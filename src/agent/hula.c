@@ -1,6 +1,7 @@
 #include "human/agent/hula.h"
 #include "human/agent/planner.h"
 #include "human/agent/dag.h"
+#include "human/agent/registry.h"
 #include "human/agent/spawn.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
@@ -9,11 +10,25 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <time.h>
 #endif
 
 #define HU_HULA_REF_EXPAND_CAP (256u * 1024u)
+
+__attribute__((unused))
+static uint64_t hula_wall_ms(void) {
+#ifdef _WIN32
+    return (uint64_t)GetTickCount64();
+#else
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+    return (uint64_t)ts.tv_sec * 1000ull + (uint64_t)ts.tv_nsec / 1000000ull;
+#endif
+}
 
 static bool hula_id_char_start(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
@@ -45,6 +60,25 @@ static size_t hula_ref_longest_match(const char *s, size_t s_rem, const hu_hula_
     return best;
 }
 
+static size_t hula_slot_key_longest_match(const hu_hula_exec_t *exec, const char *s, size_t s_rem) {
+    size_t best = 0;
+    if (!exec || !s || s_rem == 0)
+        return 0;
+    for (size_t si = 0; si < exec->slot_count; si++) {
+        const char *k = exec->slots[si].key;
+        size_t kl = exec->slots[si].key_len;
+        if (!k || kl == 0 || kl > s_rem)
+            continue;
+        if (memcmp(s, k, kl) != 0)
+            continue;
+        if (s_rem > kl && hula_id_char_cont(s[kl]))
+            continue;
+        if (kl > best)
+            best = kl;
+    }
+    return best;
+}
+
 /* Expand $node_id in JSON string values to prior node outputs (HU_HULA_DONE). */
 static hu_error_t hula_expand_dollar_refs(hu_hula_exec_t *exec, const char *in, size_t in_len,
                                           char **out, size_t *out_len) {
@@ -65,53 +99,66 @@ static hu_error_t hula_expand_dollar_refs(hu_hula_exec_t *exec, const char *in, 
     for (size_t i = 0; i < in_len;) {
         if (in[i] == '$' && i + 1 < in_len && hula_id_char_start(in[i + 1])) {
             size_t rem = in_len - (i + 1);
-            size_t idl = hula_ref_longest_match(in + i + 1, rem, exec->program);
-            if (idl > 0) {
+            size_t skl = hula_slot_key_longest_match(exec, in + i + 1, rem);
+            size_t nid = hula_ref_longest_match(in + i + 1, rem, exec->program);
+            bool use_slot = (skl >= nid && skl > 0);
+            size_t ref_len = use_slot ? skl : nid;
+            const char *rep = NULL;
+            size_t rep_len = 0;
+            if (use_slot) {
+                for (size_t si = 0; si < exec->slot_count; si++) {
+                    if (exec->slots[si].key_len == skl &&
+                        memcmp(exec->slots[si].key, in + i + 1, skl) == 0) {
+                        rep = exec->slots[si].value;
+                        rep_len = exec->slots[si].value_len;
+                        break;
+                    }
+                }
+            } else if (nid > 0) {
                 char idbuf[160];
-                if (idl >= sizeof(idbuf)) {
+                if (nid >= sizeof(idbuf)) {
                     a->free(a->ctx, buf, cap);
                     return HU_ERR_INVALID_ARGUMENT;
                 }
-                memcpy(idbuf, in + i + 1, idl);
-                idbuf[idl] = '\0';
+                memcpy(idbuf, in + i + 1, nid);
+                idbuf[nid] = '\0';
                 const hu_hula_result_t *hr = hu_hula_exec_result(exec, idbuf);
                 if (!hr || hr->status != HU_HULA_DONE || !hr->output) {
                     a->free(a->ctx, buf, cap);
                     return HU_ERR_INVALID_ARGUMENT;
                 }
-                if (hr->output_len > HU_HULA_REF_EXPAND_CAP) {
-                    a->free(a->ctx, buf, cap);
-                    return HU_ERR_INVALID_ARGUMENT;
-                }
-                size_t need = pos + hr->output_len + 1;
-                while (cap < need) {
-                    size_t oldc = cap;
-                    if (cap > SIZE_MAX / 2) {
-                        a->free(a->ctx, buf, oldc);
-                        return HU_ERR_OUT_OF_MEMORY;
-                    }
-                    cap *= 2;
-                    if (cap < need)
-                        cap = need;
-                    void *nb = a->realloc(a->ctx, buf, oldc, cap);
-                    if (!nb) {
-                        a->free(a->ctx, buf, oldc);
-                        return HU_ERR_OUT_OF_MEMORY;
-                    }
-                    buf = (char *)nb;
-                }
-                memcpy(buf + pos, hr->output, hr->output_len);
-                pos += hr->output_len;
-                if (pos > HU_HULA_REF_EXPAND_CAP) {
-                    a->free(a->ctx, buf, cap);
-                    return HU_ERR_INVALID_ARGUMENT;
-                }
-                i += 1 + idl;
-                continue;
+                rep = hr->output;
+                rep_len = hr->output_len;
             }
-            /* `$` + id-like prefix but no matching node id */
-            a->free(a->ctx, buf, cap);
-            return HU_ERR_INVALID_ARGUMENT;
+            if (!rep || ref_len == 0 || rep_len > HU_HULA_REF_EXPAND_CAP) {
+                a->free(a->ctx, buf, cap);
+                return HU_ERR_INVALID_ARGUMENT;
+            }
+            size_t need = pos + rep_len + 1;
+            while (cap < need) {
+                size_t oldc = cap;
+                if (cap > SIZE_MAX / 2) {
+                    a->free(a->ctx, buf, oldc);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                cap *= 2;
+                if (cap < need)
+                    cap = need;
+                void *nb = a->realloc(a->ctx, buf, oldc, cap);
+                if (!nb) {
+                    a->free(a->ctx, buf, oldc);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                buf = (char *)nb;
+            }
+            memcpy(buf + pos, rep, rep_len);
+            pos += rep_len;
+            if (pos > HU_HULA_REF_EXPAND_CAP) {
+                a->free(a->ctx, buf, cap);
+                return HU_ERR_INVALID_ARGUMENT;
+            }
+            i += 1 + ref_len;
+            continue;
         }
         size_t need = pos + 2;
         while (cap < need) {
@@ -184,6 +231,7 @@ static const char *const op_names[] = {
     [HU_HULA_LOOP]     = "loop",
     [HU_HULA_DELEGATE]  = "delegate",
     [HU_HULA_EMIT]     = "emit",
+    [HU_HULA_TRY]      = "try",
 };
 
 static const char *const pred_names[] = {
@@ -200,6 +248,7 @@ static const char *const status_names[] = {
     [HU_HULA_DONE]    = "done",
     [HU_HULA_FAILED]  = "failed",
     [HU_HULA_SKIPPED] = "skipped",
+    [HU_HULA_CANCELLED] = "cancelled",
 };
 
 const char *hu_hula_op_name(hu_hula_op_t op) {
@@ -213,7 +262,7 @@ const char *hu_hula_pred_name(hu_hula_pred_t pred) {
 }
 
 const char *hu_hula_status_name(hu_hula_status_t status) {
-    if ((unsigned)status <= HU_HULA_SKIPPED) return status_names[status];
+    if ((unsigned)status <= HU_HULA_CANCELLED) return status_names[status];
     return "unknown";
 }
 
@@ -241,8 +290,12 @@ static void hula_node_clear(hu_allocator_t *alloc, hu_hula_node_t *n) {
     if (n->goal)            hu_str_free(alloc, n->goal);
     if (n->delegate_model)  hu_str_free(alloc, n->delegate_model);
     if (n->emit_key)        hu_str_free(alloc, n->emit_key);
-    if (n->emit_value)      hu_str_free(alloc, n->emit_value);
-    if (n->description)     hu_str_free(alloc, n->description);
+    if (n->emit_value)           hu_str_free(alloc, n->emit_value);
+    if (n->delegate_context)     hu_str_free(alloc, n->delegate_context);
+    if (n->delegate_result_key)  hu_str_free(alloc, n->delegate_result_key);
+    if (n->delegate_agent_id)    hu_str_free(alloc, n->delegate_agent_id);
+    if (n->required_capability)   hu_str_free(alloc, n->required_capability);
+    if (n->description)        hu_str_free(alloc, n->description);
     memset(n, 0, sizeof(*n));
 }
 
@@ -359,6 +412,22 @@ static hu_hula_node_t *parse_node(hu_hula_program_t *prog, const hu_json_value_t
         n->emit_value = hu_strdup(&prog->alloc, s);
         n->emit_value_len = strlen(s);
     }
+    if ((s = hu_json_get_string(obj, "context"))) {
+        n->delegate_context = hu_strdup(&prog->alloc, s);
+        n->delegate_context_len = strlen(s);
+    }
+    if ((s = hu_json_get_string(obj, "result_key"))) {
+        n->delegate_result_key = hu_strdup(&prog->alloc, s);
+        n->delegate_result_key_len = strlen(s);
+    }
+    if ((s = hu_json_get_string(obj, "agent_id"))) {
+        n->delegate_agent_id = hu_strdup(&prog->alloc, s);
+        n->delegate_agent_id_len = strlen(s);
+    }
+    if ((s = hu_json_get_string(obj, "required_capability"))) {
+        n->required_capability = hu_strdup(&prog->alloc, s);
+        n->required_capability_len = strlen(s);
+    }
     if ((s = hu_json_get_string(obj, "pred")))
         n->pred = parse_pred(s);
     if ((s = hu_json_get_string(obj, "match"))) {
@@ -367,6 +436,9 @@ static hu_hula_node_t *parse_node(hu_hula_program_t *prog, const hu_json_value_t
     }
 
     n->max_iter = (uint32_t)hu_json_get_number(obj, "max_iter", 0);
+    n->timeout_ms = (uint32_t)hu_json_get_number(obj, "timeout_ms", 0);
+    n->retry_count = (uint32_t)hu_json_get_number(obj, "retry_count", 0);
+    n->retry_backoff_ms = (uint32_t)hu_json_get_number(obj, "retry_backoff_ms", 0);
 
     /* args: stringify sub-object to JSON string */
     hu_json_value_t *args = hu_json_object_get(obj, "args");
@@ -401,6 +473,19 @@ static hu_hula_node_t *parse_node(hu_hula_program_t *prog, const hu_json_value_t
         if (body && n->children_count == 0 && n->children_count < HU_HULA_MAX_CHILDREN) {
             hu_hula_node_t *b = parse_node(prog, body, depth + 1);
             if (b) n->children[n->children_count++] = b;
+        }
+    }
+
+    if (op == HU_HULA_TRY) {
+        hu_json_value_t *body = hu_json_object_get(obj, "body");
+        hu_json_value_t *catchv = hu_json_object_get(obj, "catch");
+        if (body && n->children_count < HU_HULA_MAX_CHILDREN) {
+            hu_hula_node_t *b = parse_node(prog, body, depth + 1);
+            if (b) n->children[n->children_count++] = b;
+        }
+        if (catchv && n->children_count < HU_HULA_MAX_CHILDREN) {
+            hu_hula_node_t *c = parse_node(prog, catchv, depth + 1);
+            if (c) n->children[n->children_count++] = c;
         }
     }
 
@@ -510,6 +595,59 @@ static hu_error_t serialize_node(hu_json_buf_t *buf, const hu_hula_node_t *n, in
         if ((err = hu_json_append_key_int(buf, "max_iter", 8, (long long)n->max_iter)) != HU_OK)
             return err;
     }
+    if (n->timeout_ms > 0) {
+        if ((err = hu_json_buf_append_raw(buf, ",", 1)) != HU_OK) return err;
+        if ((err = hu_json_append_key_int(buf, "timeout_ms", 10, (long long)n->timeout_ms)) != HU_OK)
+            return err;
+    }
+    if (n->retry_count > 0) {
+        if ((err = hu_json_buf_append_raw(buf, ",", 1)) != HU_OK) return err;
+        if ((err = hu_json_append_key_int(buf, "retry_count", 11, (long long)n->retry_count)) != HU_OK)
+            return err;
+    }
+    if (n->retry_backoff_ms > 0) {
+        if ((err = hu_json_buf_append_raw(buf, ",", 1)) != HU_OK) return err;
+        if ((err = hu_json_append_key_int(buf, "retry_backoff_ms", 16,
+                                          (long long)n->retry_backoff_ms)) != HU_OK)
+            return err;
+    }
+    if (n->delegate_context) {
+        if ((err = hu_json_buf_append_raw(buf, ",", 1)) != HU_OK) return err;
+        if ((err = hu_json_append_key_value(buf, "context", 7, n->delegate_context,
+                                             n->delegate_context_len)) != HU_OK)
+            return err;
+    }
+    if (n->delegate_result_key) {
+        if ((err = hu_json_buf_append_raw(buf, ",", 1)) != HU_OK) return err;
+        if ((err = hu_json_append_key_value(buf, "result_key", 10, n->delegate_result_key,
+                                             n->delegate_result_key_len)) != HU_OK)
+            return err;
+    }
+    if (n->delegate_agent_id) {
+        if ((err = hu_json_buf_append_raw(buf, ",", 1)) != HU_OK) return err;
+        if ((err = hu_json_append_key_value(buf, "agent_id", 8, n->delegate_agent_id,
+                                             n->delegate_agent_id_len)) != HU_OK)
+            return err;
+    }
+    if (n->required_capability) {
+        if ((err = hu_json_buf_append_raw(buf, ",", 1)) != HU_OK) return err;
+        if ((err = hu_json_append_key_value(buf, "required_capability", 19, n->required_capability,
+                                             n->required_capability_len)) != HU_OK)
+            return err;
+    }
+    if (n->op == HU_HULA_TRY) {
+        if (n->children_count > 0) {
+            if ((err = hu_json_buf_append_raw(buf, ",", 1)) != HU_OK) return err;
+            if ((err = hu_json_append_key(buf, "body", 4)) != HU_OK) return err;
+            if ((err = serialize_node(buf, n->children[0], depth + 1)) != HU_OK) return err;
+        }
+        if (n->children_count > 1) {
+            if ((err = hu_json_buf_append_raw(buf, ",", 1)) != HU_OK) return err;
+            if ((err = hu_json_append_key(buf, "catch", 5)) != HU_OK) return err;
+            if ((err = serialize_node(buf, n->children[1], depth + 1)) != HU_OK) return err;
+        }
+        return hu_json_buf_append_raw(buf, "}", 1);
+    }
     if (n->children_count > 0) {
         if ((err = hu_json_buf_append_raw(buf, ",", 1)) != HU_OK) return err;
         if ((err = serialize_children(buf, n, depth)) != HU_OK) return err;
@@ -607,6 +745,10 @@ static void validate_node(const hu_hula_node_t *n, hu_allocator_t *alloc,
         if (!n->emit_key || n->emit_key_len == 0)
             add_diag(v, alloc, n, "emit node missing key");
         break;
+    case HU_HULA_TRY:
+        if (n->children_count < 1)
+            add_diag(v, alloc, n, "try needs a body child");
+        break;
     default:
         add_diag(v, alloc, n, "unknown opcode");
         break;
@@ -690,6 +832,38 @@ void hu_hula_exec_set_spawn(hu_hula_exec_t *exec, struct hu_agent_pool *pool,
     exec->spawn_cfg = spawn_cfg;
 }
 
+void hu_hula_exec_set_delegate_registry(hu_hula_exec_t *exec, struct hu_agent_registry *registry) {
+    if (!exec)
+        return;
+    exec->delegate_registry = registry;
+}
+
+void hu_hula_exec_cancel(hu_hula_exec_t *exec, const char *reason, size_t reason_len) {
+    if (!exec)
+        return;
+    exec->halted = true;
+    if (exec->halt_reason)
+        exec->alloc.free(exec->alloc.ctx, exec->halt_reason, exec->halt_reason_len + 1);
+    exec->halt_reason = NULL;
+    exec->halt_reason_len = 0;
+    if (reason && reason_len > 0) {
+        exec->halt_reason = hu_strndup(&exec->alloc, reason, reason_len);
+        if (exec->halt_reason)
+            exec->halt_reason_len = reason_len;
+    }
+}
+
+void hu_hula_exec_set_budget(hu_hula_exec_t *exec, uint32_t max_depth, uint32_t max_wall_ms,
+                             uint32_t max_tool_calls) {
+    if (!exec)
+        return;
+    exec->budget_max_depth = max_depth;
+    exec->budget_max_wall_ms = max_wall_ms;
+    exec->budget_max_tool_calls = max_tool_calls;
+    exec->budget_enabled =
+        (max_depth > 0) || (max_wall_ms > 0) || (max_tool_calls > 0);
+}
+
 static size_t node_index(const hu_hula_program_t *prog, const hu_hula_node_t *n) {
     return (size_t)(n - prog->nodes);
 }
@@ -708,13 +882,65 @@ static hu_tool_t *find_tool(hu_tool_t *tools, size_t count, const char *name) {
     return NULL;
 }
 
-static hu_error_t exec_node(hu_hula_exec_t *exec, hu_hula_node_t *n);
+static hu_error_t exec_node_depth(hu_hula_exec_t *exec, hu_hula_node_t *n, int depth);
+static hu_error_t exec_dispatch(hu_hula_exec_t *exec, hu_hula_node_t *n, int depth);
+
+static void hula_result_reset(hu_hula_exec_t *exec, hu_hula_node_t *n) {
+    hu_hula_result_t *r = result_for(exec, n);
+    if (!r)
+        return;
+    if (r->output) {
+        exec->alloc.free(exec->alloc.ctx, r->output, r->output_len + 1);
+        r->output = NULL;
+    }
+    if (r->error) {
+        exec->alloc.free(exec->alloc.ctx, r->error, r->error_len + 1);
+        r->error = NULL;
+    }
+    memset(r, 0, sizeof(*r));
+}
+
+static hu_error_t hula_slot_set(hu_hula_exec_t *exec, const char *key, size_t key_len,
+                                const char *val, size_t val_len) {
+    if (!exec || !key || key_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    for (size_t i = 0; i < exec->slot_count; i++) {
+        if (exec->slots[i].key_len == key_len && memcmp(exec->slots[i].key, key, key_len) == 0) {
+            if (exec->slots[i].value)
+                exec->alloc.free(exec->alloc.ctx, exec->slots[i].value,
+                                 exec->slots[i].value_len + 1);
+            exec->slots[i].value =
+                val_len > 0 ? hu_strndup(&exec->alloc, val, val_len) : hu_strdup(&exec->alloc, "");
+            exec->slots[i].value_len = val_len;
+            return (exec->slots[i].value) ? HU_OK : HU_ERR_OUT_OF_MEMORY;
+        }
+    }
+    if (exec->slot_count >= HU_HULA_MAX_SLOTS)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_hula_slot_t *sl = &exec->slots[exec->slot_count];
+    sl->key = hu_strndup(&exec->alloc, key, key_len);
+    sl->key_len = key_len;
+    sl->value = val_len > 0 ? hu_strndup(&exec->alloc, val, val_len) : hu_strdup(&exec->alloc, "");
+    sl->value_len = val_len;
+    if (!sl->key || !sl->value)
+        return HU_ERR_OUT_OF_MEMORY;
+    exec->slot_count++;
+    return HU_OK;
+}
 
 static void set_result(hu_hula_exec_t *exec, hu_hula_node_t *n, hu_hula_status_t status,
-                        const char *output, size_t output_len,
-                        const char *error, size_t error_len) {
+                       const char *output, size_t output_len, const char *error, size_t error_len) {
     hu_hula_result_t *r = result_for(exec, n);
-    if (!r) return;
+    if (!r)
+        return;
+    if (r->output) {
+        exec->alloc.free(exec->alloc.ctx, r->output, r->output_len + 1);
+        r->output = NULL;
+    }
+    if (r->error) {
+        exec->alloc.free(exec->alloc.ctx, r->error, r->error_len + 1);
+        r->error = NULL;
+    }
     r->status = status;
     if (output && output_len > 0)
         r->output = hu_strndup(&exec->alloc, output, output_len);
@@ -834,6 +1060,15 @@ static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
             return HU_OK;
         }
     }
+
+    if (exec->budget_enabled && exec->budget_max_tool_calls > 0 &&
+        exec->budget_tool_calls_used >= exec->budget_max_tool_calls) {
+        set_result(exec, n, HU_HULA_FAILED, NULL, 0, "hula budget: tool call limit exceeded",
+                   strlen("hula budget: tool call limit exceeded"));
+        return HU_OK;
+    }
+    if (exec->budget_enabled && exec->budget_max_tool_calls > 0)
+        exec->budget_tool_calls_used++;
 
     hu_tool_t *tool = find_tool(exec->tools, exec->tools_count, n->tool_name);
     if (!tool) {

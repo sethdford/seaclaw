@@ -44,6 +44,9 @@ targets:
     platform: iOS
     sources:
       - Sources/HumanWidgetExtension
+    dependencies:
+      - package: HumanKit
+        product: HumanChatUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.human.ios.widget

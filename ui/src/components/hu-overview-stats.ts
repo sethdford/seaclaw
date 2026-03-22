@@ -14,7 +14,7 @@ export interface StatMetric {
 export interface MetricRowItem {
   label: string;
   value: string;
-  accent?: "success" | "error";
+  accent?: "success" | "error" | "tertiary";
   countTarget?: number;
 }
 
@@ -45,6 +45,7 @@ export class ScOverviewStats extends LitElement {
                 .valueStr=${m.valueStr ?? ""}
                 .label=${m.label}
                 .sparklineData=${m.sparklineData ?? []}
+                .sparklineColor=${"var(--hu-accent-tertiary)"}
                 .countUp=${this.countUp}
                 style="--hu-stagger-delay: ${i * 50}ms"
               ></hu-stat-card>

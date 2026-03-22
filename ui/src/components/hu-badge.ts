@@ -46,8 +46,8 @@ export class ScBadge extends LitElement {
     }
 
     .badge.variant-info {
-      background: var(--hu-info-dim);
-      color: var(--hu-info);
+      background: var(--hu-accent-tertiary-subtle);
+      color: var(--hu-accent-tertiary);
     }
 
     .dot {
@@ -70,7 +70,7 @@ export class ScBadge extends LitElement {
       background: var(--hu-error);
     }
     .variant-info .dot {
-      background: var(--hu-info);
+      background: var(--hu-accent-tertiary);
     }
   `;
 

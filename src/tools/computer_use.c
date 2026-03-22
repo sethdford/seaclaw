@@ -51,6 +51,7 @@ static bool cu_autonomy_allows(hu_computer_use_ctx_t *c) {
 }
 #endif
 
+__attribute__((unused))
 static char *cu_dup_json(hu_allocator_t *alloc, const char *s, size_t len) {
     char *p = (char *)alloc->alloc(alloc->ctx, len + 1);
     if (!p)
@@ -1048,7 +1049,8 @@ static hu_error_t computer_use_execute(void *ctx, hu_allocator_t *alloc, const h
     return HU_OK;
 
 #else
-
+    (void)c;
+    (void)args;
     *out = hu_tool_result_fail("computer_use requires macOS or Linux with X11/XTest", 52);
     return HU_OK;
 

@@ -60,11 +60,18 @@ typedef struct hu_security_policy {
     hu_sandbox_t *sandbox;
     hu_net_proxy_t *net_proxy;
     bool pre_approved; /* set by agent before re-executing an approved tool */
+    /* Comma-separated capability tokens granted for HuLa `required_capability` nodes (exact match).
+     * NULL = no HuLa capabilities granted when a node declares required_capability. */
+    const char *hula_capability_allowlist;
 } hu_security_policy_t;
 
 bool hu_security_path_allowed(const hu_security_policy_t *policy, const char *path,
                               size_t path_len);
 bool hu_security_shell_allowed(const hu_security_policy_t *policy);
+
+/** HuLa: true if `cap` is listed in policy->hula_capability_allowlist (comma-separated, exact token). */
+bool hu_policy_hula_capability_allowed(const hu_security_policy_t *policy, const char *cap,
+                                     size_t cap_len);
 
 hu_command_risk_level_t hu_policy_command_risk_level(const hu_security_policy_t *policy,
                                                      const char *command);

@@ -223,6 +223,18 @@ describe("hu-input", () => {
     expect(el.value).toBe("");
     expect(el.type).toBe("text");
     expect(el.size).toBe("md");
+    expect(el.variant).toBe("");
+  });
+
+  it("should reflect variant attribute", async () => {
+    const { ScInput } = await import("./hu-input.js");
+    const el = new ScInput();
+    document.body.appendChild(el);
+    el.setAttribute("variant", "tonal");
+    await el.updateComplete;
+    expect(el.variant).toBe("tonal");
+    expect(el.getAttribute("variant")).toBe("tonal");
+    document.body.removeChild(el);
   });
 
   it("should fire hu-input event on input", async () => {

@@ -23,7 +23,7 @@ struct hu_spawn_config;
  * output and vtable dispatch.
  *
  * Design principles:
- *   - 7 opcodes, no more. Small grammar, growing vocabulary.
+ *   - 8 opcodes, no more. Small grammar, growing vocabulary.
  *   - Machine-checkable: parse → validate → policy → execute.
  *   - Compiles from natural language (or traces) into the IR.
  *   - Maps 1:1 to existing vtable dispatch (tools, channels, memory).
@@ -37,6 +37,7 @@ struct hu_spawn_config;
  *   LOOP      — repeat body while predicate holds (bounded)
  *   DELEGATE  — spawn a sub-agent with a goal string
  *   EMIT      — produce a named output (return value, side-channel message)
+ *   TRY       — run body child; on failure optionally run catch child
  *
  * Wire format: JSON (parse/serialize), with a compact text notation for
  * human-readable debugging.
@@ -55,6 +56,7 @@ typedef enum hu_hula_op {
     HU_HULA_LOOP,
     HU_HULA_DELEGATE,
     HU_HULA_EMIT,
+    HU_HULA_TRY,
     HU_HULA_OP_COUNT,
 } hu_hula_op_t;
 
@@ -95,6 +97,23 @@ struct hu_hula_node {
     char *emit_value;       /* owned; template, may reference $node_id */
     size_t emit_value_len;
 
+    /* Execution hints (any opcode) */
+    uint32_t timeout_ms;       /* 0 = no per-node wall limit */
+    uint32_t retry_count;       /* extra attempts after first failure */
+    uint32_t retry_backoff_ms; /* delay between retries (skipped in HU_IS_TEST) */
+
+    /* DELEGATE: structured handoff / fleet */
+    char *delegate_context; /* owned; prepended to child system prompt */
+    size_t delegate_context_len;
+    char *delegate_result_key; /* owned; if set, DONE output is stored as a named slot */
+    size_t delegate_result_key_len;
+    char *delegate_agent_id; /* owned; optional registry agent name for spawn_named */
+    size_t delegate_agent_id_len;
+
+    /* Policy: node requires this capability token in policy->hula_capability_allowlist */
+    char *required_capability; /* owned */
+    size_t required_capability_len;
+
     /* Tree structure */
     hu_hula_node_t *children[HU_HULA_MAX_CHILDREN];
     size_t children_count;
@@ -123,6 +142,7 @@ typedef enum hu_hula_status {
     HU_HULA_DONE,
     HU_HULA_FAILED,
     HU_HULA_SKIPPED,
+    HU_HULA_CANCELLED,
 } hu_hula_status_t;
 
 typedef struct hu_hula_result {
@@ -132,6 +152,17 @@ typedef struct hu_hula_result {
     char *error;            /* owned */
     size_t error_len;
 } hu_hula_result_t;
+
+#define HU_HULA_MAX_SLOTS 64
+
+typedef struct hu_hula_slot {
+    char *key;   /* owned */
+    size_t key_len;
+    char *value; /* owned */
+    size_t value_len;
+} hu_hula_slot_t;
+
+struct hu_agent_registry;
 
 /* Execution state for a running program */
 typedef struct hu_hula_exec {
@@ -152,6 +183,16 @@ typedef struct hu_hula_exec {
     bool halted;
     char *halt_reason;              /* owned */
     size_t halt_reason_len;
+    hu_hula_slot_t slots[HU_HULA_MAX_SLOTS];
+    size_t slot_count;
+    /* Optional budget (set via hu_hula_exec_set_budget); 0 = unlimited per field */
+    bool budget_enabled;
+    uint32_t budget_max_depth;      /* execution depth from root; 0 = unlimited */
+    uint32_t budget_max_wall_ms;    /* wall clock since hu_hula_exec_run; 0 = unlimited */
+    uint32_t budget_max_tool_calls; /* HU_HULA_CALL invocations; 0 = unlimited */
+    uint64_t budget_run_start_ms;
+    uint32_t budget_tool_calls_used;
+    struct hu_agent_registry *delegate_registry; /* optional; for delegate_agent_id */
 } hu_hula_exec_t;
 
 /* Validation diagnostics */
@@ -212,6 +253,16 @@ hu_error_t hu_hula_exec_init_full(hu_hula_exec_t *exec, hu_allocator_t alloc,
 /* Optional: enable delegate opcode to use hu_agent_pool_spawn (non-test builds). */
 void hu_hula_exec_set_spawn(hu_hula_exec_t *exec, struct hu_agent_pool *pool,
                             struct hu_spawn_config *spawn_cfg);
+
+/* Optional: registry for delegate nodes with delegate_agent_id (spawn_named). */
+void hu_hula_exec_set_delegate_registry(hu_hula_exec_t *exec, struct hu_agent_registry *registry);
+
+/* Optional: stop execution; in-flight nodes complete as cancelled. */
+void hu_hula_exec_cancel(hu_hula_exec_t *exec, const char *reason, size_t reason_len);
+
+/* Optional: enforce max depth, wall time, and tool-call count (0 = unlimited each). */
+void hu_hula_exec_set_budget(hu_hula_exec_t *exec, uint32_t max_depth, uint32_t max_wall_ms,
+                             uint32_t max_tool_calls);
 
 /* Run the program to completion. */
 hu_error_t hu_hula_exec_run(hu_hula_exec_t *exec);

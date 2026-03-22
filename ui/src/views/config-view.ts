@@ -103,14 +103,14 @@ export class ScConfigView extends GatewayAwareLitElement {
         border: 1px solid var(--hu-border);
         border-radius: var(--hu-radius);
         overflow: hidden;
-        background: var(--hu-bg-elevated);
+        background: var(--hu-surface-container);
       }
       .section + .section {
         margin-top: var(--hu-space-sm);
       }
       .section-header {
         padding: var(--hu-space-md) var(--hu-space-md);
-        background: var(--hu-bg-elevated);
+        background: var(--hu-surface-container);
         cursor: pointer;
         display: flex;
         align-items: center;

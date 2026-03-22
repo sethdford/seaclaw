@@ -2,6 +2,7 @@
 import ActivityKit
 import SwiftUI
 import WidgetKit
+import HumanChatUI
 
 struct HumanChatAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
@@ -22,7 +23,7 @@ struct HumanLiveActivity: Widget {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(context.state.isProcessing ? Color(red: 122/255, green: 182/255, blue: 72/255) : Color(red: 138/255, green: 160/255, blue: 184/255))
+                            .fill(context.state.isProcessing ? HUTokens.Dark.accent : HUTokens.Dark.textMuted)
                             .frame(width: 8, height: 8)
                         Text(context.attributes.sessionName)
                             .font(.custom("Avenir-Heavy", size: 14))
@@ -49,7 +50,7 @@ struct HumanLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(context.state.isProcessing ? Color(red: 122/255, green: 182/255, blue: 72/255) : Color(red: 138/255, green: 160/255, blue: 184/255))
+                            .fill(context.state.isProcessing ? HUTokens.Dark.accent : HUTokens.Dark.textMuted)
                             .frame(width: 8, height: 8)
                         Text(context.attributes.channelName)
                             .font(.custom("Avenir-Medium", size: 12))
@@ -68,14 +69,14 @@ struct HumanLiveActivity: Widget {
                 }
             } compactLeading: {
                 Circle()
-                    .fill(context.state.isProcessing ? Color(red: 122/255, green: 182/255, blue: 72/255) : Color(red: 138/255, green: 160/255, blue: 184/255))
+                    .fill(context.state.isProcessing ? HUTokens.Dark.accent : HUTokens.Dark.textMuted)
                     .frame(width: 10, height: 10)
             } compactTrailing: {
                 Text("\(context.state.messageCount)")
                     .font(.custom("Avenir-Heavy", size: 14))
             } minimal: {
                 Circle()
-                    .fill(context.state.isProcessing ? Color(red: 122/255, green: 182/255, blue: 72/255) : Color(red: 138/255, green: 160/255, blue: 184/255))
+                    .fill(context.state.isProcessing ? HUTokens.Dark.accent : HUTokens.Dark.textMuted)
                     .frame(width: 10, height: 10)
             }
         }

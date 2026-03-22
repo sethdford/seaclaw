@@ -548,3 +548,29 @@ bool hu_policy_is_rate_limited(const hu_security_policy_t *policy) {
         return false;
     return hu_rate_tracker_is_limited(policy->tracker);
 }
+
+bool hu_policy_hula_capability_allowed(const hu_security_policy_t *policy, const char *cap,
+                                       size_t cap_len) {
+    if (!cap || cap_len == 0)
+        return true;
+    if (!policy || !policy->hula_capability_allowlist)
+        return false;
+    const char *p = policy->hula_capability_allowlist;
+    while (*p) {
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (!*p)
+            break;
+        const char *start = p;
+        while (*p && *p != ',')
+            p++;
+        size_t tok_len = (size_t)(p - start);
+        while (tok_len > 0 && (start[tok_len - 1] == ' ' || start[tok_len - 1] == '\t'))
+            tok_len--;
+        if (tok_len == cap_len && memcmp(start, cap, cap_len) == 0)
+            return true;
+        if (*p == ',')
+            p++;
+    }
+    return false;
+}

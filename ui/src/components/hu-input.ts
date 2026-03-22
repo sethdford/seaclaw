@@ -12,6 +12,7 @@ export class ScInput extends LitElement {
   @property({ type: String }) type = "text";
   @property({ type: Boolean }) disabled = false;
   @property({ type: String }) error = "";
+  @property({ type: String, reflect: true }) variant = "";
   @property({ type: String }) size: InputSize = "md";
   @property({ type: Number }) min?: number;
   @property({ type: Number }) max?: number;
@@ -56,6 +57,12 @@ export class ScInput extends LitElement {
         background var(--hu-duration-fast) var(--hu-ease-out);
     }
 
+    :host([variant="tonal"]) input,
+    :host([variant="tonal"]) textarea {
+      background: var(--hu-surface-container);
+      border-color: var(--hu-surface-container-high);
+    }
+
     input::placeholder {
       color: var(--hu-text-muted);
     }
@@ -68,6 +75,7 @@ export class ScInput extends LitElement {
       border-color: var(--hu-accent);
       outline: var(--hu-focus-ring-width) solid var(--hu-focus-ring);
       outline-offset: var(--hu-focus-ring-offset);
+      box-shadow: 0 0 12px var(--hu-focus-glow);
     }
 
     input.error {

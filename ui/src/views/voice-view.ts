@@ -71,9 +71,11 @@ export class ScVoiceView extends GatewayAwareLitElement {
         padding: var(--hu-space-xs) var(--hu-space-md);
         font-size: var(--hu-text-xs);
         color: var(--hu-text-secondary);
-        background: color-mix(in srgb, var(--hu-bg-surface) 60%, transparent);
-        backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
-        -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px));
+        background: color-mix(in srgb, var(--hu-surface-container) 60%, transparent);
+        backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
+          saturate(var(--hu-glass-subtle-saturate, 120%));
+        -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
+          saturate(var(--hu-glass-subtle-saturate, 120%));
         border-bottom: 1px solid var(--hu-border-subtle);
         flex-shrink: 0;
       }
@@ -138,7 +140,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
         align-items: flex-end;
         width: 100%;
         padding: var(--hu-space-md);
-        background: var(--hu-bg-surface);
+        background: var(--hu-surface-container);
         background-image: var(--hu-surface-gradient);
         border: 1px solid var(--hu-border);
         border-radius: var(--hu-radius-lg);
@@ -195,7 +197,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
         .input-row {
           backdrop-filter: none;
           -webkit-backdrop-filter: none;
-          background: var(--hu-bg-surface);
+          background: var(--hu-surface-container);
         }
       }
     `,

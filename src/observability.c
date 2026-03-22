@@ -125,6 +125,30 @@ static void log_record_event(void *ctx, const hu_observer_event_t *event) {
                 (double)event->data.metacog_action.confidence,
                 (double)event->data.metacog_action.coherence);
         break;
+    case HU_OBSERVER_EVENT_HULA_NODE_START:
+        fprintf(f, "hula.node_start id=%s op=%s\n",
+                HU_STR(event->data.hula_node_start.node_id),
+                HU_STR(event->data.hula_node_start.op_name));
+        break;
+    case HU_OBSERVER_EVENT_HULA_NODE_END:
+        fprintf(f, "hula.node_end id=%s op=%s status=%s elapsed_ms=%llu\n",
+                HU_STR(event->data.hula_node_end.node_id),
+                HU_STR(event->data.hula_node_end.op_name),
+                HU_STR(event->data.hula_node_end.status),
+                (unsigned long long)event->data.hula_node_end.elapsed_ms);
+        break;
+    case HU_OBSERVER_EVENT_HULA_NODE_OUTPUT:
+        fprintf(f, "hula.node_output id=%s output_len=%zu\n",
+                HU_STR(event->data.hula_node_output.node_id),
+                event->data.hula_node_output.output_len);
+        break;
+    case HU_OBSERVER_EVENT_HULA_PROGRAM_END:
+        fprintf(f, "hula.program_end name=%s success=%s total_ms=%llu nodes=%zu\n",
+                HU_STR(event->data.hula_program_end.program_name),
+                event->data.hula_program_end.success ? "true" : "false",
+                (unsigned long long)event->data.hula_program_end.total_ms,
+                event->data.hula_program_end.node_count);
+        break;
     }
 }
 

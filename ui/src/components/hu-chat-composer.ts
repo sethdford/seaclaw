@@ -88,7 +88,7 @@ export class ScChatComposer extends LitElement {
       flex-direction: column;
       gap: var(--hu-space-xs);
       padding: var(--hu-space-sm) var(--hu-space-md);
-      background: color-mix(in srgb, var(--hu-bg-surface) 65%, transparent);
+      background: color-mix(in srgb, var(--hu-surface-container) 65%, transparent);
       backdrop-filter: blur(var(--hu-space-md));
       -webkit-backdrop-filter: blur(var(--hu-space-md));
       border: 1px solid var(--hu-border-subtle);
@@ -313,7 +313,7 @@ export class ScChatComposer extends LitElement {
       bottom: 100%;
       left: var(--hu-space-md);
       margin-bottom: var(--hu-space-xs);
-      background: var(--hu-bg-surface);
+      background: var(--hu-surface-container);
       border: 1px solid var(--hu-border);
       border-radius: var(--hu-radius-lg);
       box-shadow: var(--hu-shadow-md);
@@ -521,7 +521,7 @@ export class ScChatComposer extends LitElement {
       .composer {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
-        background: var(--hu-bg-surface);
+        background: var(--hu-surface-container);
       }
     }
     @container (max-width: 640px) /* --hu-breakpoint-md */ {

@@ -64,7 +64,7 @@ export class ScToolsView extends GatewayAwareLitElement {
       .expand-panel {
         margin-top: var(--hu-space-md);
         padding: var(--hu-space-md);
-        background: var(--hu-bg-elevated);
+        background: var(--hu-surface-container);
         border: 1px solid var(--hu-border-subtle);
         border-radius: var(--hu-radius);
       }

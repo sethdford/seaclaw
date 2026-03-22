@@ -108,11 +108,13 @@ export class ScOverviewView extends GatewayAwareLitElement {
         color: var(--hu-text-muted);
 
         & .update-link {
-          color: var(--hu-accent-text, var(--hu-accent));
+          color: var(--hu-accent-tertiary-text);
           text-decoration: none;
+          text-decoration-color: var(--hu-accent-tertiary-subtle);
           font-weight: var(--hu-weight-medium);
 
           &:hover {
+            color: var(--hu-accent-tertiary-hover);
             text-decoration: underline;
           }
         }
@@ -164,7 +166,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
         font-weight: var(--hu-weight-semibold);
         letter-spacing: var(--hu-tracking-xs);
         text-transform: uppercase;
-        color: var(--hu-accent-text, var(--hu-accent));
+        color: var(--hu-accent-tertiary-text);
         margin-bottom: var(--hu-space-sm);
       }
 
@@ -315,19 +317,22 @@ export class ScOverviewView extends GatewayAwareLitElement {
         padding: var(--hu-space-2xs) var(--hu-space-sm);
         font-size: var(--hu-text-xs);
         font-weight: var(--hu-weight-medium);
-        color: var(--hu-accent-text, var(--hu-accent));
+        color: var(--hu-accent-tertiary-text);
         background: transparent;
         border: none;
         border-radius: var(--hu-radius-sm);
         cursor: pointer;
         font-family: var(--hu-font);
-        transition: background var(--hu-duration-fast) var(--hu-ease-out);
+        transition:
+          background var(--hu-duration-fast) var(--hu-ease-out),
+          color var(--hu-duration-fast) var(--hu-ease-out);
       }
       .show-more-btn:hover {
         background: var(--hu-hover-overlay);
+        color: var(--hu-accent-tertiary-hover);
       }
       .show-more-btn:focus-visible {
-        outline: 2px solid var(--hu-accent);
+        outline: 2px solid var(--hu-accent-tertiary);
         outline-offset: 2px;
       }
       @container (max-width: 768px) {
@@ -694,10 +699,15 @@ export class ScOverviewView extends GatewayAwareLitElement {
       },
     ];
     const metricRowItems = [
-      { label: "Sessions Today", value: String(this.sessions.length) },
+      {
+        label: "Sessions Today",
+        value: String(this.sessions.length),
+        accent: "tertiary" as const,
+      },
       {
         label: "Channels Active",
         value: String(this.channels.filter((c) => c.configured).length),
+        accent: "tertiary" as const,
       },
       {
         label: "Status",

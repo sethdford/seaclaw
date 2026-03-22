@@ -257,6 +257,41 @@ object HUTokens {
     val glassFocusGlowSpread = 8.dp
     val glassPressBlurDelta = -4.dp
 
+    // Chart / Data Visualization
+    val chartBrand = Color(0xFF7AB648)
+    val chartCategorical1 = Color(0xFF7AB648)
+    val chartCategorical10 = Color(0xFF009BDE)
+    val chartCategorical11 = Color(0xFF9D61CC)
+    val chartCategorical12 = Color(0xFFC2CD23)
+    val chartCategorical13 = Color(0xFFF0D202)
+    val chartCategorical14 = Color(0xFFFF6800)
+    val chartCategorical15 = Color(0xFFCC0000)
+    val chartCategorical16 = Color(0xFF2B89CB)
+    val chartCategorical2 = Color(0xFF4A6FA5)
+    val chartCategorical3 = Color(0xFFF59E0B)
+    val chartCategorical4 = Color(0xFFF97066)
+    val chartCategorical5 = Color(0xFF14B8A6)
+    val chartCategorical6 = Color(0xFF9FB8D9)
+    val chartCategorical7 = Color(0xFFFCD34D)
+    val chartCategorical8 = Color(0xFFA3D46A)
+    val chartCategorical9 = Color(0xFF00703C)
+    val chartDivergingNegative = Color(0xFFF97066)
+    val chartDivergingNeutral = Color(0xFF8A847E)
+    val chartDivergingPositive = Color(0xFF7AB648)
+    val chartSequential100 = Color(0xFFE2F2C8)
+    val chartSequential200 = Color(0xFFC5E59A)
+    val chartSequential300 = Color(0xFFA3D46A)
+    val chartSequential400 = Color(0xFF8DC63F)
+    val chartSequential500 = Color(0xFF7AB648)
+    val chartSequential600 = Color(0xFF5A9A30)
+    val chartSequential700 = Color(0xFF3A6A24)
+    val chartSequential800 = Color(0xFF366320)
+    val chartStatusError = Color(0xFFF97066)
+    val chartStatusInfo = Color(0xFF4A6FA5)
+    val chartStatusMuted = Color(0xFF8A847E)
+    val chartStatusSuccess = Color(0xFF7AB648)
+    val chartStatusWarning = Color(0xFFF59E0B)
+
     // Haptic Feedback
     enum class HapticType {
         LIGHT, MEDIUM, HEAVY, SUCCESS, WARNING, SELECTION;

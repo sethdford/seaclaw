@@ -106,7 +106,7 @@ export class ScLogsView extends GatewayAwareLitElement {
       }
       .filter-input {
         padding: var(--hu-space-sm) var(--hu-space-md);
-        background: var(--hu-bg-surface);
+        background: var(--hu-surface-container);
         border: 1px solid var(--hu-border);
         border-radius: var(--hu-radius);
         color: var(--hu-text);

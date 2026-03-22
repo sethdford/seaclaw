@@ -88,6 +88,8 @@ export class ScSidebar extends LitElement {
       width: var(--hu-sidebar-width);
       min-width: var(--hu-sidebar-width);
       contain: layout style;
+      /* Glass-standard equivalent — uses tokens directly because :host
+         can't receive utility classes from theme.css light DOM */
       background: color-mix(
         in srgb,
         var(--hu-bg-surface) var(--hu-glass-standard-bg-opacity, 8%),

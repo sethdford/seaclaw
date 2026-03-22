@@ -56,6 +56,10 @@ static void metrics_record_event(void *ctx, const hu_observer_event_t *event) {
         break;
     case HU_OBSERVER_EVENT_COGNITION_MODE:
     case HU_OBSERVER_EVENT_METACOG_ACTION:
+    case HU_OBSERVER_EVENT_HULA_NODE_START:
+    case HU_OBSERVER_EVENT_HULA_NODE_END:
+    case HU_OBSERVER_EVENT_HULA_NODE_OUTPUT:
+    case HU_OBSERVER_EVENT_HULA_PROGRAM_END:
         break;
     }
 }

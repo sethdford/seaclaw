@@ -21,6 +21,10 @@ typedef enum hu_observer_event_tag {
     HU_OBSERVER_EVENT_ERR,
     HU_OBSERVER_EVENT_COGNITION_MODE,
     HU_OBSERVER_EVENT_METACOG_ACTION,
+    HU_OBSERVER_EVENT_HULA_NODE_START,
+    HU_OBSERVER_EVENT_HULA_NODE_END,
+    HU_OBSERVER_EVENT_HULA_NODE_OUTPUT,
+    HU_OBSERVER_EVENT_HULA_PROGRAM_END,
 } hu_observer_event_tag_t;
 
 typedef struct hu_observer_event {
@@ -75,6 +79,27 @@ typedef struct hu_observer_event {
             float confidence;
             float coherence;
         } metacog_action;
+        struct {
+            const char *node_id;
+            const char *op_name;
+        } hula_node_start;
+        struct {
+            const char *node_id;
+            const char *op_name;
+            const char *status;
+            uint64_t elapsed_ms;
+        } hula_node_end;
+        struct {
+            const char *node_id;
+            const char *output;
+            size_t output_len;
+        } hula_node_output;
+        struct {
+            const char *program_name;
+            bool success;
+            uint64_t total_ms;
+            size_t node_count;
+        } hula_program_end;
     } data;
 } hu_observer_event_t;
 

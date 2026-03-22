@@ -49,6 +49,9 @@ export class ScMetricRow extends LitElement {
       &.error {
         color: var(--hu-error);
       }
+      &.tertiary {
+        color: var(--hu-accent-tertiary-text);
+      }
     }
 
     @container (max-width: 480px) /* --hu-breakpoint-sm */ {

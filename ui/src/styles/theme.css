@@ -15,7 +15,7 @@
   --hu-glass-card-bg-mix: 65%;
   --hu-surface: var(--hu-bg-surface);
   --hu-overlay: var(--hu-color-overlay, rgb(0 0 0 / 0.6));
-  --hu-focus-glow: rgb(59 130 246 / 0.15);
+  --hu-focus-glow: color-mix(in srgb, var(--hu-accent) 15%, transparent);
   --hu-glass-text-shadow-color: rgb(0 0 0 / 0.5);
   --hu-glass-hover-border: rgb(255 255 255 / 0.08);
   --hu-accent-glow: color-mix(in srgb, var(--hu-accent) 35%, transparent);
@@ -1672,8 +1672,8 @@ dd {
 
 .hu-shadow-warm {
   box-shadow:
-    0 4px 16px rgba(200, 160, 80, 0.1),
-    0 8px 32px rgba(200, 160, 80, 0.06);
+    0 4px 16px color-mix(in srgb, var(--hu-accent-secondary) 10%, transparent),
+    0 8px 32px color-mix(in srgb, var(--hu-accent-secondary) 6%, transparent);
 }
 
 .hu-shadow-glass {
@@ -1681,6 +1681,41 @@ dd {
     0 4px 16px color-mix(in srgb, var(--hu-bg) 30%, transparent),
     0 1px 0 inset color-mix(in srgb, var(--hu-color-white) 8%, transparent),
     0 -1px 0 inset color-mix(in srgb, var(--hu-color-white) 3%, transparent);
+}
+
+.hu-link-structural {
+  color: var(--hu-accent-tertiary-text);
+  text-decoration-color: var(--hu-accent-tertiary-subtle);
+}
+
+.hu-link-structural:hover {
+  color: var(--hu-accent-tertiary-hover);
+}
+
+/* Layered interactive states — apply to list items, cards, rows */
+.hu-interactive {
+  transition:
+    background var(--hu-duration-fast) var(--hu-ease-out),
+    border-color var(--hu-duration-fast) var(--hu-ease-out),
+    box-shadow var(--hu-duration-fast) var(--hu-ease-out);
+}
+
+.hu-interactive:hover {
+  background: var(--hu-hover-overlay);
+  border-color: color-mix(in srgb, var(--hu-border) 80%, var(--hu-accent) 20%);
+}
+
+.hu-interactive:active {
+  background: var(--hu-pressed-overlay);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--hu-accent) 8%, transparent);
+}
+
+.hu-interactive-subtle:hover {
+  background: color-mix(in srgb, var(--hu-hover-overlay) 50%, transparent);
+}
+
+.hu-interactive-subtle:active {
+  background: var(--hu-hover-overlay);
 }
 
 .hu-cv-defer {

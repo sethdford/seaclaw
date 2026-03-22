@@ -1228,6 +1228,34 @@ function generateSwift(tokens: TokenMap): string {
   }
   lines.push("");
 
+  // Chart / Data visualization (hex or rgb/rgba only)
+  lines.push("    // MARK: - Chart / Data Visualization");
+  const chartKeysSwift = Object.keys(tokens)
+    .filter((k) => k.startsWith("chart."))
+    .sort();
+  for (const k of chartKeysSwift) {
+    const v = tokens[k];
+    if (typeof v !== "string") continue;
+    const vTrim = v.trim();
+    if (
+      !/^#[0-9a-fA-F]{6}$/.test(v) &&
+      !/^rgba?\(/i.test(vTrim)
+    ) {
+      continue;
+    }
+    const suffix = k.replace(/^chart\./, "");
+    const name =
+      "chart" +
+      suffix
+        .split(".")
+        .map((p) =>
+          /^\d+$/.test(p) ? p : p.charAt(0).toUpperCase() + p.slice(1),
+        )
+        .join("");
+    lines.push(`    public static let ${name} = ${formatSwiftColor(v)}`);
+  }
+  lines.push("");
+
   // Spring (discover from tokens)
   lines.push("    // MARK: - Motion (Spring)");
   const springNames = Object.keys(tokens)
@@ -1597,6 +1625,35 @@ function generateKotlin(tokens: TokenMap): string {
           .join("");
       lines.push(`    val ${name} = ${px}.dp`);
     }
+  }
+  lines.push("");
+
+  // Chart / Data visualization (hex or rgb/rgba only)
+  lines.push("    // Chart / Data Visualization");
+  const chartKeysKotlin = Object.keys(tokens)
+    .filter((k) => k.startsWith("chart."))
+    .sort();
+  for (const k of chartKeysKotlin) {
+    const v = tokens[k];
+    if (typeof v !== "string") continue;
+    const vTrim = v.trim();
+    if (
+      !/^#[0-9a-fA-F]{6}$/.test(v) &&
+      !/^rgba?\(/i.test(vTrim)
+    ) {
+      continue;
+    }
+    const suffix = k.replace(/^chart\./, "");
+    const name =
+      "chart" +
+      suffix
+        .split(".")
+        .map((p) =>
+          /^\d+$/.test(p) ? p : p.charAt(0).toUpperCase() + p.slice(1),
+        )
+        .join("");
+    const color = v.startsWith("#") ? hexToKotlin(v) : colorToKotlin(v);
+    lines.push(`    val ${name} = Color(${color})`);
   }
   lines.push("");
 
