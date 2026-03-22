@@ -570,7 +570,7 @@ export class ScLogsView extends GatewayAwareLitElement {
         </div>
       </div>
       <hu-card class="log-card" glass>
-          <div class="log-area-wrapper log-area-min">
+        <div class="log-area-wrapper log-area-min">
           <div class="log-area hu-stagger-motion9">
             <hu-skeleton variant="line" class="skeleton-line"></hu-skeleton>
             <hu-skeleton variant="line" class="skeleton-line-90"></hu-skeleton>

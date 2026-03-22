@@ -19,7 +19,7 @@ export class ScCard extends LitElement {
   /** Enable chromatic prismatic border. */
   @property({ type: Boolean }) chromatic = false;
   /** Animate card into view when it intersects the viewport (IntersectionObserver). */
-  @property({ type: Boolean, reflect: true }) animate = false;
+  @property({ type: Boolean, reflect: true }) entrance = false;
   /** Tonal surface: default (container), high (interactive/elevated), highest (emphasis). */
   @property({ type: String }) surface: CardSurface = "default";
 
@@ -244,7 +244,7 @@ export class ScCard extends LitElement {
       padding: 1px;
     }
 
-    :host([animate]) .card {
+    :host([entrance]) .card {
       opacity: 0;
       transform: translateY(var(--hu-space-sm, 8px));
       transition:
@@ -253,13 +253,13 @@ export class ScCard extends LitElement {
       transition-delay: var(--hu-stagger-delay, 0ms);
     }
 
-    :host([animate].entered) .card {
+    :host([entrance].entered) .card {
       opacity: 1;
       transform: translateY(0);
     }
 
     @media (prefers-reduced-motion: reduce) {
-      :host([animate]) .card {
+      :host([entrance]) .card {
         opacity: 1;
         transform: none;
         transition: none;
@@ -302,7 +302,7 @@ export class ScCard extends LitElement {
 
   private _setupEntranceObserver(): void {
     this._teardownEntranceObserver();
-    if (!this.animate) {
+    if (!this.entrance) {
       return;
     }
     if (typeof IntersectionObserver === "undefined") {
@@ -329,7 +329,7 @@ export class ScCard extends LitElement {
     if (this.tilt) {
       pointerProximity.observe(this);
     }
-    if (this.animate) {
+    if (this.entrance) {
       this._setupEntranceObserver();
     }
   }
@@ -348,8 +348,8 @@ export class ScCard extends LitElement {
         pointerProximity.unobserve(this);
       }
     }
-    if (changed.has("animate")) {
-      if (this.animate) {
+    if (changed.has("entrance")) {
+      if (this.entrance) {
         this._setupEntranceObserver();
       } else {
         this._teardownEntranceObserver();
