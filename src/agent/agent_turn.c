@@ -1850,6 +1850,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         agent->metacognition.difficulty = HU_METACOG_DIFFICULTY_EASY;
     }
 
+    if (agent->metacognition.cfg.enabled) {
+        const char *mlp = getenv("HUMAN_METACOG_LOGPROBS");
+        if (mlp && (strcmp(mlp, "1") == 0 || strcmp(mlp, "true") == 0 || strcmp(mlp, "on") == 0))
+            req.include_completion_logprobs = true;
+    }
+
     clock_t turn_start = clock();
     uint64_t turn_tokens = 0;
     const char *prov_name = agent->provider.vtable->get_name
@@ -2404,6 +2410,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     size_t work_len = final_len;
                     uint64_t work_in = (uint64_t)resp.usage.prompt_tokens;
                     uint64_t work_out = (uint64_t)resp.usage.completion_tokens;
+                    bool hist_logprob_valid = resp.logprob_mean_valid;
+                    float hist_logprob_mean = resp.logprob_mean_valid ? resp.logprob_mean : -1.0f;
                     hu_metacog_action_t last_mc_act = HU_METACOG_ACTION_NONE;
                     hu_metacognition_signal_t last_mc_sig;
                     memset(&last_mc_sig, 0, sizeof(last_mc_sig));
@@ -2508,6 +2516,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         work_in = (uint64_t)mc_resp.usage.prompt_tokens;
                         work_out = (uint64_t)mc_resp.usage.completion_tokens;
 
+                        if (mc_resp.logprob_mean_valid) {
+                            hist_logprob_valid = true;
+                            hist_logprob_mean = mc_resp.logprob_mean;
+                        }
+
                         char *new_final =
                             hu_strndup(agent->alloc, mc_resp.content, mc_resp.content_len);
                         hu_chat_response_free(agent->alloc, &mc_resp);
@@ -2530,7 +2543,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         hu_metacog_history_extra_t mc_ex = {
                             .prompt_tokens = work_in,
                             .completion_tokens = work_out,
-                            .logprob_mean = -1.0f,
+                            .logprob_mean = hist_logprob_valid ? hist_logprob_mean : -1.0f,
                             .risk_score = risk,
                         };
                         (void)hu_metacog_history_insert(

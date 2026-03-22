@@ -452,6 +452,7 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
         scfg.autonomy_level = agent->autonomy_level;
         scfg.caller_spawn_depth = agent->spawn_depth;
         scfg.shared_cost_tracker = agent->cost_tracker;
+        scfg.metacognition_policy = &agent->metacognition.cfg;
         uint64_t new_id = 0;
         hu_error_t err =
             hu_agent_pool_spawn(agent->agent_pool, &scfg, arg_buf, arg_len, "cli-spawn", &new_id);

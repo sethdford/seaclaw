@@ -2301,7 +2301,7 @@ h3 {
   opacity: var(--hu-proximity, 0);
   background: radial-gradient(
     200px at calc(50% + var(--hu-pointer-x, 0px)) calc(50% + var(--hu-pointer-y, 0px)),
-    color-mix(in srgb, var(--color-accent) 8%, transparent),
+    color-mix(in srgb, var(--color-accent, var(--hu-accent)) 8%, transparent),
     transparent
   );
   transition: opacity var(--hu-duration-fast) var(--hu-ease-out);

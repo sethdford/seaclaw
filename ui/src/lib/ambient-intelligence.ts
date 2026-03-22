@@ -11,10 +11,10 @@ function isMobile(): boolean {
 
 function getTimeWarmth(): number {
   const hour = new Date().getHours();
-  if (hour >= 6 && hour < 10) return 0.0;   // cool morning
-  if (hour >= 10 && hour < 16) return 0.5;  // neutral day
-  if (hour >= 16 && hour < 22) return 1.0;  // warm evening
-  return 0.3;                                 // slightly cool night
+  if (hour >= 6 && hour < 10) return 0.0; // cool morning
+  if (hour >= 10 && hour < 16) return 0.5; // neutral day
+  if (hour >= 16 && hour < 22) return 1.0; // warm evening
+  return 0.3; // slightly cool night
 }
 
 export class AmbientIntelligence {
@@ -45,7 +45,10 @@ export class AmbientIntelligence {
     const warmth = getTimeWarmth();
     const root = document.documentElement;
     root.style.setProperty("--hu-ambient-warmth", warmth.toFixed(2));
-    root.style.setProperty("--hu-ambient-warmth-mix", `${(warmth * WARMTH_MIX_MAX * 100).toFixed(1)}%`);
+    root.style.setProperty(
+      "--hu-ambient-warmth-mix",
+      `${(warmth * WARMTH_MIX_MAX * 100).toFixed(1)}%`,
+    );
   }
 }
 

@@ -177,8 +177,7 @@ export class ScCard extends LitElement {
     }
     :host([tilt]) .card {
       transform-style: preserve-3d;
-      transform:
-        rotateY(calc(var(--hu-pointer-x, 0px) * 0.02deg))
+      transform: rotateY(calc(var(--hu-pointer-x, 0px) * 0.02deg))
         rotateX(calc(var(--hu-pointer-y, 0px) * -0.02deg));
       transition: transform var(--hu-duration-fast) var(--hu-spring-out);
     }

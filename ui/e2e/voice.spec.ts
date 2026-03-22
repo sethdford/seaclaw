@@ -362,9 +362,7 @@ test.describe("Voice Streaming Pipeline (demo)", () => {
 
   test("status text shows pipeline states", async ({ page }) => {
     await expect(async () => {
-      const status = await page.evaluate(
-        shadowElementText(VIEW, "hu-voice-orb"),
-      );
+      const status = await page.evaluate(shadowElementText(VIEW, "hu-voice-orb"));
       expect(status).toContain("Click the microphone");
     }).toPass({ timeout: POLL });
   });

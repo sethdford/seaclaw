@@ -3,6 +3,35 @@
 #include "human/core/string.h"
 #include <string.h>
 
+void hu_helpers_openai_choice_apply_logprobs(hu_json_value_t *choice, hu_chat_response_t *out) {
+    if (!choice || !out)
+        return;
+    out->logprob_mean_valid = false;
+    out->logprob_mean = 0.0f;
+    hu_json_value_t *lp = hu_json_object_get(choice, "logprobs");
+    if (!lp || lp->type != HU_JSON_OBJECT)
+        return;
+    hu_json_value_t *content = hu_json_object_get(lp, "content");
+    if (!content || content->type != HU_JSON_ARRAY || content->data.array.len == 0)
+        return;
+    double sum = 0.0;
+    size_t n = 0;
+    for (size_t i = 0; i < content->data.array.len; i++) {
+        hu_json_value_t *tok = content->data.array.items[i];
+        if (!tok || tok->type != HU_JSON_OBJECT)
+            continue;
+        double v = hu_json_get_number(tok, "logprob", -999.0);
+        if (v > -900.0) {
+            sum += v;
+            n++;
+        }
+    }
+    if (n > 0) {
+        out->logprob_mean_valid = true;
+        out->logprob_mean = (float)(sum / (double)n);
+    }
+}
+
 void hu_chat_response_free(hu_allocator_t *alloc, hu_chat_response_t *resp) {
     if (!alloc || !resp)
         return;

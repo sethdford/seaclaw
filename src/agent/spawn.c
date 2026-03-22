@@ -51,6 +51,7 @@ typedef struct hu_pool_slot {
     double cost_usd;
     uint32_t child_spawn_depth;
     hu_cost_tracker_t *inherit_cost_tracker;
+    const hu_metacog_settings_t *inherit_metacognition_policy;
     volatile bool cancelled;
     void *persistent_agent;
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
@@ -179,6 +180,8 @@ static void *spawn_thread(void *arg) {
             result = hu_strndup(a, "(agent create failed)", 21);
             goto done;
         }
+        if (s->inherit_metacognition_policy)
+            hu_metacognition_apply_config(&ag->metacognition, s->inherit_metacognition_policy);
         ag->agent_id = s->agent_id;
         ag->spawn_depth = s->child_spawn_depth;
         ag->worktree_mgr = pool->worktree_mgr;
@@ -227,6 +230,8 @@ static void *spawn_thread(void *arg) {
             result = hu_strndup(a, "(agent create failed)", 21);
             goto done;
         }
+        if (s->inherit_metacognition_policy)
+            hu_metacognition_apply_config(&ag.metacognition, s->inherit_metacognition_policy);
         ag.agent_id = s->agent_id;
         ag.spawn_depth = s->child_spawn_depth;
         ag.worktree_mgr = pool->worktree_mgr;
@@ -515,6 +520,7 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
     s->child_spawn_depth = cfg->caller_spawn_depth + 1u;
     s->inherit_cost_tracker = cfg->shared_cost_tracker ? cfg->shared_cost_tracker
                                                        : pool->fleet_cost_tracker;
+    s->inherit_metacognition_policy = cfg->metacognition_policy;
     pool->used[si] = true;
     pool->fleet_spawns_started++;
 

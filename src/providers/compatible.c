@@ -3,6 +3,7 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/provider.h"
+#include "human/providers/helpers.h"
 #include "human/providers/provider_http.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -258,6 +259,15 @@ static hu_error_t compatible_chat(void *ctx, hu_allocator_t *alloc,
             hu_json_object_set(alloc, rf_obj, "type", rf_type);
             hu_json_object_set(alloc, root, "response_format", rf_obj);
         }
+    }
+
+    if (request->include_completion_logprobs) {
+        hu_json_value_t *lp_true = hu_json_bool_new(alloc, true);
+        if (lp_true)
+            hu_json_object_set(alloc, root, "logprobs", lp_true);
+        hu_json_value_t *topn = hu_json_number_new(alloc, 1.0);
+        if (topn)
+            hu_json_object_set(alloc, root, "top_logprobs", topn);
     }
 
     char *body = NULL;

@@ -158,6 +158,9 @@ Values: 1/true/on or 0/false/off.
 .B HUMAN_METACOG_MAX_REGEN
 Maximum metacognition-driven regeneration passes per assistant turn (0-32).
 .TP
+.B HUMAN_METACOG_LOGPROBS
+When 1/true/on and metacognition is enabled, request completion token logprobs on chat turns (OpenAI-compatible providers); stored in cognition DB when available.
+.TP
 .B HUMAN_LOG
 Log file path for service/gateway.
 .SH FILES

@@ -86,6 +86,7 @@ static hu_error_t agent_spawn_execute(void *ctx, hu_allocator_t *alloc, const hu
     if (parent) {
         cfg.caller_spawn_depth = parent->spawn_depth;
         cfg.shared_cost_tracker = parent->cost_tracker;
+        cfg.metacognition_policy = &parent->metacognition.cfg;
     }
 
     const char *model = hu_json_get_string(args, "model");

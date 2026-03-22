@@ -2,6 +2,7 @@
 #define HU_AGENT_SPAWN_H
 
 #include "human/agent/mailbox.h"
+#include "human/cognition/metacognition.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/cost.h"
@@ -54,6 +55,8 @@ typedef struct hu_spawn_config {
     uint32_t caller_spawn_depth;
     /* Optional; shared session accounting for fleet_budget_usd (typically parent's tracker). */
     hu_cost_tracker_t *shared_cost_tracker;
+    /* Optional: apply same metacognition policy as parent after hu_agent_from_config. */
+    const hu_metacog_settings_t *metacognition_policy;
 } hu_spawn_config_t;
 
 /* Limits for the agent pool ("fleet") — concurrent slots still use max_concurrent. */

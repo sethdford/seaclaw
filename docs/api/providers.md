@@ -126,6 +126,11 @@ void hu_chat_response_free(hu_allocator_t *alloc, hu_chat_response_t *resp);
 const char *hu_compatible_provider_url(const char *name);
 ```
 
+### Completion logprobs (optional)
+
+- `hu_chat_request_t.include_completion_logprobs` — when true, the OpenAI provider adds `logprobs` + `top_logprobs` to the chat-completions body (other providers may ignore).
+- `hu_chat_response_t.logprob_mean_valid` + `logprob_mean` — mean of per-token `logprob` values from `choices[0].logprobs.content[]` when present.
+
 ## Usage Example
 
 ```c

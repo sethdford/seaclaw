@@ -57,7 +57,7 @@ export class PointerProximity {
           }
         }
       },
-      { threshold: 0 }
+      { threshold: 0 },
     );
 
     for (const el of this.elements) {
@@ -131,20 +131,11 @@ export class PointerProximity {
     el.style.setProperty("--hu-pointer-x", `${dx.toFixed(1)}px`);
     el.style.setProperty("--hu-pointer-y", `${dy.toFixed(1)}px`);
 
-    if (
-      proximity > 0 &&
-      Math.max(rect.width, rect.height) <= MAGNETIC_THRESHOLD
-    ) {
+    if (proximity > 0 && Math.max(rect.width, rect.height) <= MAGNETIC_THRESHOLD) {
       const pull = proximity * MAGNETIC_STRENGTH;
       const angle = Math.atan2(dy, dx);
-      el.style.setProperty(
-        "--hu-magnetic-x",
-        `${(Math.cos(angle) * pull * -1).toFixed(1)}px`
-      );
-      el.style.setProperty(
-        "--hu-magnetic-y",
-        `${(Math.sin(angle) * pull * -1).toFixed(1)}px`
-      );
+      el.style.setProperty("--hu-magnetic-x", `${(Math.cos(angle) * pull * -1).toFixed(1)}px`);
+      el.style.setProperty("--hu-magnetic-y", `${(Math.sin(angle) * pull * -1).toFixed(1)}px`);
     } else {
       el.style.removeProperty("--hu-magnetic-x");
       el.style.removeProperty("--hu-magnetic-y");

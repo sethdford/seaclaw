@@ -2,6 +2,7 @@
 #define HU_PROVIDERS_HELPERS_H
 
 #include "human/core/allocator.h"
+#include "human/core/json.h"
 #include "human/provider.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -15,5 +16,8 @@ char *hu_helpers_extract_openai_content(hu_allocator_t *alloc, const char *body,
 /* Extract text content from Anthropic-style JSON response (content[0].text) */
 char *hu_helpers_extract_anthropic_content(hu_allocator_t *alloc, const char *body,
                                            size_t body_len);
+
+/* OpenAI-style choices[0]: mean logprob over logprobs.content[].logprob when present. */
+void hu_helpers_openai_choice_apply_logprobs(hu_json_value_t *choice, hu_chat_response_t *out);
 
 #endif /* HU_PROVIDERS_HELPERS_H */

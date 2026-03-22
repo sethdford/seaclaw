@@ -94,3 +94,24 @@ hu_config_deinit(&cfg);
 ## Schema
 
 Config file location: `~/.human/config.json` (or path in `HU_CONFIG_PATH`). See project docs for full schema.
+
+### `agent.metacognition` (object)
+
+Optional. Parsed into `hu_metacog_settings_t` and applied to the agent after `hu_agent_from_config` (bootstrap, CLI, spawns with parent policy, subagent tasks).
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `enabled` | bool | Master switch for metacognition loop, SQLite `metacog_history`, follow-up outcome labeling, difficulty/BTH counters. |
+| `confidence_threshold` | number 0–1 | Below this (after difficulty scaling), plan may choose REFLECT / CLARIFY. |
+| `coherence_threshold` | number 0–1 | Below → SWITCH_STRATEGY. |
+| `repetition_threshold` | number 0–1 | Above → SIMPLIFY (with stuck). |
+| `max_reflects` | int | Cap REFLECT before CLARIFY. |
+| `max_regen` | int | Max provider re-calls per assistant turn (bounded re-entry). |
+| `hysteresis_min` | int | Consecutive “bad” signals before a costly action fires. |
+| `use_calibrated_risk` | bool | Weighted risk score can reduce hysteresis when high. |
+| `risk_high_threshold` | number 0–1 | Threshold for that reduction. |
+| `w_low_confidence` … `w_low_trajectory` | number | Non-negative weights for calibrated risk (normalized internally). |
+
+**Environment overrides** (see `hu_config_apply_env_overrides`): `HUMAN_METACOGNITION`, `HUMAN_METACOG_MAX_REGEN`. **`HUMAN_METACOG_LOGPROBS`** is read in the agent turn when metacognition is enabled (requests logprobs from OpenAI-style APIs).
+
+**Operational queries** on `~/.human/cognition.db` → `metacog_history`: see `docs/operations/metacog-analytics.md`.

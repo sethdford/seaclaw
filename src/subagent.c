@@ -1,5 +1,6 @@
 #include "human/subagent.h"
 #include "human/agent.h"
+#include "human/cognition/metacognition.h"
 #include "human/config.h"
 #include "human/core/string.h"
 #include "human/providers/factory.h"
@@ -91,6 +92,7 @@ static void *subagent_thread_fn(void *arg) {
             if (hu_agent_from_config(&agent, alloc, provider, NULL, 0, NULL, NULL, NULL, NULL,
                                      model, model_len, prov, prov_len, temp, ws, ws_len, 25, 50,
                                      false, 2, NULL, 0, NULL, 0, NULL) == HU_OK) {
+                hu_metacognition_apply_config(&agent.metacognition, &mgr->cfg->agent.metacognition);
                 char *resp = NULL;
                 size_t resp_len = 0;
                 const char *sys = "You are a helpful assistant. Answer concisely.";
