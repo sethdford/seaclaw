@@ -60,7 +60,7 @@ export class ScActivityFeed extends LitElement {
       height: 100%;
     }
     .event-icon.message {
-      color: var(--hu-accent);
+      color: var(--hu-accent-tertiary);
     }
     .event-icon.tool {
       color: var(--hu-warning);

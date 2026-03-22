@@ -22,10 +22,21 @@ typedef hu_error_t (*hu_hula_compiler_chat_fn)(void *ctx, hu_allocator_t *alloc,
 typedef void (*hu_hula_compiler_done_fn)(void *ctx, const hu_hula_program_t *prog,
                                            const hu_hula_exec_t *exec);
 
+/* Few-shot snippet for compiler prompt when domain matches (see hula_compiler_examples.c). */
+const char *hu_hula_compiler_examples_for_domain(const char *domain, size_t domain_len,
+                                                 size_t *out_len);
+
+/* Replace {{key}} in tmpl using string values from vars_json (JSON object). Caller frees *out. */
+hu_error_t hu_hula_expand_template(hu_allocator_t *alloc, const char *tmpl, size_t tmpl_len,
+                                   const char *vars_json, size_t vars_json_len, char **out,
+                                   size_t *out_len);
+
 /* Build a user message for an LLM to emit a HuLa program JSON for the given goal.
- * Includes tool names and short descriptions from vtable. */
+ * Includes tool names and short descriptions from vtable.
+ * When domain is non-NULL, appends a domain-scoped example program. */
 hu_error_t hu_hula_compiler_build_prompt(hu_allocator_t *alloc, const char *goal, size_t goal_len,
-                                         hu_tool_t *tools, size_t tools_count, char **out,
+                                         hu_tool_t *tools, size_t tools_count,
+                                         const char *domain, size_t domain_len, char **out,
                                          size_t *out_len);
 
 /* Extract JSON from model response (fences, brace matching) and parse into out.
@@ -50,6 +61,7 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
     hu_security_policy_t *policy, hu_observer_t *observer, hu_agent_pool_t *pool,
     hu_spawn_config_t *spawn_tpl, hu_hula_compiler_chat_fn chat_fn, void *chat_ctx,
     const char *model_name, size_t model_name_len, double temperature,
-    hu_hula_compiler_done_fn done_fn, void *done_ctx, bool *out_ok);
+    const char *domain, size_t domain_len, hu_hula_compiler_done_fn done_fn, void *done_ctx,
+    bool *out_ok);
 
 #endif /* HU_AGENT_HULA_COMPILER_H */

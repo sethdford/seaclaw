@@ -380,6 +380,7 @@ set(HU_CORE_SOURCES
     src/gateway/cp_config.c
     src/gateway/cp_admin.c
     src/gateway/cp_memory.c
+    src/gateway/cp_hula.c
     src/gateway/cp_voice.c
     src/gateway/cp_voice_stream.c
     src/gateway/event_bridge.c
@@ -412,6 +413,9 @@ set(HU_CORE_SOURCES
     src/agent/hula.c
     src/agent/hula_compiler.c
     src/agent/hula_emergence.c
+    src/agent/hula_compiler_examples.c
+    src/agent/hula_lite.c
+    src/agent/hula_analytics.c
     src/agent/llm_compiler.c
     src/agent/orchestrator.c
     src/agent/orchestrator_llm.c
@@ -1982,6 +1986,7 @@ set(HU_TEST_SOURCES
     tests/test_tool_router.c
     tests/test_dag.c
     tests/test_hula.c
+    tests/test_hula_golden.c
     tests/test_sota_features.c
     tests/test_mood.c
     tests/test_bth_e2e.c

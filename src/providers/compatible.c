@@ -251,6 +251,11 @@ static hu_error_t compatible_chat(void *ctx, hu_allocator_t *alloc,
                            hu_json_number_new(alloc, (double)request->max_tokens));
     }
 
+    /* HuLa compiler (`hu_hula_compiler_chat_compile_execute`) sets response_format to
+     * `json_object` for OpenAI-style APIs. Most OpenAI-compatible endpoints honor
+     * `response_format.type`; some third-party proxies strip or ignore it (models may return
+     * markdown fences). See `docs/providers/hula-json-mode-matrix.md` for a coarse
+     * compatibility matrix. */
     if (request->response_format && request->response_format_len > 0) {
         hu_json_value_t *rf_obj = hu_json_object_new(alloc);
         if (rf_obj) {

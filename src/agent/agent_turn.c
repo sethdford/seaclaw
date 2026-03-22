@@ -3269,7 +3269,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         agent->observer, agent->agent_pool,
                         agent->agent_pool ? &hula_spawn_tpl : NULL, agent->provider.vtable->chat,
                         agent->provider.ctx, agent->model_name, agent->model_name_len,
-                        agent->temperature, hula_compiler_agent_done, agent, &hula_compiler_ok);
+                        agent->temperature, NULL, 0, hula_compiler_agent_done, agent,
+                        &hula_compiler_ok);
                     if (hula_compiler_ok) {
                         used_llm_compiler = true;
                         used_hula_ir = true;

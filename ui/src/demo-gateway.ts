@@ -1808,6 +1808,41 @@ export class DemoGatewayClient extends EventTarget {
           ],
         };
 
+      case "hula.traces.list":
+        return {
+          directory: "~/.human/hula_traces",
+          traces: [
+            { id: "deadbeef_demo.json", size: 420, mtime: Math.floor(Date.now() / 1000) - 120 },
+            { id: "cafebabe_ops.json", size: 890, mtime: Math.floor(Date.now() / 1000) - 3600 },
+          ],
+        };
+      case "hula.traces.get":
+        return {
+          id: "deadbeef_demo.json",
+          record: {
+            version: 1,
+            success: true,
+            ts: Math.floor(Date.now() / 1000),
+            program_name: "demo",
+            trace: [
+              { id: "n1", op: "call", tool: "echo", status: "done", output_len: 5 },
+              { id: "n2", op: "emit", status: "done", output_len: 3 },
+            ],
+          },
+        };
+      case "hula.traces.delete":
+        return { deleted: true };
+      case "hula.traces.analytics":
+        return {
+          summary: {
+            file_count: 12,
+            success_count: 9,
+            fail_count: 3,
+            total_trace_steps: 184,
+            newest_ts: Math.floor(Date.now() / 1000),
+          },
+        };
+
       // --- Turing score API (mirrors REST /api/turing/*) ---
       case "turing.scores": {
         const baseTs = Math.floor(Date.now() / 1000);

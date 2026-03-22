@@ -108,14 +108,12 @@ export class ScDeliveryStatus extends LitElement {
       animation-delay: calc(var(--hu-duration-fast) * 2);
     }
 
-    /* Streaming: accent color */
     :host([data-status="streaming"]) {
-      color: var(--hu-accent);
+      color: var(--hu-accent-tertiary-text);
     }
 
-    /* Complete: accent color + bounce */
     :host([data-status="complete"]) {
-      color: var(--hu-accent);
+      color: var(--hu-accent-tertiary-text);
     }
 
     :host([data-status="complete"]) .icon {

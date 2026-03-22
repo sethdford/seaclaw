@@ -1,6 +1,9 @@
 #include "human/cli_commands.h"
 #include "human/agent/hula.h"
+#include "human/agent/hula_analytics.h"
+#include "human/agent/hula_compiler.h"
 #include "human/agent/hula_emergence.h"
+#include "human/agent/hula_lite.h"
 #include "human/bootstrap.h"
 #include "human/core/process_util.h"
 #include "human/calibration.h"
@@ -2206,18 +2209,139 @@ static const hu_tool_vtable_t hula_demo_vtable = {
     .deinit = hula_demo_deinit,
 };
 
+static hu_error_t hula_try_open_schema(FILE **out, char *path_buf, size_t path_cap) {
+    static const char *const candidates[] = {
+        "schemas/hula-program.schema.json",
+        "../schemas/hula-program.schema.json",
+        "../../schemas/hula-program.schema.json",
+    };
+    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+        FILE *f = fopen(candidates[i], "rb");
+        if (f) {
+            *out = f;
+            (void)snprintf(path_buf, path_cap, "%s", candidates[i]);
+            return HU_OK;
+        }
+    }
+    const char *root = getenv("HUMAN_SOURCE_ROOT");
+    if (root && root[0]) {
+        int n = snprintf(path_buf, path_cap, "%s/schemas/hula-program.schema.json", root);
+        if (n > 0 && (size_t)n < path_cap) {
+            FILE *f = fopen(path_buf, "rb");
+            if (f) {
+                *out = f;
+                return HU_OK;
+            }
+        }
+    }
+    *out = NULL;
+    path_buf[0] = '\0';
+    return HU_ERR_NOT_FOUND;
+}
+
 hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human hula <run|validate> <file.json | '{...}'>\n\n");
-        printf("  run <program>       Parse, validate, execute, and print trace\n");
-        printf("  validate <program>  Parse and validate only\n\n");
-        printf("The program can be a file path or inline JSON.\n");
-        printf("Demo tools available: echo, search, write, analyze\n");
-        printf("Optional: HU_HULA_TRACE_DIR=/path/dir persists trace JSON (POSIX; see hu_hula_trace_persist).\n");
+        printf("Usage: human hula <schema|expand|compile|run|validate> ...\n\n");
+        printf("  schema              Print JSON Schema path and contents (if found)\n");
+        printf("  expand <tmpl> <vars.json>   Expand {{keys}} using JSON object vars\n");
+        printf("  compile [--lite] <file>     Print HuLa JSON (lite syntax or JSON file passthrough)\n");
+        printf("  run [--lite] <file|'{...}'>  Execute program\n");
+        printf("  validate [--lite] <file|'{...}'>\n\n");
+        printf("Demo tools for run: echo, search, write, analyze\n");
+        printf("Optional: HU_HULA_TRACE_DIR=/path/dir persists trace JSON (POSIX).\n");
         return HU_OK;
     }
 
     const char *sub = argv[2];
+    if (strcmp(sub, "schema") == 0) {
+        char pbuf[512];
+        FILE *f = NULL;
+        hu_error_t er = hula_try_open_schema(&f, pbuf, sizeof(pbuf));
+        if (er != HU_OK || !f) {
+            fprintf(stderr, "hula: schema file not found (try from repo root or set HUMAN_SOURCE_ROOT)\n");
+            return er != HU_OK ? er : HU_ERR_NOT_FOUND;
+        }
+        printf("(schema) %s\n\n", pbuf[0] ? pbuf : "hula-program.schema.json");
+        char buf[4096];
+        size_t n;
+        while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
+            fwrite(buf, 1, n, stdout);
+        fclose(f);
+        return HU_OK;
+    }
+
+    if (strcmp(sub, "expand") == 0) {
+        if (argc < 5) {
+            fprintf(stderr, "Usage: human hula expand <template.txt> <vars.json>\n");
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        char *tmpl = NULL, *vars = NULL;
+        size_t tl = 0, vl = 0;
+        hu_error_t er = hula_read_file(alloc, argv[3], &tmpl, &tl);
+        if (er != HU_OK) {
+            fprintf(stderr, "hula: cannot read template: %s\n", hu_error_string(er));
+            return er;
+        }
+        er = hula_read_file(alloc, argv[4], &vars, &vl);
+        if (er != HU_OK) {
+            hu_str_free(alloc, tmpl);
+            fprintf(stderr, "hula: cannot read vars: %s\n", hu_error_string(er));
+            return er;
+        }
+        char *out = NULL;
+        size_t ol = 0;
+        er = hu_hula_expand_template(alloc, tmpl, tl, vars, vl, &out, &ol);
+        hu_str_free(alloc, tmpl);
+        hu_str_free(alloc, vars);
+        if (er != HU_OK) {
+            fprintf(stderr, "hula: expand failed: %s\n", hu_error_string(er));
+            return er;
+        }
+        fwrite(out, 1, ol, stdout);
+        fputc('\n', stdout);
+        hu_str_free(alloc, out);
+        return HU_OK;
+    }
+
+    if (strcmp(sub, "compile") == 0) {
+        int i = 3;
+        bool lite = false;
+        if (argc > i && strcmp(argv[i], "--lite") == 0) {
+            lite = true;
+            i++;
+        }
+        if (argc <= i) {
+            fprintf(stderr, "Usage: human hula compile [--lite] <file>\n");
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        char *raw = NULL;
+        size_t rl = 0;
+        hu_error_t err = hula_read_file(alloc, argv[i], &raw, &rl);
+        if (err != HU_OK) {
+            fprintf(stderr, "hula: cannot read %s: %s\n", argv[i], hu_error_string(err));
+            return err;
+        }
+        char *json = raw;
+        size_t json_len = rl;
+        char *lite_out = NULL;
+        size_t lite_len = 0;
+        if (lite) {
+            err = hu_hula_lite_to_json(alloc, raw, rl, &lite_out, &lite_len);
+            hu_str_free(alloc, raw);
+            if (err != HU_OK) {
+                fprintf(stderr, "hula: lite parse failed: %s\n", hu_error_string(err));
+                return err;
+            }
+            json = lite_out;
+            json_len = lite_len;
+        }
+        fwrite(json, 1, json_len, stdout);
+        fputc('\n', stdout);
+        if (lite_out)
+            hu_str_free(alloc, lite_out);
+        return HU_OK;
+    }
+
     bool run_mode = (strcmp(sub, "run") == 0);
     bool validate_mode = (strcmp(sub, "validate") == 0);
     if (!run_mode && !validate_mode) {
@@ -2225,18 +2349,24 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_ERR_INVALID_ARGUMENT;
     }
 
-    if (argc < 4) {
-        fprintf(stderr, "Usage: human hula %s <file.json | '{...}'>\n", sub);
+    int argi = 3;
+    bool lite_input = false;
+    if (argc > argi && strcmp(argv[argi], "--lite") == 0) {
+        lite_input = true;
+        argi++;
+    }
+    if (argc <= argi) {
+        fprintf(stderr, "Usage: human hula %s [--lite] <file.json | '{...}'>\n", sub);
         return HU_ERR_INVALID_ARGUMENT;
     }
 
     /* Load program JSON */
-    const char *input = argv[3];
+    const char *input = argv[argi];
     char *json = NULL;
     size_t json_len = 0;
     bool json_owned = false;
 
-    if (input[0] == '{') {
+    if (!lite_input && input[0] == '{') {
         json = (char *)input;
         json_len = strlen(input);
     } else {
@@ -2246,6 +2376,20 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
             return err;
         }
         json_owned = true;
+        if (lite_input) {
+            char *lj = NULL;
+            size_t ll = 0;
+            err = hu_hula_lite_to_json(alloc, json, json_len, &lj, &ll);
+            if (json_owned)
+                hu_str_free(alloc, json);
+            json = lj;
+            json_len = ll;
+            json_owned = true;
+            if (err != HU_OK) {
+                fprintf(stderr, "hula: lite parse failed: %s\n", hu_error_string(err));
+                return err;
+            }
+        }
     }
 
     /* 1. Parse */

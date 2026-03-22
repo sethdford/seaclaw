@@ -35,6 +35,7 @@ typedef struct {
     hu_security_policy_t *policy;
 } doc_ingest_ctx_t;
 
+#if !HU_IS_TEST
 static void strip_base_slash(char *s) {
     size_t n = strlen(s);
     while (n > 0 && s[n - 1] == '/')
@@ -72,6 +73,7 @@ static int bff_store_json(hu_allocator_t *alloc, const char *base, const char *a
         hu_http_response_free(alloc, &resp);
     return (sc >= 200 && sc < 300) ? 0 : -1;
 }
+#endif
 
 static hu_error_t doc_ingest_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
                                      hu_tool_result_t *out) {
@@ -81,6 +83,7 @@ static hu_error_t doc_ingest_execute(void *ctx, hu_allocator_t *alloc, const hu_
         return HU_ERR_INVALID_ARGUMENT;
     }
 #if HU_IS_TEST
+    (void)alloc;
     *out = hu_tool_result_ok("{\"ok\":true,\"chunks_stored\":1}", 30);
     return HU_OK;
 #else

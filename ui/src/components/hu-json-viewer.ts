@@ -361,7 +361,7 @@ export class ScJsonViewer extends LitElement {
     }
 
     .val-string {
-      color: var(--hu-accent);
+      color: var(--hu-accent-tertiary-text);
     }
 
     .val-number {

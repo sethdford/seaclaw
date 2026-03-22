@@ -278,6 +278,8 @@ static void hu_srtp_derive_session_keys(const uint8_t mkey[16], const uint8_t ms
 }
 
 #if defined(__SIZEOF_INT128__) && __SIZEOF_INT128__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 static void hu_srtp_packet_iv(uint8_t iv[16], const uint8_t salt[14], uint32_t ssrc, uint32_t roc,
                               uint16_t seq) {
     unsigned __int128 k_s = 0;
@@ -289,6 +291,7 @@ static void hu_srtp_packet_iv(uint8_t iv[16], const uint8_t salt[14], uint32_t s
     for (int b = 0; b < 16; b++)
         iv[b] = (uint8_t)(ivv >> (120 - 8 * b));
 }
+#pragma GCC diagnostic pop
 #else
 static void hu_srtp_packet_iv(uint8_t iv[16], const uint8_t salt[14], uint32_t ssrc, uint32_t roc,
                               uint16_t seq) {

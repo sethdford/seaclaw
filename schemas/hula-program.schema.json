@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://human.local/schema/hula-program.json",
+  "title": "HuLa program",
+  "type": "object",
+  "required": ["name", "root"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "integer", "minimum": 1 },
+    "root": { "$ref": "#/$defs/node" }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": ["op", "id"],
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "call",
+            "seq",
+            "par",
+            "branch",
+            "loop",
+            "delegate",
+            "emit",
+            "try"
+          ]
+        },
+        "id": { "type": "string", "minLength": 1 },
+        "tool": { "type": "string" },
+        "args": { "type": "object" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/node" }
+        },
+        "goal": { "type": "string" },
+        "model": { "type": "string" },
+        "context": { "type": "string" },
+        "result_key": { "type": "string" },
+        "agent_id": { "type": "string" },
+        "emit_key": { "type": "string" },
+        "emit_value": { "type": "string" },
+        "pred": {
+          "type": "string",
+          "enum": ["success", "failure", "contains", "not_contains", "always"]
+        },
+        "match": { "type": "string" },
+        "then": { "$ref": "#/$defs/node" },
+        "else": { "$ref": "#/$defs/node" },
+        "body": { "$ref": "#/$defs/node" },
+        "catch": { "$ref": "#/$defs/node" },
+        "max_iter": { "type": "integer", "minimum": 0 },
+        "timeout_ms": { "type": "integer", "minimum": 0 },
+        "retry_count": { "type": "integer", "minimum": 0 },
+        "retry_backoff_ms": { "type": "integer", "minimum": 0 },
+        "required_capability": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "op": { "const": "call" } } },
+          "then": { "required": ["tool"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "delegate" } } },
+          "then": { "required": ["goal"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "emit" } } },
+          "then": { "required": ["emit_key"] }
+        }
+      ]
+    }
+  }
+}

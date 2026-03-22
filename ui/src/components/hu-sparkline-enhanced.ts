@@ -6,7 +6,7 @@ export class ScSparklineEnhanced extends LitElement {
   @property({ type: Array }) data: number[] = [];
   @property({ type: Number }) width = 200;
   @property({ type: Number }) height = 48;
-  @property({ type: String }) color = "var(--hu-accent)";
+  @property({ type: String }) color = "var(--hu-accent-tertiary)";
   @property({ type: Boolean }) showTooltip = true;
   @property({ type: Boolean }) fillGradient = true;
   @property({ type: Number }) dotSize = 4;

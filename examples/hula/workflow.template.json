@@ -1,0 +1,16 @@
+{
+  "name": "{{program_name}}",
+  "version": 1,
+  "root": {
+    "op": "seq",
+    "id": "main",
+    "children": [
+      {
+        "op": "call",
+        "id": "step1",
+        "tool": "echo",
+        "args": { "text": "{{first_message}}" }
+      }
+    ]
+  }
+}

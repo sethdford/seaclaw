@@ -35,7 +35,8 @@ type TabId =
   | "memory"
   | "security"
   | "logs"
-  | "turing";
+  | "turing"
+  | "hula";
 
 const VALID_TABS: TabId[] = [
   "overview",
@@ -56,6 +57,7 @@ const VALID_TABS: TabId[] = [
   "security",
   "logs",
   "turing",
+  "hula",
 ];
 
 const SIDEBAR_KEY = "hu-sidebar-collapsed";
@@ -82,6 +84,7 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   security: () => import("./views/security-view.js"),
   logs: () => import("./views/logs-view.js"),
   turing: () => import("./views/turing-view.js"),
+  hula: () => import("./views/hula-view.js"),
 };
 
 const loadedViews = new Set<TabId>(["overview"]);
@@ -1146,6 +1149,8 @@ export class ScApp extends LitElement {
         return html`<hu-logs-view></hu-logs-view>`;
       case "turing":
         return html`<hu-turing-view></hu-turing-view>`;
+      case "hula":
+        return html`<hu-hula-view></hu-hula-view>`;
       default:
         return html`<hu-overview-view></hu-overview-view>`;
     }

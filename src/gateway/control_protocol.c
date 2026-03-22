@@ -85,6 +85,10 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"memory.ingest", cp_memory_ingest},
     {"memory.consolidate", cp_memory_consolidate},
     {"memory.graph", cp_memory_graph},
+    {"hula.traces.list", cp_hula_traces_list},
+    {"hula.traces.get", cp_hula_traces_get},
+    {"hula.traces.delete", cp_hula_traces_delete},
+    {"hula.traces.analytics", cp_hula_traces_analytics},
 #ifdef HU_HAS_PUSH
     {"push.register", cp_admin_push_register},
     {"push.unregister", cp_admin_push_unregister},

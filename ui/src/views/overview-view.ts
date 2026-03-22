@@ -298,7 +298,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
           justify-content: center;
           width: var(--hu-icon-2xl);
           height: var(--hu-icon-2xl);
-          color: var(--hu-accent);
+          color: var(--hu-accent-tertiary);
 
           & svg {
             width: var(--hu-icon-lg);

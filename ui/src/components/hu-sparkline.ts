@@ -6,7 +6,7 @@ export class ScSparkline extends LitElement {
   @property({ type: Array }) data: number[] = [];
   @property({ type: Number }) width = 80;
   @property({ type: Number }) height = 28;
-  @property({ type: String }) color = "var(--hu-accent)";
+  @property({ type: String }) color = "var(--hu-accent-tertiary)";
   @property({ type: Boolean }) fill = true;
 
   static override styles = css`

@@ -29,6 +29,7 @@ typedef struct {
     char _unused;
 } bff_memory_ctx_t;
 
+#if !HU_IS_TEST
 static void bff_strip_trailing_slash(char *s) {
     size_t n = strlen(s);
     while (n > 0 && s[n - 1] == '/')
@@ -50,6 +51,7 @@ static const char *bff_base(void) {
         return NULL;
     return b;
 }
+#endif
 
 static hu_error_t bff_memory_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
                                      hu_tool_result_t *out) {
@@ -65,6 +67,7 @@ static hu_error_t bff_memory_execute(void *ctx, hu_allocator_t *alloc, const hu_
     }
 
 #if HU_IS_TEST
+    (void)alloc;
     if (strcmp(action, "store") == 0)
         *out = hu_tool_result_ok("{\"ok\":true,\"chunk_id\":\"test\"}", 32);
     else if (strcmp(action, "recall") == 0)

@@ -13,7 +13,7 @@ export class ScStatCard extends LitElement {
   @property({ type: String }) label = "";
   @property({ type: Array }) sparklineData: number[] = [];
   /** Sparkline stroke/fill; use tertiary for informational dashboard metrics. */
-  @property({ type: String }) sparklineColor = "var(--hu-accent)";
+  @property({ type: String }) sparklineColor = "var(--hu-accent-tertiary)";
   @property({ type: String }) trend = "";
   @property({ type: String }) trendDirection: "up" | "down" | "flat" = "flat";
   @property({ type: Number }) progress = -1;

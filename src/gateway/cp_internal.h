@@ -222,4 +222,18 @@ hu_error_t cp_memory_graph(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
                            const hu_control_protocol_t *proto, const hu_json_value_t *root,
                            char **out, size_t *out_len);
 
+/* HuLa trace persistence (under ~/.human/hula_traces) */
+hu_error_t cp_hula_traces_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                               const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                               char **out, size_t *out_len);
+hu_error_t cp_hula_traces_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                              const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                              char **out, size_t *out_len);
+hu_error_t cp_hula_traces_delete(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                 const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                 char **out, size_t *out_len);
+hu_error_t cp_hula_traces_analytics(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                    const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                    char **out, size_t *out_len);
+
 #endif /* HU_CP_INTERNAL_H */

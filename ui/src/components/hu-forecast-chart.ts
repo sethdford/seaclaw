@@ -61,14 +61,14 @@ export class ScForecastChart extends LitElement {
     }
     .actual-line {
       fill: none;
-      stroke: var(--hu-accent);
+      stroke: var(--hu-chart-brand);
       stroke-width: 2.5;
       stroke-linecap: round;
       stroke-linejoin: round;
     }
     .projected-line {
       fill: none;
-      stroke: var(--hu-accent);
+      stroke: var(--hu-chart-brand);
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
@@ -87,11 +87,11 @@ export class ScForecastChart extends LitElement {
       opacity: 0.25;
     }
     .hover-dot {
-      fill: var(--hu-accent);
-      filter: drop-shadow(0 0 6px var(--hu-accent));
+      fill: var(--hu-chart-brand);
+      filter: drop-shadow(0 0 6px var(--hu-chart-brand));
     }
     .end-dot {
-      fill: var(--hu-accent);
+      fill: var(--hu-chart-brand);
       opacity: 0.5;
     }
     .end-label {
@@ -312,12 +312,12 @@ export class ScForecastChart extends LitElement {
       >
         <defs>
           <linearGradient id="fc-actual-${this._uid}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="var(--hu-accent)" stop-opacity="0.25" />
-            <stop offset="1" stop-color="var(--hu-accent)" stop-opacity="0.02" />
+            <stop offset="0" stop-color="var(--hu-chart-brand)" stop-opacity="0.25" />
+            <stop offset="1" stop-color="var(--hu-chart-brand)" stop-opacity="0.02" />
           </linearGradient>
           <linearGradient id="fc-proj-${this._uid}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="var(--hu-accent)" stop-opacity="0.08" />
-            <stop offset="1" stop-color="var(--hu-accent)" stop-opacity="0" />
+            <stop offset="0" stop-color="var(--hu-chart-brand)" stop-opacity="0.08" />
+            <stop offset="1" stop-color="var(--hu-chart-brand)" stop-opacity="0" />
           </linearGradient>
         </defs>
 
