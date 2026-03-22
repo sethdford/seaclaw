@@ -94,12 +94,14 @@ static void hula_op_names_correct(void) {
     HU_ASSERT_STR_EQ(hu_hula_op_name(HU_HULA_LOOP), "loop");
     HU_ASSERT_STR_EQ(hu_hula_op_name(HU_HULA_DELEGATE), "delegate");
     HU_ASSERT_STR_EQ(hu_hula_op_name(HU_HULA_EMIT), "emit");
+    HU_ASSERT_STR_EQ(hu_hula_op_name(HU_HULA_TRY), "try");
 }
 
 static void hula_pred_names_correct(void) {
     HU_ASSERT_STR_EQ(hu_hula_pred_name(HU_HULA_PRED_SUCCESS), "success");
     HU_ASSERT_STR_EQ(hu_hula_pred_name(HU_HULA_PRED_FAILURE), "failure");
     HU_ASSERT_STR_EQ(hu_hula_pred_name(HU_HULA_PRED_CONTAINS), "contains");
+    HU_ASSERT_STR_EQ(hu_hula_pred_name(HU_HULA_PRED_NOT_CONTAINS), "not_contains");
     HU_ASSERT_STR_EQ(hu_hula_pred_name(HU_HULA_PRED_ALWAYS), "always");
 }
 
@@ -108,6 +110,7 @@ static void hula_status_names_correct(void) {
     HU_ASSERT_STR_EQ(hu_hula_status_name(HU_HULA_DONE), "done");
     HU_ASSERT_STR_EQ(hu_hula_status_name(HU_HULA_FAILED), "failed");
     HU_ASSERT_STR_EQ(hu_hula_status_name(HU_HULA_SKIPPED), "skipped");
+    HU_ASSERT_STR_EQ(hu_hula_status_name(HU_HULA_CANCELLED), "cancelled");
 }
 
 /* ── Program lifecycle ──────────────────────────────────────────────────── */

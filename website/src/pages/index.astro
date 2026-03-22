@@ -197,33 +197,33 @@ const tools = [
       }
     </style>
     <style is:global>
-      /* --color-* aliases for index.astro (maps to --hu-web-* / --hu-* tokens) */
+      /* --color-* aliases for index.astro (shortcuts over canonical --hu-* tokens) */
       :root {
-        --color-bg: var(--hu-web-bg);
-        --color-text: var(--hu-web-text);
-        --color-text-secondary: var(--hu-web-text-secondary);
-        --color-text-tertiary: var(--hu-web-text-tertiary);
+        --color-bg: var(--hu-bg);
+        --color-text: var(--hu-text);
+        --color-text-secondary: var(--hu-text-secondary);
+        --color-text-tertiary: var(--hu-text-muted);
         --color-accent: var(--hu-accent);
         --color-accent-light: var(--hu-accent-light, var(--hu-accent-subtle));
         --color-accent-glow: var(--hu-accent-subtle);
-        --color-border: var(--hu-web-border);
-        --color-line-stroke: var(--hu-web-line-stroke);
-        --color-node-fill: var(--hu-web-node-fill);
-        --color-node-stroke: var(--hu-web-node-stroke);
-        /* Terminal (dark surface — light border intentional) */
-        --color-terminal-bg: var(--hu-web-terminal-bg);
-        --color-terminal-chrome: var(--hu-web-terminal-chrome);
+        --color-border: var(--hu-border-subtle);
+        --color-line-stroke: var(--hu-border-subtle);
+        --color-node-fill: color-mix(in srgb, var(--hu-bg-surface) 80%, transparent);
+        --color-node-stroke: color-mix(in srgb, var(--hu-text) 8%, transparent);
+        /* Terminal panel: dynamic neutrals stay dark on light pages */
+        --color-terminal-bg: var(--hu-dynamic-neutral-200);
+        --color-terminal-chrome: var(--hu-dynamic-neutral-300);
         --color-terminal-border: color-mix(in srgb, white 6%, transparent);
-        /* Pills */
-        --color-pill-provider: var(--hu-web-pill-provider);
-        --color-pill-provider-bg: var(--hu-web-pill-provider-bg);
-        --color-pill-provider-border: var(--hu-web-pill-provider-border);
-        --color-pill-channel: var(--hu-web-pill-channel);
-        --color-pill-channel-bg: var(--hu-web-pill-channel-bg);
-        --color-pill-channel-border: var(--hu-web-pill-channel-border);
-        --color-pill-tool: var(--hu-web-pill-tool);
-        --color-pill-tool-bg: var(--hu-web-pill-tool-bg);
-        --color-pill-tool-border: var(--hu-web-pill-tool-border);
+        /* Pills — status / chart-adjacent semantic colors */
+        --color-pill-provider: var(--hu-info);
+        --color-pill-provider-bg: var(--hu-info-dim);
+        --color-pill-provider-border: color-mix(in srgb, var(--hu-info) 22%, transparent);
+        --color-pill-channel: var(--hu-success);
+        --color-pill-channel-bg: var(--hu-success-dim);
+        --color-pill-channel-border: color-mix(in srgb, var(--hu-success) 22%, transparent);
+        --color-pill-tool: var(--hu-warning);
+        --color-pill-tool-bg: var(--hu-warning-dim);
+        --color-pill-tool-border: color-mix(in srgb, var(--hu-warning) 22%, transparent);
       }
     </style>
   </head>
@@ -443,9 +443,9 @@ const tools = [
               <span class="terminal-dot red w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-close)"></span>
               <span class="terminal-dot yellow w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-minimize)"></span>
               <span class="terminal-dot green w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-maximize)"></span>
-              <span class="terminal-title ml-2 text-[13px] font-medium" style="color: var(--hu-web-text-tertiary)">human</span>
+              <span class="terminal-title ml-2 text-[13px] font-medium" style="color: var(--hu-text-muted)">human</span>
             </div>
-            <div class="terminal-body px-6 py-5 font-mono text-[14px] leading-relaxed" style="color: var(--hu-web-text);">
+            <div class="terminal-body px-6 py-5 font-mono text-[14px] leading-relaxed" style="color: var(--hu-text);">
               <div class="terminal-line" style="--line-delay: 0"><span style="color: var(--color-accent)">$</span> human chat</div>
               <div class="terminal-line" style="--line-delay: 1"><span style="color: var(--color-accent)">human&gt;</span> Summarize the latest commits</div>
               <div class="terminal-line response" style="--line-delay: 2">Analyzing 12 commits from the last 24 hours...</div>
@@ -965,7 +965,7 @@ const tools = [
             <span class="flex items-center gap-2">
               <span
                 class="w-2 h-2 rounded-sm"
-                style="background: var(--hu-web-surface); border: 1px solid var(--hu-web-border);"
+                style="background: var(--hu-bg-surface); border: 1px solid var(--hu-border-subtle);"
               ></span>
               Unused space
             </span>
@@ -1861,7 +1861,7 @@ const tools = [
                 style="background: var(--hu-terminal-maximize)"></span>
               <span
                 class="text-[11px] ml-2 font-mono"
-                style="color: var(--hu-web-text-tertiary)">terminal</span
+                style="color: var(--hu-text-muted)">terminal</span
               >
             </div>
             <div
@@ -1915,7 +1915,7 @@ const tools = [
                 style="background: var(--hu-terminal-maximize)"></span>
               <span
                 class="text-[11px] ml-2 font-mono"
-                style="color: var(--hu-web-text-tertiary)"
+                style="color: var(--hu-text-muted)"
                 >h-uman Dashboard</span
               >
               <span
@@ -1937,13 +1937,13 @@ const tools = [
                 >
                   <div
                     class="text-[10px] uppercase tracking-wider mb-2"
-                    style="color: var(--hu-web-text-tertiary);"
+                    style="color: var(--hu-text-muted);"
                   >
                     Providers
                   </div>
                   <div
                     class="hu-metric-counter text-2xl font-bold mb-1"
-                    style="color: var(--hu-web-text);"
+                    style="color: var(--hu-text);"
                   >
                     <span class="dash-count" data-target="50">0</span>
                   </div>
@@ -1969,13 +1969,13 @@ const tools = [
                 >
                   <div
                     class="text-[10px] uppercase tracking-wider mb-2"
-                    style="color: var(--hu-web-text-tertiary);"
+                    style="color: var(--hu-text-muted);"
                   >
                     Channels
                   </div>
                   <div
                     class="hu-metric-counter text-2xl font-bold mb-1"
-                    style="color: var(--hu-web-text);"
+                    style="color: var(--hu-text);"
                   >
                     <span class="dash-count" data-target="34">0</span>
                   </div>
@@ -2001,19 +2001,19 @@ const tools = [
                 >
                   <div
                     class="text-[10px] uppercase tracking-wider mb-2"
-                    style="color: var(--hu-web-text-tertiary);"
+                    style="color: var(--hu-text-muted);"
                   >
                     Tools
                   </div>
                   <div
                     class="hu-metric-counter text-2xl font-bold mb-1"
-                    style="color: var(--hu-web-text);"
+                    style="color: var(--hu-text);"
                   >
                     <span class="dash-count" data-target="67">0</span>
                   </div>
                   <div
                     class="flex items-center gap-1 text-[11px]"
-                    style="color: var(--hu-web-text-tertiary);"
+                    style="color: var(--hu-text-muted);"
                   >
                     <svg
                       width="12"
@@ -2033,13 +2033,13 @@ const tools = [
                 >
                   <div
                     class="text-[10px] uppercase tracking-wider mb-2"
-                    style="color: var(--hu-web-text-tertiary);"
+                    style="color: var(--hu-text-muted);"
                   >
                     Sessions
                   </div>
                   <div
                     class="hu-metric-counter text-2xl font-bold mb-1"
-                    style="color: var(--hu-web-text);"
+                    style="color: var(--hu-text);"
                   >
                     <span class="dash-count" data-target="5">0</span>
                   </div>
@@ -2063,7 +2063,7 @@ const tools = [
               <div
                 id="dash-activity"
                 class="text-left text-[13px] space-y-2"
-                style="color: var(--hu-web-text-secondary);"
+                style="color: var(--hu-text-secondary);"
               >
               </div>
             </div>
@@ -2452,12 +2452,12 @@ const tools = [
         const outputEl = document.getElementById("terminal-output");
         if (outputEl) {
           outputEl.innerHTML = [
-            '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-web-text)">git clone https://github.com/sethdford/h-uman.git</span></div>',
-            '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-web-text)">cd h-uman && mkdir -p build && cd build</span></div>',
-            '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-web-text)">cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON && cmake --build .</span></div>',
-            '<div><span style="color:var(--hu-web-text-tertiary)">[100%] Built target human</span></div>',
-            '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-web-text)">ls -lh human</span></div>',
-            '<div><span style="color:var(--hu-web-text-tertiary)">-rwxr-xr-x  1 user  staff  </span><span style="color:var(--color-accent)">1696K</span><span style="color:var(--hu-web-text-tertiary)">  human</span></div>',
+            '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-text)">git clone https://github.com/sethdford/h-uman.git</span></div>',
+            '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-text)">cd h-uman && mkdir -p build && cd build</span></div>',
+            '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-text)">cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON && cmake --build .</span></div>',
+            '<div><span style="color:var(--hu-text-muted)">[100%] Built target human</span></div>',
+            '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-text)">ls -lh human</span></div>',
+            '<div><span style="color:var(--hu-text-muted)">-rwxr-xr-x  1 user  staff  </span><span style="color:var(--color-accent)">1696K</span><span style="color:var(--hu-text-muted)">  human</span></div>',
           ].join("");
         }
 
@@ -2747,7 +2747,7 @@ const tools = [
               p.textContent = "$ ";
               div.appendChild(p);
               const t = document.createElement("span");
-              t.style.color = "var(--hu-web-text)";
+              t.style.color = "var(--hu-text)";
               div.appendChild(t);
               container.appendChild(div);
               let ci = 0;
@@ -2764,7 +2764,7 @@ const tools = [
               tc();
             } else {
               const w = document.createElement("span");
-              w.style.color = "var(--hu-web-text-tertiary)";
+              w.style.color = "var(--hu-text-muted)";
               if (line.highlights?.length) {
                 let rem = line.text;
                 for (const hl of line.highlights) {
@@ -2854,7 +2854,7 @@ const tools = [
                       const div = document.createElement("div");
                       div.className = "flex items-center gap-2";
                       div.style.opacity = "0";
-                      div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-web-text-secondary); flex: 1;">${act.text}</span><span class="text-[11px]" style="color: var(--hu-web-text-tertiary)">${act.time}</span>`;
+                      div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-[11px]" style="color: var(--hu-text-muted)">${act.time}</span>`;
                       actContainer.appendChild(div);
                       requestAnimationFrame(() => {
                         div.style.transition = "opacity 0.4s ease-out";

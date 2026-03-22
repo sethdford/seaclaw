@@ -20,6 +20,9 @@ export interface ChartData {
 export const HU_CHART_CATEGORICAL_SERIES_COUNT = 16;
 const CATEGORICAL_SERIES_COUNT = HU_CHART_CATEGORICAL_SERIES_COUNT;
 
+/** Matches `chart.sequential` keys in `design-tokens/data-viz.tokens.json`. */
+const SEQUENTIAL_STOP_KEYS = [100, 200, 300, 400, 500, 600, 700, 800] as const;
+
 const CATEGORICAL_FALLBACKS = [
   "var(--hu-chart-categorical-1, hsl(90 45% 50%))",
   "var(--hu-chart-categorical-2, hsl(239 84% 67%))",
@@ -145,18 +148,51 @@ export class ScChart extends LitElement {
     return val || CATEGORICAL_FALLBACKS[index % CATEGORICAL_SERIES_COUNT];
   }
 
+  private _getSequentialColor(stopKey: (typeof SEQUENTIAL_STOP_KEYS)[number]): string {
+    const token = `--hu-chart-sequential-${stopKey}`;
+    const val = getComputedStyle(this).getPropertyValue(token).trim();
+    return val || `var(${token})`;
+  }
+
+  private _buildSequentialPalette(length: number): string[] {
+    if (length <= 0) return [];
+    if (length === 1) return [this._getSequentialColor(500)];
+    const maxK = SEQUENTIAL_STOP_KEYS.length - 1;
+    return Array.from({ length }, (_, i) => {
+      const t = i / (length - 1);
+      const idx = Math.round(t * maxK);
+      const key = SEQUENTIAL_STOP_KEYS[Math.min(maxK, Math.max(0, idx))];
+      return this._getSequentialColor(key);
+    });
+  }
+
+  private _maybeSequentialPalette(
+    ds: ChartDataset,
+    datasetCount: number,
+    datasetIndex: number,
+  ): string[] | null {
+    if (datasetIndex !== 0 || datasetCount !== 1) return null;
+    if (this.type !== "bar" && this.type !== "doughnut") return null;
+    if (ds.color != null || ds.backgroundColor != null) return null;
+    const n = ds.data?.length ?? 0;
+    if (n <= 1) return null;
+    return this._buildSequentialPalette(n);
+  }
+
   private _buildChartDatasets(): Array<Record<string, unknown>> {
     const datasets = this.data?.datasets ?? [];
     const isArea = this.type === "area";
     const chartType = isArea ? "line" : this.type;
 
     return datasets.map((ds, i) => {
+      const seq = this._maybeSequentialPalette(ds, datasets.length, i);
       const color = ds.color ?? ds.backgroundColor ?? this._getCategoricalColor(i);
+      const fillAndStroke = seq ?? color;
       const base: Record<string, unknown> = {
         label: ds.label,
         data: ds.data ?? [],
-        backgroundColor: ds.backgroundColor ?? color,
-        borderColor: color,
+        backgroundColor: ds.backgroundColor ?? fillAndStroke,
+        borderColor: fillAndStroke,
         borderWidth: chartType === "line" || isArea ? 2 : 1,
       };
       if (isArea) {

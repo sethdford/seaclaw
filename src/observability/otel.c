@@ -107,6 +107,14 @@ static const char *event_tag_str(hu_observer_event_tag_t tag) {
         return "cognition.mode";
     case HU_OBSERVER_EVENT_METACOG_ACTION:
         return "metacog.action";
+    case HU_OBSERVER_EVENT_HULA_NODE_START:
+        return "hula.node.start";
+    case HU_OBSERVER_EVENT_HULA_NODE_END:
+        return "hula.node.end";
+    case HU_OBSERVER_EVENT_HULA_NODE_OUTPUT:
+        return "hula.node.output";
+    case HU_OBSERVER_EVENT_HULA_PROGRAM_END:
+        return "hula.program.end";
     default:
         return "unknown";
     }

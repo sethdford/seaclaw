@@ -26,7 +26,7 @@ export class ScBadge extends LitElement {
 
     /* Variants */
     .badge.variant-neutral {
-      background: var(--hu-bg-elevated);
+      background: color-mix(in srgb, var(--hu-dynamic-neutral-700) 14%, var(--hu-bg-elevated));
       color: var(--hu-text-muted);
     }
 
@@ -46,7 +46,7 @@ export class ScBadge extends LitElement {
     }
 
     .badge.variant-info {
-      background: var(--hu-accent-tertiary-subtle);
+      background: color-mix(in srgb, var(--hu-dynamic-tertiary-500) 16%, transparent);
       color: var(--hu-accent-tertiary);
     }
 
@@ -70,7 +70,7 @@ export class ScBadge extends LitElement {
       background: var(--hu-error);
     }
     .variant-info .dot {
-      background: var(--hu-accent-tertiary);
+      background: var(--hu-dynamic-tertiary-600);
     }
   `;
 

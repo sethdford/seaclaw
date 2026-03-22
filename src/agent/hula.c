@@ -1067,8 +1067,6 @@ static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
                    strlen("hula budget: tool call limit exceeded"));
         return HU_OK;
     }
-    if (exec->budget_enabled && exec->budget_max_tool_calls > 0)
-        exec->budget_tool_calls_used++;
 
     hu_tool_t *tool = find_tool(exec->tools, exec->tools_count, n->tool_name);
     if (!tool) {
@@ -1105,6 +1103,9 @@ static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
         hu_observer_record_event(*exec->observer, &ev);
     }
 
+    if (exec->budget_enabled && exec->budget_max_tool_calls > 0)
+        exec->budget_tool_calls_used++;
+
     err = tool->vtable->execute(tool->ctx, &exec->alloc, args, &tr);
     hu_json_free(&exec->alloc, args);
 
@@ -1134,77 +1135,84 @@ static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
     return HU_OK;
 }
 
-static hu_error_t exec_seq(hu_hula_exec_t *exec, hu_hula_node_t *n) {
+static hu_error_t exec_seq(hu_hula_exec_t *exec, hu_hula_node_t *n, int depth) {
     for (size_t i = 0; i < n->children_count; i++) {
-        hu_error_t err = exec_node(exec, n->children[i]);
-        if (err != HU_OK) return err;
+        hu_error_t err = exec_node_depth(exec, n->children[i], depth + 1);
+        if (err != HU_OK)
+            return err;
         hu_hula_result_t *cr = result_for(exec, n->children[i]);
         if (cr && cr->status == HU_HULA_FAILED) {
-            set_result(exec, n, HU_HULA_FAILED, NULL, 0,
-                       cr->error, cr->error_len);
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, cr->error, cr->error_len);
             return HU_OK;
         }
     }
-    /* Propagate last child's output */
     if (n->children_count > 0) {
         hu_hula_result_t *lr = result_for(exec, n->children[n->children_count - 1]);
-        if (lr) set_result(exec, n, HU_HULA_DONE, lr->output, lr->output_len, NULL, 0);
+        if (lr)
+            set_result(exec, n, HU_HULA_DONE, lr->output, lr->output_len, NULL, 0);
     } else {
         set_result(exec, n, HU_HULA_DONE, NULL, 0, NULL, 0);
     }
     return HU_OK;
 }
 
-static hu_error_t exec_par(hu_hula_exec_t *exec, hu_hula_node_t *n) {
-    /* Sequential in-process execution (no threading under HU_IS_TEST).
-     * Parallel dispatch via pthreads can be added when wired into dispatcher. */
+static hu_error_t exec_par(hu_hula_exec_t *exec, hu_hula_node_t *n, int depth) {
     bool any_failed = false;
     for (size_t i = 0; i < n->children_count; i++) {
-        hu_error_t err = exec_node(exec, n->children[i]);
-        if (err != HU_OK) return err;
+        hu_error_t err = exec_node_depth(exec, n->children[i], depth + 1);
+        if (err != HU_OK)
+            return err;
         hu_hula_result_t *cr = result_for(exec, n->children[i]);
-        if (cr && cr->status == HU_HULA_FAILED) any_failed = true;
+        if (cr && cr->status == HU_HULA_FAILED)
+            any_failed = true;
     }
     set_result(exec, n, any_failed ? HU_HULA_FAILED : HU_HULA_DONE, NULL, 0,
                any_failed ? "child failed" : NULL, any_failed ? 12 : 0);
     return HU_OK;
 }
 
-static hu_error_t exec_branch(hu_hula_exec_t *exec, hu_hula_node_t *n) {
+static hu_error_t exec_branch(hu_hula_exec_t *exec, hu_hula_node_t *n, int depth) {
     hu_hula_result_t *lr = last_result(exec);
     bool cond = eval_pred(exec, n, lr);
     if (cond && n->children_count >= 1) {
-        hu_error_t err = exec_node(exec, n->children[0]);
-        if (err != HU_OK) return err;
+        hu_error_t err = exec_node_depth(exec, n->children[0], depth + 1);
+        if (err != HU_OK)
+            return err;
         hu_hula_result_t *cr = result_for(exec, n->children[0]);
-        if (cr) set_result(exec, n, cr->status, cr->output, cr->output_len, cr->error, cr->error_len);
+        if (cr)
+            set_result(exec, n, cr->status, cr->output, cr->output_len, cr->error, cr->error_len);
     } else if (!cond && n->children_count >= 2) {
-        hu_error_t err = exec_node(exec, n->children[1]);
-        if (err != HU_OK) return err;
+        hu_error_t err = exec_node_depth(exec, n->children[1], depth + 1);
+        if (err != HU_OK)
+            return err;
         hu_hula_result_t *cr = result_for(exec, n->children[1]);
-        if (cr) set_result(exec, n, cr->status, cr->output, cr->output_len, cr->error, cr->error_len);
+        if (cr)
+            set_result(exec, n, cr->status, cr->output, cr->output_len, cr->error, cr->error_len);
     } else {
         set_result(exec, n, HU_HULA_SKIPPED, NULL, 0, NULL, 0);
     }
     return HU_OK;
 }
 
-static hu_error_t exec_loop(hu_hula_exec_t *exec, hu_hula_node_t *n) {
+static hu_error_t exec_loop(hu_hula_exec_t *exec, hu_hula_node_t *n, int depth) {
     uint32_t max = n->max_iter > 0 ? n->max_iter : 10;
     for (uint32_t i = 0; i < max; i++) {
         hu_hula_result_t *lr = last_result(exec);
-        if (n->pred != HU_HULA_PRED_ALWAYS && !eval_pred(exec, n, lr)) break;
+        if (n->pred != HU_HULA_PRED_ALWAYS && !eval_pred(exec, n, lr))
+            break;
 
         for (size_t c = 0; c < n->children_count; c++) {
-            /* Reset child results for re-execution */
             hu_hula_result_t *cr = result_for(exec, n->children[c]);
             if (cr) {
-                if (cr->output) hu_str_free(&exec->alloc, cr->output);
-                if (cr->error) hu_str_free(&exec->alloc, cr->error);
+                if (cr->output)
+                    hu_str_free(&exec->alloc, cr->output);
+                if (cr->error)
+                    hu_str_free(&exec->alloc, cr->error);
                 memset(cr, 0, sizeof(*cr));
             }
-            hu_error_t err = exec_node(exec, n->children[c]);
-            if (err != HU_OK) return err;
+            hu_error_t err = exec_node_depth(exec, n->children[c], depth + 1);
+            if (err != HU_OK)
+                return err;
             cr = result_for(exec, n->children[c]);
             if (cr && cr->status == HU_HULA_FAILED) {
                 set_result(exec, n, HU_HULA_FAILED, NULL, 0, cr->error, cr->error_len);
@@ -1213,6 +1221,31 @@ static hu_error_t exec_loop(hu_hula_exec_t *exec, hu_hula_node_t *n) {
         }
     }
     set_result(exec, n, HU_HULA_DONE, NULL, 0, NULL, 0);
+    return HU_OK;
+}
+
+static hu_error_t exec_try(hu_hula_exec_t *exec, hu_hula_node_t *n, int depth) {
+    if (n->children_count < 1) {
+        set_result(exec, n, HU_HULA_FAILED, NULL, 0, "try needs body", 14);
+        return HU_OK;
+    }
+    hu_error_t err = exec_node_depth(exec, n->children[0], depth + 1);
+    if (err != HU_OK)
+        return err;
+    hu_hula_result_t *br = result_for(exec, n->children[0]);
+    if (br && br->status == HU_HULA_FAILED && n->children_count >= 2) {
+        err = exec_node_depth(exec, n->children[1], depth + 1);
+        if (err != HU_OK)
+            return err;
+        hu_hula_result_t *cr = result_for(exec, n->children[1]);
+        if (cr)
+            set_result(exec, n, cr->status, cr->output, cr->output_len, cr->error, cr->error_len);
+        return HU_OK;
+    }
+    if (br)
+        set_result(exec, n, br->status, br->output, br->output_len, br->error, br->error_len);
+    else
+        set_result(exec, n, HU_HULA_DONE, NULL, 0, NULL, 0);
     return HU_OK;
 }
 
@@ -1281,6 +1314,30 @@ static hu_error_t exec_delegate(hu_hula_exec_t *exec, hu_hula_node_t *n) {
 #if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
     if (exec->pool && exec->spawn_cfg && n->goal && n->goal_len > 0) {
         hu_spawn_config_t cfg = *exec->spawn_cfg;
+        char *ctx_sp = NULL;
+        if (n->delegate_context && n->delegate_context_len > 0) {
+            static const char dcx[] = "Delegate context:\n";
+            size_t old_len = cfg.system_prompt_len;
+            const char *old = cfg.system_prompt;
+            size_t need = sizeof(dcx) - 1 + n->delegate_context_len + 2 + old_len + 1;
+            ctx_sp = exec->alloc.alloc(exec->alloc.ctx, need);
+            if (ctx_sp) {
+                size_t pos = 0;
+                memcpy(ctx_sp + pos, dcx, sizeof(dcx) - 1);
+                pos += sizeof(dcx) - 1;
+                memcpy(ctx_sp + pos, n->delegate_context, n->delegate_context_len);
+                pos += n->delegate_context_len;
+                ctx_sp[pos++] = '\n';
+                ctx_sp[pos++] = '\n';
+                if (old && old_len > 0) {
+                    memcpy(ctx_sp + pos, old, old_len);
+                    pos += old_len;
+                }
+                ctx_sp[pos] = '\0';
+                cfg.system_prompt = ctx_sp;
+                cfg.system_prompt_len = pos;
+            }
+        }
         char *embed = NULL;
         size_t embed_len = 0;
         char *combined_sp = NULL;
@@ -1309,16 +1366,30 @@ static hu_error_t exec_delegate(hu_hula_exec_t *exec, hu_hula_node_t *n) {
                 cfg.system_prompt_len = pos;
             }
             exec->alloc.free(exec->alloc.ctx, embed, embed_len + 1);
+            if (ctx_sp && combined_sp && cfg.system_prompt == combined_sp) {
+                exec->alloc.free(exec->alloc.ctx, ctx_sp, strlen(ctx_sp) + 1);
+                ctx_sp = NULL;
+            }
         }
         if (n->delegate_model && n->delegate_model_len > 0) {
             cfg.model = n->delegate_model;
             cfg.model_len = n->delegate_model_len;
         }
         uint64_t agent_id = 0;
-        hu_error_t err = hu_agent_pool_spawn(exec->pool, &cfg, n->goal, n->goal_len,
-                                              n->id ? n->id : "hula_delegate", &agent_id);
+        hu_error_t err;
+        if (n->delegate_agent_id && n->delegate_agent_id_len > 0 && exec->delegate_registry)
+            err = hu_agent_pool_spawn_named(exec->pool, exec->delegate_registry,
+                                            n->delegate_agent_id, n->goal, n->goal_len, &agent_id);
+        else
+            err = hu_agent_pool_spawn(exec->pool, &cfg, n->goal, n->goal_len,
+                                      n->id ? n->id : "hula_delegate", &agent_id);
         if (combined_sp)
             exec->alloc.free(exec->alloc.ctx, combined_sp, strlen(combined_sp) + 1);
+        combined_sp = NULL;
+        if (ctx_sp) {
+            exec->alloc.free(exec->alloc.ctx, ctx_sp, strlen(ctx_sp) + 1);
+            ctx_sp = NULL;
+        }
         if (err != HU_OK) {
             set_result(exec, n, HU_HULA_FAILED, NULL, 0, "delegate spawn failed", 21);
             return HU_OK;
@@ -1329,6 +1400,9 @@ static hu_error_t exec_delegate(hu_hula_exec_t *exec, hu_hula_node_t *n) {
                 const char *result = hu_agent_pool_result(exec->pool, agent_id);
                 if (st == HU_AGENT_COMPLETED && result) {
                     set_result(exec, n, HU_HULA_DONE, result, strlen(result), NULL, 0);
+                    if (n->delegate_result_key && n->delegate_result_key_len > 0)
+                        (void)hula_slot_set(exec, n->delegate_result_key, n->delegate_result_key_len,
+                                            result, strlen(result));
                 } else {
                     set_result(exec, n, HU_HULA_FAILED, NULL, 0,
                                result ? result : "delegate failed", result ? strlen(result) : 15);
@@ -1340,6 +1414,13 @@ static hu_error_t exec_delegate(hu_hula_exec_t *exec, hu_hula_node_t *n) {
         }
         set_result(exec, n, HU_HULA_FAILED, NULL, 0, "delegate timeout", 16);
         hu_agent_pool_cancel(exec->pool, agent_id);
+        return HU_OK;
+    }
+#endif
+#if defined(_WIN32) && !defined(HU_IS_TEST)
+    if (exec->pool && exec->spawn_cfg && n->goal && n->goal_len > 0) {
+        set_result(exec, n, HU_HULA_FAILED, NULL, 0, "delegate spawn not supported on this platform",
+                   strlen("delegate spawn not supported on this platform"));
         return HU_OK;
     }
 #endif
@@ -1369,36 +1450,202 @@ static hu_error_t exec_emit(hu_hula_exec_t *exec, hu_hula_node_t *n) {
     }
 
     set_result(exec, n, HU_HULA_DONE, val, val_len, NULL, 0);
+    if (n->emit_key && n->emit_key_len > 0)
+        (void)hula_slot_set(exec, n->emit_key, n->emit_key_len, val, val_len);
     return HU_OK;
 }
 
-static hu_error_t exec_node(hu_hula_exec_t *exec, hu_hula_node_t *n) {
-    if (!n || exec->halted) return HU_OK;
+static void hula_emit_stream_output(hu_hula_exec_t *exec, const hu_hula_node_t *n) {
+    if (!exec->observer || !n)
+        return;
+    const hu_hula_result_t *rr = result_for(exec, (hu_hula_node_t *)n);
+    if (!rr || rr->status != HU_HULA_DONE || !rr->output || rr->output_len == 0)
+        return;
+    hu_observer_event_t ev = {0};
+    ev.tag = HU_OBSERVER_EVENT_HULA_NODE_OUTPUT;
+    ev.data.hula_node_output.node_id = n->id ? n->id : "";
+    ev.data.hula_node_output.output = rr->output;
+    ev.data.hula_node_output.output_len = rr->output_len;
+    hu_observer_record_event(*exec->observer, &ev);
+}
 
-    hu_hula_result_t *r = result_for(exec, n);
-    if (r) r->status = HU_HULA_RUNNING;
-
+static hu_error_t exec_dispatch(hu_hula_exec_t *exec, hu_hula_node_t *n, int depth) {
     hu_error_t err;
     switch (n->op) {
-    case HU_HULA_CALL:     err = exec_call(exec, n); break;
-    case HU_HULA_SEQ:      err = exec_seq(exec, n); break;
-    case HU_HULA_PAR:      err = exec_par(exec, n); break;
-    case HU_HULA_BRANCH:   err = exec_branch(exec, n); break;
-    case HU_HULA_LOOP:     err = exec_loop(exec, n); break;
-    case HU_HULA_DELEGATE: err = exec_delegate(exec, n); break;
-    case HU_HULA_EMIT:     err = exec_emit(exec, n); break;
+    case HU_HULA_CALL:
+        err = exec_call(exec, n);
+        break;
+    case HU_HULA_SEQ:
+        err = exec_seq(exec, n, depth);
+        break;
+    case HU_HULA_PAR:
+        err = exec_par(exec, n, depth);
+        break;
+    case HU_HULA_BRANCH:
+        err = exec_branch(exec, n, depth);
+        break;
+    case HU_HULA_LOOP:
+        err = exec_loop(exec, n, depth);
+        break;
+    case HU_HULA_DELEGATE:
+        err = exec_delegate(exec, n);
+        break;
+    case HU_HULA_EMIT:
+        err = exec_emit(exec, n);
+        break;
+    case HU_HULA_TRY:
+        err = exec_try(exec, n, depth);
+        break;
     default:
         set_result(exec, n, HU_HULA_FAILED, NULL, 0, "unknown opcode", 14);
         err = HU_OK;
         break;
     }
-    if (err == HU_OK) trace_append(exec, n);
+    return err;
+}
+
+static hu_error_t exec_node_depth(hu_hula_exec_t *exec, hu_hula_node_t *n, int depth) {
+    if (!n)
+        return HU_OK;
+
+    hu_hula_result_t *r = result_for(exec, n);
+    if (exec->halted) {
+        if (r) {
+            const char *rs = exec->halt_reason ? exec->halt_reason : "cancelled";
+            size_t rl = exec->halt_reason_len ? exec->halt_reason_len : strlen(rs);
+            set_result(exec, n, HU_HULA_CANCELLED, NULL, 0, rs, rl);
+            trace_append(exec, n);
+        }
+        return HU_OK;
+    }
+
+    if (n->required_capability && n->required_capability_len > 0) {
+        if (!hu_policy_hula_capability_allowed(exec->policy, n->required_capability,
+                                               n->required_capability_len)) {
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "hula capability denied",
+                       strlen("hula capability denied"));
+            trace_append(exec, n);
+            return HU_OK;
+        }
+    }
+
+    if (exec->budget_enabled && exec->budget_max_depth > 0 &&
+        (uint32_t)depth > exec->budget_max_depth) {
+        set_result(exec, n, HU_HULA_FAILED, NULL, 0, "hula budget: max depth exceeded",
+                   strlen("hula budget: max depth exceeded"));
+        trace_append(exec, n);
+        return HU_OK;
+    }
+    if (exec->budget_enabled && exec->budget_max_wall_ms > 0 && exec->budget_run_start_ms > 0) {
+        uint64_t now = hula_wall_ms();
+        if (now >= exec->budget_run_start_ms &&
+            now - exec->budget_run_start_ms > (uint64_t)exec->budget_max_wall_ms) {
+            set_result(exec, n, HU_HULA_FAILED, NULL, 0, "hula budget: wall time exceeded",
+                       strlen("hula budget: wall time exceeded"));
+            trace_append(exec, n);
+            return HU_OK;
+        }
+    }
+
+    if (r)
+        r->status = HU_HULA_RUNNING;
+
+    if (exec->observer) {
+        hu_observer_event_t ev = {0};
+        ev.tag = HU_OBSERVER_EVENT_HULA_NODE_START;
+        ev.data.hula_node_start.node_id = n->id ? n->id : "";
+        ev.data.hula_node_start.op_name = hu_hula_op_name(n->op);
+        hu_observer_record_event(*exec->observer, &ev);
+    }
+
+    uint64_t t0 = hula_wall_ms();
+    uint32_t max_attempts = 1u + n->retry_count;
+    if (max_attempts > 64u)
+        max_attempts = 64u;
+    hu_error_t err = HU_OK;
+
+    for (uint32_t att = 0; att < max_attempts; att++) {
+        if (att > 0) {
+            hula_result_reset(exec, n);
+#if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
+            if (n->retry_backoff_ms > 0) {
+                struct timespec ts = {.tv_sec = n->retry_backoff_ms / 1000u,
+                                      .tv_nsec = (long)(n->retry_backoff_ms % 1000u) * 1000000L};
+                (void)nanosleep(&ts, NULL);
+            }
+#endif
+        }
+
+        err = exec_dispatch(exec, n, depth);
+        if (err != HU_OK)
+            return err;
+
+        if (n->timeout_ms > 0) {
+            uint64_t elapsed = hula_wall_ms() - t0;
+            if (elapsed > (uint64_t)n->timeout_ms) {
+                set_result(exec, n, HU_HULA_FAILED, NULL, 0, "timeout exceeded", 16);
+                break;
+            }
+        }
+
+        r = result_for(exec, n);
+        if (!r || r->status != HU_HULA_FAILED || att + 1 >= max_attempts)
+            break;
+    }
+
+    uint64_t elapsed_ms = 0;
+    {
+        uint64_t t1 = hula_wall_ms();
+        if (t1 >= t0)
+            elapsed_ms = t1 - t0;
+    }
+
+    if (exec->observer) {
+        hu_observer_event_t ev2 = {0};
+        ev2.tag = HU_OBSERVER_EVENT_HULA_NODE_END;
+        ev2.data.hula_node_end.node_id = n->id ? n->id : "";
+        ev2.data.hula_node_end.op_name = hu_hula_op_name(n->op);
+        r = result_for(exec, n);
+        ev2.data.hula_node_end.status =
+            r ? hu_hula_status_name(r->status) : hu_hula_status_name(HU_HULA_PENDING);
+        ev2.data.hula_node_end.elapsed_ms = elapsed_ms;
+        hu_observer_record_event(*exec->observer, &ev2);
+    }
+
+    if (err == HU_OK &&
+        (n->op == HU_HULA_CALL || n->op == HU_HULA_EMIT || n->op == HU_HULA_DELEGATE))
+        hula_emit_stream_output(exec, n);
+
+    if (err == HU_OK)
+        trace_append(exec, n);
     return err;
 }
 
 hu_error_t hu_hula_exec_run(hu_hula_exec_t *exec) {
-    if (!exec || !exec->program || !exec->program->root) return HU_ERR_INVALID_ARGUMENT;
-    return exec_node(exec, exec->program->root);
+    if (!exec || !exec->program || !exec->program->root)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (exec->budget_enabled)
+        exec->budget_run_start_ms = hula_wall_ms();
+    exec->budget_tool_calls_used = 0;
+    uint64_t t_run0 = hula_wall_ms();
+    hu_error_t e = exec_node_depth(exec, exec->program->root, 0);
+    if (exec->observer) {
+        hu_observer_event_t ev = {0};
+        ev.tag = HU_OBSERVER_EVENT_HULA_PROGRAM_END;
+        const hu_hula_result_t *rr =
+            exec->program->root && exec->program->root->id
+                ? hu_hula_exec_result(exec, exec->program->root->id)
+                : NULL;
+        bool ok = rr && rr->status == HU_HULA_DONE;
+        ev.data.hula_program_end.program_name =
+            exec->program->name ? exec->program->name : "";
+        ev.data.hula_program_end.success = ok;
+        uint64_t t1 = hula_wall_ms();
+        ev.data.hula_program_end.total_ms = (t1 >= t_run0) ? (t1 - t_run0) : 0;
+        ev.data.hula_program_end.node_count = exec->program->node_count;
+        hu_observer_record_event(*exec->observer, &ev);
+    }
+    return e;
 }
 
 const hu_hula_result_t *hu_hula_exec_result(const hu_hula_exec_t *exec, const char *node_id) {
@@ -1464,6 +1711,13 @@ static size_t subtree_estimated_calls(const hu_hula_node_t *n) {
         return s;
     }
     case HU_HULA_EMIT:
+        return 0;
+    case HU_HULA_TRY: {
+        size_t s = 0;
+        for (size_t i = 0; i < n->children_count; i++)
+            s += subtree_estimated_calls(n->children[i]);
+        return s;
+    }
     default:
         return 0;
     }
@@ -1512,6 +1766,11 @@ static void cost_visit(const hu_hula_node_t *n, size_t *calls, size_t *par_max, 
         /* Children describe the child agent's program — not executed in this process. */
         break;
     case HU_HULA_EMIT:
+        break;
+    case HU_HULA_TRY:
+        for (size_t i = 0; i < n->children_count; i++)
+            cost_visit(n->children[i], calls, par_max, loop_sum, max_risk);
+        break;
     default:
         break;
     }
@@ -1542,6 +1801,12 @@ void hu_hula_exec_deinit(hu_hula_exec_t *exec) {
         exec->alloc.free(exec->alloc.ctx, exec->trace_log, exec->trace_log_cap);
     if (exec->halt_reason)
         exec->alloc.free(exec->alloc.ctx, exec->halt_reason, exec->halt_reason_len + 1);
+    for (size_t si = 0; si < exec->slot_count; si++) {
+        if (exec->slots[si].key)
+            exec->alloc.free(exec->alloc.ctx, exec->slots[si].key, exec->slots[si].key_len + 1);
+        if (exec->slots[si].value)
+            exec->alloc.free(exec->alloc.ctx, exec->slots[si].value, exec->slots[si].value_len + 1);
+    }
     memset(exec, 0, sizeof(*exec));
 }
 

@@ -34,15 +34,16 @@ export class ScPageHero extends LitElement {
       inset: 0;
       background:
         radial-gradient(
-          ellipse 80% 60% at 20% 40%,
-          color-mix(in srgb, var(--hu-accent) 6%, transparent),
-          transparent
+          ellipse at 20% 50%,
+          color-mix(in srgb, var(--hu-dynamic-primary-800) 8%, transparent),
+          transparent 60%
         ),
         radial-gradient(
-          ellipse 60% 50% at 80% 30%,
-          color-mix(in srgb, var(--hu-accent-secondary, var(--hu-accent)) 4%, transparent),
-          transparent
-        );
+          ellipse at 80% 30%,
+          color-mix(in srgb, var(--hu-dynamic-tertiary-800) 6%, transparent),
+          transparent 50%
+        ),
+        var(--hu-bg);
       pointer-events: none;
     }
     .content {
