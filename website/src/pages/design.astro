@@ -146,7 +146,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 If it's slow, it's ugly. Every animation runs on the compositor.
                 Every transition respects <code
                   class="text-[var(--hu-text-sm)] px-1.5 py-0.5 rounded"
-                  style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono);"
+                  style="background: var(--hu-surface-container-high); font-family: var(--hu-font-mono);"
                   >prefers-reduced-motion</code
                 >.
               </p>
@@ -503,7 +503,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             </p>
             <pre
               class="p-6 rounded-xl overflow-x-auto"
-              style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono); font-size: var(--hu-text-sm); border: 1px solid var(--color-border);">
+              style="background: var(--hu-surface-container-high); font-family: var(--hu-font-mono); font-size: var(--hu-text-sm); border: 1px solid var(--color-border);">
               <code style="color: var(--color-text);"><span style="color: var(--color-accent);">$</span> cmake --preset dev
 <span style="color: var(--color-accent);">$</span> cmake --build --preset dev
 <span style="color: var(--color-text-tertiary);">[100%] Built target human</span></code>
@@ -749,7 +749,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               > — All animations respect the user's motion preference. When
               <code
                 class="px-1.5 py-0.5 rounded text-[var(--hu-text-sm)]"
-                style="background: var(--hu-web-code-bg); font-family: var(--hu-font-mono);"
+                style="background: var(--hu-surface-container-high); font-family: var(--hu-font-mono);"
                 >prefers-reduced-motion: reduce</code
               >
               is set, durations collapse to near-instant and spring effects are disabled.

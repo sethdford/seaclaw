@@ -45,15 +45,15 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     <meta property="og:url" content="https://h-uman.ai/brand/" />
 
     <style is:global>
-      /* --color-* aliases for brand.astro (maps to --hu-web-* / --hu-* tokens) */
+      /* --color-* aliases for brand.astro (shortcuts over canonical --hu-* tokens) */
       :root {
-        --color-bg: var(--hu-web-bg);
-        --color-text: var(--hu-web-text);
-        --color-text-secondary: var(--hu-web-text-secondary);
-        --color-text-tertiary: var(--hu-web-text-tertiary);
+        --color-bg: var(--hu-bg);
+        --color-text: var(--hu-text);
+        --color-text-secondary: var(--hu-text-secondary);
+        --color-text-tertiary: var(--hu-text-muted);
         --color-accent: var(--hu-accent);
         --color-accent-light: var(--hu-accent-light, var(--hu-accent-subtle));
-        --color-border: var(--hu-web-border);
+        --color-border: var(--hu-border-subtle);
       }
     </style>
   </head>
@@ -78,19 +78,19 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         <div class="relative z-10 max-w-5xl mx-auto text-center">
           <h1
             class="text-[clamp(3.5rem,10vw,7rem)] font-black leading-[0.95] tracking-tighter mb-4"
-            style="font-family: var(--hu-font); color: var(--hu-web-text);"
+            style="font-family: var(--hu-font); color: var(--hu-text);"
           >
             h-uman
           </h1>
           <p
             class="text-[clamp(1.25rem,2.5vw,1.75rem)] font-normal mb-8"
-            style="color: var(--hu-web-text-secondary); letter-spacing: 0.06em;"
+            style="color: var(--hu-text-secondary); letter-spacing: 0.06em;"
           >
             not quite human.
           </p>
           <p
             class="text-[clamp(1rem,1.8vw,1.2rem)] max-w-2xl mx-auto leading-relaxed"
-            style="color: var(--hu-web-text-tertiary);"
+            style="color: var(--hu-text-muted);"
           >
             We built an AI runtime that's honest about what it is. Not trying to
             be human. Not pretending to be anything it's not. Just a fast,
@@ -187,7 +187,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                   loading="lazy"
                 />
               </div>
-              <p class="text-sm" style="color: var(--hu-web-text-secondary);">
+              <p class="text-sm" style="color: var(--hu-text-secondary);">
                 Clear space: minimum 1× logo height on all sides
               </p>
             </div>
@@ -206,12 +206,12 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 />
                 <span
                   class="text-xs mt-3"
-                  style="color: var(--hu-web-text-tertiary);">64px</span
+                  style="color: var(--hu-text-muted);">64px</span
                 >
               </div>
               <div
                 class="rounded-xl p-8 flex flex-col items-center justify-center"
-                style="background: var(--hu-web-surface); border: 1px solid var(--color-border);"
+                style="background: var(--hu-bg-surface); border: 1px solid var(--color-border);"
               >
                 <img
                   src={`${base}human.svg`}
@@ -240,7 +240,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 />
                 <span
                   class="text-xs mt-3"
-                  style="color: var(--hu-web-text-tertiary);">32px on dark</span
+                  style="color: var(--hu-text-muted);">32px on dark</span
                 >
               </div>
             </div>
@@ -273,12 +273,12 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               <p class="text-sm" style="color: var(--color-text-secondary);">
                 <code
                   class="px-2 py-0.5 rounded"
-                  style="background: var(--hu-web-code-bg); color: var(--color-accent);"
+                  style="background: var(--hu-surface-container-high); color: var(--color-accent);"
                   >#7AB648</code
                 >
                 — <code
                   class="px-2 py-0.5 rounded"
-                  style="background: var(--hu-web-code-bg);"
+                  style="background: var(--hu-surface-container-high);"
                   >var(--hu-accent)</code
                 >
               </p>
@@ -319,7 +319,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               <div class="grid sm:grid-cols-2 gap-6">
                 <div
                   class="rounded-2xl p-6 border"
-                  style="background: var(--hu-web-bg); border-color: var(--color-border);"
+                  style="background: var(--hu-bg); border-color: var(--color-border);"
                 >
                   <p
                     class="text-xs uppercase tracking-wider mb-4"
@@ -351,7 +351,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 >
                   <p
                     class="text-xs uppercase tracking-wider mb-4"
-                    style="color: var(--hu-web-text-tertiary);"
+                    style="color: var(--hu-text-muted);"
                   >
                     Dark mode
                   </p>
@@ -391,7 +391,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
           <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
             Avenir at all weights. Use <code
               class="px-2 py-0.5 rounded"
-              style="background: var(--hu-web-code-bg);">var(--hu-font)</code
+              style="background: var(--hu-surface-container-high);">var(--hu-font)</code
             >.
           </p>
           <div class="space-y-10">
