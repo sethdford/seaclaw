@@ -46,7 +46,7 @@ Every node:
 - **`loop`**: bounded iterations over `body`; uses `max_iter` when set.
 - **`delegate`**: with `hu_agent_pool_t` + `hu_spawn_config_t` (non-test Unix), spawns a child agent; optional **child program** is embedded from `children` as JSON in an extended system prompt. The main turn wires pool + `hu_spawn_config_apply_parent_agent` into `hu_hula_exec_set_spawn` for native HuLa, the trivial IR path, and `hu_hula_compiler_chat_compile_execute` (stack `hu_spawn_config_t` must remain valid until `hu_hula_exec_run` returns). Without pool/config, returns the goal string as a stub success result (`HU_IS_TEST` always stubs delegate execution).
 - **`emit`**: produces a string value, resolving `$id` placeholders from prior node outputs.
-- **`call` args**: after JSON parse, the executor walks string values and expands `$node_id` the same way as `emit_value` (referenced node must be **done** before the `call` runs, for example under `seq`).
+- **`call` args**: after JSON parse, the executor walks string values and expands `$node_id` the same way as `emit_value` (referenced node must be **done** before the `call` runs, for example under `seq`). A substitution ends at a **boundary**: the next character must not be an id-continuation character (`[A-Za-z0-9_]`); otherwise a longer id is required (use an explicit delimiter such as `.` between a ref and literal text).
 
 Policy (`hu_security_policy_t`) is applied before each tool `call`. Risk is combined into `hu_hula_estimate_cost` (`max_tool_risk`).
 
