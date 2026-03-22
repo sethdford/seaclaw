@@ -1550,6 +1550,8 @@ static hu_error_t exec_node_depth(hu_hula_exec_t *exec, hu_hula_node_t *n, int d
     if (r)
         r->status = HU_HULA_RUNNING;
 
+    uint64_t t0 = hula_wall_ms();
+
     if (exec->observer) {
         hu_observer_event_t ev = {0};
         ev.tag = HU_OBSERVER_EVENT_HULA_NODE_START;
@@ -1558,7 +1560,32 @@ static hu_error_t exec_node_depth(hu_hula_exec_t *exec, hu_hula_node_t *n, int d
         hu_observer_record_event(*exec->observer, &ev);
     }
 
-    uint64_t t0 = hula_wall_ms();
+    if (exec->halted) {
+        if (r) {
+            const char *rs = exec->halt_reason ? exec->halt_reason : "cancelled";
+            size_t rl = exec->halt_reason_len ? exec->halt_reason_len : strlen(rs);
+            set_result(exec, n, HU_HULA_CANCELLED, NULL, 0, rs, rl);
+        }
+        uint64_t elapsed_ms = 0;
+        {
+            uint64_t t1 = hula_wall_ms();
+            if (t1 >= t0)
+                elapsed_ms = t1 - t0;
+        }
+        if (exec->observer) {
+            hu_observer_event_t ev2 = {0};
+            ev2.tag = HU_OBSERVER_EVENT_HULA_NODE_END;
+            ev2.data.hula_node_end.node_id = n->id ? n->id : "";
+            ev2.data.hula_node_end.op_name = hu_hula_op_name(n->op);
+            r = result_for(exec, n);
+            ev2.data.hula_node_end.status =
+                r ? hu_hula_status_name(r->status) : hu_hula_status_name(HU_HULA_PENDING);
+            ev2.data.hula_node_end.elapsed_ms = elapsed_ms;
+            hu_observer_record_event(*exec->observer, &ev2);
+        }
+        trace_append(exec, n);
+        return HU_OK;
+    }
     uint32_t max_attempts = 1u + n->retry_count;
     if (max_attempts > 64u)
         max_attempts = 64u;

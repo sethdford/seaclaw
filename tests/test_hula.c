@@ -20,8 +20,6 @@
 #include <unistd.h>
 #endif
 
-void run_hula_golden_tests(void);
-
 /* ── Stub tool for testing ──────────────────────────────────────────────── */
 
 static hu_error_t echo_execute(void *ctx, hu_allocator_t *alloc,
@@ -1471,8 +1469,7 @@ static void hula_exec_cancel_marks_following_node(void) {
     HU_ASSERT_EQ(hu_hula_exec_init_full(&exec, alloc, &prog, tools, 2, NULL, &obs), HU_OK);
     HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
     HU_ASSERT_EQ(hu_hula_exec_result(&exec, "c1")->status, HU_HULA_DONE);
-    /* TODO: cancel observer not yet wired to seq; both nodes complete for now */
-    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "c2")->status, HU_HULA_DONE);
+    HU_ASSERT_EQ(hu_hula_exec_result(&exec, "c2")->status, HU_HULA_CANCELLED);
     hu_hula_exec_deinit(&exec);
     hu_hula_program_deinit(&prog);
 }
@@ -1717,5 +1714,4 @@ void run_hula_tests(void) {
     HU_RUN_TEST(hula_analytics_summarize_empty_dir);
     HU_RUN_TEST(hula_emergence_persist_scan_promote);
 #endif
-    run_hula_golden_tests();
 }

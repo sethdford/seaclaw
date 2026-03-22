@@ -3627,7 +3627,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 if (tc_count == 1) {
                                     cn = hula_root;
                                 } else {
-                                    char cid[16];
+                                    char cid[32];
                                     (void)snprintf(cid, sizeof(cid), "t%zu", hti);
                                     cn = hu_hula_program_alloc_node(&hula_prog, HU_HULA_CALL, cid);
                                     if (cn)

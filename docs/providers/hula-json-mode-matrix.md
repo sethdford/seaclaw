@@ -1,3 +1,8 @@
+---
+title: HuLa JSON / json_object mode matrix
+description: Provider compatibility with OpenAI-style json_object response_format for the HuLa compiler
+---
+
 # HuLa compiler — JSON / `json_object` mode matrix
 
 The HuLa compiler calls the active provider `chat` with `response_format` set to `json_object` (OpenAI-style). The generic adapter builds this in `src/providers/compatible.c` as:
