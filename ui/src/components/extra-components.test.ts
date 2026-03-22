@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import type { ScChart } from "./hu-chart.js";
+import {
+  HU_CHART_CATEGORICAL_SERIES_COUNT,
+  type ScChart,
+} from "./hu-chart.js";
 import type { ScJsonViewer } from "./hu-json-viewer.js";
 import type { ScPagination } from "./hu-pagination.js";
 import type { ScDataTableV2 } from "./hu-data-table-v2.js";
@@ -3368,6 +3371,10 @@ describe("hu-message-thread", () => {
 });
 
 describe("hu-chart", () => {
+  it("should align categorical series count with design-tokens data-viz", () => {
+    expect(HU_CHART_CATEGORICAL_SERIES_COUNT).toBe(16);
+  });
+
   it("should be defined as a custom element", () => {
     expect(customElements.get("hu-chart")).toBeDefined();
   });

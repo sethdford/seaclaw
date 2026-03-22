@@ -2,6 +2,7 @@
 #include "config_parse_internal.h"
 #include "human/config.h"
 #include "human/core/string.h"
+#include <stdio.h>
 #include <string.h>
 
 hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -189,6 +190,41 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
         }
     }
 
+    /* Constitutional AI configurable principles */
+    hu_json_value_t *cp_arr = hu_json_object_get(obj, "constitutional_principles");
+    if (cp_arr && cp_arr->type == HU_JSON_ARRAY && cp_arr->data.array.len > 0) {
+        if (cfg->agent.constitutional_principles)
+            a->free(a->ctx, cfg->agent.constitutional_principles,
+                    strlen(cfg->agent.constitutional_principles) + 1);
+        size_t buf_cap = 512;
+        char *buf = (char *)a->alloc(a->ctx, buf_cap);
+        if (buf) {
+            size_t pos = 0;
+            buf[0] = '\0';
+            for (size_t i = 0; i < cp_arr->data.array.len && i < 16; i++) {
+                hu_json_value_t *item = cp_arr->data.array.items[i];
+                if (!item || item->type != HU_JSON_STRING)
+                    continue;
+                const char *principle = item->data.string.ptr;
+                size_t plen = item->data.string.len;
+                size_t needed = pos + plen + 8;
+                if (needed >= buf_cap) {
+                    size_t nc = buf_cap * 2;
+                    while (nc < needed) nc *= 2;
+                    char *nb = (char *)a->realloc(a->ctx, buf, buf_cap, nc);
+                    if (!nb) break;
+                    buf = nb;
+                    buf_cap = nc;
+                }
+                int n = snprintf(buf + pos, buf_cap - pos, "- %.*s\n", (int)plen, principle);
+                if (n > 0 && (size_t)n < buf_cap - pos)
+                    pos += (size_t)n;
+            }
+            buf[pos] = '\0';
+            cfg->agent.constitutional_principles = buf;
+        }
+    }
+
     hu_json_value_t *ct_obj = hu_json_object_get(obj, "persona_contacts");
     if (ct_obj && ct_obj->type == HU_JSON_OBJECT && ct_obj->data.object.pairs) {
         size_t n = ct_obj->data.object.len;
@@ -217,6 +253,38 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
                 cfg->agent.persona_contacts = arr;
                 cfg->agent.persona_contacts_count = count;
             }
+        }
+    }
+
+    hu_json_value_t *mr_obj = hu_json_object_get(obj, "model_router");
+    if (mr_obj && mr_obj->type == HU_JSON_OBJECT) {
+        const char *mr_ref = hu_json_get_string(mr_obj, "reflexive_model");
+        if (mr_ref) {
+            if (cfg->agent.mr_reflexive_model)
+                a->free(a->ctx, cfg->agent.mr_reflexive_model,
+                        strlen(cfg->agent.mr_reflexive_model) + 1);
+            cfg->agent.mr_reflexive_model = hu_strdup(a, mr_ref);
+        }
+        const char *mr_conv = hu_json_get_string(mr_obj, "conversational_model");
+        if (mr_conv) {
+            if (cfg->agent.mr_conversational_model)
+                a->free(a->ctx, cfg->agent.mr_conversational_model,
+                        strlen(cfg->agent.mr_conversational_model) + 1);
+            cfg->agent.mr_conversational_model = hu_strdup(a, mr_conv);
+        }
+        const char *mr_ana = hu_json_get_string(mr_obj, "analytical_model");
+        if (mr_ana) {
+            if (cfg->agent.mr_analytical_model)
+                a->free(a->ctx, cfg->agent.mr_analytical_model,
+                        strlen(cfg->agent.mr_analytical_model) + 1);
+            cfg->agent.mr_analytical_model = hu_strdup(a, mr_ana);
+        }
+        const char *mr_deep = hu_json_get_string(mr_obj, "deep_model");
+        if (mr_deep) {
+            if (cfg->agent.mr_deep_model)
+                a->free(a->ctx, cfg->agent.mr_deep_model,
+                        strlen(cfg->agent.mr_deep_model) + 1);
+            cfg->agent.mr_deep_model = hu_strdup(a, mr_deep);
         }
     }
 

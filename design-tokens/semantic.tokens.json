@@ -27,7 +27,7 @@
     }
   },
   "dark": {
-    "$description": "Dark theme — deep ocean midnight with Fidelity green accents",
+    "$description": "Dark theme — warm charcoal with Human green accents",
     "bg": {
       "$value": "{color.neutral.50}",
       "$type": "color"
@@ -91,24 +91,24 @@
       "$type": "color"
     },
     "accent": {
-      "$value": "{color.fidelity.500}",
+      "$value": "{color.human.500}",
       "$type": "color"
     },
     "accent-text": {
-      "$value": "{color.fidelity.400}",
+      "$value": "{color.human.400}",
       "$type": "color",
-      "$description": "Fidelity green for text on dark backgrounds"
+      "$description": "Human green for text on dark backgrounds"
     },
     "accent-hover": {
-      "$value": "{color.fidelity.400}",
+      "$value": "{color.human.400}",
       "$type": "color"
     },
     "accent-subtle": {
-      "$value": "{color.fidelity.dark-subtle}",
+      "$value": "{color.human.dark-subtle}",
       "$type": "color"
     },
     "accent-strong": {
-      "$value": "{color.fidelity.300}",
+      "$value": "{color.human.300}",
       "$type": "color"
     },
     "on-accent": {
@@ -141,24 +141,24 @@
       "$type": "color"
     },
     "accent-tertiary": {
-      "$value": "{color.indigo.500}",
+      "$value": "{color.blue.500}",
       "$type": "color"
     },
     "accent-tertiary-text": {
-      "$value": "{color.indigo.400}",
+      "$value": "{color.blue.400}",
       "$type": "color",
       "$description": "Indigo accent for text on dark backgrounds"
     },
     "accent-tertiary-hover": {
-      "$value": "{color.indigo.400}",
+      "$value": "{color.blue.400}",
       "$type": "color"
     },
     "accent-tertiary-subtle": {
-      "$value": "{color.indigo.dark-subtle}",
+      "$value": "{color.blue.dark-subtle}",
       "$type": "color"
     },
     "accent-tertiary-strong": {
-      "$value": "{color.indigo.300}",
+      "$value": "{color.blue.300}",
       "$type": "color"
     },
     "on-accent-tertiary": {
@@ -206,7 +206,7 @@
       "$type": "color"
     },
     "focus-ring": {
-      "$value": "{color.fidelity.500}",
+      "$value": "{color.human.500}",
       "$type": "color"
     },
     "focus-ring-width": {
@@ -218,19 +218,19 @@
       "$type": "dimension"
     },
     "link": {
-      "$value": "{color.fidelity.400}",
+      "$value": "{color.human.400}",
       "$type": "color"
     },
     "link-hover": {
-      "$value": "{color.fidelity.300}",
+      "$value": "{color.human.300}",
       "$type": "color"
     },
     "link-active": {
-      "$value": "{color.fidelity.500}",
+      "$value": "{color.human.500}",
       "$type": "color"
     },
     "link-visited": {
-      "$value": "{color.fidelity.600}",
+      "$value": "{color.human.600}",
       "$type": "color"
     },
     "hover-overlay": {
@@ -312,7 +312,7 @@
     "surface-glow": {
       "$value": "radial-gradient(ellipse at 50% 0%, rgba(122,182,72,0.08) 0%, transparent 70%)",
       "$type": "string",
-      "$description": "Ambient Fidelity green glow at the top of cards — creates atmospheric depth"
+      "$description": "Ambient Human green glow at the top of cards — creates atmospheric depth"
     },
     "button-gradient-primary": {
       "$value": "linear-gradient(180deg, rgba(252,248,242,0.12) 0%, rgba(12,8,4,0.18) 100%)",
@@ -321,12 +321,12 @@
     "hero-gradient": {
       "$value": "linear-gradient(135deg, rgba(122,182,72,0.10) 0%, rgba(90,154,48,0.05) 40%, rgba(99,102,241,0.03) 80%, transparent 100%)",
       "$type": "string",
-      "$description": "Atmospheric gradient — Fidelity green to forest with a hint of deep indigo"
+      "$description": "Atmospheric gradient — Human green to forest with steel blue depth"
     },
     "mesh-gradient": {
       "$value": "radial-gradient(ellipse at 20% 50%, rgba(122,182,72,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.04) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.03) 0%, transparent 50%)",
       "$type": "string",
-      "$description": "Multi-point mesh gradient — fidelity green, indigo, amber for cinematic depth"
+      "$description": "Multi-point mesh gradient — Human green, steel blue, amber for cinematic depth"
     },
     "aurora-gradient": {
       "$value": "conic-gradient(from 135deg at 50% 50%, rgba(122,182,72,0.08), rgba(99,102,241,0.06), rgba(245,158,11,0.04), rgba(122,182,72,0.08))",
@@ -336,7 +336,7 @@
     "shadow-colored-accent": {
       "$value": "0 4px 16px rgba(122,182,72,0.12), 0 8px 32px rgba(122,182,72,0.08)",
       "$type": "shadow",
-      "$description": "Fidelity green tinted shadow for accent-heavy elements"
+      "$description": "Human green tinted shadow for accent-heavy elements"
     },
     "shadow-colored-warm": {
       "$value": "0 4px 16px rgba(200,160,80,0.10), 0 8px 32px rgba(200,160,80,0.06)",
@@ -345,7 +345,7 @@
     }
   },
   "light": {
-    "$description": "Light theme — warm cream surfaces, fidelity green accents, charcoal text",
+    "$description": "Light theme — warm cream surfaces, Human green accents, charcoal text",
     "bg": {
       "$value": "#F4F1EE",
       "$type": "color",
@@ -416,16 +416,16 @@
       "$type": "color"
     },
     "accent": {
-      "$value": "{color.fidelity.500}",
+      "$value": "{color.human.500}",
       "$type": "color"
     },
     "accent-text": {
-      "$value": "{color.fidelity.700}",
+      "$value": "{color.human.700}",
       "$type": "color",
-      "$description": "WCAG AA: Fidelity dark green for text on light backgrounds (4.5:1 contrast)"
+      "$description": "WCAG AA: Human dark green for text on light backgrounds (4.5:1 contrast)"
     },
     "accent-hover": {
-      "$value": "{color.fidelity.600}",
+      "$value": "{color.human.600}",
       "$type": "color"
     },
     "accent-subtle": {
@@ -433,11 +433,11 @@
       "$type": "color"
     },
     "accent-light": {
-      "$value": "{color.fidelity.100}",
+      "$value": "{color.human.100}",
       "$type": "color"
     },
     "accent-strong": {
-      "$value": "{color.fidelity.light-400}",
+      "$value": "{color.human.light-400}",
       "$type": "color"
     },
     "on-accent": {
@@ -470,24 +470,24 @@
       "$type": "color"
     },
     "accent-tertiary": {
-      "$value": "{color.indigo.600}",
+      "$value": "{color.blue.600}",
       "$type": "color"
     },
     "accent-tertiary-text": {
-      "$value": "{color.indigo.700}",
+      "$value": "{color.blue.700}",
       "$type": "color",
-      "$description": "WCAG AA: indigo accent for text on light backgrounds"
+      "$description": "WCAG AA: steel blue accent for text on light backgrounds"
     },
     "accent-tertiary-hover": {
-      "$value": "{color.indigo.light-600}",
+      "$value": "{color.blue.light-600}",
       "$type": "color"
     },
     "accent-tertiary-subtle": {
-      "$value": "{color.indigo.light-subtle}",
+      "$value": "{color.blue.light-subtle}",
       "$type": "color"
     },
     "accent-tertiary-strong": {
-      "$value": "{color.indigo.light-400}",
+      "$value": "{color.blue.light-400}",
       "$type": "color"
     },
     "on-accent-tertiary": {
@@ -535,7 +535,7 @@
       "$type": "color"
     },
     "focus-ring": {
-      "$value": "{color.fidelity.light-500}",
+      "$value": "{color.human.light-500}",
       "$type": "color"
     },
     "focus-ring-width": {
@@ -547,40 +547,40 @@
       "$type": "dimension"
     },
     "link": {
-      "$value": "{color.fidelity.light-500}",
+      "$value": "{color.human.light-500}",
       "$type": "color"
     },
     "link-hover": {
-      "$value": "{color.fidelity.light-600}",
+      "$value": "{color.human.light-600}",
       "$type": "color"
     },
     "link-active": {
-      "$value": "{color.fidelity.light-400}",
+      "$value": "{color.human.light-400}",
       "$type": "color"
     },
     "link-visited": {
-      "$value": "{color.fidelity.light-600}",
+      "$value": "{color.human.light-600}",
       "$type": "color"
     },
     "hover-overlay": {
       "$value": "rgba(90, 154, 48, 0.06)",
       "$type": "color",
-      "$description": "M3 tinted state layer — fidelity green tint on hover"
+      "$description": "M3 tinted state layer — Human green tint on hover"
     },
     "pressed-overlay": {
       "$value": "rgba(90, 154, 48, 0.10)",
       "$type": "color",
-      "$description": "M3 tinted state layer — fidelity green tint on press"
+      "$description": "M3 tinted state layer — Human green tint on press"
     },
     "focus-overlay": {
       "$value": "rgba(90, 154, 48, 0.10)",
       "$type": "color",
-      "$description": "M3 tinted state layer — fidelity green tint on focus"
+      "$description": "M3 tinted state layer — Human green tint on focus"
     },
     "dragged-overlay": {
       "$value": "rgba(90, 154, 48, 0.14)",
       "$type": "color",
-      "$description": "M3 tinted state layer — fidelity green tint while dragging"
+      "$description": "M3 tinted state layer — Human green tint while dragging"
     },
     "disabled-overlay": {
       "$value": "rgba(0, 0, 0, 0.04)",
@@ -618,7 +618,7 @@
     "shadow-glow-accent": {
       "$value": "0 0 0 1px rgba(90,154,48,0.12), 0 4px 16px rgba(90,154,48,0.15)",
       "$type": "shadow",
-      "$description": "Fidelity green glow for hover/focus states"
+      "$description": "Human green glow for hover/focus states"
     },
     "shadow-glow-blue": {
       "$value": "0 0 0 1px rgba(37,99,235,0.12), 0 4px 12px rgba(37,99,235,0.08)",
@@ -649,7 +649,7 @@
     "hero-gradient": {
       "$value": "linear-gradient(135deg, rgba(122,182,72,0.07) 0%, rgba(122,182,72,0.03) 50%, transparent 100%)",
       "$type": "string",
-      "$description": "Fidelity green gradient — single-hue, varying intensity for depth"
+      "$description": "Human green gradient — single-hue, varying intensity for depth"
     }
   },
   "high-contrast": {

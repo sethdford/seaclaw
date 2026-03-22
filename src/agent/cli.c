@@ -902,6 +902,22 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
 #ifndef HU_IS_TEST
         if (cli_provider_uses_gemini_slot_models(prov_name, prov_name_len)) {
             hu_model_router_config_t mr_cfg = hu_model_router_default_config();
+            if (cfg.agent.mr_reflexive_model) {
+                mr_cfg.reflexive_model = cfg.agent.mr_reflexive_model;
+                mr_cfg.reflexive_model_len = strlen(cfg.agent.mr_reflexive_model);
+            }
+            if (cfg.agent.mr_conversational_model) {
+                mr_cfg.conversational_model = cfg.agent.mr_conversational_model;
+                mr_cfg.conversational_model_len = strlen(cfg.agent.mr_conversational_model);
+            }
+            if (cfg.agent.mr_analytical_model) {
+                mr_cfg.analytical_model = cfg.agent.mr_analytical_model;
+                mr_cfg.analytical_model_len = strlen(cfg.agent.mr_analytical_model);
+            }
+            if (cfg.agent.mr_deep_model) {
+                mr_cfg.deep_model = cfg.agent.mr_deep_model;
+                mr_cfg.deep_model_len = strlen(cfg.agent.mr_deep_model);
+            }
             time_t now_rt = time(NULL);
             struct tm *lt = localtime(&now_rt);
             int hour = lt ? lt->tm_hour : 12;

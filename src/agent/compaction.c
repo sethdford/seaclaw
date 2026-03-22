@@ -737,3 +737,200 @@ hu_error_t hu_compact_hierarchical(hu_allocator_t *alloc, hu_provider_t *provide
     return HU_OK;
 #endif /* HU_IS_TEST */
 }
+
+/* ── Hierarchical Compaction ──────────────────────────────────────────── */
+
+static char *summarize_chunk_text(hu_allocator_t *alloc, hu_provider_t *provider,
+                                  const char *chunk, size_t chunk_len, uint32_t max_chars,
+                                  size_t *out_len) {
+    *out_len = 0;
+    if (provider && provider->vtable && provider->vtable->chat_with_system) {
+        static const char sys[] =
+            "Summarize the following conversation excerpt into a brief paragraph. "
+            "Preserve key decisions, facts, commitments, and emotional context. "
+            "Output only the summary.";
+        char *summary = NULL;
+        size_t summary_len = 0;
+        hu_error_t serr = provider->vtable->chat_with_system(
+            provider->ctx, alloc, sys, sizeof(sys) - 1, chunk, chunk_len,
+            "gpt-4o-mini", 11, 0.2, &summary, &summary_len);
+        if (serr == HU_OK && summary && summary_len > 0) {
+            if (summary_len > max_chars) {
+                summary[max_chars] = '\0';
+                summary_len = max_chars;
+            }
+            *out_len = summary_len;
+            return summary;
+        }
+        if (summary)
+            alloc->free(alloc->ctx, summary, summary_len + 1);
+    }
+    size_t tlen = chunk_len < max_chars ? chunk_len : max_chars;
+    char *trunc = hu_strndup(alloc, chunk, tlen);
+    if (trunc)
+        *out_len = tlen;
+    return trunc;
+}
+
+hu_error_t hu_compact_history_hierarchical(hu_allocator_t *alloc, hu_owned_message_t *history,
+                                           size_t *history_count, size_t *history_cap,
+                                           const hu_compaction_config_t *config,
+                                           hu_provider_t *provider,
+                                           uint32_t chunk_size, uint32_t max_depth) {
+    if (!alloc || !history || !history_count || !history_cap || !config)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    size_t cnt = *history_count;
+    if (!hu_should_compact(history, cnt, config))
+        return HU_OK;
+
+    if (chunk_size == 0) chunk_size = 10;
+    if (max_depth == 0) max_depth = 3;
+
+    bool has_sys = cnt > 0 && history[0].role == HU_ROLE_SYSTEM;
+    size_t hstart = has_sys ? 1 : 0;
+    size_t non_sys = cnt - hstart;
+
+    uint32_t keep = config->keep_recent;
+    if (keep > (uint32_t)non_sys)
+        keep = (uint32_t)non_sys;
+
+    size_t compact_n = non_sys - keep;
+    if (compact_n == 0)
+        return HU_OK;
+
+    size_t cend = hstart + compact_n;
+    size_t orig_chunks = (compact_n + chunk_size - 1) / chunk_size;
+    size_t nchunks = orig_chunks;
+
+    char **ctexts = (char **)alloc->alloc(alloc->ctx, orig_chunks * sizeof(char *));
+    size_t *clens = (size_t *)alloc->alloc(alloc->ctx, orig_chunks * sizeof(size_t));
+    if (!ctexts || !clens) {
+        if (ctexts) alloc->free(alloc->ctx, ctexts, orig_chunks * sizeof(char *));
+        if (clens) alloc->free(alloc->ctx, clens, orig_chunks * sizeof(size_t));
+        return hu_compact_history_llm(alloc, history, history_count, history_cap, config, provider);
+    }
+    memset(ctexts, 0, orig_chunks * sizeof(char *));
+    memset(clens, 0, orig_chunks * sizeof(size_t));
+
+    uint32_t msrc = config->max_source_chars > 0 ? config->max_source_chars
+                                                  : HU_COMPACTION_DEFAULT_MAX_SOURCE_CHARS;
+    uint32_t msum = config->max_summary_chars > 0 ? config->max_summary_chars
+                                                   : HU_COMPACTION_DEFAULT_MAX_SUMMARY_CHARS;
+
+    for (size_t ci = 0; ci < nchunks; ci++) {
+        size_t cs = hstart + ci * chunk_size;
+        size_t ce = cs + chunk_size;
+        if (ce > cend) ce = cend;
+
+        size_t raw_alloc_sz = 0;
+        char *raw = build_summary(alloc, history, cs, ce, msrc, &raw_alloc_sz);
+        if (!raw) continue;
+
+        size_t slen = 0;
+        uint32_t pcmax = msum / (uint32_t)nchunks + 200;
+        char *s = summarize_chunk_text(alloc, provider, raw, strlen(raw), pcmax, &slen);
+        alloc->free(alloc->ctx, raw, raw_alloc_sz);
+        ctexts[ci] = s;
+        clens[ci] = slen;
+    }
+
+    /* Hierarchical reduction: merge pairs until result fits */
+    uint32_t depth = 0;
+    while (nchunks > 1 && depth < max_depth) {
+        size_t tl = 0;
+        for (size_t i = 0; i < nchunks; i++)
+            tl += clens[i];
+        if (tl <= msum)
+            break;
+
+        size_t nc = (nchunks + 1) / 2;
+        for (size_t i = 0; i < nc; i++) {
+            size_t a = i * 2;
+            size_t b = a + 1;
+            if (b >= nchunks) {
+                if (a != i) { ctexts[i] = ctexts[a]; clens[i] = clens[a]; ctexts[a] = NULL; }
+                continue;
+            }
+            size_t comb_len = clens[a] + 1 + clens[b];
+            char *comb = (char *)alloc->alloc(alloc->ctx, comb_len + 1);
+            if (comb) {
+                if (ctexts[a]) memcpy(comb, ctexts[a], clens[a]);
+                comb[clens[a]] = '\n';
+                if (ctexts[b]) memcpy(comb + clens[a] + 1, ctexts[b], clens[b]);
+                comb[comb_len] = '\0';
+
+                size_t ml = 0;
+                uint32_t pm = msum / (uint32_t)nc + 200;
+                char *m = summarize_chunk_text(alloc, provider, comb, comb_len, pm, &ml);
+                alloc->free(alloc->ctx, comb, comb_len + 1);
+                if (ctexts[a]) alloc->free(alloc->ctx, ctexts[a], clens[a] + 1);
+                if (ctexts[b]) alloc->free(alloc->ctx, ctexts[b], clens[b] + 1);
+                ctexts[a] = NULL; ctexts[b] = NULL;
+                ctexts[i] = m; clens[i] = ml;
+            } else {
+                if (a != i) { ctexts[i] = ctexts[a]; clens[i] = clens[a]; ctexts[a] = NULL; }
+                if (ctexts[b]) alloc->free(alloc->ctx, ctexts[b], clens[b] + 1);
+                ctexts[b] = NULL;
+            }
+        }
+        nchunks = nc;
+        depth++;
+    }
+
+    size_t ftotal = 0;
+    for (size_t i = 0; i < nchunks; i++)
+        ftotal += clens[i] + 1;
+
+    char pfx[64];
+    int pn = snprintf(pfx, sizeof(pfx), "[Hierarchical compaction L%u]\n", depth + 1);
+    size_t pfx_len = (pn > 0 && (size_t)pn < sizeof(pfx)) ? (size_t)pn : 0;
+
+    char *fc = (char *)alloc->alloc(alloc->ctx, pfx_len + ftotal + 1);
+    if (!fc) {
+        for (size_t i = 0; i < orig_chunks; i++)
+            if (ctexts[i]) alloc->free(alloc->ctx, ctexts[i], clens[i] + 1);
+        alloc->free(alloc->ctx, ctexts, orig_chunks * sizeof(char *));
+        alloc->free(alloc->ctx, clens, orig_chunks * sizeof(size_t));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    memcpy(fc, pfx, pfx_len);
+    size_t fp = pfx_len;
+    for (size_t i = 0; i < nchunks; i++) {
+        if (ctexts[i] && clens[i] > 0) {
+            memcpy(fc + fp, ctexts[i], clens[i]);
+            fp += clens[i];
+            fc[fp++] = '\n';
+        }
+    }
+    fc[fp] = '\0';
+
+    for (size_t i = 0; i < orig_chunks; i++)
+        if (ctexts[i]) alloc->free(alloc->ctx, ctexts[i], clens[i] + 1);
+    alloc->free(alloc->ctx, ctexts, orig_chunks * sizeof(char *));
+    alloc->free(alloc->ctx, clens, orig_chunks * sizeof(size_t));
+
+    free_messages(alloc, history, hstart, cend);
+
+    history[hstart].role = HU_ROLE_ASSISTANT;
+    history[hstart].content = fc;
+    history[hstart].content_len = fp;
+    history[hstart].name = NULL;
+    history[hstart].name_len = 0;
+    history[hstart].tool_call_id = NULL;
+    history[hstart].tool_call_id_len = 0;
+    history[hstart].tool_calls = NULL;
+    history[hstart].tool_calls_count = 0;
+
+    if (cend > hstart + 1) {
+        size_t hshift = cend - hstart - 1;
+        size_t hrem = cnt - cend;
+        if (hrem > 0)
+            memmove(&history[hstart + 1], &history[cend], hrem * sizeof(hu_owned_message_t));
+        cnt -= hshift;
+    }
+
+    *history_count = cnt;
+    return HU_OK;
+}

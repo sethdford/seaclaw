@@ -1,6 +1,6 @@
 ---
 title: Palette Expansion Design
-status: approved
+status: complete
 ---
 
 # Palette Expansion — Unify on Ocean-Teal + Add Amber & Indigo
@@ -53,7 +53,7 @@ Use: info states, alternative link color, provider-related UI, data visualizatio
 - Hero mesh gradient → teal + indigo + amber blend (replaces coral-dominant conic)
 - Text gradient shimmer → teal → amber → indigo cycle
 - Card glow → teal/indigo (replaces coral/blue)
-- Ambient blobs → `ambient-teal` + `ambient-indigo` (replaces `ambient-coral`)
+- Ambient blobs → `ambient-teal` + `ambient-steel` (replaces `ambient-coral`)
 - Selection color → teal-based
 - Terminal cursor → teal
 

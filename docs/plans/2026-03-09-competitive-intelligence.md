@@ -1,5 +1,5 @@
 ---
-status: approved
+status: complete
 ---
 
 # Competitive Intelligence & Category-Defining Standards — Implementation Plan

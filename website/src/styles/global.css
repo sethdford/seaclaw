@@ -800,28 +800,14 @@
   }
 
   /* ── Ambient gradients ── */
-  .ambient-coral {
+  .ambient-teal {
     position: absolute;
     width: 600px;
     height: 600px;
     border-radius: 50%;
     background: radial-gradient(
       circle,
-      color-mix(in srgb, var(--hu-accent-secondary) 15%, transparent) 0%,
-      transparent 70%
-    );
-    pointer-events: none;
-    z-index: -1;
-  }
-
-  .ambient-blue {
-    position: absolute;
-    width: 500px;
-    height: 500px;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--hu-accent-tertiary) 12%, transparent) 0%,
+      color-mix(in srgb, var(--hu-accent) 15%, transparent) 0%,
       transparent 70%
     );
     pointer-events: none;
@@ -842,7 +828,8 @@
     z-index: -1;
   }
 
-  .ambient-indigo {
+  /* Tertiary / steel accent blob (uses --hu-accent-tertiary-subtle) */
+  .ambient-steel {
     position: absolute;
     width: 500px;
     height: 500px;
@@ -1496,7 +1483,7 @@
 .btn-outline,
 .card-spotlight,
 .ambient-accent,
-.ambient-indigo,
+.ambient-steel,
 .dash-preview,
 .custom-cursor,
 #terminal,
@@ -1587,7 +1574,7 @@
   }
 
   .ambient-accent,
-  .ambient-indigo {
+  .ambient-steel {
     display: none;
   }
 
@@ -1742,7 +1729,7 @@ body.hu-ambient-ready {
 @media print {
   nav,
   .ambient-accent,
-  .ambient-indigo,
+  .ambient-steel,
   footer {
     display: none !important;
   }

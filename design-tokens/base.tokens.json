@@ -5,7 +5,7 @@
     "com.human.version": "0.5.0"
   },
   "color": {
-    "$description": "Ocean-inspired primitive color palette",
+    "$description": "Warm charcoal neutrals — Human green, steel blue, amber, coral, teal, and chart-only viz-extended hues",
     "neutral": {
       "0": {
         "$value": "#000000",
@@ -82,21 +82,21 @@
       "$description": "Warm charcoal scale — cinematic amber-tinted darks to cream whites. Warm neutral tones for premium feel, OKLCH hue ~55deg."
     },
     "tonal": {
-      "$description": "M3-style tonal surface primitives — warm neutrals tinted with fidelity green for surface-container hierarchy",
+      "$description": "M3-style tonal surface primitives — warm neutrals tinted with Human green for surface-container hierarchy",
       "dark-container": {
         "$value": "#1f1c19",
         "$type": "color",
-        "$description": "warm neutral.150 + 4% fidelity.500 — default card/panel surface"
+        "$description": "warm neutral.150 + 4% human.500 — default card/panel surface"
       },
       "dark-container-high": {
         "$value": "#2a2621",
         "$type": "color",
-        "$description": "warm neutral.200 + 6% fidelity.500 — elevated interactive surfaces"
+        "$description": "warm neutral.200 + 6% human.500 — elevated interactive surfaces"
       },
       "dark-container-highest": {
         "$value": "#35302a",
         "$type": "color",
-        "$description": "warm neutral.250 + 8% fidelity.500 — highest emphasis surfaces, active states"
+        "$description": "warm neutral.250 + 8% human.500 — highest emphasis surfaces, active states"
       },
       "dark-dim": {
         "$value": "#080604",
@@ -111,17 +111,17 @@
       "light-container": {
         "$value": "#f9f7f4",
         "$type": "color",
-        "$description": "warm cream + 6% fidelity.100 — default card/panel surface"
+        "$description": "warm cream + 6% human.100 — default card/panel surface"
       },
       "light-container-high": {
         "$value": "#f0ede9",
         "$type": "color",
-        "$description": "warm gray + 8% fidelity.100 — elevated interactive surfaces"
+        "$description": "warm gray + 8% human.100 — elevated interactive surfaces"
       },
       "light-container-highest": {
         "$value": "#e9e5e0",
         "$type": "color",
-        "$description": "warm gray + 10% fidelity.100 — highest emphasis surfaces"
+        "$description": "warm gray + 10% human.100 — highest emphasis surfaces"
       },
       "light-dim": {
         "$value": "#e6e2de",
@@ -197,7 +197,7 @@
         "$type": "color"
       }
     },
-    "fidelity": {
+    "human": {
       "50": {
         "$value": "#f3fae8",
         "$type": "color"
@@ -238,7 +238,7 @@
         "$value": "#264A17",
         "$type": "color"
       },
-      "$description": "Primary accent — Fidelity-inspired green",
+      "$description": "Primary accent — Human green (#7AB648)",
       "dark-subtle": {
         "$value": "rgba(122, 182, 72, 0.14)",
         "$type": "color"
@@ -433,20 +433,65 @@
       }
     },
     "blue": {
-      "500": {
-        "$value": "#3b82f6",
+      "50": {
+        "$value": "#f3f6fb",
         "$type": "color"
       },
-      "dim": {
-        "$value": "rgba(59, 130, 246, 0.15)",
+      "100": {
+        "$value": "#e4ecf6",
+        "$type": "color"
+      },
+      "200": {
+        "$value": "#c5d5e8",
+        "$type": "color"
+      },
+      "300": {
+        "$value": "#9fb8d9",
+        "$type": "color"
+      },
+      "400": {
+        "$value": "#7496c4",
+        "$type": "color"
+      },
+      "500": {
+        "$value": "#4a6fa5",
+        "$type": "color"
+      },
+      "600": {
+        "$value": "#3d5d8c",
+        "$type": "color"
+      },
+      "700": {
+        "$value": "#324a73",
+        "$type": "color"
+      },
+      "800": {
+        "$value": "#2a3d5f",
+        "$type": "color"
+      },
+      "900": {
+        "$value": "#24354f",
+        "$type": "color"
+      },
+      "$description": "Depth accent — steel blue for info states, data viz, and richness (500 #4A6FA5)",
+      "dark-subtle": {
+        "$value": "rgba(74, 111, 165, 0.14)",
         "$type": "color"
       },
       "light-500": {
-        "$value": "#2563eb",
+        "$value": "#3d5d8c",
         "$type": "color"
       },
-      "light-dim": {
-        "$value": "rgba(37, 99, 235, 0.1)",
+      "light-600": {
+        "$value": "#324a73",
+        "$type": "color"
+      },
+      "light-400": {
+        "$value": "#4a6fa5",
+        "$type": "color"
+      },
+      "light-subtle": {
+        "$value": "rgba(61, 93, 140, 0.10)",
         "$type": "color"
       }
     },
@@ -513,66 +558,39 @@
         "$type": "color"
       }
     },
-    "indigo": {
-      "50": {
-        "$value": "#eef2ff",
+    "viz-extended": {
+      "$description": "Supplementary hues — charts and illustrations only; not UI chrome or semantic status",
+      "forest": {
+        "$value": "#00703C",
         "$type": "color"
       },
-      "100": {
-        "$value": "#e0e7ff",
+      "cyan": {
+        "$value": "#009BDE",
         "$type": "color"
       },
-      "200": {
-        "$value": "#c7d2fe",
+      "violet": {
+        "$value": "#9D61CC",
         "$type": "color"
       },
-      "300": {
-        "$value": "#a5b4fc",
+      "chartreuse": {
+        "$value": "#C2CD23",
         "$type": "color"
       },
-      "400": {
-        "$value": "#818cf8",
+      "gold": {
+        "$value": "#F0D202",
         "$type": "color"
       },
-      "500": {
-        "$value": "#6366f1",
+      "orange": {
+        "$value": "#FF6800",
         "$type": "color"
       },
-      "600": {
-        "$value": "#4f46e5",
-        "$type": "color"
+      "crimson": {
+        "$value": "#CC0000",
+        "$type": "color",
+        "$description": "Chart series only — not error UI"
       },
-      "700": {
-        "$value": "#4338ca",
-        "$type": "color"
-      },
-      "800": {
-        "$value": "#3730a3",
-        "$type": "color"
-      },
-      "900": {
-        "$value": "#312e81",
-        "$type": "color"
-      },
-      "$description": "Depth accent — indigo for info states, data viz, and richness",
-      "dark-subtle": {
-        "$value": "rgba(99, 102, 241, 0.14)",
-        "$type": "color"
-      },
-      "light-500": {
-        "$value": "#4f46e5",
-        "$type": "color"
-      },
-      "light-600": {
-        "$value": "#4338ca",
-        "$type": "color"
-      },
-      "light-400": {
-        "$value": "#6366f1",
-        "$type": "color"
-      },
-      "light-subtle": {
-        "$value": "rgba(79, 70, 229, 0.10)",
+      "azure": {
+        "$value": "#2B89CB",
         "$type": "color"
       }
     }

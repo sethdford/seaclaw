@@ -336,6 +336,18 @@ Full details: `docs/standards/engineering/anti-patterns.md`
 
 Critical reminders: no vtable pointers to temporaries (dangling), no skipping `free()` (ASan catches), no `SQLITE_TRANSIENT` (use `SQLITE_STATIC`), no cross-subsystem coupling, no speculative flags, one concern per change.
 
+## 10.1) AI Model Version Policy (Required)
+
+- **Never reference Gemini 2.0 or 2.5 models** — they are deprecated/end-of-life. Always use Gemini 3.0+ (currently 3.1 series).
+- **Always verify model IDs before writing code.** Do a web search for current Vertex AI model availability. Model names change frequently (previews rotate, versions get deprecated).
+- **Current canonical models (as of March 2026):**
+  - `gemini-3.1-pro-preview` — highest capability, reasoning, emotional nuance (global endpoint only)
+  - `gemini-3.1-flash-lite-preview` — fastest, cheapest, high-volume tasks
+  - `gemini-3-flash-preview` — balanced speed/quality
+- **All Gemini access uses Vertex AI** with Application Default Credentials (ADC). Never use raw API keys for Gemini.
+- **Python eval scripts**: use `google.cloud.aiplatform` or direct REST to `https://{region}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:generateContent`. Authenticate with ADC OAuth2 tokens.
+- **Model router**: `src/agent/model_router.c` selects tier based on message complexity. Emotional/vulnerable messages MUST route to a higher-tier model (pro or flash, never flash-lite alone).
+
 ## 11) Handoff Template (Agent → Agent / Maintainer)
 
 When handing off work, include:
@@ -429,7 +441,7 @@ Required:
 
 Color accent hierarchy (60-30-10 rule — see `docs/standards/design/visual-standards.md` §2.1):
 
-- **Primary**: `--hu-accent` (Fidelity green) — brand identity, primary buttons, links, focus rings.
+- **Primary**: `--hu-accent` (Human green) — brand identity, primary buttons, links, focus rings.
 - **Secondary**: `--hu-accent-secondary` (amber) — warm highlights, featured content, CTAs needing contrast.
 - **Tertiary**: `--hu-accent-tertiary` (indigo) — info states, data visualization, depth.
 - **Error only**: coral — reserved exclusively for `--hu-error` / `--hu-error-dim`. Never use coral as a general accent.
@@ -440,7 +452,7 @@ Each accent provides `-hover`, `-subtle`, `-strong`, `-text`, and `on-accent-*` 
 
 Surfaces are tinted with the primary accent for branded depth hierarchy:
 
-- `--hu-surface-container` — default card/panel (4% fidelity green tint)
+- `--hu-surface-container` — default card/panel (4% Human green tint)
 - `--hu-surface-container-high` — elevated interactive (6% tint)
 - `--hu-surface-container-highest` — highest emphasis (8% tint)
 - `--hu-surface-dim` / `--hu-surface-bright` — recessed / prominent extremes
@@ -449,7 +461,7 @@ Surfaces are tinted with the primary accent for branded depth hierarchy:
 
 #### Tinted State Layers (M3)
 
-Interactive overlays are tinted with fidelity green, not neutral white/black:
+Interactive overlays are tinted with Human green, not neutral white/black:
 
 - `--hu-hover-overlay` / `--hu-pressed-overlay` / `--hu-focus-overlay` / `--hu-dragged-overlay`
 - `--hu-disabled-overlay` remains neutral (no brand color on disabled states)

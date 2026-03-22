@@ -22,7 +22,7 @@ Human's design system prioritizes:
 
 ### Primary Accent — Ocean Teal
 
-The primary accent is Fidelity green (`--hu-accent`), a nature-inspired color that anchors the Human brand identity.
+The primary accent is Human green (`--hu-accent`), a nature-inspired color that anchors the Human brand identity.
 
 | Token                | Dark                  | Light                |
 | -------------------- | --------------------- | -------------------- |

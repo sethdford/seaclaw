@@ -1,5 +1,5 @@
 ---
-status: approved
+status: complete
 ---
 
 # Gateway Auto-Fallback Implementation Plan

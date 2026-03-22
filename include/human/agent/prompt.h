@@ -75,6 +75,8 @@ typedef struct hu_prompt_config {
     size_t cognition_mode_len;
     const char *episodic_replay;        /* cognitive replay from episodic patterns */
     size_t episodic_replay_len;
+    const char *constitutional_principles; /* formatted principles for prompt injection */
+    size_t constitutional_principles_len;
 } hu_prompt_config_t;
 
 /* Build the full system prompt. Caller owns returned string; free with alloc. */

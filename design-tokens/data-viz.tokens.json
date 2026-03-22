@@ -8,14 +8,14 @@
   "chart": {
     "categorical": {
       "1": {
-        "$value": "{color.fidelity.500}",
+        "$value": "{color.human.500}",
         "$type": "color",
-        "$description": "Primary — Fidelity green"
+        "$description": "Primary — Human green"
       },
       "2": {
-        "$value": "{color.indigo.500}",
+        "$value": "{color.blue.500}",
         "$type": "color",
-        "$description": "Secondary — Indigo"
+        "$description": "Secondary — Steel blue"
       },
       "3": {
         "$value": "{color.amber.500}",
@@ -33,9 +33,9 @@
         "$description": "Quinary — Teal"
       },
       "6": {
-        "$value": "{color.indigo.300}",
+        "$value": "{color.blue.300}",
         "$type": "color",
-        "$description": "Light indigo"
+        "$description": "Light steel blue"
       },
       "7": {
         "$value": "{color.amber.300}",
@@ -43,43 +43,83 @@
         "$description": "Light amber"
       },
       "8": {
-        "$value": "{color.fidelity.300}",
+        "$value": "{color.human.300}",
         "$type": "color",
         "$description": "Light green"
       },
-      "$description": "Ordered categorical series — 8 colors optimized for visual distinction across color vision deficiencies"
+      "9": {
+        "$value": "{color.viz-extended.forest}",
+        "$type": "color",
+        "$description": "Extended — deep forest"
+      },
+      "10": {
+        "$value": "{color.viz-extended.cyan}",
+        "$type": "color",
+        "$description": "Extended — bright cyan"
+      },
+      "11": {
+        "$value": "{color.viz-extended.violet}",
+        "$type": "color",
+        "$description": "Extended — violet"
+      },
+      "12": {
+        "$value": "{color.viz-extended.chartreuse}",
+        "$type": "color",
+        "$description": "Extended — chartreuse"
+      },
+      "13": {
+        "$value": "{color.viz-extended.gold}",
+        "$type": "color",
+        "$description": "Extended — gold yellow"
+      },
+      "14": {
+        "$value": "{color.viz-extended.orange}",
+        "$type": "color",
+        "$description": "Extended — vivid orange"
+      },
+      "15": {
+        "$value": "{color.viz-extended.crimson}",
+        "$type": "color",
+        "$description": "Extended — crimson (series only)"
+      },
+      "16": {
+        "$value": "{color.viz-extended.azure}",
+        "$type": "color",
+        "$description": "Extended — azure blue"
+      },
+      "$description": "Ordered categorical series — 16 colors: core 1–8 plus viz-extended for dense charts"
     },
     "sequential": {
       "100": {
-        "$value": "{color.fidelity.100}",
+        "$value": "{color.human.100}",
         "$type": "color"
       },
       "200": {
-        "$value": "{color.fidelity.200}",
+        "$value": "{color.human.200}",
         "$type": "color"
       },
       "300": {
-        "$value": "{color.fidelity.300}",
+        "$value": "{color.human.300}",
         "$type": "color"
       },
       "400": {
-        "$value": "{color.fidelity.400}",
+        "$value": "{color.human.400}",
         "$type": "color"
       },
       "500": {
-        "$value": "{color.fidelity.500}",
+        "$value": "{color.human.500}",
         "$type": "color"
       },
       "600": {
-        "$value": "{color.fidelity.600}",
+        "$value": "{color.human.600}",
         "$type": "color"
       },
       "700": {
-        "$value": "{color.fidelity.700}",
+        "$value": "{color.human.700}",
         "$type": "color"
       },
       "800": {
-        "$value": "{color.fidelity.800}",
+        "$value": "{color.human.800}",
         "$type": "color"
       },
       "$description": "Sequential ramp — single hue from light to dark for ordered data"
@@ -87,7 +127,7 @@
     "diverging": {
       "$description": "Diverging palette — positive to negative via neutral midpoint",
       "positive": {
-        "$value": "{color.fidelity.500}",
+        "$value": "{color.human.500}",
         "$type": "color"
       },
       "neutral": {
@@ -102,7 +142,7 @@
     "status": {
       "$description": "Semantic status colors for chart elements",
       "success": {
-        "$value": "{color.fidelity.500}",
+        "$value": "{color.human.500}",
         "$type": "color"
       },
       "warning": {
@@ -114,7 +154,7 @@
         "$type": "color"
       },
       "info": {
-        "$value": "{color.indigo.500}",
+        "$value": "{color.blue.500}",
         "$type": "color"
       },
       "muted": {
@@ -123,7 +163,7 @@
       }
     },
     "brand": {
-      "$value": "{color.fidelity.500}",
+      "$value": "{color.human.500}",
       "$type": "color",
       "$description": "Default single-color chart fill"
     }

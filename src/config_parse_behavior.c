@@ -43,5 +43,20 @@ hu_error_t parse_behavior(hu_allocator_t *a, hu_config_t *cfg, const hu_json_val
     if (mmts >= 60 && mmts <= 86400)
         cfg->behavior.missed_msg_threshold_sec = (uint32_t)mmts;
 
+    /* Callback delay window in seconds */
+    double cw = hu_json_get_number(obj, "callback_window", cfg->behavior.callback_window);
+    if (cw >= 0 && cw <= 86400)
+        cfg->behavior.callback_window = (uint32_t)cw;
+
+    /* Conversation pattern match threshold percentage */
+    double pt = hu_json_get_number(obj, "pattern_threshold", cfg->behavior.pattern_threshold);
+    if (pt >= 0 && pt <= 100)
+        cfg->behavior.pattern_threshold = (uint32_t)pt;
+
+    /* Probability to skip tapback/reaction percentage */
+    double tsp = hu_json_get_number(obj, "tapback_skip_pct", cfg->behavior.tapback_skip_pct);
+    if (tsp >= 0 && tsp <= 100)
+        cfg->behavior.tapback_skip_pct = (uint32_t)tsp;
+
     return HU_OK;
 }

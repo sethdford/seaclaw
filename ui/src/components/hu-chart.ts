@@ -13,15 +13,30 @@ export interface ChartData {
   datasets: ChartDataset[];
 }
 
+/**
+ * Matches `chart.categorical` in `design-tokens/data-viz.tokens.json`.
+ * Exported for tests; keep in sync when adding series.
+ */
+export const HU_CHART_CATEGORICAL_SERIES_COUNT = 16;
+const CATEGORICAL_SERIES_COUNT = HU_CHART_CATEGORICAL_SERIES_COUNT;
+
 const CATEGORICAL_FALLBACKS = [
   "var(--hu-chart-categorical-1, hsl(90 45% 50%))",
-  "var(--hu-chart-categorical-2, hsl(239 84% 67%))",
+  "var(--hu-chart-categorical-2, hsl(214 40% 48%))",
   "var(--hu-chart-categorical-3, hsl(38 92% 50%))",
   "var(--hu-chart-categorical-4, hsl(0 91% 71%))",
   "var(--hu-chart-categorical-5, hsl(168 76% 42%))",
-  "var(--hu-chart-categorical-6, hsl(235 90% 82%))",
+  "var(--hu-chart-categorical-6, hsl(214 35% 74%))",
   "var(--hu-chart-categorical-7, hsl(48 96% 59%))",
   "var(--hu-chart-categorical-8, hsl(90 45% 62%))",
+  "var(--hu-chart-categorical-9, hsl(158 100% 24%))",
+  "var(--hu-chart-categorical-10, hsl(198 100% 44%))",
+  "var(--hu-chart-categorical-11, hsl(271 50% 58%))",
+  "var(--hu-chart-categorical-12, hsl(64 71% 47%))",
+  "var(--hu-chart-categorical-13, hsl(52 98% 48%))",
+  "var(--hu-chart-categorical-14, hsl(24 100% 50%))",
+  "var(--hu-chart-categorical-15, hsl(0 100% 40%))",
+  "var(--hu-chart-categorical-16, hsl(205 65% 48%))",
 ];
 
 @customElement("hu-chart")
@@ -124,9 +139,10 @@ export class ScChart extends LitElement {
   }
 
   private _getCategoricalColor(index: number): string {
-    const token = `--hu-chart-categorical-${(index % 8) + 1}`;
+    const slot = (index % CATEGORICAL_SERIES_COUNT) + 1;
+    const token = `--hu-chart-categorical-${slot}`;
     const val = getComputedStyle(this).getPropertyValue(token).trim();
-    return val || CATEGORICAL_FALLBACKS[index % 8];
+    return val || CATEGORICAL_FALLBACKS[index % CATEGORICAL_SERIES_COUNT];
   }
 
   private _buildChartDatasets(): Array<Record<string, unknown>> {

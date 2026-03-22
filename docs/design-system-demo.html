@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Human Design System — M3 + Apple Glass Upgrade</title>
     <style>
-      @import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap");
+      /* System fonts only — dashboard uses Avenir via var(--hu-font). */
 
       :root {
-        /* Old neutral steps (before) */
+        /* Legacy ocean neutrals (before) */
         --old-50: #060b12;
         --old-100: #0b1219;
         --old-150: #101a24;
@@ -16,38 +16,38 @@
         --old-250: #1c2a3a;
         --old-300: #233345;
 
-        /* New neutral steps (after) */
-        --new-50: #060b12;
-        --new-100: #0d1520;
-        --new-150: #152333;
-        --new-200: #1e3044;
-        --new-250: #273d55;
-        --new-300: #2f4a64;
+        /* Warm charcoal neutrals — base.tokens.json color.neutral */
+        --new-50: #0c0a08;
+        --new-100: #141210;
+        --new-150: #1e1a16;
+        --new-200: #28231e;
+        --new-250: #332d26;
+        --new-300: #3e372f;
 
-        /* Tonal surfaces */
-        --tonal-container: #172631;
-        --tonal-container-high: #223540;
-        --tonal-container-highest: #2c4451;
-        --tonal-dim: #030710;
-        --tonal-bright: #34506a;
+        /* Tonal surfaces — semantic dark-container* */
+        --tonal-dim: #080604;
+        --tonal-container: #1f1c19;
+        --tonal-container-high: #2a2621;
+        --tonal-container-highest: #35302a;
+        --tonal-bright: #42392e;
 
         /* Accent */
-        --fidelity: #7ab648;
-        --fidelity-dim: rgba(122, 182, 72, 0.14);
+        --human: #7ab648;
+        --human-dim: rgba(122, 182, 72, 0.14);
         --amber: #f59e0b;
-        --indigo: #6366f1;
+        --steel-blue: #4a6fa5;
 
         /* Old overlays */
         --old-hover: rgba(255, 255, 255, 0.06);
         --old-pressed: rgba(255, 255, 255, 0.1);
 
-        /* New tinted overlays */
+        /* Tinted overlays — Human green */
         --new-hover: rgba(122, 182, 72, 0.08);
         --new-pressed: rgba(122, 182, 72, 0.12);
         --new-focus: rgba(122, 182, 72, 0.12);
         --new-dragged: rgba(122, 182, 72, 0.16);
 
-        /* Dynamic palette */
+        /* Dynamic palette — mirror ui/src/styles/_dynamic-color.css (sRGB) */
         --dp-50: #000100;
         --dp-100: #000700;
         --dp-200: #001f00;
@@ -72,36 +72,59 @@
         --ds-900: #9fefec;
         --ds-950: #b1fffd;
 
-        --dt-50: #020006;
-        --dt-100: #090012;
-        --dt-200: #210a2b;
-        --dt-300: #3a2247;
-        --dt-400: #563b64;
-        --dt-500: #735683;
-        --dt-600: #9073a0;
-        --dt-700: #ae92be;
-        --dt-800: #cdb1de;
-        --dt-900: #edd2fd;
-        --dt-950: #fee3ff;
+        --dt-50: #000010;
+        --dt-100: #00001e;
+        --dt-200: #00163a;
+        --dt-300: #003057;
+        --dt-400: #0f4b77;
+        --dt-500: #2d6897;
+        --dt-600: #4e85b5;
+        --dt-700: #6ea4d3;
+        --dt-800: #8fc4f2;
+        --dt-900: #b1e4ff;
+        --dt-950: #c3f5ff;
 
-        --dn-50: #000000;
-        --dn-100: #030402;
-        --dn-200: #151714;
-        --dn-300: #2c2f2b;
-        --dn-400: #464944;
-        --dn-500: #616460;
-        --dn-600: #7e817d;
-        --dn-700: #9d9f9b;
-        --dn-800: #bcbfba;
-        --dn-900: #dcdfdb;
-        --dn-950: #edefeb;
+        --dn-50: #010000;
+        --dn-100: #050302;
+        --dn-200: #1a1512;
+        --dn-300: #322d29;
+        --dn-400: #4c4642;
+        --dn-500: #68625d;
+        --dn-600: #857f7a;
+        --dn-700: #a49d99;
+        --dn-800: #c3bcb8;
+        --dn-900: #e3dcd8;
+        --dn-950: #f3ede9;
 
         --de-50: #150000;
+        --de-100: #270000;
         --de-200: #4b0000;
+        --de-300: #6f0000;
         --de-400: #940000;
+        --de-500: #bb061e;
         --de-600: #db4041;
+        --de-700: #fc6761;
         --de-800: #ff8b83;
+        --de-900: #ffaea5;
         --de-950: #ffc0b6;
+
+        /* Chart categorical — data-viz.tokens.json */
+        --hu-chart-categorical-1: #7ab648;
+        --hu-chart-categorical-2: #4a6fa5;
+        --hu-chart-categorical-3: #f59e0b;
+        --hu-chart-categorical-4: #f97066;
+        --hu-chart-categorical-5: #14b8a6;
+        --hu-chart-categorical-6: #9fb8d9;
+        --hu-chart-categorical-7: #fcd34d;
+        --hu-chart-categorical-8: #a3d46a;
+        --hu-chart-categorical-9: #00703c;
+        --hu-chart-categorical-10: #009bde;
+        --hu-chart-categorical-11: #9d61cc;
+        --hu-chart-categorical-12: #c2cd23;
+        --hu-chart-categorical-13: #f0d202;
+        --hu-chart-categorical-14: #ff6800;
+        --hu-chart-categorical-15: #cc0000;
+        --hu-chart-categorical-16: #2b89cb;
       }
 
       * {
@@ -111,7 +134,7 @@
       }
 
       body {
-        font-family: "DM Sans", system-ui, sans-serif;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
         background: #030710;
         color: #c0d0e0;
         overflow-x: hidden;
@@ -137,7 +160,7 @@
           ),
           radial-gradient(
             ellipse at 20% 80%,
-            rgba(99, 102, 241, 0.06) 0%,
+            rgba(74, 111, 165, 0.1) 0%,
             transparent 40%
           ),
           radial-gradient(
@@ -158,7 +181,7 @@
       }
 
       .hero h1 span {
-        color: var(--fidelity);
+        color: var(--human);
       }
 
       .hero p {
@@ -208,8 +231,8 @@
         font-weight: 700;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: var(--fidelity);
-        background: var(--fidelity-dim);
+        color: var(--human);
+        background: var(--human-dim);
         padding: 4px 12px;
         border-radius: 100px;
         margin-bottom: 12px;
@@ -263,7 +286,7 @@
 
       .swatch-row > div span {
         font-size: 0.6rem;
-        font-family: "DM Sans", monospace;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         color: rgba(255, 255, 255, 0.5);
       }
 
@@ -300,7 +323,7 @@
 
       .tonal-card .hex {
         font-size: 0.75rem;
-        font-family: "DM Sans", monospace;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         color: rgba(255, 255, 255, 0.6);
       }
 
@@ -333,7 +356,7 @@
         padding: 14px 20px;
         border-radius: 10px;
         font-size: 0.85rem;
-        font-family: "DM Sans", sans-serif;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
         color: #c0d0e0;
         border: 1px solid rgba(255, 255, 255, 0.06);
         cursor: pointer;
@@ -474,7 +497,7 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.1em;
-        color: var(--fidelity);
+        color: var(--human);
       }
 
       .glass-panel .tier-desc {
@@ -484,7 +507,7 @@
 
       .glass-panel .tier-specs {
         font-size: 0.65rem;
-        font-family: "DM Sans", monospace;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         color: rgba(255, 255, 255, 0.35);
         margin-top: auto;
       }
@@ -499,11 +522,11 @@
       .glass-enter-btn {
         padding: 10px 20px;
         border-radius: 8px;
-        background: var(--fidelity);
+        background: var(--human);
         color: #fff;
         font-size: 0.8rem;
         font-weight: 600;
-        font-family: "DM Sans", sans-serif;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
         border: none;
         cursor: pointer;
         transition:
@@ -544,6 +567,32 @@
         animation: glass-reveal 0.35s cubic-bezier(0.2, 0, 0, 1) both;
       }
 
+      /* ── 6. Chart categorical (16 series) ── */
+      .chart-cat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .chart-cat-swatch {
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .chart-cat-swatch .bar {
+        height: 36px;
+      }
+
+      .chart-cat-swatch .meta {
+        padding: 8px 10px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.65rem;
+        color: #5e7a94;
+        background: var(--new-150);
+      }
+
       /* ── 5. Dynamic Color ── */
       .palette-grid {
         display: flex;
@@ -575,7 +624,7 @@
 
       .palette-row > div span {
         font-size: 0.5rem;
-        font-family: "DM Sans", monospace;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         opacity: 0;
         transition: opacity 0.15s;
       }
@@ -620,7 +669,7 @@
         border: 1px solid rgba(255, 255, 255, 0.08);
         color: #c0d0e0;
         font-size: 0.75rem;
-        font-family: "DM Sans", sans-serif;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
         font-weight: 500;
         cursor: pointer;
         transition: all 0.2s;
@@ -717,7 +766,7 @@
         <div class="section-badge">Improvement 2</div>
         <h2>M3 Tonal Surface Hierarchy</h2>
         <p>
-          Surfaces tinted with 4-8% fidelity green. No more pure gray — surfaces
+          Surfaces tinted with 4-8% Human green. No more pure gray — surfaces
           now have a warm, branded identity.
         </p>
         <div class="tonal-grid">
@@ -786,18 +835,18 @@
             </div>
           </div>
           <div>
-            <h3>After (fidelity green tint)</h3>
+            <h3>After (Human green tint)</h3>
             <div class="state-buttons">
               <div class="state-btn tinted">
-                <div class="dot" style="background: var(--fidelity)"></div>
+                <div class="dot" style="background: var(--human)"></div>
                 Hover me — green tint
               </div>
               <div class="state-btn tinted">
-                <div class="dot" style="background: var(--fidelity)"></div>
+                <div class="dot" style="background: var(--human)"></div>
                 Press me — green tint
               </div>
               <div class="state-btn tinted">
-                <div class="dot" style="background: var(--fidelity)"></div>
+                <div class="dot" style="background: var(--human)"></div>
                 Another tinted item
               </div>
             </div>
@@ -854,8 +903,9 @@
         <div class="section-badge">Improvement 5</div>
         <h2>Dynamic Color from Source</h2>
         <p>
-          OKLCH palette generated from the brand hex #7AB648. Five harmonious
-          scales with P3 wide-gamut overrides.
+          OKLCH palette generated from the brand hex #7AB648. Primary (green),
+          secondary (teal), tertiary (steel blue), neutral (warm charcoal), and
+          error scales — with P3 wide-gamut overrides in the built CSS.
         </p>
         <div class="palette-grid">
           <div class="palette-row-wrap">
@@ -926,19 +976,31 @@
             <div class="palette-label">Error</div>
             <div class="palette-row">
               <div style="background: var(--de-50)"><span>50</span></div>
-              <div style="background: var(--de-50)"><span></span></div>
+              <div style="background: var(--de-100)"><span>100</span></div>
               <div style="background: var(--de-200)"><span>200</span></div>
-              <div style="background: var(--de-200)"><span></span></div>
+              <div style="background: var(--de-300)"><span>300</span></div>
               <div style="background: var(--de-400)"><span>400</span></div>
-              <div style="background: var(--de-400)"><span></span></div>
+              <div style="background: var(--de-500)"><span>500</span></div>
               <div style="background: var(--de-600)"><span>600</span></div>
-              <div style="background: var(--de-600)"><span></span></div>
+              <div style="background: var(--de-700)"><span>700</span></div>
               <div style="background: var(--de-800)"><span>800</span></div>
+              <div style="background: var(--de-900)"><span>900</span></div>
               <div style="background: var(--de-950)"><span>950</span></div>
-              <div style="background: var(--de-950)"><span></span></div>
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- 6. Chart categorical (16) -->
+      <section>
+        <div class="section-badge">Data viz</div>
+        <h2>Chart categorical (16 series)</h2>
+        <p>
+          Matches <code>data-viz.tokens.json</code> —
+          <code>--hu-chart-categorical-1</code> … <code>16</code>. Series 9–16 use
+          <code>color.viz-extended</code> for multi-series charts.
+        </p>
+        <div class="chart-cat-grid" id="chartCatGrid"></div>
       </section>
     </div>
 
@@ -984,6 +1046,22 @@
 
       // Auto-play glass reveal on load
       setTimeout(replayGlass, 800);
+
+      (function renderChartCategorical() {
+        const grid = document.getElementById("chartCatGrid");
+        if (!grid) return;
+        for (let i = 1; i <= 16; i += 1) {
+          const sw = document.createElement("div");
+          sw.className = "chart-cat-swatch";
+          sw.innerHTML =
+            '<div class="bar" style="background: var(--hu-chart-categorical-' +
+            i +
+            ')"></div><div class="meta">categorical-' +
+            i +
+            "</div>";
+          grid.appendChild(sw);
+        }
+      })();
     </script>
   </body>
 </html>

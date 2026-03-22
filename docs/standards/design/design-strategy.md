@@ -10,21 +10,21 @@ title: Human Design Strategy
 
 ## Color Philosophy
 
-Human uses a **Fidelity Green** primary palette inspired by ocean-meets-finance
-aesthetics. The hierarchy is:
+Human uses a **Human green** primary palette with **steel blue** tertiary accents
+and **warm charcoal** neutrals. The hierarchy is:
 
 | Role      | Palette        | Token prefix                      | Usage                          |
 | --------- | -------------- | --------------------------------- | ------------------------------ |
-| Primary   | Fidelity green | `--hu-accent`                     | Brand, CTA, links, focus rings |
+| Primary   | Human green    | `--hu-accent`                     | Brand, CTA, links, focus rings |
 | Secondary | Amber          | `--hu-secondary`                  | Highlights, featured content   |
-| Tertiary  | Indigo         | `--hu-tertiary`                   | Data visualization, depth      |
+| Tertiary  | Steel blue     | `--hu-tertiary`                   | Info, data visualization, depth |
 | Status    | Semantic       | `--hu-success/warning/error/info` | System feedback                |
-| Neutral   | Ocean scale    | `--hu-text/bg/border`             | Backgrounds, text, borders     |
+| Neutral   | Warm charcoal  | `--hu-text/bg/border`             | Backgrounds, text, borders     |
 
 ### Theme Support
 
-- **Dark mode** (default): Deep ocean backgrounds, light text
-- **Light mode**: Coastal whites, dark text — triggered by `prefers-color-scheme: light` or `data-theme="light"`
+- **Dark mode** (default): Deep warm-charcoal backgrounds, light text
+- **Light mode**: Warm off-whites, dark text — triggered by `prefers-color-scheme: light` or `data-theme="light"`
 - **High contrast**: Enhanced boundaries — triggered by `prefers-contrast: more`
 - **Wide gamut (P3)**: Enhanced saturation where supported
 
@@ -37,7 +37,7 @@ aesthetics. The hierarchy is:
 ### Tonal Surfaces (M3)
 
 Human implements Material Design 3 tonal surface containers. Instead of pure neutral
-backgrounds, surfaces are tinted with 4-8% of the primary accent (fidelity green),
+backgrounds, surfaces are tinted with 4-8% of the primary accent (Human green),
 creating a branded warmth across elevation levels.
 
 | Token                            | Dark Value | Light Value | Usage                           |
@@ -78,9 +78,9 @@ neutral white/black. This connects interactive feedback to the brand identity.
 Human generates harmonious color palettes from the brand hex using OKLCH color math,
 following Material Design 3's "color from source" pattern.
 
-- **Source hex**: `#7AB648` (fidelity green)
+- **Source hex**: `#7AB648` (Human green)
 - **Generation**: `design-tokens/dynamic-color-lib.ts` → build pipeline → `_dynamic-color.css`
-- **Scales**: primary, secondary (+60° hue), tertiary (+180° hue), neutral (5% chroma), error
+- **Scales**: primary, secondary (+60° hue), tertiary (fixed steel-blue hue), neutral (warm charcoal), error
 - **Steps per scale**: 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950
 - **P3 overrides**: Automatic `@media (color-gamut: p3)` block with `color(display-p3 ...)` values
 - **Token prefix**: `--hu-dynamic-{group}-{step}` (e.g. `--hu-dynamic-primary-500`)
@@ -317,23 +317,33 @@ Optional multi-sensory layer. Muted by default. Always opt-in.
 
 Chart colors use the `chart.*` token series from `data-viz.tokens.json`.
 
-### Categorical (up to 8 series)
+### Categorical (up to 16 series)
 
-| Series | Color          | Token                      |
-| ------ | -------------- | -------------------------- |
-| 1      | Fidelity green | `--hu-chart-categorical-1` |
-| 2      | Indigo         | `--hu-chart-categorical-2` |
-| 3      | Amber          | `--hu-chart-categorical-3` |
-| 4      | Coral          | `--hu-chart-categorical-4` |
-| 5      | Teal           | `--hu-chart-categorical-5` |
-| 6      | Light indigo   | `--hu-chart-categorical-6` |
-| 7      | Light amber    | `--hu-chart-categorical-7` |
-| 8      | Light green    | `--hu-chart-categorical-8` |
+Core palette (1–8) plus `color.viz-extended` (9–16) for dense multi-series charts.
+
+| Series | Color           | Token                       |
+| ------ | --------------- | --------------------------- |
+| 1      | Human green     | `--hu-chart-categorical-1`  |
+| 2      | Steel blue      | `--hu-chart-categorical-2`  |
+| 3      | Amber           | `--hu-chart-categorical-3`  |
+| 4      | Coral           | `--hu-chart-categorical-4`  |
+| 5      | Teal            | `--hu-chart-categorical-5`  |
+| 6      | Light steel blue | `--hu-chart-categorical-6` |
+| 7      | Light amber     | `--hu-chart-categorical-7`  |
+| 8      | Light green     | `--hu-chart-categorical-8`  |
+| 9      | Forest          | `--hu-chart-categorical-9`  |
+| 10     | Cyan            | `--hu-chart-categorical-10` |
+| 11     | Violet          | `--hu-chart-categorical-11` |
+| 12     | Chartreuse      | `--hu-chart-categorical-12` |
+| 13     | Gold            | `--hu-chart-categorical-13` |
+| 14     | Orange          | `--hu-chart-categorical-14` |
+| 15     | Crimson         | `--hu-chart-categorical-15` |
+| 16     | Azure           | `--hu-chart-categorical-16` |
 
 ### Sequential (single hue ramp)
 
 Use `--hu-chart-sequential-100` through `--hu-chart-sequential-800` for ordered data
-(light to dark within the Fidelity green hue).
+(light to dark within the Human green hue).
 
 ### Diverging
 

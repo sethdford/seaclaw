@@ -69,4 +69,13 @@ hu_error_t hu_compact_hierarchical(hu_allocator_t *alloc, hu_provider_t *provide
                                    char **chapter_summary, size_t *chapter_len,
                                    char **overall_summary, size_t *overall_len);
 
+/* Hierarchical compaction: groups messages into chunks, summarizes each chunk,
+ * then recursively summarizes summaries until the result fits within limits.
+ * chunk_size: messages per chunk (0 = default 10). max_depth: recursion limit (0 = default 3). */
+hu_error_t hu_compact_history_hierarchical(hu_allocator_t *alloc, hu_owned_message_t *history,
+                                           size_t *history_count, size_t *history_cap,
+                                           const hu_compaction_config_t *config,
+                                           hu_provider_t *provider,
+                                           uint32_t chunk_size, uint32_t max_depth);
+
 #endif /* HU_AGENT_COMPACTION_H */

@@ -83,14 +83,14 @@ Digital "better than Pixar" exceeds film in dimensions only software can win:
 
 ### 1. Color Evolution: Quiet Palette
 
-Retain fidelity green as surgical accent. Evolve the neutral stage:
+Retain Human green as surgical accent. Evolve the neutral stage:
 
 ```
 Background:     Near-black with 2% warm tint (#0a0c10 → #0d0f14)
 Surface:        Existing tonal containers (4-8% green tint) — no change
-Accent:         Fidelity green (#7AB648) — unchanged, more surgically applied
+Accent:         Human green (#7AB648) — unchanged, more surgically applied
 Ambient Glow:   New token: --hu-ambient-glow (radial gradient, 3% opacity green)
-Particle Color: New token: --hu-particle-primary (fidelity green at 15% opacity)
+Particle Color: New token: --hu-particle-primary (Human green at 15% opacity)
 ```
 
 New tokens:

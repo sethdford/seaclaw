@@ -764,9 +764,11 @@ hu-card.hu-entrance.hu-visible {
     transparent
   );
   backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
-    saturate(var(--hu-glass-subtle-saturate, 120%));
+    saturate(var(--hu-glass-subtle-saturate, 120%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
-    saturate(var(--hu-glass-subtle-saturate, 120%));
+    saturate(var(--hu-glass-subtle-saturate, 120%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   border: 1px solid
     color-mix(in srgb, var(--hu-border) var(--hu-glass-subtle-border-opacity, 5%), transparent);
   border-radius: var(--hu-radius-lg);
@@ -780,9 +782,11 @@ hu-card.hu-entrance.hu-visible {
     transparent
   );
   backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
-    saturate(var(--hu-glass-standard-saturate, 180%));
+    saturate(var(--hu-glass-standard-saturate, 180%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
-    saturate(var(--hu-glass-standard-saturate, 180%));
+    saturate(var(--hu-glass-standard-saturate, 180%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   border: 1px solid
     color-mix(in srgb, var(--hu-border) var(--hu-glass-standard-border-opacity, 8%), transparent);
   border-radius: var(--hu-radius-lg);
@@ -803,9 +807,11 @@ hu-card.hu-entrance.hu-visible {
     transparent
   );
   backdrop-filter: blur(var(--hu-glass-prominent-blur, 32px))
-    saturate(var(--hu-glass-prominent-saturate, 200%));
+    saturate(var(--hu-glass-prominent-saturate, 200%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   -webkit-backdrop-filter: blur(var(--hu-glass-prominent-blur, 32px))
-    saturate(var(--hu-glass-prominent-saturate, 200%));
+    saturate(var(--hu-glass-prominent-saturate, 200%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   border: 1px solid
     color-mix(in srgb, var(--hu-border) var(--hu-glass-prominent-border-opacity, 12%), transparent);
   border-radius: var(--hu-radius-lg);
@@ -829,9 +835,11 @@ hu-card.hu-entrance.hu-visible {
     transparent
   );
   backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
-    saturate(var(--hu-glass-subtle-saturate, 150%));
+    saturate(var(--hu-glass-subtle-saturate, 150%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
-    saturate(var(--hu-glass-subtle-saturate, 150%));
+    saturate(var(--hu-glass-subtle-saturate, 150%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   border: 1px solid
     color-mix(in srgb, var(--hu-border) var(--hu-glass-subtle-border-opacity, 6%), transparent);
   border-radius: var(--hu-radius-lg);
@@ -844,9 +852,11 @@ hu-card.hu-entrance.hu-visible {
     transparent
   );
   backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
-    saturate(var(--hu-glass-standard-saturate, 180%));
+    saturate(var(--hu-glass-standard-saturate, 180%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
-    saturate(var(--hu-glass-standard-saturate, 180%));
+    saturate(var(--hu-glass-standard-saturate, 180%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   border: 1px solid
     color-mix(in srgb, var(--hu-border) var(--hu-glass-standard-border-opacity, 10%), transparent);
   box-shadow: var(--hu-shadow-sm);
@@ -859,9 +869,11 @@ hu-card.hu-entrance.hu-visible {
     var(--hu-bg-surface) var(--hu-glass-prominent-bg-opacity, 12%),
     transparent
   );
-  backdrop-filter: blur(var(--hu-blur-xl, 40px)) saturate(var(--hu-glass-prominent-saturate, 200%));
+  backdrop-filter: blur(var(--hu-blur-xl, 40px)) saturate(var(--hu-glass-prominent-saturate, 200%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   -webkit-backdrop-filter: blur(var(--hu-blur-xl, 40px))
-    saturate(var(--hu-glass-prominent-saturate, 200%));
+    saturate(var(--hu-glass-prominent-saturate, 200%))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.08));
   border: 1px solid
     color-mix(in srgb, var(--hu-border) var(--hu-glass-prominent-border-opacity, 15%), transparent);
   box-shadow: var(--hu-shadow-md);
@@ -962,6 +974,32 @@ hu-card.hu-entrance.hu-visible {
   text-shadow: var(--hu-glass-vibrancy-text-shadow, 0 0 8px var(--hu-glass-text-shadow-color));
 }
 
+/* Vibrancy — body text contrast boost on glass */
+.hu-glass-subtle :is(p, span, label, a, li, td, th, dt, dd),
+.hu-glass :is(p, span, label, a, li, td, th, dt, dd),
+.hu-glass-standard :is(p, span, label, a, li, td, th, dt, dd),
+.hu-glass-prominent :is(p, span, label, a, li, td, th, dt, dd),
+.hu-glass-surface :is(p, span, label, a, li, td, th, dt, dd),
+.hu-glass-elevated :is(p, span, label, a, li, td, th, dt, dd),
+.hu-glass-floating :is(p, span, label, a, li, td, th, dt, dd) {
+  color: color-mix(
+    in srgb,
+    var(--hu-text) calc(var(--hu-glass-vibrancy-text-boost, 1.15) * 87%),
+    white
+  );
+}
+
+/* Vibrancy — icon contrast boost on glass */
+.hu-glass-subtle :is(svg, .icon),
+.hu-glass :is(svg, .icon),
+.hu-glass-standard :is(svg, .icon),
+.hu-glass-prominent :is(svg, .icon),
+.hu-glass-surface :is(svg, .icon),
+.hu-glass-elevated :is(svg, .icon),
+.hu-glass-floating :is(svg, .icon) {
+  filter: brightness(var(--hu-glass-vibrancy-icon-boost, 1.2));
+}
+
 /* Glass choreography — blur/saturation animate on state changes */
 .hu-glass-subtle,
 .hu-glass,
@@ -1017,6 +1055,14 @@ hu-card.hu-entrance.hu-visible {
 
 .hu-glass-interactive:active {
   transform: scale(var(--hu-glass-interactive-press-scale, 0.98));
+  backdrop-filter: blur(
+      calc(var(--hu-glass-standard-blur, 24px) + var(--hu-glass-interactive-press-blur-delta, -4px))
+    )
+    saturate(var(--hu-glass-interactive-press-saturate-boost, 120%));
+  -webkit-backdrop-filter: blur(
+      calc(var(--hu-glass-standard-blur, 24px) + var(--hu-glass-interactive-press-blur-delta, -4px))
+    )
+    saturate(var(--hu-glass-interactive-press-saturate-boost, 120%));
 }
 
 .hu-glass-interactive:focus-visible {

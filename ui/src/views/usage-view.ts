@@ -46,13 +46,10 @@ interface UsageSummary {
   days_in_month?: number;
 }
 
-const CHART_COLORS = [
-  "var(--hu-chart-categorical-1)",
-  "var(--hu-chart-categorical-2)",
-  "var(--hu-chart-categorical-3)",
-  "var(--hu-chart-categorical-4)",
-  "var(--hu-chart-categorical-5)",
-];
+const CHART_COLORS = Array.from(
+  { length: 16 },
+  (_, i) => `var(--hu-chart-categorical-${i + 1})`,
+);
 
 const TIME_RANGE_OPTIONS = [
   { value: "24h", label: "24h" },

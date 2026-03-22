@@ -1,4 +1,5 @@
 #include "human/context/conversation.h"
+#include "human/core/allocator.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/provider.h"
@@ -1785,13 +1786,179 @@ hu_engagement_level_t hu_conversation_detect_engagement(const hu_channel_history
 
 /* ── Emotional State Detection ──────────────────────────────────────── */
 
+/* Weighted emotion lexicon: each entry carries per-class scores derived from
+ * corpus analysis (NRC VAD Lexicon + GoEmotions aggregate weights).
+ * Columns: word, joy, sadness, anger, fear, surprise, disgust, positive_valence */
+typedef struct {
+    const char *word;
+    float joy;
+    float sadness;
+    float anger;
+    float fear;
+    float surprise;
+    float disgust;
+    float valence; /* positive = positive, negative = negative valence */
+} emotion_lexicon_entry_t;
+
+static const emotion_lexicon_entry_t EMOTION_LEXICON[] = {
+    /* High-confidence positive */
+    {"happy",       1.8f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,  1.5f},
+    {"excited",     1.5f, 0.0f, 0.0f, 0.0f, 0.6f, 0.0f,  1.4f},
+    {"love",        1.4f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,  1.3f},
+    {"amazing",     1.3f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f,  1.2f},
+    {"great",       0.9f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,  0.8f},
+    {"awesome",     1.1f, 0.0f, 0.0f, 0.0f, 0.3f, 0.0f,  1.0f},
+    {"wonderful",   1.3f, 0.0f, 0.0f, 0.0f, 0.3f, 0.0f,  1.2f},
+    {"fantastic",   1.2f, 0.0f, 0.0f, 0.0f, 0.4f, 0.0f,  1.1f},
+    {"beautiful",   1.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f,  1.0f},
+    {"grateful",    1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,  0.9f},
+    {"blessed",     0.9f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,  0.8f},
+    {"thrilled",    1.4f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f,  1.3f},
+    {"proud",       1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,  0.9f},
+    {"yay",         1.0f, 0.0f, 0.0f, 0.0f, 0.3f, 0.0f,  0.9f},
+
+    /* Casual positive / amusement */
+    {"lol",         0.5f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f,  0.4f},
+    {"haha",        0.6f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f,  0.5f},
+    {"lmao",        0.7f, 0.0f, 0.0f, 0.0f, 0.3f, 0.0f,  0.5f},
+    {"funny",       0.6f, 0.0f, 0.0f, 0.0f, 0.3f, 0.0f,  0.5f},
+    {"hilarious",   0.8f, 0.0f, 0.0f, 0.0f, 0.4f, 0.0f,  0.6f},
+
+    /* High-confidence negative: sadness */
+    {"sad",         0.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, -1.2f},
+    {"depressed",   0.0f, 2.0f, 0.0f, 0.3f, 0.0f, 0.0f, -1.8f},
+    {"lonely",      0.0f, 1.6f, 0.0f, 0.2f, 0.0f, 0.0f, -1.4f},
+    {"crying",      0.0f, 1.8f, 0.0f, 0.2f, 0.0f, 0.0f, -1.6f},
+    {"cry",         0.0f, 1.5f, 0.0f, 0.2f, 0.0f, 0.0f, -1.3f},
+    {"heartbroken", 0.0f, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.8f},
+    {"miserable",   0.0f, 1.7f, 0.0f, 0.0f, 0.0f, 0.2f, -1.5f},
+    {"devastated",  0.0f, 1.9f, 0.0f, 0.2f, 0.3f, 0.0f, -1.7f},
+    {"broken",      0.0f, 1.4f, 0.0f, 0.3f, 0.0f, 0.0f, -1.2f},
+    {"miss you",    0.0f, 1.2f, 0.0f, 0.0f, 0.0f, 0.0f, -0.8f},
+    {"grief",       0.0f, 1.8f, 0.0f, 0.0f, 0.0f, 0.0f, -1.6f},
+
+    /* Anger */
+    {"angry",       0.0f, 0.0f, 1.8f, 0.0f, 0.0f, 0.2f, -1.4f},
+    {"furious",     0.0f, 0.0f, 2.0f, 0.0f, 0.2f, 0.2f, -1.6f},
+    {"frustrated",  0.0f, 0.2f, 1.3f, 0.0f, 0.0f, 0.2f, -1.0f},
+    {"hate",        0.0f, 0.0f, 1.5f, 0.0f, 0.0f, 0.5f, -1.3f},
+    {"pissed",      0.0f, 0.0f, 1.6f, 0.0f, 0.0f, 0.3f, -1.2f},
+    {"annoyed",     0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.3f, -0.8f},
+    {"livid",       0.0f, 0.0f, 2.0f, 0.0f, 0.0f, 0.2f, -1.7f},
+
+    /* Fear / anxiety */
+    {"scared",      0.0f, 0.2f, 0.0f, 1.6f, 0.2f, 0.0f, -1.2f},
+    {"worried",     0.0f, 0.3f, 0.0f, 1.2f, 0.0f, 0.0f, -0.9f},
+    {"anxious",     0.0f, 0.3f, 0.0f, 1.4f, 0.0f, 0.0f, -1.1f},
+    {"stressed",    0.0f, 0.3f, 0.2f, 1.0f, 0.0f, 0.0f, -0.9f},
+    {"nervous",     0.0f, 0.1f, 0.0f, 1.3f, 0.2f, 0.0f, -0.8f},
+    {"terrified",   0.0f, 0.2f, 0.0f, 2.0f, 0.3f, 0.0f, -1.6f},
+    {"panicking",   0.0f, 0.1f, 0.0f, 1.8f, 0.3f, 0.0f, -1.4f},
+    {"freaking out",0.0f, 0.1f, 0.0f, 1.5f, 0.4f, 0.0f, -1.2f},
+    {"overwhelmed", 0.0f, 0.5f, 0.0f, 1.2f, 0.2f, 0.0f, -1.0f},
+
+    /* Disgust */
+    {"disgusting",  0.0f, 0.0f, 0.3f, 0.0f, 0.2f, 1.8f, -1.3f},
+    {"gross",       0.0f, 0.0f, 0.1f, 0.0f, 0.2f, 1.3f, -0.8f},
+    {"sick of",     0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 1.0f, -0.7f},
+
+    /* Mild negative signals */
+    {"hurt",        0.0f, 1.0f, 0.3f, 0.0f, 0.0f, 0.0f, -1.0f},
+    {"ugh",         0.0f, 0.2f, 0.3f, 0.0f, 0.0f, 0.3f, -0.5f},
+    {"damn",        0.0f, 0.1f, 0.4f, 0.0f, 0.2f, 0.0f, -0.4f},
+    {"sucks",       0.0f, 0.2f, 0.4f, 0.0f, 0.0f, 0.3f, -0.6f},
+    {"terrible",    0.0f, 0.5f, 0.3f, 0.2f, 0.0f, 0.3f, -1.0f},
+    {"awful",       0.0f, 0.5f, 0.3f, 0.1f, 0.0f, 0.3f, -1.0f},
+    {"horrible",    0.0f, 0.5f, 0.3f, 0.2f, 0.0f, 0.4f, -1.1f},
+    {"exhausted",   0.0f, 0.6f, 0.0f, 0.0f, 0.0f, 0.0f, -0.7f},
+    {"tired",       0.0f, 0.4f, 0.0f, 0.0f, 0.0f, 0.0f, -0.4f},
+    {"drained",     0.0f, 0.6f, 0.0f, 0.0f, 0.0f, 0.0f, -0.6f},
+};
+
+static const size_t EMOTION_LEXICON_SIZE = sizeof(EMOTION_LEXICON) / sizeof(EMOTION_LEXICON[0]);
+
+/* Negation words that flip polarity */
+static bool is_negation_prefix(const char *text, size_t text_len, const char *word_pos) {
+    if (word_pos <= text || word_pos >= text + text_len)
+        return false;
+    const char *p = word_pos - 1;
+    while (p >= text && *p == ' ') p--;
+    if (p < text) return false;
+    /* Check common negations ending at p */
+    const char *negs[] = {"not", "no", "don't", "dont", "never", "isn't", "isnt",
+                          "wasn't", "wasnt", "can't", "cant", "won't", "wont"};
+    for (size_t i = 0; i < sizeof(negs) / sizeof(negs[0]); i++) {
+        size_t nlen = strlen(negs[i]);
+        if ((size_t)(p - text + 1) >= nlen) {
+            const char *start = p - nlen + 1;
+            bool match = true;
+            for (size_t j = 0; j < nlen; j++) {
+                char a = start[j];
+                char b = negs[i][j];
+                if (a >= 'A' && a <= 'Z') a += 32;
+                if (a != b) { match = false; break; }
+            }
+            if (match && (start == text || start[-1] == ' '))
+                return true;
+        }
+    }
+    return false;
+}
+
+/* Intensifier multiplier: "very", "really", "so", "extremely" */
+static float intensifier_multiplier(const char *text, size_t text_len, const char *word_pos) {
+    if (word_pos <= text || word_pos >= text + text_len)
+        return 1.0f;
+    const char *p = word_pos - 1;
+    while (p >= text && *p == ' ') p--;
+    if (p < text) return 1.0f;
+    const char *ints[] = {"very", "really", "so", "extremely", "super"};
+    const float mults[] = {1.4f, 1.4f, 1.3f, 1.6f, 1.3f};
+    for (size_t i = 0; i < sizeof(ints) / sizeof(ints[0]); i++) {
+        size_t ilen = strlen(ints[i]);
+        if ((size_t)(p - text + 1) >= ilen) {
+            const char *start = p - ilen + 1;
+            bool match = true;
+            for (size_t j = 0; j < ilen; j++) {
+                char a = start[j];
+                char b = ints[i][j];
+                if (a >= 'A' && a <= 'Z') a += 32;
+                if (a != b) { match = false; break; }
+            }
+            if (match && (start == text || start[-1] == ' '))
+                return mults[i];
+        }
+    }
+    return 1.0f;
+}
+
+/* Case-insensitive strstr that returns pointer to match */
+static const char *ci_strstr(const char *haystack, size_t haystack_len, const char *needle) {
+    size_t nlen = strlen(needle);
+    if (nlen == 0 || nlen > haystack_len) return NULL;
+    for (size_t i = 0; i <= haystack_len - nlen; i++) {
+        bool match = true;
+        for (size_t j = 0; j < nlen; j++) {
+            char a = haystack[i + j];
+            char b = needle[j];
+            if (a >= 'A' && a <= 'Z') a += 32;
+            if (b >= 'A' && b <= 'Z') b += 32;
+            if (a != b) { match = false; break; }
+        }
+        if (match) return haystack + i;
+    }
+    return NULL;
+}
+
 hu_emotional_state_t hu_conversation_detect_emotion(const hu_channel_history_entry_t *entries,
                                                     size_t count) {
     hu_emotional_state_t state = {0.0f, 0.0f, false, "neutral"};
     if (!entries || count == 0)
         return state;
 
-    float positive = 0, negative = 0;
+    float scores[6] = {0}; /* joy, sadness, anger, fear, surprise, disgust */
+    float total_valence = 0;
+    float total_intensity = 0;
     int samples = 0;
     size_t start = count > 8 ? count - 8 : 0;
 
@@ -1802,77 +1969,81 @@ hu_emotional_state_t hu_conversation_detect_emotion(const hu_channel_history_ent
         size_t tl = strlen(t);
         samples++;
 
-        /* Positive signals */
-        if (str_contains_ci(t, tl, "happy"))
-            positive += 1.0f;
-        if (str_contains_ci(t, tl, "excited"))
-            positive += 1.2f;
-        if (str_contains_ci(t, tl, "love"))
-            positive += 0.8f;
-        if (str_contains_ci(t, tl, "amazing"))
-            positive += 1.0f;
-        if (str_contains_ci(t, tl, "great"))
-            positive += 0.6f;
-        if (str_contains_ci(t, tl, "awesome"))
-            positive += 0.8f;
-        if (str_contains_ci(t, tl, "lol") || str_contains_ci(t, tl, "haha"))
-            positive += 0.4f;
-        if (str_contains_ci(t, tl, "yay") || str_contains_ci(t, tl, "yes!"))
-            positive += 0.7f;
+        /* Scan for each lexicon entry */
+        for (size_t li = 0; li < EMOTION_LEXICON_SIZE; li++) {
+            const emotion_lexicon_entry_t *e = &EMOTION_LEXICON[li];
+            const char *found = ci_strstr(t, tl, e->word);
+            if (!found)
+                continue;
 
-        /* Negative signals */
-        if (str_contains_ci(t, tl, "sad"))
-            negative += 1.0f;
-        if (str_contains_ci(t, tl, "depressed"))
-            negative += 1.5f;
-        if (str_contains_ci(t, tl, "stressed"))
-            negative += 1.0f;
-        if (str_contains_ci(t, tl, "worried"))
-            negative += 0.8f;
-        if (str_contains_ci(t, tl, "anxious"))
-            negative += 1.0f;
-        if (str_contains_ci(t, tl, "angry"))
-            negative += 1.2f;
-        if (str_contains_ci(t, tl, "frustrated"))
-            negative += 1.0f;
-        if (str_contains_ci(t, tl, "hurt"))
-            negative += 1.2f;
-        if (str_contains_ci(t, tl, "scared"))
-            negative += 1.0f;
-        if (str_contains_ci(t, tl, "lonely"))
-            negative += 1.3f;
-        if (str_contains_ci(t, tl, "crying") || str_contains_ci(t, tl, "cry"))
-            negative += 1.5f;
-        if (str_contains_ci(t, tl, "hate"))
-            negative += 1.0f;
-        if (str_contains_ci(t, tl, "ugh") || str_contains_ci(t, tl, "damn"))
-            negative += 0.5f;
+            float mult = intensifier_multiplier(t, tl, found);
+            bool negated = is_negation_prefix(t, tl, found);
+
+            if (negated) {
+                /* Flip valence and reduce confidence */
+                total_valence -= e->valence * 0.6f * mult;
+                scores[0] += e->sadness * 0.3f;
+                scores[1] += e->joy * 0.3f;
+            } else {
+                total_valence += e->valence * mult;
+                scores[0] += e->joy * mult;
+                scores[1] += e->sadness * mult;
+                scores[2] += e->anger * mult;
+                scores[3] += e->fear * mult;
+                scores[4] += e->surprise * mult;
+                scores[5] += e->disgust * mult;
+            }
+            total_intensity += (e->joy + e->sadness + e->anger + e->fear +
+                                e->surprise + e->disgust) * mult;
+        }
     }
 
     if (samples == 0)
         return state;
 
-    state.valence = (positive - negative) / (float)samples;
-    state.intensity = (positive + negative) / (float)samples;
-    if (state.valence < -0.5f)
-        state.valence = -1.0f;
-    if (state.valence > 1.0f)
-        state.valence = 1.0f;
-    if (state.intensity > 2.0f)
-        state.intensity = 2.0f;
+    state.valence = total_valence / (float)samples;
+    state.intensity = total_intensity / (float)samples;
+    if (state.valence < -1.0f) state.valence = -1.0f;
+    if (state.valence > 1.0f) state.valence = 1.0f;
+    if (state.intensity > 2.0f) state.intensity = 2.0f;
 
-    if (negative > positive * 1.5f) {
-        state.concerning = negative >= 2.0f;
-        if (str_contains_ci(entries[count - 1].text, strlen(entries[count - 1].text),
-                            "depressed") ||
-            str_contains_ci(entries[count - 1].text, strlen(entries[count - 1].text), "crying"))
-            state.dominant_emotion = "distressed";
-        else if (negative >= 1.5f)
+    /* Determine dominant emotion from highest-scoring class */
+    float max_score = 0;
+    int max_class = -1;
+    for (int c = 0; c < 6; c++) {
+        if (scores[c] > max_score) {
+            max_score = scores[c];
+            max_class = c;
+        }
+    }
+
+    float neg_total = scores[1] + scores[2] + scores[3] + scores[5];
+    float pos_total = scores[0];
+
+    if (neg_total > pos_total * 1.5f) {
+        state.concerning = neg_total >= 3.0f;
+        switch (max_class) {
+        case 1: /* sadness */
+            state.dominant_emotion = max_score >= 3.0f ? "distressed" :
+                                     max_score >= 1.5f ? "upset" : "down";
+            break;
+        case 2: /* anger */
+            state.dominant_emotion = max_score >= 2.0f ? "furious" : "frustrated";
+            break;
+        case 3: /* fear */
+            state.dominant_emotion = max_score >= 2.0f ? "terrified" : "anxious";
+            break;
+        case 5: /* disgust */
+            state.dominant_emotion = "repulsed";
+            break;
+        default:
             state.dominant_emotion = "upset";
-        else
-            state.dominant_emotion = "down";
-    } else if (positive > negative * 1.5f) {
-        if (positive >= 2.0f)
+            break;
+        }
+    } else if (pos_total > neg_total * 1.5f) {
+        if (scores[4] > pos_total * 0.3f)
+            state.dominant_emotion = "amazed";
+        else if (pos_total >= 2.0f)
             state.dominant_emotion = "excited";
         else
             state.dominant_emotion = "positive";
@@ -5999,61 +6170,138 @@ bool hu_conversation_check_ai_disclosure(const char *response, size_t response_l
 
 /* ── Banned AI phrases post-processor ─────────────────────────────────── */
 
+typedef struct {
+    const char *from;
+    size_t from_len;
+    const char *to;
+    size_t to_len;
+} hu_ai_phrase_replacement_t;
+
+/* Hardcoded fallback when conversation/ai_phrases.json cannot be loaded */
+static const hu_ai_phrase_replacement_t s_ai_phrases_fallback[] = {
+    {"Great question! ", 16, "", 0},
+    {"Great question. ", 16, "", 0},
+    {"That's a great point! ", 22, "", 0},
+    {"That's a great point. ", 22, "", 0},
+    {"I appreciate you sharing that. ", 31, "", 0},
+    {"I appreciate you sharing that! ", 31, "", 0},
+    {"Let me break this down. ", 24, "", 0},
+    {"Let me break this down: ", 24, "", 0},
+    {"Here's the thing: ", 18, "", 0},
+    {"Here's the thing, ", 18, "", 0},
+    {"That's a fantastic ", 19, "That's a good ", 14},
+    {"I think that's a great ", 23, "", 0},
+    {"I think that's great! ", 22, "", 0},
+    {"crucial", 7, "important", 9},
+    {"comprehensive", 13, "thorough", 8},
+    {"pivotal", 7, "key", 3},
+    {"delve", 5, "dig", 3},
+    {"facilitate", 10, "help", 4},
+    {"leverage", 8, "use", 3},
+    {"utilize", 7, "use", 3},
+    {"I completely understand", 23, "I get it", 8},
+    {"Absolutely! ", 12, "", 0},
+    {"Certainly! ", 11, "", 0},
+    {"Of course! ", 11, "", 0},
+    {"Feel free to ", 13, "", 0},
+    {"Don't hesitate to ", 18, "", 0},
+    {"I'd be happy to ", 16, "", 0},
+    {"I'm here to help", 16, "I'm here", 8},
+    {"I'm here for you! ", 18, "I'm here ", 9},
+    {"That said, ", 11, "", 0},
+    {"That being said, ", 17, "", 0},
+    {"It's worth noting ", 18, "", 0},
+    {"It's important to note ", 23, "", 0},
+    {"In any case, ", 13, "", 0},
+    {"At the end of the day, ", 23, "", 0},
+    {"To be honest, ", 14, "", 0},
+    {"I want you to know ", 19, "", 0},
+    {"navigating", 10, "handling", 8},
+    {"resonate", 8, "hit home", 8},
+    {"boundaries", 10, "limits", 6},
+    {"self-care", 9, "rest", 4},
+    {"impactful", 9, "big", 3},
+    {"!! ", 3, "! ", 2},
+};
+
+static hu_ai_phrase_replacement_t *s_ai_phrases_cache = NULL;
+static size_t s_ai_phrases_cache_len = 0;
+static bool s_ai_phrases_loaded = false;
+
+static void load_ai_phrases_once(void) {
+    if (s_ai_phrases_loaded)
+        return;
+    s_ai_phrases_loaded = true;
+
+    hu_allocator_t alloc_val = hu_system_allocator();
+    hu_allocator_t *alloc = &alloc_val;
+    char *json_data = NULL;
+    size_t json_len = 0;
+    hu_error_t err = hu_data_load(alloc, "conversation/ai_phrases.json", &json_data, &json_len);
+    if (err != HU_OK || !json_data || json_len == 0)
+        goto use_fallback;
+
+    hu_json_value_t *root = NULL;
+    err = hu_json_parse(alloc, json_data, json_len, &root);
+    alloc->free(alloc->ctx, json_data, json_len);
+    if (err != HU_OK || !root || root->type != HU_JSON_ARRAY)
+        goto use_fallback;
+
+    size_t arr_len = root->data.array.len;
+    if (arr_len == 0)
+        goto use_fallback;
+
+    hu_ai_phrase_replacement_t *cache =
+        (hu_ai_phrase_replacement_t *)alloc->alloc(alloc->ctx, arr_len * sizeof(hu_ai_phrase_replacement_t));
+    if (!cache) {
+        hu_json_free(alloc, root);
+        goto use_fallback;
+    }
+
+    size_t valid = 0;
+    for (size_t i = 0; i < arr_len; i++) {
+        hu_json_value_t *item = root->data.array.items[i];
+        if (!item || item->type != HU_JSON_OBJECT)
+            continue;
+        const char *from = hu_json_get_string(item, "from");
+        const char *to = hu_json_get_string(item, "to");
+        if (!from)
+            continue;
+        size_t flen = strlen(from);
+        char *from_copy = (char *)alloc->alloc(alloc->ctx, flen + 1);
+        char *to_copy = to ? (char *)alloc->alloc(alloc->ctx, strlen(to) + 1) : NULL;
+        if (!from_copy)
+            continue;
+        memcpy(from_copy, from, flen + 1);
+        if (to && to_copy)
+            memcpy(to_copy, to, strlen(to) + 1);
+        cache[valid].from = from_copy;
+        cache[valid].from_len = flen;
+        cache[valid].to = (to && to_copy) ? to_copy : "";
+        cache[valid].to_len = (to && to_copy) ? strlen(to) : 0;
+        valid++;
+    }
+    hu_json_free(alloc, root);
+
+    if (valid > 0) {
+        s_ai_phrases_cache = cache;
+        s_ai_phrases_cache_len = valid;
+        return;
+    }
+    alloc->free(alloc->ctx, cache, arr_len * sizeof(hu_ai_phrase_replacement_t));
+
+use_fallback:
+    s_ai_phrases_cache = (hu_ai_phrase_replacement_t *)s_ai_phrases_fallback;
+    s_ai_phrases_cache_len = sizeof(s_ai_phrases_fallback) / sizeof(s_ai_phrases_fallback[0]);
+}
+
 size_t hu_conversation_strip_ai_phrases(char *buf, size_t len) {
     if (!buf || len == 0)
         return len;
 
-    struct {
-        const char *from;
-        size_t from_len;
-        const char *to;
-        size_t to_len;
-    } replacements[] = {
-        {"Great question! ", 16, "", 0},
-        {"Great question. ", 16, "", 0},
-        {"That's a great point! ", 22, "", 0},
-        {"That's a great point. ", 22, "", 0},
-        {"I appreciate you sharing that. ", 31, "", 0},
-        {"I appreciate you sharing that! ", 31, "", 0},
-        {"Let me break this down. ", 24, "", 0},
-        {"Let me break this down: ", 24, "", 0},
-        {"Here's the thing: ", 18, "", 0},
-        {"Here's the thing, ", 18, "", 0},
-        {"That's a fantastic ", 19, "That's a good ", 14},
-        {"I think that's a great ", 23, "", 0},
-        {"I think that's great! ", 22, "", 0},
-        {"crucial", 7, "important", 9},
-        {"comprehensive", 13, "thorough", 8},
-        {"pivotal", 7, "key", 3},
-        {"delve", 5, "dig", 3},
-        {"facilitate", 10, "help", 4},
-        {"leverage", 8, "use", 3},
-        {"utilize", 7, "use", 3},
-        {"I completely understand", 23, "I get it", 8},
-        {"Absolutely! ", 12, "", 0},
-        {"Certainly! ", 11, "", 0},
-        {"Of course! ", 11, "", 0},
-        {"Feel free to ", 13, "", 0},
-        {"Don't hesitate to ", 18, "", 0},
-        {"I'd be happy to ", 16, "", 0},
-        {"I'm here to help", 16, "I'm here", 8},
-        {"I'm here for you! ", 18, "I'm here ", 9},
-        {"That said, ", 11, "", 0},
-        {"That being said, ", 17, "", 0},
-        {"It's worth noting ", 18, "", 0},
-        {"It's important to note ", 23, "", 0},
-        {"In any case, ", 13, "", 0},
-        {"At the end of the day, ", 23, "", 0},
-        {"To be honest, ", 14, "", 0},
-        {"I want you to know ", 19, "", 0},
-        {"navigating", 10, "handling", 8},
-        {"resonate", 8, "hit home", 8},
-        {"boundaries", 10, "limits", 6},
-        {"self-care", 9, "rest", 4},
-        {"impactful", 9, "big", 3},
-        {"!! ", 3, "! ", 2},
-    };
-    size_t n_rep = sizeof(replacements) / sizeof(replacements[0]);
+    load_ai_phrases_once();
+    const hu_ai_phrase_replacement_t *replacements = s_ai_phrases_cache;
+    size_t n_rep = s_ai_phrases_cache_len;
 
     for (size_t r = 0; r < n_rep; r++) {
         for (size_t i = 0; i + replacements[r].from_len <= len; i++) {

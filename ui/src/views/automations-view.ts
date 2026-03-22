@@ -240,6 +240,17 @@ export class ScAutomationsView extends GatewayAwareLitElement {
     return this.jobs.filter((j) => j.last_status === "failed").length;
   }
 
+  private get runsTodayCount(): number {
+    const todayStart = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
+    let count = 0;
+    for (const runs of this.runsMap.values()) {
+      for (const r of runs) {
+        if (r.started_at >= todayStart) count++;
+      }
+    }
+    return count;
+  }
+
   private get runChartData(): { labels: string[]; datasets: { label: string; data: number[] }[] } {
     const byDay = new Map<string, { success: number; failure: number }>();
     for (const runs of this.runsMap.values()) {
@@ -444,6 +455,11 @@ export class ScAutomationsView extends GatewayAwareLitElement {
           label="Failed"
           accent="error"
           style="--hu-stagger-delay: 150ms"
+        ></hu-stat-card>
+        <hu-stat-card
+          .value=${this.runsTodayCount}
+          label="Runs Today"
+          style="--hu-stagger-delay: 200ms"
         ></hu-stat-card>
       </hu-stats-row>
       <hu-metric-row

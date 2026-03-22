@@ -1,4 +1,5 @@
 #include "test_framework.h"
+#include "human/agent.h"
 #include "human/agent/constitutional.h"
 #include "human/agent/dispatcher.h"
 #include "human/agent/orchestrator.h"
@@ -1334,6 +1335,129 @@ static void test_streaming_dispatcher_null_callback_falls_back(void) {
     hu_dispatch_result_free(&alloc, &dres);
 }
 
+/* ─── Integration: Streaming dispatch with execute-only tool ──────── */
+
+static hu_error_t mock_execute_only(void *ctx, hu_allocator_t *alloc,
+    const hu_json_value_t *args, hu_tool_result_t *out) {
+    (void)ctx; (void)args;
+    char *buf = (char *)alloc->alloc(alloc->ctx, 10);
+    memcpy(buf, "exec_only", 10);
+    *out = hu_tool_result_ok_owned(buf, 9);
+    return HU_OK;
+}
+
+static const char *mock_exec_name(void *ctx) { (void)ctx; return "exec_only"; }
+static const char *mock_exec_desc(void *ctx) { (void)ctx; return "execute-only tool"; }
+static const char *mock_exec_params(void *ctx) { (void)ctx; return "{}"; }
+
+static const hu_tool_vtable_t mock_exec_only_vtable = {
+    .execute = mock_execute_only,
+    .name = mock_exec_name,
+    .description = mock_exec_desc,
+    .parameters_json = mock_exec_params,
+    .deinit = NULL,
+    .execute_streaming = NULL,
+};
+
+static void test_streaming_dispatch_execute_only_fallback(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t tool = {.ctx = NULL, .vtable = &mock_exec_only_vtable};
+
+    hu_tool_call_t call = {
+        .id = "c1", .id_len = 2,
+        .name = "exec_only", .name_len = 9,
+        .arguments = "{}", .arguments_len = 2,
+    };
+
+    hu_dispatcher_t disp;
+    hu_dispatcher_default(&disp);
+    hu_dispatch_result_t dres;
+    test_stream_chunks_received = 0;
+
+    hu_error_t err = hu_dispatcher_dispatch_streaming(&disp, &alloc, &tool, 1,
+        &call, 1, test_stream_chunk_counter, NULL, &dres);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(dres.count, 1u);
+    HU_ASSERT_TRUE(dres.results[0].success);
+    HU_ASSERT_EQ(test_stream_chunks_received, 0u);
+    HU_ASSERT_TRUE(strstr(dres.results[0].output, "exec_only") != NULL);
+
+    hu_dispatch_result_free(&alloc, &dres);
+}
+
+/* ─── Integration: hu_agent_turn_stream E2E ───────────────────────── */
+
+static hu_error_t agi_mock_chat(void *ctx, hu_allocator_t *alloc,
+    const hu_chat_request_t *request, const char *model, size_t model_len,
+    double temperature, hu_chat_response_t *out) {
+    (void)ctx; (void)request; (void)model; (void)model_len; (void)temperature;
+    const char *resp = "streamed response";
+    char *buf = (char *)alloc->alloc(alloc->ctx, 18);
+    if (buf) {
+        memcpy(buf, resp, 18);
+        out->content = buf;
+        out->content_len = 17;
+    }
+    out->tool_calls = NULL;
+    out->tool_calls_count = 0;
+    out->usage.prompt_tokens = 1;
+    out->usage.completion_tokens = 2;
+    out->usage.total_tokens = 3;
+    out->model = NULL;
+    out->model_len = 0;
+    out->reasoning_content = NULL;
+    out->reasoning_content_len = 0;
+    return out->content ? HU_OK : HU_ERR_OUT_OF_MEMORY;
+}
+
+static bool agi_mock_supports_tools(void *ctx) { (void)ctx; return false; }
+static const char *agi_mock_name(void *ctx) { (void)ctx; return "mock"; }
+static void agi_mock_deinit(void *ctx, hu_allocator_t *alloc) { (void)ctx; (void)alloc; }
+
+static const hu_provider_vtable_t agi_mock_vtable = {
+    .chat = agi_mock_chat,
+    .supports_native_tools = agi_mock_supports_tools,
+    .get_name = agi_mock_name,
+    .deinit = agi_mock_deinit,
+};
+
+static size_t stream_token_total_len;
+static void stream_token_counter(const char *delta, size_t len, void *ctx) {
+    (void)ctx;
+    if (delta && len > 0)
+        stream_token_total_len += len;
+}
+
+static void test_agent_turn_stream_e2e(void) {
+    hu_allocator_t alloc = {
+        .alloc = agi_alloc_fn, .realloc = agi_realloc_fn, .free = agi_free_fn, .ctx = NULL,
+    };
+    hu_provider_t prov = {.ctx = NULL, .vtable = &agi_mock_vtable};
+
+    hu_agent_t agent;
+    hu_error_t err = hu_agent_from_config(
+        &agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL,
+        "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0,
+        NULL, 0, NULL, 0, NULL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    char *response = NULL;
+    size_t response_len = 0;
+    stream_token_total_len = 0;
+
+    err = hu_agent_turn_stream(&agent, "hello world", 11,
+        stream_token_counter, NULL, &response, &response_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(response);
+    HU_ASSERT_TRUE(response_len > 0);
+    HU_ASSERT_TRUE(stream_token_total_len > 0);
+    HU_ASSERT_TRUE(strstr(response, "streamed") != NULL);
+
+    if (response)
+        alloc.free(alloc.ctx, response, response_len + 1);
+    hu_agent_deinit(&agent);
+}
+
 /* ─── Integration: Tree of Thought explore + config ───────────────── */
 
 static void test_tot_explore_generates_branches(void) {
@@ -1439,6 +1563,8 @@ void run_agi_frontiers_tests(void) {
     HU_RUN_TEST(test_tot_explore_generates_branches);
     HU_RUN_TEST(test_streaming_dispatcher_calls_execute_streaming);
     HU_RUN_TEST(test_streaming_dispatcher_null_callback_falls_back);
+    HU_RUN_TEST(test_streaming_dispatch_execute_only_fallback);
+    HU_RUN_TEST(test_agent_turn_stream_e2e);
 
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(test_dpo_record_from_retry_roundtrip);

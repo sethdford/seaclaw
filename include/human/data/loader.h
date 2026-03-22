@@ -5,6 +5,9 @@
 #include "human/core/error.h"
 #include <stddef.h>
 
+/* Set custom data directory (overrides ~/.human/data/). Thread-safe for single init. */
+void hu_data_set_dir(const char *dir);
+
 /* Load a data file by relative path (e.g. "prompts/group_chat_hint.txt").
  * First checks ~/.human/data/<path> for a user override.
  * Falls back to the compiled-in embedded default.

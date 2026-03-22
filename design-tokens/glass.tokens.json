@@ -251,12 +251,12 @@
     "focus-glow-spread": {
       "$value": "8px",
       "$type": "string",
-      "$description": "Fidelity green glow spread on focus"
+      "$description": "Human green glow spread on focus"
     },
     "focus-glow-color": {
       "$value": "rgba(122,182,72,0.35)",
       "$type": "color",
-      "$description": "Focus glow color (Fidelity green)"
+      "$description": "Focus glow color (Human green)"
     },
     "transition-duration": {
       "$value": "200ms",

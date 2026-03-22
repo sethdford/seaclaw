@@ -10,7 +10,7 @@
     "glow": {
       "$value": "radial-gradient(ellipse at 50% 50%, rgba(122,182,72,0.03), transparent 70%)",
       "$type": "string",
-      "$description": "Subtle background radial glow — fidelity green at 3%"
+      "$description": "Subtle background radial glow — Human green at 3%"
     },
     "glow-warm": {
       "$value": "radial-gradient(ellipse at 50% 50%, rgba(182,156,72,0.02), transparent 70%)",
@@ -20,7 +20,7 @@
     "glow-cool": {
       "$value": "radial-gradient(ellipse at 50% 50%, rgba(72,122,182,0.02), transparent 70%)",
       "$type": "string",
-      "$description": "Cool ambient glow — indigo at 2% (morning/night)"
+      "$description": "Cool ambient glow — steel blue at 2% (morning/night)"
     },
     "warmth-default": {
       "$value": 0.5,

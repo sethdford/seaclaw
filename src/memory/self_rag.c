@@ -124,7 +124,8 @@ hu_error_t hu_srag_should_retrieve(hu_allocator_t *alloc, const hu_srag_config_t
         }
     }
 
-    static const char *factual[] = {"what is", "who is", "how does", "explain", "define"};
+    static const char *factual[] = {"what ", "who ", "when ", "where ", "how does",
+                                     "how many", "how much", "explain", "define"};
     for (size_t i = 0; i < sizeof(factual) / sizeof(factual[0]); i++) {
         if (srag_starts_with_ci(query, query_len, factual[i])) {
             out->decision = HU_SRAG_RETRIEVE_AND_VERIFY;

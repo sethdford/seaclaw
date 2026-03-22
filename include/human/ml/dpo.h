@@ -36,11 +36,6 @@ typedef struct hu_dpo_collector {
     size_t max_pairs;
 } hu_dpo_collector_t;
 
-typedef struct hu_dpo_export {
-    hu_preference_pair_t *pairs;
-    size_t count;
-} hu_dpo_export_t;
-
 hu_error_t hu_dpo_collector_create(hu_allocator_t *alloc,
 #ifdef HU_ENABLE_SQLITE
                                    sqlite3 *db,
@@ -70,6 +65,12 @@ hu_error_t hu_dpo_export_jsonl(hu_dpo_collector_t *collector,
 
 hu_error_t hu_dpo_pair_count(hu_dpo_collector_t *collector, size_t *out);
 hu_error_t hu_dpo_clear(hu_dpo_collector_t *collector);
+
+typedef struct hu_dpo_export {
+    hu_preference_pair_t *pairs;
+    size_t count;
+} hu_dpo_export_t;
+
 void hu_dpo_export_free(hu_allocator_t *alloc, hu_dpo_export_t *export_data);
 
 /* Build a prompt fragment from top-margin preference pairs (few-shot injection). */

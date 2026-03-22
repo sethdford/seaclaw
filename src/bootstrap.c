@@ -9,6 +9,7 @@
 #include "human/agent/spawn.h"
 #include "human/cognition/metacognition.h"
 #include "human/config.h"
+#include "human/data/loader.h"
 #include "human/memory.h"
 #include "human/memory/engines.h"
 #include "human/memory/factory.h"
@@ -419,6 +420,9 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
     if (err != HU_OK)
         goto fail;
     ctx->cfg = &bi->cfg;
+
+    if (bi->cfg.data_dir && bi->cfg.data_dir[0])
+        hu_data_set_dir(bi->cfg.data_dir);
 
     const char *ws = bi->cfg.workspace_dir ? bi->cfg.workspace_dir : ".";
 

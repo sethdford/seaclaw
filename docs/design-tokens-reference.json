@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-22T09:05:01.361Z",
+  "generated": "2026-03-22T12:31:53.206Z",
   "groups": {
     "color.neutral": [
       {
@@ -220,7 +220,7 @@
         "value": "rgba(13, 148, 136, 0.10)"
       }
     ],
-    "color.fidelity": [
+    "color.human": [
       {
         "name": "50",
         "value": "#f3fae8",
@@ -497,22 +497,77 @@
     ],
     "color.blue": [
       {
-        "name": "500",
-        "value": "#3b82f6",
-        "hex": "#3b82f6"
+        "name": "50",
+        "value": "#f3f6fb",
+        "hex": "#f3f6fb"
       },
       {
-        "name": "dim",
-        "value": "rgba(59, 130, 246, 0.15)"
+        "name": "100",
+        "value": "#e4ecf6",
+        "hex": "#e4ecf6"
+      },
+      {
+        "name": "200",
+        "value": "#c5d5e8",
+        "hex": "#c5d5e8"
+      },
+      {
+        "name": "300",
+        "value": "#9fb8d9",
+        "hex": "#9fb8d9"
+      },
+      {
+        "name": "400",
+        "value": "#7496c4",
+        "hex": "#7496c4"
+      },
+      {
+        "name": "500",
+        "value": "#4a6fa5",
+        "hex": "#4a6fa5"
+      },
+      {
+        "name": "600",
+        "value": "#3d5d8c",
+        "hex": "#3d5d8c"
+      },
+      {
+        "name": "700",
+        "value": "#324a73",
+        "hex": "#324a73"
+      },
+      {
+        "name": "800",
+        "value": "#2a3d5f",
+        "hex": "#2a3d5f"
+      },
+      {
+        "name": "900",
+        "value": "#24354f",
+        "hex": "#24354f"
+      },
+      {
+        "name": "dark-subtle",
+        "value": "rgba(74, 111, 165, 0.14)"
       },
       {
         "name": "light-500",
-        "value": "#2563eb",
-        "hex": "#2563eb"
+        "value": "#3d5d8c",
+        "hex": "#3d5d8c"
       },
       {
-        "name": "light-dim",
-        "value": "rgba(37, 99, 235, 0.1)"
+        "name": "light-600",
+        "value": "#324a73",
+        "hex": "#324a73"
+      },
+      {
+        "name": "light-400",
+        "value": "#4a6fa5",
+        "hex": "#4a6fa5"
+      },
+      {
+        "name": "light-subtle",
+        "value": "rgba(61, 93, 140, 0.10)"
       }
     ],
     "color.amber": [
@@ -590,79 +645,46 @@
         "value": "rgba(217, 119, 6, 0.10)"
       }
     ],
-    "color.indigo": [
+    "color.viz-extended": [
       {
-        "name": "50",
-        "value": "#eef2ff",
-        "hex": "#eef2ff"
+        "name": "forest",
+        "value": "#00703C",
+        "hex": "#00703C"
       },
       {
-        "name": "100",
-        "value": "#e0e7ff",
-        "hex": "#e0e7ff"
+        "name": "cyan",
+        "value": "#009BDE",
+        "hex": "#009BDE"
       },
       {
-        "name": "200",
-        "value": "#c7d2fe",
-        "hex": "#c7d2fe"
+        "name": "violet",
+        "value": "#9D61CC",
+        "hex": "#9D61CC"
       },
       {
-        "name": "300",
-        "value": "#a5b4fc",
-        "hex": "#a5b4fc"
+        "name": "chartreuse",
+        "value": "#C2CD23",
+        "hex": "#C2CD23"
       },
       {
-        "name": "400",
-        "value": "#818cf8",
-        "hex": "#818cf8"
+        "name": "gold",
+        "value": "#F0D202",
+        "hex": "#F0D202"
       },
       {
-        "name": "500",
-        "value": "#6366f1",
-        "hex": "#6366f1"
+        "name": "orange",
+        "value": "#FF6800",
+        "hex": "#FF6800"
       },
       {
-        "name": "600",
-        "value": "#4f46e5",
-        "hex": "#4f46e5"
+        "name": "crimson",
+        "value": "#CC0000",
+        "hex": "#CC0000"
       },
       {
-        "name": "700",
-        "value": "#4338ca",
-        "hex": "#4338ca"
-      },
-      {
-        "name": "800",
-        "value": "#3730a3",
-        "hex": "#3730a3"
-      },
-      {
-        "name": "900",
-        "value": "#312e81",
-        "hex": "#312e81"
-      },
-      {
-        "name": "dark-subtle",
-        "value": "rgba(99, 102, 241, 0.14)"
-      },
-      {
-        "name": "light-500",
-        "value": "#4f46e5",
-        "hex": "#4f46e5"
-      },
-      {
-        "name": "light-600",
-        "value": "#4338ca",
-        "hex": "#4338ca"
-      },
-      {
-        "name": "light-400",
-        "value": "#6366f1",
-        "hex": "#6366f1"
-      },
-      {
-        "name": "light-subtle",
-        "value": "rgba(79, 70, 229, 0.10)"
+        "name": "azure",
+        "value": "#2B89CB",
+        "hex": "#2B89CB"
       }
     ],
     "spacing": [
@@ -1776,27 +1798,27 @@
       },
       {
         "name": "accent-tertiary",
-        "value": "#6366f1",
-        "hex": "#6366f1"
+        "value": "#4a6fa5",
+        "hex": "#4a6fa5"
       },
       {
         "name": "accent-tertiary-text",
-        "value": "#818cf8",
-        "hex": "#818cf8"
+        "value": "#7496c4",
+        "hex": "#7496c4"
       },
       {
         "name": "accent-tertiary-hover",
-        "value": "#818cf8",
-        "hex": "#818cf8"
+        "value": "#7496c4",
+        "hex": "#7496c4"
       },
       {
         "name": "accent-tertiary-subtle",
-        "value": "rgba(99, 102, 241, 0.14)"
+        "value": "rgba(74, 111, 165, 0.14)"
       },
       {
         "name": "accent-tertiary-strong",
-        "value": "#a5b4fc",
-        "hex": "#a5b4fc"
+        "value": "#9fb8d9",
+        "hex": "#9fb8d9"
       },
       {
         "name": "on-accent-tertiary",
@@ -1842,12 +1864,12 @@
       },
       {
         "name": "info",
-        "value": "#3b82f6",
-        "hex": "#3b82f6"
+        "value": "#4a6fa5",
+        "hex": "#4a6fa5"
       },
       {
         "name": "info-dim",
-        "value": "rgba(59, 130, 246, 0.15)"
+        "value": "{color.blue.dim}"
       },
       {
         "name": "focus-ring",
@@ -2120,27 +2142,27 @@
       },
       {
         "name": "accent-tertiary",
-        "value": "#4f46e5",
-        "hex": "#4f46e5"
+        "value": "#3d5d8c",
+        "hex": "#3d5d8c"
       },
       {
         "name": "accent-tertiary-text",
-        "value": "#4338ca",
-        "hex": "#4338ca"
+        "value": "#324a73",
+        "hex": "#324a73"
       },
       {
         "name": "accent-tertiary-hover",
-        "value": "#4338ca",
-        "hex": "#4338ca"
+        "value": "#324a73",
+        "hex": "#324a73"
       },
       {
         "name": "accent-tertiary-subtle",
-        "value": "rgba(79, 70, 229, 0.10)"
+        "value": "rgba(61, 93, 140, 0.10)"
       },
       {
         "name": "accent-tertiary-strong",
-        "value": "#6366f1",
-        "hex": "#6366f1"
+        "value": "#4a6fa5",
+        "hex": "#4a6fa5"
       },
       {
         "name": "on-accent-tertiary",
@@ -2186,12 +2208,12 @@
       },
       {
         "name": "info",
-        "value": "#2563eb",
-        "hex": "#2563eb"
+        "value": "#3d5d8c",
+        "hex": "#3d5d8c"
       },
       {
         "name": "info-dim",
-        "value": "rgba(37, 99, 235, 0.1)"
+        "value": "{color.blue.light-dim}"
       },
       {
         "name": "focus-ring",
@@ -3168,8 +3190,8 @@
       },
       {
         "name": "2",
-        "value": "#6366f1",
-        "hex": "#6366f1"
+        "value": "#4a6fa5",
+        "hex": "#4a6fa5"
       },
       {
         "name": "3",
@@ -3188,8 +3210,8 @@
       },
       {
         "name": "6",
-        "value": "#a5b4fc",
-        "hex": "#a5b4fc"
+        "value": "#9fb8d9",
+        "hex": "#9fb8d9"
       },
       {
         "name": "7",
@@ -3200,6 +3222,46 @@
         "name": "8",
         "value": "#a3d46a",
         "hex": "#a3d46a"
+      },
+      {
+        "name": "9",
+        "value": "#00703C",
+        "hex": "#00703C"
+      },
+      {
+        "name": "10",
+        "value": "#009BDE",
+        "hex": "#009BDE"
+      },
+      {
+        "name": "11",
+        "value": "#9D61CC",
+        "hex": "#9D61CC"
+      },
+      {
+        "name": "12",
+        "value": "#C2CD23",
+        "hex": "#C2CD23"
+      },
+      {
+        "name": "13",
+        "value": "#F0D202",
+        "hex": "#F0D202"
+      },
+      {
+        "name": "14",
+        "value": "#FF6800",
+        "hex": "#FF6800"
+      },
+      {
+        "name": "15",
+        "value": "#CC0000",
+        "hex": "#CC0000"
+      },
+      {
+        "name": "16",
+        "value": "#2B89CB",
+        "hex": "#2B89CB"
       }
     ],
     "chart.sequential": [
@@ -3279,8 +3341,8 @@
       },
       {
         "name": "info",
-        "value": "#6366f1",
-        "hex": "#6366f1"
+        "value": "#4a6fa5",
+        "hex": "#4a6fa5"
       },
       {
         "name": "muted",

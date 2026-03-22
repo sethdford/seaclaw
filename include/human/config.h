@@ -90,6 +90,7 @@ typedef struct hu_agent_config {
     bool tool_routing_enabled;
     bool tree_of_thought;
     bool constitutional_ai;
+    char *constitutional_principles; /* formatted principle list for system prompt injection */
     bool speculative_cache;
     bool multi_agent;
     bool compact_context;
@@ -118,6 +119,10 @@ typedef struct hu_agent_config {
     float context_pressure_compact; /* auto-compact at this ratio (default 0.95) */
     float context_compact_target;   /* compact until below this ratio (default 0.70) */
     hu_metacog_settings_t metacognition; /* agent.metacognition in config.json */
+    char *mr_reflexive_model;       /* model router: fast backchannel model */
+    char *mr_conversational_model;  /* model router: standard chat model */
+    char *mr_analytical_model;      /* model router: capable reasoning model */
+    char *mr_deep_model;            /* model router: most capable model */
 } hu_agent_config_t;
 
 typedef struct hu_policy_config {
@@ -533,6 +538,8 @@ typedef struct hu_config {
     char *workspace_dir_override;
     /** When set, DPO exports write to `<dpo_export_dir>/dpo_preferences.jsonl`. */
     char *dpo_export_dir;
+    char *data_dir;   /* overrides ~/.human/data/ for hu_data_load() */
+    char *temp_dir;   /* overrides platform temp dir */
     char *api_key;
     hu_provider_entry_t *providers;
     size_t providers_len;
