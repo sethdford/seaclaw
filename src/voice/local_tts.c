@@ -93,8 +93,8 @@ hu_error_t hu_local_tts_synthesize(hu_allocator_t *alloc, const hu_local_tts_con
     fclose(jf);
     hu_json_buf_free(&body);
 
-    char out_tmpl[] = "/tmp/hu_ltts_outXXXXXX.raw";
-    int out_fd = mkstemps(out_tmpl, 4);
+    char out_tmpl[] = "/tmp/hu_ltts_outXXXXXX";
+    int out_fd = mkstemp(out_tmpl);
     if (out_fd < 0) {
         unlink(json_path);
         return HU_ERR_IO;
