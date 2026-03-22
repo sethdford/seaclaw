@@ -57,6 +57,9 @@ runs:
     - name: Configure
       shell: bash
       run: |
+        if [ "${{ runner.os }}" = "macOS" ]; then
+          export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+        fi
         mkdir -p ${{ inputs.build-dir }} && cd ${{ inputs.build-dir }}
         rm -f CMakeCache.txt
         CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}"

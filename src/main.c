@@ -276,10 +276,12 @@ static const hu_command_t commands[] = {
     {"research", "Run research agent", cmd_research},
     {"calibrate", "Analyze messaging patterns and calibrate persona", cmd_calibrate},
     {"workspace", "Workspace management", cmd_workspace},
+    {"config", "Configuration reference (schema)", cmd_config},
     {"capabilities", "Show available capabilities", cmd_capabilities},
     {"models", "List available models", cmd_models},
     {"auth", "Authentication management", cmd_auth},
     {"eval", "Run eval suites and compare runs", cmd_eval},
+    {"hula", "Run a HuLa program (parse, validate, execute, trace)", cmd_hula},
     {"update", "Check for updates", cmd_update},
 #ifdef HU_ENABLE_CURL
     {"paperclip", "Paperclip agent integration", cmd_paperclip},

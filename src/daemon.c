@@ -2778,12 +2778,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             hu_dpo_pair_count(&agent->dpo_collector, &pair_count);
                             if (pair_count > 0) {
                                 char dpo_path[HU_MAX_PATH];
-                                const char *dpo_ch =
-                                    (agent->active_channel && agent->active_channel[0])
-                                        ? agent->active_channel
-                                        : "unknown";
-                                int dpo_plen = snprintf(dpo_path, sizeof(dpo_path),
-                                                          "data/%s/dpo_preferences.jsonl", dpo_ch);
+                                int dpo_plen;
+                                if (config && config->dpo_export_dir &&
+                                    config->dpo_export_dir[0]) {
+                                    dpo_plen = snprintf(dpo_path, sizeof(dpo_path), "%s/dpo_preferences.jsonl",
+                                                        config->dpo_export_dir);
+                                } else {
+                                    dpo_plen = snprintf(dpo_path, sizeof(dpo_path),
+                                                          "data/dpo/dpo_preferences.jsonl");
+                                }
                                 size_t exported = 0;
                                 if (dpo_plen > 0 && (size_t)dpo_plen < sizeof(dpo_path) &&
                                     hu_dpo_export_jsonl(&agent->dpo_collector, dpo_path,

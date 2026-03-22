@@ -47,6 +47,25 @@ static const hu_tool_vtable_t fail_vtable = {
     .description = fail_desc, .parameters_json = fail_params,
 };
 
+/* High-risk tool name for policy tests — must never execute if policy blocks first */
+static hu_error_t shell_stub_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
+                                     hu_tool_result_t *out) {
+    (void)ctx;
+    (void)alloc;
+    (void)args;
+    *out = hu_tool_result_fail("shell stub invoked (policy should block)", 40);
+    return HU_OK;
+}
+
+static const char *shell_stub_name(void *ctx) { (void)ctx; return "shell"; }
+static const char *shell_stub_desc(void *ctx) { (void)ctx; return "Shell stub"; }
+static const char *shell_stub_params(void *ctx) { (void)ctx; return "{}"; }
+
+static const hu_tool_vtable_t shell_stub_vtable = {
+    .execute = shell_stub_execute, .name = shell_stub_name,
+    .description = shell_stub_desc, .parameters_json = shell_stub_params,
+};
+
 static hu_tool_t make_tools(hu_tool_t *buf) {
     (void)buf;
     buf[0] = (hu_tool_t){.ctx = NULL, .vtable = &echo_vtable};
@@ -816,16 +835,17 @@ static void hula_policy_high_risk_blocked(void) {
     policy.autonomy = HU_AUTONOMY_AUTONOMOUS;
     policy.block_high_risk_commands = true;
 
-    hu_tool_t tools[2];
+    hu_tool_t tools[3];
     make_tools(tools);
+    tools[2] = (hu_tool_t){.ctx = NULL, .vtable = &shell_stub_vtable};
     hu_hula_exec_t exec;
-    HU_ASSERT_EQ(hu_hula_exec_init_full(&exec, alloc, &prog, tools, 2, &policy, NULL), HU_OK);
+    HU_ASSERT_EQ(hu_hula_exec_init_full(&exec, alloc, &prog, tools, 3, &policy, NULL), HU_OK);
     HU_ASSERT_EQ(hu_hula_exec_run(&exec), HU_OK);
 
     const hu_hula_result_t *r = hu_hula_exec_result(&exec, "c1");
     HU_ASSERT_NOT_NULL(r);
     HU_ASSERT_EQ(r->status, HU_HULA_FAILED);
-    HU_ASSERT_STR_CONTAINS(r->error, "high risk");
+    HU_ASSERT_STR_CONTAINS(r->error, "blocked by policy: high risk");
 
     hu_hula_exec_deinit(&exec);
     hu_hula_program_deinit(&prog);

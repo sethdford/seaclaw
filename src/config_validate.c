@@ -10,7 +10,8 @@
 
 /* Top-level keys read by hu_config_parse_json (derive from config.c) */
 static const char *const hu_config_top_keys[] = {
-    "workspace",     "default_provider",
+    "workspace",     "dpo_export_dir",
+    "default_provider",
     "default_model", "default_temperature",
     "max_tokens",    "api_key",
     "providers",     "autonomy",
@@ -320,6 +321,11 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
     /* Path traversal */
     if (cfg->workspace_dir && has_path_traversal(cfg->workspace_dir)) {
         fprintf(stderr, "[config] workspace_dir must not contain '..'\n");
+        if (strict)
+            has_error = true;
+    }
+    if (cfg->dpo_export_dir && has_path_traversal(cfg->dpo_export_dir)) {
+        fprintf(stderr, "[config] dpo_export_dir must not contain '..'\n");
         if (strict)
             has_error = true;
     }

@@ -225,6 +225,22 @@ static void test_cmd_setup_unknown_subcommand_fails(void) {
 }
 
 #if defined(__linux__) || defined(__APPLE__)
+static void test_cli_config_schema_emit_contains_core_keys(void) {
+    char *buf = NULL;
+    size_t len = 0;
+    FILE *fp = open_memstream(&buf, &len);
+    HU_ASSERT_NOT_NULL(fp);
+    HU_ASSERT_EQ(hu_cli_config_schema_emit(fp), HU_OK);
+    fclose(fp);
+    HU_ASSERT_NOT_NULL(buf);
+    HU_ASSERT_TRUE(strstr(buf, "human config schema:") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "default_provider") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "memory.backend") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "dpo_export_dir") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "channels.*") != NULL);
+    free(buf);
+}
+
 static void test_cli_setup_local_model_emit_contains_expected_lines(void) {
     char *buf = NULL;
     size_t len = 0;
@@ -324,6 +340,7 @@ void run_cli_tests(void) {
     HU_RUN_TEST(test_cmd_setup_local_model_ok);
     HU_RUN_TEST(test_cmd_setup_unknown_subcommand_fails);
 #if defined(__linux__) || defined(__APPLE__)
+    HU_RUN_TEST(test_cli_config_schema_emit_contains_core_keys);
     HU_RUN_TEST(test_cli_setup_local_model_emit_contains_expected_lines);
 #endif
     HU_RUN_TEST(test_agent_cli_demo_flag_parsing);

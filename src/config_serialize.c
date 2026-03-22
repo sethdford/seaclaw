@@ -32,6 +32,12 @@ hu_error_t hu_config_save(const hu_config_t *cfg) {
         if (ws)
             hu_json_object_set(&a, root, "workspace", ws);
     }
+    if (cfg->dpo_export_dir && cfg->dpo_export_dir[0]) {
+        hu_json_value_t *dd = hu_json_string_new(&a, cfg->dpo_export_dir,
+                                                  strlen(cfg->dpo_export_dir));
+        if (dd)
+            hu_json_object_set(&a, root, "dpo_export_dir", dd);
+    }
     if (cfg->default_provider) {
         hu_json_value_t *dp =
             hu_json_string_new(&a, cfg->default_provider, strlen(cfg->default_provider));

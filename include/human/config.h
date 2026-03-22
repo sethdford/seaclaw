@@ -531,6 +531,8 @@ typedef struct hu_config {
     char *workspace_dir;
     char *config_path;
     char *workspace_dir_override;
+    /** When set, DPO exports write to `<dpo_export_dir>/dpo_preferences.jsonl`. */
+    char *dpo_export_dir;
     char *api_key;
     hu_provider_entry_t *providers;
     size_t providers_len;

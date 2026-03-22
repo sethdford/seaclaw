@@ -9,6 +9,9 @@ hu_error_t cmd_channel(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_hardware(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_memory(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_workspace(hu_allocator_t *alloc, int argc, char **argv);
+hu_error_t cmd_config(hu_allocator_t *alloc, int argc, char **argv);
+/** Prints top-level config key documentation to `out` (used by `human config schema` and tests). */
+hu_error_t hu_cli_config_schema_emit(FILE *out);
 hu_error_t cmd_capabilities(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_models(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_auth(hu_allocator_t *alloc, int argc, char **argv);
@@ -24,5 +27,6 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv);
 #endif
 hu_error_t cmd_research(hu_allocator_t *alloc, int argc, char **argv);
 hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv);
+hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv);
 
 #endif /* HU_CLI_COMMANDS_H */

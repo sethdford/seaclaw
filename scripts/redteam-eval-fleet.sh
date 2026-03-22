@@ -129,7 +129,6 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
 
   # Isolated HOME so eval runs don't load stale ~/.human/ memory/preferences
   EVAL_HOME="$(mktemp -d "${TMPDIR:-/tmp}/hu_eval_home_XXXXXX")"
-  export HOME="$EVAL_HOME"
   echo "redteam-eval-fleet: isolated HOME=$EVAL_HOME"
 
   SUITES="${REDTEAM_EVAL_SUITES:-$DEFAULT_EVAL_SUITES}"
@@ -139,7 +138,7 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
     base="$(basename "$path" .json)"
     out="$LIVE_DIR/eval-${base}.log"
     echo "  running: $suite"
-    if "$HUMAN_BIN" eval run "$path" >"$out" 2>&1; then
+    if HOME="$EVAL_HOME" "$HUMAN_BIN" eval run "$path" >"$out" 2>&1; then
       echo "  --- OK: $suite"
     else
       echo "  --- FAIL: $suite (see $out)"

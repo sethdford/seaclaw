@@ -1,4 +1,5 @@
 #include "human/cli_commands.h"
+#include "human/agent/hula.h"
 #include "human/bootstrap.h"
 #include "human/core/process_util.h"
 #include "human/calibration.h"
@@ -393,6 +394,88 @@ hu_error_t cmd_workspace(hu_allocator_t *alloc, int argc, char **argv) {
     return HU_ERR_INVALID_ARGUMENT;
 }
 
+/* Top-level and common nested keys — static listing aligned with hu_config_t / config_parse.c.
+ * Under HU_IS_TEST the binary still emits this same table (no config file read). */
+typedef struct {
+    const char *key;
+    const char *type;
+    const char *desc;
+} hu_cli_config_schema_row_t;
+
+static const hu_cli_config_schema_row_t hu_cli_config_schema_rows[] = {
+    {"config_version", "int", "Schema version for migration"},
+    {"workspace", "string", "Workspace directory"},
+    {"dpo_export_dir", "string", "Directory for DPO exports (<dir>/dpo_preferences.jsonl)"},
+    {"default_provider", "string", "AI provider name (e.g. openrouter)"},
+    {"default_model", "string", "Model name"},
+    {"default_temperature", "number", "Default sampling temperature (0.0–2.0)"},
+    {"max_tokens", "int", "Max tokens per response"},
+    {"temperature", "number", "Runtime temperature override"},
+    {"api_key", "string", "Legacy default API key"},
+    {"providers", "array|object", "Per-provider keys, base_url, native_tools, etc."},
+    {"autonomy", "object", "Autonomy limits, allowlists, workspace_only"},
+    {"gateway", "object", "enabled, port, host, pairing, CORS, control_ui_dir, ..."},
+    {"gateway.port", "int", "Gateway server port"},
+    {"gateway.host", "string", "Bind address / host"},
+    {"memory", "object", "backend, sqlite_path, consolidation_interval_hours, ..."},
+    {"memory.backend", "string", "sqlite | markdown | lru | ..."},
+    {"tools", "object", "shell timeouts, enabled_tools, disabled_tools, model_overrides"},
+    {"cron", "object", "Scheduled task defaults"},
+    {"scheduler", "object", "max_concurrent"},
+    {"runtime", "object", "kind, docker_image, GCE fields"},
+    {"tunnel", "object", "provider, domain"},
+    {"channels", "object", "default_channel, per-channel blocks (discord, telegram, ...)"},
+    {"channels.*", "object", "Per-channel configuration"},
+    {"agent", "object", "persona, compaction, token_limit, fleet, metacognition, ..."},
+    {"agent.persona", "string", "Default persona profile name"},
+    {"behavior", "object", "response length, dedup, participation limits"},
+    {"heartbeat", "object", "enabled, interval_minutes"},
+    {"reliability", "object", "retries, backoff, fallback_providers"},
+    {"router", "object", "fast/standard/powerful provider routing"},
+    {"ensemble", "object", "providers[], strategy"},
+    {"diagnostics", "object", "logging, OpenTelemetry endpoints"},
+    {"session", "object", "dm_scope, idle_minutes, identity_links"},
+    {"peripherals", "object", "enabled, datasheet_dir"},
+    {"hardware", "object", "serial, transport, probe_target"},
+    {"browser", "object", "enabled"},
+    {"cost", "object", "daily/monthly USD limits"},
+    {"mcp_servers", "array", "MCP server command entries"},
+    {"nodes", "array", "Named node status entries"},
+    {"policy", "object", "enabled, rules_json"},
+    {"plugins", "object", "enabled, plugin_dir, plugin_paths"},
+    {"feeds", "object", "RSS/Gmail/Twitter polling and retention"},
+    {"voice", "object", "STT/TTS providers, endpoints, realtime model"},
+    {"security", "object", "autonomy_level, sandbox, resources, audit"},
+    {"security.autonomy_level", "int", "0–4 autonomy tier"},
+    {"secrets", "object", "encrypt"},
+    {"identity", "object", "format"},
+};
+
+hu_error_t hu_cli_config_schema_emit(FILE *out) {
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    fprintf(out, "human config schema:\n");
+    for (size_t i = 0; i < sizeof(hu_cli_config_schema_rows) / sizeof(hu_cli_config_schema_rows[0]);
+         i++) {
+        fprintf(out, "  %-22s %-8s %s\n", hu_cli_config_schema_rows[i].key,
+                hu_cli_config_schema_rows[i].type, hu_cli_config_schema_rows[i].desc);
+    }
+    return HU_OK;
+}
+
+hu_error_t cmd_config(hu_allocator_t *alloc, int argc, char **argv) {
+    (void)alloc;
+    if (argc < 3) {
+        fprintf(stderr, "Usage: human config schema\n");
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    if (strcmp(argv[2], "schema") != 0) {
+        fprintf(stderr, "Unknown config subcommand: %s\n", argv[2]);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    return hu_cli_config_schema_emit(stdout);
+}
+
 /* ── capabilities ────────────────────────────────────────────────────────── */
 hu_error_t cmd_capabilities(hu_allocator_t *alloc, int argc, char **argv) {
     hu_config_t cfg;
@@ -662,7 +745,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         printf("  compare <r1> <r2>    Compare two run report JSON files\n");
         printf("  dashboard [r1.json]  Render terminal dashboard from run report(s)\n");
         printf("  history [--last N] [--benchmark X]  Show eval history from SQLite\n");
-        printf("  trend                Compare eval runs over time (placeholder; use eval run first)\n");
+        printf("  trend                Compare eval scores over time (requires prior baselines)\n");
         printf("  benchmark <gaia|swebench|tooluse> <suite.json>  Load and run a benchmark\n");
         return HU_OK;
     }
@@ -2060,3 +2143,220 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
     return err;
 }
 #endif /* HU_ENABLE_FEEDS && HU_ENABLE_SQLITE */
+
+/* ── hula (run a HuLa program) ─────────────────────────────────────────── */
+
+static hu_error_t hula_read_file(hu_allocator_t *alloc, const char *path,
+                                  char **out, size_t *out_len) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return HU_ERR_NOT_FOUND;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz <= 0) { fclose(f); return HU_ERR_NOT_FOUND; }
+    char *buf = alloc->alloc(alloc->ctx, (size_t)sz + 1);
+    if (!buf) { fclose(f); return HU_ERR_OUT_OF_MEMORY; }
+    size_t rd = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[rd] = '\0';
+    *out = buf;
+    *out_len = rd;
+    return HU_OK;
+}
+
+/* Stub tools for local demo (no real providers needed) */
+typedef struct { const char *name; } hula_demo_tool_ctx_t;
+
+static hu_error_t hula_demo_execute(void *ctx, hu_allocator_t *alloc,
+                                     const hu_json_value_t *args,
+                                     hu_tool_result_t *out) {
+    (void)alloc;
+    hula_demo_tool_ctx_t *t = ctx;
+    const char *text = "ok";
+    if (args) {
+        const hu_json_value_t *v = hu_json_get(args, "text");
+        if (v && v->type == HU_JSON_STRING)
+            text = v->str;
+    }
+    char buf[256];
+    int n = snprintf(buf, sizeof(buf), "[%s] %s", t->name, text);
+    out->success = true;
+    out->output = hu_strndup(alloc, buf, n > 0 ? (size_t)n : 0);
+    out->output_len = n > 0 ? (size_t)n : 0;
+    out->output_owned = true;
+    return HU_OK;
+}
+
+static const char *hula_demo_name(void *ctx) {
+    return ((hula_demo_tool_ctx_t *)ctx)->name;
+}
+static const char *hula_demo_desc(void *ctx) { (void)ctx; return "demo tool"; }
+static const char *hula_demo_params(void *ctx) { (void)ctx; return "{}"; }
+static void hula_demo_deinit(void *ctx, hu_allocator_t *alloc) { (void)ctx; (void)alloc; }
+
+static const hu_tool_vtable_t hula_demo_vtable = {
+    .execute = hula_demo_execute,
+    .name = hula_demo_name,
+    .description = hula_demo_desc,
+    .parameters_json = hula_demo_params,
+    .deinit = hula_demo_deinit,
+};
+
+hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
+    if (argc < 3) {
+        printf("Usage: human hula <run|validate> <file.json | '{...}'>\n\n");
+        printf("  run <program>       Parse, validate, execute, and print trace\n");
+        printf("  validate <program>  Parse and validate only\n\n");
+        printf("The program can be a file path or inline JSON.\n");
+        printf("Demo tools available: echo, search, write, analyze\n");
+        return HU_OK;
+    }
+
+    const char *sub = argv[2];
+    bool run_mode = (strcmp(sub, "run") == 0);
+    bool validate_mode = (strcmp(sub, "validate") == 0);
+    if (!run_mode && !validate_mode) {
+        fprintf(stderr, "Unknown hula subcommand: %s\n", sub);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    if (argc < 4) {
+        fprintf(stderr, "Usage: human hula %s <file.json | '{...}'>\n", sub);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    /* Load program JSON */
+    const char *input = argv[3];
+    char *json = NULL;
+    size_t json_len = 0;
+    bool json_owned = false;
+
+    if (input[0] == '{') {
+        json = (char *)input;
+        json_len = strlen(input);
+    } else {
+        hu_error_t err = hula_read_file(alloc, input, &json, &json_len);
+        if (err != HU_OK) {
+            fprintf(stderr, "hula: cannot read %s: %s\n", input, hu_error_string(err));
+            return err;
+        }
+        json_owned = true;
+    }
+
+    /* 1. Parse */
+    printf("── Parse ────────────────────────────────────────────\n");
+    hu_hula_program_t prog;
+    hu_error_t err = hu_hula_parse_json(alloc, json, json_len, &prog);
+    if (err != HU_OK) {
+        fprintf(stderr, "  FAIL: parse error: %s\n", hu_error_string(err));
+        if (json_owned) hu_str_free(alloc, json);
+        return err;
+    }
+    printf("  OK: program \"%s\" v%u, %zu nodes, root=%s (%s)\n",
+           prog.name ? prog.name : "(unnamed)", prog.version,
+           prog.node_count,
+           prog.root ? (prog.root->id ? prog.root->id : "?") : "(none)",
+           prog.root ? hu_hula_op_name(prog.root->op) : "?");
+
+    /* 2. Validate */
+    printf("\n── Validate ─────────────────────────────────────────\n");
+    const char *tool_names[] = {"echo", "search", "write", "analyze"};
+    hu_hula_validation_t v;
+    err = hu_hula_validate(&prog, alloc, tool_names, 4, &v);
+    if (err != HU_OK) {
+        fprintf(stderr, "  FAIL: validation error: %s\n", hu_error_string(err));
+        hu_hula_program_deinit(&prog);
+        if (json_owned) hu_str_free(alloc, json);
+        return err;
+    }
+    if (v.valid) {
+        printf("  OK: program is valid\n");
+    } else {
+        printf("  WARN: %zu diagnostics:\n", v.diag_count);
+        for (size_t i = 0; i < v.diag_count; i++)
+            printf("    - %s\n", v.diags[i].message ? v.diags[i].message : "?");
+    }
+    hu_hula_validation_deinit(alloc, &v);
+
+    if (validate_mode) {
+        hu_hula_program_deinit(&prog);
+        if (json_owned) hu_str_free(alloc, json);
+        return HU_OK;
+    }
+
+    /* 3. Execute with trace + observer */
+    printf("\n── Execute ──────────────────────────────────────────\n");
+
+    hula_demo_tool_ctx_t demo_ctxs[] = {
+        {.name = "echo"}, {.name = "search"}, {.name = "write"}, {.name = "analyze"},
+    };
+    hu_tool_t tools[4];
+    for (size_t i = 0; i < 4; i++) {
+        tools[i].ctx = &demo_ctxs[i];
+        tools[i].vtable = &hula_demo_vtable;
+    }
+
+    hu_security_policy_t policy;
+    memset(&policy, 0, sizeof(policy));
+    policy.autonomy = HU_AUTONOMY_AUTONOMOUS;
+
+    hu_observer_t obs = hu_observer_log_stderr();
+
+    hu_hula_exec_t exec;
+    err = hu_hula_exec_init_full(&exec, *alloc, &prog, tools, 4, &policy, &obs);
+    if (err != HU_OK) {
+        fprintf(stderr, "  FAIL: exec init: %s\n", hu_error_string(err));
+        hu_hula_program_deinit(&prog);
+        if (json_owned) hu_str_free(alloc, json);
+        return err;
+    }
+
+    err = hu_hula_exec_run(&exec);
+    if (err != HU_OK) {
+        fprintf(stderr, "  FAIL: exec run: %s\n", hu_error_string(err));
+        hu_hula_exec_deinit(&exec);
+        hu_hula_program_deinit(&prog);
+        if (json_owned) hu_str_free(alloc, json);
+        return err;
+    }
+
+    /* Print per-node results */
+    printf("  Results:\n");
+    for (size_t i = 0; i < prog.node_count; i++) {
+        const hu_hula_node_t *n = &prog.nodes[i];
+        const hu_hula_result_t *r = hu_hula_exec_result(&exec, n->id);
+        if (!r) continue;
+        printf("    %-10s %-8s %-7s", n->id ? n->id : "?",
+               hu_hula_op_name(n->op), hu_hula_status_name(r->status));
+        if (r->output && r->output_len > 0) {
+            size_t show = r->output_len > 60 ? 60 : r->output_len;
+            printf("  \"%.*s%s\"", (int)show, r->output, r->output_len > 60 ? "..." : "");
+        }
+        if (r->error && r->error_len > 0)
+            printf("  err=\"%.*s\"", (int)r->error_len, r->error);
+        printf("\n");
+    }
+
+    /* 4. Trace log */
+    printf("\n── Trace ────────────────────────────────────────────\n");
+    size_t trace_len = 0;
+    const char *trace = hu_hula_exec_trace(&exec, &trace_len);
+    if (trace && trace_len > 0) {
+        printf("  %.*s\n", (int)trace_len, trace);
+    } else {
+        printf("  (empty)\n");
+    }
+
+    /* Summary */
+    const hu_hula_result_t *root_r = prog.root ? hu_hula_exec_result(&exec, prog.root->id) : NULL;
+    printf("\n── Summary ──────────────────────────────────────────\n");
+    printf("  Program: %s\n", prog.name ? prog.name : "?");
+    printf("  Nodes:   %zu\n", prog.node_count);
+    printf("  Root:    %s\n", root_r ? hu_hula_status_name(root_r->status) : "?");
+    printf("  Result:  %s\n", (root_r && root_r->status == HU_HULA_DONE) ? "SUCCESS" : "FAILED");
+
+    hu_hula_exec_deinit(&exec);
+    hu_hula_program_deinit(&prog);
+    if (json_owned) hu_str_free(alloc, json);
+    return HU_OK;
+}

@@ -852,6 +852,15 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
         cfg->workspace_dir = hu_strdup(a, workspace);
     }
 
+    const char *dpo_dir = hu_json_get_string(root, "dpo_export_dir");
+    if (dpo_dir && strstr(dpo_dir, ".."))
+        dpo_dir = NULL;
+    if (dpo_dir && dpo_dir[0]) {
+        if (cfg->dpo_export_dir)
+            a->free(a->ctx, cfg->dpo_export_dir, strlen(cfg->dpo_export_dir) + 1);
+        cfg->dpo_export_dir = hu_strdup(a, dpo_dir);
+    }
+
     const char *prov = hu_json_get_string(root, "default_provider");
     if (!prov) prov = hu_json_get_string(root, "provider");
     if (prov) {
