@@ -355,6 +355,17 @@ hu_error_t hu_config_save(const hu_config_t *cfg) {
         }
     }
 
+    /* auto_update */
+    if (cfg->auto_update && strcmp(cfg->auto_update, "off") != 0) {
+        hu_json_object_set(
+            &a, root, "auto_update",
+            hu_json_string_new(&a, cfg->auto_update, strlen(cfg->auto_update)));
+    }
+    if (cfg->update_check_interval_hours != 24 && cfg->update_check_interval_hours > 0) {
+        hu_json_object_set(&a, root, "update_check_interval_hours",
+                           hu_json_number_new(&a, (double)cfg->update_check_interval_hours));
+    }
+
     /* browser */
     hu_json_object_set(&a, root, "browser", hu_json_bool_new(&a, cfg->browser.enabled));
 

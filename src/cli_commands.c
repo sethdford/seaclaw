@@ -704,10 +704,7 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
     }
 
     const char *current = ver ? ver : "0.0.0";
-    const char *remote = latest;
-    if (remote[0] == 'v')
-        remote++;
-    if (strcmp(current, remote) == 0) {
+    if (hu_version_compare(current, latest) >= 0) {
         printf("Already up to date.\n");
         return HU_OK;
     }

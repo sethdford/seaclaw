@@ -1141,6 +1141,17 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
         }
     }
 
+    const char *au = hu_json_get_string(root, "auto_update");
+    if (au) {
+        if (cfg->auto_update)
+            a->free(a->ctx, cfg->auto_update, strlen(cfg->auto_update) + 1);
+        cfg->auto_update = hu_strdup(a, au);
+    }
+    double uci = hu_json_get_number(root, "update_check_interval_hours",
+                                    cfg->update_check_interval_hours);
+    if (uci >= 0 && uci <= 8760)
+        cfg->update_check_interval_hours = (uint32_t)uci;
+
     hu_json_free(a, root);
     return HU_OK;
 }

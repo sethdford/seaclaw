@@ -593,6 +593,8 @@ typedef struct hu_config {
     hu_policy_config_t policy;
     hu_plugins_config_t plugins;
     hu_feeds_config_t feeds;
+    char *auto_update;                    /* "off" (default), "check", or "apply" */
+    uint32_t update_check_interval_hours; /* default 24; 0 = use default */
     hu_arena_t *arena;
     hu_allocator_t allocator;
 } hu_config_t;

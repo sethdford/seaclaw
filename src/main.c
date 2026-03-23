@@ -70,6 +70,9 @@
 #include "human/paperclip/client.h"
 #include "human/paperclip/heartbeat.h"
 #endif
+#ifdef HU_HAS_UPDATE
+#include "human/update.h"
+#endif
 #include "human/pwa.h"
 #include "human/pwa_context.h"
 #include "human/pwa_learner.h"
@@ -2028,6 +2031,17 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Run 'human help' for usage.\n");
         return 1;
     }
+
+#if defined(HU_HAS_UPDATE) && !HU_IS_TEST
+    if (strcmp(cmd_name, "update") != 0 && strcmp(cmd_name, "version") != 0 &&
+        strcmp(cmd_name, "help") != 0) {
+        hu_config_t update_cfg;
+        if (hu_config_load(&alloc, &update_cfg) == HU_OK) {
+            hu_update_maybe_check(&alloc, &update_cfg);
+            hu_config_deinit(&update_cfg);
+        }
+    }
+#endif
 
     return run_command(&alloc, argc, argv, cmd) == 0 ? 0 : 1;
 }

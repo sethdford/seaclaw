@@ -148,6 +148,10 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     /* channels.default_daemon and per-channel .daemon: zeroed here; successive
      * hu_config_parse_json (global then workspace in config_load_impl) overlays
      * only keys present in each file — no separate merge pass. */
+    cfg->auto_update = hu_strdup(a, "off");
+    if (!cfg->auto_update)
+        return;
+    cfg->update_check_interval_hours = 24;
     cfg->tunnel.provider = hu_strdup(a, "none");
     if (!cfg->tunnel.provider)
         return;

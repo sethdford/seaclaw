@@ -451,6 +451,8 @@ set(HU_CORE_SOURCES
     src/context/context_ext.c
     src/agent/episodic.c
     src/agent/reflection.c
+    src/agent/gvr.c
+    src/agent/degradation.c
     src/agent/tree_of_thought.c
     src/agent/constitutional.c
     src/agent/ab_response.c
@@ -735,6 +737,7 @@ list(APPEND HU_CORE_SOURCES
     src/agent/process_reward.c
     src/ml/dpo.c
     src/security/cot_audit.c
+    src/security/escalate.c
     src/security/moderation.c
     src/tools/code_sandbox.c
     src/tools/computer_use.c
@@ -1911,6 +1914,7 @@ set(HU_TEST_SOURCES
     tests/test_local_voice.c
     tests/test_vector_stores.c
     tests/test_cli.c
+    tests/test_update.c
     tests/test_memory_engines_ext.c
     tests/test_runtime.c
     tests/test_runtime_bundle.c
@@ -2075,6 +2079,9 @@ list(APPEND HU_TEST_SOURCES tests/test_integration.c)
 
 # SOTA capability tests
 list(APPEND HU_TEST_SOURCES
+    tests/test_gvr.c
+    tests/test_provider_degradation.c
+    tests/test_escalate.c
     tests/test_a2a.c
     tests/test_eval.c
     tests/test_turing_score.c

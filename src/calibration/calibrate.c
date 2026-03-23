@@ -110,7 +110,7 @@ static hu_error_t hu_calib_build_recommendations_json(hu_allocator_t *alloc,
     if (err != HU_OK)
         goto fail;
 
-    err = hu_json_buf_append_raw(&buf, ",\"recommended_voice_rhythm\":{", 31);
+    err = hu_json_buf_append_raw(&buf, ",\"recommended_voice_rhythm\":{", 29);
     if (err != HU_OK)
         goto fail;
     err = hu_json_util_append_key_value(&buf, "response_tempo", tempo);
@@ -120,7 +120,7 @@ static hu_error_t hu_calib_build_recommendations_json(hu_allocator_t *alloc,
     if (err != HU_OK)
         goto fail;
 
-    err = hu_json_buf_append_raw(&buf, ",\"calibration_meta\":{", 22);
+    err = hu_json_buf_append_raw(&buf, ",\"calibration_meta\":{", 21);
     if (err != HU_OK)
         goto fail;
     err = hu_json_util_append_key_int(&buf, "timing_weighted_median_reply_sec", (int64_t)(wmed + 0.5));
@@ -157,7 +157,7 @@ static hu_error_t hu_calib_build_recommendations_json(hu_allocator_t *alloc,
         goto fail;
 
     if (style->opening_count > 0) {
-        err = hu_json_buf_append_raw(&buf, ",\"sample_opening_phrases\":[", 28);
+        err = hu_json_buf_append_raw(&buf, ",\"sample_opening_phrases\":[", 27);
         if (err != HU_OK)
             goto fail;
         for (size_t i = 0; i < style->opening_count; i++) {
@@ -176,7 +176,7 @@ static hu_error_t hu_calib_build_recommendations_json(hu_allocator_t *alloc,
     }
 
     if (style->closing_count > 0) {
-        err = hu_json_buf_append_raw(&buf, ",\"sample_closing_phrases\":[", 28);
+        err = hu_json_buf_append_raw(&buf, ",\"sample_closing_phrases\":[", 27);
         if (err != HU_OK)
             goto fail;
         for (size_t i = 0; i < style->closing_count; i++) {

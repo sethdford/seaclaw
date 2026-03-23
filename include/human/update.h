@@ -1,14 +1,22 @@
 #ifndef HU_UPDATE_H
 #define HU_UPDATE_H
 
+#include "human/core/allocator.h"
 #include "human/core/error.h"
 #include <stddef.h>
 
-/* Self-update mechanism.
- * hu_update_check: queries GitHub releases via curl for newer versions.
- * hu_update_apply: downloads and replaces the binary (Unix only).
- * Requires HU_ENABLE_CURL; returns HU_ERR_NOT_SUPPORTED otherwise. */
+struct hu_config;
+
 hu_error_t hu_update_check(char *version_buf, size_t buf_size);
 hu_error_t hu_update_apply(void);
+
+/* Semver comparison: returns <0 if a<b, 0 if a==b, >0 if a>b.
+ * Parses "major.minor.patch" numerically. Leading 'v' is stripped. */
+int hu_version_compare(const char *a, const char *b);
+
+/* Periodic auto-check: reads ~/.human/.last_update_check timestamp,
+ * checks staleness vs config interval, notifies or applies based on
+ * config.auto_update ("off", "check", "apply"). */
+hu_error_t hu_update_maybe_check(hu_allocator_t *alloc, const struct hu_config *cfg);
 
 #endif /* HU_UPDATE_H */
