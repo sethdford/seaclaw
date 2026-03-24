@@ -15,7 +15,7 @@ cmake --build --preset dev
 # Other presets: test (no ASan), release (MinSizeRel+LTO), fuzz (Clang), minimal
 cmake --list-presets               # show all available presets
 
-# Run tests (6742+ tests, must be 0 failures, 0 ASan errors)
+# Run tests (6802+ tests, must be 0 failures, 0 ASan errors)
 ./build/human_tests                          # full suite
 ./build/human_tests --suite=JSON             # run suites matching "JSON"
 ./build/human_tests --filter=config_parse    # run tests matching "config_parse"
@@ -103,7 +103,7 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 | --------------------------------- | --------------------------------------------------------------------- |
 | `src/`                            | All C source (~1,093 files, ~233K lines)                              |
 | `include/human/`                  | Public headers                                                        |
-| `tests/`                          | 332 test files, 6742+ tests                                           |
+| `tests/`                          | 333 test files, 6802+ tests                                           |
 | `fuzz/`                           | libFuzzer harnesses                                                   |
 | `ui/`                             | LitElement web dashboard                                              |
 | `website/`                        | Astro marketing site                                                  |
