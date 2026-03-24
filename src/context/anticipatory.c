@@ -1,23 +1,11 @@
 typedef int hu_anticipatory_unused_;
 
-#ifdef HU_ENABLE_SQLITE
-
-#include "human/context/anticipatory.h"
-#include "human/core/string.h"
-#include "human/memory.h"
-#include "human/provider.h"
 #include <ctype.h>
-#include <sqlite3.h>
 #include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
-#include <time.h>
 
-#define HU_ANTICIPATORY_MAX_PREDICTIONS   16
-#define HU_ANTICIPATORY_CONFIDENCE_THRESH 0.5f
-
-/* Case-insensitive substring match. */
+/* Case-insensitive substring match (no SQLite dependency). */
 static bool contains_ci(const char *haystack, size_t hlen, const char *needle) {
     size_t nlen = strlen(needle);
     if (nlen == 0 || hlen < nlen)
@@ -88,6 +76,20 @@ static void match_keyword_to_emotion(const char *text, size_t text_len, const ch
         }
     }
 }
+
+#ifdef HU_ENABLE_SQLITE
+
+#include "human/context/anticipatory.h"
+#include "human/core/string.h"
+#include "human/memory.h"
+#include "human/provider.h"
+#include <sqlite3.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define HU_ANTICIPATORY_MAX_PREDICTIONS   16
+#define HU_ANTICIPATORY_CONFIDENCE_THRESH 0.5f
 
 static hu_error_t anticipatory_predict_impl(hu_allocator_t *alloc, hu_memory_t *memory,
                                             hu_provider_t *provider, const char *model,
@@ -373,6 +375,7 @@ void hu_anticipatory_predictions_free(hu_allocator_t *alloc, hu_emotional_predic
 
 #endif /* HU_ENABLE_SQLITE */
 
+#include "human/context/anticipatory.h"
 #include "human/provider.h"
 
 hu_error_t hu_anticipatory_classify_emotion(hu_allocator_t *alloc, hu_provider_t *provider,
@@ -390,7 +393,6 @@ hu_error_t hu_anticipatory_classify_emotion(hu_allocator_t *alloc, hu_provider_t
     (void)provider;
     (void)model;
     (void)model_len;
-#ifdef HU_ENABLE_SQLITE
     const char *emo = NULL;
     float conf = 0.0f;
     char basis[64] = {0};
@@ -402,7 +404,6 @@ hu_error_t hu_anticipatory_classify_emotion(hu_allocator_t *alloc, hu_provider_t
         emotion_out[copy] = '\0';
         *confidence_out = conf;
     }
-#endif
     return HU_OK;
 #else
     /* Try model-based classification if provider is available */
@@ -440,7 +441,6 @@ hu_error_t hu_anticipatory_classify_emotion(hu_allocator_t *alloc, hu_provider_t
     }
 
     /* Fallback: keyword matching */
-#ifdef HU_ENABLE_SQLITE
     const char *emo = NULL;
     float conf = 0.0f;
     char basis[64] = {0};
@@ -452,7 +452,6 @@ hu_error_t hu_anticipatory_classify_emotion(hu_allocator_t *alloc, hu_provider_t
         emotion_out[copy] = '\0';
         *confidence_out = conf;
     }
-#endif
     return HU_OK;
 #endif
 }
