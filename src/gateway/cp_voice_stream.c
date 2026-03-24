@@ -1,5 +1,6 @@
 /*
  * Streaming voice session: binary mic chunks, STT, bus → agent, Cartesia TTS → binary PCM.
+ * Micro-turn duplex FSM drives turn-taking and control-token stripping.
  */
 #include "cp_internal.h"
 #include "human/bus.h"
@@ -9,6 +10,8 @@
 #include "human/platform.h"
 #include "human/tts/cartesia_stream.h"
 #include "human/voice.h"
+#include "human/voice/duplex.h"
+#include "human/voice/turn_signal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +21,8 @@
 #endif
 
 #ifdef HU_GATEWAY_POSIX
+
+#include <time.h>
 
 #define VS_MAX_SLOTS 8
 #define VS_MAX_AUDIO (10u * 1024u * 1024u)
@@ -36,12 +41,20 @@ typedef struct {
     unsigned turn_counter;
     char voice_id[128];
     char model_id[128];
+    hu_duplex_session_t duplex;
 } vs_slot_t;
 
 static vs_slot_t s_vs[VS_MAX_SLOTS];
 static hu_control_protocol_t *s_proto;
 static hu_bus_t *s_bus;
 static vs_slot_t *s_active_tts_slot;
+
+static int64_t vs_now_ms(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
+        return 0;
+    return (int64_t)ts.tv_sec * 1000 + (int64_t)ts.tv_nsec / 1000000;
+}
 
 static hu_allocator_t *vs_alloc_for_close(void) {
     if (s_proto && s_proto->alloc)
@@ -89,6 +102,7 @@ static vs_slot_t *vs_alloc_slot(hu_ws_conn_t *c) {
             s_vs[i].conn = c;
             memcpy(s_vs[i].session_key, "voice", 5);
             s_vs[i].session_key[5] = '\0';
+            hu_duplex_session_init(&s_vs[i].duplex);
             return &s_vs[i];
         }
     }
@@ -133,6 +147,15 @@ static void vs_drain_tts_to_conn(vs_slot_t *sl) {
     }
 }
 
+static void vs_finish_agent_turn(vs_slot_t *sl, hu_allocator_t *a) {
+    (void)hu_cartesia_stream_flush_context(sl->tts, a, sl->tts_context);
+    vs_drain_tts_to_conn(sl);
+    hu_control_send_event_to_conn(s_proto, sl->conn, "voice.audio.done", "{}");
+    sl->tts_armed = false;
+    if (s_active_tts_slot == sl)
+        s_active_tts_slot = NULL;
+}
+
 static bool vs_bus_cb(hu_bus_event_type_t type, const hu_bus_event_t *ev, void *user_ctx) {
     (void)user_ctx;
     if (!s_proto || !s_active_tts_slot || !s_active_tts_slot->tts_armed || !s_active_tts_slot->tts)
@@ -142,19 +165,41 @@ static bool vs_bus_cb(hu_bus_event_type_t type, const hu_bus_event_t *ev, void *
 
     hu_allocator_t *a = s_proto->alloc;
     vs_slot_t *sl = s_active_tts_slot;
+    int64_t now = vs_now_ms();
 
     if (type == HU_BUS_MESSAGE_CHUNK) {
         const char *tok = ev->message[0] ? ev->message : NULL;
         if (!tok || !tok[0])
             return true;
-        if (hu_cartesia_stream_send_generation(sl->tts, a, sl->tts_context, tok, true) == HU_OK)
-            vs_drain_tts_to_conn(sl);
+
+        size_t tok_len = strlen(tok);
+        hu_turn_signal_result_t sig;
+        hu_turn_signal_extract(tok, tok_len, &sig);
+
+        hu_turn_signal_t fsm_signal = sig.had_token ? sig.signal : HU_TURN_SIGNAL_CONTINUE;
+        hu_turn_action_t action;
+        hu_duplex_agent_chunk(&sl->duplex, now, fsm_signal, &action);
+
+        if (action == HU_TURN_ACTION_FLUSH_AUDIO) {
+            char stripped[HU_BUS_MSG_LEN];
+            const char *tts_text = tok;
+            if (sig.had_token) {
+                size_t slen = hu_turn_signal_strip(tok, tok_len, stripped, sizeof(stripped));
+                if (slen > 0)
+                    tts_text = stripped;
+                else
+                    return true;
+            }
+            if (hu_cartesia_stream_send_generation(sl->tts, a, sl->tts_context, tts_text, true) ==
+                HU_OK)
+                vs_drain_tts_to_conn(sl);
+        } else if (action == HU_TURN_ACTION_YIELD_FLOOR) {
+            vs_finish_agent_turn(sl, a);
+        }
     } else if (type == HU_BUS_MESSAGE_SENT) {
-        (void)hu_cartesia_stream_flush_context(sl->tts, a, sl->tts_context);
-        vs_drain_tts_to_conn(sl);
-        hu_control_send_event_to_conn(s_proto, sl->conn, "voice.audio.done", "{}");
-        sl->tts_armed = false;
-        s_active_tts_slot = NULL;
+        hu_turn_action_t action;
+        hu_duplex_agent_chunk(&sl->duplex, now, HU_TURN_SIGNAL_YIELD, &action);
+        vs_finish_agent_turn(sl, a);
     }
     return true;
 }
@@ -175,8 +220,8 @@ void hu_voice_stream_detach_bus(hu_bus_t *bus) {
     }
 }
 
-void hu_voice_stream_on_binary(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
-                               const char *data, size_t data_len) {
+void hu_voice_stream_on_binary(hu_control_protocol_t *proto, hu_ws_conn_t *conn, const char *data,
+                               size_t data_len) {
     if (!proto || !proto->alloc || !conn || !data || data_len == 0)
         return;
     vs_slot_t *sl = vs_find_slot_by_conn(conn);
@@ -213,8 +258,8 @@ void hu_voice_stream_on_conn_close(hu_ws_conn_t *conn) {
 }
 
 hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
-                                  const hu_control_protocol_t *proto,
-                                  const hu_json_value_t *root, char **out, size_t *out_len) {
+                                  const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                  char **out, size_t *out_len) {
     *out = NULL;
     *out_len = 0;
     if (!alloc || !app || !app->config || !conn || !proto || !root)
@@ -250,9 +295,8 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
         sl->tts = NULL;
     }
 
-    hu_error_t oerr =
-        hu_cartesia_stream_open(alloc, key, voice_id ? voice_id : "", model_id ? model_id : "",
-                                &sl->tts);
+    hu_error_t oerr = hu_cartesia_stream_open(alloc, key, voice_id ? voice_id : "",
+                                              model_id ? model_id : "", &sl->tts);
     if (oerr != HU_OK)
         return oerr;
 
@@ -305,6 +349,10 @@ hu_error_t cp_voice_session_interrupt(hu_allocator_t *alloc, hu_app_context_t *a
     if (!alloc || !app || !conn)
         return HU_ERR_INVALID_ARGUMENT;
     vs_slot_t *sl = vs_find_slot_by_conn(conn);
+    if (sl) {
+        hu_turn_action_t action;
+        hu_duplex_user_chunk(&sl->duplex, vs_now_ms(), HU_TURN_SIGNAL_INTERRUPT, &action);
+    }
     if (sl && sl->tts && sl->tts_context[0])
         (void)hu_cartesia_stream_cancel_context(sl->tts, alloc, sl->tts_context);
     if (sl) {
@@ -315,7 +363,7 @@ hu_error_t cp_voice_session_interrupt(hu_allocator_t *alloc, hu_app_context_t *a
     }
     if (sl && conn->active)
         hu_control_send_event_to_conn((hu_control_protocol_t *)proto, conn,
-                                       "voice.audio.interrupted", "{}");
+                                      "voice.audio.interrupted", "{}");
 
     hu_json_value_t *res = hu_json_object_new(alloc);
     if (!res)
@@ -398,6 +446,11 @@ hu_error_t cp_voice_audio_end(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     if (err != HU_OK || !text)
         return err == HU_OK ? HU_ERR_IO : err;
 
+    /* User finished speaking → yield floor to agent */
+    hu_turn_action_t turn_action;
+    hu_duplex_user_chunk(&sl->duplex, vs_now_ms(), HU_TURN_SIGNAL_YIELD, &turn_action);
+    hu_duplex_start_streaming(&sl->duplex, vs_now_ms());
+
     /* Targeted transcript event */
     hu_json_value_t *tev = hu_json_object_new(alloc);
     if (!tev) {
@@ -453,8 +506,8 @@ void hu_voice_stream_detach_bus(hu_bus_t *bus) {
     (void)bus;
 }
 
-void hu_voice_stream_on_binary(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
-                               const char *data, size_t data_len) {
+void hu_voice_stream_on_binary(hu_control_protocol_t *proto, hu_ws_conn_t *conn, const char *data,
+                               size_t data_len) {
     (void)proto;
     (void)conn;
     (void)data;

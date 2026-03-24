@@ -304,7 +304,7 @@ static const hu_command_t commands[] = {
     {"models", "List available models", cmd_models},
     {"auth", "Authentication management", cmd_auth},
     {"eval", "Run eval suites and compare runs", cmd_eval},
-    {"hula", "Run a HuLa program (parse, validate, execute, trace)", cmd_hula},
+    {"hula", "HuLa program engine (parse, compile, execute, trace, replay)", cmd_hula},
     {"update", "Check for updates", cmd_update},
 #ifdef HU_ENABLE_CURL
     {"paperclip", "Paperclip agent integration", cmd_paperclip},
@@ -327,7 +327,8 @@ static hu_command_t const *find_command(const char *name) {
 }
 
 static void print_usage(FILE *out) {
-    fprintf(out, "%s v%s — not quite human.\n\n", HU_CODENAME, HU_VERSION);
+    fprintf(out, "%s v%s — not quite human.\n", HU_CODENAME, HU_VERSION);
+    fprintf(out, "Autonomous AI assistant with HuLa program orchestration.\n\n");
     fprintf(out, "Usage: human [command] [options]\n\n");
     fprintf(out, "Commands:\n");
     for (size_t i = 0; i < COMMANDS_COUNT; i++) {

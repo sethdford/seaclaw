@@ -55,6 +55,7 @@ void run_multimodal_memory_tests(void);
 void run_multimodal_audio_tests(void);
 void run_multimodal_video_tests(void);
 void run_voice_duplex_tests(void);
+void run_turn_signal_tests(void);
 void run_voice_rt_openai_tests(void);
 void run_voice_session_tests(void);
 void run_autonomy_tests(void);
@@ -438,6 +439,7 @@ int main(int argc, char **argv) {
     run_multimodal_audio_tests();
     run_multimodal_video_tests();
     run_voice_duplex_tests();
+    run_turn_signal_tests();
     run_voice_rt_openai_tests();
     run_voice_session_tests();
     run_autonomy_tests();

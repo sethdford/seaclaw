@@ -64,14 +64,12 @@ hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *ses
     session->active = true;
 
     const char *tp = config->voice.tts_provider;
-    const char *rt_model =
-        (config->voice.realtime_model && config->voice.realtime_model[0])
-            ? config->voice.realtime_model
-            : config->voice.tts_model;
-    const char *rt_voice =
-        (config->voice.realtime_voice && config->voice.realtime_voice[0])
-            ? config->voice.realtime_voice
-            : config->voice.tts_voice;
+    const char *rt_model = (config->voice.realtime_model && config->voice.realtime_model[0])
+                               ? config->voice.realtime_model
+                               : config->voice.tts_model;
+    const char *rt_voice = (config->voice.realtime_voice && config->voice.realtime_voice[0])
+                               ? config->voice.realtime_voice
+                               : config->voice.tts_voice;
     bool realtime_mode = (config->voice.mode && strcmp(config->voice.mode, "realtime") == 0) ||
                          (tp && strcmp(tp, "realtime") == 0);
     if (realtime_mode) {
@@ -103,6 +101,7 @@ hu_error_t hu_voice_session_stop(hu_voice_session_t *session) {
         session->rt = NULL;
     }
     (void)hu_duplex_session_init(&session->duplex);
+    session->last_action = HU_TURN_ACTION_NONE;
     session->active = false;
     session->started_at = 0;
     session->last_audio_ms = 0;
@@ -126,7 +125,10 @@ hu_error_t hu_voice_session_send_audio(hu_voice_session_t *session, const uint8_
 
     int64_t now = voice_session_now_ms();
     session->last_audio_ms = now;
-    hu_error_t err = hu_duplex_handle_input(&session->duplex, now);
+
+    hu_turn_action_t action = HU_TURN_ACTION_NONE;
+    hu_error_t err = hu_duplex_user_chunk(&session->duplex, now, HU_TURN_SIGNAL_NONE, &action);
+    session->last_action = action;
     if (err != HU_OK)
         return err;
 
@@ -160,11 +162,13 @@ hu_error_t hu_voice_session_on_interrupt(hu_voice_session_t *session) {
     if (!session->active)
         return HU_OK;
 
-    session->duplex.interrupt_detected = true;
-    (void)hu_duplex_cancel_output(&session->duplex);
+    int64_t now = voice_session_now_ms();
+    hu_turn_action_t action = HU_TURN_ACTION_NONE;
+    (void)hu_duplex_user_chunk(&session->duplex, now, HU_TURN_SIGNAL_INTERRUPT, &action);
+    session->last_action = action;
 
 #if !HU_IS_TEST
-    session->latency_interrupt_mark_ms = voice_session_now_ms();
+    session->latency_interrupt_mark_ms = now;
     session->latency_await_interrupt_silence = true;
 #endif
 
@@ -200,8 +204,8 @@ void hu_voice_session_note_response_complete(hu_voice_session_t *session) {
     if (dt < 0)
         dt = 0;
     session->latency.total_round_trip_ms = dt;
-    running_avg_update(&session->latency_avg_round_trip_ms, &session->latency_round_trip_measurements,
-                       dt);
+    running_avg_update(&session->latency_avg_round_trip_ms,
+                       &session->latency_round_trip_measurements, dt);
     session->latency_rt_mark_ms = now;
     session->latency_first_byte_pending = false;
 #endif
@@ -264,8 +268,41 @@ void hu_voice_session_warn_first_byte_latency_if_needed(const hu_voice_session_t
         return;
     if (session->latency.avg_first_byte_ms <= (double)HU_VOICE_TARGET_FIRST_BYTE_MS)
         return;
-    fprintf(stderr,
-            "[human] voice: average first-byte latency %.0f ms exceeds target %d ms\n",
+    fprintf(stderr, "[human] voice: average first-byte latency %.0f ms exceeds target %d ms\n",
             session->latency.avg_first_byte_ms, HU_VOICE_TARGET_FIRST_BYTE_MS);
     s_warned = 1;
+}
+
+/* ── Micro-turn API ─────────────────────────────────────────────── */
+
+hu_error_t hu_voice_session_user_turn_signal(hu_voice_session_t *session, hu_turn_signal_t signal,
+                                             hu_turn_action_t *out_action) {
+    if (!session || !out_action)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!session->active)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    int64_t now = voice_session_now_ms();
+    hu_error_t err = hu_duplex_user_chunk(&session->duplex, now, signal, out_action);
+    session->last_action = *out_action;
+    return err;
+}
+
+hu_error_t hu_voice_session_agent_turn_signal(hu_voice_session_t *session, hu_turn_signal_t signal,
+                                              hu_turn_action_t *out_action) {
+    if (!session || !out_action)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!session->active)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    int64_t now = voice_session_now_ms();
+    hu_error_t err = hu_duplex_agent_chunk(&session->duplex, now, signal, out_action);
+    session->last_action = *out_action;
+    return err;
+}
+
+hu_turn_action_t hu_voice_session_last_action(const hu_voice_session_t *session) {
+    if (!session)
+        return HU_TURN_ACTION_NONE;
+    return session->last_action;
 }
