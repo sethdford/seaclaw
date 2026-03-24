@@ -53,9 +53,9 @@ struct HumanShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: SendMessageIntent(),
             phrases: [
-                "Send \(\.$message) to \(.applicationName)",
-                "Ask \(.applicationName) \(\.$message)",
-                "Tell \(.applicationName) \(\.$message)",
+                "Send a message in \(.applicationName)",
+                "Ask \(.applicationName)",
+                "Tell \(.applicationName) something",
             ],
             shortTitle: "Send Message",
             systemImageName: "bubble.left.fill"
