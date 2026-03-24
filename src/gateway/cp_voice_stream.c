@@ -11,6 +11,7 @@
 #include "human/tts/cartesia_stream.h"
 #include "human/voice.h"
 #include "human/voice/duplex.h"
+#include "human/voice/semantic_eot.h"
 #include "human/voice/turn_signal.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -446,9 +447,20 @@ hu_error_t cp_voice_audio_end(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     if (err != HU_OK || !text)
         return err == HU_OK ? HU_ERR_IO : err;
 
-    /* User finished speaking → yield floor to agent */
+    /* Semantic EOT: analyze transcript to decide if user's turn is truly complete */
+    hu_turn_signal_t eot_signal = HU_TURN_SIGNAL_YIELD;
+    {
+        hu_semantic_eot_config_t eot_cfg;
+        hu_semantic_eot_config_default(&eot_cfg);
+        hu_semantic_eot_result_t eot_result;
+        memset(&eot_result, 0, sizeof(eot_result));
+        if (hu_semantic_eot_analyze(&eot_cfg, text, text_len, 0, &eot_result) == HU_OK &&
+            eot_result.is_endpoint)
+            eot_signal = eot_result.suggested_signal;
+    }
+
     hu_turn_action_t turn_action;
-    hu_duplex_user_chunk(&sl->duplex, vs_now_ms(), HU_TURN_SIGNAL_YIELD, &turn_action);
+    hu_duplex_user_chunk(&sl->duplex, vs_now_ms(), eot_signal, &turn_action);
     hu_duplex_start_streaming(&sl->duplex, vs_now_ms());
 
     /* Targeted transcript event */

@@ -2,6 +2,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/mcp_context.h"
 #include "human/tool.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -571,8 +572,13 @@ static hu_error_t mcp_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         alloc->free(alloc->ctx, args_json, args_len + 1);
 
     if (err != HU_OK) {
-        char buf[128];
-        int n = snprintf(buf, sizeof(buf), "MCP tool '%s' failed", w->original_name);
+        /* SERF: classify raw error into structured categories for upstream retry logic */
+        hu_mcp_structured_error_t serr;
+        hu_mcp_error_classify(w->original_name, strlen(w->original_name), &serr);
+
+        char buf[256];
+        int n = snprintf(buf, sizeof(buf), "MCP tool '%s' failed: %s%s", w->original_name,
+                         serr.message, serr.retryable ? " (retryable)" : "");
         char *msg = (char *)alloc->alloc(alloc->ctx, (size_t)n + 1);
         if (msg) {
             memcpy(msg, buf, (size_t)n + 1);

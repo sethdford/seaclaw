@@ -28,13 +28,12 @@ const char *hu_imessage_reaction_to_tapback_name(hu_reaction_type_t reaction);
 /** Build tapback context string for recent reactions on our messages from this contact.
  * Returns allocated string like "[REACTIONS on your recent messages: 2 hearts, 1 like]" or NULL.
  * Caller owns. Stub returns NULL on non-macOS or when SQLite unavailable. */
-hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
-                                            const char *contact_id, size_t contact_id_len,
-                                            char **out, size_t *out_len);
+hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *contact_id,
+                                             size_t contact_id_len, char **out, size_t *out_len);
 
-hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
-                                                  const char *contact_id, size_t contact_id_len,
-                                                  char **out, size_t *out_len);
+hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const char *contact_id,
+                                                  size_t contact_id_len, char **out,
+                                                  size_t *out_len);
 
 #ifndef HU_IS_TEST
 /** Check if the real user sent a message to `handle` within the last
@@ -52,6 +51,13 @@ char *hu_imessage_get_attachment_path(hu_allocator_t *alloc, int64_t message_id)
 char *hu_imessage_get_latest_attachment_path(hu_allocator_t *alloc, const char *contact_id,
                                              size_t contact_id_len);
 #endif
+
+/** Search Tenor for a GIF matching the query and download to a temp file.
+ * Returns the local path to the downloaded GIF (caller owns, free with alloc).
+ * Returns NULL on failure (no API key, network error, no results).
+ * Requires HU_ENABLE_CURL. api_key is the Tenor API v2 key. */
+char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t query_len,
+                            const char *api_key, size_t api_key_len);
 
 #if HU_IS_TEST
 hu_error_t hu_imessage_test_inject_mock(hu_channel_t *ch, const char *session_key,
