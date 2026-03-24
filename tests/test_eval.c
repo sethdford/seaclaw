@@ -1,5 +1,5 @@
-#include "test_framework.h"
 #include "human/eval.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -11,20 +11,13 @@ static const struct eval_suite_expect_row {
     const char *file;
     size_t expect_tasks;
 } k_eval_suite_expect[] = {
-    {"adversarial.json", 10},
-    {"capability_edges.json", 10},
-    {"coding_basic.json", 5},
-    {"fidelity.json", 10},
-    {"hula_orchestration.json", 2},
-    {"human_likeness.json", 8},
-    {"intelligence.json", 10},
-    {"memory.json", 8},
-    {"multi_turn.json", 6},
-    {"reasoning.json", 10},
-    {"reasoning_basic.json", 10},
-    {"social.json", 8},
-    {"tool_capability.json", 8},
-    {"tool_use.json", 8},
+    {"adversarial.json", 10},       {"capability_edges.json", 10},
+    {"coding_basic.json", 5},       {"fidelity.json", 18},
+    {"hula_orchestration.json", 2}, {"human_likeness.json", 8},
+    {"intelligence.json", 10},      {"memory.json", 8},
+    {"multi_turn.json", 6},         {"reasoning.json", 10},
+    {"reasoning_basic.json", 10},   {"social.json", 8},
+    {"tool_capability.json", 8},    {"tool_use.json", 8},
     {"tool_use_basic.json", 5},
 };
 
@@ -56,8 +49,9 @@ static void test_eval_load_match_mode_defaults(void) {
 
 static void test_eval_load_task_match_mode_override(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json = "{\"name\":\"m\",\"match_mode\":\"exact\",\"tasks\":["
-                       "{\"id\":\"t1\",\"prompt\":\"p\",\"expected\":\"e\",\"match_mode\":\"contains\"}]}";
+    const char *json =
+        "{\"name\":\"m\",\"match_mode\":\"exact\",\"tasks\":["
+        "{\"id\":\"t1\",\"prompt\":\"p\",\"expected\":\"e\",\"match_mode\":\"contains\"}]}";
     hu_eval_suite_t suite;
     HU_ASSERT_EQ(hu_eval_suite_load_json(&alloc, json, strlen(json), &suite), HU_OK);
     HU_ASSERT_EQ(suite.default_match_mode, HU_EVAL_EXACT);
@@ -67,9 +61,12 @@ static void test_eval_load_task_match_mode_override(void) {
 
 static void test_eval_load_tasks(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json = "{\"name\":\"reasoning\",\"tasks\":["
-        "{\"id\":\"t1\",\"prompt\":\"What is 2+2?\",\"expected\":\"4\",\"category\":\"math\",\"difficulty\":1,\"timeout_ms\":5000},"
-        "{\"id\":\"t2\",\"prompt\":\"Capital of France?\",\"expected\":\"Paris\",\"category\":\"knowledge\",\"difficulty\":1}"
+    const char *json =
+        "{\"name\":\"reasoning\",\"tasks\":["
+        "{\"id\":\"t1\",\"prompt\":\"What is "
+        "2+2?\",\"expected\":\"4\",\"category\":\"math\",\"difficulty\":1,\"timeout_ms\":5000},"
+        "{\"id\":\"t2\",\"prompt\":\"Capital of "
+        "France?\",\"expected\":\"Paris\",\"category\":\"knowledge\",\"difficulty\":1}"
         "]}";
     hu_eval_suite_t suite;
     hu_error_t err = hu_eval_suite_load_json(&alloc, json, strlen(json), &suite);
@@ -95,57 +92,65 @@ static void test_eval_load_tasks(void) {
 static void test_eval_llm_judge_placeholder(void) {
     hu_allocator_t alloc = hu_system_allocator();
     bool passed = false;
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "The answer is 4", 15, "4", 1, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "The answer is 4", 15, "4", 1, HU_EVAL_LLM_JUDGE, &passed),
+                 HU_OK);
     HU_ASSERT(passed);
     passed = false;
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "Paris is the capital", 19, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(
+        hu_eval_check(&alloc, "Paris is the capital", 19, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed),
+        HU_OK);
     HU_ASSERT(passed);
     passed = true;
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "wrong answer", 12, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "wrong answer", 12, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed),
+                 HU_OK);
     HU_ASSERT(!passed);
 }
 
 static void test_eval_llm_judge_case_insensitive(void) {
     hu_allocator_t alloc = hu_system_allocator();
     bool passed = false;
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "the CAPITAL is paris", 20, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(
+        hu_eval_check(&alloc, "the CAPITAL is paris", 20, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed),
+        HU_OK);
     HU_ASSERT(passed);
     passed = false;
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "HELLO WORLD", 11, "hello", 5, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "HELLO WORLD", 11, "hello", 5, HU_EVAL_LLM_JUDGE, &passed),
+                 HU_OK);
     HU_ASSERT(passed);
 }
 
 static void test_eval_llm_judge_word_overlap(void) {
     hu_allocator_t alloc = hu_system_allocator();
     bool passed = false;
-    HU_ASSERT_EQ(hu_eval_check(&alloc,
-        "The transformer architecture uses attention mechanisms for sequence modeling", 75,
-        "transformer attention sequence", 30,
-        HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check(
+                     &alloc,
+                     "The transformer architecture uses attention mechanisms for sequence modeling",
+                     75, "transformer attention sequence", 30, HU_EVAL_LLM_JUDGE, &passed),
+                 HU_OK);
     HU_ASSERT(passed);
 
     passed = true;
-    HU_ASSERT_EQ(hu_eval_check(&alloc,
-        "The weather is sunny today", 26,
-        "transformer attention sequence modeling", 39,
-        HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "The weather is sunny today", 26,
+                               "transformer attention sequence modeling", 39, HU_EVAL_LLM_JUDGE,
+                               &passed),
+                 HU_OK);
     HU_ASSERT(!passed);
 }
 
 static void test_eval_llm_judge_word_overlap_threshold(void) {
     hu_allocator_t alloc = hu_system_allocator();
     bool passed = false;
-    HU_ASSERT_EQ(hu_eval_check(&alloc,
-        "machine learning optimization gradient", 38,
-        "machine learning optimization gradient descent backprop", 55,
-        HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "machine learning optimization gradient", 38,
+                               "machine learning optimization gradient descent backprop", 55,
+                               HU_EVAL_LLM_JUDGE, &passed),
+                 HU_OK);
     HU_ASSERT(passed);
 
     passed = true;
-    HU_ASSERT_EQ(hu_eval_check(&alloc,
-        "machine zzzzz yyyyy xxxxx", 25,
-        "machine learning optimization gradient descent backprop", 55,
-        HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "machine zzzzz yyyyy xxxxx", 25,
+                               "machine learning optimization gradient descent backprop", 55,
+                               HU_EVAL_LLM_JUDGE, &passed),
+                 HU_OK);
     HU_ASSERT(!passed);
 }
 
@@ -161,21 +166,30 @@ static void test_eval_exact(void) {
 static void test_eval_contains(void) {
     hu_allocator_t alloc = hu_system_allocator();
     bool passed = false;
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "hello world", 11, "world", 5, HU_EVAL_CONTAINS, &passed), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "hello world", 11, "world", 5, HU_EVAL_CONTAINS, &passed),
+                 HU_OK);
     HU_ASSERT(passed);
 }
 
 static void test_eval_numeric(void) {
     hu_allocator_t alloc = hu_system_allocator();
     bool passed = false;
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "3.14", 4, "3.14", 4, HU_EVAL_NUMERIC_CLOSE, &passed), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "3.14", 4, "3.14", 4, HU_EVAL_NUMERIC_CLOSE, &passed),
+                 HU_OK);
     HU_ASSERT(passed);
 }
 
 static void test_eval_report(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_eval_run_t run = { .suite_name = "s", .provider = "p", .model = "m", .passed = 5, .failed = 1, .pass_rate = 83.33, .total_elapsed_ms = 1000 };
-    char *out = NULL; size_t out_len = 0;
+    hu_eval_run_t run = {.suite_name = "s",
+                         .provider = "p",
+                         .model = "m",
+                         .passed = 5,
+                         .failed = 1,
+                         .pass_rate = 83.33,
+                         .total_elapsed_ms = 1000};
+    char *out = NULL;
+    size_t out_len = 0;
     HU_ASSERT_EQ(hu_eval_report_json(&alloc, &run, &out, &out_len), HU_OK);
     HU_ASSERT(out != NULL);
     alloc.free(alloc.ctx, out, out_len + 1);
@@ -183,9 +197,10 @@ static void test_eval_report(void) {
 
 static void test_eval_compare(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_eval_run_t b = { .pass_rate = 80.0 };
-    hu_eval_run_t c = { .pass_rate = 90.0 };
-    char *report = NULL; size_t rlen = 0;
+    hu_eval_run_t b = {.pass_rate = 80.0};
+    hu_eval_run_t c = {.pass_rate = 90.0};
+    char *report = NULL;
+    size_t rlen = 0;
     HU_ASSERT_EQ(hu_eval_compare(&alloc, &b, &c, &report, &rlen), HU_OK);
     HU_ASSERT(report != NULL);
     alloc.free(alloc.ctx, report, rlen + 1);
@@ -223,8 +238,9 @@ static void test_eval_run_suite_empty(void) {
 static void test_eval_run_suite_with_tasks(void) {
     hu_allocator_t alloc = hu_system_allocator();
     const char *json = "{\"name\":\"basic\",\"tasks\":["
-        "{\"id\":\"t1\",\"prompt\":\"What is 2+2?\",\"expected\":\"4\",\"category\":\"math\",\"difficulty\":1}"
-        "]}";
+                       "{\"id\":\"t1\",\"prompt\":\"What is "
+                       "2+2?\",\"expected\":\"4\",\"category\":\"math\",\"difficulty\":1}"
+                       "]}";
     hu_eval_suite_t suite = {0};
     HU_ASSERT_EQ(hu_eval_suite_load_json(&alloc, json, strlen(json), &suite), HU_OK);
     HU_ASSERT_EQ(suite.tasks_count, 1u);
@@ -245,8 +261,9 @@ static void test_eval_run_suite_with_tasks(void) {
 static void test_eval_run_suite_report_roundtrip(void) {
     hu_allocator_t alloc = hu_system_allocator();
     const char *json = "{\"name\":\"rt\",\"tasks\":["
-        "{\"id\":\"t1\",\"prompt\":\"hello\",\"expected\":\"hello\",\"category\":\"test\",\"difficulty\":1}"
-        "]}";
+                       "{\"id\":\"t1\",\"prompt\":\"hello\",\"expected\":\"hello\",\"category\":"
+                       "\"test\",\"difficulty\":1}"
+                       "]}";
     hu_eval_suite_t suite = {0};
     HU_ASSERT_EQ(hu_eval_suite_load_json(&alloc, json, strlen(json), &suite), HU_OK);
 
@@ -268,7 +285,8 @@ static void test_eval_run_suite_report_roundtrip(void) {
 
 static void test_eval_run_load_json_valid(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json = "{\"suite\":\"my-suite\",\"passed\":8,\"failed\":2,\"pass_rate\":0.80,\"elapsed_ms\":1500}";
+    const char *json =
+        "{\"suite\":\"my-suite\",\"passed\":8,\"failed\":2,\"pass_rate\":0.80,\"elapsed_ms\":1500}";
     hu_eval_run_t run = {0};
     HU_ASSERT_EQ(hu_eval_run_load_json(&alloc, json, strlen(json), &run), HU_OK);
     HU_ASSERT_NOT_NULL(run.suite_name);
@@ -305,18 +323,23 @@ static void test_eval_run_load_json_partial(void) {
 static void test_eval_check_null_args(void) {
     hu_allocator_t alloc = hu_system_allocator();
     bool passed = false;
-    HU_ASSERT_EQ(hu_eval_check(NULL, "a", 1, "a", 1, HU_EVAL_EXACT, &passed), HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_eval_check(&alloc, NULL, 1, "a", 1, HU_EVAL_EXACT, &passed), HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "a", 1, NULL, 1, HU_EVAL_EXACT, &passed), HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "a", 1, "a", 1, HU_EVAL_EXACT, NULL), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_check(NULL, "a", 1, "a", 1, HU_EVAL_EXACT, &passed),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, NULL, 1, "a", 1, HU_EVAL_EXACT, &passed),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "a", 1, NULL, 1, HU_EVAL_EXACT, &passed),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "a", 1, "a", 1, HU_EVAL_EXACT, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
 }
 
 static void test_eval_judge_with_provider_null_falls_back(void) {
     hu_allocator_t alloc = hu_system_allocator();
     bool passed = false;
     double score = -1.0;
-    HU_ASSERT_EQ(hu_eval_check_with_provider(&alloc, "The answer is 4", 15, "4", 1, HU_EVAL_LLM_JUDGE,
-                                             NULL, NULL, 0, &passed, &score), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check_with_provider(&alloc, "The answer is 4", 15, "4", 1,
+                                             HU_EVAL_LLM_JUDGE, NULL, NULL, 0, &passed, &score),
+                 HU_OK);
     HU_ASSERT(passed);
     HU_ASSERT_TRUE(score >= 0.0 && score <= 1.0);
 }
@@ -324,18 +347,22 @@ static void test_eval_judge_with_provider_null_falls_back(void) {
 static void test_eval_judge_heuristic_still_works(void) {
     hu_allocator_t alloc = hu_system_allocator();
     bool passed = false;
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "Paris is the capital", 19, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(
+        hu_eval_check(&alloc, "Paris is the capital", 19, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed),
+        HU_OK);
     HU_ASSERT(passed);
     passed = true;
-    HU_ASSERT_EQ(hu_eval_check(&alloc, "wrong answer", 12, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed), HU_OK);
+    HU_ASSERT_EQ(hu_eval_check(&alloc, "wrong answer", 12, "Paris", 5, HU_EVAL_LLM_JUDGE, &passed),
+                 HU_OK);
     HU_ASSERT(!passed);
 }
 
 static void test_eval_suite_load_json_path_missing_returns_io(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_eval_suite_t suite = {0};
-    HU_ASSERT_EQ(hu_eval_suite_load_json_path(&alloc, "/nonexistent/human_eval_suite_xyz.json", &suite),
-                 HU_ERR_IO);
+    HU_ASSERT_EQ(
+        hu_eval_suite_load_json_path(&alloc, "/nonexistent/human_eval_suite_xyz.json", &suite),
+        HU_ERR_IO);
 }
 
 static void test_eval_expanded_suite_json_files_parse_unique_ids_expected_counts(void) {
@@ -345,7 +372,8 @@ static void test_eval_expanded_suite_json_files_parse_unique_ids_expected_counts
 
     for (size_t si = 0; si < sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0]); si++) {
         char path[768];
-        int n = snprintf(path, sizeof(path), "%s/%s", HU_EVAL_SUITES_DIR, k_eval_suite_expect[si].file);
+        int n =
+            snprintf(path, sizeof(path), "%s/%s", HU_EVAL_SUITES_DIR, k_eval_suite_expect[si].file);
         HU_ASSERT(n > 0 && (size_t)n < sizeof(path));
         HU_ASSERT_EQ(hu_eval_suite_load_json_path(&alloc, path, &suites[si]), HU_OK);
         HU_ASSERT_EQ(suites[si].tasks_count, k_eval_suite_expect[si].expect_tasks);
@@ -354,7 +382,8 @@ static void test_eval_expanded_suite_json_files_parse_unique_ids_expected_counts
     for (size_t i = 0; i < sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0]); i++) {
         for (size_t ti = 0; ti < suites[i].tasks_count; ti++) {
             HU_ASSERT_NOT_NULL(suites[i].tasks[ti].id);
-            for (size_t j = i; j < sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0]); j++) {
+            for (size_t j = i; j < sizeof(k_eval_suite_expect) / sizeof(k_eval_suite_expect[0]);
+                 j++) {
                 size_t tj_start = (j == i) ? (ti + 1) : 0;
                 for (size_t tj = tj_start; tj < suites[j].tasks_count; tj++) {
                     if (strcmp(suites[i].tasks[ti].id, suites[j].tasks[tj].id) == 0)
@@ -412,23 +441,97 @@ static void test_eval_run_free(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_eval_run_t run = {0};
     run.suite_name = alloc.alloc(alloc.ctx, 8);
-    if (run.suite_name) memcpy(run.suite_name, "suite", 6);
+    if (run.suite_name)
+        memcpy(run.suite_name, "suite", 6);
     run.provider = alloc.alloc(alloc.ctx, 6);
-    if (run.provider) memcpy(run.provider, "p", 2);
+    if (run.provider)
+        memcpy(run.provider, "p", 2);
     run.model = alloc.alloc(alloc.ctx, 6);
-    if (run.model) memcpy(run.model, "m", 2);
+    if (run.model)
+        memcpy(run.model, "m", 2);
     run.results = alloc.alloc(alloc.ctx, sizeof(hu_eval_result_t));
     run.results_count = 1;
     if (run.results) {
         memset(&run.results[0], 0, sizeof(run.results[0]));
         run.results[0].task_id = alloc.alloc(alloc.ctx, 4);
-        if (run.results[0].task_id) memcpy(run.results[0].task_id, "t1", 3);
+        if (run.results[0].task_id)
+            memcpy(run.results[0].task_id, "t1", 3);
         run.results[0].actual_output = alloc.alloc(alloc.ctx, 6);
-        if (run.results[0].actual_output) { memcpy(run.results[0].actual_output, "out", 4); run.results[0].actual_output_len = 3; }
+        if (run.results[0].actual_output) {
+            memcpy(run.results[0].actual_output, "out", 4);
+            run.results[0].actual_output_len = 3;
+        }
     }
     hu_eval_run_free(&alloc, &run);
     HU_ASSERT(run.suite_name == NULL);
     HU_ASSERT(run.results == NULL);
+}
+
+static void test_eval_empathy_trajectory_increasing(void) {
+    float scores[] = {0.3f, 0.5f, 0.6f, 0.8f, 0.9f};
+    hu_eval_empathy_trajectory_t result;
+    hu_error_t err = hu_eval_score_empathy_trajectory(scores, 5, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.directional_alignment > 0.9f);
+    HU_ASSERT_TRUE(result.stability > 0.9f);
+    HU_ASSERT_TRUE(result.composite > 0.5f);
+}
+
+static void test_eval_empathy_trajectory_regressing(void) {
+    float scores[] = {0.8f, 0.6f, 0.3f, 0.2f};
+    hu_eval_empathy_trajectory_t result;
+    hu_error_t err = hu_eval_score_empathy_trajectory(scores, 4, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.directional_alignment < 0.4f);
+    HU_ASSERT_TRUE(result.stability < 0.7f);
+}
+
+static void test_eval_empathy_trajectory_null(void) {
+    hu_eval_empathy_trajectory_t result;
+    hu_error_t err = hu_eval_score_empathy_trajectory(NULL, 0, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.composite == 0.0f);
+}
+
+static void test_eval_consistency_high(void) {
+    float prompt_sims[] = {0.9f, 0.85f, 0.92f};
+    float turn_sims[] = {0.88f, 0.91f};
+    hu_eval_consistency_metrics_t result;
+    hu_error_t err = hu_eval_score_consistency(prompt_sims, 3, turn_sims, 2, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.prompt_to_line > 0.8f);
+    HU_ASSERT_TRUE(result.line_to_line > 0.85f);
+    HU_ASSERT_TRUE(result.composite > 0.8f);
+}
+
+static void test_eval_consistency_null(void) {
+    hu_eval_consistency_metrics_t result;
+    hu_error_t err = hu_eval_score_consistency(NULL, 0, NULL, 0, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.composite == 0.0f);
+}
+
+static void test_eval_antisycophancy_all_held(void) {
+    bool opinions[] = {true, true, true, true};
+    float score = hu_eval_score_antisycophancy(opinions, 4);
+    HU_ASSERT_TRUE(score > 0.99f);
+}
+
+static void test_eval_antisycophancy_none_held(void) {
+    bool opinions[] = {false, false, false};
+    float score = hu_eval_score_antisycophancy(opinions, 3);
+    HU_ASSERT_TRUE(score < 0.01f);
+}
+
+static void test_eval_antisycophancy_mixed(void) {
+    bool opinions[] = {true, false, true, false};
+    float score = hu_eval_score_antisycophancy(opinions, 4);
+    HU_ASSERT_TRUE(score > 0.4f && score < 0.6f);
+}
+
+static void test_eval_antisycophancy_null(void) {
+    float score = hu_eval_score_antisycophancy(NULL, 0);
+    HU_ASSERT_TRUE(score == 0.0f);
 }
 
 void run_eval_tests(void) {
@@ -464,4 +567,13 @@ void run_eval_tests(void) {
     HU_RUN_TEST(test_eval_smoke_validate_eval_suites_directory);
 #endif
     HU_RUN_TEST(test_eval_run_free);
+    HU_RUN_TEST(test_eval_empathy_trajectory_increasing);
+    HU_RUN_TEST(test_eval_empathy_trajectory_regressing);
+    HU_RUN_TEST(test_eval_empathy_trajectory_null);
+    HU_RUN_TEST(test_eval_consistency_high);
+    HU_RUN_TEST(test_eval_consistency_null);
+    HU_RUN_TEST(test_eval_antisycophancy_all_held);
+    HU_RUN_TEST(test_eval_antisycophancy_none_held);
+    HU_RUN_TEST(test_eval_antisycophancy_mixed);
+    HU_RUN_TEST(test_eval_antisycophancy_null);
 }

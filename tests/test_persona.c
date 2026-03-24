@@ -186,8 +186,10 @@ static void test_persona_load_json_phase6_fields(void) {
                        "  \"core\": {\"identity\": \"Test\"},"
                        "  \"daily_routine\": {"
                        "    \"routine_variance\": 0.2,"
-                       "    \"weekday\": [{\"time\": \"07:00\", \"activity\": \"walk\", \"availability\": \"brief\"}],"
-                       "    \"weekend\": [{\"time\": \"09:00\", \"activity\": \"sleep\", \"availability\": \"available\"}]"
+                       "    \"weekday\": [{\"time\": \"07:00\", \"activity\": \"walk\", "
+                       "\"availability\": \"brief\"}],"
+                       "    \"weekend\": [{\"time\": \"09:00\", \"activity\": \"sleep\", "
+                       "\"availability\": \"available\"}]"
                        "  },"
                        "  \"current_chapter\": {"
                        "    \"theme\": \"new job\","
@@ -1202,6 +1204,54 @@ static void test_persona_build_prompt_with_overlay(void) {
     alloc.free(alloc.ctx, out, out_len + 1);
 }
 
+static void test_persona_overlay_vulnerability_tier(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_overlay_t overlays[] = {
+        {.channel = "imessage", .formality = "casual", .vulnerability_tier = "open"},
+    };
+    hu_persona_t p = {
+        .name = "testuser",
+        .name_len = 8,
+        .identity = "A test persona",
+        .overlays = overlays,
+        .overlays_count = 1,
+    };
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_persona_build_prompt(&alloc, &p, "imessage", 8, NULL, 0, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(strstr(out, "Vulnerability tier: open"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_overlay_vulnerability_tier_parsed(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{"
+                       "  \"name\": \"vuln-test\","
+                       "  \"core\": {"
+                       "    \"identity\": \"A vuln test persona\","
+                       "    \"traits\": [\"direct\"],"
+                       "    \"vocabulary\": {\"preferred\": [], \"avoided\": [], \"slang\": []},"
+                       "    \"communication_rules\": [\"Be honest\"],"
+                       "    \"values\": [\"truth\"],"
+                       "    \"decision_style\": \"Fast\""
+                       "  },"
+                       "  \"channel_overlays\": {"
+                       "    \"imessage\": {"
+                       "      \"formality\": \"casual\","
+                       "      \"vulnerability_tier\": \"guarded\""
+                       "    }"
+                       "  }"
+                       "}";
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(p.overlays_count, 1);
+    HU_ASSERT_STR_EQ(p.overlays[0].vulnerability_tier, "guarded");
+    hu_persona_deinit(&alloc, &p);
+}
+
 /* hu_persona_load_json */
 static void test_persona_load_json_malformed_returns_error(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -2008,12 +2058,13 @@ static void test_persona_load_json_humanization_defaults_when_absent(void) {
 
 static void test_persona_load_json_important_dates_parses(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json = "{\"version\":1,\"name\":\"dates_test\","
-                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
-                       "\"important_dates\":["
-                       "{\"date\":\"07-15\",\"type\":\"birthday\",\"message\":\"happy birthday min!\"},"
-                       "{\"date\":\"12-25\",\"type\":\"holiday\",\"message\":\"merry christmas!\"}"
-                       "]}";
+    const char *json =
+        "{\"version\":1,\"name\":\"dates_test\","
+        "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
+        "\"important_dates\":["
+        "{\"date\":\"07-15\",\"type\":\"birthday\",\"message\":\"happy birthday min!\"},"
+        "{\"date\":\"12-25\",\"type\":\"holiday\",\"message\":\"merry christmas!\"}"
+        "]}";
     hu_persona_t p = {0};
     hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
     HU_ASSERT_EQ(err, HU_OK);
@@ -2060,8 +2111,10 @@ static void test_persona_load_json_phase4_all_fields(void) {
         "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
         "\"follow_up_style\":{\"delayed_follow_up_probability\":0.15,\"min_delay_minutes\":20,"
         "\"max_delay_hours\":4},"
-        "\"bookend_messages\":{\"enabled\":true,\"morning_window\":[7,9],\"evening_window\":[22,23],"
-        "\"frequency_per_week\":2.5,\"phrases_morning\":[\"morning min\"],\"phrases_evening\":[\"night\"]},"
+        "\"bookend_messages\":{\"enabled\":true,\"morning_window\":[7,9],\"evening_window\":[22,23]"
+        ","
+        "\"frequency_per_week\":2.5,\"phrases_morning\":[\"morning "
+        "min\"],\"phrases_evening\":[\"night\"]},"
         "\"context_awareness\":{\"calendar_enabled\":false,\"weather_enabled\":false,"
         "\"sports_teams\":[\"Lakers\"],\"news_topics\":[\"tech\"]},"
         "\"humanization\":{\"double_text_probability\":0.08},"
@@ -2124,17 +2177,16 @@ static void test_persona_load_json_phase4_defaults_when_absent(void) {
 
 static void test_persona_load_json_voice_block_parses(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"version\":1,\"name\":\"voice_user\","
-        "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
-        "\"voice\":{"
-        "\"provider\":\"cartesia\","
-        "\"voice_id\":\"cloned-voice-uuid\","
-        "\"model\":\"sonic-3-2026-01-12\","
-        "\"default_emotion\":\"content\","
-        "\"default_speed\":0.95,"
-        "\"nonverbals\":true"
-        "}}";
+    const char *json = "{\"version\":1,\"name\":\"voice_user\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
+                       "\"voice\":{"
+                       "\"provider\":\"cartesia\","
+                       "\"voice_id\":\"cloned-voice-uuid\","
+                       "\"model\":\"sonic-3-2026-01-12\","
+                       "\"default_emotion\":\"content\","
+                       "\"default_speed\":0.95,"
+                       "\"nonverbals\":true"
+                       "}}";
     hu_persona_t p = {0};
     hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
     HU_ASSERT_EQ(err, HU_OK);
@@ -2149,9 +2201,8 @@ static void test_persona_load_json_voice_block_parses(void) {
 
 static void test_persona_load_json_voice_defaults_when_absent(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"version\":1,\"name\":\"no_voice\","
-        "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]}}";
+    const char *json = "{\"version\":1,\"name\":\"no_voice\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]}}";
     hu_persona_t p = {0};
     hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
     HU_ASSERT_EQ(err, HU_OK);
@@ -2171,16 +2222,15 @@ static void test_persona_load_json_voice_defaults_when_absent(void) {
 
 static void test_persona_load_json_voice_messages_parses(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"version\":1,\"name\":\"voice_msg_user\","
-        "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
-        "\"voice_messages\":{"
-        "\"enabled\":true,"
-        "\"frequency\":\"occasional\","
-        "\"prefer_for\":[\"emotional\",\"late_night\",\"long_response\"],"
-        "\"never_for\":[\"questions\",\"logistics\"],"
-        "\"max_duration_sec\":60"
-        "}}";
+    const char *json = "{\"version\":1,\"name\":\"voice_msg_user\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
+                       "\"voice_messages\":{"
+                       "\"enabled\":true,"
+                       "\"frequency\":\"occasional\","
+                       "\"prefer_for\":[\"emotional\",\"late_night\",\"long_response\"],"
+                       "\"never_for\":[\"questions\",\"logistics\"],"
+                       "\"max_duration_sec\":60"
+                       "}}";
     hu_persona_t p = {0};
     hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
     HU_ASSERT_EQ(err, HU_OK);
@@ -2199,11 +2249,11 @@ static void test_persona_load_json_voice_messages_parses(void) {
 
 static void test_persona_load_json_bookend_phrases_morning_array(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"version\":1,\"name\":\"bookend_phrases\","
-        "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
-        "\"bookend_messages\":{\"enabled\":true,\"phrases_morning\":[\"morning min\",\"hey\",\"gm\"],"
-        "\"phrases_evening\":[\"night\",\"gn\"]}}";
+    const char *json = "{\"version\":1,\"name\":\"bookend_phrases\","
+                       "\"core\":{\"identity\":\"Test\",\"traits\":[\"direct\"]},"
+                       "\"bookend_messages\":{\"enabled\":true,\"phrases_morning\":[\"morning "
+                       "min\",\"hey\",\"gm\"],"
+                       "\"phrases_evening\":[\"night\",\"gn\"]}}";
     hu_persona_t p = {0};
     hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
     HU_ASSERT_EQ(err, HU_OK);
@@ -3604,6 +3654,8 @@ void run_persona_tests(void) {
     HU_RUN_TEST(test_agent_set_persona_not_found);
     HU_RUN_TEST(test_persona_feedback_record_and_apply);
     HU_RUN_TEST(test_persona_build_prompt_with_overlay);
+    HU_RUN_TEST(test_persona_overlay_vulnerability_tier);
+    HU_RUN_TEST(test_persona_overlay_vulnerability_tier_parsed);
     HU_RUN_TEST(test_persona_examples_load_json);
     HU_RUN_TEST(test_persona_prompt_overrides_default);
     HU_RUN_TEST(test_spawn_config_persona_field);

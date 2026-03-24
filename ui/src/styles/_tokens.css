@@ -58,25 +58,25 @@
   --hu-elevation-5: 0 8px 12px 6px rgba(0, 0, 0, 0.15), 0 4px 4px rgba(0, 0, 0, 0.3);
   /* Glass tiers (Liquid Motion) */
   --hu-glass-subtle-blur: 12px;
-  --hu-glass-subtle-saturate: 120%;
-  --hu-glass-subtle-bg-opacity: 0.04;
+  --hu-glass-subtle-saturate: 105%;
+  --hu-glass-subtle-bg-opacity: 0.055;
   --hu-glass-subtle-border-opacity: 0.05;
   --hu-glass-subtle-inset-opacity: 0;
-  --hu-glass-subtle-tint-opacity: 0.02;
+  --hu-glass-subtle-tint-opacity: 0.008;
   --hu-glass-subtle-refraction-scale: 0;
   --hu-glass-standard-blur: 24px;
-  --hu-glass-standard-saturate: 180%;
-  --hu-glass-standard-bg-opacity: 0.06;
+  --hu-glass-standard-saturate: 128%;
+  --hu-glass-standard-bg-opacity: 0.085;
   --hu-glass-standard-border-opacity: 0.08;
   --hu-glass-standard-inset-opacity: 0.06;
-  --hu-glass-standard-tint-opacity: 0.04;
+  --hu-glass-standard-tint-opacity: 0.018;
   --hu-glass-standard-refraction-scale: 2;
   --hu-glass-prominent-blur: 32px;
-  --hu-glass-prominent-saturate: 200%;
-  --hu-glass-prominent-bg-opacity: 0.08;
+  --hu-glass-prominent-saturate: 148%;
+  --hu-glass-prominent-bg-opacity: 0.11;
   --hu-glass-prominent-border-opacity: 0.12;
   --hu-glass-prominent-inset-opacity: 0.1;
-  --hu-glass-prominent-tint-opacity: 0.06;
+  --hu-glass-prominent-tint-opacity: 0.028;
   --hu-glass-prominent-refraction-scale: 3;
   /* Glass: standalone tokens */
   --hu-glass-border-color: rgba(252, 248, 242, 0.08);
@@ -85,7 +85,7 @@
   --hu-glass-chat-bg-opacity: 0.85;
   --hu-glass-chat-blur: 24px;
   --hu-glass-chat-border-opacity: 0.08;
-  --hu-glass-chat-saturate: 180%;
+  --hu-glass-chat-saturate: 125%;
   --hu-glass-chromatic-opacity: 0.15;
   --hu-glass-chromatic-spread: 2px;
   /* Glass: dynamic-light, vibrancy, interactive, choreography, material */
@@ -95,7 +95,7 @@
   --hu-glass-dynamic-light-color-light: rgba(252, 248, 242, 0.18);
   --hu-glass-dynamic-light-intensity: 0.15;
   --hu-glass-dynamic-light-spread: 60%;
-  --hu-glass-vibrancy-backdrop-brightness: 1.08;
+  --hu-glass-vibrancy-backdrop-brightness: 1.12;
   --hu-glass-vibrancy-icon-boost: 1.2;
   --hu-glass-vibrancy-text-boost: 1.15;
   --hu-glass-vibrancy-text-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
@@ -117,16 +117,16 @@
   --hu-glass-choreography-state-easing: cubic-bezier(0.2, 0, 0, 1);
   --hu-glass-material-regular-bg-opacity: 0.06;
   --hu-glass-material-regular-blur: 24px;
-  --hu-glass-material-regular-saturate: 180%;
+  --hu-glass-material-regular-saturate: 132%;
   --hu-glass-material-thick-bg-opacity: 0.1;
   --hu-glass-material-thick-blur: 32px;
-  --hu-glass-material-thick-saturate: 200%;
+  --hu-glass-material-thick-saturate: 152%;
   --hu-glass-material-thin-bg-opacity: 0.04;
   --hu-glass-material-thin-blur: 16px;
-  --hu-glass-material-thin-saturate: 140%;
+  --hu-glass-material-thin-saturate: 118%;
   --hu-glass-material-ultra-thin-bg-opacity: 0.02;
   --hu-glass-material-ultra-thin-blur: 8px;
-  --hu-glass-material-ultra-thin-saturate: 110%;
+  --hu-glass-material-ultra-thin-saturate: 102%;
   /* Pixar micro-physics */
   --hu-physics-button-press-scaleX: 1.01;
   --hu-physics-button-press-scaleY: 0.97;
@@ -395,10 +395,10 @@
     rgba(12, 8, 4, 0.18) 100%
   );
   --hu-disabled-overlay: rgba(252, 248, 242, 0.04);
-  --hu-dragged-overlay: rgba(122, 182, 72, 0.16);
+  --hu-dragged-overlay: rgba(255, 255, 255, 0.16);
   --hu-error: #f97066;
   --hu-error-dim: rgba(249, 112, 102, 0.12);
-  --hu-focus-overlay: rgba(122, 182, 72, 0.12);
+  --hu-focus-overlay: rgba(255, 255, 255, 0.12);
   --hu-focus-ring: #7ab648;
   --hu-focus-ring-offset: 2px;
   --hu-focus-ring-width: 2px;
@@ -409,7 +409,7 @@
     rgba(74, 111, 165, 0.03) 80%,
     transparent 100%
   );
-  --hu-hover-overlay: rgba(122, 182, 72, 0.08);
+  --hu-hover-overlay: rgba(255, 255, 255, 0.08);
   --hu-info: #3b82f6;
   --hu-info-dim: rgba(59, 130, 246, 0.15);
   --hu-link: #8dc63f;
@@ -423,7 +423,7 @@
   --hu-on-accent: #ffffff;
   --hu-on-accent-secondary: #0c0a08;
   --hu-on-accent-tertiary: #ffffff;
-  --hu-pressed-overlay: rgba(122, 182, 72, 0.12);
+  --hu-pressed-overlay: rgba(255, 255, 255, 0.12);
   --hu-shadow-card:
     0 1px 3px rgba(12, 8, 4, 0.35), 0 8px 24px rgba(12, 8, 4, 0.25),
     inset 0 1px 0 rgba(255, 252, 248, 0.05);
@@ -713,10 +713,10 @@
       rgba(0, 0, 0, 0.15) 100%
     );
     --hu-disabled-overlay: rgba(0, 0, 0, 0.04);
-    --hu-dragged-overlay: rgba(90, 154, 48, 0.14);
+    --hu-dragged-overlay: rgba(0, 0, 0, 0.14);
     --hu-error: #cc0000;
     --hu-error-dim: rgba(204, 0, 0, 0.08);
-    --hu-focus-overlay: rgba(90, 154, 48, 0.1);
+    --hu-focus-overlay: rgba(0, 0, 0, 0.1);
     --hu-focus-ring: #5a9a30;
     --hu-focus-ring-offset: 2px;
     --hu-focus-ring-width: 2px;
@@ -726,7 +726,7 @@
       rgba(122, 182, 72, 0.03) 50%,
       transparent 100%
     );
-    --hu-hover-overlay: rgba(90, 154, 48, 0.06);
+    --hu-hover-overlay: rgba(0, 0, 0, 0.06);
     --hu-info: #2563eb;
     --hu-info-dim: rgba(37, 99, 235, 0.1);
     --hu-link: #5a9a30;
@@ -736,7 +736,7 @@
     --hu-on-accent: #ffffff;
     --hu-on-accent-secondary: #ffffff;
     --hu-on-accent-tertiary: #ffffff;
-    --hu-pressed-overlay: rgba(90, 154, 48, 0.1);
+    --hu-pressed-overlay: rgba(0, 0, 0, 0.1);
     --hu-shadow-card: 0 1px 2px rgba(45, 36, 24, 0.04), 0 2px 8px rgba(45, 36, 24, 0.03);
     --hu-shadow-glow-accent: 0 0 0 1px rgba(90, 154, 48, 0.12), 0 4px 16px rgba(90, 154, 48, 0.15);
     --hu-shadow-glow-blue: 0 0 0 1px rgba(37, 99, 235, 0.12), 0 4px 12px rgba(37, 99, 235, 0.08);
@@ -813,10 +813,10 @@
     rgba(12, 8, 4, 0.18) 100%
   );
   --hu-disabled-overlay: rgba(252, 248, 242, 0.04);
-  --hu-dragged-overlay: rgba(122, 182, 72, 0.16);
+  --hu-dragged-overlay: rgba(255, 255, 255, 0.16);
   --hu-error: #f97066;
   --hu-error-dim: rgba(249, 112, 102, 0.12);
-  --hu-focus-overlay: rgba(122, 182, 72, 0.12);
+  --hu-focus-overlay: rgba(255, 255, 255, 0.12);
   --hu-focus-ring: #7ab648;
   --hu-focus-ring-offset: 2px;
   --hu-focus-ring-width: 2px;
@@ -827,7 +827,7 @@
     rgba(74, 111, 165, 0.03) 80%,
     transparent 100%
   );
-  --hu-hover-overlay: rgba(122, 182, 72, 0.08);
+  --hu-hover-overlay: rgba(255, 255, 255, 0.08);
   --hu-info: #3b82f6;
   --hu-info-dim: rgba(59, 130, 246, 0.15);
   --hu-link: #8dc63f;
@@ -841,7 +841,7 @@
   --hu-on-accent: #ffffff;
   --hu-on-accent-secondary: #0c0a08;
   --hu-on-accent-tertiary: #ffffff;
-  --hu-pressed-overlay: rgba(122, 182, 72, 0.12);
+  --hu-pressed-overlay: rgba(255, 255, 255, 0.12);
   --hu-shadow-card:
     0 1px 3px rgba(12, 8, 4, 0.35), 0 8px 24px rgba(12, 8, 4, 0.25),
     inset 0 1px 0 rgba(255, 252, 248, 0.05);
@@ -923,10 +923,10 @@
     rgba(0, 0, 0, 0.15) 100%
   );
   --hu-disabled-overlay: rgba(0, 0, 0, 0.04);
-  --hu-dragged-overlay: rgba(90, 154, 48, 0.14);
+  --hu-dragged-overlay: rgba(0, 0, 0, 0.14);
   --hu-error: #cc0000;
   --hu-error-dim: rgba(204, 0, 0, 0.08);
-  --hu-focus-overlay: rgba(90, 154, 48, 0.1);
+  --hu-focus-overlay: rgba(0, 0, 0, 0.1);
   --hu-focus-ring: #5a9a30;
   --hu-focus-ring-offset: 2px;
   --hu-focus-ring-width: 2px;
@@ -936,7 +936,7 @@
     rgba(122, 182, 72, 0.03) 50%,
     transparent 100%
   );
-  --hu-hover-overlay: rgba(90, 154, 48, 0.06);
+  --hu-hover-overlay: rgba(0, 0, 0, 0.06);
   --hu-info: #2563eb;
   --hu-info-dim: rgba(37, 99, 235, 0.1);
   --hu-link: #5a9a30;
@@ -946,7 +946,7 @@
   --hu-on-accent: #ffffff;
   --hu-on-accent-secondary: #ffffff;
   --hu-on-accent-tertiary: #ffffff;
-  --hu-pressed-overlay: rgba(90, 154, 48, 0.1);
+  --hu-pressed-overlay: rgba(0, 0, 0, 0.1);
   --hu-shadow-card: 0 1px 2px rgba(45, 36, 24, 0.04), 0 2px 8px rgba(45, 36, 24, 0.03);
   --hu-shadow-glow-accent: 0 0 0 1px rgba(90, 154, 48, 0.12), 0 4px 16px rgba(90, 154, 48, 0.15);
   --hu-shadow-glow-blue: 0 0 0 1px rgba(37, 99, 235, 0.12), 0 4px 12px rgba(37, 99, 235, 0.08);

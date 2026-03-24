@@ -56,8 +56,14 @@ This document benchmarks the `human` runtime against state-of-the-art AI agent p
 | **DPO preference learning** | RLHF (OpenAI, Anthropic) | SQLite pair collection + weekly JSONL export + best-pair few-shot injection into system prompt | **COMPETITIVE** | High-margin preference pairs injected as few-shot examples. Not gradient-based RLHF, but closes the learning loop. |
 | **Contact profiles** | Replika (relationship stages) | 25+ fields (relationship, warmth, vulnerability, interests, Dunbar layer, attachment style) | **SOTA** | Richer than any consumer companion app |
 
+| **Vulnerability calibration** | — | Per-channel `vulnerability_tier` in persona overlay; prompt builder injects disclosure guidance | **SOTA** | No competitor has per-channel vulnerability tuning. Research: [arXiv:2603.16874](https://arxiv.org/abs/2603.16874) (Disclosure By Design) |
+| **Anti-sycophancy** | Anthropic Constitutional AI | Metacognition sycophancy detection; opinion persistence under pushback | **COMPETITIVE** | Detects agreement-bias patterns. Research: [arXiv:2509.16533](https://arxiv.org/abs/2509.16533), [arXiv:2603.01214](https://arxiv.org/abs/2603.01214) |
+| **Trajectory empathy** | Pi (empathy focus) | Multi-turn emotional coherence tracking in eval framework | **COMPETITIVE** | Trajectory-level scoring per EMPA framework. Research: [arXiv:2603.00552](https://arxiv.org/abs/2603.00552) |
+| **Personality consistency** | Character.AI (PipSqueak) | 3-metric consistency scoring (prompt-to-line, line-to-line, Q&A) in fidelity eval | **COMPETITIVE** | Automatic metrics from multi-turn RL research. Gap: no RL fine-tuning loop yet. |
+| **ML-based predictions** | — | Local BPE/GPT training, DPO, LoRA persona fine-tuning, model-driven speculative cache + emotion classification | **SOTA** | Full on-device ML pipeline. No competitor runs local training for personalization. |
+
 ### Digital Twin Summary
-**Overall: SOTA.** Timing, proactive messaging, memory, contact profiles, and emotional intelligence all exceed the consumer field. DPO learning loop is closed via few-shot injection. Behavioral calibration feeds measured patterns directly into the persona prompt. No consumer companion app matches this depth across 38 channels.
+**Overall: SOTA.** Timing, proactive messaging, memory, contact profiles, emotional intelligence, vulnerability calibration, and ML-based personalization all exceed the consumer field. DPO learning loop is closed via both few-shot injection and local gradient training. Behavioral calibration feeds measured patterns directly into the persona prompt. Anti-sycophancy detection and trajectory empathy scoring informed by latest arXiv research ([2511.04195](https://arxiv.org/abs/2511.04195), [2603.00552](https://arxiv.org/abs/2603.00552), [2603.01214](https://arxiv.org/abs/2603.01214)). No consumer companion app matches this depth across 38 channels.
 
 ---
 

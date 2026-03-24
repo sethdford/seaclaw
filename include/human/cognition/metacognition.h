@@ -22,7 +22,7 @@ typedef enum hu_metacog_difficulty {
 } hu_metacog_difficulty_t;
 
 #define HU_METACOG_SIGNAL_RING_SIZE 8
-#define HU_METACOG_TRACE_ID_CAP 40 /* UUID + NUL + margin */
+#define HU_METACOG_TRACE_ID_CAP     40 /* UUID + NUL + margin */
 
 /* Tunable policy (config.json "agent.metacognition" + env overrides). */
 typedef struct hu_metacog_settings {
@@ -46,14 +46,15 @@ typedef struct hu_metacog_settings {
 } hu_metacog_settings_t;
 
 typedef struct hu_metacognition_signal {
-    float confidence;           /* 0.0–1.0; estimated from hedging word frequency */
-    float coherence;            /* 0.0–1.0; semantic overlap with user query */
-    float repetition;         /* 0.0–1.0; n-gram overlap with prior assistant turns */
-    float token_efficiency;   /* response_tokens / input_tokens ratio */
-    float emotional_alignment; /* from emotional cognition confidence */
-    float stuck_score;        /* 0.0–1.0; repetition + rolling repetition pressure */
-    float satisfaction_proxy; /* 0.0–1.0; response length vs expected band */
+    float confidence;            /* 0.0–1.0; estimated from hedging word frequency */
+    float coherence;             /* 0.0–1.0; semantic overlap with user query */
+    float repetition;            /* 0.0–1.0; n-gram overlap with prior assistant turns */
+    float token_efficiency;      /* response_tokens / input_tokens ratio */
+    float emotional_alignment;   /* from emotional cognition confidence */
+    float stuck_score;           /* 0.0–1.0; repetition + rolling repetition pressure */
+    float satisfaction_proxy;    /* 0.0–1.0; response length vs expected band */
     float trajectory_confidence; /* 0.0–1.0; decay-weighted composite of ring (filled in plan) */
+    float sycophancy_score;      /* 0.0–1.0; agreement-bias detection (arXiv:2509.16533) */
 } hu_metacognition_signal_t;
 
 typedef struct hu_metacog_trend {
@@ -102,20 +103,18 @@ float hu_metacog_trajectory_confidence(const hu_metacognition_t *mc);
 
 /* Monitor: compute signals from a model response.
  * mc_opt may be NULL; when set, stuck_score uses rolling repetition from the ring. */
-hu_metacognition_signal_t hu_metacognition_monitor(
-    const char *user_query, size_t user_query_len,
-    const char *response, size_t response_len,
-    const char *prev_response, size_t prev_response_len,
-    float emotional_confidence,
-    uint64_t input_tokens, uint64_t output_tokens,
-    hu_metacognition_t *mc_opt);
+hu_metacognition_signal_t
+hu_metacognition_monitor(const char *user_query, size_t user_query_len, const char *response,
+                         size_t response_len, const char *prev_response, size_t prev_response_len,
+                         float emotional_confidence, uint64_t input_tokens, uint64_t output_tokens,
+                         hu_metacognition_t *mc_opt);
 
 /* Analyze signals and plan a control action. Mutates *signal to set trajectory_confidence. */
 hu_metacog_action_t hu_metacognition_plan_action(hu_metacognition_t *mc,
                                                  hu_metacognition_signal_t *signal);
 
 void hu_metacognition_record_signal(hu_metacognition_t *mc,
-                                  const hu_metacognition_signal_t *signal);
+                                    const hu_metacognition_signal_t *signal);
 
 hu_error_t hu_metacognition_apply(hu_metacog_action_t action, char *prompt_buf, size_t prompt_cap,
                                   size_t *prompt_len_out);

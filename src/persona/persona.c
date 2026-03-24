@@ -82,6 +82,10 @@ static void free_overlay(hu_allocator_t *alloc, hu_persona_overlay_t *ov) {
     }
     free_string_array(alloc, ov->style_notes, ov->style_notes_count);
     free_string_array(alloc, ov->typing_quirks, ov->typing_quirks_count);
+    if (ov->vulnerability_tier) {
+        size_t len = strlen(ov->vulnerability_tier);
+        alloc->free(alloc->ctx, ov->vulnerability_tier, len + 1);
+    }
 }
 
 static void free_example(hu_allocator_t *alloc, hu_persona_example_t *ex) {
@@ -766,6 +770,9 @@ static hu_error_t parse_overlay(hu_allocator_t *a, const char *channel_name,
     hu_json_value_t *quirks = hu_json_object_get(obj, "typing_quirks");
     if (quirks)
         parse_string_array(a, quirks, &ov->typing_quirks, &ov->typing_quirks_count);
+    s = hu_json_get_string(obj, "vulnerability_tier");
+    if (s)
+        ov->vulnerability_tier = hu_strdup(a, s);
     return HU_OK;
 }
 
@@ -1012,7 +1019,9 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
             if (a && a->type == HU_JSON_ARRAY) {
                 size_t n = a->data.array.len;
                 for (size_t i = 0; i < n && i < 8; i++) {
-                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING)
+                            ? a->data.array.items[i]->data.string.ptr
+                            : NULL;
                     if (s)
                         snprintf(out->humor.style[i], sizeof(out->humor.style[i]), "%.31s", s);
                 }
@@ -1025,7 +1034,9 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
             if (a && a->type == HU_JSON_ARRAY) {
                 size_t n = a->data.array.len;
                 for (size_t i = 0; i < n && i < 8; i++) {
-                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING)
+                            ? a->data.array.items[i]->data.string.ptr
+                            : NULL;
                     if (s)
                         snprintf(out->humor.never_during[i], sizeof(out->humor.never_during[i]),
                                  "%.31s", s);
@@ -1036,7 +1047,9 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
             if (a && a->type == HU_JSON_ARRAY) {
                 size_t n = a->data.array.len;
                 for (size_t i = 0; i < n && i < 8; i++) {
-                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING)
+                            ? a->data.array.items[i]->data.string.ptr
+                            : NULL;
                     if (s)
                         snprintf(out->humor.signature_phrases[i],
                                  sizeof(out->humor.signature_phrases[i]), "%.63s", s);
@@ -1047,7 +1060,9 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
             if (a && a->type == HU_JSON_ARRAY) {
                 size_t n = a->data.array.len;
                 for (size_t i = 0; i < n && i < 8; i++) {
-                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                    s = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING)
+                            ? a->data.array.items[i]->data.string.ptr
+                            : NULL;
                     if (s)
                         snprintf(out->humor.self_deprecation_topics[i],
                                  sizeof(out->humor.self_deprecation_topics[i]), "%.63s", s);
@@ -1072,7 +1087,10 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 out->humor.targets = alloc->alloc(alloc->ctx, n * sizeof(char *));
                 if (out->humor.targets) {
                     for (size_t i = 0; i < n; i++) {
-                        const char *ts = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                        const char *ts = (a->data.array.items[i] &&
+                                          a->data.array.items[i]->type == HU_JSON_STRING)
+                                             ? a->data.array.items[i]->data.string.ptr
+                                             : NULL;
                         out->humor.targets[i] = ts ? hu_strdup(alloc, ts) : NULL;
                     }
                     out->humor.targets_count = n;
@@ -1084,7 +1102,10 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 out->humor.boundaries = alloc->alloc(alloc->ctx, n * sizeof(char *));
                 if (out->humor.boundaries) {
                     for (size_t i = 0; i < n; i++) {
-                        const char *bs = (a->data.array.items[i] && a->data.array.items[i]->type == HU_JSON_STRING) ? a->data.array.items[i]->data.string.ptr : NULL;
+                        const char *bs = (a->data.array.items[i] &&
+                                          a->data.array.items[i]->type == HU_JSON_STRING)
+                                             ? a->data.array.items[i]->data.string.ptr
+                                             : NULL;
                         out->humor.boundaries[i] = bs ? hu_strdup(alloc, bs) : NULL;
                     }
                     out->humor.boundaries_count = n;
@@ -1092,9 +1113,8 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 if (out->humor.never_during_count == 0) {
                     for (size_t i = 0; i < n && i < 8; i++) {
                         if (out->humor.boundaries[i])
-                            snprintf(out->humor.never_during[i],
-                                     sizeof(out->humor.never_during[i]), "%.31s",
-                                     out->humor.boundaries[i]);
+                            snprintf(out->humor.never_during[i], sizeof(out->humor.never_during[i]),
+                                     "%.31s", out->humor.boundaries[i]);
                     }
                     out->humor.never_during_count = (n > 8) ? 8 : n;
                 }
@@ -1471,16 +1491,15 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
     if (ctx_aw && ctx_aw->type == HU_JSON_OBJECT) {
         out->context_awareness.calendar_enabled =
             hu_json_get_bool(ctx_aw, "calendar_enabled", false);
-        out->context_awareness.weather_enabled =
-            hu_json_get_bool(ctx_aw, "weather_enabled", false);
+        out->context_awareness.weather_enabled = hu_json_get_bool(ctx_aw, "weather_enabled", false);
         hu_json_value_t *teams = hu_json_object_get(ctx_aw, "sports_teams");
         if (teams)
             parse_string_array_fixed(teams, out->context_awareness.sports_teams, 8,
-                                    &out->context_awareness.sports_teams_count);
+                                     &out->context_awareness.sports_teams_count);
         hu_json_value_t *topics = hu_json_object_get(ctx_aw, "news_topics");
         if (topics)
             parse_string_array_fixed(topics, out->context_awareness.news_topics, 8,
-                                    &out->context_awareness.news_topics_count);
+                                     &out->context_awareness.news_topics_count);
     }
 
     /* Phase 4: follow_up_style (defaults applied when block absent) */
@@ -1512,8 +1531,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         out->bookend_messages.frequency_per_week =
             (float)hu_json_get_number(bookend, "frequency_per_week", 2.5);
         hu_json_value_t *mw = hu_json_object_get(bookend, "morning_window");
-        if (mw && mw->type == HU_JSON_ARRAY && mw->data.array.len >= 2 &&
-            mw->data.array.items) {
+        if (mw && mw->type == HU_JSON_ARRAY && mw->data.array.len >= 2 && mw->data.array.items) {
             const hu_json_value_t *v0 = mw->data.array.items[0];
             const hu_json_value_t *v1 = mw->data.array.items[1];
             if (v0 && v0->type == HU_JSON_NUMBER)
@@ -1522,8 +1540,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 out->bookend_messages.morning_window[1] = (uint8_t)v1->data.number;
         }
         hu_json_value_t *ew = hu_json_object_get(bookend, "evening_window");
-        if (ew && ew->type == HU_JSON_ARRAY && ew->data.array.len >= 2 &&
-            ew->data.array.items) {
+        if (ew && ew->type == HU_JSON_ARRAY && ew->data.array.len >= 2 && ew->data.array.items) {
             const hu_json_value_t *v0 = ew->data.array.items[0];
             const hu_json_value_t *v1 = ew->data.array.items[1];
             if (v0 && v0->type == HU_JSON_NUMBER)
@@ -1534,11 +1551,11 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         hu_json_value_t *pm = hu_json_object_get(bookend, "phrases_morning");
         if (pm)
             parse_string_array_fixed(pm, out->bookend_messages.phrases_morning, 8,
-                                    &out->bookend_messages.phrases_morning_count);
+                                     &out->bookend_messages.phrases_morning_count);
         hu_json_value_t *pe = hu_json_object_get(bookend, "phrases_evening");
         if (pe)
             parse_string_array_fixed(pe, out->bookend_messages.phrases_evening, 8,
-                                    &out->bookend_messages.phrases_evening_count);
+                                     &out->bookend_messages.phrases_evening_count);
     }
 
     /* Phase 4: timezone, location, group_response_rate (persona-level) */
@@ -1573,9 +1590,8 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         s = hu_json_get_string(voice_obj, "default_emotion");
         if (s && s[0])
             (void)snprintf(out->voice.default_emotion, sizeof(out->voice.default_emotion), "%.31s",
-                          s);
-        out->voice.default_speed =
-            (float)hu_json_get_number(voice_obj, "default_speed", 0.95);
+                           s);
+        out->voice.default_speed = (float)hu_json_get_number(voice_obj, "default_speed", 0.95);
         out->voice.nonverbals = hu_json_get_bool(voice_obj, "nonverbals", true);
     }
 
@@ -1591,21 +1607,22 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         out->voice_messages.enabled = hu_json_get_bool(vm, "enabled", false);
         const char *freq = hu_json_get_string(vm, "frequency");
         if (freq && freq[0])
-            (void)snprintf(out->voice_messages.frequency,
-                           sizeof(out->voice_messages.frequency), "%.15s", freq);
+            (void)snprintf(out->voice_messages.frequency, sizeof(out->voice_messages.frequency),
+                           "%.15s", freq);
         out->voice_messages.max_duration_sec =
             (uint32_t)hu_json_get_number(vm, "max_duration_sec", 30);
         hu_json_value_t *pf = hu_json_object_get(vm, "prefer_for");
         if (pf)
             parse_string_array_32(pf, out->voice_messages.prefer_for, 8,
-                                 &out->voice_messages.prefer_for_count);
+                                  &out->voice_messages.prefer_for_count);
         hu_json_value_t *nf = hu_json_object_get(vm, "never_for");
         if (nf)
             parse_string_array_32(nf, out->voice_messages.never_for, 8,
-                                 &out->voice_messages.never_for_count);
+                                  &out->voice_messages.never_for_count);
     }
 
-    /* Phase 6: daily_routine, current_chapter, memory_degradation_rate, core_values, relationships */
+    /* Phase 6: daily_routine, current_chapter, memory_degradation_rate, core_values, relationships
+     */
     out->daily_routine.weekday_count = 0;
     out->daily_routine.weekend_count = 0;
     out->daily_routine.routine_variance = 0.15f;
@@ -1695,8 +1712,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         }
     }
 
-    out->memory_degradation_rate =
-        (float)hu_json_get_number(root, "memory_degradation_rate", 0.10);
+    out->memory_degradation_rate = (float)hu_json_get_number(root, "memory_degradation_rate", 0.10);
 
     hu_json_value_t *cv = hu_json_object_get(root, "core_values");
     if (cv)
@@ -2009,8 +2025,7 @@ hu_error_t hu_persona_validate_json(hu_allocator_t *alloc, const char *json, siz
     hu_json_value_t *principles_val = hu_json_object_get(core, "principles");
     if (principles_val && !is_string_array(principles_val)) {
         hu_json_free(alloc, root);
-        return set_err_msg(alloc, err_msg, err_msg_len,
-                           "core.principles must be array of strings");
+        return set_err_msg(alloc, err_msg, err_msg_len, "core.principles must be array of strings");
     }
 
     /* Optional: core.decision_style — string */
@@ -2681,13 +2696,14 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
         }
     }
 
-    /* Humor profile (Phase 6 — style, frequency, never_during; legacy: type, targets, boundaries, timing) */
+    /* Humor profile (Phase 6 — style, frequency, never_during; legacy: type, targets, boundaries,
+     * timing) */
     {
         const hu_humor_profile_t *h = &persona->humor;
         bool has = h->style_count > 0 || (h->frequency && h->frequency[0]) ||
-                   h->never_during_count > 0 ||
-                   h->signature_phrases_count > 0 || h->self_deprecation_count > 0 ||
-                   (h->type && h->type[0]) || (h->targets && h->targets_count > 0) ||
+                   h->never_during_count > 0 || h->signature_phrases_count > 0 ||
+                   h->self_deprecation_count > 0 || (h->type && h->type[0]) ||
+                   (h->targets && h->targets_count > 0) ||
                    (h->boundaries && h->boundaries_count > 0) || (h->timing && h->timing[0]);
         if (has) {
             static const char hum_hdr[] = "\n--- Humor ---\n";
@@ -2705,8 +2721,7 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                         if (err != HU_OK)
                             goto fail;
                     }
-                    err = append_prompt(alloc, &buf, &len, &cap, h->style[i],
-                                        strlen(h->style[i]));
+                    err = append_prompt(alloc, &buf, &len, &cap, h->style[i], strlen(h->style[i]));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3614,6 +3629,14 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 if (err != HU_OK)
                     goto fail;
             }
+            if (ov->vulnerability_tier && ov->vulnerability_tier[0]) {
+                n = snprintf(header, sizeof(header), "- Vulnerability tier: %s\n",
+                             ov->vulnerability_tier);
+                if (n > 0)
+                    err = append_prompt(alloc, &buf, &len, &cap, header, (size_t)n);
+                if (err != HU_OK)
+                    goto fail;
+            }
         }
     }
 
@@ -3655,8 +3678,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                         goto fail;
                 }
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
-                    if (err != HU_OK)
-                        goto fail;
+                if (err != HU_OK)
+                    goto fail;
             }
         }
     }
@@ -3681,8 +3704,7 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
         else if (hour >= 17 && hour < 22)
             overlay = persona->time_overlay_evening;
         if (overlay && overlay[0]) {
-            err = append_prompt(alloc, &buf, &len, &cap,
-                               "\n--- Current Time Context ---\n", 31);
+            err = append_prompt(alloc, &buf, &len, &cap, "\n--- Current Time Context ---\n", 31);
             if (err != HU_OK)
                 goto fail;
             err = append_prompt(alloc, &buf, &len, &cap, overlay, strlen(overlay));
@@ -3738,13 +3760,13 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 const hu_routine_block_t *b = &blocks[idx];
                 if (b->activity[0] || b->availability[0] || b->mood_modifier[0]) {
                     err = append_prompt(alloc, &buf, &len, &cap,
-                                       "\n--- Current Routine Block ---\n", 29);
+                                        "\n--- Current Routine Block ---\n", 29);
                     if (err != HU_OK)
                         goto fail;
                     char block_buf[256];
                     int bn = snprintf(block_buf, sizeof(block_buf),
-                                     "Time: %s. Activity: %s. Availability: %s. Mood: %s.\n",
-                                     b->time, b->activity, b->availability, b->mood_modifier);
+                                      "Time: %s. Activity: %s. Availability: %s. Mood: %s.\n",
+                                      b->time, b->activity, b->availability, b->mood_modifier);
                     if (bn > 0 && (size_t)bn < sizeof(block_buf)) {
                         err = append_prompt(alloc, &buf, &len, &cap, block_buf, (size_t)bn);
                         if (err != HU_OK)
@@ -3764,9 +3786,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
             err = append_prompt(alloc, &buf, &len, &cap, "Theme: ", 7);
             if (err != HU_OK)
                 goto fail;
-            err = append_prompt(alloc, &buf, &len, &cap,
-                               persona->current_chapter.theme,
-                               strlen(persona->current_chapter.theme));
+            err = append_prompt(alloc, &buf, &len, &cap, persona->current_chapter.theme,
+                                strlen(persona->current_chapter.theme));
             if (err != HU_OK)
                 goto fail;
             err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
@@ -3777,9 +3798,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
             err = append_prompt(alloc, &buf, &len, &cap, "Mood: ", 6);
             if (err != HU_OK)
                 goto fail;
-            err = append_prompt(alloc, &buf, &len, &cap,
-                               persona->current_chapter.mood,
-                               strlen(persona->current_chapter.mood));
+            err = append_prompt(alloc, &buf, &len, &cap, persona->current_chapter.mood,
+                                strlen(persona->current_chapter.mood));
             if (err != HU_OK)
                 goto fail;
             err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
@@ -3798,8 +3818,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 }
                 if (persona->current_chapter.key_threads[i][0]) {
                     err = append_prompt(alloc, &buf, &len, &cap,
-                                       persona->current_chapter.key_threads[i],
-                                       strlen(persona->current_chapter.key_threads[i]));
+                                        persona->current_chapter.key_threads[i],
+                                        strlen(persona->current_chapter.key_threads[i]));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3830,8 +3850,7 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 continue;
             if (strcmp(d->date, today_md) != 0)
                 continue;
-            err = append_prompt(alloc, &buf, &len, &cap,
-                               "\n--- Important Date Today ---\n", 29);
+            err = append_prompt(alloc, &buf, &len, &cap, "\n--- Important Date Today ---\n", 29);
             if (err != HU_OK)
                 goto fail;
             err = append_prompt(alloc, &buf, &len, &cap, d->type, strlen(d->type));
@@ -3860,9 +3879,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 err = append_prompt(alloc, &buf, &len, &cap, "- ", 2);
                 if (err != HU_OK)
                     goto fail;
-                err = append_prompt(alloc, &buf, &len, &cap,
-                                   persona->core_values[i],
-                                   strlen(persona->core_values[i]));
+                err = append_prompt(alloc, &buf, &len, &cap, persona->core_values[i],
+                                    strlen(persona->core_values[i]));
                 if (err != HU_OK)
                     goto fail;
                 err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
@@ -3914,8 +3932,7 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
 
     /* Immersive reinforcement */
     if (persona->immersive_reinforcement && persona->immersive_reinforcement_count > 0) {
-        err = append_prompt(alloc, &buf, &len, &cap,
-                           "\n--- Immersive Reinforcement ---\n", 32);
+        err = append_prompt(alloc, &buf, &len, &cap, "\n--- Immersive Reinforcement ---\n", 32);
         if (err != HU_OK)
             goto fail;
         for (size_t i = 0; i < persona->immersive_reinforcement_count; i++) {
@@ -3936,13 +3953,11 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
 
     /* Identity reinforcement */
     if (persona->identity_reinforcement && persona->identity_reinforcement[0]) {
-        err = append_prompt(alloc, &buf, &len, &cap,
-                           "\n--- Identity Reinforcement ---\n", 31);
+        err = append_prompt(alloc, &buf, &len, &cap, "\n--- Identity Reinforcement ---\n", 31);
         if (err != HU_OK)
             goto fail;
-        err = append_prompt(alloc, &buf, &len, &cap,
-                           persona->identity_reinforcement,
-                           strlen(persona->identity_reinforcement));
+        err = append_prompt(alloc, &buf, &len, &cap, persona->identity_reinforcement,
+                            strlen(persona->identity_reinforcement));
         if (err != HU_OK)
             goto fail;
         err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
@@ -3997,9 +4012,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
         err = append_prompt(alloc, &buf, &len, &cap, "\n--- Proactive Rules ---\n", 24);
         if (err != HU_OK)
             goto fail;
-        err = append_prompt(alloc, &buf, &len, &cap,
-                           persona->proactive_rules,
-                           strlen(persona->proactive_rules));
+        err = append_prompt(alloc, &buf, &len, &cap, persona->proactive_rules,
+                            strlen(persona->proactive_rules));
         if (err != HU_OK)
             goto fail;
         err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);

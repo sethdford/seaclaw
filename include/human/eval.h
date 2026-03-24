@@ -70,17 +70,31 @@ typedef struct hu_eval_validate_stats {
     size_t errors;
 } hu_eval_validate_stats_t;
 
-hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size_t json_len, hu_eval_suite_t *out);
-hu_error_t hu_eval_suite_load_json_path(hu_allocator_t *alloc, const char *path, hu_eval_suite_t *out);
-/** Validate every *.json suite in `dir`: parse OK, unique task ids across files, required task fields. */
+hu_error_t hu_eval_suite_load_json(hu_allocator_t *alloc, const char *json, size_t json_len,
+                                   hu_eval_suite_t *out);
+hu_error_t hu_eval_suite_load_json_path(hu_allocator_t *alloc, const char *path,
+                                        hu_eval_suite_t *out);
+/** Validate every *.json suite in `dir`: parse OK, unique task ids across files, required task
+ * fields. */
 hu_error_t hu_eval_suites_validate_dir(hu_allocator_t *alloc, const char *dir, FILE *diag,
                                        hu_eval_validate_stats_t *out_stats);
-hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len, hu_eval_suite_t *suite, hu_eval_match_mode_t mode, hu_eval_run_t *out);
-hu_error_t hu_eval_check(hu_allocator_t *alloc, const char *actual, size_t actual_len, const char *expected, size_t expected_len, hu_eval_match_mode_t mode, bool *passed);
-hu_error_t hu_eval_check_with_provider(hu_allocator_t *alloc, const char *actual, size_t actual_len, const char *expected, size_t expected_len, hu_eval_match_mode_t mode, hu_provider_t *provider, const char *model, size_t model_len, bool *passed, double *score_out);
-hu_error_t hu_eval_report_json(hu_allocator_t *alloc, const hu_eval_run_t *run, char **out, size_t *out_len);
-hu_error_t hu_eval_compare(hu_allocator_t *alloc, const hu_eval_run_t *baseline, const hu_eval_run_t *current, char **report, size_t *report_len);
-hu_error_t hu_eval_run_load_json(hu_allocator_t *alloc, const char *json, size_t json_len, hu_eval_run_t *out);
+hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, const char *model,
+                             size_t model_len, hu_eval_suite_t *suite, hu_eval_match_mode_t mode,
+                             hu_eval_run_t *out);
+hu_error_t hu_eval_check(hu_allocator_t *alloc, const char *actual, size_t actual_len,
+                         const char *expected, size_t expected_len, hu_eval_match_mode_t mode,
+                         bool *passed);
+hu_error_t hu_eval_check_with_provider(hu_allocator_t *alloc, const char *actual, size_t actual_len,
+                                       const char *expected, size_t expected_len,
+                                       hu_eval_match_mode_t mode, hu_provider_t *provider,
+                                       const char *model, size_t model_len, bool *passed,
+                                       double *score_out);
+hu_error_t hu_eval_report_json(hu_allocator_t *alloc, const hu_eval_run_t *run, char **out,
+                               size_t *out_len);
+hu_error_t hu_eval_compare(hu_allocator_t *alloc, const hu_eval_run_t *baseline,
+                           const hu_eval_run_t *current, char **report, size_t *report_len);
+hu_error_t hu_eval_run_load_json(hu_allocator_t *alloc, const char *json, size_t json_len,
+                                 hu_eval_run_t *out);
 void hu_eval_suite_free(hu_allocator_t *alloc, hu_eval_suite_t *suite);
 void hu_eval_run_free(hu_allocator_t *alloc, hu_eval_run_t *run);
 void hu_eval_result_free(hu_allocator_t *alloc, hu_eval_result_t *result);
@@ -99,19 +113,20 @@ hu_error_t hu_eval_init_tables(sqlite3 *db);
 hu_error_t hu_eval_store_run(hu_allocator_t *alloc, sqlite3 *db, const hu_eval_run_t *run);
 hu_error_t hu_eval_load_history(hu_allocator_t *alloc, sqlite3 *db, hu_eval_run_t *runs,
                                 size_t max_runs, size_t *out_count);
-hu_error_t hu_eval_detect_regression(sqlite3 *db, const char *suite_name,
-                                     double current_pass_rate, double threshold,
-                                     hu_eval_regression_t *out);
+hu_error_t hu_eval_detect_regression(sqlite3 *db, const char *suite_name, double current_pass_rate,
+                                     double threshold, hu_eval_regression_t *out);
 hu_error_t hu_eval_persist_baseline(sqlite3 *db, const char *suite_name, double score,
                                     size_t task_count);
 hu_error_t hu_eval_get_baseline(sqlite3 *db, const char *suite_name, double *out_score);
 /**
  * Compare `current_score` to the last persisted baseline for `suite_stem` in `eval_baselines`.
  * If no prior baseline exists, does not regress. If prior − current > max_drop, sets *regressed_out
- * and writes FAIL line into msg_buf (when provided). max_drop is on 0–1 scale (e.g. 0.10 = 10 points).
+ * and writes FAIL line into msg_buf (when provided). max_drop is on 0–1 scale (e.g. 0.10 = 10
+ * points).
  */
-hu_error_t hu_eval_regression_check_baseline_drop(sqlite3 *db, const char *suite_stem, double current_score,
-                                                  double max_drop, bool *regressed_out, char *msg_buf,
+hu_error_t hu_eval_regression_check_baseline_drop(sqlite3 *db, const char *suite_stem,
+                                                  double current_score, double max_drop,
+                                                  bool *regressed_out, char *msg_buf,
                                                   size_t msg_cap);
 #endif
 
@@ -123,5 +138,46 @@ const char *hu_eval_baseline_status_for_score(double score);
  * Returns false if no mock applies (caller should run the suite and use pass_rate).
  */
 bool hu_eval_baseline_try_mock_score_for_stem(const char *suite_stem, double *out_score);
+
+/* --- Fidelity dimension scoring (arXiv research-backed) --- */
+
+typedef struct hu_eval_empathy_trajectory {
+    float directional_alignment; /* 0.0-1.0: moves toward user emotional needs */
+    float cumulative_impact;     /* 0.0-1.0: net positive emotional shift */
+    float stability;             /* 0.0-1.0: no regression after good turns */
+    float composite;             /* weighted average */
+} hu_eval_empathy_trajectory_t;
+
+typedef struct hu_eval_consistency_metrics {
+    float prompt_to_line; /* 0.0-1.0: response aligns with persona prompt */
+    float line_to_line;   /* 0.0-1.0: consecutive responses maintain voice */
+    float qa_consistency; /* 0.0-1.0: same question different wording → same answer */
+    float composite;      /* weighted average */
+} hu_eval_consistency_metrics_t;
+
+/**
+ * Score empathy trajectory over a multi-turn conversation.
+ * emotional_scores: per-turn empathy scores (0.0–1.0), count entries.
+ * arXiv:2603.00552 (EMPA framework).
+ */
+hu_error_t hu_eval_score_empathy_trajectory(const float *emotional_scores, size_t count,
+                                            hu_eval_empathy_trajectory_t *out);
+
+/**
+ * Score personality consistency given per-turn similarity values.
+ * prompt_sims: persona-prompt to response similarity per turn.
+ * turn_sims: consecutive-turn similarity (count-1 entries).
+ * arXiv multi-turn RL persona consistency metrics.
+ */
+hu_error_t hu_eval_score_consistency(const float *prompt_sims, size_t prompt_count,
+                                     const float *turn_sims, size_t turn_count,
+                                     hu_eval_consistency_metrics_t *out);
+
+/**
+ * Score sycophancy resistance (0.0 = fully sycophantic, 1.0 = independent).
+ * opinion_held: whether the model maintained its position under pushback, per turn.
+ * arXiv:2509.16533, arXiv:2603.01214.
+ */
+float hu_eval_score_antisycophancy(const bool *opinion_held, size_t count);
 
 #endif

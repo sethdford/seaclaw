@@ -36,8 +36,7 @@ static void monitor_confident_response(void) {
                            "sunlight into chemical energy. Chlorophyll absorbs light "
                            "and drives the reaction.";
     hu_metacognition_signal_t s = hu_metacognition_monitor(
-        query, strlen(query), response, strlen(response),
-        NULL, 0, 0.8f, 500, 100, NULL);
+        query, strlen(query), response, strlen(response), NULL, 0, 0.8f, 500, 100, NULL);
 
     HU_ASSERT_TRUE(s.confidence > 0.5f);
     HU_ASSERT_TRUE(s.coherence > 0.0f);
@@ -52,8 +51,7 @@ static void monitor_hedging_response_low_confidence(void) {
     const char *response = "I'm not sure, maybe it could be safe, perhaps, "
                            "I think it might possibly work, although I'm uncertain.";
     hu_metacognition_signal_t s = hu_metacognition_monitor(
-        query, strlen(query), response, strlen(response),
-        NULL, 0, 0.5f, 500, 100, NULL);
+        query, strlen(query), response, strlen(response), NULL, 0, 0.5f, 500, 100, NULL);
 
     HU_ASSERT_TRUE(s.confidence < 0.5f);
 }
@@ -301,6 +299,36 @@ static void hard_difficulty_relaxes_confidence_threshold(void) {
     HU_ASSERT_TRUE(a == HU_METACOG_ACTION_NONE || a == HU_METACOG_ACTION_REFLECT);
 }
 
+static void sycophancy_detects_agreement_markers(void) {
+    const char *response = "You're absolutely right, that's a great point! "
+                           "I completely agree with everything you said.";
+    hu_metacognition_signal_t s = hu_metacognition_monitor("test", 4, response, strlen(response),
+                                                           NULL, 0, 0.8f, 100, 80, NULL);
+    HU_ASSERT_TRUE(s.sycophancy_score > 0.3f);
+}
+
+static void sycophancy_low_for_independent_response(void) {
+    const char *response = "I actually disagree. The evidence suggests otherwise. "
+                           "Here is my reasoning for a different conclusion.";
+    hu_metacognition_signal_t s = hu_metacognition_monitor("test", 4, response, strlen(response),
+                                                           NULL, 0, 0.8f, 100, 80, NULL);
+    HU_ASSERT_TRUE(s.sycophancy_score < 0.2f);
+}
+
+static void sycophancy_triggers_reflect_when_high(void) {
+    hu_metacognition_t mc;
+    hu_metacognition_init(&mc);
+    mc.cfg.hysteresis_min = 0;
+    hu_metacognition_signal_t s;
+    memset(&s, 0, sizeof(s));
+    s.confidence = 0.9f;
+    s.coherence = 0.9f;
+    s.sycophancy_score = 0.8f;
+    s.trajectory_confidence = 0.8f;
+    hu_metacog_action_t action = hu_metacognition_plan_action(&mc, &s);
+    HU_ASSERT_EQ(action, HU_METACOG_ACTION_REFLECT);
+}
+
 void run_metacognition_tests(void) {
     HU_TEST_SUITE("Metacognition");
     HU_RUN_TEST(apply_config_copies_settings);
@@ -328,4 +356,7 @@ void run_metacognition_tests(void) {
     HU_RUN_TEST(hysteresis_suppresses_first_costly);
     HU_RUN_TEST(token_efficiency_simplify_immediate);
     HU_RUN_TEST(hard_difficulty_relaxes_confidence_threshold);
+    HU_RUN_TEST(sycophancy_detects_agreement_markers);
+    HU_RUN_TEST(sycophancy_low_for_independent_response);
+    HU_RUN_TEST(sycophancy_triggers_reflect_when_high);
 }

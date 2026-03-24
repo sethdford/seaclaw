@@ -22,6 +22,7 @@ typedef struct hu_persona_overlay {
     uint32_t max_segment_chars;
     char **typing_quirks;
     size_t typing_quirks_count;
+    char *vulnerability_tier;
 } hu_persona_overlay_t;
 
 typedef struct hu_persona_example {
@@ -85,7 +86,7 @@ typedef struct hu_situational_direction {
 
 /* Phase 6 — daily routine block (time, activity, availability, mood modifier) */
 typedef struct hu_routine_block {
-    char time[8];         /* "05:30" */
+    char time[8]; /* "05:30" */
     char activity[64];
     char availability[16]; /* "brief","unavailable","slow","available" */
     char mood_modifier[32];
@@ -246,11 +247,11 @@ typedef struct hu_follow_up_style {
 
 /* Bookend messages — morning/evening check-ins */
 typedef struct hu_bookend_config {
-    bool enabled;                   /* default false */
-    uint8_t morning_window[2];       /* default {7, 9} */
-    uint8_t evening_window[2];       /* default {22, 23} */
-    float frequency_per_week;        /* default 2.5 */
-    char phrases_morning[8][64];    /* fixed-size arrays */
+    bool enabled;                /* default false */
+    uint8_t morning_window[2];   /* default {7, 9} */
+    uint8_t evening_window[2];   /* default {22, 23} */
+    float frequency_per_week;    /* default 2.5 */
+    char phrases_morning[8][64]; /* fixed-size arrays */
     size_t phrases_morning_count;
     char phrases_evening[8][64];
     size_t phrases_evening_count;
@@ -261,7 +262,7 @@ typedef struct hu_humanization_config {
     float disfluency_frequency;      /* default 0.15 */
     float backchannel_probability;   /* default 0.3 */
     float burst_message_probability; /* default 0.03 */
-    float double_text_probability;  /* default 0.08 */
+    float double_text_probability;   /* default 0.08 */
 } hu_humanization_config_t;
 
 /* Context modifiers — topic/emotion/turn-based boosts */
@@ -282,12 +283,12 @@ typedef struct hu_important_date {
 /* Voice messages config — when to send voice vs text (per-contact) */
 typedef struct hu_voice_messages_config {
     bool enabled;
-    char frequency[16];           /* "rare", "occasional", "frequent" */
-    char prefer_for[8][32];        /* "emotional", "late_night", "long_response", "comfort" */
+    char frequency[16];     /* "rare", "occasional", "frequent" */
+    char prefer_for[8][32]; /* "emotional", "late_night", "long_response", "comfort" */
     size_t prefer_for_count;
-    char never_for[8][32];         /* "questions", "logistics", "quick_ack" */
+    char never_for[8][32]; /* "questions", "logistics", "quick_ack" */
     size_t never_for_count;
-    uint32_t max_duration_sec;     /* default 30 */
+    uint32_t max_duration_sec; /* default 30 */
 } hu_voice_messages_config_t;
 
 /* Voice config — Cartesia TTS, cloned voice UUID, model, emotion */
@@ -295,7 +296,7 @@ typedef struct hu_persona_voice_config {
     char provider[32];        /* "cartesia" */
     char voice_id[64];        /* UUID */
     char model[64];           /* "sonic-3-2026-01-12" */
-    char default_emotion[32];  /* "content" */
+    char default_emotion[32]; /* "content" */
     float default_speed;      /* 0.95 */
     bool nonverbals;          /* true */
 } hu_persona_voice_config_t;
@@ -577,10 +578,9 @@ hu_error_t hu_persona_cli_run(hu_allocator_t *alloc, const hu_persona_cli_args_t
 struct hu_memory;
 struct hu_provider;
 hu_error_t hu_persona_style_reanalyze(hu_allocator_t *alloc, struct hu_provider *provider,
-                                     const char *model, size_t model_len,
-                                     struct hu_memory *memory,
-                                     const char *persona_name, size_t persona_name_len,
-                                     const char *channel, size_t channel_len,
-                                     const char *contact_id, size_t contact_id_len);
+                                      const char *model, size_t model_len, struct hu_memory *memory,
+                                      const char *persona_name, size_t persona_name_len,
+                                      const char *channel, size_t channel_len,
+                                      const char *contact_id, size_t contact_id_len);
 
 #endif /* HU_PERSONA_H */
