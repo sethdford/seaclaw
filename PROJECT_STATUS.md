@@ -7,10 +7,10 @@ Last updated: 2026-03-24
 | Metric                         | Value                  |
 | ------------------------------ | ---------------------- |
 | Source files (src/ + include/) | **1,093**              |
-| Lines of C/H/ASM code          | **~278K**              |
+| Lines of C/H/ASM code          | **~279K**              |
 | Test files                     | ~308                   |
-| Tests passing                  | **6819/6819 (100%)** |
-| Binary size (MinSizeRel+LTO)   | **~1539 KB**           |
+| Tests passing                  | **6852/6852 (100%)** |
+| Binary size (MinSizeRel+LTO)   | **~1571 KB**           |
 | Peak RSS (test suite)          | **~6.0 MB**            |
 
 ## Channels — Honest Status
@@ -54,7 +54,7 @@ Last updated: 2026-03-24
 | -------- | ------------------------ |
 | Dispatch | Forwards to sub-channels |
 
-## Tools — All 81 Real (with all feature flags)
+## Tools — All 82 Real (with all feature flags)
 
 Every tool has a real implementation. In test mode (`HU_IS_TEST`), they return mock
 data to avoid side effects. Highlights:
