@@ -3,18 +3,11 @@ import { customElement, state } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 import type { GatewayClient, GatewayStatus } from "./gateway.js";
 import { GatewayClient as GatewayClientClass } from "./gateway.js";
-import { DemoGatewayClient } from "./demo-gateway.js";
 import { setGateway } from "./gateway-provider.js";
 import { AUTH_FAILED } from "./gateway-aware.js";
-import { dynamicLight } from "./lib/dynamic-light.js";
-import { ambientIntelligence } from "./lib/ambient-intelligence.js";
 import { icons } from "./icons.js";
-import "./components/floating-mic.js";
 import "./components/sidebar.js";
-import "./components/command-palette.js";
-import "./components/hu-shortcut-overlay.js";
 import "./components/hu-error-boundary.js";
-import "./views/overview-view.js";
 
 type TabId =
   | "overview"
@@ -65,7 +58,7 @@ const SIDEBAR_KEY = "hu-sidebar-collapsed";
 const LIST_DETAIL_TABS: TabId[] = ["sessions", "channels", "tools", "nodes"];
 
 const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
-  overview: () => Promise.resolve(),
+  overview: () => import("./views/overview-view.js"),
   chat: () => import("./views/chat-view.js"),
   agents: () => import("./views/agents-view.js"),
   sessions: () => import("./views/sessions-view.js"),
@@ -86,7 +79,7 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   hula: () => import("./views/hula-view.js"),
 };
 
-const loadedViews = new Set<TabId>(["overview"]);
+const loadedViews = new Set<TabId>();
 
 const MOBILE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] = [
   { id: "overview", label: "Home", icon: icons.grid },
@@ -550,11 +543,6 @@ export class ScApp extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.gateway = this._isDemo
-      ? (new DemoGatewayClient() as unknown as GatewayClient)
-      : new GatewayClientClass();
-    setGateway(this.gateway);
-    this.gateway.addEventListener("status", this._statusHandler);
 
     this.sidebarCollapsed = localStorage.getItem(SIDEBAR_KEY) === "true";
     this._updateViewportBreakpoint();
@@ -563,36 +551,10 @@ export class ScApp extends LitElement {
     document.addEventListener(AUTH_FAILED, this._authFailedHandler);
     window.addEventListener("hashchange", this._hashHandler);
     this._onHashChange();
-    dynamicLight.start();
-    ambientIntelligence.start(this);
+    import("./lib/dynamic-light.js").then((m) => m.dynamicLight.start());
+    import("./lib/ambient-intelligence.js").then((m) => m.ambientIntelligence.start(this));
 
-    const wsUrl =
-      typeof window !== "undefined" &&
-      (window as unknown as { __VITE_WS_PROXY__?: string }).__VITE_WS_PROXY__
-        ? (window as unknown as { __VITE_WS_PROXY__: string }).__VITE_WS_PROXY__
-        : (() => {
-            const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-            return `${proto}//${window.location.host}/ws`;
-          })();
-
-    // Auto-fallback: if real gateway doesn't complete handshake within 2.5s, use demo.
-    // A raw WebSocket open (e.g. to Vite's HMR server) is not enough — we need a
-    // successful "connect" handshake proving this is a real human gateway.
-    if (!this._isDemo) {
-      this._inFallbackWindow = true;
-      this._fallbackTimer = setTimeout(() => {
-        this._switchToDemo();
-      }, 2500);
-      this.gateway.addEventListener("features", (() => {
-        if (this._fallbackTimer) {
-          clearTimeout(this._fallbackTimer);
-          this._fallbackTimer = null;
-          this._inFallbackWindow = false;
-        }
-      }) as EventListener);
-    }
-
-    this.gateway.connect(wsUrl);
+    void this._initGateway();
 
     this.addEventListener("navigate", ((e: CustomEvent<string>) => {
       const raw = e.detail as string;
@@ -648,11 +610,14 @@ export class ScApp extends LitElement {
   }
 
   override firstUpdated(): void {
-    if ("requestIdleCallback" in window) {
-      requestIdleCallback(() => this._prefetchOnIdle());
-    } else {
-      setTimeout(() => this._prefetchOnIdle(), 0);
-    }
+    const idle = (fn: () => void) =>
+      "requestIdleCallback" in window ? requestIdleCallback(fn) : setTimeout(fn, 0);
+    idle(() => {
+      this._prefetchOnIdle();
+      import("./components/floating-mic.js");
+      import("./components/command-palette.js");
+      import("./components/hu-shortcut-overlay.js");
+    });
   }
 
   override disconnectedCallback(): void {
@@ -667,8 +632,8 @@ export class ScApp extends LitElement {
     window.removeEventListener("resize", this._resizeHandler);
     document.removeEventListener(AUTH_FAILED, this._authFailedHandler);
     window.removeEventListener("hashchange", this._hashHandler);
-    dynamicLight.stop();
-    ambientIntelligence.stop();
+    import("./lib/dynamic-light.js").then((m) => m.dynamicLight.stop());
+    import("./lib/ambient-intelligence.js").then((m) => m.ambientIntelligence.stop());
     if (this._fallbackTimer) {
       clearTimeout(this._fallbackTimer);
       this._fallbackTimer = null;
@@ -719,7 +684,10 @@ export class ScApp extends LitElement {
 
   private _onHashChange(): void {
     const hash = window.location.hash.replace("#", "");
-    if (!hash) return;
+    if (!hash) {
+      void this._ensureLoaded("overview");
+      return;
+    }
     const [tabPart, ...rest] = hash.split(":");
     const sessionPart = rest.join(":");
     const targetTab = tabPart as TabId;
@@ -878,23 +846,61 @@ export class ScApp extends LitElement {
     localStorage.setItem(SIDEBAR_KEY, String(this.sidebarCollapsed));
   }
 
-  /** @deprecated Replaced by AmbientIntelligence module */
-  private _initAmbientIntelligence(): void {
-    ambientIntelligence.start(this);
+  private async _createDemoGateway(): Promise<GatewayClient> {
+    const { DemoGatewayClient } = await import("./demo-gateway.js");
+    return new DemoGatewayClient() as unknown as GatewayClient;
+  }
+
+  private async _initGateway(): Promise<void> {
+    const wsUrl =
+      typeof window !== "undefined" &&
+      (window as unknown as { __VITE_WS_PROXY__?: string }).__VITE_WS_PROXY__
+        ? (window as unknown as { __VITE_WS_PROXY__: string }).__VITE_WS_PROXY__
+        : (() => {
+            const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+            return `${proto}//${window.location.host}/ws`;
+          })();
+
+    if (this._isDemo) {
+      const demo = await this._createDemoGateway();
+      this.gateway = demo;
+      setGateway(demo);
+      demo.addEventListener("status", this._statusHandler);
+      demo.connect(wsUrl);
+      return;
+    }
+
+    const gw = new GatewayClientClass();
+    this.gateway = gw;
+    setGateway(gw);
+    gw.addEventListener("status", this._statusHandler);
+
+    this._inFallbackWindow = true;
+    this._fallbackTimer = setTimeout(() => {
+      this._switchToDemo();
+    }, 2500);
+    gw.addEventListener("features", (() => {
+      if (this._fallbackTimer) {
+        clearTimeout(this._fallbackTimer);
+        this._fallbackTimer = null;
+        this._inFallbackWindow = false;
+      }
+    }) as EventListener);
+
+    gw.connect(wsUrl);
   }
 
   private _switchToDemo(): void {
     this._fallbackTimer = null;
     this._inFallbackWindow = false;
-    // Tear down real gateway
     this.gateway?.removeEventListener("status", this._statusHandler);
     this.gateway?.disconnect();
-    // Create and wire demo gateway
-    const demo = new DemoGatewayClient() as unknown as GatewayClient;
-    this.gateway = demo;
-    setGateway(demo);
-    demo.addEventListener("status", this._statusHandler);
-    demo.connect("demo://fallback");
+    this._createDemoGateway().then((demo) => {
+      this.gateway = demo;
+      setGateway(demo);
+      demo.addEventListener("status", this._statusHandler);
+      demo.connect("demo://fallback");
+    });
   }
 
   private async _ensureLoaded(tab: TabId): Promise<void> {

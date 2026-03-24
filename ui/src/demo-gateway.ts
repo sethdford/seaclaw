@@ -32,6 +32,7 @@ function makeSessions() {
       messages_count: 24,
       last_message: "Let me review the sprint goals and create a summary.",
       status: "active",
+      hula_count: 3,
     },
     {
       key: "sess-b2",
@@ -44,6 +45,7 @@ function makeSessions() {
       messages_count: 12,
       last_message: "The PR looks good. I've added inline suggestions.",
       status: "active",
+      hula_count: 1,
     },
     {
       key: "sess-c3",
@@ -56,6 +58,7 @@ function makeSessions() {
       messages_count: 8,
       last_message: "Found the issue — missing free() in error path.",
       status: "active",
+      hula_count: 0,
     },
     {
       key: "sess-d4",
@@ -68,6 +71,7 @@ function makeSessions() {
       messages_count: 31,
       last_message: "The vtable pattern fits well for extensibility.",
       status: "archived",
+      hula_count: 5,
     },
     {
       key: "sess-e5",
@@ -1900,8 +1904,15 @@ export class DemoGatewayClient extends EventTarget {
             context_awareness: 7,
             non_robotic: 8,
             genuine_warmth: 7,
+            orchestration_quality: 7,
           },
         };
+
+      // --- MCP Resources + Prompts ---
+      case "mcp.resources.list":
+        return { resources: [], templates: [] };
+      case "mcp.prompts.list":
+        return { prompts: [] };
 
       default:
         return {};

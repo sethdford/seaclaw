@@ -47,6 +47,7 @@ const DIMENSION_ORDER = [
   "context_awareness",
   "non_robotic",
   "genuine_warmth",
+  "orchestration_quality",
 ];
 
 function formatDimensionName(key: string): string {

@@ -370,6 +370,9 @@ export class ScOverviewView extends GatewayAwareLitElement {
   @state() private updateInfo: UpdateInfo = {};
   @state() private activityEvents: ActivityEvent[] = [];
   @state() private channelsExpanded = false;
+  @state() private hulaAnalytics: {
+    summary?: { file_count?: number; success_count?: number; fail_count?: number };
+  } = {};
   @state() private connectionStatus: "connected" | "connecting" | "disconnected" = "disconnected";
   private _scrollEntranceObserver: IntersectionObserver | null = null;
   private _countUpDone = false;
@@ -487,7 +490,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
     this.loading = true;
     this.error = "";
     try {
-      const [healthRes, capRes, chRes, sessRes, updateRes, actRes] = await Promise.all([
+      const [healthRes, capRes, chRes, sessRes, updateRes, actRes, hulaRes] = await Promise.all([
         gw.request<HealthRes>("health", {}).catch(() => ({})),
         gw.request<CapabilitiesRes>("capabilities", {}).catch(() => ({})),
         gw
@@ -500,6 +503,11 @@ export class ScOverviewView extends GatewayAwareLitElement {
         gw
           .request<{ events?: ActivityEvent[] }>("activity.recent", {})
           .catch(() => ({ events: [] })),
+        gw
+          .request<{
+            summary?: { file_count?: number; success_count?: number; fail_count?: number };
+          }>("hula.traces.analytics", {})
+          .catch(() => ({})),
       ]);
       this.health = healthRes as HealthRes;
       this.capabilities = capRes as CapabilitiesRes;
@@ -508,6 +516,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
       const sessPayload = sessRes as { sessions?: SessionItem[] };
       this.sessions = Array.isArray(sessPayload?.sessions) ? sessPayload.sessions : [];
       this.updateInfo = (updateRes as UpdateInfo) ?? {};
+      this.hulaAnalytics = (hulaRes as typeof this.hulaAnalytics) ?? {};
       const actPayload = actRes as { events?: ActivityEvent[] };
       if (
         Array.isArray(actPayload?.events) &&
@@ -720,6 +729,11 @@ export class ScOverviewView extends GatewayAwareLitElement {
         label: "Memory",
         valueStr: memoryStr,
         sparklineData: this._mockTrendData(memoryMb, 0.8),
+      },
+      {
+        label: "HuLa Programs",
+        value: this.hulaAnalytics?.summary?.file_count ?? 0,
+        sparklineData: this._mockTrendData(this.hulaAnalytics?.summary?.file_count || 12, 2),
       },
     ];
     const metricRowItems = [

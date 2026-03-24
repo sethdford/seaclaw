@@ -168,6 +168,17 @@ export class ScSessionsView extends GatewayAwareLitElement {
         font-size: var(--hu-text-xs);
         color: var(--hu-text-secondary);
       }
+      .session-hula-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25em;
+        color: var(--hu-accent);
+        font-weight: 600;
+      }
+      .session-hula-badge svg {
+        width: 1em;
+        height: 1em;
+      }
 
       @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
         .sessions-grid {
@@ -517,6 +528,11 @@ export class ScSessionsView extends GatewayAwareLitElement {
                   <div class="session-card-meta">
                     <span>${this.sessionMessageCount(s)} messages</span>
                     <span>${formatRelative(this.sessionTimestamp(s))}</span>
+                    ${(s as Record<string, unknown>).hula_count
+                      ? html`<span class="session-hula-badge"
+                          >${icons.code} ${(s as Record<string, unknown>).hula_count} HuLa</span
+                        >`
+                      : nothing}
                   </div>
                 </hu-card>
               `,
@@ -541,6 +557,9 @@ export class ScSessionsView extends GatewayAwareLitElement {
           <span>${this.sessionMessageCount(s)} messages</span>
           <span>${formatRelative(this.sessionTimestamp(s))}</span>
           <span>Status: ${s.status === "archived" ? "Archived" : "Active"}</span>
+          ${(s as Record<string, unknown>).hula_count
+            ? html`<span>HuLa Programs: ${(s as Record<string, unknown>).hula_count}</span>`
+            : nothing}
         </div>
         <div class="session-detail-actions">
           <hu-button
