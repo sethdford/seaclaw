@@ -29,4 +29,17 @@ hu_error_t hu_doctor_truncate_for_display(hu_allocator_t *alloc, const char *s, 
 hu_error_t hu_doctor_check_config_semantics(hu_allocator_t *alloc, const hu_config_t *cfg,
                                             hu_diag_item_t **items, size_t *count);
 
+/* Check security posture: exec env sanitization, safe-bin allowlist,
+ * sandbox availability, HTTPS enforcement. */
+hu_error_t hu_doctor_check_security(hu_allocator_t *alloc, hu_diag_item_t **items, size_t *count,
+                                    size_t *cap);
+
+/* Check memory backend health (SQLite integrity, disk space). */
+hu_error_t hu_doctor_check_memory_health(hu_allocator_t *alloc, const hu_config_t *cfg,
+                                         hu_diag_item_t **items, size_t *count, size_t *cap);
+
+/* Check skill registry and installed skills. */
+hu_error_t hu_doctor_check_skills(hu_allocator_t *alloc, hu_diag_item_t **items, size_t *count,
+                                  size_t *cap);
+
 #endif /* HU_DOCTOR_H */

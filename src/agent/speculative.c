@@ -1,5 +1,6 @@
 #include "human/agent/speculative.h"
 #include "human/core/string.h"
+#include "human/provider.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
@@ -21,7 +22,7 @@ static void prediction_clear(hu_prediction_t *p, hu_allocator_t *alloc) {
 
 hu_error_t hu_speculative_cache_init(hu_speculative_cache_t *cache, hu_allocator_t *alloc) {
     if (!cache || !alloc)
-            return HU_ERR_INVALID_ARGUMENT;
+        return HU_ERR_INVALID_ARGUMENT;
     memset(cache, 0, sizeof(*cache));
     cache->alloc = alloc;
     return HU_OK;
@@ -46,8 +47,8 @@ static int tolower_strcmp(const char *a, size_t a_len, const char *b, size_t b_l
     return (int)(a_len - b_len);
 }
 
-static bool prefix_match(const char *query, size_t query_len,
-                         const char *entry_query, size_t entry_len) {
+static bool prefix_match(const char *query, size_t query_len, const char *entry_query,
+                         size_t entry_len) {
     if (query_len == 0 || entry_len == 0)
         return false;
     size_t n = query_len < entry_len ? query_len : entry_len;
@@ -68,8 +69,8 @@ static size_t count_words(const char *s, size_t len) {
     return n;
 }
 
-static size_t shared_word_count(const char *query, size_t query_len,
-                                const char *entry_query, size_t entry_len) {
+static size_t shared_word_count(const char *query, size_t query_len, const char *entry_query,
+                                size_t entry_len) {
     size_t shared = 0;
     const char *p = query;
     const char *end = query + query_len;
@@ -105,8 +106,8 @@ static size_t shared_word_count(const char *query, size_t query_len,
     return shared;
 }
 
-static double word_similarity(const char *query, size_t query_len,
-                              const char *entry_query, size_t entry_len) {
+static double word_similarity(const char *query, size_t query_len, const char *entry_query,
+                              size_t entry_len) {
     size_t total = count_words(query, query_len);
     if (total == 0)
         return 1.0;
@@ -114,9 +115,8 @@ static double word_similarity(const char *query, size_t query_len,
     return (double)shared / (double)total;
 }
 
-hu_error_t hu_speculative_cache_store(hu_speculative_cache_t *cache,
-                                      const char *query, size_t query_len,
-                                      const char *response, size_t response_len,
+hu_error_t hu_speculative_cache_store(hu_speculative_cache_t *cache, const char *query,
+                                      size_t query_len, const char *response, size_t response_len,
                                       double confidence, int64_t now_ts) {
     if (!cache || !cache->alloc)
         return HU_ERR_INVALID_ARGUMENT;
@@ -135,7 +135,7 @@ hu_error_t hu_speculative_cache_store(hu_speculative_cache_t *cache,
         }
         prediction_clear(&cache->entries[oldest_idx], cache->alloc);
         memmove(&cache->entries[oldest_idx], &cache->entries[oldest_idx + 1],
-               (cache->count - 1 - oldest_idx) * sizeof(hu_prediction_t));
+                (cache->count - 1 - oldest_idx) * sizeof(hu_prediction_t));
         cache->count--;
     }
 
@@ -157,9 +157,8 @@ hu_error_t hu_speculative_cache_store(hu_speculative_cache_t *cache,
     return HU_OK;
 }
 
-hu_error_t hu_speculative_cache_lookup(hu_speculative_cache_t *cache,
-                                       const char *query, size_t query_len,
-                                       int64_t now_ts,
+hu_error_t hu_speculative_cache_lookup(hu_speculative_cache_t *cache, const char *query,
+                                       size_t query_len, int64_t now_ts,
                                        const hu_speculative_config_t *config,
                                        hu_prediction_t **out) {
     if (!cache || !config || !out)
@@ -176,8 +175,8 @@ hu_error_t hu_speculative_cache_lookup(hu_speculative_cache_t *cache,
         if (p->confidence < config->min_confidence)
             continue;
 
-        bool prefix_ok = prefix_match(query, query_len, p->query, p->query_len)
-                     || prefix_match(p->query, p->query_len, query, query_len);
+        bool prefix_ok = prefix_match(query, query_len, p->query, p->query_len) ||
+                         prefix_match(p->query, p->query_len, query, query_len);
         double sim = word_similarity(query, query_len, p->query, p->query_len);
 
         if ((prefix_ok || sim >= 0.7) && sim >= 0.7) {
@@ -213,8 +212,8 @@ static bool response_has_list(const char *response, size_t len) {
     const char *end = response + len;
     int num_count = 0;
     while (p < end) {
-        if (*p == '\n' && p + 1 < end && (p[1] == '-' || p[1] == '*' ||
-            (p[1] >= '0' && p[1] <= '9')))
+        if (*p == '\n' && p + 1 < end &&
+            (p[1] == '-' || p[1] == '*' || (p[1] >= '0' && p[1] <= '9')))
             num_count++;
         if (num_count >= 2)
             return true;
@@ -267,12 +266,10 @@ static const char *first_list_item(const char *response, size_t len, size_t *out
     return NULL;
 }
 
-hu_error_t hu_speculative_predict(hu_allocator_t *alloc,
-                                   const char *user_msg, size_t user_msg_len,
-                                   const char *response, size_t response_len,
-                                   char **predictions, size_t *prediction_lens,
-                                   double *confidences, size_t max_predictions,
-                                   size_t *actual_count) {
+hu_error_t hu_speculative_predict(hu_allocator_t *alloc, const char *user_msg, size_t user_msg_len,
+                                  const char *response, size_t response_len, char **predictions,
+                                  size_t *prediction_lens, double *confidences,
+                                  size_t max_predictions, size_t *actual_count) {
     (void)user_msg;
     (void)user_msg_len;
     if (!alloc || !predictions || !prediction_lens || !confidences || !actual_count)
@@ -300,8 +297,8 @@ hu_error_t hu_speculative_predict(hu_allocator_t *alloc,
         const char *item = first_list_item(response, response_len, &item_len);
         if (item && item_len > 0 && item_len < 64) {
             char buf[128];
-            int written = snprintf(buf, sizeof(buf), "tell me more about %.*s",
-                                  (int)item_len, item);
+            int written =
+                snprintf(buf, sizeof(buf), "tell me more about %.*s", (int)item_len, item);
             if (written > 0 && (size_t)written < sizeof(buf)) {
                 predictions[n] = hu_strndup(alloc, buf, (size_t)written);
                 if (predictions[n]) {
@@ -326,6 +323,87 @@ hu_error_t hu_speculative_predict(hu_allocator_t *alloc,
 
     *actual_count = n;
     return HU_OK;
+}
+
+hu_error_t hu_speculative_predict_with_model(hu_allocator_t *alloc, hu_provider_t *provider,
+                                             const char *model, size_t model_len,
+                                             const char *user_msg, size_t user_msg_len,
+                                             const char *response, size_t response_len,
+                                             char **predictions, size_t *prediction_lens,
+                                             double *confidences, size_t max_predictions,
+                                             size_t *actual_count) {
+    if (!alloc || !predictions || !prediction_lens || !confidences || !actual_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *actual_count = 0;
+    if (max_predictions == 0)
+        return HU_OK;
+
+#ifdef HU_IS_TEST
+    (void)provider;
+    (void)model;
+    (void)model_len;
+    return hu_speculative_predict(alloc, user_msg, user_msg_len, response, response_len,
+                                  predictions, prediction_lens, confidences, max_predictions,
+                                  actual_count);
+#else
+    if (!provider || !provider->vtable || !provider->vtable->chat_with_system) {
+        return hu_speculative_predict(alloc, user_msg, user_msg_len, response, response_len,
+                                      predictions, prediction_lens, confidences, max_predictions,
+                                      actual_count);
+    }
+
+    static const char sys_prompt[] =
+        "Given a conversation where the user said something and received a response, "
+        "predict the most likely follow-up message the user will send next. "
+        "Output ONLY the predicted message, nothing else. Be specific and contextual.";
+
+    char prompt[4096];
+    int pn = snprintf(prompt, sizeof(prompt),
+                      "User: %.*s\nAssistant: %.*s\nPredict the user's next message:",
+                      (int)(user_msg_len < 1000 ? user_msg_len : 1000), user_msg ? user_msg : "",
+                      (int)(response_len < 2000 ? response_len : 2000), response ? response : "");
+    if (pn <= 0)
+        return hu_speculative_predict(alloc, user_msg, user_msg_len, response, response_len,
+                                      predictions, prediction_lens, confidences, max_predictions,
+                                      actual_count);
+
+    char *pred_out = NULL;
+    size_t pred_out_len = 0;
+    hu_error_t err = provider->vtable->chat_with_system(
+        provider->ctx, alloc, sys_prompt, sizeof(sys_prompt) - 1, prompt, (size_t)pn,
+        model ? model : "", model_len, 0.3, &pred_out, &pred_out_len);
+
+    if (err != HU_OK || !pred_out || pred_out_len == 0) {
+        if (pred_out)
+            alloc->free(alloc->ctx, pred_out, pred_out_len + 1);
+        return hu_speculative_predict(alloc, user_msg, user_msg_len, response, response_len,
+                                      predictions, prediction_lens, confidences, max_predictions,
+                                      actual_count);
+    }
+
+    predictions[0] = pred_out;
+    prediction_lens[0] = pred_out_len;
+    confidences[0] = 0.8;
+    *actual_count = 1;
+
+    /* Fill remaining slots with heuristic predictions */
+    if (max_predictions > 1) {
+        size_t heuristic_count = 0;
+        char *h_preds[HU_SPEC_MAX_PREDICTIONS] = {0};
+        size_t h_lens[HU_SPEC_MAX_PREDICTIONS] = {0};
+        double h_confs[HU_SPEC_MAX_PREDICTIONS] = {0};
+        hu_speculative_predict(alloc, user_msg, user_msg_len, response, response_len, h_preds,
+                               h_lens, h_confs, max_predictions - 1, &heuristic_count);
+        for (size_t i = 0; i < heuristic_count && *actual_count < max_predictions; i++) {
+            predictions[*actual_count] = h_preds[i];
+            prediction_lens[*actual_count] = h_lens[i];
+            confidences[*actual_count] = h_confs[i] * 0.5;
+            (*actual_count)++;
+        }
+    }
+
+    return HU_OK;
+#endif
 }
 
 hu_speculative_config_t hu_speculative_config_default(void) {

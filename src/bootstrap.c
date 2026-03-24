@@ -19,6 +19,7 @@
 #include "human/memory/vector/embeddings_gemini.h"
 #include "human/observability/log_observer.h"
 #include "human/plugin.h"
+#include "human/plugin_discovery.h"
 #include "human/plugin_loader.h"
 #include "human/providers/factory.h"
 #include "human/runtime.h"
@@ -446,6 +447,16 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                 }
             }
         }
+
+        /* Auto-discover plugins from ~/.human/plugins/ */
+        {
+            hu_plugin_discovery_result_t *disc_results = NULL;
+            size_t disc_count = 0;
+            hu_error_t disc_err =
+                hu_plugin_discover_and_load(alloc, NULL, &host, &disc_results, &disc_count);
+            if (disc_err == HU_OK && disc_results)
+                hu_plugin_discovery_results_free(alloc, disc_results, disc_count);
+        }
     }
 
     bi->sb_alloc.ctx = alloc->ctx;
@@ -696,9 +707,9 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         hu_metacognition_apply_config(&bi->agent.metacognition, &bi->cfg.agent.metacognition);
         memset(&bi->voice_cfg, 0, sizeof(bi->voice_cfg));
         (void)hu_voice_config_from_settings(&bi->cfg, &bi->voice_cfg);
-        if (bi->voice_cfg.tts_provider || bi->voice_cfg.local_tts_endpoint || bi->voice_cfg.api_key ||
-            bi->voice_cfg.cartesia_api_key || bi->voice_cfg.openai_api_key ||
-            (bi->cfg.voice.mode && bi->cfg.voice.mode[0])) {
+        if (bi->voice_cfg.tts_provider || bi->voice_cfg.local_tts_endpoint ||
+            bi->voice_cfg.api_key || bi->voice_cfg.cartesia_api_key ||
+            bi->voice_cfg.openai_api_key || (bi->cfg.voice.mode && bi->cfg.voice.mode[0])) {
             hu_agent_set_voice_config(&bi->agent, &bi->voice_cfg);
         }
         bi->agent.chain_of_thought = true;
@@ -798,10 +809,8 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
 
 #if HU_HAS_PWA
         if (cfg->channels.pwa.apps_count > 0 && ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
-            err = hu_pwa_channel_create(alloc,
-                                        (const char *const *)cfg->channels.pwa.apps,
-                                        cfg->channels.pwa.apps_count,
-                                        &bi->channel_slots[ch_count]);
+            err = hu_pwa_channel_create(alloc, (const char *const *)cfg->channels.pwa.apps,
+                                        cfg->channels.pwa.apps_count, &bi->channel_slots[ch_count]);
             if (err == HU_OK) {
                 bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
                 bi->channels[ch_count].channel = &bi->channel_slots[ch_count];

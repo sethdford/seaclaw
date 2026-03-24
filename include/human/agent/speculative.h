@@ -14,14 +14,14 @@
  */
 
 #define HU_SPEC_MAX_PREDICTIONS 3
-#define HU_SPEC_MAX_CACHE 8
+#define HU_SPEC_MAX_CACHE       8
 
 typedef struct hu_prediction {
     char *query;
     size_t query_len;
     char *response;
     size_t response_len;
-    double confidence;   /* 0.0-1.0 */
+    double confidence; /* 0.0-1.0 */
     int64_t created_at;
 } hu_prediction_t;
 
@@ -36,42 +36,48 @@ typedef struct hu_speculative_cache {
 
 typedef struct hu_speculative_config {
     bool enabled;
-    double min_confidence;  /* only cache predictions above this (default 0.6) */
-    int64_t ttl_seconds;    /* expire predictions after this long (default 300) */
-    int max_predictions;    /* how many follow-ups to predict (default 2) */
+    double min_confidence; /* only cache predictions above this (default 0.6) */
+    int64_t ttl_seconds;   /* expire predictions after this long (default 300) */
+    int max_predictions;   /* how many follow-ups to predict (default 2) */
 } hu_speculative_config_t;
 
 hu_error_t hu_speculative_cache_init(hu_speculative_cache_t *cache, hu_allocator_t *alloc);
 void hu_speculative_cache_deinit(hu_speculative_cache_t *cache);
 
 /* Store predicted follow-up queries with pre-generated responses. */
-hu_error_t hu_speculative_cache_store(hu_speculative_cache_t *cache,
-                                      const char *query, size_t query_len,
-                                      const char *response, size_t response_len,
+hu_error_t hu_speculative_cache_store(hu_speculative_cache_t *cache, const char *query,
+                                      size_t query_len, const char *response, size_t response_len,
                                       double confidence, int64_t now_ts);
 
 /* Look up a query in the cache. Returns HU_OK and sets *out if found.
  * out->response is owned by the cache — caller must NOT free it. */
-hu_error_t hu_speculative_cache_lookup(hu_speculative_cache_t *cache,
-                                       const char *query, size_t query_len,
-                                       int64_t now_ts,
+hu_error_t hu_speculative_cache_lookup(hu_speculative_cache_t *cache, const char *query,
+                                       size_t query_len, int64_t now_ts,
                                        const hu_speculative_config_t *config,
                                        hu_prediction_t **out);
 
 /* Evict expired entries. */
-void hu_speculative_cache_evict(hu_speculative_cache_t *cache, int64_t now_ts,
-                                 int64_t ttl_seconds);
+void hu_speculative_cache_evict(hu_speculative_cache_t *cache, int64_t now_ts, int64_t ttl_seconds);
 
 /* Generate follow-up predictions from a conversation turn.
  * Predicts what the user might ask next. Returns predicted queries
  * (not full responses — responses would be pre-computed separately). */
-hu_error_t hu_speculative_predict(hu_allocator_t *alloc,
-                                   const char *user_msg, size_t user_msg_len,
-                                   const char *response, size_t response_len,
-                                   char **predictions, size_t *prediction_lens,
-                                   double *confidences, size_t max_predictions,
-                                   size_t *actual_count);
+hu_error_t hu_speculative_predict(hu_allocator_t *alloc, const char *user_msg, size_t user_msg_len,
+                                  const char *response, size_t response_len, char **predictions,
+                                  size_t *prediction_lens, double *confidences,
+                                  size_t max_predictions, size_t *actual_count);
 
 hu_speculative_config_t hu_speculative_config_default(void);
+
+/* Model-based prediction: uses a local provider to predict follow-ups.
+ * Falls back to hu_speculative_predict if provider is NULL or fails. */
+struct hu_provider;
+hu_error_t hu_speculative_predict_with_model(hu_allocator_t *alloc, struct hu_provider *provider,
+                                             const char *model, size_t model_len,
+                                             const char *user_msg, size_t user_msg_len,
+                                             const char *response, size_t response_len,
+                                             char **predictions, size_t *prediction_lens,
+                                             double *confidences, size_t max_predictions,
+                                             size_t *actual_count);
 
 #endif

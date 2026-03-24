@@ -5,6 +5,7 @@ typedef int hu_anticipatory_unused_;
 #include "human/context/anticipatory.h"
 #include "human/core/string.h"
 #include "human/memory.h"
+#include "human/provider.h"
 #include <ctype.h>
 #include <sqlite3.h>
 #include <stdbool.h>
@@ -13,7 +14,7 @@ typedef int hu_anticipatory_unused_;
 #include <string.h>
 #include <time.h>
 
-#define HU_ANTICIPATORY_MAX_PREDICTIONS 16
+#define HU_ANTICIPATORY_MAX_PREDICTIONS   16
 #define HU_ANTICIPATORY_CONFIDENCE_THRESH 0.5f
 
 /* Case-insensitive substring match. */
@@ -61,12 +62,10 @@ static const keyword_emotion_t KEYWORD_EMOTIONS[] = {
     {"new job", "overwhelmed", 0.7f},
     {"started new job", "overwhelmed", 0.75f},
 };
-static const size_t KEYWORD_EMOTIONS_COUNT =
-    sizeof(KEYWORD_EMOTIONS) / sizeof(KEYWORD_EMOTIONS[0]);
+static const size_t KEYWORD_EMOTIONS_COUNT = sizeof(KEYWORD_EMOTIONS) / sizeof(KEYWORD_EMOTIONS[0]);
 
-static void match_keyword_to_emotion(const char *text, size_t text_len,
-                                    const char **out_emotion, float *out_conf,
-                                    char *out_basis, size_t basis_cap) {
+static void match_keyword_to_emotion(const char *text, size_t text_len, const char **out_emotion,
+                                     float *out_conf, char *out_basis, size_t basis_cap) {
     *out_emotion = NULL;
     *out_conf = 0.0f;
     if (out_basis && basis_cap > 0)
@@ -90,10 +89,11 @@ static void match_keyword_to_emotion(const char *text, size_t text_len,
     }
 }
 
-hu_error_t hu_anticipatory_predict(hu_allocator_t *alloc, hu_memory_t *memory,
-                                  const char *contact_id, size_t contact_id_len,
-                                  int64_t now_ts, hu_emotional_prediction_t **out,
-                                  size_t *out_count) {
+static hu_error_t anticipatory_predict_impl(hu_allocator_t *alloc, hu_memory_t *memory,
+                                            hu_provider_t *provider, const char *model,
+                                            size_t model_len, const char *contact_id,
+                                            size_t contact_id_len, int64_t now_ts,
+                                            hu_emotional_prediction_t **out, size_t *out_count) {
     (void)now_ts;
     if (!alloc || !memory || !contact_id || contact_id_len == 0 || !out || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
@@ -116,10 +116,8 @@ hu_error_t hu_anticipatory_predict(hu_allocator_t *alloc, hu_memory_t *memory,
 
     sqlite3_bind_text(stmt, 1, contact_id, (int)contact_id_len, SQLITE_STATIC);
 
-    hu_emotional_prediction_t *preds =
-        (hu_emotional_prediction_t *)alloc->alloc(alloc->ctx,
-                                                  HU_ANTICIPATORY_MAX_PREDICTIONS *
-                                                      sizeof(hu_emotional_prediction_t));
+    hu_emotional_prediction_t *preds = (hu_emotional_prediction_t *)alloc->alloc(
+        alloc->ctx, HU_ANTICIPATORY_MAX_PREDICTIONS * sizeof(hu_emotional_prediction_t));
     if (!preds) {
         sqlite3_finalize(stmt);
         return HU_ERR_OUT_OF_MEMORY;
@@ -152,13 +150,20 @@ hu_error_t hu_anticipatory_predict(hu_allocator_t *alloc, hu_memory_t *memory,
             combined[comb_len] = '\0';
         }
 
-        const char *emotion = NULL;
+        char emo_buf[64] = {0};
         float conf = 0.0f;
         char basis[64];
 
-        match_keyword_to_emotion(combined, comb_len, &emotion, &conf, basis, sizeof(basis));
+        hu_anticipatory_classify_emotion(alloc, provider, model, model_len, combined, comb_len,
+                                         emo_buf, sizeof(emo_buf), &conf);
+        const char *emotion = emo_buf[0] ? emo_buf : NULL;
         if (!emotion || conf <= 0.0f)
             continue;
+
+        /* Copy combined text into basis for record-keeping */
+        size_t basis_copy = comb_len < sizeof(basis) - 1 ? comb_len : sizeof(basis) - 1;
+        memcpy(basis, combined, basis_copy);
+        basis[basis_copy] = '\0';
 
         /* Avoid duplicates (same emotion). */
         bool dup = false;
@@ -173,9 +178,8 @@ hu_error_t hu_anticipatory_predict(hu_allocator_t *alloc, hu_memory_t *memory,
 
         hu_emotional_prediction_t *p = &preds[count];
         memset(p, 0, sizeof(*p));
-        size_t cid_copy = contact_id_len < sizeof(p->contact_id) - 1
-                             ? contact_id_len
-                             : sizeof(p->contact_id) - 1;
+        size_t cid_copy =
+            contact_id_len < sizeof(p->contact_id) - 1 ? contact_id_len : sizeof(p->contact_id) - 1;
         memcpy(p->contact_id, contact_id, cid_copy);
         p->contact_id[cid_copy] = '\0';
 
@@ -216,7 +220,7 @@ hu_error_t hu_anticipatory_predict(hu_allocator_t *alloc, hu_memory_t *memory,
 
     if (count == 0) {
         alloc->free(alloc->ctx, preds,
-                   HU_ANTICIPATORY_MAX_PREDICTIONS * sizeof(hu_emotional_prediction_t));
+                    HU_ANTICIPATORY_MAX_PREDICTIONS * sizeof(hu_emotional_prediction_t));
         *out = NULL;
         *out_count = 0;
         return HU_OK;
@@ -227,10 +231,26 @@ hu_error_t hu_anticipatory_predict(hu_allocator_t *alloc, hu_memory_t *memory,
     return HU_OK;
 }
 
-char *hu_anticipatory_build_directive(hu_allocator_t *alloc,
-                                     const hu_emotional_prediction_t *preds, size_t count,
-                                     const char *contact_name, size_t name_len,
-                                     size_t *out_len) {
+hu_error_t hu_anticipatory_predict(hu_allocator_t *alloc, hu_memory_t *memory,
+                                   const char *contact_id, size_t contact_id_len, int64_t now_ts,
+                                   hu_emotional_prediction_t **out, size_t *out_count) {
+    return anticipatory_predict_impl(alloc, memory, NULL, NULL, 0, contact_id, contact_id_len,
+                                     now_ts, out, out_count);
+}
+
+hu_error_t hu_anticipatory_predict_with_provider(hu_allocator_t *alloc, hu_memory_t *memory,
+                                                 hu_provider_t *provider, const char *model,
+                                                 size_t model_len, const char *contact_id,
+                                                 size_t contact_id_len, int64_t now_ts,
+                                                 hu_emotional_prediction_t **out,
+                                                 size_t *out_count) {
+    return anticipatory_predict_impl(alloc, memory, provider, model, model_len, contact_id,
+                                     contact_id_len, now_ts, out, out_count);
+}
+
+char *hu_anticipatory_build_directive(hu_allocator_t *alloc, const hu_emotional_prediction_t *preds,
+                                      size_t count, const char *contact_name, size_t name_len,
+                                      size_t *out_len) {
     if (!alloc || !preds || !out_len)
         return NULL;
     *out_len = 0;
@@ -260,12 +280,12 @@ char *hu_anticipatory_build_directive(hu_allocator_t *alloc,
 
         if (preds[i].basis[0]) {
             pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%.*s",
-                                   (int)(sizeof(preds[i].basis) - 1), preds[i].basis);
+                                    (int)(sizeof(preds[i].basis) - 1), preds[i].basis);
         } else {
             pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "upcoming event");
         }
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " — they may be %s.",
-                               preds[i].predicted_emotion);
+                                preds[i].predicted_emotion);
     }
 
     if (first) {
@@ -283,12 +303,12 @@ char *hu_anticipatory_build_directive(hu_allocator_t *alloc,
     return result;
 }
 
-void hu_anticipatory_predictions_free(hu_allocator_t *alloc,
-                                     hu_emotional_prediction_t *preds, size_t count) {
+void hu_anticipatory_predictions_free(hu_allocator_t *alloc, hu_emotional_prediction_t *preds,
+                                      size_t count) {
     (void)count;
     if (alloc && preds)
         alloc->free(alloc->ctx, preds,
-                   HU_ANTICIPATORY_MAX_PREDICTIONS * sizeof(hu_emotional_prediction_t));
+                    HU_ANTICIPATORY_MAX_PREDICTIONS * sizeof(hu_emotional_prediction_t));
 }
 
 #else /* !HU_ENABLE_SQLITE */
@@ -296,13 +316,13 @@ void hu_anticipatory_predictions_free(hu_allocator_t *alloc,
 #include "human/context/anticipatory.h"
 #include "human/core/error.h"
 #include "human/memory.h"
+#include "human/provider.h"
 #include <stddef.h>
 #include <string.h>
 
 hu_error_t hu_anticipatory_predict(hu_allocator_t *alloc, hu_memory_t *memory,
-                                  const char *contact_id, size_t contact_id_len,
-                                  int64_t now_ts, hu_emotional_prediction_t **out,
-                                  size_t *out_count) {
+                                   const char *contact_id, size_t contact_id_len, int64_t now_ts,
+                                   hu_emotional_prediction_t **out, size_t *out_count) {
     (void)alloc;
     (void)memory;
     (void)contact_id;
@@ -313,10 +333,9 @@ hu_error_t hu_anticipatory_predict(hu_allocator_t *alloc, hu_memory_t *memory,
     return HU_ERR_NOT_SUPPORTED;
 }
 
-char *hu_anticipatory_build_directive(hu_allocator_t *alloc,
-                                     const hu_emotional_prediction_t *preds, size_t count,
-                                     const char *contact_name, size_t name_len,
-                                     size_t *out_len) {
+char *hu_anticipatory_build_directive(hu_allocator_t *alloc, const hu_emotional_prediction_t *preds,
+                                      size_t count, const char *contact_name, size_t name_len,
+                                      size_t *out_len) {
     (void)alloc;
     (void)preds;
     (void)count;
@@ -326,11 +345,114 @@ char *hu_anticipatory_build_directive(hu_allocator_t *alloc,
     return NULL;
 }
 
-void hu_anticipatory_predictions_free(hu_allocator_t *alloc,
-                                     hu_emotional_prediction_t *preds, size_t count) {
+hu_error_t hu_anticipatory_predict_with_provider(hu_allocator_t *alloc, hu_memory_t *memory,
+                                                 hu_provider_t *provider, const char *model,
+                                                 size_t model_len, const char *contact_id,
+                                                 size_t contact_id_len, int64_t now_ts,
+                                                 hu_emotional_prediction_t **out,
+                                                 size_t *out_count) {
+    (void)alloc;
+    (void)memory;
+    (void)provider;
+    (void)model;
+    (void)model_len;
+    (void)contact_id;
+    (void)contact_id_len;
+    (void)now_ts;
+    (void)out;
+    (void)out_count;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
+void hu_anticipatory_predictions_free(hu_allocator_t *alloc, hu_emotional_prediction_t *preds,
+                                      size_t count) {
     (void)alloc;
     (void)preds;
     (void)count;
 }
 
 #endif /* HU_ENABLE_SQLITE */
+
+#include "human/provider.h"
+
+hu_error_t hu_anticipatory_classify_emotion(hu_allocator_t *alloc, hu_provider_t *provider,
+                                            const char *model, size_t model_len, const char *text,
+                                            size_t text_len, char *emotion_out, size_t emotion_cap,
+                                            float *confidence_out) {
+    if (!alloc || !emotion_out || emotion_cap == 0 || !confidence_out)
+        return HU_ERR_INVALID_ARGUMENT;
+    emotion_out[0] = '\0';
+    *confidence_out = 0.0f;
+    if (!text || text_len == 0)
+        return HU_OK;
+
+#ifdef HU_IS_TEST
+    (void)provider;
+    (void)model;
+    (void)model_len;
+#ifdef HU_ENABLE_SQLITE
+    const char *emo = NULL;
+    float conf = 0.0f;
+    char basis[64] = {0};
+    match_keyword_to_emotion(text, text_len, &emo, &conf, basis, sizeof(basis));
+    if (emo) {
+        size_t elen = strlen(emo);
+        size_t copy = elen < emotion_cap - 1 ? elen : emotion_cap - 1;
+        memcpy(emotion_out, emo, copy);
+        emotion_out[copy] = '\0';
+        *confidence_out = conf;
+    }
+#endif
+    return HU_OK;
+#else
+    /* Try model-based classification if provider is available */
+    if (provider && provider->vtable && provider->vtable->chat_with_system) {
+        static const char sys[] =
+            "Classify the emotional state implied by this text. "
+            "Output ONLY one word: the emotion (e.g., happy, sad, stressed, "
+            "nervous, excited, overwhelmed, angry, anxious, grateful, neutral).";
+
+        char *out = NULL;
+        size_t out_len = 0;
+        hu_error_t err = provider->vtable->chat_with_system(
+            provider->ctx, alloc, sys, sizeof(sys) - 1, text, text_len, model ? model : "",
+            model_len, 0.1, &out, &out_len);
+
+        if (err == HU_OK && out && out_len > 0 && out_len < emotion_cap) {
+            /* Strip whitespace/newlines */
+            size_t start = 0;
+            while (start < out_len && (out[start] == ' ' || out[start] == '\n'))
+                start++;
+            size_t end = out_len;
+            while (end > start && (out[end - 1] == ' ' || out[end - 1] == '\n'))
+                end--;
+            size_t copy = end - start;
+            if (copy > 0 && copy < emotion_cap) {
+                memcpy(emotion_out, out + start, copy);
+                emotion_out[copy] = '\0';
+                *confidence_out = 0.85f;
+                alloc->free(alloc->ctx, out, out_len + 1);
+                return HU_OK;
+            }
+        }
+        if (out)
+            alloc->free(alloc->ctx, out, out_len + 1);
+    }
+
+    /* Fallback: keyword matching */
+#ifdef HU_ENABLE_SQLITE
+    const char *emo = NULL;
+    float conf = 0.0f;
+    char basis[64] = {0};
+    match_keyword_to_emotion(text, text_len, &emo, &conf, basis, sizeof(basis));
+    if (emo) {
+        size_t elen = strlen(emo);
+        size_t copy = elen < emotion_cap - 1 ? elen : emotion_cap - 1;
+        memcpy(emotion_out, emo, copy);
+        emotion_out[copy] = '\0';
+        *confidence_out = conf;
+    }
+#endif
+    return HU_OK;
+#endif
+}
