@@ -1,12 +1,35 @@
 // Auto-generated from design-tokens/ — do not edit manually
 
 export const tokens = {
+  3d: {
+    grainOpacity: "0.005",
+    particleFlowOpacity: "0.22",
+    particleFlowPointSize: "0.055",
+    particleMaxCount: "5000",
+    particlePointSize: "0.18",
+    tiltLightOpacity: "0.05",
+    tiltMaxAngle: "8deg",
+    tiltPerspective: "800px",
+  },
   ambient: {
+    breathingDuration: "4000ms",
+    breathingOpacityMax: "1.0",
+    breathingOpacityMin: "0.6",
+    breathingScaleMax: "1.02",
+    breathingScaleMin: "0.98",
+    cpuBudgetCombined: "2%",
+    cpuBudgetSingleEffect: "1%",
     glow: "radial-gradient(ellipse at 50% 50%, rgba(122,182,72,0.03), transparent 70%)",
     glowCool: "radial-gradient(ellipse at 50% 50%, rgba(72,122,182,0.02), transparent 70%)",
     glowWarm: "radial-gradient(ellipse at 50% 50%, rgba(182,156,72,0.02), transparent 70%)",
+    gradientResponseActiveShift: "2deg",
+    gradientResponseIdleShift: "0.5deg",
+    gradientResponseTransitionDuration: "2000ms",
     warmthDefault: 0.5,
     warmthMixMax: 0.03,
+    warmthDawn: "0.12",
+    warmthDay: "0",
+    warmthTwilight: "0.06",
   },
   audio: {
     ambientLoopDuration: "30s",

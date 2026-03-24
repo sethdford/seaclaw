@@ -1,0 +1,51 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$extensions": {
+    "com.human.platform": "all",
+    "com.human.version": "0.5.0"
+  },
+  "3d": {
+    "$description": "3D and spatial interaction tokens",
+    "tilt": {
+      "max-angle": {
+        "$value": "8deg",
+        "$type": "dimension",
+        "$description": "Maximum card tilt angle"
+      },
+      "perspective": {
+        "$value": "800px",
+        "$type": "dimension"
+      },
+      "light-opacity": {
+        "$value": "0.05",
+        "$type": "number",
+        "$description": "Tilt light overlay opacity"
+      }
+    },
+    "particle": {
+      "max-count": {
+        "$value": "5000",
+        "$type": "number"
+      },
+      "point-size": {
+        "$value": "0.18",
+        "$type": "number"
+      },
+      "flow-point-size": {
+        "$value": "0.055",
+        "$type": "number"
+      },
+      "flow-opacity": {
+        "$value": "0.22",
+        "$type": "number"
+      }
+    },
+    "grain": {
+      "opacity": {
+        "$value": "0.005",
+        "$type": "number",
+        "$description": "Film grain overlay opacity"
+      }
+    }
+  }
+}

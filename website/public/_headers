@@ -19,8 +19,8 @@
 
 /
   Cache-Control: public, max-age=0, must-revalidate
-  Link: </fonts/avenir/Avenir-Black.woff2>; rel=preload; as=font; type=font/woff2; crossorigin
+  Link: </fonts/avenir/Avenir-Black.woff2>; rel=preload; as=font; type=font/woff2; crossorigin, </human.svg>; rel=preload; as=image; fetchpriority=high
 
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
-  Link: </fonts/avenir/Avenir-Black.woff2>; rel=preload; as=font; type=font/woff2; crossorigin
+  Link: </fonts/avenir/Avenir-Black.woff2>; rel=preload; as=font; type=font/woff2; crossorigin, </human.svg>; rel=preload; as=image; fetchpriority=high

@@ -12,6 +12,9 @@ static const char *DIMENSION_NAMES[HU_TURING_DIM_COUNT] = {
     "imperfection",             "opinion_having",
     "energy_matching",          "context_awareness",
     "non_robotic",              "genuine_warmth",
+    "prosody_naturalness",      "turn_timing",
+    "filler_usage",             "emotional_prosody",
+    "conversational_repair",    "paralinguistic_cues",
 };
 
 static int ci_has(const char *haystack, size_t len, const char *needle) {
@@ -191,6 +194,65 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     out->dimensions[HU_TURING_GENUINE_WARMTH] = 5 + emotional;
     if (ai_tells > 0)
         out->dimensions[HU_TURING_GENUINE_WARMTH] -= ai_tells;
+
+    /* S2S voice dimensions — text heuristic provides limited signal */
+
+    /* prosody_naturalness: inferred from punctuation variety (excl/question/ellipsis) */
+    {
+        int punct_variety = 0;
+        if (memchr(response, '!', response_len)) punct_variety++;
+        if (memchr(response, '?', response_len)) punct_variety++;
+        if (ci_has(response, response_len, "...")) punct_variety++;
+        out->dimensions[HU_TURING_PROSODY_NATURALNESS] = 5 + punct_variety;
+    }
+
+    /* turn_timing: can't measure from text alone, default neutral */
+    out->dimensions[HU_TURING_TURN_TIMING] = 5;
+
+    /* filler_usage: check for natural hesitation markers */
+    {
+        int fillers = 0;
+        if (ci_has(response, response_len, " um ") || ci_has(response, response_len, " um,"))
+            fillers++;
+        if (ci_has(response, response_len, " uh ") || ci_has(response, response_len, "uh,"))
+            fillers++;
+        if (ci_has(response, response_len, " like ") || ci_has(response, response_len, " like,"))
+            fillers++;
+        if (ci_has(response, response_len, "hmm") || ci_has(response, response_len, "well,"))
+            fillers++;
+        out->dimensions[HU_TURING_FILLER_USAGE] = 4 + fillers * 2;
+    }
+
+    /* emotional_prosody: proxy via emotional words + exclamation density */
+    out->dimensions[HU_TURING_EMOTIONAL_PROSODY] = 4 + emotional;
+    if (memchr(response, '!', response_len))
+        out->dimensions[HU_TURING_EMOTIONAL_PROSODY] += 1;
+
+    /* conversational_repair: self-corrections ("I mean", "wait", "actually") */
+    {
+        int repairs = 0;
+        if (ci_has(response, response_len, "i mean")) repairs++;
+        if (ci_has(response, response_len, "wait,") || ci_has(response, response_len, "wait "))
+            repairs++;
+        if (ci_has(response, response_len, "actually,") ||
+            ci_has(response, response_len, "actually "))
+            repairs++;
+        if (ci_has(response, response_len, "no wait") || ci_has(response, response_len, "sorry,"))
+            repairs++;
+        out->dimensions[HU_TURING_CONVERSATIONAL_REPAIR] = 4 + repairs * 2;
+    }
+
+    /* paralinguistic_cues: laughter, sighs, breath markers */
+    {
+        int para = 0;
+        if (ci_has(response, response_len, "haha") || ci_has(response, response_len, "lol"))
+            para++;
+        if (ci_has(response, response_len, "*sigh*") || ci_has(response, response_len, "sigh"))
+            para++;
+        if (ci_has(response, response_len, "*laugh*"))
+            para++;
+        out->dimensions[HU_TURING_PARALINGUISTIC_CUES] = 4 + para * 2;
+    }
 
     /* Clamp all to [1, 10] */
     int sum = 0;

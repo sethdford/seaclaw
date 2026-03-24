@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-24T10:28:14.441Z",
+  "generated": "2026-03-24T00:46:57.920Z",
   "groups": {
     "color.neutral": [
       {
@@ -1926,19 +1926,19 @@
       },
       {
         "name": "hover-overlay",
-        "value": "rgba(255, 255, 255, 0.08)"
+        "value": "rgba(122, 182, 72, 0.08)"
       },
       {
         "name": "pressed-overlay",
-        "value": "rgba(255, 255, 255, 0.12)"
+        "value": "rgba(122, 182, 72, 0.12)"
       },
       {
         "name": "focus-overlay",
-        "value": "rgba(255, 255, 255, 0.12)"
+        "value": "rgba(122, 182, 72, 0.12)"
       },
       {
         "name": "dragged-overlay",
-        "value": "rgba(255, 255, 255, 0.16)"
+        "value": "rgba(122, 182, 72, 0.16)"
       },
       {
         "name": "disabled-overlay",
@@ -2270,19 +2270,19 @@
       },
       {
         "name": "hover-overlay",
-        "value": "rgba(0, 0, 0, 0.06)"
+        "value": "rgba(90, 154, 48, 0.06)"
       },
       {
         "name": "pressed-overlay",
-        "value": "rgba(0, 0, 0, 0.10)"
+        "value": "rgba(90, 154, 48, 0.10)"
       },
       {
         "name": "focus-overlay",
-        "value": "rgba(0, 0, 0, 0.10)"
+        "value": "rgba(90, 154, 48, 0.10)"
       },
       {
         "name": "dragged-overlay",
-        "value": "rgba(0, 0, 0, 0.14)"
+        "value": "rgba(90, 154, 48, 0.14)"
       },
       {
         "name": "disabled-overlay",
@@ -2945,11 +2945,11 @@
       },
       {
         "name": "saturate",
-        "value": "105%"
+        "value": "120%"
       },
       {
         "name": "bg-opacity",
-        "value": "0.055"
+        "value": "0.04"
       },
       {
         "name": "border-opacity",
@@ -2961,7 +2961,7 @@
       },
       {
         "name": "tint-opacity",
-        "value": "0.008"
+        "value": "0.02"
       },
       {
         "name": "refraction-scale",
@@ -2975,11 +2975,11 @@
       },
       {
         "name": "saturate",
-        "value": "128%"
+        "value": "180%"
       },
       {
         "name": "bg-opacity",
-        "value": "0.085"
+        "value": "0.06"
       },
       {
         "name": "border-opacity",
@@ -2991,7 +2991,7 @@
       },
       {
         "name": "tint-opacity",
-        "value": "0.018"
+        "value": "0.04"
       },
       {
         "name": "refraction-scale",
@@ -3005,11 +3005,11 @@
       },
       {
         "name": "saturate",
-        "value": "148%"
+        "value": "200%"
       },
       {
         "name": "bg-opacity",
-        "value": "0.11"
+        "value": "0.08"
       },
       {
         "name": "border-opacity",
@@ -3021,7 +3021,7 @@
       },
       {
         "name": "tint-opacity",
-        "value": "0.028"
+        "value": "0.06"
       },
       {
         "name": "refraction-scale",
@@ -3035,7 +3035,7 @@
       },
       {
         "name": "saturate",
-        "value": "125%"
+        "value": "180%"
       },
       {
         "name": "bg-opacity",
@@ -3105,7 +3105,7 @@
       },
       {
         "name": "backdrop-brightness",
-        "value": "1.12"
+        "value": "1.08"
       },
       {
         "name": "text-shadow",
@@ -3157,7 +3157,7 @@
       },
       {
         "name": "saturate",
-        "value": "102%"
+        "value": "110%"
       }
     ],
     "material.thin": [
@@ -3171,7 +3171,7 @@
       },
       {
         "name": "saturate",
-        "value": "118%"
+        "value": "140%"
       }
     ],
     "material.regular": [
@@ -3185,7 +3185,7 @@
       },
       {
         "name": "saturate",
-        "value": "132%"
+        "value": "180%"
       }
     ],
     "material.thick": [
@@ -3199,7 +3199,7 @@
       },
       {
         "name": "saturate",
-        "value": "152%"
+        "value": "200%"
       }
     ],
     "chart.categorical": [
@@ -3525,6 +3525,66 @@
         "value": "after-fcp"
       }
     ],
+    "ambient.warmth": [
+      {
+        "name": "dawn",
+        "value": "0.12"
+      },
+      {
+        "name": "twilight",
+        "value": "0.06"
+      },
+      {
+        "name": "day",
+        "value": "0"
+      }
+    ],
+    "ambient.breathing": [
+      {
+        "name": "scale-min",
+        "value": "0.98"
+      },
+      {
+        "name": "scale-max",
+        "value": "1.02"
+      },
+      {
+        "name": "duration",
+        "value": "4000ms"
+      },
+      {
+        "name": "opacity-min",
+        "value": "0.6"
+      },
+      {
+        "name": "opacity-max",
+        "value": "1.0"
+      }
+    ],
+    "ambient.gradient-response": [
+      {
+        "name": "idle-shift",
+        "value": "0.5deg"
+      },
+      {
+        "name": "active-shift",
+        "value": "2deg"
+      },
+      {
+        "name": "transition-duration",
+        "value": "2000ms"
+      }
+    ],
+    "ambient.cpu-budget": [
+      {
+        "name": "single-effect",
+        "value": "1%"
+      },
+      {
+        "name": "combined",
+        "value": "2%"
+      }
+    ],
     "ambient": [
       {
         "name": "glow",
@@ -3707,6 +3767,44 @@
       {
         "name": "scope",
         "value": "website-only"
+      }
+    ],
+    "3d.tilt": [
+      {
+        "name": "max-angle",
+        "value": "8deg"
+      },
+      {
+        "name": "perspective",
+        "value": "800px"
+      },
+      {
+        "name": "light-opacity",
+        "value": "0.05"
+      }
+    ],
+    "3d.particle": [
+      {
+        "name": "max-count",
+        "value": "5000"
+      },
+      {
+        "name": "point-size",
+        "value": "0.18"
+      },
+      {
+        "name": "flow-point-size",
+        "value": "0.055"
+      },
+      {
+        "name": "flow-opacity",
+        "value": "0.22"
+      }
+    ],
+    "3d.grain": [
+      {
+        "name": "opacity",
+        "value": "0.005"
       }
     ]
   }

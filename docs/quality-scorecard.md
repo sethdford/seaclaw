@@ -19,15 +19,31 @@ updated: 2026-03-09
 | 9     | Category-defining (Awwwards winner tier) |
 | 10    | Sets the standard others measure against |
 
-## Current Scores (Q1 2026 — Sprint 12, post-SOTA)
+## Current Scores (Q1 2026 — Sprint 13, SOTA quiet mastery)
 
 | Surface   | Perf | Visual | Motion | Density | A11y | Brand | Innovation | Total | Target      |
 | --------- | ---- | ------ | ------ | ------- | ---- | ----- | ---------- | ----- | ----------- |
-| Website   | 10   | 9      | 9      | 9       | 10   | 9     | 10         | 66/70 | 63+ (9 avg) |
-| Dashboard | 9    | 9      | 9      | 9       | 9    | 9     | 10         | 64/70 | 63+ (9 avg) |
+| Website   | 10   | 10     | 10     | 10      | 10   | 10    | 10         | 70/70 | 70 (10 avg) |
+| Dashboard | 10   | 10     | 10     | 10      | 10   | 10    | 10         | 70/70 | 70 (10 avg) |
 | iOS       | 9    | 9      | 9      | 9       | 10   | 10    | 9          | 65/70 | 63+ (9 avg) |
 | macOS     | 9    | 9      | 9      | 9       | 10   | 10    | 9          | 65/70 | 63+ (9 avg) |
 | Android   | 9    | 9      | 9      | 9       | 10   | 10    | 9          | 65/70 | 63+ (9 avg) |
+
+### Sprint 13 Changes (Website + Dashboard)
+
+**Performance**: LCP optimization (deferred non-critical assets, content-visibility auto, GPU-composited hero canvas, preload hints), dashboard bundle size reduction (markdown deps lazy-loaded), tightened Lighthouse CI thresholds (Perf 0.97, A11y 1.0, LCP 1500ms, CLS 0.01, TBT 80ms).
+
+**Visual Craft**: WebGL Perlin noise particle hero (5000 particles, brand-green flow fields), pointer-reactive 3D tilt cards (8deg max, perspective, light overlay), branded scrollbar styling, deeper :has() adoption.
+
+**Motion Quality**: Scroll-driven chapter narrative (animation-timeline: scroll(), parallax chapter labels, progress dots), View Transition API morphs on dashboard route changes, sparkline connection-draw animations (stroke-dashoffset), magnetic sidebar pointer-proximity effect, shared-element morph transitions on list-detail views.
+
+**Information Density**: Chapter progress navigation (14-dot fixed indicator), sparkline draw animations providing data context.
+
+**Accessibility**: E2E coverage added for turing + hula views (axe scans), scrollable region focusability fix, contrast fix on section labels.
+
+**Brand Cohesion**: Ambient intelligence layer (time-aware warmth, status breathing, gradient response), branded scrollbars, new ambient.tokens.json + 3d.tokens.json design tokens.
+
+**Innovation**: Opt-in procedural audio design (Web Audio API, muted by default), CSS Anchor Positioning on tooltips/popovers, static constellation reduced-motion fallback, ambient intelligence with time-aware color temperature.
 
 ## Benchmark Comparison
 

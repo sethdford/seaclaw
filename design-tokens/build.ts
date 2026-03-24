@@ -29,6 +29,7 @@ const TOKEN_FILES = [
   "data-viz.tokens.json",
   "spatial.tokens.json",
   "ambient.tokens.json",
+  "3d.tokens.json",
 ];
 
 type TokenValue = string | number;
@@ -857,6 +858,19 @@ function generateCSS(
         const suffix = k.replace(`${prefix}.`, "").replace(/\./g, "-");
         lines.push(`  --hu-${prefix}-${suffix}: ${val};`);
       }
+    }
+  }
+
+  // 3D / spatial interaction (3d.tokens.json — top-level group "3d")
+  lines.push("  /* 3D / spatial interaction */");
+  const threeDKeys = Object.keys(tokens)
+    .filter((k) => k.startsWith("3d."))
+    .sort();
+  for (const k of threeDKeys) {
+    const val = tokens[k];
+    if (val != null) {
+      const suffix = k.replace("3d.", "").replace(/\./g, "-");
+      lines.push(`  --hu-3d-${suffix}: ${val};`);
     }
   }
 

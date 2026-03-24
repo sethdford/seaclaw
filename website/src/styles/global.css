@@ -170,6 +170,32 @@
   }
 }
 
+/* ── Branded scrollbar (after base; matches dashboard) ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--hu-accent) 40%, transparent) transparent;
+}
+*:hover {
+  scrollbar-color: color-mix(in srgb, var(--hu-accent) 60%, transparent) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--hu-accent) 40%, transparent);
+  border-radius: var(--hu-radius);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--hu-accent) 60%, transparent);
+}
+
 @layer components {
   /* ── Skip link ── */
   .skip-link {
@@ -424,27 +450,21 @@
     top: 0;
     left: 0;
     width: 100%;
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      var(--hu-accent),
-      var(--hu-accent-hover)
-    );
-    z-index: 9999;
+    height: 3px;
+    background: var(--hu-accent);
     transform-origin: left;
+    transform: scaleX(0);
+    z-index: 9999;
+    pointer-events: none;
     will-change: transform;
     contain: layout style;
-    pointer-events: none;
   }
   @supports (animation-timeline: scroll()) {
     .scroll-progress {
-      animation: hu-scroll-grow linear forwards;
-      animation-timeline: scroll(root block);
+      animation: hu-scroll-progress auto linear;
+      animation-timeline: scroll();
     }
-    @keyframes hu-scroll-grow {
-      from {
-        transform: scaleX(0);
-      }
+    @keyframes hu-scroll-progress {
       to {
         transform: scaleX(1);
       }
@@ -1053,32 +1073,6 @@
     letter-spacing: 0.02em;
   }
 
-  /* ── Branded scrollbar (modern browsers) ── */
-  @supports (scrollbar-color: auto) {
-    html {
-      scrollbar-color: color-mix(in srgb, var(--hu-accent) 30%, transparent)
-        transparent;
-      scrollbar-width: thin;
-    }
-  }
-
-  ::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: color-mix(in srgb, var(--hu-accent) 30%, transparent);
-    border-radius: var(--hu-radius-full);
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--hu-accent) 50%, transparent);
-  }
-
   /* ── Section gradient dividers ── */
   .section-divider {
     height: 1px;
@@ -1133,6 +1127,11 @@
     z-index: 1;
     pointer-events: none;
     opacity: 0;
+  }
+
+  /* Static neural-constellation fallback when WebGL hero is off (see reduced motion) */
+  .hero-static-constellation {
+    display: none;
   }
 
   /* ── Custom cursor ── */
@@ -1501,12 +1500,71 @@
     display: none !important;
   }
 
+  .hero-static-constellation {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background-color: transparent;
+    background-image:
+      radial-gradient(
+        ellipse 85% 55% at 50% 42%,
+        color-mix(in srgb, var(--hu-accent) 16%, transparent) 0%,
+        transparent 68%
+      ),
+      radial-gradient(
+        circle at 22% 28%,
+        color-mix(in srgb, var(--hu-accent-secondary) 14%, transparent) 0%,
+        transparent 38%
+      ),
+      radial-gradient(
+        circle at 76% 62%,
+        color-mix(in srgb, var(--hu-accent) 12%, transparent) 0%,
+        transparent 42%
+      ),
+      radial-gradient(
+        circle,
+        color-mix(in srgb, var(--hu-accent) 40%, transparent) 0.08rem,
+        transparent 0.11rem
+      ),
+      radial-gradient(
+        circle,
+        color-mix(in srgb, var(--hu-accent-secondary) 28%, transparent) 0.05rem,
+        transparent 0.09rem
+      );
+    background-size:
+      100% 100%,
+      100% 100%,
+      100% 100%,
+      2.5rem 2.5rem,
+      1.75rem 1.75rem;
+    background-position:
+      center,
+      center,
+      center,
+      0 0,
+      1.1rem 0.6rem;
+  }
+
   .comparison-bar {
     transition: none !important;
   }
 
   .scroll-progress {
-    display: none !important;
+    animation: none !important;
+    transform: scaleX(var(--hu-scroll-depth, 0));
+  }
+
+  .hu-chapter-label {
+    animation: none !important;
+  }
+
+  .hu-chapter-reveal {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
   }
 }
 
@@ -1737,15 +1795,48 @@ figcaption {
   }
 }
 
-/* 6. :has() — contextual styling based on child state */
-.feature-card:has(img) {
-  grid-template-rows: auto 1fr;
-}
-.feature-card:has(.badge) {
-  border-color: var(--hu-accent);
-}
-.nav-item:has(> .active) {
-  color: var(--hu-accent);
+/* 6. :has() — contextual styling based on child state (progressive enhancement) */
+@supports selector(:has(*)) {
+  .feature-card:has(img) {
+    grid-template-rows: auto 1fr;
+  }
+  .feature-card:has(.badge) {
+    border-color: var(--hu-accent);
+  }
+  .nav-item:has(> .active) {
+    color: var(--hu-accent);
+  }
+
+  /* Form validation cues (for future / docs forms using .form-group) */
+  .form-group:has(:invalid) {
+    --form-border: var(--hu-error);
+  }
+  .form-group:has(:valid:not(:placeholder-shown)) {
+    --form-border: var(--hu-success);
+  }
+
+  /* Single-item proof grid: center a lone capability card */
+  .proof-grid:has(> :only-child) {
+    grid-template-columns: 1fr;
+    max-width: var(--hu-tooltip-max-width);
+    margin-inline: auto;
+  }
+
+  /* Sections that include heavy visuals get layout breathing room / overflow */
+  .hu-chapter-reveal:has(.terminal-demo) {
+    padding-block: var(--hu-space-2xl);
+  }
+  .hu-chapter-reveal:has(.dep-tree-svg) {
+    overflow: visible;
+  }
+
+  /* Chapter nav: parent scales when the inner dot is active */
+  .chapter-dot {
+    transition: transform var(--hu-duration-normal) var(--hu-ease-out);
+  }
+  .chapter-dot:has(> .chapter-dot-inner.active) {
+    transform: scale(1.2);
+  }
 }
 
 /* 7. field-sizing — auto-growing textareas and inputs */
@@ -2181,24 +2272,86 @@ h3 {
 
 /* ─── Quiet Mastery: Scroll Narrative ──────────────────────────── */
 
-@supports (animation-timeline: view()) {
+@supports (animation-timeline: scroll()) {
+  .hu-chapter-label {
+    animation: hu-chapter-parallax auto linear;
+    animation-timeline: scroll();
+    animation-range: entry 0% exit 100%;
+  }
+
+  @keyframes hu-chapter-parallax {
+    from {
+      transform: translateY(40px);
+      opacity: 0.3;
+    }
+    to {
+      transform: translateY(-40px);
+      opacity: 0.8;
+    }
+  }
+
   .hu-chapter-reveal {
-    animation: hu-chapter-reveal linear both;
+    animation: hu-chapter-entrance auto linear;
     animation-timeline: view();
     animation-range: entry 0% entry 40%;
   }
 
-  @keyframes hu-chapter-reveal {
+  @keyframes hu-chapter-entrance {
     from {
       opacity: 0;
-      transform: translateY(40px) scale(0.98);
-      filter: blur(4px);
+      transform: translateY(60px);
     }
     to {
       opacity: 1;
-      transform: translateY(0) scale(1);
-      filter: blur(0);
+      transform: translateY(0);
     }
+  }
+}
+
+.chapter-nav {
+  position: fixed;
+  right: var(--hu-space-md);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hu-space-xs);
+  z-index: 100;
+}
+
+.chapter-dot {
+  width: var(--hu-space-legend-gap);
+  height: var(--hu-space-legend-gap);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: var(--hu-radius-full);
+  text-decoration: none;
+}
+
+.chapter-dot-inner {
+  width: 50%;
+  height: 50%;
+  border-radius: var(--hu-radius-full);
+  background: color-mix(in srgb, var(--hu-text) 30%, transparent);
+  transition:
+    width var(--hu-duration-normal) var(--hu-ease-out),
+    height var(--hu-duration-normal) var(--hu-ease-out),
+    background var(--hu-duration-normal) var(--hu-ease-out);
+}
+
+.chapter-dot:hover .chapter-dot-inner,
+.chapter-dot.active .chapter-dot-inner {
+  background: var(--hu-accent);
+  width: calc(var(--hu-space-legend-gap) * 2 / 3);
+  height: calc(var(--hu-space-legend-gap) * 2 / 3);
+}
+
+@media (max-width: 768px) {
+  /* --hu-breakpoint-lg */
+  .chapter-nav {
+    display: none;
   }
 }
 
@@ -2299,12 +2452,6 @@ h3 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hu-chapter-reveal {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-    filter: none !important;
-  }
   .hu-film-grain::before {
     display: none;
   }

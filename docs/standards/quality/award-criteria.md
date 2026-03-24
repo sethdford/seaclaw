@@ -72,26 +72,34 @@ updated: 2026-03-14
 
 ### Awwwards Submission Checklist (Website)
 
-- [ ] Lighthouse Performance >= 98 (production URL)
-- [ ] Lighthouse Accessibility = 100
-- [ ] Zero CLS on all pages
-- [ ] LCP < 1.0s on 4G connection
+- [ ] Lighthouse Performance >= 98 (production URL — gated on edge deployment)
+- [ ] Lighthouse Accessibility = 100 (production URL — gated on edge deployment)
+- [ ] Zero CLS on all pages (production URL — gated on edge deployment)
+- [ ] LCP < 1.0s on 4G connection (production URL — LCP optimizations shipped: deferred non-critical assets, content-visibility, GPU-composited hero canvas, preload hints)
 - [x] Spring physics on every interactive element
-- [x] Scroll-driven narrative with parallax
-- [x] At least one 3D/WebGL element (hero or transition)
+- [x] Scroll-driven narrative with parallax (scroll-driven chapter narrative with animation-timeline: scroll(), chapter progress dots, parallax chapter labels)
+- [x] At least one 3D/WebGL element (hero or transition) (Perlin noise flow field with ~5000 particles + neural network topology)
 - [x] @starting-style enter animations on dynamically added elements
 - [x] View Transitions API between pages (if MPA) or routes (if SPA)
-- [x] Custom cursor or hover interactions that delight
+- [x] Custom cursor or hover interactions that delight (pointer-reactive 3D tilt cards, magnetic sidebar, pointer-proximity effects)
 - [x] Responsive from 320px to 2560px with fluid typography
 - [x] Dark mode with equal visual quality to light mode
 - [x] prefers-reduced-motion fully supported (95+ files)
 - [x] prefers-contrast: more supported
-- [x] axe-core zero violations in E2E (accessibility.spec.ts)
+- [x] axe-core zero violations in E2E (accessibility.spec.ts + turing.spec.ts + hula.spec.ts)
 - [x] Container queries for responsive layouts
 - [x] Original typography treatment (not default system stack)
 - [x] No stock photography — all illustrations/assets bespoke
 - [x] Schema.org structured data
 - [x] OG + Twitter Card meta complete with images
+- [x] Ambient intelligence layer (time-aware warmth, status breathing, gradient response)
+- [x] Opt-in audio design (procedural Web Audio API sounds, muted by default)
+- [x] CSS Anchor Positioning (progressive enhancement on tooltips/popovers)
+- [x] Branded scrollbar styling (scrollbar-color with accent)
+- [x] Deeper :has() selector adoption (contextual styling without JS)
+- [x] Shared-element morph transitions (view-transition-name on list-detail morphs)
+- [x] Sparkline connection-draw animations (stroke-dashoffset reveal)
+- [x] Static constellation reduced-motion fallback for WebGL hero
 
 ### Apple Design Award Checklist (iOS/macOS)
 

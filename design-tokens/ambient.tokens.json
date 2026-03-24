@@ -7,6 +7,80 @@
   "$description": "Ambient intelligence tokens — environmental responsiveness, time-aware theming, and optional audio design",
   "ambient": {
     "$description": "Ambient visual effects that make the UI feel alive",
+    "warmth": {
+      "$description": "Color temperature shift weights for time-of-day (sepia driver; max ~3% perceptual mix)",
+      "dawn": {
+        "$value": "0.12",
+        "$type": "number",
+        "$description": "Color temperature shift at dawn/dusk (max 3% color-mix)"
+      },
+      "twilight": {
+        "$value": "0.06",
+        "$type": "number",
+        "$description": "Color temperature shift at twilight"
+      },
+      "day": {
+        "$value": "0",
+        "$type": "number",
+        "$description": "No shift during daylight"
+      }
+    },
+    "breathing": {
+      "$description": "Connection / status breathing pulse (compositor-only)",
+      "scale-min": {
+        "$value": "0.98",
+        "$type": "number",
+        "$description": "Minimum scale for breathing pulse"
+      },
+      "scale-max": {
+        "$value": "1.02",
+        "$type": "number",
+        "$description": "Maximum scale for breathing pulse"
+      },
+      "duration": {
+        "$value": "4000ms",
+        "$type": "duration",
+        "$description": "Full breathing cycle"
+      },
+      "opacity-min": {
+        "$value": "0.6",
+        "$type": "number"
+      },
+      "opacity-max": {
+        "$value": "1.0",
+        "$type": "number"
+      }
+    },
+    "gradient-response": {
+      "$description": "Background gradient angle drift (idle vs active)",
+      "idle-shift": {
+        "$value": "0.5deg",
+        "$type": "dimension",
+        "$description": "Gradient angle drift per second when idle"
+      },
+      "active-shift": {
+        "$value": "2deg",
+        "$type": "dimension",
+        "$description": "Gradient angle shift on content change"
+      },
+      "transition-duration": {
+        "$value": "2000ms",
+        "$type": "duration"
+      }
+    },
+    "cpu-budget": {
+      "$description": "Dashboard ambient CPU caps (documentation + CSS custom props)",
+      "single-effect": {
+        "$value": "1%",
+        "$type": "dimension",
+        "$description": "Max CPU for any single ambient effect"
+      },
+      "combined": {
+        "$value": "2%",
+        "$type": "dimension",
+        "$description": "Max combined CPU for all ambient effects"
+      }
+    },
     "glow": {
       "$value": "radial-gradient(ellipse at 50% 50%, rgba(122,182,72,0.03), transparent 70%)",
       "$type": "string",
