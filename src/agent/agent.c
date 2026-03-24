@@ -29,8 +29,8 @@
 #include "human/agent/planner.h"
 #include "human/agent/preferences.h"
 #include "human/agent/prompt.h"
-#include "human/agent/speculative.h"
 #include "human/agent/reflection.h"
+#include "human/agent/speculative.h"
 #include "human/agent/task_list.h"
 #include "human/agent/team.h"
 #include "human/agent/tool_context.h"
@@ -361,6 +361,32 @@ hu_error_t hu_agent_from_config(
         (void)hu_superhuman_register(&out->superhuman, svc);
     }
 
+    /* SOTA operational modules — safe defaults for production */
+    out->dq_config.enabled = true;
+    out->dq_config.deduplicate = true;
+    out->dq_config.check_encoding = true;
+
+    hu_token_budget_init_defaults(&out->token_budget);
+    out->token_budget.enabled = true;
+
+    out->tool_validator.default_level = HU_VALIDATE_SCHEMA;
+
+    out->checkpoint_store.auto_checkpoint = true;
+    out->checkpoint_store.interval_steps = 5;
+
+    out->scratchpad.max_bytes = 4096;
+
+    out->mem_policy.enabled = true;
+    out->mem_policy.recency_weight = 0.4;
+    out->mem_policy.relevance_weight = 0.4;
+    out->mem_policy.frequency_weight = 0.2;
+
+    out->gvr_config.enabled = true;
+    out->gvr_config.max_revisions = 2;
+
+    out->degradation_config.enabled = true;
+    out->degradation_config.max_retries = 1;
+
     /* SOTA neural subsystems initialization */
     out->srag_config = hu_srag_config_default();
     out->prm_config = hu_prm_config_default();
@@ -582,7 +608,8 @@ void hu_agent_deinit(hu_agent_t *agent) {
     /* Promote important STM entities to persistent memory before cleanup */
     if (agent->memory && agent->memory->vtable) {
         hu_promotion_config_t promo_config = HU_PROMOTION_DEFAULTS;
-        hu_error_t promo_err = hu_promotion_run(agent->alloc, &agent->stm, agent->memory, &promo_config);
+        hu_error_t promo_err =
+            hu_promotion_run(agent->alloc, &agent->stm, agent->memory, &promo_config);
         if (promo_err != HU_OK)
             fprintf(stderr, "[agent] STM promotion failed: %s\n", hu_error_string(promo_err));
     }
@@ -646,9 +673,8 @@ hu_error_t hu_agent_consolidate_memory(hu_agent_t *agent) {
     /* After consolidation, demote stale recall-tier entries to archival.
      * Uses a sentinel key to trigger a sweep of entries older than the threshold. */
     if (agent->sota_initialized) {
-        hu_tier_manager_demote(&agent->tier_manager,
-            "__consolidation_sweep__", 23,
-            HU_TIER_RECALL, HU_TIER_ARCHIVAL);
+        hu_tier_manager_demote(&agent->tier_manager, "__consolidation_sweep__", 23, HU_TIER_RECALL,
+                               HU_TIER_ARCHIVAL);
     }
     return err;
 }
@@ -685,8 +711,7 @@ hu_error_t hu_agent_internal_append_history(hu_agent_t *agent, hu_role_t role, c
     agent->history[agent->history_count].content_len = stored_content_len;
     char *name_dup = name_len ? hu_strndup(agent->alloc, name, name_len) : NULL;
     agent->history[agent->history_count].name = name_dup;
-    agent->history[agent->history_count].name_len =
-        name_dup ? strlen(name_dup) : 0;
+    agent->history[agent->history_count].name_len = name_dup ? strlen(name_dup) : 0;
     if (name_len && !name_dup) {
         agent->alloc->free(agent->alloc->ctx, dup, stored_content_len + 1);
         return HU_ERR_OUT_OF_MEMORY;
@@ -694,8 +719,7 @@ hu_error_t hu_agent_internal_append_history(hu_agent_t *agent, hu_role_t role, c
     char *tc_dup =
         tool_call_id_len ? hu_strndup(agent->alloc, tool_call_id, tool_call_id_len) : NULL;
     agent->history[agent->history_count].tool_call_id = tc_dup;
-    agent->history[agent->history_count].tool_call_id_len =
-        tc_dup ? strlen(tc_dup) : 0;
+    agent->history[agent->history_count].tool_call_id_len = tc_dup ? strlen(tc_dup) : 0;
     if (tool_call_id_len && !tc_dup) {
         agent->alloc->free(agent->alloc->ctx, dup, stored_content_len + 1);
         if (name_dup)
@@ -1004,10 +1028,11 @@ void hu_agent_internal_process_mailbox_messages(hu_agent_t *agent) {
                          (unsigned long long)msg.from_agent, (int)payload_len,
                          msg.payload ? msg.payload : "");
         if (n > 0) {
-            hu_error_t hist_err = hu_agent_internal_append_history(
-                agent, HU_ROLE_USER, buf, (size_t)n, NULL, 0, NULL, 0);
+            hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_USER, buf,
+                                                                   (size_t)n, NULL, 0, NULL, 0);
             if (hist_err != HU_OK)
-                fprintf(stderr, "[agent] mailbox message history append failed: %s\n", hu_error_string(hist_err));
+                fprintf(stderr, "[agent] mailbox message history append failed: %s\n",
+                        hu_error_string(hist_err));
         }
         hu_message_free(agent->alloc, &msg);
     }
