@@ -180,9 +180,8 @@ hu_error_t hu_sse_parser_feed(hu_sse_parser_t *p, const char *bytes, size_t len,
         p->buf_len = 0;
     }
 
-    if (data && !has_data) {
+    if (data)
         p->alloc->free(p->alloc->ctx, data, data_cap);
-    }
     return HU_OK;
 }
 

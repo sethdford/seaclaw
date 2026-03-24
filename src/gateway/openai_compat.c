@@ -1,9 +1,10 @@
 #include "human/gateway/openai_compat.h"
-#include "human/agent.h"
 #include "../agent/agent_internal.h"
+#include "human/agent.h"
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/core/string.h"
 #include "human/provider.h"
 #include "human/providers/factory.h"
 #include <stdbool.h>
@@ -453,28 +454,34 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                 last_user_msg_len = msgs[i].content_len;
             }
             if (i < msg_count - 1 || msgs[i].role != HU_ROLE_USER) {
-                hu_agent_internal_append_history(app_ctx->agent, msgs[i].role,
-                    msgs[i].content, msgs[i].content_len, NULL, 0, NULL, 0);
+                hu_agent_internal_append_history(app_ctx->agent, msgs[i].role, msgs[i].content,
+                                                 msgs[i].content_len, NULL, 0, NULL, 0);
             }
         }
 
         if (last_user_msg) {
             char *response = NULL;
             size_t response_len = 0;
-            hu_error_t agent_err =
-                hu_agent_turn(app_ctx->agent, last_user_msg, last_user_msg_len, &response,
-                              &response_len);
+            hu_error_t agent_err = hu_agent_turn(app_ctx->agent, last_user_msg, last_user_msg_len,
+                                                 &response, &response_len);
 
             /* AI-tell filter: retry once if known robotic phrases detected */
             if (agent_err == HU_OK && response && response_len > 0) {
                 static const char *ai_tells[] = {
-                    "I understand how you", "I am here to support",
-                    "I am here for you", "that must be really",
-                    "I appreciate you sharing", "feel free to",
-                    "I hear you", "I'd be happy to",
-                    "I am sorry to hear", "I can only imagine",
-                    "sorry to hear", "going through that",
-                    "I'm here for you", "here to support",
+                    "I understand how you",
+                    "I am here to support",
+                    "I am here for you",
+                    "that must be really",
+                    "I appreciate you sharing",
+                    "feel free to",
+                    "I hear you",
+                    "I'd be happy to",
+                    "I am sorry to hear",
+                    "I can only imagine",
+                    "sorry to hear",
+                    "going through that",
+                    "I'm here for you",
+                    "here to support",
                     "According to the available",
                     "According to my",
                     "significant negative impact",
@@ -482,14 +489,13 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                 };
                 bool has_tell = false;
                 for (size_t ati = 0; ati < sizeof(ai_tells) / sizeof(ai_tells[0]); ati++) {
-                    if (strcasestr(response, ai_tells[ati])) {
+                    if (hu_strcasestr(response, ai_tells[ati])) {
                         has_tell = true;
                         break;
                     }
                 }
                 if (has_tell) {
-                    fprintf(stderr, "[openai-compat] ai-tell retry for: %.60s\n",
-                            response);
+                    fprintf(stderr, "[openai-compat] ai-tell retry for: %.60s\n", response);
                     app_ctx->agent->alloc->free(app_ctx->agent->alloc->ctx, response,
                                                 response_len + 1);
                     response = NULL;
@@ -506,8 +512,8 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                         "DO NOT use 'I understand', 'going through', 'sorry to hear', "
                         "'here for you', or any therapeutic language. "
                         "Be BRIEF. Be REAL. Be a FRIEND not a counselor.]";
-                    hu_agent_internal_append_history(app_ctx->agent, HU_ROLE_SYSTEM,
-                        hint, sizeof(hint) - 1, NULL, 0, NULL, 0);
+                    hu_agent_internal_append_history(app_ctx->agent, HU_ROLE_SYSTEM, hint,
+                                                     sizeof(hint) - 1, NULL, 0, NULL, 0);
                     agent_err = hu_agent_turn(app_ctx->agent, last_user_msg, last_user_msg_len,
                                               &response, &response_len);
                 }
@@ -518,12 +524,11 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
              * defense against models that stubbornly produce therapy-speak. */
             if (agent_err == HU_OK && response && response_len > 0) {
                 static const char *kill_phrases[] = {
-                    "I understand how", "going through that",
-                    "sorry to hear", "here for you", "here to support",
-                    "I can only imagine", "that must be", "how difficult",
+                    "I understand how", "going through that", "sorry to hear", "here for you",
+                    "here to support",  "I can only imagine", "that must be",  "how difficult",
                 };
                 for (size_t ki = 0; ki < sizeof(kill_phrases) / sizeof(kill_phrases[0]); ki++) {
-                    char *found = strcasestr(response, kill_phrases[ki]);
+                    char *found = hu_strcasestr(response, kill_phrases[ki]);
                     if (found && found > response) {
                         /* Walk back to the start of this clause (after ';', '.', or ',') */
                         char *cut = found;
@@ -531,7 +536,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                             cut--;
                         if (cut > response && (size_t)(cut - response) >= 4) {
                             while (cut > response && (cut[-1] == ' ' || cut[-1] == ';' ||
-                                                       cut[-1] == ',' || cut[-1] == '.'))
+                                                      cut[-1] == ',' || cut[-1] == '.'))
                                 cut--;
                             *cut = '\0';
                             response_len = (size_t)(cut - response);
@@ -563,8 +568,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                 if (hu_json_buf_init(&buf, alloc) == HU_OK) {
                     now = time(NULL);
                     snprintf(id_buf, sizeof(id_buf), "chatcmpl-%lx", (unsigned long)now);
-                    static const char oc_hdr[] =
-                        "\",\"object\":\"chat.completion\",\"created\":";
+                    static const char oc_hdr[] = "\",\"object\":\"chat.completion\",\"created\":";
                     static const char oc_choices[] =
                         "\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\","
                         "\"content\":";
@@ -600,8 +604,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                     }
                     hu_json_buf_free(&buf);
                 }
-                app_ctx->agent->alloc->free(app_ctx->agent->alloc->ctx, response,
-                                            response_len + 1);
+                app_ctx->agent->alloc->free(app_ctx->agent->alloc->ctx, response, response_len + 1);
                 return;
             }
             if (agent_err != HU_OK) {

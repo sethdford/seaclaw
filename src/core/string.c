@@ -1,4 +1,5 @@
 #include "human/core/string.h"
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -145,4 +146,21 @@ int hu_str_index_of(hu_str_t haystack, hu_str_t needle) {
             return (int)i;
     }
     return -1;
+}
+
+char *hu_strcasestr(const char *haystack, const char *needle) {
+    if (!haystack || !needle)
+        return NULL;
+    if (!needle[0])
+        return (char *)haystack;
+    for (; *haystack; haystack++) {
+        const char *h = haystack, *n = needle;
+        while (*h && *n && tolower((unsigned char)*h) == tolower((unsigned char)*n)) {
+            h++;
+            n++;
+        }
+        if (!*n)
+            return (char *)haystack;
+    }
+    return NULL;
 }

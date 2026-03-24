@@ -796,8 +796,11 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
     hu_json_value_t *root = NULL;
     (void)oom_on_optional;
     hu_error_t err = hu_json_parse(alloc, json, json_len, &root);
-    if (err != HU_OK || !root || root->type != HU_JSON_OBJECT)
+    if (err != HU_OK || !root || root->type != HU_JSON_OBJECT) {
+        if (root)
+            hu_json_free(alloc, root);
         return err != HU_OK ? err : HU_ERR_JSON_PARSE;
+    }
 
     const char *name = hu_json_get_string(root, "name");
     if (name) {

@@ -7400,7 +7400,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         };
                         bool has_ai_tell = false;
                         for (size_t ati = 0; ati < sizeof(ai_tells) / sizeof(ai_tells[0]); ati++) {
-                            if (strcasestr(response, ai_tells[ati])) {
+                            if (hu_strcasestr(response, ai_tells[ati])) {
                                 has_ai_tell = true;
                                 fprintf(stderr, "[human] ai-tell detected: \"%s\" in response\n",
                                         ai_tells[ati]);

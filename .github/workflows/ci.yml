@@ -46,7 +46,7 @@ jobs:
           ./build/human persona show ci_test
       - name: Test count regression guard
         run: |
-          COUNT=$(./build/human_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | head -1 | cut -d/ -f1)
+          COUNT=$(./build/human_tests 2>&1 | grep -oE '[0-9]+/[0-9]+ passed' | tail -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
           BASELINE=6419
           if [ "$COUNT" -lt "$BASELINE" ]; then

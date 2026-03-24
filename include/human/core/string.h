@@ -17,4 +17,7 @@ void hu_str_free(hu_allocator_t *alloc, char *s);
 bool hu_str_contains(hu_str_t haystack, hu_str_t needle);
 int hu_str_index_of(hu_str_t haystack, hu_str_t needle);
 
+/* Portable case-insensitive substring search (like GNU strcasestr). */
+char *hu_strcasestr(const char *haystack, const char *needle);
+
 #endif
