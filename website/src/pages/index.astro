@@ -65,7 +65,7 @@ const tools = [
   "Delegate",
 ];
 
-const chapterCount = 14;
+const chapterCount = 15;
 ---
 
 <html lang="en">
@@ -1705,10 +1705,67 @@ const chapterCount = 14;
 
       <hr class="section-divider" />
 
-      {/* ═══ ECOSYSTEM — Categorized Cards ═══ */}
+      {/* ═══ HULA — Programs, Not Prompts ═══ */}
 
       <section id="chapter-9" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
         <span class="hu-chapter-label" aria-hidden="true">09</span>
+        <div class="max-w-4xl mx-auto text-center">
+          <h2
+            class="hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            style="color: var(--color-text); letter-spacing: -0.03em;"
+          >
+            Programs, not prompts.
+          </h2>
+          <p
+            class="text-lg mb-12"
+            data-reveal
+            style="color: var(--color-text-secondary)"
+          >
+            HuLa is a typed intermediate representation that turns tool calls into composable,
+            traceable, policy-checked programs. Eight opcodes. Automatic skill promotion.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
+            <div class="glass glass-enter flex flex-col items-center gap-4 px-6 py-8 rounded-xl" data-reveal="scale" style="--ri: 0">
+              <svg class="w-10 h-10 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
+                <path d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z" />
+              </svg>
+              <span class="text-base font-semibold" style="color: var(--color-text)">Structured Execution</span>
+              <span class="text-sm text-center" style="color: var(--color-text-secondary)">call, seq, par, branch, loop, delegate, emit, assert — composable by design.</span>
+            </div>
+            <div class="glass glass-enter flex flex-col items-center gap-4 px-6 py-8 rounded-xl" data-reveal="scale" style="--ri: 1">
+              <svg class="w-10 h-10 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
+                <path d="M232,56V200a8,8,0,0,1-8,8H32a8,8,0,0,1,0-16H216V56a8,8,0,0,1,16,0ZM80,192a40,40,0,1,0-40-40A40,40,0,0,0,80,192Zm0-64a24,24,0,1,1-24,24A24,24,0,0,1,80,128Zm96-8a40,40,0,1,0-40-40A40,40,0,0,0,176,120Zm0-64a24,24,0,1,1-24,24A24,24,0,0,1,176,56Z" />
+              </svg>
+              <span class="text-base font-semibold" style="color: var(--color-text)">Skill Promotion</span>
+              <span class="text-sm text-center" style="color: var(--color-text-secondary)">Successful traces get promoted to reusable skills automatically — the agent learns from execution.</span>
+            </div>
+            <div class="glass glass-enter flex flex-col items-center gap-4 px-6 py-8 rounded-xl" data-reveal="scale" style="--ri: 2">
+              <svg class="w-10 h-10 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
+                <path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z" />
+              </svg>
+              <span class="text-base font-semibold" style="color: var(--color-text)">Secure by Default</span>
+              <span class="text-sm text-center" style="color: var(--color-text-secondary)">Every program node checked against runtime policy before execution. Deny-by-default.</span>
+            </div>
+          </div>
+
+          <div class="glass rounded-xl p-6 text-left max-w-xl mx-auto" data-reveal>
+            <div class="text-xs font-mono mb-3" style="color: var(--color-text-tertiary)">example.hula.json</div>
+            <pre class="text-sm font-mono leading-relaxed overflow-x-auto" style="color: var(--color-text-secondary)"><code set:html={`{\n  "name": "deploy-review",\n  "root": "main",\n  "nodes": {\n    "main": { "op": "seq", "children": ["lint", "test", "deploy"] },\n    "lint":   { "op": "call", "tool": "shell", "args": { "cmd": "npm run lint" } },\n    "test":   { "op": "call", "tool": "shell", "args": { "cmd": "npm test" } },\n    "deploy": { "op": "call", "tool": "shell", "args": { "cmd": "npm run deploy" } }\n  }\n}`} /></pre>
+          </div>
+
+          <a href="/features/hula/" class="btn-outline mt-8 inline-block" data-reveal>
+            Learn more about HuLa
+          </a>
+        </div>
+      </section>
+
+      <hr class="section-divider" />
+
+      {/* ═══ ECOSYSTEM — Categorized Cards ═══ */}
+
+      <section id="chapter-10" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+        <span class="hu-chapter-label" aria-hidden="true">10</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
             class="providers-title hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
@@ -1839,8 +1896,8 @@ const chapterCount = 14;
 
       {/* ═══ TERMINAL ═══ */}
 
-      <section id="chapter-10" class="section-spacing relative hu-chapter-reveal px-6 cv-defer">
-        <span class="hu-chapter-label" aria-hidden="true">10</span>
+      <section id="chapter-11" class="section-spacing relative hu-chapter-reveal px-6 cv-defer">
+        <span class="hu-chapter-label" aria-hidden="true">11</span>
         <div class="max-w-3xl mx-auto">
           <h2
             class="terminal-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-6 text-center"
@@ -1894,8 +1951,8 @@ const chapterCount = 14;
 
       {/* ═══ DASHBOARD PREVIEW ═══ */}
 
-      <section id="chapter-11" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
-        <span class="hu-chapter-label" aria-hidden="true">11</span>
+      <section id="chapter-12" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+        <span class="hu-chapter-label" aria-hidden="true">12</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
             class="dash-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
@@ -2101,8 +2158,8 @@ const chapterCount = 14;
 
       {/* ═══ QUALITY — Ring Gauges ═══ */}
 
-      <section id="chapter-12" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
-        <span class="hu-chapter-label" aria-hidden="true">12</span>
+      <section id="chapter-13" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+        <span class="hu-chapter-label" aria-hidden="true">13</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
             class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
@@ -2215,8 +2272,8 @@ const chapterCount = 14;
 
       {/* ═══ COMPARISON — Tufte-inspired direct-label bars ═══ */}
 
-      <section id="chapter-13" class="relative hu-chapter-reveal py-16 md:py-24 cv-defer">
-        <span class="hu-chapter-label" aria-hidden="true">13</span>
+      <section id="chapter-14" class="relative hu-chapter-reveal py-16 md:py-24 cv-defer">
+        <span class="hu-chapter-label" aria-hidden="true">14</span>
         <div class="max-w-4xl mx-auto px-4">
           <h2
             class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] text-center mb-4"
@@ -2372,8 +2429,8 @@ const chapterCount = 14;
 
       {/* ═══ CTA ═══ */}
 
-      <section id="chapter-14" class="relative hu-chapter-reveal py-20 md:py-40 px-6 cv-defer">
-        <span class="hu-chapter-label" aria-hidden="true">14</span>
+      <section id="chapter-15" class="relative hu-chapter-reveal py-20 md:py-40 px-6 cv-defer">
+        <span class="hu-chapter-label" aria-hidden="true">15</span>
         <div class="ambient-coral" style="top: 30%; left: 30%;"></div>
         <div class="ambient-blue" style="top: 40%; right: 20%;"></div>
         <div class="max-w-3xl mx-auto text-center">
