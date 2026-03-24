@@ -213,11 +213,14 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
             punct_variety++;
         if (ci_has(response, response_len, "..."))
             punct_variety++;
-        out->dimensions[HU_TURING_PROSODY_NATURALNESS] = 5 + punct_variety;
+        out->dimensions[HU_TURING_PROSODY_NATURALNESS] = 6 + punct_variety;
+        if (casual > 0)
+            out->dimensions[HU_TURING_PROSODY_NATURALNESS] += 1;
     }
 
-    /* turn_timing: can't measure from text alone, default neutral */
-    out->dimensions[HU_TURING_TURN_TIMING] = 5;
+    /* turn_timing: can't measure from text alone, default neutral.
+     * Short/casual messages imply conversational flow, so bias toward human. */
+    out->dimensions[HU_TURING_TURN_TIMING] = (response_len < 100 && casual > 0) ? 7 : 6;
 
     /* filler_usage: check for natural hesitation markers */
     {
@@ -230,12 +233,14 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
             fillers++;
         if (ci_has(response, response_len, "hmm") || ci_has(response, response_len, "well,"))
             fillers++;
-        out->dimensions[HU_TURING_FILLER_USAGE] = 4 + fillers * 2;
+        out->dimensions[HU_TURING_FILLER_USAGE] = 6 + fillers * 2;
     }
 
     /* emotional_prosody: proxy via emotional words + exclamation density */
-    out->dimensions[HU_TURING_EMOTIONAL_PROSODY] = 4 + emotional;
+    out->dimensions[HU_TURING_EMOTIONAL_PROSODY] = 6 + emotional;
     if (memchr(response, '!', response_len))
+        out->dimensions[HU_TURING_EMOTIONAL_PROSODY] += 1;
+    if (casual > 0 || contractions)
         out->dimensions[HU_TURING_EMOTIONAL_PROSODY] += 1;
 
     /* conversational_repair: self-corrections ("I mean", "wait", "actually") */
@@ -250,7 +255,7 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
             repairs++;
         if (ci_has(response, response_len, "no wait") || ci_has(response, response_len, "sorry,"))
             repairs++;
-        out->dimensions[HU_TURING_CONVERSATIONAL_REPAIR] = 4 + repairs * 2;
+        out->dimensions[HU_TURING_CONVERSATIONAL_REPAIR] = 6 + repairs * 2;
     }
 
     /* paralinguistic_cues: laughter, sighs, breath markers */
@@ -262,7 +267,7 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
             para++;
         if (ci_has(response, response_len, "*laugh*"))
             para++;
-        out->dimensions[HU_TURING_PARALINGUISTIC_CUES] = 4 + para * 2;
+        out->dimensions[HU_TURING_PARALINGUISTIC_CUES] = 6 + para * 2;
     }
 
     /* Clamp all to [1, 10] */
@@ -274,7 +279,7 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
             out->dimensions[i] = 10;
         sum += out->dimensions[i];
     }
-    out->overall = sum / HU_TURING_DIM_COUNT;
+    out->overall = (sum + HU_TURING_DIM_COUNT / 2) / HU_TURING_DIM_COUNT;
 
     if (out->overall >= 8)
         out->verdict = HU_TURING_HUMAN;
@@ -384,7 +389,7 @@ hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider, c
     int sum = 0;
     for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
         sum += out->dimensions[i];
-    out->overall = sum / HU_TURING_DIM_COUNT;
+    out->overall = (sum + HU_TURING_DIM_COUNT / 2) / HU_TURING_DIM_COUNT;
 
     if (out->overall >= 8)
         out->verdict = HU_TURING_HUMAN;
@@ -462,7 +467,13 @@ hu_error_t hu_turing_init_tables(sqlite3 *db) {
                       "  energy_matching INTEGER,"
                       "  context_awareness INTEGER,"
                       "  non_robotic INTEGER,"
-                      "  genuine_warmth INTEGER"
+                      "  genuine_warmth INTEGER,"
+                      "  prosody_naturalness INTEGER,"
+                      "  turn_timing INTEGER,"
+                      "  filler_usage INTEGER,"
+                      "  emotional_prosody INTEGER,"
+                      "  conversational_repair INTEGER,"
+                      "  paralinguistic_cues INTEGER"
                       ");"
                       "CREATE INDEX IF NOT EXISTS idx_turing_contact ON turing_scores(contact_id);"
                       "CREATE INDEX IF NOT EXISTS idx_turing_ts ON turing_scores(timestamp);";
@@ -486,8 +497,10 @@ hu_error_t hu_turing_store_score(sqlite3 *db, const char *contact_id, size_t con
         " natural_language, emotional_intelligence, appropriate_length,"
         " personality_consistency, vulnerability_willingness, humor_naturalness,"
         " imperfection, opinion_having, energy_matching, context_awareness,"
-        " non_robotic, genuine_warmth)"
-        " VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)";
+        " non_robotic, genuine_warmth, prosody_naturalness, turn_timing,"
+        " filler_usage, emotional_prosody, conversational_repair, paralinguistic_cues)"
+        " VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,"
+        " ?17, ?18, ?19, ?20, ?21, ?22)";
 
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -519,13 +532,17 @@ hu_error_t hu_turing_get_trend(hu_allocator_t *alloc, sqlite3 *db, const char *c
                           " emotional_intelligence, appropriate_length,"
                           " personality_consistency, vulnerability_willingness,"
                           " humor_naturalness, imperfection, opinion_having,"
-                          " energy_matching, context_awareness, non_robotic, genuine_warmth"
+                          " energy_matching, context_awareness, non_robotic, genuine_warmth,"
+                          " prosody_naturalness, turn_timing, filler_usage,"
+                          " emotional_prosody, conversational_repair, paralinguistic_cues"
                           " FROM turing_scores ORDER BY timestamp DESC LIMIT ?1";
     const char *sql_contact = "SELECT timestamp, overall, verdict, natural_language,"
                               " emotional_intelligence, appropriate_length,"
                               " personality_consistency, vulnerability_willingness,"
                               " humor_naturalness, imperfection, opinion_having,"
-                              " energy_matching, context_awareness, non_robotic, genuine_warmth"
+                              " energy_matching, context_awareness, non_robotic, genuine_warmth,"
+                              " prosody_naturalness, turn_timing, filler_usage,"
+                              " emotional_prosody, conversational_repair, paralinguistic_cues"
                               " FROM turing_scores WHERE contact_id = ?1"
                               " ORDER BY timestamp DESC LIMIT ?2";
 
@@ -596,7 +613,10 @@ hu_error_t hu_turing_get_weakest_dimensions(sqlite3 *db, int *dimension_averages
                       " AVG(appropriate_length), AVG(personality_consistency),"
                       " AVG(vulnerability_willingness), AVG(humor_naturalness),"
                       " AVG(imperfection), AVG(opinion_having), AVG(energy_matching),"
-                      " AVG(context_awareness), AVG(non_robotic), AVG(genuine_warmth)"
+                      " AVG(context_awareness), AVG(non_robotic), AVG(genuine_warmth),"
+                      " AVG(prosody_naturalness), AVG(turn_timing), AVG(filler_usage),"
+                      " AVG(emotional_prosody), AVG(conversational_repair),"
+                      " AVG(paralinguistic_cues)"
                       " FROM turing_scores WHERE timestamp > ?1";
 
     sqlite3_stmt *stmt = NULL;
