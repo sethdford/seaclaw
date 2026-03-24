@@ -1,9 +1,9 @@
 #include "human/agent/cli.h"
 #include "human/agent.h"
-#include "human/agent/spawn.h"
 #include "human/agent/awareness.h"
 #include "human/agent/outcomes.h"
 #include "human/agent/profile.h"
+#include "human/agent/spawn.h"
 #include "human/agent/tui.h"
 #include "human/channels/cli.h"
 #ifdef HU_HAS_VOICE_CHANNEL
@@ -75,7 +75,8 @@
 #define HU_CLI_MAX_PATH 1024
 
 #ifndef HU_IS_TEST
-/* Gemini-tier router IDs are only valid for Google providers; OpenAI et al. need cfg model names. */
+/* Gemini-tier router IDs are only valid for Google providers; OpenAI et al. need cfg model names.
+ */
 static bool cli_provider_uses_gemini_slot_models(const char *prov, size_t prov_len) {
     if (!prov || prov_len == 0)
         return false;
@@ -163,9 +164,15 @@ hu_error_t hu_agent_cli_parse_args(const char *const *argv, size_t argc,
         } else if (strcmp(a, "--demo") == 0) {
             out->demo_mode = 1;
         } else if (strcmp(a, "--prompt") == 0) {
-            if (i + 1 < argc) { out->prompt = argv[i + 1]; i++; }
+            if (i + 1 < argc) {
+                out->prompt = argv[i + 1];
+                i++;
+            }
         } else if (strcmp(a, "--channel") == 0) {
-            if (i + 1 < argc) { out->channel = argv[i + 1]; i++; }
+            if (i + 1 < argc) {
+                out->channel = argv[i + 1];
+                i++;
+            }
         } else if (strcmp(a, "--once") == 0) {
             out->once = 1;
         }
@@ -257,7 +264,7 @@ static void run_spinner_loop(agent_turn_ctx_t *tctx, int use_ansi) {
 /* ── Print welcome banner ────────────────────────────────────────────── */
 static void print_banner(const char *prov_name, const char *model, size_t tools_count) {
     printf(HU_COLOR_BOLD HU_COLOR_ACCENT "%s" HU_COLOR_RESET " v%s" HU_COLOR_DIM
-           " — not quite human." HU_COLOR_RESET "\n",
+                                         " — not quite human." HU_COLOR_RESET "\n",
            HU_CODENAME, hu_version_string());
     printf(HU_COLOR_DIM "Provider: %s | Model: %s | Tools: %zu" HU_COLOR_RESET "\n", prov_name,
            (model[0] ? model : "(default)"), tools_count);
@@ -273,15 +280,14 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_parsed_agent_args_t parsed_args;
     hu_agent_cli_parse_args(argv, argc, &parsed_args);
 
-    const char *config_path = parsed_args.config_path ? parsed_args.config_path
-                                                      : getenv("HUMAN_CONFIG_PATH");
+    const char *config_path =
+        parsed_args.config_path ? parsed_args.config_path : getenv("HUMAN_CONFIG_PATH");
     hu_config_t cfg;
 #ifdef HU_HAS_VOICE_CHANNEL
     hu_channel_t cli_voice_ch = {0};
 #endif
-    hu_error_t err =
-        (config_path && config_path[0]) ? hu_config_load_from(alloc, config_path, &cfg)
-                                         : hu_config_load(alloc, &cfg);
+    hu_error_t err = (config_path && config_path[0]) ? hu_config_load_from(alloc, config_path, &cfg)
+                                                     : hu_config_load(alloc, &cfg);
     if (err != HU_OK) {
         fprintf(stderr, "[%s] Config error: %s\n", HU_CODENAME, hu_error_string(err));
         return err;
@@ -417,7 +423,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_vector_store_t vector_store = hu_vector_store_mem_create(alloc);
     hu_retrieval_engine_t retrieval_engine =
         hu_retrieval_create_with_vector(alloc, &memory, &embedder, &vector_store);
+#ifdef HU_ENABLE_SQLITE
     hu_graph_t *cli_graph = NULL;
+#endif
 
 #ifdef HU_HAS_CRON
     hu_cron_scheduler_t *cron = hu_cron_create(alloc, 64, true);
@@ -447,7 +455,10 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
             retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
 #ifdef HU_ENABLE_SQLITE
-        if (cli_graph) { hu_graph_close(cli_graph, alloc); cli_graph = NULL; }
+        if (cli_graph) {
+            hu_graph_close(cli_graph, alloc);
+            cli_graph = NULL;
+        }
 #endif
         if (vector_store.vtable && vector_store.vtable->deinit)
             vector_store.vtable->deinit(vector_store.ctx, alloc);
@@ -499,7 +510,10 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
             retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
 #ifdef HU_ENABLE_SQLITE
-        if (cli_graph) { hu_graph_close(cli_graph, alloc); cli_graph = NULL; }
+        if (cli_graph) {
+            hu_graph_close(cli_graph, alloc);
+            cli_graph = NULL;
+        }
 #endif
         if (vector_store.vtable && vector_store.vtable->deinit)
             vector_store.vtable->deinit(vector_store.ctx, alloc);
@@ -641,7 +655,10 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
             retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
 #ifdef HU_ENABLE_SQLITE
-        if (cli_graph) { hu_graph_close(cli_graph, alloc); cli_graph = NULL; }
+        if (cli_graph) {
+            hu_graph_close(cli_graph, alloc);
+            cli_graph = NULL;
+        }
 #endif
         if (vector_store.vtable && vector_store.vtable->deinit)
             vector_store.vtable->deinit(vector_store.ctx, alloc);
@@ -695,15 +712,19 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                 char *digest = NULL;
                 size_t digest_len = 0;
                 int64_t since = (int64_t)time(NULL) - 86400;
-                if (hu_feed_build_daily_digest(alloc, feed_db, since, 2000, &digest, &digest_len) == HU_OK && digest) {
+                if (hu_feed_build_daily_digest(alloc, feed_db, since, 2000, &digest, &digest_len) ==
+                        HU_OK &&
+                    digest) {
                     char *trend_section = NULL;
                     size_t trend_len = 0;
                     if (cfg.feeds.interests) {
                         hu_feed_trend_t *trends = NULL;
                         size_t trend_count = 0;
                         if (hu_feed_detect_trends(alloc, feed_db, cfg.feeds.interests,
-                                strlen(cfg.feeds.interests), &trends, &trend_count) == HU_OK) {
-                            hu_feed_trends_build_section(alloc, trends, trend_count, &trend_section, &trend_len);
+                                                  strlen(cfg.feeds.interests), &trends,
+                                                  &trend_count) == HU_OK) {
+                            hu_feed_trends_build_section(alloc, trends, trend_count, &trend_section,
+                                                         &trend_len);
                             hu_feed_trends_free(alloc, trends, trend_count);
                         }
                     }
@@ -717,8 +738,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                         hu_self_improve_deinit(&si);
                     }
 
-                    size_t ctx_len = digest_len + (trend_section ? trend_len : 0) +
-                                     (patches ? patches_len : 0);
+                    size_t ctx_len =
+                        digest_len + (trend_section ? trend_len : 0) + (patches ? patches_len : 0);
                     char *ctx_buf = (char *)alloc->alloc(alloc->ctx, ctx_len + 1);
                     if (ctx_buf) {
                         size_t p = 0;
@@ -726,15 +747,23 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                             memcpy(ctx_buf + p, patches, patches_len);
                             p += patches_len;
                         }
-                        if (trend_section) { memcpy(ctx_buf + p, trend_section, trend_len); p += trend_len; }
-                        memcpy(ctx_buf + p, digest, digest_len); p += digest_len;
+                        if (trend_section) {
+                            memcpy(ctx_buf + p, trend_section, trend_len);
+                            p += trend_len;
+                        }
+                        memcpy(ctx_buf + p, digest, digest_len);
+                        p += digest_len;
                         ctx_buf[p] = '\0';
-                        if (hu_research_build_prompt(alloc, ctx_buf, p, &enriched_prompt, &enriched_len) == HU_OK && enriched_prompt)
+                        if (hu_research_build_prompt(alloc, ctx_buf, p, &enriched_prompt,
+                                                     &enriched_len) == HU_OK &&
+                            enriched_prompt)
                             effective_prompt = enriched_prompt;
                         alloc->free(alloc->ctx, ctx_buf, ctx_len + 1);
                     }
-                    if (patches) alloc->free(alloc->ctx, patches, patches_len + 1);
-                    if (trend_section) alloc->free(alloc->ctx, trend_section, trend_len + 1);
+                    if (patches)
+                        alloc->free(alloc->ctx, patches, patches_len + 1);
+                    if (trend_section)
+                        alloc->free(alloc->ctx, trend_section, trend_len + 1);
                     alloc->free(alloc->ctx, digest, digest_len + 1);
                 }
             }
@@ -758,7 +787,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                     hu_intelligence_cycle_result_t cycle_result;
                     memset(&cycle_result, 0, sizeof(cycle_result));
                     if (hu_intelligence_run_cycle(alloc, findings_db, &cycle_result) == HU_OK) {
-                        fprintf(stderr, "[intelligence] cycle: %zu actioned, %zu lessons, %zu events, %zu values\n",
+                        fprintf(stderr,
+                                "[intelligence] cycle: %zu actioned, %zu lessons, %zu events, %zu "
+                                "values\n",
                                 cycle_result.findings_actioned, cycle_result.lessons_extracted,
                                 cycle_result.events_recorded, cycle_result.values_learned);
                     }
@@ -774,7 +805,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                 sqlite3 *fail_db = hu_sqlite_memory_get_db(&memory);
                 if (fail_db) {
                     sqlite3_stmt *fb = NULL;
-                    if (sqlite3_prepare_v2(fail_db,
+                    if (sqlite3_prepare_v2(
+                            fail_db,
                             "INSERT INTO behavioral_feedback "
                             "(behavior_type, contact_id, signal, context, timestamp) "
                             "VALUES ('research_cycle', 'system', 'negative', ?, ?)",
@@ -791,20 +823,24 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                     if (hu_online_learning_create(alloc, fail_db, 0.1, &ol) == HU_OK) {
                         (void)hu_online_learning_init_tables(&ol);
                         int64_t now = (int64_t)time(NULL);
-                        (void)hu_online_learning_update_weight(&ol, "research_findings", 18,
-                                                               -0.5, now);
+                        (void)hu_online_learning_update_weight(&ol, "research_findings", 18, -0.5,
+                                                               now);
                         hu_online_learning_deinit(&ol);
                     }
                 }
             }
 #endif
         }
-        if (enriched_prompt) alloc->free(alloc->ctx, enriched_prompt, enriched_len + 1);
+        if (enriched_prompt)
+            alloc->free(alloc->ctx, enriched_prompt, enriched_len + 1);
         hu_agent_deinit(&agent);
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
             retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
 #ifdef HU_ENABLE_SQLITE
-        if (cli_graph) { hu_graph_close(cli_graph, alloc); cli_graph = NULL; }
+        if (cli_graph) {
+            hu_graph_close(cli_graph, alloc);
+            cli_graph = NULL;
+        }
 #endif
         if (vector_store.vtable && vector_store.vtable->deinit)
             vector_store.vtable->deinit(vector_store.ctx, alloc);
@@ -922,8 +958,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             time_t now_rt = time(NULL);
             struct tm *lt = localtime(&now_rt);
             int hour = lt ? lt->tm_hour : 12;
-            hu_model_selection_t sel = hu_model_route(
-                &mr_cfg, line, line_len, NULL, 0, hour, agent.history_count);
+            hu_model_selection_t sel =
+                hu_model_route(&mr_cfg, line, line_len, NULL, 0, hour, agent.history_count);
             agent.turn_model = sel.model;
             agent.turn_model_len = sel.model_len;
             agent.turn_temperature = sel.temperature;
@@ -1018,7 +1054,10 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
         retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);
 #ifdef HU_ENABLE_SQLITE
-    if (cli_graph) { hu_graph_close(cli_graph, alloc); cli_graph = NULL; }
+    if (cli_graph) {
+        hu_graph_close(cli_graph, alloc);
+        cli_graph = NULL;
+    }
 #endif
     if (vector_store.vtable && vector_store.vtable->deinit)
         vector_store.vtable->deinit(vector_store.ctx, alloc);
