@@ -197,12 +197,17 @@ static hu_error_t parse_string(parser_t *p, hu_json_value_t **out) {
 }
 
 static hu_error_t parse_number(parser_t *p, hu_json_value_t **out) {
-    const char *start = p->src + p->pos;
+    size_t remaining = p->len - p->pos;
+    char buf[64];
+    size_t copy = remaining < sizeof(buf) - 1 ? remaining : sizeof(buf) - 1;
+    memcpy(buf, p->src + p->pos, copy);
+    buf[copy] = '\0';
+
     char *end = NULL;
-    double num = strtod(start, &end);
-    if (end == start)
+    double num = strtod(buf, &end);
+    if (end == buf)
         return HU_ERR_JSON_PARSE;
-    p->pos += (size_t)(end - start);
+    p->pos += (size_t)(end - buf);
 
     if (fpclassify(num) == FP_NAN || fpclassify(num) == FP_INFINITE)
         return HU_ERR_JSON_PARSE;
