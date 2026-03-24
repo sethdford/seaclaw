@@ -326,6 +326,10 @@ set(HU_CORE_SOURCES
     src/channel_catalog.c
     src/channel_adapters.c
     src/doctor.c
+    src/doctor_fix.c
+    src/humanness.c
+    src/channels/channel_monitor.c
+    src/memory/evolved_opinions.c
     src/status.c
     src/http_util.c
     src/mcp.c
@@ -360,6 +364,7 @@ set(HU_CORE_SOURCES
     src/security/noop_sandbox.c
     src/security/docker.c
     src/security/detect.c
+    src/security/exec_env.c
     src/security/adversarial.c
     src/security/sandbox.c
     src/observability.c
@@ -367,6 +372,7 @@ set(HU_CORE_SOURCES
     src/observability/metrics_observer.c
     src/observability/multi_observer.c
     src/observability/bth_metrics.c
+    src/observability/otlp.c
     src/tunnel/none.c
     src/tunnel/root.c
     src/gateway/gateway.c
@@ -453,6 +459,13 @@ set(HU_CORE_SOURCES
     src/agent/reflection.c
     src/agent/gvr.c
     src/agent/degradation.c
+    src/agent/token_budget.c
+    src/agent/data_quality.c
+    src/agent/mar.c
+    src/agent/prompt_optimizer.c
+    src/agent/checkpoint.c
+    src/agent/chaos.c
+    src/agent/scratchpad.c
     src/agent/tree_of_thought.c
     src/agent/constitutional.c
     src/agent/ab_response.c
@@ -523,6 +536,7 @@ set(HU_CORE_SOURCES
     src/memory/fast_capture.c
     src/memory/promotion.c
     src/memory/consolidation.c
+    src/memory/policy.c
     src/memory/deep_extract.c
     src/memory/graph.c
     src/memory/multimodal_index.c
@@ -638,6 +652,14 @@ set(HU_CORE_SOURCES
     src/security/replay.c
     src/plugins/registry.c
     src/plugin_loader.c
+    src/plugin_discovery.c
+    src/channels/channel_monitor.c
+    src/doctor_fix.c
+    src/skills/skill_scaffold.c
+    src/context/context_engine.c
+    src/context/context_engine_rag.c
+    src/humanness.c
+    src/memory/evolved_opinions.c
     src/mcp_registry.c
     src/onboard.c
     src/interactions/choices.c
@@ -729,6 +751,7 @@ list(APPEND HU_CORE_SOURCES
     src/eval/turing_score.c
     src/eval_judge.c
     src/eval_benchmarks.c
+    src/mcp_resources.c
     src/eval_dashboard.c
     src/memory/corrective_rag.c
     src/memory/adaptive_rag.c
@@ -902,6 +925,7 @@ if(HU_ENABLE_SKILLS)
     list(APPEND HU_CORE_SOURCES
         src/skillforge.c
         src/skills.c
+        src/skills/skill_scaffold.c
         src/tools/skill_run.c
         src/intelligence/skills.c
         src/intelligence/reflection.c
@@ -945,6 +969,7 @@ if(HU_ENABLE_ML)
         src/ml/cli.c
         src/ml/lora.c
         src/ml/agent_trainer.c
+        src/providers/huml.c
     )
     if(HU_ENABLE_SQLITE)
         list(APPEND HU_CORE_SOURCES src/ml/training_data.c)
@@ -1401,6 +1426,9 @@ if(HU_ENABLE_CURL)
 endif()
 if(HU_ENABLE_SKILLS)
     target_compile_definitions(human PRIVATE HU_HAS_SKILLS=1)
+endif()
+if(HU_ENABLE_ML)
+    target_compile_definitions(human PRIVATE HU_ENABLE_ML=1)
 endif()
 if(HU_ENABLE_CRON)
     target_compile_definitions(human PRIVATE HU_HAS_CRON=1)
@@ -2087,6 +2115,26 @@ list(APPEND HU_TEST_SOURCES
     tests/test_turing_score.c
     tests/test_eval_judge.c
     tests/test_eval_benchmarks.c
+    tests/test_token_budget.c
+    tests/test_data_quality.c
+    tests/test_tool_validation.c
+    tests/test_otlp.c
+    tests/test_mar.c
+    tests/test_mem_policy.c
+    tests/test_prompt_optimizer.c
+    tests/test_chaos.c
+    tests/test_checkpoint.c
+    tests/test_scratchpad.c
+    tests/test_mcp_resources.c
+    tests/test_context_engine.c
+    tests/test_exec_env.c
+    tests/test_channel_monitor.c
+    tests/test_context_engine_rag.c
+    tests/test_doctor_fix.c
+    tests/test_humanness.c
+    tests/test_opinions_persistence.c
+    tests/test_plugin_discovery.c
+    tests/test_skill_scaffold.c
     tests/test_eval_runner.c
     tests/test_eval_history.c
     tests/test_corrective_rag.c

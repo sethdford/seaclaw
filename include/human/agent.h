@@ -1,18 +1,26 @@
 #ifndef HU_AGENT_H
 #define HU_AGENT_H
 
+#include "human/agent/chaos.h"
+#include "human/agent/checkpoint.h"
 #include "human/agent/commitment_store.h"
+#include "human/agent/data_quality.h"
+#include "human/agent/degradation.h"
+#include "human/agent/gvr.h"
+#include "human/agent/mailbox.h"
+#include "human/agent/mar.h"
 #include "human/agent/pattern_radar.h"
+#include "human/agent/scratchpad.h"
+#include "human/agent/spawn.h"
 #include "human/agent/superhuman.h"
 #include "human/agent/superhuman_commitment.h"
 #include "human/agent/superhuman_emotional.h"
 #include "human/agent/superhuman_predictive.h"
 #include "human/agent/superhuman_silence.h"
-#include "human/agent/mailbox.h"
-#include "human/agent/spawn.h"
 #include "human/agent/task_list.h"
-#include "human/agent/timing.h"
 #include "human/agent/team.h"
+#include "human/agent/timing.h"
+#include "human/agent/token_budget.h"
 #include "human/agent/worktree.h"
 #include "human/channel.h"
 #include "human/core/allocator.h"
@@ -21,16 +29,19 @@
 #include "human/core/slice.h"
 #include "human/cost.h"
 #include "human/memory.h"
+#include "human/memory/policy.h"
 #include "human/memory/retrieval.h"
+#include "human/security/escalate.h"
+#include "human/tools/validation.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/meta_learning.h"
 #endif
-#include "human/memory/self_rag.h"
-#include "human/memory/adaptive_rag.h"
-#include "human/memory/tiers.h"
 #include "human/agent/process_reward.h"
-#include "human/ml/dpo.h"
+#include "human/memory/adaptive_rag.h"
+#include "human/memory/self_rag.h"
 #include "human/memory/stm.h"
+#include "human/memory/tiers.h"
+#include "human/ml/dpo.h"
 #include "human/observability/bth_metrics.h"
 #include "human/observer.h"
 #ifdef HU_HAS_PERSONA
@@ -106,7 +117,7 @@ struct hu_agent {
     hu_retrieval_engine_t *retrieval_engine; /* optional; when set, memory_loader uses it */
     hu_session_store_t *session_store;       /* optional, may be NULL */
     hu_observer_t *observer;                 /* optional, may be NULL */
-    hu_bth_metrics_t *bth_metrics;            /* optional; set by daemon for BTH observability */
+    hu_bth_metrics_t *bth_metrics;           /* optional; set by daemon for BTH observability */
     hu_security_policy_t *policy;            /* optional, may be NULL */
     hu_cost_tracker_t *cost_tracker;         /* optional, may be NULL */
 
@@ -177,10 +188,10 @@ struct hu_agent {
 
     hu_agent_pool_t *agent_pool;
     hu_mailbox_t *mailbox;
-    uint64_t agent_id; /* used for mailbox registration; 0 = use (uintptr_t)agent */
-    uint32_t spawn_depth; /* 0 = root session; +1 per nested agent_spawn */
-    struct hu_skillforge *skillforge;       /* optional; loaded skills for prompt injection */
-    hu_embedder_t *skill_route_embedder;    /* optional; NOT owned — cosine skill routing when set */
+    uint64_t agent_id;                /* used for mailbox registration; 0 = use (uintptr_t)agent */
+    uint32_t spawn_depth;             /* 0 = root session; +1 per nested agent_spawn */
+    struct hu_skillforge *skillforge; /* optional; loaded skills for prompt injection */
+    hu_embedder_t *skill_route_embedder; /* optional; NOT owned — cosine skill routing when set */
     struct hu_agent_registry *agent_registry; /* optional; named agent definitions */
     hu_worktree_manager_t *worktree_mgr;
     hu_team_t *team;
@@ -257,12 +268,45 @@ struct hu_agent {
     hu_dpo_collector_t dpo_collector;
     bool sota_initialized;
 
+    /* GVR (Generator-Verifier-Reviser) pipeline config */
+    hu_gvr_config_t gvr_config;
+
+    /* Provider graceful degradation config */
+    hu_provider_degradation_config_t degradation_config;
+
+    /* Adaptive token budget (DOVA-style tier allocation) */
+    hu_token_budget_config_t token_budget;
+
+    /* Tool result validation */
+    hu_tool_validator_t tool_validator;
+
+    /* Data quality checks for context assembly */
+    hu_dq_config_t dq_config;
+
+    /* MAR orchestration config */
+    hu_mar_config_t mar_config;
+
+    /* Policy-learned memory management */
+    hu_mem_policy_t mem_policy;
+
+    /* Chaos testing engine */
+    hu_chaos_engine_t chaos_engine;
+
+    /* Checkpoint/resume store */
+    hu_checkpoint_store_t checkpoint_store;
+
+    /* Structured scratchpad */
+    hu_scratchpad_t scratchpad;
+
+    /* ESCALATE.md protocol */
+    hu_escalate_protocol_t escalate_protocol;
+
     /* Cognition subsystems */
     hu_emotional_cognition_t emotional_cognition;
     hu_metacognition_t metacognition;
     hu_cognition_mode_t current_cognition_mode;
 #ifdef HU_ENABLE_SQLITE
-    struct sqlite3 *cognition_db;  /* shared DB for evolving + episodic */
+    struct sqlite3 *cognition_db; /* shared DB for evolving + episodic */
 #endif
 };
 
@@ -296,8 +340,8 @@ void hu_agent_set_task_list(hu_agent_t *agent, hu_task_list_t *task_list);
 /* Optional: set retrieval engine for semantic/hybrid recall. Caller owns engine lifecycle. */
 void hu_agent_set_retrieval_engine(hu_agent_t *agent, hu_retrieval_engine_t *engine);
 
-/* Optional embedder for semantic skill routing in hu_agent_turn (same instance as retrieval is typical).
- * Not owned by the agent — cleared on deinit without calling embedder deinit. */
+/* Optional embedder for semantic skill routing in hu_agent_turn (same instance as retrieval is
+ * typical). Not owned by the agent — cleared on deinit without calling embedder deinit. */
 void hu_agent_set_skill_route_embedder(hu_agent_t *agent, hu_embedder_t *embedder);
 
 /* Optional: set awareness for situational context injection. Caller owns awareness lifecycle. */
