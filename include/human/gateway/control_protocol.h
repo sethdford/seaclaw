@@ -33,6 +33,8 @@ typedef struct hu_app_context {
     struct hu_push_manager *push;
     struct hu_agent *agent; /* gateway agent for persona.set; NULL when --with-agent not used */
     struct hu_graph *graph; /* knowledge graph for memory.graph RPC; NULL when not opened */
+    struct hu_mcp_resource_registry *mcp_resources; /* MCP resources registry; NULL if unused */
+    struct hu_mcp_prompt_registry *mcp_prompts;     /* MCP prompts registry; NULL if unused */
 } hu_app_context_t;
 
 typedef struct hu_control_protocol {

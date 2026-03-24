@@ -78,20 +78,74 @@ hu_error_t cp_admin_connect(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    static const char *const methods[] = {
-        "auth.token",      "connect",          "health",
-        "config.get",      "config.schema",    "capabilities",
-        "chat.send",       "chat.history",     "chat.abort",
-        "config.set",      "config.apply",     "sessions.list",
-        "sessions.patch",  "sessions.delete",  "persona.set",
-        "tools.catalog",   "channels.status",  "cron.list",
-        "cron.add",        "cron.remove",      "cron.run",
-        "cron.update",     "cron.runs",        "skills.list",
-        "skills.install",  "skills.enable",    "skills.disable",
-        "skills.search",   "skills.uninstall", "skills.update",
-        "update.check",    "update.run",       "exec.approval.resolve",
-        "usage.summary",   "models.list",      "nodes.list",
-        "activity.recent", "push.register",    "push.unregister"};
+    static const char *const methods[] = {"auth.token",
+                                          "connect",
+                                          "health",
+                                          "config.get",
+                                          "config.schema",
+                                          "capabilities",
+                                          "chat.send",
+                                          "chat.history",
+                                          "chat.abort",
+                                          "config.set",
+                                          "config.apply",
+                                          "sessions.list",
+                                          "sessions.patch",
+                                          "sessions.delete",
+                                          "persona.set",
+                                          "tools.catalog",
+                                          "channels.status",
+                                          "cron.list",
+                                          "cron.add",
+                                          "cron.remove",
+                                          "cron.run",
+                                          "cron.update",
+                                          "cron.runs",
+                                          "skills.list",
+                                          "skills.install",
+                                          "skills.enable",
+                                          "skills.disable",
+                                          "skills.search",
+                                          "skills.uninstall",
+                                          "skills.update",
+                                          "update.check",
+                                          "update.run",
+                                          "exec.approval.resolve",
+                                          "usage.summary",
+                                          "models.list",
+                                          "nodes.list",
+                                          "activity.recent",
+                                          "push.register",
+                                          "push.unregister",
+                                          "nodes.action",
+                                          "agents.list",
+                                          "voice.transcribe",
+                                          "voice.session.start",
+                                          "voice.session.stop",
+                                          "voice.session.interrupt",
+                                          "voice.audio.end",
+                                          "voice.config",
+                                          "metrics.snapshot",
+                                          "memory.status",
+                                          "memory.list",
+                                          "memory.recall",
+                                          "memory.store",
+                                          "memory.forget",
+                                          "memory.ingest",
+                                          "memory.consolidate",
+                                          "memory.graph",
+                                          "hula.traces.list",
+                                          "hula.traces.get",
+                                          "hula.traces.delete",
+                                          "hula.traces.analytics",
+                                          "auth.oauth.start",
+                                          "auth.oauth.callback",
+                                          "auth.oauth.refresh",
+                                          "turing.scores",
+                                          "turing.trend",
+                                          "turing.dimensions",
+                                          "mcp.resources.list",
+                                          "mcp.prompts.list"};
     for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
         hu_json_value_t *m = hu_json_string_new(alloc, methods[i], strlen(methods[i]));
         if (!m) {
@@ -679,7 +733,8 @@ hu_error_t cp_admin_nodes_action(hu_allocator_t *alloc, hu_app_context_t *app, h
     if (!node_id || !node_id[0] || !action || !action[0])
         return HU_ERR_INVALID_ARGUMENT;
 
-    if (strcmp(action, "restart") != 0 && strcmp(action, "stop") != 0 && strcmp(action, "status") != 0)
+    if (strcmp(action, "restart") != 0 && strcmp(action, "stop") != 0 &&
+        strcmp(action, "status") != 0)
         return HU_ERR_INVALID_ARGUMENT;
 
     if (!cp_admin_node_object_for_id(alloc, app, node_id))
@@ -749,9 +804,9 @@ hu_error_t cp_admin_agents_list(hu_allocator_t *alloc, hu_app_context_t *app, hu
 
 #if HU_IS_TEST
     (void)app;
-    static const char mock[] =
-        "{\"agents\":[{\"name\":\"main\",\"status\":\"idle\",\"model\":\"claude-sonnet-4-20250514\","
-        "\"turns\":0,\"uptime\":0}]}";
+    static const char mock[] = "{\"agents\":[{\"name\":\"main\",\"status\":\"idle\",\"model\":"
+                               "\"claude-sonnet-4-20250514\","
+                               "\"turns\":0,\"uptime\":0}]}";
     size_t mlen = strlen(mock);
     char *copy = (char *)alloc->alloc(alloc->ctx, mlen + 1);
     if (!copy)

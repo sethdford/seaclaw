@@ -93,6 +93,11 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"push.register", cp_admin_push_register},
     {"push.unregister", cp_admin_push_unregister},
 #endif
+    {"turing.scores", cp_turing_scores},
+    {"turing.trend", cp_turing_trend},
+    {"turing.dimensions", cp_turing_dimensions},
+    {"mcp.resources.list", cp_mcp_resources_list},
+    {"mcp.prompts.list", cp_mcp_prompts_list},
     {NULL, NULL},
 };
 

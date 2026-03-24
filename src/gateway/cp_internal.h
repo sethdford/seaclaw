@@ -232,8 +232,27 @@ hu_error_t cp_hula_traces_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
 hu_error_t cp_hula_traces_delete(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                                  const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                  char **out, size_t *out_len);
-hu_error_t cp_hula_traces_analytics(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
-                                    const hu_control_protocol_t *proto, const hu_json_value_t *root,
-                                    char **out, size_t *out_len);
+hu_error_t cp_hula_traces_analytics(hu_allocator_t *alloc, hu_app_context_t *app,
+                                    hu_ws_conn_t *conn, const hu_control_protocol_t *proto,
+                                    const hu_json_value_t *root, char **out, size_t *out_len);
+
+/* Turing score RPC handlers */
+hu_error_t cp_turing_scores(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                            const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                            char **out, size_t *out_len);
+hu_error_t cp_turing_trend(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                           const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                           char **out, size_t *out_len);
+hu_error_t cp_turing_dimensions(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                char **out, size_t *out_len);
+
+/* MCP Resources + Prompts RPC handlers */
+hu_error_t cp_mcp_resources_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                 const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                 char **out, size_t *out_len);
+hu_error_t cp_mcp_prompts_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                               const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                               char **out, size_t *out_len);
 
 #endif /* HU_CP_INTERNAL_H */
