@@ -71,7 +71,13 @@ const chapterCount = 15;
 <html lang="en">
   <head>
     <script is:inline>
-      (function(){var s=localStorage.getItem("hu-theme");var m=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s||m})();
+      (function () {
+        var s = localStorage.getItem("hu-theme");
+        var m = window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+        document.documentElement.dataset.theme = s || m;
+      })();
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -165,10 +171,22 @@ const chapterCount = 15;
     />
     <style is:global>
       /* Critical hero CSS — inline for fast LCP (paint before external CSS) */
-      :root { --color-bg-inline: #fafaf9; }
-      @media (prefers-color-scheme: dark) { :root { --color-bg-inline: #0a0a0a; } }
+      :root {
+        --color-bg-inline: #fafaf9;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --color-bg-inline: #0a0a0a;
+        }
+      }
       body {
-        font-family: "Avenir", "Avenir Next", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        font-family:
+          "Avenir",
+          "Avenir Next",
+          -apple-system,
+          BlinkMacSystemFont,
+          system-ui,
+          sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         background: var(--color-bg-inline);
@@ -193,8 +211,16 @@ const chapterCount = 15;
         letter-spacing: -0.04em;
         line-height: 1;
       }
-      .hero-logo, .hero-headline { opacity: 1; transform: none; }
-      .hero-desc, .hero-mission, .hero-proof, .hero-buttons, .hero-fade-in {
+      .hero-logo,
+      .hero-headline {
+        opacity: 1;
+        transform: none;
+      }
+      .hero-desc,
+      .hero-mission,
+      .hero-proof,
+      .hero-buttons,
+      .hero-fade-in {
         opacity: 0;
       }
       /* Below-fold: defer layout/paint until near viewport (hero / LCP stays prioritized) */
@@ -223,7 +249,11 @@ const chapterCount = 15;
         --color-accent-glow: var(--hu-accent-subtle);
         --color-border: var(--hu-border-subtle);
         --color-line-stroke: var(--hu-border-subtle);
-        --color-node-fill: color-mix(in srgb, var(--hu-bg-surface) 80%, transparent);
+        --color-node-fill: color-mix(
+          in srgb,
+          var(--hu-bg-surface) 80%,
+          transparent
+        );
         --color-node-stroke: color-mix(in srgb, var(--hu-text) 8%, transparent);
         /* Terminal panel: dynamic neutrals stay dark on light pages */
         --color-terminal-bg: var(--hu-dynamic-neutral-200);
@@ -232,13 +262,25 @@ const chapterCount = 15;
         /* Pills — status / chart-adjacent semantic colors */
         --color-pill-provider: var(--hu-info);
         --color-pill-provider-bg: var(--hu-info-dim);
-        --color-pill-provider-border: color-mix(in srgb, var(--hu-info) 22%, transparent);
+        --color-pill-provider-border: color-mix(
+          in srgb,
+          var(--hu-info) 22%,
+          transparent
+        );
         --color-pill-channel: var(--hu-success);
         --color-pill-channel-bg: var(--hu-success-dim);
-        --color-pill-channel-border: color-mix(in srgb, var(--hu-success) 22%, transparent);
+        --color-pill-channel-border: color-mix(
+          in srgb,
+          var(--hu-success) 22%,
+          transparent
+        );
         --color-pill-tool: var(--hu-warning);
         --color-pill-tool-bg: var(--hu-warning-dim);
-        --color-pill-tool-border: color-mix(in srgb, var(--hu-warning) 22%, transparent);
+        --color-pill-tool-border: color-mix(
+          in srgb,
+          var(--hu-warning) 22%,
+          transparent
+        );
       }
     </style>
   </head>
@@ -369,7 +411,11 @@ const chapterCount = 15;
       </section>
 
       {/* ═══ SOCIAL PROOF (Built for) ═══ */}
-      <section id="chapter-1" class="social-proof relative hu-chapter-reveal py-16 md:py-20 px-6" aria-label="Capabilities">
+      <section
+        id="chapter-1"
+        class="social-proof relative hu-chapter-reveal py-16 md:py-20 px-6"
+        aria-label="Capabilities"
+      >
         <span class="hu-chapter-label" aria-hidden="true">01</span>
         <div class="max-w-5xl mx-auto">
           <p
@@ -378,42 +424,134 @@ const chapterCount = 15;
           >
             Built for
           </p>
-          <div class="proof-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 md:gap-6">
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 0">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z" />
+          <div
+            class="proof-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 md:gap-6"
+          >
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 0"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">CLI Automation</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">CLI Automation</span
+              >
             </div>
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 1">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z" />
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 1"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">DevOps</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">DevOps</span
+              >
             </div>
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 2">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z" />
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 2"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">Security</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">Security</span
+              >
             </div>
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 3">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z" />
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 3"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">Research</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">Research</span
+              >
             </div>
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 4">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z" />
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 4"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">IoT</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">IoT</span
+              >
             </div>
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 5">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z" />
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 5"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">Enterprise</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">Enterprise</span
+              >
             </div>
           </div>
           <div class="github-badge mt-10 flex justify-center">
@@ -438,7 +576,11 @@ const chapterCount = 15;
       </section>
 
       {/* ═══ INTERACTIVE DEMO (Terminal replay) ═══ */}
-      <section id="chapter-2" class="demo-section relative hu-chapter-reveal py-20 md:py-28 px-6 cv-defer" aria-label="Product demo">
+      <section
+        id="chapter-2"
+        class="demo-section relative hu-chapter-reveal py-20 md:py-28 px-6 cv-defer"
+        aria-label="Product demo"
+      >
         <span class="hu-chapter-label" aria-hidden="true">02</span>
         <div class="max-w-4xl mx-auto">
           <h2
@@ -458,16 +600,39 @@ const chapterCount = 15;
               class="terminal-header flex items-center gap-2 px-4 py-3"
               style="background: var(--color-terminal-chrome); border-bottom: 1px solid var(--color-terminal-border);"
             >
-              <span class="terminal-dot red w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-close)"></span>
-              <span class="terminal-dot yellow w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-minimize)"></span>
-              <span class="terminal-dot green w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-maximize)"></span>
-              <span class="terminal-title ml-2 text-[13px] font-medium" style="color: var(--hu-text-muted)">human</span>
+              <span
+                class="terminal-dot red w-3 h-3 rounded-full shrink-0"
+                style="background: var(--hu-terminal-close)"></span>
+              <span
+                class="terminal-dot yellow w-3 h-3 rounded-full shrink-0"
+                style="background: var(--hu-terminal-minimize)"></span>
+              <span
+                class="terminal-dot green w-3 h-3 rounded-full shrink-0"
+                style="background: var(--hu-terminal-maximize)"></span>
+              <span
+                class="terminal-title ml-2 text-[13px] font-medium"
+                style="color: var(--hu-text-muted)">human</span
+              >
             </div>
-            <div class="terminal-body px-6 py-5 font-mono text-[14px] leading-relaxed" style="color: var(--hu-text);">
-              <div class="terminal-line" style="--line-delay: 0"><span style="color: var(--color-accent)">$</span> human chat</div>
-              <div class="terminal-line" style="--line-delay: 1"><span style="color: var(--color-accent)">human&gt;</span> Summarize the latest commits</div>
-              <div class="terminal-line response" style="--line-delay: 2">Analyzing 12 commits from the last 24 hours...</div>
-              <div class="terminal-line response" style="--line-delay: 3">3 features, 2 fixes, 1 refactor. Key changes: agent loop optimization, new Discord channel, security hardening for tool execution.</div>
+            <div
+              class="terminal-body px-6 py-5 font-mono text-[14px] leading-relaxed"
+              style="color: var(--hu-text);"
+            >
+              <div class="terminal-line" style="--line-delay: 0">
+                <span style="color: var(--color-accent)">$</span> human chat
+              </div>
+              <div class="terminal-line" style="--line-delay: 1">
+                <span style="color: var(--color-accent)">human&gt;</span> Summarize
+                the latest commits
+              </div>
+              <div class="terminal-line response" style="--line-delay: 2">
+                Analyzing 12 commits from the last 24 hours...
+              </div>
+              <div class="terminal-line response" style="--line-delay: 3">
+                3 features, 2 fixes, 1 refactor. Key changes: agent loop
+                optimization, new Discord channel, security hardening for tool
+                execution.
+              </div>
             </div>
           </div>
         </div>
@@ -477,7 +642,10 @@ const chapterCount = 15;
 
       {/* ═══ THE NUMBERS ═══ */}
 
-      <section id="chapter-3" class="relative hu-chapter-reveal py-16 md:py-24 px-6 cv-defer">
+      <section
+        id="chapter-3"
+        class="relative hu-chapter-reveal py-16 md:py-24 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">03</span>
         <div class="max-w-5xl mx-auto numbers-section">
           <div
@@ -527,7 +695,10 @@ const chapterCount = 15;
 
       {/* ═══ THE PROBLEM ═══ */}
 
-      <section id="chapter-4" class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer">
+      <section
+        id="chapter-4"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">04</span>
         <div class="max-w-5xl mx-auto">
           <div class="grid md:grid-cols-2 gap-16 items-center">
@@ -879,7 +1050,10 @@ const chapterCount = 15;
 
       {/* ═══ THE CONTRAST ═══ */}
 
-      <section id="chapter-5" class="relative hu-chapter-reveal py-12 md:py-20 px-6 cv-defer">
+      <section
+        id="chapter-5"
+        class="relative hu-chapter-reveal py-12 md:py-20 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">05</span>
         <div class="max-w-3xl mx-auto">
           <div
@@ -946,7 +1120,10 @@ const chapterCount = 15;
 
       {/* ═══ CRYSTAL GRID — What's inside 1,696 KB ═══ */}
 
-      <section id="chapter-6" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+      <section
+        id="chapter-6"
+        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">06</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
@@ -995,7 +1172,10 @@ const chapterCount = 15;
 
       {/* ═══ DEVICE SPECTRUM — SVG Illustrations ═══ */}
 
-      <section id="chapter-7" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+      <section
+        id="chapter-7"
+        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+      >
         <span id="use-cases" class="sr-only">Use cases</span>
         <span class="hu-chapter-label" aria-hidden="true">07</span>
         <div class="max-w-5xl mx-auto">
@@ -1526,7 +1706,10 @@ const chapterCount = 15;
 
       {/* ═══ ARCHITECTURE ═══ */}
 
-      <section id="chapter-8" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+      <section
+        id="chapter-8"
+        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+      >
         <span id="architecture" class="sr-only">Architecture</span>
         <span class="hu-chapter-label" aria-hidden="true">08</span>
         <div class="ambient-coral" style="top: 20%; left: 10%;"></div>
@@ -1707,7 +1890,10 @@ const chapterCount = 15;
 
       {/* ═══ HULA — Programs, Not Prompts ═══ */}
 
-      <section id="chapter-9" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+      <section
+        id="chapter-9"
+        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">09</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
@@ -1721,40 +1907,115 @@ const chapterCount = 15;
             data-reveal
             style="color: var(--color-text-secondary)"
           >
-            HuLa is a typed intermediate representation that turns tool calls into composable,
-            traceable, policy-checked programs. Eight opcodes. Automatic skill promotion.
+            HuLa is a typed intermediate representation that turns tool calls
+            into composable, traceable, policy-checked programs. Eight opcodes.
+            Automatic skill promotion.
           </p>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
-            <div class="glass glass-enter flex flex-col items-center gap-4 px-6 py-8 rounded-xl" data-reveal="scale" style="--ri: 0">
-              <svg class="w-10 h-10 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z" />
+            <div
+              class="glass glass-enter flex flex-col items-center gap-4 px-6 py-8 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 0"
+            >
+              <svg
+                class="w-10 h-10 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z"
+                ></path>
               </svg>
-              <span class="text-base font-semibold" style="color: var(--color-text)">Structured Execution</span>
-              <span class="text-sm text-center" style="color: var(--color-text-secondary)">call, seq, par, branch, loop, delegate, emit, assert — composable by design.</span>
+              <span
+                class="text-base font-semibold"
+                style="color: var(--color-text)">Structured Execution</span
+              >
+              <span
+                class="text-sm text-center"
+                style="color: var(--color-text-secondary)"
+                >call, seq, par, branch, loop, delegate, emit, assert —
+                composable by design.</span
+              >
             </div>
-            <div class="glass glass-enter flex flex-col items-center gap-4 px-6 py-8 rounded-xl" data-reveal="scale" style="--ri: 1">
-              <svg class="w-10 h-10 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M232,56V200a8,8,0,0,1-8,8H32a8,8,0,0,1,0-16H216V56a8,8,0,0,1,16,0ZM80,192a40,40,0,1,0-40-40A40,40,0,0,0,80,192Zm0-64a24,24,0,1,1-24,24A24,24,0,0,1,80,128Zm96-8a40,40,0,1,0-40-40A40,40,0,0,0,176,120Zm0-64a24,24,0,1,1-24,24A24,24,0,0,1,176,56Z" />
+            <div
+              class="glass glass-enter flex flex-col items-center gap-4 px-6 py-8 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 1"
+            >
+              <svg
+                class="w-10 h-10 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M232,56V200a8,8,0,0,1-8,8H32a8,8,0,0,1,0-16H216V56a8,8,0,0,1,16,0ZM80,192a40,40,0,1,0-40-40A40,40,0,0,0,80,192Zm0-64a24,24,0,1,1-24,24A24,24,0,0,1,80,128Zm96-8a40,40,0,1,0-40-40A40,40,0,0,0,176,120Zm0-64a24,24,0,1,1-24,24A24,24,0,0,1,176,56Z"
+                ></path>
               </svg>
-              <span class="text-base font-semibold" style="color: var(--color-text)">Skill Promotion</span>
-              <span class="text-sm text-center" style="color: var(--color-text-secondary)">Successful traces get promoted to reusable skills automatically — the agent learns from execution.</span>
+              <span
+                class="text-base font-semibold"
+                style="color: var(--color-text)">Skill Promotion</span
+              >
+              <span
+                class="text-sm text-center"
+                style="color: var(--color-text-secondary)"
+                >Successful traces get promoted to reusable skills automatically
+                — the agent learns from execution.</span
+              >
             </div>
-            <div class="glass glass-enter flex flex-col items-center gap-4 px-6 py-8 rounded-xl" data-reveal="scale" style="--ri: 2">
-              <svg class="w-10 h-10 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z" />
+            <div
+              class="glass glass-enter flex flex-col items-center gap-4 px-6 py-8 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 2"
+            >
+              <svg
+                class="w-10 h-10 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z"
+                ></path>
               </svg>
-              <span class="text-base font-semibold" style="color: var(--color-text)">Secure by Default</span>
-              <span class="text-sm text-center" style="color: var(--color-text-secondary)">Every program node checked against runtime policy before execution. Deny-by-default.</span>
+              <span
+                class="text-base font-semibold"
+                style="color: var(--color-text)">Secure by Default</span
+              >
+              <span
+                class="text-sm text-center"
+                style="color: var(--color-text-secondary)"
+                >Every program node checked against runtime policy before
+                execution. Deny-by-default.</span
+              >
             </div>
           </div>
 
-          <div class="glass rounded-xl p-6 text-left max-w-xl mx-auto" data-reveal>
-            <div class="text-xs font-mono mb-3" style="color: var(--color-text-tertiary)">example.hula.json</div>
-            <pre class="text-sm font-mono leading-relaxed overflow-x-auto" style="color: var(--color-text-secondary)"><code set:html={`{\n  "name": "deploy-review",\n  "root": "main",\n  "nodes": {\n    "main": { "op": "seq", "children": ["lint", "test", "deploy"] },\n    "lint":   { "op": "call", "tool": "shell", "args": { "cmd": "npm run lint" } },\n    "test":   { "op": "call", "tool": "shell", "args": { "cmd": "npm test" } },\n    "deploy": { "op": "call", "tool": "shell", "args": { "cmd": "npm run deploy" } }\n  }\n}`} /></pre>
+          <div
+            class="glass rounded-xl p-6 text-left max-w-xl mx-auto"
+            data-reveal
+          >
+            <div
+              class="text-xs font-mono mb-3"
+              style="color: var(--color-text-tertiary)"
+            >
+              example.hula.json
+            </div>
+            <pre
+              class="text-sm font-mono leading-relaxed overflow-x-auto"
+              style="color: var(--color-text-secondary)"><code set:html={`{\n  "name": "deploy-review",\n  "root": "main",\n  "nodes": {\n    "main": { "op": "seq", "children": ["lint", "test", "deploy"] },\n    "lint":   { "op": "call", "tool": "shell", "args": { "cmd": "npm run lint" } },\n    "test":   { "op": "call", "tool": "shell", "args": { "cmd": "npm test" } },\n    "deploy": { "op": "call", "tool": "shell", "args": { "cmd": "npm run deploy" } }\n  }\n}`} /></pre>
           </div>
 
-          <a href="/features/hula/" class="btn-outline mt-8 inline-block" data-reveal>
+          <a
+            href="/features/hula/"
+            class="btn-outline mt-8 inline-block"
+            data-reveal
+          >
             Learn more about HuLa
           </a>
         </div>
@@ -1764,7 +2025,10 @@ const chapterCount = 15;
 
       {/* ═══ ECOSYSTEM — Categorized Cards ═══ */}
 
-      <section id="chapter-10" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+      <section
+        id="chapter-10"
+        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">10</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
@@ -1896,7 +2160,10 @@ const chapterCount = 15;
 
       {/* ═══ TERMINAL ═══ */}
 
-      <section id="chapter-11" class="section-spacing relative hu-chapter-reveal px-6 cv-defer">
+      <section
+        id="chapter-11"
+        class="section-spacing relative hu-chapter-reveal px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">11</span>
         <div class="max-w-3xl mx-auto">
           <h2
@@ -1951,7 +2218,10 @@ const chapterCount = 15;
 
       {/* ═══ DASHBOARD PREVIEW ═══ */}
 
-      <section id="chapter-12" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+      <section
+        id="chapter-12"
+        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">12</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
@@ -1989,8 +2259,7 @@ const chapterCount = 15;
                 style="background: var(--hu-terminal-maximize)"></span>
               <span
                 class="text-[11px] ml-2 font-mono"
-                style="color: var(--hu-text-muted)"
-                >h-uman Dashboard</span
+                style="color: var(--hu-text-muted)">h-uman Dashboard</span
               >
               <span
                 class="ml-auto text-[11px] px-2 py-0.5 rounded-full"
@@ -2158,7 +2427,10 @@ const chapterCount = 15;
 
       {/* ═══ QUALITY — Ring Gauges ═══ */}
 
-      <section id="chapter-13" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+      <section
+        id="chapter-13"
+        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">13</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
@@ -2272,7 +2544,10 @@ const chapterCount = 15;
 
       {/* ═══ COMPARISON — Tufte-inspired direct-label bars ═══ */}
 
-      <section id="chapter-14" class="relative hu-chapter-reveal py-16 md:py-24 cv-defer">
+      <section
+        id="chapter-14"
+        class="relative hu-chapter-reveal py-16 md:py-24 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">14</span>
         <div class="max-w-4xl mx-auto px-4">
           <h2
@@ -2429,7 +2704,10 @@ const chapterCount = 15;
 
       {/* ═══ CTA ═══ */}
 
-      <section id="chapter-15" class="relative hu-chapter-reveal py-20 md:py-40 px-6 cv-defer">
+      <section
+        id="chapter-15"
+        class="relative hu-chapter-reveal py-20 md:py-40 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">15</span>
         <div class="ambient-coral" style="top: 30%; left: 30%;"></div>
         <div class="ambient-blue" style="top: 40%; right: 20%;"></div>
@@ -2531,8 +2809,8 @@ const chapterCount = 15;
             if (el) sections.push(el);
           }
           if (sections.length && dots.length) {
-            var setActive = function(index) {
-              dots.forEach(function(d, i) {
+            var setActive = function (index) {
+              dots.forEach(function (d, i) {
                 var on = i === index;
                 d.classList.toggle("active", on);
                 var inner = d.querySelector(".chapter-dot-inner");
@@ -2540,8 +2818,8 @@ const chapterCount = 15;
               });
             };
             var obs = new IntersectionObserver(
-              function(entries) {
-                entries.forEach(function(entry) {
+              function (entries) {
+                entries.forEach(function (entry) {
                   if (!entry.isIntersecting) return;
                   var idx = sections.indexOf(entry.target);
                   if (idx >= 0) setActive(idx);
@@ -2549,7 +2827,9 @@ const chapterCount = 15;
               },
               { threshold: 0, rootMargin: "-42% 0px -42% 0px" },
             );
-            sections.forEach(function(s) { obs.observe(s); });
+            sections.forEach(function (s) {
+              obs.observe(s);
+            });
             setActive(0);
           }
         }
@@ -3084,7 +3364,14 @@ const chapterCount = 15;
           }
         };
         if ("requestIdleCallback" in window) {
-          (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(initParticles, { timeout: 2000 });
+          (
+            window as unknown as {
+              requestIdleCallback: (
+                cb: () => void,
+                opts?: { timeout: number },
+              ) => number;
+            }
+          ).requestIdleCallback(initParticles, { timeout: 2000 });
         } else {
           setTimeout(initParticles, 2000);
         }
@@ -3220,8 +3507,7 @@ const chapterCount = 15;
             p[j] = tmp;
           }
           for (let i = 0; i < 256; i++) p[i + 256] = p[i];
-          const fade = (t: number) =>
-            t * t * t * (t * (t * 6 - 15) + 10);
+          const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
           const lerp = (t: number, a: number, b: number) => a + t * (b - a);
           const grad = (hash: number, x: number, y: number, z: number) => {
             const h = hash & 15;
@@ -3249,11 +3535,7 @@ const chapterCount = 15;
               w,
               lerp(
                 v,
-                lerp(
-                  u,
-                  grad(p[AA], xf, yf, zf),
-                  grad(p[BA], xf - 1, yf, zf),
-                ),
+                lerp(u, grad(p[AA], xf, yf, zf), grad(p[BA], xf - 1, yf, zf)),
                 lerp(
                   u,
                   grad(p[AB], xf, yf - 1, zf),
@@ -3665,8 +3947,7 @@ const chapterCount = 15;
         const updateScrollDepth = () => {
           const scrollH =
             document.documentElement.scrollHeight - window.innerHeight;
-          const depth =
-            scrollH > 0 ? Math.min(window.scrollY / scrollH, 1) : 0;
+          const depth = scrollH > 0 ? Math.min(window.scrollY / scrollH, 1) : 0;
           root.style.setProperty("--hu-scroll-depth", depth.toFixed(3));
         };
         let depthTicking = false;
@@ -3688,22 +3969,23 @@ const chapterCount = 15;
     </script>
     <script is:inline>
       /* Defer heavy visual effects until after LCP */
-      new PerformanceObserver(function(list) {
-        list.getEntries().forEach(function() {
-          document.documentElement.classList.add('hu-lcp-done');
-          document.body.classList.add('hu-ambient-ready');
+      new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function () {
+          document.documentElement.classList.add("hu-lcp-done");
+          document.body.classList.add("hu-ambient-ready");
         });
-      }).observe({type: 'largest-contentful-paint', buffered: true});
+      }).observe({ type: "largest-contentful-paint", buffered: true });
       /* Fallback for browsers without LCP observer */
-      setTimeout(function() {
-        document.documentElement.classList.add('hu-lcp-done');
-        document.body.classList.add('hu-ambient-ready');
+      setTimeout(function () {
+        document.documentElement.classList.add("hu-lcp-done");
+        document.body.classList.add("hu-ambient-ready");
       }, 1500);
     </script>
     <script is:inline>
       (function () {
         var K = "hu-audio-enabled";
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+          return;
         var x = null;
         var ht = 0;
         function on() {
@@ -3711,7 +3993,10 @@ const chapterCount = 15;
         }
         function ctx() {
           if (!on()) return null;
-          if (!x) { var AC = window.AudioContext || window["webkitAudioContext"]; x = new AC(); }
+          if (!x) {
+            var AC = window.AudioContext || window["webkitAudioContext"];
+            x = new AC();
+          }
           if (x.state === "suspended") x.resume();
           return x;
         }
@@ -3778,7 +4063,8 @@ const chapterCount = 15;
           if (!el || typeof el.closest !== "function") return;
           var card = el.closest(".proof-item, .feature-card");
           if (!card) return;
-          if (e.relatedTarget instanceof Node && card.contains(e.relatedTarget)) return;
+          if (e.relatedTarget instanceof Node && card.contains(e.relatedTarget))
+            return;
           var n = performance.now();
           if (n - ht < 100) return;
           ht = n;

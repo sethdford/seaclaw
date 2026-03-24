@@ -47,6 +47,7 @@ _human() {
                 paperclip:Paperclip agent integration
                 persona:Persona management
                 research:Run research agent
+                plugins:Plugin management
                 pwa:PWA browser automation
                 sandbox:Sandbox management
                 eval:Run evaluation harness

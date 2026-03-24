@@ -173,10 +173,12 @@
 /* ── Branded scrollbar (after base; matches dashboard) ── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--hu-accent) 40%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--hu-accent) 40%, transparent)
+    transparent;
 }
 *:hover {
-  scrollbar-color: color-mix(in srgb, var(--hu-accent) 60%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--hu-accent) 60%, transparent)
+    transparent;
 }
 ::-webkit-scrollbar {
   width: 6px;
