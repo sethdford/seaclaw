@@ -33,7 +33,10 @@ jobs:
       - name: Validate eval suites
         run: ./build/human eval validate eval_suites/
       - name: Check eval regression
-        run: ./build/human eval check-regression eval_suites/
+        run: |
+          mkdir -p "$HOME/.human"
+          echo '{"default_provider":"openai","default_model":"gpt-4o-mini","memory":{"backend":"sqlite"}}' > "$HOME/.human/config.json"
+          ./build/human eval check-regression eval_suites/
       - name: Persona CLI smoke test
         run: |
           ./build/human persona list
