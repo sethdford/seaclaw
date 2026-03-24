@@ -1680,7 +1680,7 @@ dd {
   inset: 0;
   pointer-events: none;
   z-index: 9998;
-  opacity: 0.03;
+  opacity: var(--hu-film-grain-opacity, 0.03);
   /* Cacheable asset — mirror: website/public/noise-grain.svg, docs/design-assets/noise-grain.svg */
   background-image: url("/noise-grain.svg");
   mix-blend-mode: overlay;

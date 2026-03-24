@@ -177,6 +177,7 @@ static const char *LIVE_AGENT_JSON =
 
 /* Stubbed: hu_live_agent_task_t / hu_benchmark_live_agent_* APIs not yet implemented */
 static void benchmark_live_agent_load(void) {
+    (void)LIVE_AGENT_JSON;
     HU_ASSERT_TRUE(1 == 1);
 }
 static void benchmark_live_agent_load_null(void) {
@@ -203,6 +204,7 @@ static const char *APEX_JSON =
 
 /* Stubbed: hu_apex_task_t / hu_benchmark_apex_* APIs not yet implemented */
 static void benchmark_apex_load(void) {
+    (void)APEX_JSON;
     HU_ASSERT_TRUE(1 == 1);
 }
 static void benchmark_apex_load_null(void) {
