@@ -70,6 +70,34 @@ All errors return JSON:
 - Methods scoped to authenticated sessions
 - Binary frames rejected; text-only protocol
 
+### HuLa Trace Methods
+
+| Method | Description | Request Params | Response |
+| --- | --- | --- | --- |
+| `hula.traces.list` | List all HuLa execution traces | `{}` | `{ traces: [{ id, name, status, started_at, ended_at }] }` |
+| `hula.traces.get` | Get a single trace by ID | `{ id: string }` | `{ trace: { id, name, status, nodes, steps, started_at, ended_at } }` |
+| `hula.traces.delete` | Delete a trace by ID | `{ id: string }` | `{ ok: true }` |
+| `hula.traces.analytics` | Aggregate trace statistics | `{}` | `{ summary: { file_count, success_count, fail_count, total_trace_steps, newest_ts } }` |
+
+### Memory Methods
+
+| Method | Description |
+| --- | --- |
+| `memory.status` | Memory subsystem health and stats |
+| `memory.list` | List stored memory entries |
+| `memory.recall` | Retrieve entries matching a query |
+| `memory.store` | Store a new memory entry |
+| `memory.forget` | Remove a memory entry |
+| `memory.ingest` | Ingest external content into memory |
+| `memory.consolidate` | Trigger memory consolidation |
+
+### Metrics / Turing Methods
+
+| Method | Description |
+| --- | --- |
+| `metrics.snapshot` | Full metrics snapshot (health, intelligence, BTH counters) |
+| `turing.dimensions` | Turing test dimension scores (natural language, emotional intelligence, etc.) |
+
 ---
 
 ## Anti-Patterns

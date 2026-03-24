@@ -22,7 +22,7 @@ Response: `{ "id": "uuid", ...result }` or `{ "id": "uuid", "error": "message" }
 
 All methods follow `noun.verb` convention (e.g., `chat.send`, `sessions.list`).
 
-## Method Catalog (45+ methods; optional features add more)
+## Method Catalog (49 methods)
 
 | Namespace    | Methods |
 |-------------|---------|
@@ -43,7 +43,10 @@ All methods follow `noun.verb` convention (e.g., `chat.send`, `sessions.list`).
 | `auth`      | `token`, `oauth.start`, `oauth.callback`, `oauth.refresh` |
 | `exec`      | `approval.resolve` |
 | `push`      | `register`, `unregister` |
-| `hula`      | `traces.list`, `traces.get`, `traces.delete`, `traces.analytics` (POSIX; dir = `HU_HULA_TRACE_DIR` or `~/.human/hula_traces`) |
+| `memory`    | `status`, `list`, `recall`, `store`, `forget`, `ingest`, `consolidate` |
+| `hula`      | `traces.list`, `traces.get`, `traces.delete`, `traces.analytics` |
+| `metrics`   | `snapshot` |
+| `turing`    | `dimensions` |
 | Singletons  | `connect`, `health`, `capabilities` |
 
 ## Demo Gateway Rules

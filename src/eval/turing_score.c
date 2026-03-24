@@ -6,15 +6,24 @@
 #include <time.h>
 
 static const char *DIMENSION_NAMES[HU_TURING_DIM_COUNT] = {
-    "natural_language",         "emotional_intelligence",
-    "appropriate_length",       "personality_consistency",
-    "vulnerability_willingness", "humor_naturalness",
-    "imperfection",             "opinion_having",
-    "energy_matching",          "context_awareness",
-    "non_robotic",              "genuine_warmth",
-    "prosody_naturalness",      "turn_timing",
-    "filler_usage",             "emotional_prosody",
-    "conversational_repair",    "paralinguistic_cues",
+    "natural_language",
+    "emotional_intelligence",
+    "appropriate_length",
+    "personality_consistency",
+    "vulnerability_willingness",
+    "humor_naturalness",
+    "imperfection",
+    "opinion_having",
+    "energy_matching",
+    "context_awareness",
+    "non_robotic",
+    "genuine_warmth",
+    "prosody_naturalness",
+    "turn_timing",
+    "filler_usage",
+    "emotional_prosody",
+    "conversational_repair",
+    "paralinguistic_cues",
 };
 
 static int ci_has(const char *haystack, size_t len, const char *needle) {
@@ -23,7 +32,8 @@ static int ci_has(const char *haystack, size_t len, const char *needle) {
         return 0;
     for (size_t i = 0; i + nlen <= len; i++) {
         size_t j = 0;
-        while (j < nlen && tolower((unsigned char)haystack[i + j]) == tolower((unsigned char)needle[j]))
+        while (j < nlen &&
+               tolower((unsigned char)haystack[i + j]) == tolower((unsigned char)needle[j]))
             j++;
         if (j == nlen)
             return 1;
@@ -33,8 +43,8 @@ static int ci_has(const char *haystack, size_t len, const char *needle) {
 
 static int count_ai_tells(const char *s, size_t len) {
     static const char *tells[] = {
-        "I'd be happy to", "certainly", "feel free", "as an AI",
-        "I understand",    "absolutely", "I appreciate", "definitely",
+        "I'd be happy to", "certainly",      "feel free",    "as an AI",
+        "I understand",    "absolutely",     "I appreciate", "definitely",
         "I can help",      "great question", "I'm here to",
     };
     int count = 0;
@@ -72,8 +82,8 @@ static int count_structural_tells(const char *s, size_t len) {
 }
 
 static int has_contractions(const char *s, size_t len) {
-    static const char *contrs[] = {"i'm", "don't", "can't", "won't", "i'll",
-                                    "it's", "that's", "they're", "we're", "you're"};
+    static const char *contrs[] = {"i'm",  "don't",  "can't",   "won't", "i'll",
+                                   "it's", "that's", "they're", "we're", "you're"};
     for (size_t i = 0; i < sizeof(contrs) / sizeof(contrs[0]); i++) {
         if (ci_has(s, len, contrs[i]))
             return 1;
@@ -83,7 +93,7 @@ static int has_contractions(const char *s, size_t len) {
 
 static int has_casual_markers(const char *s, size_t len) {
     static const char *markers[] = {"haha", "lol", "omg", "nah", "yeah",
-                                     "tbh",  "rn",  "ngl", "imo", "lmao"};
+                                    "tbh",  "rn",  "ngl", "imo", "lmao"};
     int count = 0;
     for (size_t i = 0; i < sizeof(markers) / sizeof(markers[0]); i++) {
         if (ci_has(s, len, markers[i]))
@@ -93,9 +103,8 @@ static int has_casual_markers(const char *s, size_t len) {
 }
 
 static int has_emotional_words(const char *s, size_t len) {
-    static const char *words[] = {"love",   "miss",    "worried", "happy",
-                                   "sad",    "excited", "scared",  "angry",
-                                   "sorry",  "proud",   "hurt",    "grateful"};
+    static const char *words[] = {"love",   "miss",  "worried", "happy", "sad",  "excited",
+                                  "scared", "angry", "sorry",   "proud", "hurt", "grateful"};
     int count = 0;
     for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); i++) {
         if (ci_has(s, len, words[i]))
@@ -120,8 +129,7 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     (void)context_len;
 
     /* natural_language: penalize AI tells and structural markers */
-    out->dimensions[HU_TURING_NATURAL_LANGUAGE] =
-        10 - ai_tells * 2 - structural;
+    out->dimensions[HU_TURING_NATURAL_LANGUAGE] = 10 - ai_tells * 2 - structural;
     if (contractions)
         out->dimensions[HU_TURING_NATURAL_LANGUAGE] += 1;
     if (casual > 0)
@@ -149,15 +157,14 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
 
     /* vulnerability_willingness: emotional words + first person */
     out->dimensions[HU_TURING_VULNERABILITY_WILLINGNESS] = 5;
-    if (emotional > 0 && (ci_has(response, response_len, "i feel") ||
-                          ci_has(response, response_len, "i'm") ||
-                          ci_has(response, response_len, "honestly")))
+    if (emotional > 0 &&
+        (ci_has(response, response_len, "i feel") || ci_has(response, response_len, "i'm") ||
+         ci_has(response, response_len, "honestly")))
         out->dimensions[HU_TURING_VULNERABILITY_WILLINGNESS] = 8;
 
     /* humor_naturalness: casual markers as proxy */
     out->dimensions[HU_TURING_HUMOR_NATURALNESS] = 5;
-    if (ci_has(response, response_len, "haha") ||
-        ci_has(response, response_len, "lol") ||
+    if (ci_has(response, response_len, "haha") || ci_has(response, response_len, "lol") ||
         ci_has(response, response_len, "lmao"))
         out->dimensions[HU_TURING_HUMOR_NATURALNESS] = 7;
 
@@ -200,9 +207,12 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     /* prosody_naturalness: inferred from punctuation variety (excl/question/ellipsis) */
     {
         int punct_variety = 0;
-        if (memchr(response, '!', response_len)) punct_variety++;
-        if (memchr(response, '?', response_len)) punct_variety++;
-        if (ci_has(response, response_len, "...")) punct_variety++;
+        if (memchr(response, '!', response_len))
+            punct_variety++;
+        if (memchr(response, '?', response_len))
+            punct_variety++;
+        if (ci_has(response, response_len, "..."))
+            punct_variety++;
         out->dimensions[HU_TURING_PROSODY_NATURALNESS] = 5 + punct_variety;
     }
 
@@ -231,7 +241,8 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     /* conversational_repair: self-corrections ("I mean", "wait", "actually") */
     {
         int repairs = 0;
-        if (ci_has(response, response_len, "i mean")) repairs++;
+        if (ci_has(response, response_len, "i mean"))
+            repairs++;
         if (ci_has(response, response_len, "wait,") || ci_has(response, response_len, "wait "))
             repairs++;
         if (ci_has(response, response_len, "actually,") ||
@@ -275,11 +286,11 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     /* Build tell/signal strings */
     size_t pos = 0;
     if (ai_tells > 0 && pos < sizeof(out->ai_tells) - 20)
-        pos += (size_t)snprintf(out->ai_tells + pos, sizeof(out->ai_tells) - pos,
-                                "ai_phrases=%d ", ai_tells);
+        pos += (size_t)snprintf(out->ai_tells + pos, sizeof(out->ai_tells) - pos, "ai_phrases=%d ",
+                                ai_tells);
     if (structural > 0 && pos < sizeof(out->ai_tells) - 20)
-        pos += (size_t)snprintf(out->ai_tells + pos, sizeof(out->ai_tells) - pos,
-                                "structural=%d ", structural);
+        pos += (size_t)snprintf(out->ai_tells + pos, sizeof(out->ai_tells) - pos, "structural=%d ",
+                                structural);
 
     pos = 0;
     if (contractions && pos < sizeof(out->human_signals) - 20)
@@ -295,9 +306,8 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     return HU_OK;
 }
 
-hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider,
-                               const char *model, size_t model_len,
-                               const char *response, size_t response_len,
+hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider, const char *model,
+                               size_t model_len, const char *response, size_t response_len,
                                const char *conversation_context, size_t context_len,
                                hu_turing_score_t *out) {
     if (!alloc || !provider || !response || !out)
@@ -307,24 +317,25 @@ hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider,
                                          out);
 
     static const char SYSTEM[] =
-        "You are a Turing test evaluator. Score this iMessage response on 12 dimensions "
-        "(1-10, 10=perfectly human). Respond ONLY with 12 integers separated by spaces, "
+        "You are a Turing test evaluator. Score this response on 18 dimensions "
+        "(1-10, 10=perfectly human). Respond ONLY with 18 integers separated by spaces, "
         "in this order: natural_language emotional_intelligence appropriate_length "
         "personality_consistency vulnerability_willingness humor_naturalness imperfection "
-        "opinion_having energy_matching context_awareness non_robotic genuine_warmth";
+        "opinion_having energy_matching context_awareness non_robotic genuine_warmth "
+        "prosody_naturalness turn_timing filler_usage emotional_prosody "
+        "conversational_repair paralinguistic_cues";
 
     char user_buf[2048];
     int n;
     if (conversation_context && context_len > 0) {
         size_t ctx_trunc = context_len < 800 ? context_len : 800;
         size_t resp_trunc = response_len < 500 ? response_len : 500;
-        n = snprintf(user_buf, sizeof(user_buf),
-                     "Context:\n%.*s\n\nResponse to evaluate:\n%.*s",
+        n = snprintf(user_buf, sizeof(user_buf), "Context:\n%.*s\n\nResponse to evaluate:\n%.*s",
                      (int)ctx_trunc, conversation_context, (int)resp_trunc, response);
     } else {
         size_t resp_trunc = response_len < 500 ? response_len : 500;
-        n = snprintf(user_buf, sizeof(user_buf), "Response to evaluate:\n%.*s",
-                     (int)resp_trunc, response);
+        n = snprintf(user_buf, sizeof(user_buf), "Response to evaluate:\n%.*s", (int)resp_trunc,
+                     response);
     }
     if (n < 0 || (size_t)n >= sizeof(user_buf))
         return hu_turing_score_heuristic(response, response_len, conversation_context, context_len,
@@ -412,19 +423,17 @@ char *hu_turing_score_summary(hu_allocator_t *alloc, const hu_turing_score_t *sc
 
     char buf[1024];
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "Turing Score: %d/10 [%s]\n", score->overall,
-                            hu_turing_verdict_name(score->verdict));
+    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Turing Score: %d/10 [%s]\n",
+                            score->overall, hu_turing_verdict_name(score->verdict));
     for (int i = 0; i < HU_TURING_DIM_COUNT && pos < sizeof(buf) - 40; i++) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "  %s: %d\n",
-                                DIMENSION_NAMES[i], score->dimensions[i]);
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "  %s: %d\n", DIMENSION_NAMES[i],
+                                score->dimensions[i]);
     }
     if (score->ai_tells[0] && pos < sizeof(buf) - 40)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                                "AI tells: %s\n", score->ai_tells);
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "AI tells: %s\n", score->ai_tells);
     if (score->human_signals[0] && pos < sizeof(buf) - 40)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                                "Human signals: %s\n", score->human_signals);
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Human signals: %s\n",
+                                score->human_signals);
 
     char *out = hu_strndup(alloc, buf, pos);
     if (out)
@@ -436,28 +445,27 @@ char *hu_turing_score_summary(hu_allocator_t *alloc, const hu_turing_score_t *sc
 hu_error_t hu_turing_init_tables(sqlite3 *db) {
     if (!db)
         return HU_ERR_INVALID_ARGUMENT;
-    const char *sql =
-        "CREATE TABLE IF NOT EXISTS turing_scores ("
-        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "  contact_id TEXT NOT NULL,"
-        "  timestamp INTEGER NOT NULL,"
-        "  overall INTEGER NOT NULL,"
-        "  verdict TEXT NOT NULL,"
-        "  natural_language INTEGER,"
-        "  emotional_intelligence INTEGER,"
-        "  appropriate_length INTEGER,"
-        "  personality_consistency INTEGER,"
-        "  vulnerability_willingness INTEGER,"
-        "  humor_naturalness INTEGER,"
-        "  imperfection INTEGER,"
-        "  opinion_having INTEGER,"
-        "  energy_matching INTEGER,"
-        "  context_awareness INTEGER,"
-        "  non_robotic INTEGER,"
-        "  genuine_warmth INTEGER"
-        ");"
-        "CREATE INDEX IF NOT EXISTS idx_turing_contact ON turing_scores(contact_id);"
-        "CREATE INDEX IF NOT EXISTS idx_turing_ts ON turing_scores(timestamp);";
+    const char *sql = "CREATE TABLE IF NOT EXISTS turing_scores ("
+                      "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                      "  contact_id TEXT NOT NULL,"
+                      "  timestamp INTEGER NOT NULL,"
+                      "  overall INTEGER NOT NULL,"
+                      "  verdict TEXT NOT NULL,"
+                      "  natural_language INTEGER,"
+                      "  emotional_intelligence INTEGER,"
+                      "  appropriate_length INTEGER,"
+                      "  personality_consistency INTEGER,"
+                      "  vulnerability_willingness INTEGER,"
+                      "  humor_naturalness INTEGER,"
+                      "  imperfection INTEGER,"
+                      "  opinion_having INTEGER,"
+                      "  energy_matching INTEGER,"
+                      "  context_awareness INTEGER,"
+                      "  non_robotic INTEGER,"
+                      "  genuine_warmth INTEGER"
+                      ");"
+                      "CREATE INDEX IF NOT EXISTS idx_turing_contact ON turing_scores(contact_id);"
+                      "CREATE INDEX IF NOT EXISTS idx_turing_ts ON turing_scores(timestamp);";
     char *err_msg = NULL;
     int rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
     if (rc != SQLITE_OK) {
@@ -499,8 +507,8 @@ hu_error_t hu_turing_store_score(sqlite3 *db, const char *contact_id, size_t con
 }
 
 hu_error_t hu_turing_get_trend(hu_allocator_t *alloc, sqlite3 *db, const char *contact_id,
-                               size_t contact_id_len, size_t max_entries,
-                               hu_turing_score_t *scores, int64_t *timestamps,
+                               size_t contact_id_len, size_t max_entries, hu_turing_score_t *scores,
+                               int64_t *timestamps,
                                char (*out_contact_ids)[HU_TURING_CONTACT_ID_MAX],
                                size_t *out_count) {
     if (!alloc || !db || !scores || !timestamps || !out_count)
@@ -584,13 +592,12 @@ hu_error_t hu_turing_get_weakest_dimensions(sqlite3 *db, int *dimension_averages
     if (!db || !dimension_averages)
         return HU_ERR_INVALID_ARGUMENT;
 
-    const char *sql =
-        "SELECT AVG(natural_language), AVG(emotional_intelligence),"
-        " AVG(appropriate_length), AVG(personality_consistency),"
-        " AVG(vulnerability_willingness), AVG(humor_naturalness),"
-        " AVG(imperfection), AVG(opinion_having), AVG(energy_matching),"
-        " AVG(context_awareness), AVG(non_robotic), AVG(genuine_warmth)"
-        " FROM turing_scores WHERE timestamp > ?1";
+    const char *sql = "SELECT AVG(natural_language), AVG(emotional_intelligence),"
+                      " AVG(appropriate_length), AVG(personality_consistency),"
+                      " AVG(vulnerability_willingness), AVG(humor_naturalness),"
+                      " AVG(imperfection), AVG(opinion_having), AVG(energy_matching),"
+                      " AVG(context_awareness), AVG(non_robotic), AVG(genuine_warmth)"
+                      " FROM turing_scores WHERE timestamp > ?1";
 
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);

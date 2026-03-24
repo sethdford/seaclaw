@@ -1,6 +1,6 @@
 # h-uman — not quite human.
 
-C11 autonomous AI assistant runtime. ~1696 KB binary, <6 MB RAM, <30 ms startup.
+C11 autonomous AI assistant runtime. ~1539 KB binary, <6 MB RAM, <30 ms startup.
 Zero dependencies beyond libc (optional SQLite and libcurl).
 
 Read `AGENTS.md` for the full engineering protocol. This file is the quick reference.
@@ -15,7 +15,7 @@ cmake --build --preset dev
 # Other presets: test (no ASan), release (MinSizeRel+LTO), fuzz (Clang), minimal
 cmake --list-presets               # show all available presets
 
-# Run tests (6374+ tests, must be 0 failures, 0 ASan errors)
+# Run tests (6742+ tests, must be 0 failures, 0 ASan errors)
 ./build/human_tests                          # full suite
 ./build/human_tests --suite=JSON             # run suites matching "JSON"
 ./build/human_tests --filter=config_parse    # run tests matching "config_parse"
@@ -103,7 +103,7 @@ Extend via: `src/persona/` (persona.c, creator.c, analyzer.c, sampler.c, example
 | --------------------------------- | --------------------------------------------------------------------- |
 | `src/`                            | All C source (~1,093 files, ~233K lines)                              |
 | `include/human/`                  | Public headers                                                        |
-| `tests/`                          | 291 test files, 6374+ tests                                           |
+| `tests/`                          | 331 test files, 6742+ tests                                           |
 | `fuzz/`                           | libFuzzer harnesses                                                   |
 | `ui/`                             | LitElement web dashboard                                              |
 | `website/`                        | Astro marketing site                                                  |
