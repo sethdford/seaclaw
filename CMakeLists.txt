@@ -393,6 +393,10 @@ set(HU_CORE_SOURCES
     src/gateway/cp_turing.c
     src/gateway/cp_mcp.c
     src/gateway/mcp_context.c
+    src/agent/prompt_cache.c
+    src/agent/agent_comm.c
+    src/tools/cache_ttl.c
+    src/voice/emotion_voice_map.c
     src/gateway/event_bridge.c
     src/gateway/tenant.c
     src/runtime/native.c
@@ -1909,6 +1913,7 @@ set(HU_TEST_SOURCES
     tests/test_voice_duplex.c
     tests/test_turn_signal.c
     tests/test_sota_research.c
+    tests/test_sota_wiring.c
     tests/test_voice_rt_openai.c
     tests/test_voice_session.c
     tests/test_autonomy.c
@@ -2154,6 +2159,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_sota_e2e.c
     tests/test_sota_adversarial.c
     tests/test_sota_research.c
+    tests/test_sota_wiring.c
     tests/test_otel.c
     tests/test_cot_audit.c
     tests/test_moderation.c
