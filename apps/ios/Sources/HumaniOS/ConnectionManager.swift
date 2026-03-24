@@ -63,6 +63,7 @@ public final class ConnectionManager: ObservableObject {
     @Published public private(set) var uptimeSeconds: UInt64?
     @Published public private(set) var channelCount: Int?
     @Published public private(set) var toolCount: Int?
+    @Published public private(set) var hulaProgramCount: Int = 0
     @Published public private(set) var memoryEntries: [MemoryEntrySummary] = []
 
     private var connection: HumanConnection?
@@ -203,6 +204,19 @@ public final class ConnectionManager: ObservableObject {
         }
     }
 
+    public func fetchHulaAnalytics() {
+        Task {
+            do {
+                let resp = try await request(method: "hula.traces.analytics", params: nil)
+                guard resp.ok, let payload = resp.payload else { return }
+                if let summary = payload["summary"]?.value as? [String: Any],
+                   let count = summary["file_count"] as? Int {
+                    await MainActor.run { hulaProgramCount = count }
+                }
+            } catch {}
+        }
+    }
+
     public func fetchRecentActivity() {
         Task {
             do {
@@ -276,6 +290,7 @@ public final class ConnectionManager: ObservableObject {
         case .overview:
             if recentActivity.isEmpty { fetchRecentActivity() }
             fetchHealthStatus()
+            fetchHulaAnalytics()
             if sessions.isEmpty { fetchSessions() }
             if tools.isEmpty { fetchTools() }
         case .sessions:

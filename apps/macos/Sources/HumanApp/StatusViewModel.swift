@@ -34,6 +34,7 @@ class StatusViewModel: ObservableObject {
     @Published var overviewToolCount = "—"
     @Published var overviewModel = "—"
     @Published var overviewUptime = "—"
+    @Published var overviewHulaCount = "—"
 
     @Published var sessionRows: [MacSessionRow] = []
     @Published var toolRows: [MacToolRow] = []
@@ -137,6 +138,20 @@ class StatusViewModel: ObservableObject {
                         } else if let ch = dict["channels"] as? Double {
                             self.overviewChannelCount = "\(Int(ch))"
                         }
+                    }
+                }
+            case .failure:
+                break
+            }
+        }
+        gatewayClient.request(method: "hula.traces.analytics", params: [:]) { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case let .success(dict):
+                Task { @MainActor in
+                    if let summary = dict["summary"] as? [String: Any],
+                       let count = summary["file_count"] as? Int {
+                        self.overviewHulaCount = "\(count)"
                     }
                 }
             case .failure:

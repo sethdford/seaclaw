@@ -68,6 +68,11 @@ public enum Methods {
     public static let memoryIngest = "memory.ingest"
     public static let memoryConsolidate = "memory.consolidate"
 
+    // HuLa
+    public static let hulaTracesAnalytics = "hula.traces.analytics"
+    public static let hulaTracesList = "hula.traces.list"
+    public static let hulaTracesGet = "hula.traces.get"
+
     // Push notifications
     public static let pushRegister = "push.register"
     public static let pushUnregister = "push.unregister"
@@ -87,6 +92,7 @@ public enum Methods {
         voiceTranscribe, personaSet,
         authToken, authOauthStart, authOauthCallback, authOauthRefresh,
         memoryStatus, memoryList, memoryRecall, memoryStore, memoryForget, memoryIngest, memoryConsolidate,
+        hulaTracesAnalytics, hulaTracesList, hulaTracesGet,
         pushRegister, pushUnregister
     ]
 }

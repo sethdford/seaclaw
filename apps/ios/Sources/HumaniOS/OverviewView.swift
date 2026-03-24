@@ -101,6 +101,11 @@ struct OverviewView: View {
         return connectionManager.modelName ?? "—"
     }
 
+    private var hulaProgramsStat: String {
+        guard connectionManager.isConnected else { return "—" }
+        return "\(connectionManager.hulaProgramCount)"
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -184,8 +189,19 @@ struct OverviewView: View {
                             reduceMotion: reduceMotion,
                             icon: .clock
                         )
+                        StatCard(
+                            title: "HuLa",
+                            value: hulaProgramsStat,
+                            trend: "programs",
+                            trendUp: true,
+                            tokens: tokens,
+                            appeared: appeared,
+                            delay: 0.2,
+                            reduceMotion: reduceMotion,
+                            icon: .terminal
+                        )
                         } else {
-                            ForEach(0..<4, id: \.self) { _ in
+                            ForEach(0..<5, id: \.self) { _ in
                                 StatCardSkeleton()
                             }
                         }

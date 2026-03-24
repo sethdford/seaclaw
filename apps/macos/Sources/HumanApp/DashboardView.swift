@@ -218,6 +218,7 @@ struct MacOverviewPane: View {
             ("Tools", status.overviewToolCount, "wrench.and.screwdriver"),
             ("Model", modelShort == "—" ? "—" : modelShort, "cpu"),
             ("Uptime", status.overviewUptime, "clock"),
+            ("HuLa", status.overviewHulaCount, "terminal"),
         ]
     }
 
@@ -231,7 +232,7 @@ struct MacOverviewPane: View {
 
                 MacGatewayCard(status: status, tokens: tokens, reduceMotion: reduceMotion)
 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: HUTokens.spaceMd), count: 4), spacing: HUTokens.spaceMd) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: HUTokens.spaceMd), count: 5), spacing: HUTokens.spaceMd) {
                     ForEach(Array(overviewStats.enumerated()), id: \.offset) { index, stat in
                         MacStatCard(stat: stat, tokens: tokens, index: index, appeared: appeared, reduceMotion: reduceMotion)
                     }

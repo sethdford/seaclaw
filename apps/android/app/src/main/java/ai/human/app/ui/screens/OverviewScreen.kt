@@ -255,6 +255,36 @@ fun OverviewScreen(
         }
 
         item {
+            StaggeredItem(
+                index = 3,
+                reducedMotion = reducedMotion,
+                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
+                    slideInVertically(
+                        animationSpec = listItemSpring,
+                        initialOffsetY = { it / 4 },
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(HUTokens.spaceMd),
+                ) {
+                    StatCard(
+                        title = "HuLa Programs",
+                        value = if (showSkeletons) null else gateway.hulaProgramCount.collectAsState().value,
+                        modifier = Modifier.weight(1f),
+                        isSkeleton = showSkeletons,
+                    )
+                    StatCard(
+                        title = "HuLa Success",
+                        value = if (showSkeletons) null else "${gateway.hulaSuccessRate.collectAsState().value}%",
+                        modifier = Modifier.weight(1f),
+                        isSkeleton = showSkeletons,
+                    )
+                }
+            }
+        }
+
+        item {
             Spacer(modifier = Modifier.height(HUTokens.spaceLg))
         }
 

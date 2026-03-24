@@ -97,6 +97,11 @@ class GatewayClient {
     private val _overviewLoading = MutableStateFlow(false)
     val overviewLoading: StateFlow<Boolean> = _overviewLoading.asStateFlow()
 
+    private val _hulaProgramCount = MutableStateFlow(0)
+    val hulaProgramCount: StateFlow<Int> = _hulaProgramCount.asStateFlow()
+    private val _hulaSuccessRate = MutableStateFlow(0)
+    val hulaSuccessRate: StateFlow<Int> = _hulaSuccessRate.asStateFlow()
+
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
@@ -210,6 +215,13 @@ class GatewayClient {
                                 }
                                 _memoryEntries.value = list
                             }
+                            val hulaSummary = result.optJSONObject("summary")
+                            if (hulaSummary != null && hulaSummary.has("file_count")) {
+                                _hulaProgramCount.value = hulaSummary.optInt("file_count", 0)
+                                val successes = hulaSummary.optInt("success_count", 0)
+                                val total = successes + hulaSummary.optInt("fail_count", 0)
+                                _hulaSuccessRate.value = if (total > 0) (successes * 100 / total) else 0
+                            }
                             if (result.has("status") || result.has("uptime_seconds") || result.has("uptime_secs")) {
                                 val up = when {
                                     result.has("uptime_seconds") -> result.optLong("uptime_seconds", 0L)
@@ -300,11 +312,12 @@ class GatewayClient {
         fetchMemoryList()
     }
 
-    /** Fetch overview data: sessions, activity, and health. Call when connected. */
+    /** Fetch overview data: sessions, activity, health, and HuLa analytics. */
     fun fetchOverviewData() {
         _overviewLoading.value = true
         send("sessions.list", emptyMap())
         send("activity.recent", emptyMap())
         send("health", emptyMap())
+        send("hula.traces.analytics", emptyMap())
     }
 }
