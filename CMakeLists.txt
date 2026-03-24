@@ -357,6 +357,7 @@ set(HU_CORE_SOURCES
     src/security/security.c
     src/security/mcp_audit.c
     src/security/policy.c
+    src/security/arg_inspector.c
     src/security/pairing.c
     src/security/secrets.c
     src/security/vault.c
@@ -391,6 +392,7 @@ set(HU_CORE_SOURCES
     src/gateway/cp_voice_stream.c
     src/gateway/cp_turing.c
     src/gateway/cp_mcp.c
+    src/gateway/mcp_context.c
     src/gateway/event_bridge.c
     src/gateway/tenant.c
     src/runtime/native.c
@@ -538,6 +540,7 @@ set(HU_CORE_SOURCES
     src/memory/fast_capture.c
     src/memory/promotion.c
     src/memory/consolidation.c
+    src/memory/graph_index.c
     src/memory/policy.c
     src/memory/deep_extract.c
     src/memory/graph.c
@@ -779,6 +782,7 @@ list(APPEND HU_CORE_SOURCES
     src/voice/duplex.c
     src/voice/session.c
     src/voice/turn_signal.c
+    src/voice/semantic_eot.c
     src/providers/embedded.c
 )
 
@@ -1904,6 +1908,7 @@ set(HU_TEST_SOURCES
     tests/test_multimodal_video.c
     tests/test_voice_duplex.c
     tests/test_turn_signal.c
+    tests/test_sota_research.c
     tests/test_voice_rt_openai.c
     tests/test_voice_session.c
     tests/test_autonomy.c
@@ -2148,6 +2153,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_dpo.c
     tests/test_sota_e2e.c
     tests/test_sota_adversarial.c
+    tests/test_sota_research.c
     tests/test_otel.c
     tests/test_cot_audit.c
     tests/test_moderation.c

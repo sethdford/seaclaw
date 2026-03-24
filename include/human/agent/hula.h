@@ -1,10 +1,10 @@
 #ifndef HU_AGENT_HULA_H
 #define HU_AGENT_HULA_H
 
+#include "human/agent/dag.h"
+#include "human/agent/planner.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
-#include "human/agent/planner.h"
-#include "human/agent/dag.h"
 #include "human/observer.h"
 #include "human/security.h"
 #include "human/tool.h"
@@ -45,10 +45,10 @@ struct hu_spawn_config;
  * human-readable debugging.
  * ────────────────────────────────────────────────────────────────────────── */
 
-#define HU_HULA_MAX_CHILDREN   32
-#define HU_HULA_MAX_DEPTH      16
-#define HU_HULA_MAX_NODES      128
-#define HU_HULA_VERSION        1
+#define HU_HULA_MAX_CHILDREN 32
+#define HU_HULA_MAX_DEPTH    16
+#define HU_HULA_MAX_NODES    128
+#define HU_HULA_VERSION      1
 
 typedef enum hu_hula_op {
     HU_HULA_CALL = 0,
@@ -59,49 +59,50 @@ typedef enum hu_hula_op {
     HU_HULA_DELEGATE,
     HU_HULA_EMIT,
     HU_HULA_TRY,
+    HU_HULA_VERIFY,
     HU_HULA_OP_COUNT,
 } hu_hula_op_t;
 
 /* Predicate for BRANCH/LOOP conditions */
 typedef enum hu_hula_pred {
-    HU_HULA_PRED_SUCCESS = 0,   /* last result was success */
-    HU_HULA_PRED_FAILURE,       /* last result was failure */
-    HU_HULA_PRED_CONTAINS,      /* output contains match_str */
+    HU_HULA_PRED_SUCCESS = 0, /* last result was success */
+    HU_HULA_PRED_FAILURE,     /* last result was failure */
+    HU_HULA_PRED_CONTAINS,    /* output contains match_str */
     HU_HULA_PRED_NOT_CONTAINS,
-    HU_HULA_PRED_ALWAYS,        /* unconditional (for loops with explicit max) */
+    HU_HULA_PRED_ALWAYS, /* unconditional (for loops with explicit max) */
 } hu_hula_pred_t;
 
 typedef struct hu_hula_node hu_hula_node_t;
 
 struct hu_hula_node {
     hu_hula_op_t op;
-    char *id;               /* unique node identifier; owned */
+    char *id; /* unique node identifier; owned */
 
     /* CALL: tool invocation */
-    char *tool_name;        /* owned */
-    char *args_json;        /* owned; JSON object string */
+    char *tool_name; /* owned */
+    char *args_json; /* owned; JSON object string */
 
     /* BRANCH / LOOP: condition */
     hu_hula_pred_t pred;
-    char *match_str;        /* owned; for CONTAINS predicates */
+    char *match_str; /* owned; for CONTAINS predicates */
     size_t match_str_len;
-    uint32_t max_iter;      /* LOOP bound; 0 = use default (10) */
+    uint32_t max_iter; /* LOOP bound; 0 = use default (10) */
 
     /* DELEGATE: sub-agent goal */
-    char *goal;             /* owned */
+    char *goal; /* owned */
     size_t goal_len;
-    char *delegate_model;   /* owned; optional model override */
+    char *delegate_model; /* owned; optional model override */
     size_t delegate_model_len;
 
     /* EMIT: output channel */
-    char *emit_key;         /* owned; output name/channel */
+    char *emit_key; /* owned; output name/channel */
     size_t emit_key_len;
-    char *emit_value;       /* owned; template, may reference $node_id */
+    char *emit_value; /* owned; template, may reference $node_id */
     size_t emit_value_len;
 
     /* Execution hints (any opcode) */
     uint32_t timeout_ms;       /* 0 = no per-node wall limit */
-    uint32_t retry_count;       /* extra attempts after first failure */
+    uint32_t retry_count;      /* extra attempts after first failure */
     uint32_t retry_backoff_ms; /* delay between retries (skipped in HU_IS_TEST) */
 
     /* DELEGATE: structured handoff / fleet */
@@ -113,7 +114,7 @@ struct hu_hula_node {
     size_t delegate_agent_id_len;
 
     /* VERIFY: validate a preceding node's output */
-    char *verify_node_id;      /* owned; the node whose output to check */
+    char *verify_node_id; /* owned; the node whose output to check */
     size_t verify_node_id_len;
     /* Uses pred + match_str for the validation condition (shared with BRANCH/LOOP) */
 
@@ -127,19 +128,19 @@ struct hu_hula_node {
 
     /* For BRANCH: then_branch = children[0], else_branch = children[1],
        condition_node = the CALL preceding the branch (resolved at validate) */
-    char *description;      /* owned; optional human-readable annotation */
+    char *description; /* owned; optional human-readable annotation */
 };
 
 /* A complete HuLa program */
 typedef struct hu_hula_program {
     hu_allocator_t alloc;
-    char *name;             /* owned; program/skill name */
+    char *name; /* owned; program/skill name */
     size_t name_len;
     uint32_t version;
-    hu_hula_node_t *nodes;  /* flat owned array of all nodes */
+    hu_hula_node_t *nodes; /* flat owned array of all nodes */
     size_t node_count;
     size_t node_cap;
-    hu_hula_node_t *root;   /* entry point (points into nodes array) */
+    hu_hula_node_t *root; /* entry point (points into nodes array) */
 } hu_hula_program_t;
 
 /* Execution result per node */
@@ -154,16 +155,16 @@ typedef enum hu_hula_status {
 
 typedef struct hu_hula_result {
     hu_hula_status_t status;
-    char *output;           /* owned */
+    char *output; /* owned */
     size_t output_len;
-    char *error;            /* owned */
+    char *error; /* owned */
     size_t error_len;
 } hu_hula_result_t;
 
 #define HU_HULA_MAX_SLOTS 64
 
 typedef struct hu_hula_slot {
-    char *key;   /* owned */
+    char *key; /* owned */
     size_t key_len;
     char *value; /* owned */
     size_t value_len;
@@ -174,21 +175,21 @@ struct hu_agent_registry;
 /* Execution state for a running program */
 typedef struct hu_hula_exec {
     hu_allocator_t alloc;
-    hu_hula_program_t *program;     /* borrowed */
-    hu_hula_result_t *results;      /* owned; indexed by node position */
+    hu_hula_program_t *program; /* borrowed */
+    hu_hula_result_t *results;  /* owned; indexed by node position */
     size_t results_count;
-    hu_tool_t *tools;               /* borrowed */
+    hu_tool_t *tools; /* borrowed */
     size_t tools_count;
-    hu_security_policy_t *policy;   /* borrowed; optional — NULL skips policy */
-    hu_observer_t *observer;        /* borrowed; optional — NULL skips tracing */
-    struct hu_agent_pool *pool;       /* borrowed; optional — NULL stubs delegate */
+    hu_security_policy_t *policy;      /* borrowed; optional — NULL skips policy */
+    hu_observer_t *observer;           /* borrowed; optional — NULL skips tracing */
+    struct hu_agent_pool *pool;        /* borrowed; optional — NULL stubs delegate */
     struct hu_spawn_config *spawn_cfg; /* borrowed; optional — template for delegate spawns */
     /* Trace log for emergence analysis */
-    char *trace_log;                /* owned; accumulated JSON array of executed nodes */
+    char *trace_log; /* owned; accumulated JSON array of executed nodes */
     size_t trace_log_len;
     size_t trace_log_cap;
     bool halted;
-    char *halt_reason;              /* owned */
+    char *halt_reason; /* owned */
     size_t halt_reason_len;
     hu_hula_slot_t slots[HU_HULA_MAX_SLOTS];
     size_t slot_count;
@@ -204,9 +205,9 @@ typedef struct hu_hula_exec {
 
 /* Validation diagnostics */
 typedef struct hu_hula_diag {
-    char *message;      /* owned */
+    char *message; /* owned */
     size_t message_len;
-    const hu_hula_node_t *node;     /* borrowed; may be NULL */
+    const hu_hula_node_t *node; /* borrowed; may be NULL */
 } hu_hula_diag_t;
 
 #define HU_HULA_MAX_DIAGS 32
@@ -219,13 +220,13 @@ typedef struct hu_hula_validation {
 
 /* ── Lifecycle ──────────────────────────────────────────────────────────── */
 
-hu_error_t hu_hula_program_init(hu_hula_program_t *prog, hu_allocator_t alloc,
-                                const char *name, size_t name_len);
+hu_error_t hu_hula_program_init(hu_hula_program_t *prog, hu_allocator_t alloc, const char *name,
+                                size_t name_len);
 void hu_hula_program_deinit(hu_hula_program_t *prog);
 
 /* Allocate a new node within the program. Returns pointer into the arena. */
 hu_hula_node_t *hu_hula_program_alloc_node(hu_hula_program_t *prog, hu_hula_op_t op,
-                                            const char *id);
+                                           const char *id);
 
 /* ── Parse ──────────────────────────────────────────────────────────────── */
 
@@ -234,8 +235,8 @@ hu_error_t hu_hula_parse_json(hu_allocator_t *alloc, const char *json, size_t js
                               hu_hula_program_t *out);
 
 /* Serialize a HuLa program to JSON. Caller frees output. */
-hu_error_t hu_hula_to_json(hu_allocator_t *alloc, const hu_hula_program_t *prog,
-                           char **out, size_t *out_len);
+hu_error_t hu_hula_to_json(hu_allocator_t *alloc, const hu_hula_program_t *prog, char **out,
+                           size_t *out_len);
 
 /* ── Validate ───────────────────────────────────────────────────────────── */
 
@@ -249,8 +250,8 @@ void hu_hula_validation_deinit(hu_allocator_t *alloc, hu_hula_validation_t *v);
 
 /* ── Execute ────────────────────────────────────────────────────────────── */
 
-hu_error_t hu_hula_exec_init(hu_hula_exec_t *exec, hu_allocator_t alloc,
-                             hu_hula_program_t *prog, hu_tool_t *tools, size_t tools_count);
+hu_error_t hu_hula_exec_init(hu_hula_exec_t *exec, hu_allocator_t alloc, hu_hula_program_t *prog,
+                             hu_tool_t *tools, size_t tools_count);
 
 /* Create exec with policy and observer (full integration). */
 hu_error_t hu_hula_exec_init_full(hu_hula_exec_t *exec, hu_allocator_t alloc,
@@ -300,12 +301,10 @@ void hu_hula_estimate_cost(const hu_hula_program_t *prog, hu_hula_cost_estimate_
 
 /* ── Bridges (convert existing structures to HuLa) ──────────────────── */
 
-hu_error_t hu_hula_from_plan(hu_allocator_t *alloc, const hu_plan_t *plan,
-                             const char *name, size_t name_len,
-                             hu_hula_program_t *out);
+hu_error_t hu_hula_from_plan(hu_allocator_t *alloc, const hu_plan_t *plan, const char *name,
+                             size_t name_len, hu_hula_program_t *out);
 
-hu_error_t hu_hula_from_dag(hu_allocator_t *alloc, const hu_dag_t *dag,
-                            const char *name, size_t name_len,
-                            hu_hula_program_t *out);
+hu_error_t hu_hula_from_dag(hu_allocator_t *alloc, const hu_dag_t *dag, const char *name,
+                            size_t name_len, hu_hula_program_t *out);
 
 #endif /* HU_AGENT_HULA_H */

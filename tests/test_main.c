@@ -355,6 +355,7 @@ void run_evolving_cognition_tests(void);
 void run_metacognition_tests(void);
 void run_skill_routing_tests(void);
 void run_dual_process_tests(void);
+void run_sota_research_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -734,6 +735,7 @@ int main(int argc, char **argv) {
     run_metacognition_tests();
     run_skill_routing_tests();
     run_dual_process_tests();
+    run_sota_research_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();
