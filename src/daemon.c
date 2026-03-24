@@ -7095,6 +7095,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                     const char *rel = NULL;
                     size_t rel_len = 0;
+#ifdef HU_HAS_PERSONA
                     if (agent->persona) {
                         const hu_contact_profile_t *cp_mr =
                             hu_persona_find_contact(agent->persona, batch_key, key_len);
@@ -7103,6 +7104,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             rel_len = strlen(cp_mr->relationship);
                         }
                     }
+#endif
                     hu_model_selection_t sel = hu_model_route(&mr_cfg, combined, combined_len, rel,
                                                               rel_len, bth_hour, history_count);
                     agent->turn_model = sel.model;

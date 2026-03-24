@@ -2913,10 +2913,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             hu_metacog_action_name(last_mc_act),
                             hu_metacog_difficulty_name(agent->metacognition.difficulty),
                             agent->metacognition.regen_count > 0 ? 1 : 0, &mc_ex);
-                        /* Next user turn labels outcome_proxy for this trace_id */
                         memcpy(agent->metacognition.pending_outcome_trace_id, agent->trace_id,
                                sizeof(agent->trace_id));
                     }
+#else
+                    (void)hist_logprob_valid;
+                    (void)hist_logprob_mean;
+                    (void)last_mc_act;
 #endif
                 }
 
@@ -3367,6 +3370,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                 }
             }
+#else
+            (void)cognition_skills_shown;
 #endif
             if (dpo_rejected_resp)
                 agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp, dpo_rejected_resp_len + 1);
