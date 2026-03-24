@@ -26,7 +26,7 @@ typedef struct {
     uint32_t count;
 } hu_calib_phrase_slot_t;
 
-#if !defined(HU_IS_TEST) || !HU_IS_TEST
+#if (!defined(HU_IS_TEST) || !HU_IS_TEST) && defined(HU_ENABLE_SQLITE)
 static size_t hu_calib_count_emoji_utf8(const char *s) {
     size_t count = 0;
     const unsigned char *p = (const unsigned char *)s;
@@ -99,7 +99,7 @@ static void hu_calib_extract_closing(const char *text, char *out, size_t cap) {
     if (len < 3)
         return;
     while (len > 0 && (text[len - 1] == ' ' || text[len - 1] == '\t' || text[len - 1] == '\n' ||
-                      text[len - 1] == '\r'))
+                       text[len - 1] == '\r'))
         len--;
     if (len < 3)
         return;

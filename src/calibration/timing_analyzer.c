@@ -31,7 +31,7 @@ typedef struct {
     uint32_t n;
 } hu_calib_contact_buf_t;
 
-#if !defined(HU_IS_TEST) || !HU_IS_TEST
+#if (!defined(HU_IS_TEST) || !HU_IS_TEST) && defined(HU_ENABLE_SQLITE)
 static int hu_calib_cmp_i64(const void *a, const void *b) {
     int64_t x = *(const int64_t *)a;
     int64_t y = *(const int64_t *)b;
@@ -80,7 +80,8 @@ static time_t hu_calib_apple_ns_to_unix(int64_t apple_ns) {
     return (time_t)(apple_ns / 1000000000LL + 978307200LL);
 }
 
-static hu_error_t hu_calib_latency_push(hu_allocator_t *alloc, hu_calib_latency_vec_t *v, int64_t x) {
+static hu_error_t hu_calib_latency_push(hu_allocator_t *alloc, hu_calib_latency_vec_t *v,
+                                        int64_t x) {
     if (v->n >= v->cap) {
         size_t nc = v->cap ? v->cap * 2 : 128;
         size_t old_bytes = v->cap * sizeof(int64_t);
@@ -190,7 +191,8 @@ static void hu_calibration_timing_fill_mock(hu_timing_report_t *out) {
 #endif
 
 hu_error_t hu_calibration_analyze_timing(hu_allocator_t *alloc, const char *db_path,
-                                         const char *contact_filter, hu_timing_report_t *out_report) {
+                                         const char *contact_filter,
+                                         hu_timing_report_t *out_report) {
     if (!alloc || !out_report)
         return HU_ERR_INVALID_ARGUMENT;
     memset(out_report, 0, sizeof(*out_report));
@@ -223,24 +225,22 @@ hu_error_t hu_calibration_analyze_timing(hu_allocator_t *alloc, const char *db_p
         return HU_ERR_IO;
     }
 
-    const char *sql_all =
-        "SELECT m.is_from_me, m.date, cmj.chat_id, IFNULL(h.id,'') "
-        "FROM message m "
-        "JOIN chat_message_join cmj ON m.ROWID = cmj.message_id "
-        "LEFT JOIN handle h ON m.handle_id = h.ROWID "
-        "ORDER BY cmj.chat_id ASC, m.date ASC LIMIT ?1";
+    const char *sql_all = "SELECT m.is_from_me, m.date, cmj.chat_id, IFNULL(h.id,'') "
+                          "FROM message m "
+                          "JOIN chat_message_join cmj ON m.ROWID = cmj.message_id "
+                          "LEFT JOIN handle h ON m.handle_id = h.ROWID "
+                          "ORDER BY cmj.chat_id ASC, m.date ASC LIMIT ?1";
 
-    const char *sql_filt =
-        "SELECT m.is_from_me, m.date, cmj.chat_id, IFNULL(h.id,'') "
-        "FROM message m "
-        "JOIN chat_message_join cmj ON m.ROWID = cmj.message_id "
-        "LEFT JOIN handle h ON m.handle_id = h.ROWID "
-        "WHERE cmj.chat_id IN ("
-        "  SELECT chj.chat_id FROM chat_handle_join chj "
-        "  JOIN handle h2 ON chj.handle_id = h2.ROWID "
-        "  WHERE h2.id = ?2"
-        ") "
-        "ORDER BY cmj.chat_id ASC, m.date ASC LIMIT ?1";
+    const char *sql_filt = "SELECT m.is_from_me, m.date, cmj.chat_id, IFNULL(h.id,'') "
+                           "FROM message m "
+                           "JOIN chat_message_join cmj ON m.ROWID = cmj.message_id "
+                           "LEFT JOIN handle h ON m.handle_id = h.ROWID "
+                           "WHERE cmj.chat_id IN ("
+                           "  SELECT chj.chat_id FROM chat_handle_join chj "
+                           "  JOIN handle h2 ON chj.handle_id = h2.ROWID "
+                           "  WHERE h2.id = ?2"
+                           ") "
+                           "ORDER BY cmj.chat_id ASC, m.date ASC LIMIT ?1";
 
     sqlite3_stmt *stmt = NULL;
     const char *use_sql = contact_filter && contact_filter[0] ? sql_filt : sql_all;
@@ -309,7 +309,8 @@ hu_error_t hu_calibration_analyze_timing(hu_allocator_t *alloc, const char *db_p
                         goto cleanup_loop;
 
                     if (pending_handle[0]) {
-                        hu_calib_contact_buf_t *cb = hu_calib_find_contact(cts, &n_ct, pending_handle);
+                        hu_calib_contact_buf_t *cb =
+                            hu_calib_find_contact(cts, &n_ct, pending_handle);
                         if (cb && cb->n < HU_CALIB_MAX_LAT_PER_CT)
                             cb->sec[cb->n++] = delta;
                     }
@@ -320,12 +321,12 @@ hu_error_t hu_calibration_analyze_timing(hu_allocator_t *alloc, const char *db_p
 
             out_report->active_hours[hour < 0 || hour > 23 ? 0 : (uint32_t)hour]++;
 
-            int dk = (tm_local.tm_year + 1900) * 10000 + (tm_local.tm_mon + 1) * 100 + tm_local.tm_mday;
+            int dk =
+                (tm_local.tm_year + 1900) * 10000 + (tm_local.tm_mon + 1) * 100 + tm_local.tm_mday;
             if (day_n >= day_cap) {
                 size_t nc = day_cap ? day_cap * 2 : 256;
-                int32_t *p =
-                    (int32_t *)alloc->realloc(alloc->ctx, day_keys, day_cap * sizeof(int32_t),
-                                              nc * sizeof(int32_t));
+                int32_t *p = (int32_t *)alloc->realloc(
+                    alloc->ctx, day_keys, day_cap * sizeof(int32_t), nc * sizeof(int32_t));
                 if (!p) {
                     err = HU_ERR_OUT_OF_MEMORY;
                     goto cleanup_loop;
