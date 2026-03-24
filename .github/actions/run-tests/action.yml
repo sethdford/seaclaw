@@ -16,7 +16,7 @@ runs:
       shell: bash
       run: |
         if [ -n "${{ inputs.asan-options }}" ]; then
-          ASAN_OPTIONS="${{ inputs.asan-options }}" ./${{ inputs.build-dir }}/human_tests
+          ASAN_OPTIONS="${{ inputs.asan-options }}" ./${{ inputs.build-dir }}/human_tests 2>&1 | tee /tmp/human_tests_output.txt
         else
-          ./${{ inputs.build-dir }}/human_tests
+          ./${{ inputs.build-dir }}/human_tests 2>&1 | tee /tmp/human_tests_output.txt
         fi
