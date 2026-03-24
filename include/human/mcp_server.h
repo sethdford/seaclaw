@@ -3,6 +3,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/mcp_resources.h"
 #include "human/memory.h"
 #include "human/tool.h"
 #include <stddef.h>
@@ -11,6 +12,9 @@ typedef struct hu_mcp_host hu_mcp_host_t;
 
 hu_error_t hu_mcp_host_create(hu_allocator_t *alloc, hu_tool_t *tools, size_t tool_count,
                               hu_memory_t *memory, hu_mcp_host_t **out);
+
+void hu_mcp_host_set_resources(hu_mcp_host_t *srv, hu_mcp_resource_registry_t *resources);
+void hu_mcp_host_set_prompts(hu_mcp_host_t *srv, hu_mcp_prompt_registry_t *prompts);
 
 hu_error_t hu_mcp_host_run(hu_mcp_host_t *srv);
 

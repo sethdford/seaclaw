@@ -2,6 +2,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/mcp_resources.h"
 #include "human/memory.h"
 #include "human/tool.h"
 #include <stdbool.h>
@@ -10,7 +11,7 @@
 #include <string.h>
 
 #define MCP_SERVER_NAME      "human"
-#define MCP_SERVER_VERSION   "0.4.0"
+#define MCP_SERVER_VERSION   "0.5.0"
 #define MCP_PROTOCOL_VERSION "2024-11-05"
 #define MCP_LINE_BUF_INIT    4096
 
@@ -19,6 +20,8 @@ struct hu_mcp_host {
     hu_tool_t *tools;
     size_t tool_count;
     hu_memory_t *memory;
+    hu_mcp_resource_registry_t *resources;
+    hu_mcp_prompt_registry_t *prompts;
     bool initialized;
 };
 
@@ -33,9 +36,21 @@ hu_error_t hu_mcp_host_create(hu_allocator_t *alloc, hu_tool_t *tools, size_t to
     srv->tools = tools;
     srv->tool_count = tool_count;
     srv->memory = memory;
+    srv->resources = NULL;
+    srv->prompts = NULL;
     srv->initialized = false;
     *out = srv;
     return HU_OK;
+}
+
+void hu_mcp_host_set_resources(hu_mcp_host_t *srv, hu_mcp_resource_registry_t *resources) {
+    if (srv)
+        srv->resources = resources;
+}
+
+void hu_mcp_host_set_prompts(hu_mcp_host_t *srv, hu_mcp_prompt_registry_t *prompts) {
+    if (srv)
+        srv->prompts = prompts;
 }
 
 /* ── JSON-RPC response helpers ─────────────────────────────────────────── */
@@ -106,7 +121,7 @@ static hu_error_t write_error(hu_allocator_t *alloc, const char *id_raw, int cod
 static hu_error_t handle_initialize(hu_mcp_host_t *srv, const char *id_raw) {
     srv->initialized = true;
     const char *result = "{\"protocolVersion\":\"" MCP_PROTOCOL_VERSION "\","
-                         "\"capabilities\":{\"tools\":{},\"resources\":{}},"
+                         "\"capabilities\":{\"tools\":{},\"resources\":{},\"prompts\":{}},"
                          "\"serverInfo\":{\"name\":\"" MCP_SERVER_NAME "\","
                          "\"version\":\"" MCP_SERVER_VERSION "\"}}";
     return write_response(srv->alloc, id_raw, result);
@@ -277,6 +292,30 @@ static hu_error_t handle_resources_list(hu_mcp_host_t *srv, const char *id_raw) 
                                      110);
     }
 
+    /* Append any resources from the MCP resource registry */
+    if (err == HU_OK && srv->resources) {
+        for (size_t i = 0; i < srv->resources->resource_count && err == HU_OK; i++) {
+            const hu_mcp_resource_t *r = &srv->resources->resources[i];
+            err = hu_json_buf_append_raw(&buf, ",{\"uri\":", 8);
+            if (err == HU_OK)
+                err = hu_json_append_string(&buf, r->uri, strlen(r->uri));
+            if (err == HU_OK)
+                err = hu_json_buf_append_raw(&buf, ",\"name\":", 8);
+            if (err == HU_OK)
+                err = hu_json_append_string(&buf, r->name, strlen(r->name));
+            if (err == HU_OK)
+                err = hu_json_buf_append_raw(&buf, ",\"description\":", 15);
+            if (err == HU_OK)
+                err = hu_json_append_string(&buf, r->description, strlen(r->description));
+            if (err == HU_OK)
+                err = hu_json_buf_append_raw(&buf, ",\"mimeType\":", 12);
+            if (err == HU_OK)
+                err = hu_json_append_string(&buf, r->mime_type, strlen(r->mime_type));
+            if (err == HU_OK)
+                err = hu_json_buf_append_raw(&buf, "}", 1);
+        }
+    }
+
     if (err == HU_OK)
         err = hu_json_buf_append_raw(&buf, "]}", 2);
 
@@ -376,6 +415,110 @@ static hu_error_t handle_resources_read(hu_mcp_host_t *srv, const char *id_raw,
     }
 
     return write_error(alloc, id_raw, -32602, "Unknown resource URI");
+}
+
+/* ── Handler: prompts/list ──────────────────────────────────────────────── */
+
+static hu_error_t handle_prompts_list(hu_mcp_host_t *srv, const char *id_raw) {
+    hu_allocator_t *alloc = srv->alloc;
+
+    if (!srv->prompts || srv->prompts->prompt_count == 0)
+        return write_response(alloc, id_raw, "{\"prompts\":[]}");
+
+    char *json = NULL;
+    size_t json_len = 0;
+    hu_error_t err = hu_mcp_prompt_list_json(alloc, srv->prompts, &json, &json_len);
+    if (err != HU_OK)
+        return write_response(alloc, id_raw, "{\"prompts\":[]}");
+
+    err = write_response(alloc, id_raw, json);
+    alloc->free(alloc->ctx, json, json_len);
+    return err;
+}
+
+/* ── Handler: prompts/get ──────────────────────────────────────────────── */
+
+static hu_error_t handle_prompts_get(hu_mcp_host_t *srv, const char *id_raw,
+                                     hu_json_value_t *params) {
+    hu_allocator_t *alloc = srv->alloc;
+    const char *name = hu_json_get_string(params, "name");
+    if (!name)
+        return write_error(alloc, id_raw, -32602, "Missing prompt name");
+
+    if (!srv->prompts)
+        return write_error(alloc, id_raw, -32602, "No prompts registered");
+
+    const hu_mcp_prompt_t *prompt = NULL;
+    for (size_t i = 0; i < srv->prompts->prompt_count; i++) {
+        if (strcmp(srv->prompts->prompts[i].name, name) == 0) {
+            prompt = &srv->prompts->prompts[i];
+            break;
+        }
+    }
+    if (!prompt)
+        return write_error(alloc, id_raw, -32602, "Unknown prompt");
+
+    hu_json_value_t *args_obj = hu_json_object_get(params, "arguments");
+    const char *arg_names[HU_MCP_MAX_PROMPT_ARGS] = {0};
+    const char *arg_values[HU_MCP_MAX_PROMPT_ARGS] = {0};
+    size_t arg_count = 0;
+
+    if (args_obj && args_obj->type == HU_JSON_OBJECT) {
+        for (size_t i = 0; i < args_obj->data.object.len && arg_count < HU_MCP_MAX_PROMPT_ARGS;
+             i++) {
+            hu_json_pair_t *p = &args_obj->data.object.pairs[i];
+            if (p->value && p->value->type == HU_JSON_STRING) {
+                arg_names[arg_count] = p->key;
+                arg_values[arg_count] = p->value->data.string.ptr;
+                arg_count++;
+            }
+        }
+    }
+
+    char *rendered = NULL;
+    size_t rendered_len = 0;
+    hu_error_t err = hu_mcp_prompt_render(alloc, prompt, arg_names, arg_values, arg_count,
+                                          &rendered, &rendered_len);
+    if (err != HU_OK)
+        return write_error(alloc, id_raw, -32603, "Prompt render failed");
+
+    hu_json_buf_t buf;
+    if (hu_json_buf_init(&buf, alloc) != HU_OK) {
+        alloc->free(alloc->ctx, rendered, rendered_len);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    err = hu_json_buf_append_raw(&buf, "{\"description\":", 15);
+    if (err == HU_OK)
+        err = hu_json_append_string(&buf, prompt->description, strlen(prompt->description));
+    if (err == HU_OK)
+        err = hu_json_buf_append_raw(
+            &buf, ",\"messages\":[{\"role\":\"user\",\"content\":{\"type\":\"text\",\"text\":", 63);
+    if (err == HU_OK)
+        err = hu_json_append_string(&buf, rendered, rendered_len);
+    if (err == HU_OK)
+        err = hu_json_buf_append_raw(&buf, "}}]}", 4);
+
+    alloc->free(alloc->ctx, rendered, rendered_len);
+
+    if (err != HU_OK) {
+        hu_json_buf_free(&buf);
+        return err;
+    }
+
+    char *result = (char *)alloc->alloc(alloc->ctx, buf.len + 1);
+    if (!result) {
+        hu_json_buf_free(&buf);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memcpy(result, buf.ptr, buf.len);
+    result[buf.len] = '\0';
+    size_t result_len = buf.len;
+    hu_json_buf_free(&buf);
+
+    err = write_response(alloc, id_raw, result);
+    alloc->free(alloc->ctx, result, result_len + 1);
+    return err;
 }
 
 /* ── Main loop ─────────────────────────────────────────────────────────── */
@@ -485,6 +628,13 @@ hu_error_t hu_mcp_host_run(hu_mcp_host_t *srv) {
         } else if (strcmp(method, "resources/read") == 0) {
             if (params)
                 handle_resources_read(srv, id_buf, params);
+            else
+                write_error(alloc, id_buf, -32602, "Missing params");
+        } else if (strcmp(method, "prompts/list") == 0) {
+            handle_prompts_list(srv, id_buf);
+        } else if (strcmp(method, "prompts/get") == 0) {
+            if (params)
+                handle_prompts_get(srv, id_buf, params);
             else
                 write_error(alloc, id_buf, -32602, "Missing params");
         } else if (strcmp(method, "ping") == 0) {

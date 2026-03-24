@@ -34,6 +34,7 @@
 #include "human/gateway.h"
 #include "human/gateway/control_protocol.h"
 #include "human/health.h"
+#include "human/mcp_resources.h"
 #include "human/mcp_server.h"
 #include "human/memory.h"
 #include "human/memory/engines.h"
@@ -980,6 +981,24 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
         svc_app_ctx.tools_count = app_ctx.tools_count;
         svc_app_ctx.bus = &svc_bus;
         svc_app_ctx.agent = app_ctx.agent;
+
+        static hu_mcp_resource_registry_t svc_mcp_resources;
+        hu_mcp_resource_registry_init(&svc_mcp_resources);
+        static hu_mcp_prompt_registry_t svc_mcp_prompts;
+        hu_mcp_prompt_registry_init(&svc_mcp_prompts);
+        for (size_t ti = 0; ti < app_ctx.tools_count && app_ctx.tools; ti++) {
+            const hu_tool_t *t = &app_ctx.tools[ti];
+            if (!t->vtable || !t->vtable->name)
+                continue;
+            const char *tn = t->vtable->name(t->ctx);
+            const char *td = t->vtable->description ? t->vtable->description(t->ctx) : tn;
+            char uri[128];
+            snprintf(uri, sizeof(uri), "tool://%s", tn);
+            hu_mcp_resource_register(&svc_mcp_resources, uri, tn, td, "application/json");
+        }
+        svc_app_ctx.mcp_resources = &svc_mcp_resources;
+        svc_app_ctx.mcp_prompts = &svc_mcp_prompts;
+
         gw_config.app_ctx = &svc_app_ctx;
 
         static webhook_dispatcher_ctx_t wh_ctx;
@@ -1953,6 +1972,21 @@ static hu_error_t cmd_mcp(hu_allocator_t *alloc, int argc, char **argv) {
         return err;
     }
 
+    hu_mcp_resource_registry_t mcp_res;
+    hu_mcp_resource_registry_init(&mcp_res);
+    hu_mcp_prompt_registry_t mcp_pr;
+    hu_mcp_prompt_registry_init(&mcp_pr);
+    for (size_t i = 0; i < tool_count; i++) {
+        if (!tools[i].vtable || !tools[i].vtable->name)
+            continue;
+        const char *tn = tools[i].vtable->name(tools[i].ctx);
+        const char *td =
+            tools[i].vtable->description ? tools[i].vtable->description(tools[i].ctx) : tn;
+        char uri[128];
+        snprintf(uri, sizeof(uri), "tool://%s", tn);
+        hu_mcp_resource_register(&mcp_res, uri, tn, td, "application/json");
+    }
+
     hu_mcp_host_t *srv = NULL;
     err = hu_mcp_host_create(alloc, tools, tool_count, NULL, &srv);
     if (err != HU_OK) {
@@ -1962,6 +1996,8 @@ static hu_error_t cmd_mcp(hu_allocator_t *alloc, int argc, char **argv) {
         hu_config_deinit(&cfg);
         return err;
     }
+    hu_mcp_host_set_resources(srv, &mcp_res);
+    hu_mcp_host_set_prompts(srv, &mcp_pr);
 
     err = hu_mcp_host_run(srv);
 
@@ -2151,6 +2187,44 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
     }
 #endif
 
+    /* ── MCP resource + prompt registries ─────────────────────────────── */
+    hu_mcp_resource_registry_t mcp_resources;
+    hu_mcp_resource_registry_init(&mcp_resources);
+    hu_mcp_prompt_registry_t mcp_prompts;
+    hu_mcp_prompt_registry_init(&mcp_prompts);
+
+    for (size_t ti = 0; ti < app.tools_count && app.tools; ti++) {
+        const hu_tool_t *t = &app.tools[ti];
+        if (!t->vtable || !t->vtable->name)
+            continue;
+        const char *tname = t->vtable->name(t->ctx);
+        const char *tdesc = t->vtable->description ? t->vtable->description(t->ctx) : tname;
+        char uri[128];
+        snprintf(uri, sizeof(uri), "tool://%s", tname);
+        hu_mcp_resource_register(&mcp_resources, uri, tname, tdesc, "application/json");
+    }
+
+    {
+        hu_mcp_prompt_t p = {0};
+        snprintf(p.name, sizeof(p.name), "system");
+        snprintf(p.description, sizeof(p.description), "Default system prompt for the agent");
+        snprintf(p.template_text, sizeof(p.template_text), "You are a helpful assistant.");
+        p.template_text_len = strlen(p.template_text);
+        hu_mcp_prompt_register(&mcp_prompts, &p);
+    }
+    {
+        hu_mcp_prompt_t p = {0};
+        snprintf(p.name, sizeof(p.name), "persona");
+        snprintf(p.description, sizeof(p.description), "Apply a persona profile to the agent");
+        p.argument_count = 1;
+        snprintf(p.arguments[0].name, sizeof(p.arguments[0].name), "name");
+        snprintf(p.arguments[0].description, sizeof(p.arguments[0].description), "Persona name");
+        p.arguments[0].required = true;
+        snprintf(p.template_text, sizeof(p.template_text), "Adopt the persona: {name}");
+        p.template_text_len = strlen(p.template_text);
+        hu_mcp_prompt_register(&mcp_prompts, &p);
+    }
+
     /* ── Gateway app context (hu_app_context_t for RPC handlers) ───────── */
     hu_app_context_t gw_app_ctx = {
         .config = app.cfg,
@@ -2168,6 +2242,8 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
         .tools_count = app.tools_count,
         .agent = NULL,
         .graph = gw_graph,
+        .mcp_resources = &mcp_resources,
+        .mcp_prompts = &mcp_prompts,
     };
 
     hu_gateway_config_t gw_config;
