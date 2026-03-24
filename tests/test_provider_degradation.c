@@ -1,12 +1,13 @@
-#include "test_framework.h"
 #include "human/agent/degradation.h"
+#include "test_framework.h"
 #include <string.h>
 
-/* Mock provider: succeeds unless model starts with "fail" */
 static hu_error_t mock_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_request_t *req,
                             const char *model, size_t model_len, double temperature,
                             hu_chat_response_t *out) {
-    (void)ctx; (void)req; (void)temperature;
+    (void)ctx;
+    (void)req;
+    (void)temperature;
     memset(out, 0, sizeof(*out));
     if (model_len >= 4 && memcmp(model, "fail", 4) == 0)
         return HU_ERR_PROVIDER_UNAVAILABLE;
@@ -14,7 +15,8 @@ static hu_error_t mock_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_requ
     const char *resp = "Mock response";
     size_t len = strlen(resp);
     char *content = (char *)alloc->alloc(alloc->ctx, len + 1);
-    if (!content) return HU_ERR_OUT_OF_MEMORY;
+    if (!content)
+        return HU_ERR_OUT_OF_MEMORY;
     memcpy(content, resp, len + 1);
     out->content = content;
     out->content_len = len;
@@ -34,8 +36,8 @@ static void test_degrade_primary_succeeds(void) {
 
     hu_chat_request_t req = {0};
     hu_degradation_result_t result;
-    hu_error_t err = hu_provider_degrade_chat(&config, &provider, &alloc, &req,
-                                              "good-model", 10, 0.7, &result);
+    hu_error_t err =
+        hu_provider_degrade_chat(&config, &provider, &alloc, &req, "good-model", 10, 0.7, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.strategy_used, (int)HU_DEGRADE_PRIMARY);
     HU_ASSERT_EQ((int)result.attempts, 1);
@@ -50,15 +52,17 @@ static void test_degrade_fallback_on_primary_fail(void) {
 
     char fallback[] = "good-fallback";
     hu_provider_degradation_config_t config = {
-        .enabled = true, .max_retries = 1,
-        .fallback_model = fallback, .fallback_model_len = strlen(fallback),
+        .enabled = true,
+        .max_retries = 1,
+        .fallback_model = fallback,
+        .fallback_model_len = strlen(fallback),
     };
     hu_circuit_breaker_init(&config.breaker, 3, 5000);
 
     hu_chat_request_t req = {0};
     hu_degradation_result_t result;
-    hu_error_t err = hu_provider_degrade_chat(&config, &provider, &alloc, &req,
-                                              "fail-model", 10, 0.7, &result);
+    hu_error_t err =
+        hu_provider_degrade_chat(&config, &provider, &alloc, &req, "fail-model", 10, 0.7, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.strategy_used, (int)HU_DEGRADE_FALLBACK);
     HU_ASSERT_GT((int)result.attempts, 1);
@@ -72,15 +76,17 @@ static void test_degrade_honest_failure(void) {
 
     char fallback[] = "fail-fallback";
     hu_provider_degradation_config_t config = {
-        .enabled = true, .max_retries = 1,
-        .fallback_model = fallback, .fallback_model_len = strlen(fallback),
+        .enabled = true,
+        .max_retries = 1,
+        .fallback_model = fallback,
+        .fallback_model_len = strlen(fallback),
     };
     hu_circuit_breaker_init(&config.breaker, 3, 5000);
 
     hu_chat_request_t req = {0};
     hu_degradation_result_t result;
-    hu_error_t err = hu_provider_degrade_chat(&config, &provider, &alloc, &req,
-                                              "fail-model", 10, 0.7, &result);
+    hu_error_t err =
+        hu_provider_degrade_chat(&config, &provider, &alloc, &req, "fail-model", 10, 0.7, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.strategy_used, (int)HU_DEGRADE_HONEST_FAILURE);
     HU_ASSERT_NOT_NULL(result.response.content);
@@ -93,26 +99,24 @@ static void test_degrade_circuit_breaker_trips(void) {
     hu_provider_t provider = {.ctx = NULL, .vtable = &mock_vtable};
 
     hu_provider_degradation_config_t config = {
-        .enabled = true, .max_retries = 1,
+        .enabled = true,
+        .max_retries = 1,
     };
     hu_circuit_breaker_init(&config.breaker, 2, 60000);
 
     hu_chat_request_t req = {0};
     hu_degradation_result_t result;
 
-    /* Trip the breaker with failures */
     for (int i = 0; i < 3; i++) {
         memset(&result, 0, sizeof(result));
-        hu_provider_degrade_chat(&config, &provider, &alloc, &req,
-                                 "fail-model", 10, 0.7, &result);
+        hu_provider_degrade_chat(&config, &provider, &alloc, &req, "fail-model", 10, 0.7, &result);
         if (result.response.content)
             alloc.free(alloc.ctx, (void *)result.response.content, result.response.content_len + 1);
     }
 
-    /* Now breaker should be open — immediate honest failure, 0 attempts */
     memset(&result, 0, sizeof(result));
-    hu_error_t err = hu_provider_degrade_chat(&config, &provider, &alloc, &req,
-                                              "good-model", 10, 0.7, &result);
+    hu_error_t err =
+        hu_provider_degrade_chat(&config, &provider, &alloc, &req, "good-model", 10, 0.7, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.strategy_used, (int)HU_DEGRADE_HONEST_FAILURE);
     HU_ASSERT_EQ((int)result.attempts, 0);
@@ -128,8 +132,8 @@ static void test_degrade_disabled_passthrough(void) {
 
     hu_chat_request_t req = {0};
     hu_degradation_result_t result;
-    hu_error_t err = hu_provider_degrade_chat(&config, &provider, &alloc, &req,
-                                              "good-model", 10, 0.7, &result);
+    hu_error_t err =
+        hu_provider_degrade_chat(&config, &provider, &alloc, &req, "good-model", 10, 0.7, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.strategy_used, (int)HU_DEGRADE_PRIMARY);
     HU_ASSERT_NOT_NULL(result.response.content);
@@ -142,8 +146,8 @@ static void test_degrade_null_config_passthrough(void) {
 
     hu_chat_request_t req = {0};
     hu_degradation_result_t result;
-    hu_error_t err = hu_provider_degrade_chat(NULL, &provider, &alloc, &req,
-                                              "good-model", 10, 0.7, &result);
+    hu_error_t err =
+        hu_provider_degrade_chat(NULL, &provider, &alloc, &req, "good-model", 10, 0.7, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.strategy_used, (int)HU_DEGRADE_PRIMARY);
     alloc.free(alloc.ctx, (void *)result.response.content, result.response.content_len + 1);

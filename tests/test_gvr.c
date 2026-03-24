@@ -1,5 +1,5 @@
-#include "test_framework.h"
 #include "human/agent/gvr.h"
+#include "test_framework.h"
 #include <string.h>
 
 static void test_gvr_check_pass(void) {
@@ -9,9 +9,7 @@ static void test_gvr_check_pass(void) {
 
     const char *prompt = "What is 2+2?";
     const char *response = "The answer is 4.";
-    hu_error_t err = hu_gvr_check(&alloc, &provider,
-                                  "test-model", 10,
-                                  prompt, strlen(prompt),
+    hu_error_t err = hu_gvr_check(&alloc, &provider, "test-model", 10, prompt, strlen(prompt),
                                   response, strlen(response), &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.verdict, (int)HU_GVR_PASS);
@@ -26,9 +24,7 @@ static void test_gvr_check_fail(void) {
 
     const char *prompt = "What is 2+2?";
     const char *response = "The answer is error and wrong.";
-    hu_error_t err = hu_gvr_check(&alloc, &provider,
-                                  "test-model", 10,
-                                  prompt, strlen(prompt),
+    hu_error_t err = hu_gvr_check(&alloc, &provider, "test-model", 10, prompt, strlen(prompt),
                                   response, strlen(response), &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.verdict, (int)HU_GVR_FAIL);
@@ -47,12 +43,9 @@ static void test_gvr_revise(void) {
     char *revised = NULL;
     size_t revised_len = 0;
 
-    hu_error_t err = hu_gvr_revise(&alloc, &provider,
-                                   "test-model", 10,
-                                   prompt, strlen(prompt),
-                                   response, strlen(response),
-                                   critique, strlen(critique),
-                                   &revised, &revised_len);
+    hu_error_t err =
+        hu_gvr_revise(&alloc, &provider, "test-model", 10, prompt, strlen(prompt), response,
+                      strlen(response), critique, strlen(critique), &revised, &revised_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(revised);
     HU_ASSERT_TRUE(revised_len > 0);
@@ -68,10 +61,8 @@ static void test_gvr_pipeline_pass_no_revision(void) {
 
     const char *prompt = "What is 2+2?";
     const char *response = "The answer is 4.";
-    hu_error_t err = hu_gvr_pipeline(&alloc, &provider, &config,
-                                     "test-model", 10,
-                                     prompt, strlen(prompt),
-                                     response, strlen(response), &result);
+    hu_error_t err = hu_gvr_pipeline(&alloc, &provider, &config, "test-model", 10, prompt,
+                                     strlen(prompt), response, strlen(response), &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.final_verdict, (int)HU_GVR_PASS);
     HU_ASSERT_EQ((int)result.revisions_performed, 0);
@@ -85,13 +76,10 @@ static void test_gvr_pipeline_fail_then_pass(void) {
     hu_gvr_config_t config = {.enabled = true, .max_revisions = 3};
     hu_gvr_pipeline_result_t result;
 
-    /* Initial response contains "error" -> fails check -> gets revised -> passes check */
     const char *prompt = "What is 2+2?";
     const char *response = "The answer is error.";
-    hu_error_t err = hu_gvr_pipeline(&alloc, &provider, &config,
-                                     "test-model", 10,
-                                     prompt, strlen(prompt),
-                                     response, strlen(response), &result);
+    hu_error_t err = hu_gvr_pipeline(&alloc, &provider, &config, "test-model", 10, prompt,
+                                     strlen(prompt), response, strlen(response), &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.final_verdict, (int)HU_GVR_PASS);
     HU_ASSERT_GT((int)result.revisions_performed, 0);
@@ -107,8 +95,7 @@ static void test_gvr_pipeline_disabled(void) {
 
     const char *prompt = "test";
     const char *response = "error wrong bad";
-    hu_error_t err = hu_gvr_pipeline(&alloc, &provider, &config,
-                                     "m", 1, prompt, strlen(prompt),
+    hu_error_t err = hu_gvr_pipeline(&alloc, &provider, &config, "m", 1, prompt, strlen(prompt),
                                      response, strlen(response), &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.final_verdict, (int)HU_GVR_PASS);
@@ -124,8 +111,7 @@ static void test_gvr_pipeline_null_config(void) {
 
     const char *prompt = "test";
     const char *response = "response";
-    hu_error_t err = hu_gvr_pipeline(&alloc, &provider, NULL,
-                                     "m", 1, prompt, strlen(prompt),
+    hu_error_t err = hu_gvr_pipeline(&alloc, &provider, NULL, "m", 1, prompt, strlen(prompt),
                                      response, strlen(response), &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)result.final_verdict, (int)HU_GVR_PASS);

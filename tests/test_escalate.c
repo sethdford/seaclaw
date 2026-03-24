@@ -1,19 +1,18 @@
-#include "test_framework.h"
 #include "human/security/escalate.h"
+#include "test_framework.h"
 #include <string.h>
 
-static const char VALID_ESCALATE_MD[] =
-    "# ESCALATE.md\n"
-    "\n"
-    "## Approval Matrix\n"
-    "\n"
-    "| Action | Level | Timeout | Channel |\n"
-    "| --- | --- | --- | --- |\n"
-    "| shell_* | approve | 300 | slack |\n"
-    "| file_read | auto | 0 | |\n"
-    "| file_write | notify | 0 | telegram |\n"
-    "| deploy_* | deny | 0 | |\n"
-    "| web_search | auto | 0 | |\n";
+static const char VALID_ESCALATE_MD[] = "# ESCALATE.md\n"
+                                        "\n"
+                                        "## Approval Matrix\n"
+                                        "\n"
+                                        "| Action | Level | Timeout | Channel |\n"
+                                        "| --- | --- | --- | --- |\n"
+                                        "| shell_* | approve | 300 | slack |\n"
+                                        "| file_read | auto | 0 | |\n"
+                                        "| file_write | notify | 0 | telegram |\n"
+                                        "| deploy_* | deny | 0 | |\n"
+                                        "| web_search | auto | 0 | |\n";
 
 static void test_escalate_parse_valid(void) {
     hu_escalate_protocol_t protocol;
@@ -54,7 +53,6 @@ static void test_escalate_parse_null(void) {
 static void test_escalate_evaluate_auto(void) {
     hu_escalate_protocol_t protocol;
     hu_escalate_parse(VALID_ESCALATE_MD, strlen(VALID_ESCALATE_MD), &protocol);
-
     hu_escalate_level_t level = hu_escalate_evaluate(&protocol, "file_read", 9);
     HU_ASSERT_EQ((int)level, (int)HU_ESCALATE_AUTO);
 }
@@ -62,7 +60,6 @@ static void test_escalate_evaluate_auto(void) {
 static void test_escalate_evaluate_approve_glob(void) {
     hu_escalate_protocol_t protocol;
     hu_escalate_parse(VALID_ESCALATE_MD, strlen(VALID_ESCALATE_MD), &protocol);
-
     hu_escalate_level_t level = hu_escalate_evaluate(&protocol, "shell_exec", 10);
     HU_ASSERT_EQ((int)level, (int)HU_ESCALATE_APPROVE);
 }
@@ -70,7 +67,6 @@ static void test_escalate_evaluate_approve_glob(void) {
 static void test_escalate_evaluate_deny_glob(void) {
     hu_escalate_protocol_t protocol;
     hu_escalate_parse(VALID_ESCALATE_MD, strlen(VALID_ESCALATE_MD), &protocol);
-
     hu_escalate_level_t level = hu_escalate_evaluate(&protocol, "deploy_production", 17);
     HU_ASSERT_EQ((int)level, (int)HU_ESCALATE_DENY);
 }
@@ -78,8 +74,6 @@ static void test_escalate_evaluate_deny_glob(void) {
 static void test_escalate_evaluate_default(void) {
     hu_escalate_protocol_t protocol;
     hu_escalate_parse(VALID_ESCALATE_MD, strlen(VALID_ESCALATE_MD), &protocol);
-
-    /* Unknown action -> default level (APPROVE) */
     hu_escalate_level_t level = hu_escalate_evaluate(&protocol, "unknown_action", 14);
     HU_ASSERT_EQ((int)level, (int)HU_ESCALATE_APPROVE);
 }
