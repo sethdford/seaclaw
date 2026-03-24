@@ -734,6 +734,21 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
+    /* Data quality: validate memory context fragments before assembly */
+    if (agent->dq_config.enabled && memory_ctx && memory_ctx_len > 0) {
+        hu_dq_fragment_t frag = {
+            .content = memory_ctx,
+            .content_len = memory_ctx_len,
+            .source = "memory",
+            .source_len = 6,
+        };
+        hu_dq_result_t dq_result;
+        if (hu_dq_check(&agent->dq_config, &frag, 1, &dq_result) == HU_OK && !dq_result.passed) {
+            fprintf(stderr, "[agent_turn] data quality: %zu issues in memory context\n",
+                    dq_result.issue_count);
+        }
+    }
+
     /* Adaptive RAG: select strategy and record for learning */
     hu_rag_strategy_t rag_strategy_used = HU_RAG_NONE;
     if (agent->sota_initialized && !srag_skip_retrieval) {
@@ -2211,13 +2226,49 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (agent->turn_thinking_budget > 0)
             req.thinking_budget = agent->turn_thinking_budget;
 
+        /* Adaptive token budget: classify tier and apply budget constraints */
+        if (agent->token_budget.enabled) {
+            hu_thinking_tier_t tier =
+                hu_token_budget_classify(msg, msg_len, agent->history_count, agent->tools_count);
+            const hu_tier_budget_t *budget = hu_token_budget_get(&agent->token_budget, tier);
+            if (budget) {
+                if (budget->thinking_budget > 0 && req.thinking_budget == 0)
+                    req.thinking_budget = (int)budget->thinking_budget;
+                if (budget->temperature > 0.0 && agent->turn_temperature <= 0.0)
+                    turn_temp = budget->temperature;
+            }
+        }
+
         clock_t llm_start = clock();
         hu_chat_response_t resp;
         memset(&resp, 0, sizeof(resp));
 
-        err = agent->provider.vtable->chat(agent->provider.ctx, agent->alloc, &req, turn_model,
-                                           turn_model_len, turn_temp, &resp);
+        /* OTLP tracing: begin LLM span */
+        hu_otlp_span_t *llm_span = NULL;
+        if (agent->observer) {
+            static hu_otlp_trace_t otlp_trace;
+            static bool otlp_inited = false;
+            if (!otlp_inited) {
+                hu_otlp_trace_init(&otlp_trace);
+                otlp_inited = true;
+            }
+            hu_otlp_span_begin(&otlp_trace, "llm.chat", 8, NULL, &llm_span);
+        }
+
+        /* Provider graceful degradation: try primary -> fallback -> honest failure */
+        if (agent->degradation_config.enabled) {
+            hu_degradation_result_t degrade_result;
+            err = hu_provider_degrade_chat(&agent->degradation_config, &agent->provider,
+                                           agent->alloc, &req, turn_model, turn_model_len,
+                                           turn_temp, &degrade_result);
+            resp = degrade_result.response;
+        } else {
+            err = agent->provider.vtable->chat(agent->provider.ctx, agent->alloc, &req, turn_model,
+                                               turn_model_len, turn_temp, &resp);
+        }
         uint64_t llm_duration_ms = hu_agent_internal_clock_diff_ms(llm_start, clock());
+        if (llm_span)
+            hu_otlp_span_end(llm_span, (err == HU_OK) ? 1 : 2);
 
         {
             hu_observer_event_t ev = {.tag = HU_OBSERVER_EVENT_LLM_RESPONSE, .data = {{0}}};
@@ -2253,9 +2304,55 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             return err;
         }
 
+        /* Chaos testing: optionally inject faults into LLM response */
+        if (agent->chaos_engine.config.enabled) {
+            hu_chaos_fault_t fault = hu_chaos_maybe_inject(&agent->chaos_engine);
+            if (fault != HU_CHAOS_NONE) {
+                hu_error_t chaos_err =
+                    hu_chaos_apply_to_response(&agent->chaos_engine, agent->alloc, fault, &resp);
+                if (chaos_err != HU_OK) {
+                    fprintf(stderr, "[agent_turn] chaos fault injected: %s\n",
+                            hu_chaos_fault_name(fault));
+                }
+            }
+        }
+
         agent->total_tokens += resp.usage.total_tokens;
         hu_agent_internal_record_cost(agent, &resp.usage);
         turn_tokens += resp.usage.total_tokens;
+
+        /* Token budget: record spend and check session cap */
+        if (agent->token_budget.enabled) {
+            hu_token_budget_record(&agent->token_budget, resp.usage.total_tokens);
+            if (!hu_token_budget_can_spend(&agent->token_budget, 0)) {
+                fprintf(stderr, "[agent_turn] token budget exhausted for session\n");
+            }
+        }
+
+        /* GVR (Generator-Verifier-Reviser): verify and optionally revise the response */
+        if (agent->gvr_config.enabled && resp.content && resp.content_len > 0 &&
+            resp.tool_calls_count == 0) {
+            const char *user_prompt = NULL;
+            size_t user_prompt_len = 0;
+            if (req.messages_count > 0) {
+                user_prompt = req.messages[req.messages_count - 1].content;
+                user_prompt_len = req.messages[req.messages_count - 1].content_len;
+            }
+            hu_gvr_pipeline_result_t gvr_result;
+            hu_error_t gvr_err = hu_gvr_pipeline(
+                agent->alloc, &agent->provider, &agent->gvr_config, turn_model, turn_model_len,
+                user_prompt, user_prompt_len, resp.content, resp.content_len, &gvr_result);
+            if (gvr_err == HU_OK && gvr_result.final_content) {
+                if (gvr_result.revisions_performed > 0) {
+                    hu_chat_response_free(agent->alloc, &resp);
+                    memset(&resp, 0, sizeof(resp));
+                    resp.content = gvr_result.final_content;
+                    resp.content_len = gvr_result.final_content_len;
+                    gvr_result.final_content = NULL;
+                }
+                hu_gvr_pipeline_result_free(agent->alloc, &gvr_result);
+            }
+        }
 
         /* Text-based tool call parsing for providers without native tool support */
         if (resp.tool_calls_count == 0 && resp.content && resp.content_len > 0 &&
@@ -2888,12 +2985,21 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             int n = snprintf(key_buf, sizeof(key_buf), "%s:%s:%s", f->subject,
                                              f->predicate, f->object);
                             if (n > 0 && (size_t)n < sizeof(key_buf)) {
-                                hu_error_t store_err = agent->memory->vtable->store(
-                                    agent->memory->ctx, key_buf, (size_t)n, f->object,
-                                    strlen(f->object), &cat, sid ? sid : "", sid_len);
-                                if (store_err != HU_OK && store_err != HU_ERR_NOT_SUPPORTED)
-                                    fprintf(stderr, "[agent] memory store failed: %s\n",
-                                            hu_error_string(store_err));
+                                /* Memory policy: let heuristic decide if we should store */
+                                hu_mem_action_type_t mem_action = HU_MEM_STORE;
+                                if (agent->mem_policy.enabled) {
+                                    hu_mem_state_t mstate = {0};
+                                    mem_action = hu_mem_policy_decide(&agent->mem_policy, &mstate,
+                                                                      f->object, strlen(f->object));
+                                }
+                                if (mem_action == HU_MEM_STORE || mem_action == HU_MEM_UPDATE) {
+                                    hu_error_t store_err = agent->memory->vtable->store(
+                                        agent->memory->ctx, key_buf, (size_t)n, f->object,
+                                        strlen(f->object), &cat, sid ? sid : "", sid_len);
+                                    if (store_err != HU_OK && store_err != HU_ERR_NOT_SUPPORTED)
+                                        fprintf(stderr, "[agent] memory store failed: %s\n",
+                                                hu_error_string(store_err));
+                                }
                                 if (agent->sota_initialized) {
                                     hu_memory_tier_t assigned;
                                     hu_tier_manager_auto_tier(&agent->tier_manager, key_buf,
@@ -3895,6 +4001,24 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             tn_buf[tn] = '\0';
                             const char *args_str = call->arguments ? call->arguments : "";
 
+                            /* ESCALATE enforcement: check approval matrix */
+                            if (agent->escalate_protocol.rule_count > 0) {
+                                hu_escalate_level_t esc_level =
+                                    hu_escalate_evaluate(&agent->escalate_protocol, tn_buf, tn);
+                                if (esc_level == HU_ESCALATE_DENY) {
+                                    hu_tool_result_free(agent->alloc, result);
+                                    *result = hu_tool_result_fail("blocked by ESCALATE policy", 26);
+                                    if (agent->audit_logger)
+                                        hu_escalate_log_decision(agent->audit_logger, tn_buf,
+                                                                 esc_level, false);
+                                } else if (esc_level == HU_ESCALATE_APPROVE) {
+                                    result->needs_approval = true;
+                                    if (agent->audit_logger)
+                                        hu_escalate_log_decision(agent->audit_logger, tn_buf,
+                                                                 esc_level, false);
+                                }
+                            }
+
                             /* Policy evaluation (dispatcher path) */
                             hu_policy_action_t pa = hu_agent_internal_evaluate_tool_policy(
                                 agent, tn_buf[0] ? tn_buf : "unknown", args_str);
@@ -3984,6 +4108,19 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         ? NULL
                                         : (result->error_msg ? result->error_msg : "failed");
                                 HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
+                            }
+
+                            /* Tool result validation: schema + semantic checks */
+                            if (agent->tool_validator.default_level > HU_VALIDATE_NONE &&
+                                result->success) {
+                                hu_validation_result_t vr;
+                                hu_tool_validator_check(&agent->tool_validator, tn_buf, tn, result,
+                                                        &vr);
+                                if (!vr.passed) {
+                                    fprintf(stderr,
+                                            "[agent_turn] tool validation failed for %s: %s\n",
+                                            tn_buf, vr.reason);
+                                }
                             }
 
                             /* Outcome tracking */
@@ -4304,6 +4441,35 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         agent->alloc->free(agent->alloc->ctx, goal_ctx, goal_ctx_len + 1);
                     }
                 }
+            }
+        }
+
+        /* Scratchpad: persist turn metadata as working memory */
+        if (agent->scratchpad.max_bytes > 0) {
+            char turn_key[32];
+            int tk_n = snprintf(turn_key, sizeof(turn_key), "turn_%d", (int)iter);
+            if (tk_n > 0 && (size_t)tk_n < sizeof(turn_key)) {
+                char turn_val[256];
+                int tv_n = snprintf(turn_val, sizeof(turn_val), "tokens=%u,tools=%zu",
+                                    (unsigned)turn_tokens, turn_tool_results_count);
+                if (tv_n > 0 && (size_t)tv_n < sizeof(turn_val))
+                    hu_scratchpad_set(&agent->scratchpad, agent->alloc, turn_key, (size_t)tk_n,
+                                      turn_val, (size_t)tv_n);
+            }
+        }
+
+        /* Checkpoint: auto-save state after tool iterations */
+        if (hu_checkpoint_should_save(&agent->checkpoint_store, (uint32_t)iter)) {
+            char cp_state[128];
+            int cp_n = snprintf(cp_state, sizeof(cp_state), "{\"iter\":%d,\"tokens\":%llu}",
+                                (int)iter, (unsigned long long)agent->total_tokens);
+            if (cp_n > 0) {
+                if ((size_t)cp_n >= sizeof(cp_state))
+                    cp_n = (int)(sizeof(cp_state) - 1);
+                static const char cp_task[] = "agent_turn";
+                hu_checkpoint_save(&agent->checkpoint_store, agent->alloc, cp_task,
+                                   sizeof(cp_task) - 1, (uint32_t)iter, HU_CHECKPOINT_ACTIVE,
+                                   cp_state, (size_t)cp_n);
             }
         }
 
