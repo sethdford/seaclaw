@@ -21,7 +21,7 @@ Source of truth: `design-tokens/` directory. W3C Design Tokens v2025.10 format.
 | File | Key tokens added |
 | --- | --- |
 | `base.tokens.json` | `color.tonal.*` (M3 tonal surface primitives) |
-| `semantic.tokens.json` | `surface-container`, `surface-container-high`, `surface-container-highest`, `surface-dim`, `surface-bright`, `hover-overlay` (tinted), `pressed-overlay` (tinted), `focus-overlay`, `dragged-overlay` |
+| `semantic.tokens.json` | `surface-container`, `surface-container-high`, `surface-container-highest`, `surface-dim`, `surface-bright`, `hover-overlay`, `pressed-overlay`, `focus-overlay`, `dragged-overlay` (neutral veils) |
 | `glass.tokens.json` | `choreography.*` (enter/exit/state motion), `material.*` (Apple visionOS densities) |
 | `_dynamic-color.css` | Auto-generated `--hu-dynamic-*` from OKLCH pipeline |
 

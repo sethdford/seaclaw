@@ -13,18 +13,19 @@ The lightest glass — barely perceptible blur with a faint border. Used for bac
 
 | Property           | Value | Token                              |
 | ------------------ | ----- | ---------------------------------- |
-| Blur               | 8px   | `--hu-glass-subtle-blur`           |
-| Saturation         | 120%  | `--hu-glass-subtle-saturation`     |
-| Background opacity | 0.4   | `--hu-glass-subtle-bg-opacity`     |
-| Border opacity     | 0.06  | `--hu-glass-subtle-border-opacity` |
+| Blur               | 12px  | `--hu-glass-subtle-blur`           |
+| Saturation         | 105%  | `--hu-glass-subtle-saturate`       |
+| Background opacity | 0.055 | `--hu-glass-subtle-bg-opacity`     |
+| Border opacity     | 0.05  | `--hu-glass-subtle-border-opacity` |
 
 ```css
 .glass-subtle {
   backdrop-filter: blur(var(--hu-glass-subtle-blur))
-    saturate(var(--hu-glass-subtle-saturation));
+    saturate(var(--hu-glass-subtle-saturate))
+    brightness(var(--hu-glass-vibrancy-backdrop-brightness));
   background: color-mix(
     in srgb,
-    var(--hu-bg-surface) calc(var(--hu-glass-subtle-bg-opacity) * 100%),
+    var(--hu-glass-scrim) var(--hu-glass-subtle-bg-opacity),
     transparent
   );
   border: 1px solid
@@ -44,11 +45,11 @@ The default glass tier — noticeable blur with visible borders and a subtle ins
 
 | Property           | Value | Token                                |
 | ------------------ | ----- | ------------------------------------ |
-| Blur               | 16px  | `--hu-glass-standard-blur`           |
-| Saturation         | 140%  | `--hu-glass-standard-saturation`     |
-| Background opacity | 0.5   | `--hu-glass-standard-bg-opacity`     |
+| Blur               | 24px  | `--hu-glass-standard-blur`           |
+| Saturation         | 128%  | `--hu-glass-standard-saturate`       |
+| Background opacity | 0.085 | `--hu-glass-standard-bg-opacity`     |
 | Border opacity     | 0.08  | `--hu-glass-standard-border-opacity` |
-| Inset opacity      | 0.04  | `--hu-glass-standard-inset-opacity`  |
+| Inset opacity      | 0.06  | `--hu-glass-standard-inset-opacity`  |
 
 **Use for**: Cards, panels, dropdowns, popovers.
 
@@ -58,11 +59,11 @@ Maximum glass effect — heavy blur, strong saturation, prominent borders. Creat
 
 | Property           | Value | Token                                 |
 | ------------------ | ----- | ------------------------------------- |
-| Blur               | 24px  | `--hu-glass-prominent-blur`           |
-| Saturation         | 160%  | `--hu-glass-prominent-saturation`     |
-| Background opacity | 0.6   | `--hu-glass-prominent-bg-opacity`     |
+| Blur               | 32px  | `--hu-glass-prominent-blur`           |
+| Saturation         | 148%  | `--hu-glass-prominent-saturate`       |
+| Background opacity | 0.11  | `--hu-glass-prominent-bg-opacity`     |
 | Border opacity     | 0.12  | `--hu-glass-prominent-border-opacity` |
-| Inset opacity      | 0.06  | `--hu-glass-prominent-inset-opacity`  |
+| Inset opacity      | 0.1   | `--hu-glass-prominent-inset-opacity`  |
 
 **Use for**: Modals, hero sections, primary CTAs, featured content.
 

@@ -13,14 +13,14 @@
         "$description": "Lightest frosted glass"
       },
       "saturate": {
-        "$value": "120%",
+        "$value": "105%",
         "$type": "string",
-        "$description": "Low saturation boost"
+        "$description": "Minimal saturation — keeps frost neutral, not brand-tinted"
       },
       "bg-opacity": {
-        "$value": 0.04,
+        "$value": 0.055,
         "$type": "number",
-        "$description": "Nearly transparent"
+        "$description": "Slightly milkier frost without heavy fill"
       },
       "border-opacity": {
         "$value": 0.05,
@@ -33,9 +33,9 @@
         "$description": "No inset highlight"
       },
       "tint-opacity": {
-        "$value": 0.02,
+        "$value": 0.008,
         "$type": "number",
-        "$description": "Minimal environment tint"
+        "$description": "Bare accent whisper on tinted glass"
       },
       "refraction-scale": {
         "$value": 0,
@@ -51,14 +51,14 @@
         "$description": "Standard frosted glass"
       },
       "saturate": {
-        "$value": "180%",
+        "$value": "128%",
         "$type": "string",
-        "$description": "Moderate saturation boost"
+        "$description": "Moderate frost — avoids heavy chroma from backdrop-filter"
       },
       "bg-opacity": {
-        "$value": 0.06,
+        "$value": 0.085,
         "$type": "number",
-        "$description": "Slightly visible"
+        "$description": "Slightly more white veil for readability"
       },
       "border-opacity": {
         "$value": 0.08,
@@ -71,9 +71,9 @@
         "$description": "Subtle top highlight"
       },
       "tint-opacity": {
-        "$value": 0.04,
+        "$value": 0.018,
         "$type": "number",
-        "$description": "Subtle environment tint"
+        "$description": "Light environment tint — mostly neutral frost"
       },
       "refraction-scale": {
         "$value": 2,
@@ -89,14 +89,14 @@
         "$description": "Heavy frosted glass with refraction"
       },
       "saturate": {
-        "$value": "200%",
+        "$value": "148%",
         "$type": "string",
-        "$description": "Strong saturation boost"
+        "$description": "Strong blur, restrained saturation for white-frost modals"
       },
       "bg-opacity": {
-        "$value": 0.08,
+        "$value": 0.11,
         "$type": "number",
-        "$description": "More visible"
+        "$description": "Milky overlay for prominent surfaces"
       },
       "border-opacity": {
         "$value": 0.12,
@@ -109,9 +109,9 @@
         "$description": "Strong top highlight"
       },
       "tint-opacity": {
-        "$value": 0.06,
+        "$value": 0.028,
         "$type": "number",
-        "$description": "Noticeable environment tint"
+        "$description": "Soft accent tint — still reads as frost first"
       },
       "refraction-scale": {
         "$value": 3,
@@ -127,7 +127,7 @@
         "$type": "dimension"
       },
       "saturate": {
-        "$value": "180%",
+        "$value": "125%",
         "$type": "string"
       },
       "bg-opacity": {
@@ -211,9 +211,9 @@
       "$description": "Icon contrast multiplier on glass"
     },
     "backdrop-brightness": {
-      "$value": 1.08,
+      "$value": 1.12,
       "$type": "number",
-      "$description": "Brightness boost in backdrop-filter"
+      "$description": "Lift frosted backdrop slightly for a whiter read through blur"
     },
     "text-shadow": {
       "$value": "0 0 8px rgba(0,0,0,0.5)",
@@ -319,7 +319,7 @@
         "$type": "dimension"
       },
       "saturate": {
-        "$value": "110%",
+        "$value": "102%",
         "$type": "string"
       },
       "$description": "Ultra-thin material — barely perceptible, background chrome"
@@ -334,7 +334,7 @@
         "$type": "dimension"
       },
       "saturate": {
-        "$value": "140%",
+        "$value": "118%",
         "$type": "string"
       },
       "$description": "Thin material — nav bars, toolbars"
@@ -349,7 +349,7 @@
         "$type": "dimension"
       },
       "saturate": {
-        "$value": "180%",
+        "$value": "132%",
         "$type": "string"
       },
       "$description": "Regular material — cards, panels, sidebars"
@@ -364,7 +364,7 @@
         "$type": "dimension"
       },
       "saturate": {
-        "$value": "200%",
+        "$value": "152%",
         "$type": "string"
       },
       "$description": "Thick material — modals, sheets, prominent overlays"

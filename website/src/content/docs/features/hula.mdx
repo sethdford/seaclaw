@@ -18,8 +18,8 @@ HuLa is **not** a separate “AGI layer.” It is a **structured intermediate re
 
 ## Turn it on
 
-| Setting | Effect |
-| ------- | ------ |
+| Setting                                    | Effect                                                                                                                      |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | **`agent.hula`** in `~/.human/config.json` | **On by default** after config merge. Set `"hula": false` to disable. See [Configuration](/getting-started/configuration/). |
 
 With HuLa enabled, the system prompt includes the **`<hula_program>...</hula_program>`** convention so the model can attach JSON to its reply.
@@ -61,17 +61,21 @@ Human can build a minimal program (`par` or a single `call`) from the model’s 
 
 ## Opcodes at a glance
 
-| Opcode | Meaning |
-| ------ | ------- |
-| `call` | Invoke one tool with JSON `args`. |
-| `seq` | Run children in order; stop on first failing `call`. |
-| `par` | Run children concurrently; join results. |
-| `branch` | If `pred` matches prior context, run `then` or `else`. |
-| `loop` | Bounded loop over `body` (use `max_iter`). |
+| Opcode     | Meaning                                                                                |
+| ---------- | -------------------------------------------------------------------------------------- |
+| `call`     | Invoke one tool with JSON `args`.                                                      |
+| `seq`      | Run children in order; stop on first failing `call`.                                   |
+| `par`      | Run children concurrently; join results.                                               |
+| `branch`   | If `pred` matches prior context, run `then` or `else`.                                 |
+| `loop`     | Bounded loop over `body` (use `max_iter`).                                             |
 | `delegate` | Spawn a sub-agent with a `goal` (POSIX, non-test, pool + inheritance when configured). |
-| `emit` | Produce a string; `emit_value` can use `$node_id` for prior outputs. |
+| `emit`     | Produce a string; `emit_value` can use `$node_id` for prior outputs.                   |
 
 `$node_id` applies to **`emit_value`** and to **string values in `call` `args`** (longest id match; referenced node must be done). Expansion per string is capped at 256 KiB. The character after the id must not continue an identifier (`A–Z`, `a–z`, `0–9`, `_`); use a delimiter such as `.` before literal suffix text (for example `prefix.$node.suffix`).
+
+## Web dashboard (gateway)
+
+When you run **`human gateway`** and open the bundled UI, use **HuLa** in the sidebar to browse persisted trace files. The gateway uses the same directory as the CLI: **`HU_HULA_TRACE_DIR`** if set, otherwise **`~/.human/hula_traces`** (POSIX). **Observability** shows **HuLa tool turns** (BTH) and links to the HuLa view.
 
 ## Emergence from traces
 
@@ -95,8 +99,8 @@ Traces may be written under `~/.human/hula_traces/`. The runtime can **scan** re
 
 ## See also
 
-| Resource | Purpose |
-| -------- | ------- |
-| [Config API — `agent.hula`](https://github.com/sethdford/h-uman/blob/main/docs/api/config.md) | Schema notes |
-| [Concept index — HuLa](https://github.com/sethdford/h-uman/blob/main/docs/CONCEPT_INDEX.md) | Source files |
-| [Examples](https://github.com/sethdford/h-uman/tree/main/examples) | `hula_*.json` samples |
+| Resource                                                                                      | Purpose               |
+| --------------------------------------------------------------------------------------------- | --------------------- |
+| [Config API — `agent.hula`](https://github.com/sethdford/h-uman/blob/main/docs/api/config.md) | Schema notes          |
+| [Concept index — HuLa](https://github.com/sethdford/h-uman/blob/main/docs/CONCEPT_INDEX.md)   | Source files          |
+| [Examples](https://github.com/sethdford/h-uman/tree/main/examples)                            | `hula_*.json` samples |

@@ -142,6 +142,15 @@ Four spring presets for different contexts:
 
 **Every animation must respect `prefers-reduced-motion: reduce`.** Use the global media query in `theme.css` or add component-level `@media (prefers-reduced-motion: reduce)` overrides. Keyframe names use `hu-` prefix (e.g., `hu-fade-in`, `hu-slide-up`).
 
+### Theme Switch Crossfade
+
+The dashboard uses the View Transitions API for smooth dark/light theme switching. When the user cycles themes via the sidebar toggle, the DOM mutation is wrapped in `document.startViewTransition()`, producing a crossfade:
+
+- `::view-transition-old(root)` fades out with `--hu-duration-normal`
+- `::view-transition-new(root)` fades in with the same timing
+- Falls back to instant swap when View Transitions is unsupported
+- Respects `prefers-reduced-motion: reduce` (0ms animation)
+
 ---
 
 ## Component API Reference
@@ -150,7 +159,7 @@ Four spring presets for different contexts:
 | ---------------- | ------------------------------------------------------------------- |
 | `hu-button`      | Primary actions; variants: primary, secondary, destructive, ghost   |
 | `hu-badge`       | Status indicators; variants: success, warning, error, info, neutral |
-| `hu-card`        | Content containers; optional hoverable, clickable                   |
+| `hu-card`        | Content containers; glass/solid, hover/click/tilt, mesh/chromatic, entrance, tonal surfaces |
 | `hu-modal`       | Centered dialog overlay; focus trap, Escape to close                |
 | `hu-sheet`       | Bottom sheet overlay; swipe to dismiss                              |
 | `hu-toast`       | Transient notifications                                             |
@@ -160,6 +169,28 @@ Four spring presets for different contexts:
 | `hu-avatar`      | User avatars; initials fallback, status indicator                   |
 | `hu-tabs`        | Tab navigation                                                      |
 | `hu-empty-state` | Empty list/state messaging                                          |
+
+### Component attributes
+
+#### hu-card
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `glass` | boolean | true | Glass tier styling |
+| `solid` | boolean | false | Opaque surface (no glass) |
+| `hoverable` | boolean | false | Hover lift effect |
+| `clickable` | boolean | false | Click feedback |
+| `tilt` | boolean | false | 3D perspective tilt on pointer proximity |
+| `mesh` | boolean | false | Mesh gradient background overlay |
+| `chromatic` | boolean | false | Chromatic prismatic border |
+| `entrance` | boolean | false | Animate into view (IntersectionObserver) with stagger support via `--hu-stagger-delay` |
+| `surface` | string | "default" | Tonal surface tier: `default` (container), `high` (interactive), `highest` (emphasis) |
+
+#### hu-input
+
+Supports a `variant` attribute:
+- Default: standard surface with elevated background
+- `variant="tonal"`: uses `--hu-surface-container` background with `--hu-surface-container-high` border for branded depth
 
 ---
 
@@ -171,6 +202,17 @@ Four spring presets for different contexts:
 - Never use raw hex colors, pixel spacing, or font-family
 - Shadow: `var(--hu-shadow-sm)`, `var(--hu-shadow-md)`, `var(--hu-shadow-lg)`
 - Duration: `var(--hu-duration-fast)`, `var(--hu-duration-normal)`, `var(--hu-duration-slow)`
+
+### CSS Utility Classes (theme.css)
+
+| Class | Purpose |
+|-------|---------|
+| `.hu-interactive` | Layered hover/pressed states: background shift + accent-tinted border + inset shadow on press |
+| `.hu-interactive-subtle` | Lighter variant for dense UIs |
+| `.hu-link-structural` | Steel blue (`--hu-accent-tertiary`) link styling for informational/structural links |
+| `.hu-shadow-accent` | Accent-colored drop shadow |
+| `.hu-shadow-warm` | Warm (secondary-accent) drop shadow |
+| `.hu-shadow-glass` | Glass-style shadow with inset highlights |
 
 ### Swift (iOS)
 

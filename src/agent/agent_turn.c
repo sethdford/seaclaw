@@ -2278,8 +2278,18 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         root_ok = hu_hula_exec_result(&hx, hprog.root->id)->status == HU_HULA_DONE;
                     else
                         root_ok = true;
-                    (void)hu_hula_trace_persist(agent->alloc, NULL, tr, trl, hprog.name,
-                                                hprog.name_len, root_ok, NULL, 0);
+                    {
+                        char *pj = NULL;
+                        size_t pjl = 0;
+                        if (hu_hula_to_json(agent->alloc, &hprog, &pj, &pjl) == HU_OK && pj) {
+                            (void)hu_hula_trace_persist(agent->alloc, NULL, tr, trl, hprog.name,
+                                                        hprog.name_len, root_ok, pj, pjl);
+                            hu_str_free(agent->alloc, pj);
+                        } else {
+                            (void)hu_hula_trace_persist(agent->alloc, NULL, tr, trl, hprog.name,
+                                                        hprog.name_len, root_ok, NULL, 0);
+                        }
+                    }
                     char *stripped = NULL;
                     size_t slen = 0;
                     const char *asst = resp.content;
@@ -3658,6 +3668,29 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                                     &hula_spawn_tpl);
                                     herr = hu_hula_exec_run(&hula_exec);
                                     if (herr == HU_OK) {
+                                        size_t trl = 0;
+                                        const char *tr = hu_hula_exec_trace(&hula_exec, &trl);
+                                        bool root_ok = false;
+                                        if (hula_prog.root && hula_prog.root->id)
+                                            root_ok = hu_hula_exec_result(&hula_exec,
+                                                                          hula_prog.root->id)
+                                                         ->status == HU_HULA_DONE;
+                                        else
+                                            root_ok = true;
+                                        char *pj = NULL;
+                                        size_t pjl = 0;
+                                        if (hu_hula_to_json(agent->alloc, &hula_prog, &pj, &pjl) ==
+                                                HU_OK &&
+                                            pj) {
+                                            (void)hu_hula_trace_persist(
+                                                agent->alloc, NULL, tr, trl, hula_prog.name,
+                                                hula_prog.name_len, root_ok, pj, pjl);
+                                            hu_str_free(agent->alloc, pj);
+                                        } else {
+                                            (void)hu_hula_trace_persist(
+                                                agent->alloc, NULL, tr, trl, hula_prog.name,
+                                                hula_prog.name_len, root_ok, NULL, 0);
+                                        }
                                         used_hula = true;
                                         hu_bth_metrics_record_hula_tool_turn(agent->bth_metrics);
                                         agent_turn_hula_append_histories(agent, &hula_prog,

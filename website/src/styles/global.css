@@ -118,6 +118,19 @@
     --font-mono: var(--hu-font-mono);
 
     /* Spacing, radius, shadows, motion, transitions: use --hu-* from _tokens.css */
+
+    /* Milky frost (aligned with dashboard theme.css) — less brand tint through glass */
+    --hu-glass-scrim: color-mix(in srgb, white 74%, var(--hu-bg-surface) 26%);
+  }
+
+  [data-theme="dark"] {
+    --hu-glass-scrim: color-mix(in srgb, white 86%, var(--hu-bg-surface) 14%);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --hu-glass-scrim: color-mix(in srgb, white 86%, var(--hu-bg-surface) 14%);
+    }
   }
 
   html {
@@ -182,13 +195,15 @@
   .hu-glass-subtle {
     background: color-mix(
       in srgb,
-      var(--hu-bg-surface) var(--hu-glass-subtle-bg-opacity, 4%),
+      var(--hu-glass-scrim) var(--hu-glass-subtle-bg-opacity, 4%),
       transparent
     );
     backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
-      saturate(var(--hu-glass-subtle-saturate, 120%));
+      saturate(var(--hu-glass-subtle-saturate, 120%))
+      brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.12));
     -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
-      saturate(var(--hu-glass-subtle-saturate, 120%));
+      saturate(var(--hu-glass-subtle-saturate, 120%))
+      brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.12));
     border: 1px solid
       color-mix(
         in srgb,
@@ -203,13 +218,15 @@
   .hu-glass-standard {
     background: color-mix(
       in srgb,
-      var(--hu-bg-surface) var(--hu-glass-standard-bg-opacity, 6%),
+      var(--hu-glass-scrim) var(--hu-glass-standard-bg-opacity, 6%),
       transparent
     );
     backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
-      saturate(var(--hu-glass-standard-saturate, 180%));
+      saturate(var(--hu-glass-standard-saturate, 180%))
+      brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.12));
     -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
-      saturate(var(--hu-glass-standard-saturate, 180%));
+      saturate(var(--hu-glass-standard-saturate, 180%))
+      brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.12));
     border: 1px solid
       color-mix(
         in srgb,
@@ -222,7 +239,7 @@
       inset 0 1px 0
         color-mix(
           in srgb,
-          var(--hu-bg-surface) var(--hu-glass-standard-inset-opacity, 6%),
+          white var(--hu-glass-standard-inset-opacity, 6%),
           transparent
         );
   }
@@ -231,18 +248,19 @@
   .hu-glass-prominent {
     background: color-mix(
       in srgb,
-      var(--hu-bg-surface) var(--hu-glass-prominent-bg-opacity, 8%),
+      var(--hu-glass-scrim) var(--hu-glass-prominent-bg-opacity, 8%),
       transparent
     );
     backdrop-filter: blur(var(--hu-glass-prominent-blur, 32px))
-      saturate(var(--hu-glass-prominent-saturate, 200%));
+      saturate(var(--hu-glass-prominent-saturate, 200%))
+      brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.12));
     -webkit-backdrop-filter: blur(var(--hu-glass-prominent-blur, 32px))
-      saturate(var(--hu-glass-prominent-saturate, 200%));
+      saturate(var(--hu-glass-prominent-saturate, 200%))
+      brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.12));
     border: 1px solid
       color-mix(
         in srgb,
-        var(--hu-border)
-          var(--hu-glass-prominent-border-opacity, 12%),
+        var(--hu-border) var(--hu-glass-prominent-border-opacity, 12%),
         transparent
       );
     border-radius: var(--hu-radius-xl);
@@ -251,22 +269,24 @@
       inset 0 1px 0
         color-mix(
           in srgb,
-          var(--hu-bg-surface) var(--hu-glass-prominent-inset-opacity, 10%),
+          white var(--hu-glass-prominent-inset-opacity, 10%),
           transparent
         ),
-      inset 0 -1px 0 color-mix(in srgb, var(--hu-bg-surface) 3%, transparent);
+      inset 0 -1px 0 color-mix(in srgb, white 3%, transparent);
   }
 
   .glass-premium {
     background: color-mix(
       in srgb,
-      var(--hu-bg-surface) var(--hu-glass-prominent-bg-opacity, 8%),
+      var(--hu-glass-scrim) var(--hu-glass-prominent-bg-opacity, 8%),
       transparent
     );
     backdrop-filter: blur(var(--hu-glass-prominent-blur, 32px))
-      saturate(var(--hu-glass-prominent-saturate, 200%));
+      saturate(var(--hu-glass-prominent-saturate, 200%))
+      brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.12));
     -webkit-backdrop-filter: blur(var(--hu-glass-prominent-blur, 32px))
-      saturate(var(--hu-glass-prominent-saturate, 200%));
+      saturate(var(--hu-glass-prominent-saturate, 200%))
+      brightness(var(--hu-glass-vibrancy-backdrop-brightness, 1.12));
     border: 1px solid
       color-mix(
         in srgb,
@@ -797,8 +817,7 @@
 
   .btn-primary:active {
     animation: squash-press var(--hu-duration-fast) var(--hu-ease-out) forwards;
-    box-shadow: 0 1px 2px
-      color-mix(in srgb, var(--hu-text) 10%, transparent);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--hu-text) 10%, transparent);
   }
 
   .btn-outline {
@@ -843,7 +862,8 @@
   /* ── Terminal demo (animated replay) ── */
   .terminal-line {
     opacity: 0;
-    animation: hu-terminal-type var(--hu-duration-fast, 0.3s) var(--hu-ease-out) forwards;
+    animation: hu-terminal-type var(--hu-duration-fast, 0.3s) var(--hu-ease-out)
+      forwards;
     animation-delay: calc(var(--line-delay, 0) * 0.8s + 1s);
   }
   .terminal-line.response {
@@ -1977,7 +1997,11 @@ h3 {
   );
   backdrop-filter: blur(16px);
   border: 1px solid
-    color-mix(in srgb, var(--hu-border, var(--hu-border-subtle)) 50%, transparent);
+    color-mix(
+      in srgb,
+      var(--hu-border, var(--hu-border-subtle)) 50%,
+      transparent
+    );
   border-radius: var(--hu-radius-xl);
   padding: var(--hu-space-lg);
   display: flex;
@@ -2038,7 +2062,11 @@ h3 {
   );
   backdrop-filter: blur(16px);
   border: 1px solid
-    color-mix(in srgb, var(--hu-border, var(--hu-border-subtle)) 50%, transparent);
+    color-mix(
+      in srgb,
+      var(--hu-border, var(--hu-border-subtle)) 50%,
+      transparent
+    );
   border-radius: var(--hu-radius-xl);
   padding: var(--hu-space-lg);
   position: relative;
@@ -2200,7 +2228,8 @@ h3 {
   pointer-events: none;
   opacity: var(--hu-proximity, 0);
   background: radial-gradient(
-    200px at calc(50% + var(--hu-pointer-x, 0px)) calc(50% + var(--hu-pointer-y, 0px)),
+    200px at calc(50% + var(--hu-pointer-x, 0px))
+      calc(50% + var(--hu-pointer-y, 0px)),
     color-mix(in srgb, var(--color-accent, var(--hu-accent)) 8%, transparent),
     transparent
   );
@@ -2215,14 +2244,22 @@ h3 {
 
 /* Gradient text utilities */
 .hu-text-gradient {
-  background: linear-gradient(135deg, var(--hu-accent, #7AB648), var(--hu-accent-tertiary, #4a6fa5));
+  background: linear-gradient(
+    135deg,
+    var(--hu-accent, #7ab648),
+    var(--hu-accent-tertiary, #4a6fa5)
+  );
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .hu-text-gradient-warm {
-  background: linear-gradient(135deg, var(--hu-accent, #7AB648), var(--hu-accent-secondary, #f59e0b));
+  background: linear-gradient(
+    135deg,
+    var(--hu-accent, #7ab648),
+    var(--hu-accent-secondary, #f59e0b)
+  );
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -2231,9 +2268,21 @@ h3 {
 /* Mesh gradient background */
 .hu-mesh-gradient {
   background:
-    radial-gradient(ellipse at 20% 50%, color-mix(in srgb, var(--hu-accent, #7AB648) 6%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, color-mix(in srgb, var(--hu-accent-tertiary, #4a6fa5) 4%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--hu-accent-secondary, #f59e0b) 3%, transparent) 0%, transparent 50%),
+    radial-gradient(
+      ellipse at 20% 50%,
+      color-mix(in srgb, var(--hu-accent, #7ab648) 6%, transparent) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 80% 20%,
+      color-mix(in srgb, var(--hu-accent-tertiary, #4a6fa5) 4%, transparent) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 50% 80%,
+      color-mix(in srgb, var(--hu-accent-secondary, #f59e0b) 3%, transparent) 0%,
+      transparent 50%
+    ),
     var(--hu-bg);
 }
 

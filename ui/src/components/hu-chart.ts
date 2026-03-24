@@ -50,7 +50,12 @@ export class ScChart extends LitElement {
   @property({ type: Boolean }) horizontal = false;
   @property({ type: Boolean }) hideLegend = false;
 
-  private _chart: { destroy: () => void; resize: () => void } | null = null;
+  private _chart: {
+    destroy: () => void;
+    resize: () => void;
+    data: { labels: unknown[]; datasets: unknown[] };
+    update: (mode?: string) => void;
+  } | null = null;
   private _resizeObserver: ResizeObserver | null = null;
   private _chartLoadPromise: Promise<unknown> | null = null;
   private _chartUnavailable = false;
@@ -116,24 +121,37 @@ export class ScChart extends LitElement {
   }
 
   override updated(changed: Map<string, unknown>): void {
-    if (
+    if (!this._hasData()) {
+      this._destroyChart();
+      return;
+    }
+
+    const needsRecreate =
       changed.has("type") ||
-      changed.has("data") ||
       changed.has("height") ||
       changed.has("horizontal") ||
-      changed.has("hideLegend")
-    ) {
-      this._scheduleChartUpdate();
+      changed.has("hideLegend") ||
+      !this._chart;
+
+    if (needsRecreate) {
+      if (this._chart) this._destroyChart();
+      this._initChart();
+      return;
+    }
+
+    if (changed.has("data") && this._chart) {
+      this._patchChartData();
     }
   }
 
-  private _scheduleChartUpdate(): void {
-    if (this._chart) {
-      this._destroyChart();
-    }
-    if (this._hasData()) {
-      this._initChart();
-    }
+  private _patchChartData(): void {
+    const chart = this._chart;
+    if (!chart || !this._hasData()) return;
+    chart.data.labels = [...(this.data?.labels ?? [])];
+    chart.data.datasets = this._buildChartDatasets() as never[];
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    chart.update(reducedMotion ? "none" : "default");
+    this.requestUpdate();
   }
 
   private _hasData(): boolean {
@@ -208,7 +226,15 @@ export class ScChart extends LitElement {
     if (!canvas || !this._hasData()) return;
 
     const ChartModule = (await this._chartLoadPromise) as {
-      default?: new (el: HTMLCanvasElement, config: unknown) => { destroy(): void; resize(): void };
+      default?: new (
+        el: HTMLCanvasElement,
+        config: unknown,
+      ) => {
+        destroy(): void;
+        resize(): void;
+        data: { labels: unknown[]; datasets: unknown[] };
+        update(mode?: string): void;
+      };
     } | null;
     if (!ChartModule?.default) {
       this._chartUnavailable = true;

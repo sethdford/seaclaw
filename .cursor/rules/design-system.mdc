@@ -44,7 +44,7 @@ globs:
 - Use tonal surfaces instead of `--hu-bg-surface` when the surface should carry brand identity
 - Use `--hu-surface-dim` for recessed wells, `--hu-surface-bright` for hero/featured areas
 - Plain `--hu-bg-surface` / `--hu-bg-elevated` remain available for neutral (non-tinted) surfaces
-- **State layers** are primary-tinted: `--hu-hover-overlay`, `--hu-pressed-overlay`, `--hu-focus-overlay`, `--hu-dragged-overlay` all use human green
+- **State layers** are neutral: `--hu-hover-overlay`, `--hu-pressed-overlay`, `--hu-focus-overlay`, `--hu-dragged-overlay` use white/black veils; brand shows in focus rings and primary actions
 - `--hu-disabled-overlay` remains neutral (no brand color on disabled states)
 
 ## Glass
@@ -93,6 +93,25 @@ globs:
 - Use semantic HTML and ARIA attributes: `role`, `aria-label`, `aria-labelledby`, `aria-modal`.
 - Color contrast must meet WCAG 2.1 AA (4.5:1 for text, 3:1 for large text/UI).
 - `prefers-color-scheme` and `prefers-reduced-motion` must both be supported.
+
+## Component APIs
+
+- `hu-card`: Use `entrance` for viewport-driven reveal, `surface="high"` for interactive cards, `tilt` for premium hero cards
+- `hu-input`: Use `variant="tonal"` in branded contexts (config panels, modals)
+- `hu-badge info`: Uses `--hu-accent-tertiary` (steel blue), not `--hu-info`
+
+## CSS Utilities
+
+- `.hu-interactive` / `.hu-interactive-subtle`: Layered hover/pressed states
+- `.hu-link-structural`: Steel blue links for informational content
+- `.hu-stagger`: 50ms steps, capped at 300ms (`--hu-stagger-delay`, `--hu-stagger-max`)
+- `.hu-cascade`: 30ms steps, capped at 200ms (`--hu-cascade-delay`, `--hu-cascade-max`)
+
+## View Transitions
+
+- Route navigation: `view-transition-name: main-content` (spring animation in `app.ts`)
+- Theme toggle: `::view-transition-old/new(root)` crossfade (sidebar `_applyTheme`)
+- These are distinct systems — do not conflate them
 
 ## Component Patterns
 

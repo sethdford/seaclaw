@@ -1898,6 +1898,7 @@ set(HU_TEST_SOURCES
     tests/test_core_extended.c
     tests/test_gateway_extended.c
     tests/test_gateway_voice.c
+    tests/test_gateway_hula_traces.c
     tests/test_gateway_auth.c
     tests/test_pairing.c
     tests/test_agent_extended.c

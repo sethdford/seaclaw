@@ -56,17 +56,16 @@ creating a branded warmth across elevation levels.
 - Use `--hu-surface-container-highest` for the most prominent interactive element
 - Token source: `design-tokens/base.tokens.json` (color.tonal.\*), referenced by `semantic.tokens.json`
 
-### Tinted State Layers (M3)
+### Neutral State Layers (M3)
 
-Hover, press, and focus overlays are tinted with the primary accent color instead of
-neutral white/black. This connects interactive feedback to the brand identity.
+Hover, press, focus, and drag overlays use **neutral** veils (warm white on dark UI, soft black on light UI). Brand identity stays on **focus rings**, links, and primary buttons — not on every interactive surface wash.
 
-| Token                  | Dark Value               | Light Value             | Usage          |
-| ---------------------- | ------------------------ | ----------------------- | -------------- |
-| `--hu-hover-overlay`   | rgba(122, 182, 72, 0.08) | rgba(90, 154, 48, 0.06) | Hover state    |
-| `--hu-pressed-overlay` | rgba(122, 182, 72, 0.12) | rgba(90, 154, 48, 0.10) | Active/pressed |
-| `--hu-focus-overlay`   | rgba(122, 182, 72, 0.12) | rgba(90, 154, 48, 0.10) | Focus state    |
-| `--hu-dragged-overlay` | rgba(122, 182, 72, 0.16) | rgba(90, 154, 48, 0.14) | Drag state     |
+| Token                  | Dark Value                 | Light Value           | Usage          |
+| ---------------------- | -------------------------- | --------------------- | -------------- |
+| `--hu-hover-overlay`   | rgba(255, 255, 255, 0.08)  | rgba(0, 0, 0, 0.06)   | Hover state    |
+| `--hu-pressed-overlay` | rgba(255, 255, 255, 0.12)  | rgba(0, 0, 0, 0.10)   | Active/pressed |
+| `--hu-focus-overlay`   | rgba(255, 255, 255, 0.12)  | rgba(0, 0, 0, 0.10)   | Focus state    |
+| `--hu-dragged-overlay` | rgba(255, 255, 255, 0.16)  | rgba(0, 0, 0, 0.14)   | Drag state     |
 
 **Rules:**
 

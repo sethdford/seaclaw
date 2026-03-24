@@ -9,7 +9,13 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
 <html lang="en">
   <head>
     <script is:inline>
-      (function(){var s=localStorage.getItem("hu-theme");var m=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s||m})();
+      (function () {
+        var s = localStorage.getItem("hu-theme");
+        var m = window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+        document.documentElement.dataset.theme = s || m;
+      })();
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -204,9 +210,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                   class="w-16 h-16"
                   loading="lazy"
                 />
-                <span
-                  class="text-xs mt-3"
-                  style="color: var(--hu-text-muted);">64px</span
+                <span class="text-xs mt-3" style="color: var(--hu-text-muted);"
+                  >64px</span
                 >
               </div>
               <div
@@ -238,9 +243,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                   class="w-8 h-8"
                   loading="lazy"
                 />
-                <span
-                  class="text-xs mt-3"
-                  style="color: var(--hu-text-muted);">32px on dark</span
+                <span class="text-xs mt-3" style="color: var(--hu-text-muted);"
+                  >32px on dark</span
                 >
               </div>
             </div>
@@ -347,7 +351,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 </div>
                 <div
                   class="rounded-2xl p-6"
-                  style="background: var(--hu-bg-surface, #152333); border: 1px solid color-mix(in srgb, white 0.1, transparent);"
+                  style="background: var(--hu-bg-surface, #152333); border: 1px solid color-mix(in srgb, var(--hu-color-white, #fffefa) 0.1, transparent);"
                 >
                   <p
                     class="text-xs uppercase tracking-wider mb-4"
@@ -391,7 +395,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
           <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
             Avenir at all weights. Use <code
               class="px-2 py-0.5 rounded"
-              style="background: var(--hu-surface-container-high);">var(--hu-font)</code
+              style="background: var(--hu-surface-container-high);"
+              >var(--hu-font)</code
             >.
           </p>
           <div class="space-y-10">

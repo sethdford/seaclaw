@@ -302,16 +302,22 @@ def run_human(
     timeout_sec: int,
     env_overrides: dict[str, str] | None = None,
 ) -> tuple[int, str, str]:
-    """Returns (exit_code, stdout, stderr)."""
-    r = subprocess.run(
-        [str(human_bin), "agent", "-m", prompt],
-        capture_output=True,
-        text=True,
-        timeout=timeout_sec,
-        env=_build_agent_env(env_overrides),
-        cwd=str(REPO_ROOT),
-    )
-    return r.returncode, r.stdout or "", r.stderr or ""
+    """Returns (exit_code, stdout, stderr). Exit 124 = subprocess timeout (do not raise)."""
+    try:
+        r = subprocess.run(
+            [str(human_bin), "agent", "-m", prompt],
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            env=_build_agent_env(env_overrides),
+            cwd=str(REPO_ROOT),
+        )
+        return r.returncode, r.stdout or "", r.stderr or ""
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout if isinstance(e.stdout, str) else (e.stdout.decode("utf-8", errors="replace") if e.stdout else "")
+        err = e.stderr if isinstance(e.stderr, str) else (e.stderr.decode("utf-8", errors="replace") if e.stderr else "")
+        tail = f"\n[harness] subprocess.TimeoutExpired after {timeout_sec}s"
+        return 124, (out or "").strip(), ((err or "") + tail).strip()
 
 
 def judge_response(
@@ -555,7 +561,14 @@ def main() -> int:
                 combined = (combined + "\n" + err.strip()).strip()
 
         verdict: dict[str, Any]
-        if code != 0 and not p.get("multi_turn"):
+        if code == 124:
+            verdict = {
+                "pass": False,
+                "score": 0.0,
+                "reason": "human agent subprocess timeout",
+                "violation": "severe",
+            }
+        elif code != 0 and not p.get("multi_turn"):
             verdict = {
                 "pass": False,
                 "score": 0.0,

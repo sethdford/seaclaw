@@ -60,7 +60,7 @@ Vtable-driven and modular. Extend by implementing vtable structs + factory regis
 - One concern per change. Don't mix feature + refactor + infra.
 - **AI Model Versions**: Never reference or use Gemini 2.0 or 2.5 models — they are deprecated. Always use Gemini 3.0+ (currently 3.1). Before writing any code that references a model version, do a web search to verify the latest available model IDs on Vertex AI. Current canonical models: `gemini-3.1-pro-preview`, `gemini-3.1-flash-lite-preview`, `gemini-3-flash-preview`. All Gemini access uses Vertex AI with Application Default Credentials (ADC), not API keys.
 - Use `--hu-surface-container*` for branded tonal surfaces, `--hu-bg-surface` for neutral.
-- Use tinted state overlays (`--hu-hover-overlay`, etc.) — they are primary-colored, not neutral.
+- Use neutral state overlays (`--hu-hover-overlay`, etc.) — white/black veils on dark/light; brand shows in rings and primaries.
 
 ## Commit Format
 

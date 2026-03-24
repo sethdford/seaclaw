@@ -81,6 +81,7 @@ Rules:
 - Modal backgrounds dim to focus attention on the dialog
 - Only one element should be animating prominently at any time
 - Use `--hu-cascade-delay` (30ms) for nested child elements within a parent
+- Cap nested cascade at `--hu-cascade-max` (200ms) — child 7+ all start at 200ms
 
 #### 1.4 Straight-Ahead vs. Pose-to-Pose — CSS Implementation
 
@@ -349,6 +350,13 @@ When navigating between views (tab change, route change):
 - Direction: slide up (8px) + scale (0.995→1) + fade
 - Reduced motion: `animation: none`
 
+#### Route vs Theme Transitions
+
+- **Route navigation**: `main-content` view transition with `hu-view-enter` spring animation (handled by `app.ts`)
+- **Theme switching**: `root` view transition with `hu-theme-fade-out/in` opacity crossfade (handled by sidebar toggle + `theme.css`)
+
+These are distinct: route transitions animate the content area, while theme transitions crossfade the entire document.
+
 ### 3.2 Modal/Sheet Transitions
 
 ```
@@ -413,9 +421,13 @@ When multiple elements enter simultaneously, stagger prevents cognitive overload
 }
 ```
 
-- `--hu-stagger-delay`: 50ms between items
-- `--hu-stagger-max`: 300ms cap (item 7+ all start at 300ms)
-- `--hu-cascade-delay`: 30ms for nested children within a parent
+| Token | Value | Purpose |
+| ----- | ----- | ------- |
+| `--hu-stagger-delay` | 50ms | Per-child delay step |
+| `--hu-stagger-max` | 300ms | Maximum stagger cap (child 7+) |
+| `--hu-cascade-delay` | 30ms | Per-child cascade step (faster) |
+| `--hu-cascade-max` | 200ms | Maximum cascade cap (child 7+) |
+
 - Maximum cascade depth: 3 levels
 
 ### 4.2 Entrance Choreography
@@ -667,6 +679,29 @@ Rules:
 
 - Dashboard: `ui/src/styles/scroll-driven.css` (utilities)
 - Website: apply via `global.css` or component-level `<style>` blocks
+
+### 7.5 Dashboard Scroll Entrance
+
+Two complementary systems handle entrance choreography in dashboard views:
+
+**CSS Scroll-Timeline** (`scroll-driven.css`):
+
+- `.hu-scroll-reveal` — view-timeline entrance with opacity + translateY
+- `.hu-scroll-reveal-stagger` — same, applied to direct children
+- `.hu-parallax-subtle` / `.hu-parallax-deep` — scroll-linked parallax
+- `.hu-data-cascade` — metric-style enter with scale
+
+**IntersectionObserver Fallback** (`scroll-entrance.ts`):
+
+- `scrollEntranceStyles` — Lit style module with `hu-card-enter` animation
+- `_setupScrollEntrance()` — IO-based `.entered` class toggle for browsers without `animation-timeline: view()` support
+- `staggerMotion9Styles` — fixed 50ms nth-child stagger for up to 9 children
+
+Views should import one of these helpers. All 19 dashboard views use either `scrollEntranceStyles` or `staggerMotion9Styles`.
+
+### 7.6 Component Entrance: hu-card
+
+`hu-card` supports an `entrance` boolean attribute that uses IntersectionObserver to add an `.entered` class when the card enters the viewport. The card transitions from `opacity: 0; translateY(--hu-space-sm)` to `opacity: 1; translateY(0)` using `--hu-duration-normal` and `--hu-ease-out`. Per-card stagger via `--hu-stagger-delay` CSS custom property.
 
 ---
 

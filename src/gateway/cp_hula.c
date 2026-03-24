@@ -21,6 +21,22 @@ static void default_hula_trace_dir(char *buf, size_t cap) {
     (void)snprintf(buf, cap, "%s/.human/hula_traces", h);
 }
 
+/* Prefer HU_HULA_TRACE_DIR (same as CLI `human hula run`) so dashboard lists match persist location. */
+static void resolve_hula_trace_dir(char *buf, size_t cap) {
+    if (!buf || cap == 0)
+        return;
+    buf[0] = '\0';
+    const char *e = getenv("HU_HULA_TRACE_DIR");
+    if (e && e[0]) {
+        size_t el = strlen(e);
+        if (el < cap) {
+            memcpy(buf, e, el + 1);
+        }
+        return;
+    }
+    default_hula_trace_dir(buf, cap);
+}
+
 static bool safe_trace_basename(const char *name) {
     if (!name || !name[0])
         return false;
@@ -53,7 +69,7 @@ hu_error_t cp_hula_traces_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     return HU_ERR_NOT_SUPPORTED;
 #else
     char dir[512];
-    default_hula_trace_dir(dir, sizeof(dir));
+    resolve_hula_trace_dir(dir, sizeof(dir));
     if (!dir[0])
         return HU_ERR_NOT_FOUND;
 
@@ -125,7 +141,7 @@ hu_error_t cp_hula_traces_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
         return HU_ERR_INVALID_ARGUMENT;
 
     char dir[512];
-    default_hula_trace_dir(dir, sizeof(dir));
+    resolve_hula_trace_dir(dir, sizeof(dir));
     if (!dir[0])
         return HU_ERR_NOT_FOUND;
 
@@ -191,7 +207,7 @@ hu_error_t cp_hula_traces_delete(hu_allocator_t *alloc, hu_app_context_t *app, h
         return HU_ERR_INVALID_ARGUMENT;
 
     char dir[512];
-    default_hula_trace_dir(dir, sizeof(dir));
+    resolve_hula_trace_dir(dir, sizeof(dir));
     if (!dir[0])
         return HU_ERR_NOT_FOUND;
     char path[768];
@@ -225,7 +241,7 @@ hu_error_t cp_hula_traces_analytics(hu_allocator_t *alloc, hu_app_context_t *app
     return HU_ERR_NOT_SUPPORTED;
 #else
     char dir[512];
-    default_hula_trace_dir(dir, sizeof(dir));
+    resolve_hula_trace_dir(dir, sizeof(dir));
     if (!dir[0])
         return HU_ERR_NOT_FOUND;
     char *payload = NULL;

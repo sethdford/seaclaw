@@ -69,7 +69,13 @@ const tools = [
 <html lang="en">
   <head>
     <script is:inline>
-      (function(){var s=localStorage.getItem("hu-theme");var m=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=s||m})();
+      (function () {
+        var s = localStorage.getItem("hu-theme");
+        var m = window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+        document.documentElement.dataset.theme = s || m;
+      })();
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -163,10 +169,22 @@ const tools = [
     />
     <style is:global>
       /* Critical hero CSS — inline for fast LCP (paint before external CSS) */
-      :root { --color-bg-inline: #fafaf9; }
-      @media (prefers-color-scheme: dark) { :root { --color-bg-inline: #0a0a0a; } }
+      :root {
+        --color-bg-inline: var(--hu-bg-surface);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --color-bg-inline: var(--hu-bg);
+        }
+      }
       body {
-        font-family: "Avenir", "Avenir Next", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        font-family:
+          "Avenir",
+          "Avenir Next",
+          -apple-system,
+          BlinkMacSystemFont,
+          system-ui,
+          sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         background: var(--color-bg-inline);
@@ -191,8 +209,16 @@ const tools = [
         letter-spacing: -0.04em;
         line-height: 1;
       }
-      .hero-logo, .hero-headline { opacity: 1; transform: none; }
-      .hero-desc, .hero-mission, .hero-proof, .hero-buttons, .hero-fade-in {
+      .hero-logo,
+      .hero-headline {
+        opacity: 1;
+        transform: none;
+      }
+      .hero-desc,
+      .hero-mission,
+      .hero-proof,
+      .hero-buttons,
+      .hero-fade-in {
         opacity: 0;
       }
     </style>
@@ -208,7 +234,11 @@ const tools = [
         --color-accent-glow: var(--hu-accent-subtle);
         --color-border: var(--hu-border-subtle);
         --color-line-stroke: var(--hu-border-subtle);
-        --color-node-fill: color-mix(in srgb, var(--hu-bg-surface) 80%, transparent);
+        --color-node-fill: color-mix(
+          in srgb,
+          var(--hu-bg-surface) 80%,
+          transparent
+        );
         --color-node-stroke: color-mix(in srgb, var(--hu-text) 8%, transparent);
         /* Terminal panel: dynamic neutrals stay dark on light pages */
         --color-terminal-bg: var(--hu-dynamic-neutral-200);
@@ -217,13 +247,25 @@ const tools = [
         /* Pills — status / chart-adjacent semantic colors */
         --color-pill-provider: var(--hu-info);
         --color-pill-provider-bg: var(--hu-info-dim);
-        --color-pill-provider-border: color-mix(in srgb, var(--hu-info) 22%, transparent);
+        --color-pill-provider-border: color-mix(
+          in srgb,
+          var(--hu-info) 22%,
+          transparent
+        );
         --color-pill-channel: var(--hu-success);
         --color-pill-channel-bg: var(--hu-success-dim);
-        --color-pill-channel-border: color-mix(in srgb, var(--hu-success) 22%, transparent);
+        --color-pill-channel-border: color-mix(
+          in srgb,
+          var(--hu-success) 22%,
+          transparent
+        );
         --color-pill-tool: var(--hu-warning);
         --color-pill-tool-bg: var(--hu-warning-dim);
-        --color-pill-tool-border: color-mix(in srgb, var(--hu-warning) 22%, transparent);
+        --color-pill-tool-border: color-mix(
+          in srgb,
+          var(--hu-warning) 22%,
+          transparent
+        );
       }
     </style>
   </head>
@@ -353,7 +395,10 @@ const tools = [
       </section>
 
       {/* ═══ SOCIAL PROOF (Built for) ═══ */}
-      <section class="social-proof relative hu-chapter-reveal py-16 md:py-20 px-6" aria-label="Capabilities">
+      <section
+        class="social-proof relative hu-chapter-reveal py-16 md:py-20 px-6"
+        aria-label="Capabilities"
+      >
         <span class="hu-chapter-label" aria-hidden="true">01</span>
         <div class="max-w-5xl mx-auto">
           <p
@@ -362,42 +407,134 @@ const tools = [
           >
             Built for
           </p>
-          <div class="proof-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 md:gap-6">
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 0">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z" />
+          <div
+            class="proof-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 md:gap-6"
+          >
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 0"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">CLI Automation</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">CLI Automation</span
+              >
             </div>
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 1">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z" />
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 1"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">DevOps</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">DevOps</span
+              >
             </div>
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 2">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z" />
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 2"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">Security</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">Security</span
+              >
             </div>
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 3">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z" />
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 3"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">Research</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">Research</span
+              >
             </div>
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 4">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z" />
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 4"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">IoT</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">IoT</span
+              >
             </div>
-            <div class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl" data-reveal="scale" style="--ri: 5">
-              <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                <path d="M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z" />
+            <div
+              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+              data-reveal="scale"
+              style="--ri: 5"
+            >
+              <svg
+                class="w-8 h-8 shrink-0"
+                viewBox="0 0 256 256"
+                fill="currentColor"
+                style="color: var(--color-accent)"
+                aria-hidden="true"
+              >
+                <path
+                  d="M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z"
+                ></path>
               </svg>
-              <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">Enterprise</span>
+              <span
+                class="text-[13px] font-medium text-center"
+                style="color: var(--color-text-secondary)">Enterprise</span
+              >
             </div>
           </div>
           <div class="github-badge mt-10 flex justify-center">
@@ -420,7 +557,10 @@ const tools = [
       </section>
 
       {/* ═══ INTERACTIVE DEMO (Terminal replay) ═══ */}
-      <section class="demo-section relative hu-chapter-reveal py-20 md:py-28 px-6 cv-defer" aria-label="Product demo">
+      <section
+        class="demo-section relative hu-chapter-reveal py-20 md:py-28 px-6 cv-defer"
+        aria-label="Product demo"
+      >
         <span class="hu-chapter-label" aria-hidden="true">02</span>
         <div class="max-w-4xl mx-auto">
           <h2
@@ -440,16 +580,39 @@ const tools = [
               class="terminal-header flex items-center gap-2 px-4 py-3"
               style="background: var(--color-terminal-chrome); border-bottom: 1px solid var(--color-terminal-border);"
             >
-              <span class="terminal-dot red w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-close)"></span>
-              <span class="terminal-dot yellow w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-minimize)"></span>
-              <span class="terminal-dot green w-3 h-3 rounded-full shrink-0" style="background: var(--hu-terminal-maximize)"></span>
-              <span class="terminal-title ml-2 text-[13px] font-medium" style="color: var(--hu-text-muted)">human</span>
+              <span
+                class="terminal-dot red w-3 h-3 rounded-full shrink-0"
+                style="background: var(--hu-terminal-close)"></span>
+              <span
+                class="terminal-dot yellow w-3 h-3 rounded-full shrink-0"
+                style="background: var(--hu-terminal-minimize)"></span>
+              <span
+                class="terminal-dot green w-3 h-3 rounded-full shrink-0"
+                style="background: var(--hu-terminal-maximize)"></span>
+              <span
+                class="terminal-title ml-2 text-[13px] font-medium"
+                style="color: var(--hu-text-muted)">human</span
+              >
             </div>
-            <div class="terminal-body px-6 py-5 font-mono text-[14px] leading-relaxed" style="color: var(--hu-text);">
-              <div class="terminal-line" style="--line-delay: 0"><span style="color: var(--color-accent)">$</span> human chat</div>
-              <div class="terminal-line" style="--line-delay: 1"><span style="color: var(--color-accent)">human&gt;</span> Summarize the latest commits</div>
-              <div class="terminal-line response" style="--line-delay: 2">Analyzing 12 commits from the last 24 hours...</div>
-              <div class="terminal-line response" style="--line-delay: 3">3 features, 2 fixes, 1 refactor. Key changes: agent loop optimization, new Discord channel, security hardening for tool execution.</div>
+            <div
+              class="terminal-body px-6 py-5 font-mono text-[14px] leading-relaxed"
+              style="color: var(--hu-text);"
+            >
+              <div class="terminal-line" style="--line-delay: 0">
+                <span style="color: var(--color-accent)">$</span> human chat
+              </div>
+              <div class="terminal-line" style="--line-delay: 1">
+                <span style="color: var(--color-accent)">human&gt;</span> Summarize
+                the latest commits
+              </div>
+              <div class="terminal-line response" style="--line-delay: 2">
+                Analyzing 12 commits from the last 24 hours...
+              </div>
+              <div class="terminal-line response" style="--line-delay: 3">
+                3 features, 2 fixes, 1 refactor. Key changes: agent loop
+                optimization, new Discord channel, security hardening for tool
+                execution.
+              </div>
             </div>
           </div>
         </div>
@@ -977,7 +1140,10 @@ const tools = [
 
       {/* ═══ DEVICE SPECTRUM — SVG Illustrations ═══ */}
 
-      <section id="use-cases" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+      <section
+        id="use-cases"
+        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">07</span>
         <div class="max-w-5xl mx-auto">
           <h2
@@ -1507,7 +1673,10 @@ const tools = [
 
       {/* ═══ ARCHITECTURE ═══ */}
 
-      <section id="architecture" class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer">
+      <section
+        id="architecture"
+        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+      >
         <span class="hu-chapter-label" aria-hidden="true">08</span>
         <div class="ambient-coral" style="top: 20%; left: 10%;"></div>
         <div class="ambient-blue" style="bottom: 10%; right: 15%;"></div>
@@ -1549,7 +1718,8 @@ const tools = [
                   dx="0"
                   dy="2"
                   stdDeviation="4"
-                  flood-color="rgba(0,0,0,0.06)"></feDropShadow>
+                  flood-color="var(--hu-color-black, #0c0a08)"
+                  flood-opacity="0.06"></feDropShadow>
               </filter>
             </defs>
 
@@ -1912,8 +2082,7 @@ const tools = [
                 style="background: var(--hu-terminal-maximize)"></span>
               <span
                 class="text-[11px] ml-2 font-mono"
-                style="color: var(--hu-text-muted)"
-                >h-uman Dashboard</span
+                style="color: var(--hu-text-muted)">h-uman Dashboard</span
               >
               <span
                 class="ml-auto text-[11px] px-2 py-0.5 rounded-full"
@@ -2957,7 +3126,14 @@ const tools = [
           }
         };
         if ("requestIdleCallback" in window) {
-          (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(initParticles, { timeout: 2000 });
+          (
+            window as unknown as {
+              requestIdleCallback: (
+                cb: () => void,
+                opts?: { timeout: number },
+              ) => number;
+            }
+          ).requestIdleCallback(initParticles, { timeout: 2000 });
         } else {
           setTimeout(initParticles, 2000);
         }
@@ -3127,11 +3303,11 @@ const tools = [
           const accentColor =
             getComputedStyle(document.documentElement)
               .getPropertyValue("--hu-accent")
-              .trim() || "#7AB648";
+              .trim() || "#7AB648"; /* fallback: --hu-accent */
           const accentSecondary =
             getComputedStyle(document.documentElement)
               .getPropertyValue("--hu-accent-secondary")
-              .trim() || "#f59e0b";
+              .trim() || "#f59e0b"; /* fallback: --hu-accent-secondary */
 
           // Neural network topology: 5 layers, 8–15 nodes per layer
           const layerSizes = [10, 12, 10, 12, 10];
@@ -3272,7 +3448,6 @@ const tools = [
             lastFrame = now;
             const t = now * 0.001;
             const breath = 1 + 0.04 * Math.sin(t * 0.8);
-            const pulse = 0.08 + 0.06 * Math.sin(t * 2.5);
 
             raycaster.setFromCamera(mouse, camera);
             raycaster.ray.intersectPlane(plane, intersect);
@@ -3436,16 +3611,16 @@ const tools = [
     </script>
     <script is:inline>
       /* Defer heavy visual effects until after LCP */
-      new PerformanceObserver(function(list) {
-        list.getEntries().forEach(function() {
-          document.documentElement.classList.add('hu-lcp-done');
-          document.body.classList.add('hu-ambient-ready');
+      new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function () {
+          document.documentElement.classList.add("hu-lcp-done");
+          document.body.classList.add("hu-ambient-ready");
         });
-      }).observe({type: 'largest-contentful-paint', buffered: true});
+      }).observe({ type: "largest-contentful-paint", buffered: true });
       /* Fallback for browsers without LCP observer */
-      setTimeout(function() {
-        document.documentElement.classList.add('hu-lcp-done');
-        document.body.classList.add('hu-ambient-ready');
+      setTimeout(function () {
+        document.documentElement.classList.add("hu-lcp-done");
+        document.body.classList.add("hu-ambient-ready");
       }, 1500);
     </script>
   </body>

@@ -35,6 +35,11 @@ export class ScFloatingMic extends LitElement {
     .btn:hover {
       background: var(--hu-accent-hover);
     }
+    .btn:focus-visible {
+      outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
+      outline-offset: var(--hu-focus-ring-offset, 2px);
+      box-shadow: 0 0 12px var(--hu-focus-glow);
+    }
     .btn:disabled {
       opacity: var(--hu-opacity-disabled);
       cursor: not-allowed;

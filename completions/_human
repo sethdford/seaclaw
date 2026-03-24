@@ -25,11 +25,15 @@ _human() {
                 service-loop:Run service loop in foreground
                 status:Show runtime status
                 onboard:Interactive setup wizard
+                setup:Local / on-device model setup
                 doctor:Run system diagnostics
                 cron:Manage scheduled tasks
                 channel:Channel management
+                calibrate:Analyze messaging patterns and calibrate persona
+                config:Configuration reference \(schema\)
                 skills:Skill discovery and integration
                 hardware:Hardware peripheral management
+                hula:Run a HuLa program \(parse, validate, execute, trace\)
                 migrate:Migrate memory backends
                 memory:Memory operations
                 workspace:Workspace management
@@ -42,6 +46,7 @@ _human() {
                 init:Initialize configuration
                 paperclip:Paperclip agent integration
                 persona:Persona management
+                research:Run research agent
                 pwa:PWA browser automation
                 sandbox:Sandbox management
                 eval:Run evaluation harness

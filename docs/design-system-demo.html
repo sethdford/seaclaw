@@ -37,15 +37,9 @@
         --amber: #f59e0b;
         --steel-blue: #4a6fa5;
 
-        /* Old overlays */
-        --old-hover: rgba(255, 255, 255, 0.06);
-        --old-pressed: rgba(255, 255, 255, 0.1);
-
-        /* New tinted overlays */
-        --new-hover: rgba(122, 182, 72, 0.08);
-        --new-pressed: rgba(122, 182, 72, 0.12);
-        --new-focus: rgba(122, 182, 72, 0.12);
-        --new-dragged: rgba(122, 182, 72, 0.16);
+        /* State overlays — match --hu-hover-overlay / --hu-pressed-overlay (dark theme) */
+        --state-hover: rgba(255, 255, 255, 0.08);
+        --state-pressed: rgba(255, 255, 255, 0.12);
 
         /* Dynamic palette */
         --dp-50: #000100;
@@ -322,11 +316,12 @@
         color: rgba(255, 255, 255, 0.6);
       }
 
-      /* ── 3. Tinted State Layers ── */
+      /* ── 3. Neutral state layers ── */
       .state-demo {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         gap: 24px;
+        max-width: 420px;
       }
 
       .state-demo > div > h3 {
@@ -358,6 +353,7 @@
         transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
         position: relative;
         overflow: hidden;
+        background: var(--new-200);
       }
 
       .state-btn::before {
@@ -367,28 +363,12 @@
         opacity: 0;
         transition: opacity 0.15s;
       }
-
-      .state-btn.neutral {
-        background: var(--new-200);
-      }
-      .state-btn.neutral:hover::before {
-        background: var(--old-hover);
+      .state-btn:hover::before {
+        background: var(--state-hover);
         opacity: 1;
       }
-      .state-btn.neutral:active::before {
-        background: var(--old-pressed);
-        opacity: 1;
-      }
-
-      .state-btn.tinted {
-        background: var(--new-200);
-      }
-      .state-btn.tinted:hover::before {
-        background: var(--new-hover);
-        opacity: 1;
-      }
-      .state-btn.tinted:active::before {
-        background: var(--new-pressed);
+      .state-btn:active::before {
+        background: var(--state-pressed);
         opacity: 1;
       }
 
@@ -465,23 +445,24 @@
           0 0 0 1px rgba(255, 255, 255, 0.08);
       }
 
+      /* Aligned with design-tokens/glass.tokens.json + dashboard glass (neutral frost, low backdrop saturate) */
       .glass-subtle {
-        background: rgba(21, 35, 51, 0.3);
-        backdrop-filter: blur(12px) saturate(120%);
-        -webkit-backdrop-filter: blur(12px) saturate(120%);
+        background: rgba(255, 252, 248, 0.055);
+        backdrop-filter: blur(12px) saturate(105%) brightness(1.12);
+        -webkit-backdrop-filter: blur(12px) saturate(105%) brightness(1.12);
       }
 
       .glass-standard {
-        background: rgba(30, 48, 68, 0.35);
-        backdrop-filter: blur(24px) saturate(180%);
-        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        background: rgba(255, 252, 248, 0.085);
+        backdrop-filter: blur(24px) saturate(128%) brightness(1.12);
+        -webkit-backdrop-filter: blur(24px) saturate(128%) brightness(1.12);
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
       }
 
       .glass-prominent {
-        background: rgba(39, 61, 85, 0.4);
-        backdrop-filter: blur(32px) saturate(200%);
-        -webkit-backdrop-filter: blur(32px) saturate(200%);
+        background: rgba(255, 252, 248, 0.11);
+        backdrop-filter: blur(32px) saturate(148%) brightness(1.12);
+        -webkit-backdrop-filter: blur(32px) saturate(148%) brightness(1.12);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.1),
           inset 0 -1px 0 rgba(255, 255, 255, 0.03);
@@ -544,15 +525,16 @@
       /* Glass reveal animation */
       @keyframes glass-reveal {
         from {
-          backdrop-filter: blur(0px) saturate(100%);
-          -webkit-backdrop-filter: blur(0px) saturate(100%);
+          backdrop-filter: blur(0px) saturate(100%) brightness(1.12);
+          -webkit-backdrop-filter: blur(0px) saturate(100%) brightness(1.12);
           opacity: 0;
           transform: scale(0.97);
         }
         to {
-          backdrop-filter: blur(var(--target-blur)) saturate(var(--target-sat));
+          backdrop-filter: blur(var(--target-blur)) saturate(var(--target-sat))
+            brightness(1.12);
           -webkit-backdrop-filter: blur(var(--target-blur))
-            saturate(var(--target-sat));
+            saturate(var(--target-sat)) brightness(1.12);
           opacity: 1;
           transform: scale(1);
         }
@@ -726,6 +708,20 @@
       [data-theme="light"] .tonal-card .hex {
         color: rgba(0, 0, 0, 0.5);
       }
+      [data-theme="light"] .state-btn {
+        color: #333;
+        background: #e8e4df;
+        border-color: rgba(0, 0, 0, 0.08);
+      }
+      [data-theme="light"] .state-btn:hover::before {
+        background: rgba(0, 0, 0, 0.06);
+      }
+      [data-theme="light"] .state-btn:active::before {
+        background: rgba(0, 0, 0, 0.1);
+      }
+      [data-theme="light"] .state-demo > div > h3 {
+        color: #64748b;
+      }
     </style>
   </head>
   <body>
@@ -737,7 +733,7 @@
       <h1>Human <span>Design System</span></h1>
       <p>
         M3 tonal surfaces, widened elevation contrast, dynamic color, glass
-        choreography, and tinted state layers.
+        choreography, and neutral state layers.
       </p>
     </div>
 
@@ -814,55 +810,39 @@
         </div>
       </section>
 
-      <!-- 3. Tinted State Layers -->
+      <!-- 3. Neutral state layers (canonical) -->
       <section>
         <div class="section-badge">Improvement 3</div>
-        <h2>Tinted State Layers</h2>
+        <h2>Neutral State Layers</h2>
         <p>
-          Hover and press overlays tinted with the primary accent. Interactions
-          feel connected to the brand.
+          Hover and press use a warm white veil on dark UI (black veil on light
+          — toggle theme). Brand color stays on focus rings and primary actions,
+          not on every row wash.
         </p>
         <div class="state-demo">
           <div>
-            <h3>Before (neutral white overlay)</h3>
+            <h3>Interactive list (token-aligned)</h3>
             <div class="state-buttons">
-              <div class="state-btn neutral">
+              <div class="state-btn">
                 <div
                   class="dot"
-                  style="background: rgba(255, 255, 255, 0.3)"
+                  style="background: rgba(255, 255, 255, 0.35)"
                 ></div>
-                Hover me — white overlay
+                Hover me — neutral overlay
               </div>
-              <div class="state-btn neutral">
+              <div class="state-btn">
                 <div
                   class="dot"
-                  style="background: rgba(255, 255, 255, 0.3)"
+                  style="background: rgba(255, 255, 255, 0.35)"
                 ></div>
-                Press me — white overlay
+                Press me — neutral overlay
               </div>
-              <div class="state-btn neutral">
+              <div class="state-btn">
                 <div
                   class="dot"
-                  style="background: rgba(255, 255, 255, 0.3)"
+                  style="background: rgba(255, 255, 255, 0.35)"
                 ></div>
-                Another neutral item
-              </div>
-            </div>
-          </div>
-          <div>
-            <h3>After (human green tint)</h3>
-            <div class="state-buttons">
-              <div class="state-btn tinted">
-                <div class="dot" style="background: var(--human)"></div>
-                Hover me — green tint
-              </div>
-              <div class="state-btn tinted">
-                <div class="dot" style="background: var(--human)"></div>
-                Press me — green tint
-              </div>
-              <div class="state-btn tinted">
-                <div class="dot" style="background: var(--human)"></div>
-                Another tinted item
+                Another row
               </div>
             </div>
           </div>
@@ -875,32 +855,33 @@
         <h2>Glass Choreography</h2>
         <p>
           Blur and saturation animate on enter/exit. Glass reveals build
-          gradually instead of snapping.
+          gradually instead of snapping. Saturation stays restrained so frost
+          reads neutral (matches live tokens — not the old 180–200% wash).
         </p>
         <div class="glass-demo" id="glassDemo">
           <div
             class="glass-panel glass-subtle"
-            style="--target-blur: 12px; --target-sat: 120%"
+            style="--target-blur: 12px; --target-sat: 105%"
           >
             <span class="tier-label">Subtle</span>
             <span class="tier-desc">Nav, ambient panels</span>
-            <span class="tier-specs">blur: 12px · saturate: 120%</span>
+            <span class="tier-specs">blur: 12px · saturate: 105% · brightness: 1.12</span>
           </div>
           <div
             class="glass-panel glass-standard"
-            style="--target-blur: 24px; --target-sat: 180%"
+            style="--target-blur: 24px; --target-sat: 128%"
           >
             <span class="tier-label">Standard</span>
             <span class="tier-desc">Cards, panels, sidebars</span>
-            <span class="tier-specs">blur: 24px · saturate: 180%</span>
+            <span class="tier-specs">blur: 24px · saturate: 128% · brightness: 1.12</span>
           </div>
           <div
             class="glass-panel glass-prominent"
-            style="--target-blur: 32px; --target-sat: 200%"
+            style="--target-blur: 32px; --target-sat: 148%"
           >
             <span class="tier-label">Prominent</span>
             <span class="tier-desc">Modals, sheets, overlays</span>
-            <span class="tier-specs">blur: 32px · saturate: 200%</span>
+            <span class="tier-specs">blur: 32px · saturate: 148% · brightness: 1.12</span>
           </div>
         </div>
         <div class="glass-enter-demo">
@@ -1050,8 +1031,9 @@
         panels.forEach((p, i) => {
           p.classList.remove("animating");
           p.style.opacity = "0";
-          p.style.backdropFilter = "blur(0px) saturate(100%)";
-          p.style.webkitBackdropFilter = "blur(0px) saturate(100%)";
+          p.style.backdropFilter = "blur(0px) saturate(100%) brightness(1.12)";
+          p.style.webkitBackdropFilter =
+            "blur(0px) saturate(100%) brightness(1.12)";
         });
 
         panels.forEach((p, i) => {

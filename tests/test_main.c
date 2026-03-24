@@ -106,6 +106,7 @@ void run_core_extended_tests(void);
 void run_gateway_extended_tests(void);
 void run_gateway_auth_tests(void);
 void run_gateway_voice_tests(void);
+void run_gateway_hula_traces_tests(void);
 void run_pairing_tests(void);
 void run_agent_extended_tests(void);
 void run_agent_security_tests(void);
@@ -467,6 +468,7 @@ int main(int argc, char **argv) {
     run_gateway_extended_tests();
     run_gateway_auth_tests();
     run_gateway_voice_tests();
+    run_gateway_hula_traces_tests();
     run_pairing_tests();
     run_agent_extended_tests();
     run_agent_security_tests();

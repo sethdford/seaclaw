@@ -73,6 +73,11 @@ export class ScBranchTree extends LitElement {
       font-weight: var(--hu-weight-semibold);
       color: var(--hu-text);
     }
+    .branch-node .node-label:focus-visible {
+      outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
+      outline-offset: var(--hu-focus-ring-offset, 2px);
+      box-shadow: 0 0 12px var(--hu-focus-glow);
+    }
     .branch-node .node-preview {
       font-family: var(--hu-font);
       font-size: var(--hu-text-xs);

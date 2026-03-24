@@ -40,6 +40,11 @@ import "./hu-metric-row.js";
 import "./hu-timeline.js";
 import "./hu-sparkline-enhanced.js";
 import "./hu-forecast-chart.js";
+import "./hu-ring-progress.js";
+import "./hu-animated-value.js";
+import "./hu-radial-gauge.js";
+import "./hu-timeline-chart.js";
+import "./hu-sankey.js";
 import "./hu-page-hero.js";
 import "./hu-schedule-builder.js";
 import "./hu-automation-card.js";
@@ -2159,6 +2164,117 @@ describe("hu-forecast-chart", () => {
     await el.updateComplete;
     const svg = el.shadowRoot?.querySelector("svg");
     expect(svg).toBeFalsy();
+    el.remove();
+  });
+});
+
+describe("hu-ring-progress", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("hu-ring-progress")).toBeDefined();
+  });
+
+  it("should render SVG for rings", async () => {
+    const el = document.createElement("hu-ring-progress") as HTMLElement & {
+      rings: Array<{ value: number; max?: number; label?: string }>;
+      updateComplete: Promise<boolean>;
+    };
+    el.rings = [
+      { value: 0.7, max: 1, label: "A" },
+      { value: 0.4, max: 1, label: "B" },
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(el.shadowRoot?.querySelector("svg")).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("hu-animated-value", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("hu-animated-value")).toBeDefined();
+  });
+
+  it("should render formatted value", async () => {
+    const el = document.createElement("hu-animated-value") as HTMLElement & {
+      value: number;
+      format: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.value = 12847;
+    el.format = "compact";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.shadowRoot?.textContent).toMatch(/12/);
+    el.remove();
+  });
+});
+
+describe("hu-radial-gauge", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("hu-radial-gauge")).toBeDefined();
+  });
+
+  it("should render SVG", async () => {
+    const el = document.createElement("hu-radial-gauge") as HTMLElement & {
+      value: number;
+      updateComplete: Promise<boolean>;
+    };
+    el.value = 60;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(el.shadowRoot?.querySelector("svg")).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("hu-timeline-chart", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("hu-timeline-chart")).toBeDefined();
+  });
+
+  it("should render bars", async () => {
+    const el = document.createElement("hu-timeline-chart") as HTMLElement & {
+      bars: Array<{ id: string; label: string; start: string; end: string }>;
+      updateComplete: Promise<boolean>;
+    };
+    const t0 = Date.now();
+    el.bars = [
+      {
+        id: "1",
+        label: "Task",
+        start: new Date(t0).toISOString(),
+        end: new Date(t0 + 86400000 * 3).toISOString(),
+      },
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector("rect.bar")).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("hu-sankey", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("hu-sankey")).toBeDefined();
+  });
+
+  it("should render nodes and links", async () => {
+    const el = document.createElement("hu-sankey") as HTMLElement & {
+      nodes: Array<{ id: string; label: string; column?: number }>;
+      links: Array<{ from: string; to: string; value: number }>;
+      updateComplete: Promise<boolean>;
+    };
+    el.nodes = [
+      { id: "a", label: "Prompt", column: 0 },
+      { id: "b", label: "Model", column: 1 },
+    ];
+    el.links = [{ from: "a", to: "b", value: 10 }];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelectorAll("path.link").length).toBeGreaterThan(0);
+    expect(el.shadowRoot?.querySelectorAll("rect.node").length).toBe(2);
     el.remove();
   });
 });

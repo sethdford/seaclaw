@@ -13,6 +13,8 @@
   --hu-breakpoint-wide: 1240px;
   --hu-detail-panel-width: 400px;
   --hu-glass-card-bg-mix: 65%;
+  /* Frost bias: warm white + surface — reads as milky glass, not brand-green wash */
+  --hu-glass-scrim: color-mix(in srgb, var(--hu-color-white) 74%, var(--hu-bg-surface) 26%);
   --hu-surface: var(--hu-bg-surface);
   --hu-overlay: var(--hu-color-overlay, rgb(0 0 0 / 0.6));
   --hu-focus-glow: color-mix(in srgb, var(--hu-accent) 15%, transparent);
@@ -114,7 +116,14 @@ body {
   color-scheme: dark;
   /* Dark mode glass depth — slightly higher opacity for cards/panels */
   --hu-glass-card-bg-mix: 75%;
+  --hu-glass-scrim: color-mix(in srgb, var(--hu-color-white) 86%, var(--hu-bg-surface) 14%);
   --hu-focus-ring: var(--hu-accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --hu-glass-scrim: color-mix(in srgb, var(--hu-color-white) 86%, var(--hu-bg-surface) 14%);
+  }
 }
 
 /* ─── Theme switch crossfade (View Transitions API) ──────────── */
@@ -399,12 +408,12 @@ hu-card.hu-entrance.hu-visible {
 /* ─── Glass Blur by Scroll Depth (scroll-driven) ──────────────────────── */
 @keyframes hu-glass-scroll-deepen {
   from {
-    backdrop-filter: blur(8px) saturate(1.2);
-    -webkit-backdrop-filter: blur(8px) saturate(1.2);
+    backdrop-filter: blur(8px) saturate(1.04);
+    -webkit-backdrop-filter: blur(8px) saturate(1.04);
   }
   to {
-    backdrop-filter: blur(20px) saturate(1.6);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.14);
+    -webkit-backdrop-filter: blur(20px) saturate(1.14);
   }
 }
 @supports (animation-timeline: scroll()) {
@@ -782,7 +791,7 @@ hu-card.hu-entrance.hu-visible {
 .hu-glass-subtle {
   background: color-mix(
     in srgb,
-    var(--hu-surface) var(--hu-glass-subtle-bg-opacity, 4%),
+    var(--hu-glass-scrim) var(--hu-glass-subtle-bg-opacity, 4%),
     transparent
   );
   backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
@@ -800,7 +809,7 @@ hu-card.hu-entrance.hu-visible {
 .hu-glass-standard {
   background: color-mix(
     in srgb,
-    var(--hu-surface) var(--hu-glass-standard-bg-opacity, 6%),
+    var(--hu-glass-scrim) var(--hu-glass-standard-bg-opacity, 6%),
     transparent
   );
   backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
@@ -825,7 +834,7 @@ hu-card.hu-entrance.hu-visible {
 .hu-glass-prominent {
   background: color-mix(
     in srgb,
-    var(--hu-surface) var(--hu-glass-prominent-bg-opacity, 8%),
+    var(--hu-glass-scrim) var(--hu-glass-prominent-bg-opacity, 8%),
     transparent
   );
   backdrop-filter: blur(var(--hu-glass-prominent-blur, 32px))
@@ -853,7 +862,7 @@ hu-card.hu-entrance.hu-visible {
 .hu-glass-surface {
   background: color-mix(
     in srgb,
-    var(--hu-bg-surface) var(--hu-glass-subtle-bg-opacity, 4%),
+    var(--hu-glass-scrim) var(--hu-glass-subtle-bg-opacity, 4%),
     transparent
   );
   backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
@@ -870,7 +879,7 @@ hu-card.hu-entrance.hu-visible {
 .hu-glass-elevated {
   background: color-mix(
     in srgb,
-    var(--hu-bg-surface) var(--hu-glass-standard-bg-opacity, 8%),
+    var(--hu-glass-scrim) var(--hu-glass-standard-bg-opacity, 8%),
     transparent
   );
   backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
@@ -888,7 +897,7 @@ hu-card.hu-entrance.hu-visible {
 .hu-glass-floating {
   background: color-mix(
     in srgb,
-    var(--hu-bg-surface) var(--hu-glass-prominent-bg-opacity, 12%),
+    var(--hu-glass-scrim) var(--hu-glass-prominent-bg-opacity, 12%),
     transparent
   );
   backdrop-filter: blur(var(--hu-blur-xl, 40px)) saturate(var(--hu-glass-prominent-saturate, 200%))
@@ -907,7 +916,7 @@ hu-card.hu-entrance.hu-visible {
   background: color-mix(
     in srgb,
     var(--hu-accent) var(--hu-glass-subtle-tint-opacity, 2%),
-    color-mix(in srgb, var(--hu-surface) var(--hu-glass-subtle-bg-opacity, 4%), transparent)
+    color-mix(in srgb, var(--hu-glass-scrim) var(--hu-glass-subtle-bg-opacity, 4%), transparent)
   );
 }
 
@@ -916,7 +925,7 @@ hu-card.hu-entrance.hu-visible {
   background: color-mix(
     in srgb,
     var(--hu-accent) var(--hu-glass-standard-tint-opacity, 4%),
-    color-mix(in srgb, var(--hu-surface) var(--hu-glass-standard-bg-opacity, 6%), transparent)
+    color-mix(in srgb, var(--hu-glass-scrim) var(--hu-glass-standard-bg-opacity, 6%), transparent)
   );
 }
 
@@ -924,7 +933,7 @@ hu-card.hu-entrance.hu-visible {
   background: color-mix(
     in srgb,
     var(--hu-accent) var(--hu-glass-prominent-tint-opacity, 6%),
-    color-mix(in srgb, var(--hu-surface) var(--hu-glass-prominent-bg-opacity, 8%), transparent)
+    color-mix(in srgb, var(--hu-glass-scrim) var(--hu-glass-prominent-bg-opacity, 8%), transparent)
   );
 }
 

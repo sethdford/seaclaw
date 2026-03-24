@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-22T13:43:56.475Z",
+  "generated": "2026-03-23T10:58:07.574Z",
   "groups": {
     "color.neutral": [
       {
@@ -1926,19 +1926,19 @@
       },
       {
         "name": "hover-overlay",
-        "value": "rgba(122, 182, 72, 0.08)"
+        "value": "rgba(255, 255, 255, 0.08)"
       },
       {
         "name": "pressed-overlay",
-        "value": "rgba(122, 182, 72, 0.12)"
+        "value": "rgba(255, 255, 255, 0.12)"
       },
       {
         "name": "focus-overlay",
-        "value": "rgba(122, 182, 72, 0.12)"
+        "value": "rgba(255, 255, 255, 0.12)"
       },
       {
         "name": "dragged-overlay",
-        "value": "rgba(122, 182, 72, 0.16)"
+        "value": "rgba(255, 255, 255, 0.16)"
       },
       {
         "name": "disabled-overlay",
@@ -2270,19 +2270,19 @@
       },
       {
         "name": "hover-overlay",
-        "value": "rgba(90, 154, 48, 0.06)"
+        "value": "rgba(0, 0, 0, 0.06)"
       },
       {
         "name": "pressed-overlay",
-        "value": "rgba(90, 154, 48, 0.10)"
+        "value": "rgba(0, 0, 0, 0.10)"
       },
       {
         "name": "focus-overlay",
-        "value": "rgba(90, 154, 48, 0.10)"
+        "value": "rgba(0, 0, 0, 0.10)"
       },
       {
         "name": "dragged-overlay",
-        "value": "rgba(90, 154, 48, 0.14)"
+        "value": "rgba(0, 0, 0, 0.14)"
       },
       {
         "name": "disabled-overlay",
@@ -2945,11 +2945,11 @@
       },
       {
         "name": "saturate",
-        "value": "120%"
+        "value": "105%"
       },
       {
         "name": "bg-opacity",
-        "value": "0.04"
+        "value": "0.055"
       },
       {
         "name": "border-opacity",
@@ -2961,7 +2961,7 @@
       },
       {
         "name": "tint-opacity",
-        "value": "0.02"
+        "value": "0.008"
       },
       {
         "name": "refraction-scale",
@@ -2975,11 +2975,11 @@
       },
       {
         "name": "saturate",
-        "value": "180%"
+        "value": "128%"
       },
       {
         "name": "bg-opacity",
-        "value": "0.06"
+        "value": "0.085"
       },
       {
         "name": "border-opacity",
@@ -2991,7 +2991,7 @@
       },
       {
         "name": "tint-opacity",
-        "value": "0.04"
+        "value": "0.018"
       },
       {
         "name": "refraction-scale",
@@ -3005,11 +3005,11 @@
       },
       {
         "name": "saturate",
-        "value": "200%"
+        "value": "148%"
       },
       {
         "name": "bg-opacity",
-        "value": "0.08"
+        "value": "0.11"
       },
       {
         "name": "border-opacity",
@@ -3021,7 +3021,7 @@
       },
       {
         "name": "tint-opacity",
-        "value": "0.06"
+        "value": "0.028"
       },
       {
         "name": "refraction-scale",
@@ -3035,7 +3035,7 @@
       },
       {
         "name": "saturate",
-        "value": "180%"
+        "value": "125%"
       },
       {
         "name": "bg-opacity",
@@ -3105,7 +3105,7 @@
       },
       {
         "name": "backdrop-brightness",
-        "value": "1.08"
+        "value": "1.12"
       },
       {
         "name": "text-shadow",
@@ -3157,7 +3157,7 @@
       },
       {
         "name": "saturate",
-        "value": "110%"
+        "value": "102%"
       }
     ],
     "material.thin": [
@@ -3171,7 +3171,7 @@
       },
       {
         "name": "saturate",
-        "value": "140%"
+        "value": "118%"
       }
     ],
     "material.regular": [
@@ -3185,7 +3185,7 @@
       },
       {
         "name": "saturate",
-        "value": "180%"
+        "value": "132%"
       }
     ],
     "material.thick": [
@@ -3199,7 +3199,7 @@
       },
       {
         "name": "saturate",
-        "value": "200%"
+        "value": "152%"
       }
     ],
     "chart.categorical": [

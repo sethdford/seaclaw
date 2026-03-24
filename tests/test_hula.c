@@ -1356,6 +1356,54 @@ static void hula_trace_persist_embeds_program_field(void) {
     (void)unlink(path);
     (void)rmdir(td);
 }
+
+static void hula_trace_persist_embeds_program_from_to_json(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json =
+        "{\"name\":\"tj\",\"version\":1,\"root\":{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\","
+        "\"args\":{\"text\":\"y\"}}}";
+    hu_hula_program_t prog;
+    HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
+    char *pj = NULL;
+    size_t pjl = 0;
+    HU_ASSERT_EQ(hu_hula_to_json(&alloc, &prog, &pj, &pjl), HU_OK);
+    HU_ASSERT_NOT_NULL(pj);
+    char td[] = "/tmp/hu_hula_tjsnap_XXXXXX";
+    HU_ASSERT_NOT_NULL(mkdtemp(td));
+    HU_ASSERT_EQ(hu_hula_trace_persist(&alloc, td, "[]", 2, "tj", 2, true, pj, pjl), HU_OK);
+    hu_str_free(&alloc, pj);
+    hu_hula_program_deinit(&prog);
+
+    DIR *d = opendir(td);
+    HU_ASSERT_NOT_NULL(d);
+    char path[640];
+    path[0] = '\0';
+    struct dirent *de;
+    while ((de = readdir(d)) != NULL) {
+        if (de->d_name[0] == '.')
+            continue;
+        (void)snprintf(path, sizeof(path), "%s/%s", td, de->d_name);
+        break;
+    }
+    closedir(d);
+    HU_ASSERT_TRUE(path[0] != '\0');
+    FILE *fp = fopen(path, "rb");
+    HU_ASSERT_NOT_NULL(fp);
+    char buf[4096];
+    size_t nr = fread(buf, 1, sizeof(buf) - 1, fp);
+    fclose(fp);
+    buf[nr] = '\0';
+    hu_json_value_t *root = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, buf, nr, &root), HU_OK);
+    HU_ASSERT_NOT_NULL(root);
+    hu_json_value_t *po = hu_json_object_get(root, "program");
+    HU_ASSERT_NOT_NULL(po);
+    const char *nm = hu_json_get_string(po, "name");
+    HU_ASSERT_TRUE(nm && strcmp(nm, "tj") == 0);
+    hu_json_free(&alloc, root);
+    (void)unlink(path);
+    (void)rmdir(td);
+}
 #endif
 
 typedef struct {
@@ -1773,5 +1821,6 @@ void run_hula_tests(void) {
     HU_RUN_TEST(hula_analytics_summarize_empty_dir);
     HU_RUN_TEST(hula_emergence_persist_scan_promote);
     HU_RUN_TEST(hula_trace_persist_embeds_program_field);
+    HU_RUN_TEST(hula_trace_persist_embeds_program_from_to_json);
 #endif
 }

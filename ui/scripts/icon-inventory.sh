@@ -12,10 +12,18 @@ if [ ! -f "$ICONS_FILE" ]; then
   exit 1
 fi
 
-echo "# Icon Inventory" > "$OUTPUT"
-echo "" >> "$OUTPUT"
-echo "Auto-generated from \`ui/src/icons.ts\`" >> "$OUTPUT"
-echo "" >> "$OUTPUT"
+{
+  echo "---"
+  echo "title: Icon Inventory"
+  echo "generated: true"
+  echo "source: ui/src/icons.ts"
+  echo "---"
+  echo ""
+  echo "# Icon Inventory"
+  echo ""
+  echo "Auto-generated from \`ui/src/icons.ts\`"
+  echo ""
+} > "$OUTPUT"
 echo "| Icon Name | Export | Usage |" >> "$OUTPUT"
 echo "|-----------|--------|-------|" >> "$OUTPUT"
 

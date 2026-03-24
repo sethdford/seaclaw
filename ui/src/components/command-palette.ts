@@ -152,11 +152,16 @@ export class ScCommandPalette extends LitElement {
       color: var(--hu-text);
       background: var(--hu-bg-overlay);
       border: none;
-      outline: none;
     }
 
     .input::placeholder {
       color: var(--hu-text-muted);
+    }
+
+    .input:focus-visible {
+      outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
+      outline-offset: var(--hu-focus-ring-offset, 2px);
+      box-shadow: 0 0 12px var(--hu-focus-glow);
     }
 
     .results {
@@ -177,6 +182,11 @@ export class ScCommandPalette extends LitElement {
 
       &:hover {
         background: var(--hu-hover-overlay);
+      }
+      &:focus-visible {
+        outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
+        outline-offset: var(--hu-focus-ring-offset, 2px);
+        box-shadow: 0 0 12px var(--hu-focus-glow);
       }
       &.selected {
         background: var(--hu-hover-overlay);

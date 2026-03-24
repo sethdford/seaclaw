@@ -1,4 +1,5 @@
-import { html, css, nothing } from "lit";
+import { html, css, nothing, type PropertyValues } from "lit";
+import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { customElement, state } from "lit/decorators.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { friendlyError } from "../utils/friendly-error.js";
@@ -87,133 +88,137 @@ function formatTimestamp(ts: number): string {
 export class ScTuringView extends GatewayAwareLitElement {
   override autoRefreshInterval = 60_000;
 
-  static override styles = css`
-    :host {
-      view-transition-name: view-turing;
-      display: block;
-      max-width: 75rem;
-      contain: layout style;
-      padding: var(--hu-space-lg) var(--hu-space-xl);
-      font-family: var(--hu-font);
-    }
-
-    .hero-score {
-      display: flex;
-      align-items: baseline;
-      gap: var(--hu-space-md);
-      flex-wrap: wrap;
-    }
-
-    .hero-score-value {
-      font-size: var(--hu-text-4xl);
-      font-weight: var(--hu-weight-bold);
-      color: var(--hu-text);
-      line-height: var(--hu-leading-tight);
-    }
-
-    .hero-score-max {
-      font-size: var(--hu-text-xl);
-      font-weight: var(--hu-weight-medium);
-      color: var(--hu-text-muted);
-    }
-
-    .hero-subtitle {
-      font-size: var(--hu-text-sm);
-      color: var(--hu-text-muted);
-      margin-top: var(--hu-space-xs);
-    }
-
-    .staleness {
-      font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-    }
-
-    .dimensions-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-      gap: var(--hu-space-lg);
-      margin-bottom: var(--hu-space-2xl);
-    }
-
-    .dimension-card {
-      display: flex;
-      flex-direction: column;
-      gap: var(--hu-space-sm);
-    }
-
-    .dimension-name {
-      font-size: var(--hu-text-sm);
-      font-weight: var(--hu-weight-medium);
-      color: var(--hu-text);
-    }
-
-    .dimension-bar-wrap {
-      height: var(--hu-space-md);
-      background: var(--hu-bg-inset);
-      border-radius: var(--hu-radius-sm);
-      overflow: hidden;
-    }
-
-    .dimension-bar-fill {
-      height: 100%;
-      border-radius: var(--hu-radius-sm);
-      transition: width var(--hu-duration-normal) var(--hu-ease-out);
-    }
-
-    .dimension-score {
-      font-size: var(--hu-text-xs);
-      font-weight: var(--hu-weight-semibold);
-      color: var(--hu-text);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .section-label {
-      font-size: var(--hu-text-xs);
-      font-weight: var(--hu-weight-semibold);
-      letter-spacing: var(--hu-tracking-xs);
-      text-transform: uppercase;
-      color: var(--hu-accent-text, var(--hu-accent));
-      margin-bottom: var(--hu-space-md);
-    }
-
-    .scores-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: var(--hu-text-sm);
-    }
-
-    .scores-table th,
-    .scores-table td {
-      padding: var(--hu-space-sm) var(--hu-space-md);
-      text-align: left;
-      border-bottom: 1px solid var(--hu-border-subtle);
-    }
-
-    .scores-table th {
-      font-weight: var(--hu-weight-medium);
-      color: var(--hu-text-muted);
-    }
-
-    .scores-table td {
-      color: var(--hu-text);
-    }
-
-    .scores-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .dimension-bar-fill {
-        transition: none;
+  static override styles = [
+    scrollEntranceStyles,
+    css`
+      :host {
+        view-transition-name: view-turing;
+        display: block;
+        max-width: 75rem;
+        contain: layout style;
+        padding: var(--hu-space-lg) var(--hu-space-xl);
+        font-family: var(--hu-font);
       }
-    }
-  `;
+
+      .hero-score {
+        display: flex;
+        align-items: baseline;
+        gap: var(--hu-space-md);
+        flex-wrap: wrap;
+      }
+
+      .hero-score-value {
+        font-size: var(--hu-text-4xl);
+        font-weight: var(--hu-weight-bold);
+        color: var(--hu-text);
+        line-height: var(--hu-leading-tight);
+      }
+
+      .hero-score-max {
+        font-size: var(--hu-text-xl);
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-text-muted);
+      }
+
+      .hero-subtitle {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text-muted);
+        margin-top: var(--hu-space-xs);
+      }
+
+      .staleness {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+      }
+
+      .dimensions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+        gap: var(--hu-space-lg);
+        margin-bottom: var(--hu-space-2xl);
+      }
+
+      .dimension-card {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-sm);
+      }
+
+      .dimension-name {
+        font-size: var(--hu-text-sm);
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-text);
+      }
+
+      .dimension-bar-wrap {
+        height: var(--hu-space-md);
+        background: var(--hu-bg-inset);
+        border-radius: var(--hu-radius-sm);
+        overflow: hidden;
+      }
+
+      .dimension-bar-fill {
+        height: 100%;
+        border-radius: var(--hu-radius-sm);
+        transition: width var(--hu-duration-normal) var(--hu-ease-out);
+      }
+
+      .dimension-score {
+        font-size: var(--hu-text-xs);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .section-label {
+        font-size: var(--hu-text-xs);
+        font-weight: var(--hu-weight-semibold);
+        letter-spacing: var(--hu-tracking-xs);
+        text-transform: uppercase;
+        color: var(--hu-accent-text, var(--hu-accent));
+        margin-bottom: var(--hu-space-md);
+      }
+
+      .scores-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--hu-text-sm);
+      }
+
+      .scores-table th,
+      .scores-table td {
+        padding: var(--hu-space-sm) var(--hu-space-md);
+        text-align: left;
+        border-bottom: 1px solid var(--hu-border-subtle);
+      }
+
+      .scores-table th {
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-text-muted);
+      }
+
+      .scores-table td {
+        color: var(--hu-text);
+      }
+
+      .scores-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .dimension-bar-fill {
+          transition: none;
+        }
+      }
+    `,
+  ];
 
   @state() private scores: TuringScore[] = [];
   @state() private dimensions: Record<string, number> = {};
   @state() private loading = true;
   @state() private error = "";
   @state() private connectionStatus: "connected" | "connecting" | "disconnected" = "disconnected";
+  private _scrollEntranceObserver: IntersectionObserver | null = null;
 
   private _connectionStatusHandler = ((e: CustomEvent<string>) => {
     const s = e.detail as "connected" | "connecting" | "disconnected";
@@ -229,9 +234,38 @@ export class ScTuringView extends GatewayAwareLitElement {
     }
   }
 
+  override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    this.updateComplete.then(() => this._setupScrollEntrance());
+  }
+
   override disconnectedCallback(): void {
+    this._scrollEntranceObserver?.disconnect();
+    this._scrollEntranceObserver = null;
     super.disconnectedCallback();
     this.gateway?.removeEventListener("status", this._connectionStatusHandler);
+  }
+
+  private _setupScrollEntrance(): void {
+    if (typeof CSS !== "undefined" && CSS.supports?.("animation-timeline", "view()")) return;
+    const root = this.renderRoot;
+    if (!root) return;
+    const elements = root.querySelectorAll(".hu-scroll-reveal-stagger > *");
+    if (elements.length === 0) return;
+    if (!this._scrollEntranceObserver) {
+      this._scrollEntranceObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).classList.add("entered");
+              this._scrollEntranceObserver?.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+    }
+    elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
   }
 
   protected override onGatewaySwapped(
@@ -321,38 +355,47 @@ export class ScTuringView extends GatewayAwareLitElement {
   }
 
   override render() {
-    if (this.loading) return this._renderSkeleton();
+    if (this.loading)
+      return html`<div class="hu-scroll-reveal-stagger">${this._renderSkeleton()}</div>`;
     if (this.error)
       return html`
-        <hu-empty-state .icon=${icons.warning} heading="Error" description=${this.error}>
-          <hu-button variant="primary" @click=${() => this.load()}>Retry</hu-button>
-        </hu-empty-state>
+        <div class="hu-scroll-reveal-stagger">
+          <hu-empty-state .icon=${icons.warning} heading="Error" description=${this.error}>
+            <hu-button variant="primary" @click=${() => this.load()}>Retry</hu-button>
+          </hu-empty-state>
+        </div>
       `;
 
     const hasData = this.scores.length > 0 || Object.keys(this.dimensions).length > 0;
     if (!hasData)
       return html`
-        <hu-page-hero role="region" aria-label="Turing Dashboard">
-          <hu-section-header
-            heading="Turing Dashboard"
-            description="Human Fidelity Score across conversations"
-          >
-            <hu-connection-pulse status=${this.connectionStatus}></hu-connection-pulse>
-            <hu-tooltip text="Reload Turing data" position="bottom">
-              <hu-button variant="secondary" @click=${() => this.load()}>Refresh</hu-button>
-            </hu-tooltip>
-          </hu-section-header>
-          <hu-empty-state
-            .icon=${icons.brain}
-            heading="No scores yet"
-            description="Turing scores will appear here once conversations are evaluated for human-likeness."
-          >
-            <hu-button variant="primary" @click=${() => this.load()}>Refresh</hu-button>
-          </hu-empty-state>
-        </hu-page-hero>
+        <div class="hu-scroll-reveal-stagger">
+          <hu-page-hero role="region" aria-label="Turing Dashboard">
+            <hu-section-header
+              heading="Turing Dashboard"
+              description="Human Fidelity Score across conversations"
+            >
+              <hu-connection-pulse status=${this.connectionStatus}></hu-connection-pulse>
+              <hu-tooltip text="Reload Turing data" position="bottom">
+                <hu-button variant="secondary" @click=${() => this.load()}>Refresh</hu-button>
+              </hu-tooltip>
+            </hu-section-header>
+            <hu-empty-state
+              .icon=${icons.brain}
+              heading="No scores yet"
+              description="Turing scores will appear here once conversations are evaluated for human-likeness."
+            >
+              <hu-button variant="primary" @click=${() => this.load()}>Refresh</hu-button>
+            </hu-empty-state>
+          </hu-page-hero>
+        </div>
       `;
 
-    return html` ${this._renderHero()} ${this._renderDimensions()} ${this._renderRecentScores()} `;
+    return html`
+      <div class="hu-scroll-reveal-stagger">
+        ${this._renderHero()} ${this._renderDimensions()} ${this._renderRecentScores()}
+      </div>
+    `;
   }
 
   private _renderHero() {

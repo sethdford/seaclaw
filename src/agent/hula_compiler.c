@@ -534,7 +534,18 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
             hok = true;
         size_t trl = 0;
         const char *tr = hu_hula_exec_trace(&hcx, &trl);
-        (void)hu_hula_trace_persist(alloc, NULL, tr, trl, hcp.name, hcp.name_len, hok, NULL, 0);
+        {
+            char *pj = NULL;
+            size_t pjl = 0;
+            if (hu_hula_to_json(alloc, &hcp, &pj, &pjl) == HU_OK && pj) {
+                (void)hu_hula_trace_persist(alloc, NULL, tr, trl, hcp.name, hcp.name_len, hok, pj,
+                                            pjl);
+                hu_str_free(alloc, pj);
+            } else {
+                (void)hu_hula_trace_persist(alloc, NULL, tr, trl, hcp.name, hcp.name_len, hok, NULL,
+                                            0);
+            }
+        }
         if (hok && done_fn)
             done_fn(done_ctx, &hcp, &hcx);
         if (hok)

@@ -54,6 +54,9 @@
       <a href="#hu-status-dot">hu-status-dot</a>
       <a href="#hu-connection-pulse">hu-connection-pulse</a>
       <a href="#hu-activity-heatmap">hu-activity-heatmap</a>
+      <a href="#hu-radial-gauge">hu-radial-gauge</a>
+      <a href="#hu-ring-progress">hu-ring-progress</a>
+      <a href="#hu-sankey">hu-sankey</a>
       <a href="#hu-progress">hu-progress</a>
       <a href="#hu-input">hu-input</a>
       <a href="#hu-select">hu-select</a>
@@ -76,6 +79,7 @@
       <a href="#hu-date-picker">hu-date-picker</a>
       <a href="#hu-sparkline">hu-sparkline</a>
       <a href="#hu-animated-number">hu-animated-number</a>
+      <a href="#hu-animated-value">hu-animated-value</a>
       <a href="#hu-animated-icon">hu-animated-icon</a>
       <a href="#hu-activity-feed">hu-activity-feed</a>
       <a href="#hu-welcome">hu-welcome</a>
@@ -98,6 +102,7 @@
       <a href="#hu-section-header">hu-section-header</a>
       <a href="#hu-metric-row">hu-metric-row</a>
       <a href="#hu-timeline">hu-timeline</a>
+      <a href="#hu-timeline-chart">hu-timeline-chart</a>
       <a href="#hu-sparkline-enhanced">hu-sparkline-enhanced</a>
       <a href="#hu-forecast-chart">hu-forecast-chart</a>
       <a href="#hu-page-hero">hu-page-hero</a>
@@ -110,6 +115,7 @@
       <a href="#hu-voice-conversation">hu-voice-conversation</a>
       <a href="#hu-chat-sessions-panel">hu-chat-sessions-panel</a>
       <a href="#hu-file-preview">hu-file-preview</a>
+      <a href="#hu-hula-tree">hu-hula-tree</a>
       <a href="#hu-json-viewer">hu-json-viewer</a>
       <a href="#hu-chat-bubble">hu-chat-bubble</a>
       <a href="#hu-typing-indicator">hu-typing-indicator</a>
@@ -1163,6 +1169,61 @@
         <div class="code-snippet"><code>&lt;hu-forecast-chart .history=\${[...]} .projectedTotal=\${81.53} .daysInMonth=\${31}&gt;&lt;/hu-forecast-chart&gt;</code></div>
       </section>
 
+      <section class="component-section" id="hu-ring-progress">
+        <h2>hu-ring-progress</h2>
+        <p>Concentric activity-style rings with token colors and eased stroke animation.</p>
+        <div class="playground">
+          <div class="preview" id="ring-progress-preview">
+            <hu-ring-progress id="catalog-ring-progress"></hu-ring-progress>
+          </div>
+        </div>
+        <div class="code-snippet"><code>&lt;hu-ring-progress .rings=\${[{ value: 0.75, max: 1, label: "Tokens" }]}&gt;&lt;/hu-ring-progress&gt;</code></div>
+      </section>
+
+      <section class="component-section" id="hu-animated-value">
+        <h2>hu-animated-value</h2>
+        <p>Spring-interpolated number with optional compact/currency formatting and delta badge.</p>
+        <div class="playground">
+          <div class="preview" id="animated-value-preview">
+            <hu-animated-value id="catalog-animated-value"></hu-animated-value>
+          </div>
+        </div>
+        <div class="code-snippet"><code>&lt;hu-animated-value .value=\${12847} format="compact" showDelta&gt;&lt;/hu-animated-value&gt;</code></div>
+      </section>
+
+      <section class="component-section" id="hu-radial-gauge">
+        <h2>hu-radial-gauge</h2>
+        <p>Single-metric radial gauge with threshold coloring and optional glass panel.</p>
+        <div class="playground">
+          <div class="preview" id="radial-gauge-preview">
+            <hu-radial-gauge id="catalog-radial-gauge"></hu-radial-gauge>
+          </div>
+        </div>
+        <div class="code-snippet"><code>&lt;hu-radial-gauge .value=\${60} label="CPU"&gt;&lt;/hu-radial-gauge&gt;</code></div>
+      </section>
+
+      <section class="component-section" id="hu-timeline-chart">
+        <h2>hu-timeline-chart</h2>
+        <p>Date-axis Gantt-style bars with today marker and hover tooltip.</p>
+        <div class="playground">
+          <div class="preview" id="timeline-chart-preview" style="width:100%">
+            <hu-timeline-chart id="catalog-timeline-chart"></hu-timeline-chart>
+          </div>
+        </div>
+        <div class="code-snippet"><code>&lt;hu-timeline-chart .bars=\${[{ id: "1", label: "Sprint", start, end, status: "active" }]}&gt;&lt;/hu-timeline-chart&gt;</code></div>
+      </section>
+
+      <section class="component-section" id="hu-sankey">
+        <h2>hu-sankey</h2>
+        <p>Flow diagram with curved links (e.g. prompt → model → response).</p>
+        <div class="playground">
+          <div class="preview" id="sankey-preview" style="width:100%">
+            <hu-sankey id="catalog-sankey"></hu-sankey>
+          </div>
+        </div>
+        <div class="code-snippet"><code>&lt;hu-sankey .nodes=\${[...]} .links=\${[{ from, to, value }]}&gt;&lt;/hu-sankey&gt;</code></div>
+      </section>
+
       <section class="component-section" id="hu-page-hero">
         <h2>hu-page-hero</h2>
         <div class="playground">
@@ -1271,6 +1332,17 @@
           </div>
         </div>
         <div class="code-snippet"><code>&lt;hu-file-preview .files=${"[{ name: 'doc.pdf', size: 1024, type: 'application/pdf' }]"}&gt;&lt;/hu-file-preview&gt;</code></div>
+      </section>
+
+      <section class="component-section" id="hu-hula-tree">
+        <h2>hu-hula-tree</h2>
+        <p>Compact list of persisted HuLa execution trace steps (id, operation, optional tool, status).</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 480px; justify-content: flex-start;">
+            <hu-hula-tree id="catalog-hula-tree"></hu-hula-tree>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-hula-tree .steps=\${steps}&gt;&lt;/hu-hula-tree&gt;</code></pre></div>
       </section>
 
       <section class="component-section" id="hu-json-viewer">
@@ -1662,6 +1734,11 @@
       import "/src/components/hu-timeline.js";
       import "/src/components/hu-sparkline-enhanced.js";
       import "/src/components/hu-forecast-chart.js";
+      import "/src/components/hu-ring-progress.js";
+      import "/src/components/hu-animated-value.js";
+      import "/src/components/hu-radial-gauge.js";
+      import "/src/components/hu-timeline-chart.js";
+      import "/src/components/hu-sankey.js";
       import "/src/components/hu-page-hero.js";
       import "/src/components/hu-schedule-builder.js";
       import "/src/components/hu-message-actions.js";
@@ -1672,6 +1749,7 @@
       import "/src/components/hu-voice-conversation.js";
       import "/src/components/hu-chat-sessions-panel.js";
       import "/src/components/hu-file-preview.js";
+      import "/src/components/hu-hula-tree.js";
       import "/src/components/hu-json-viewer.js";
       import "/src/components/hu-chat-bubble.js";
       import "/src/components/hu-typing-indicator.js";
@@ -2219,10 +2297,79 @@
         forecastPreview.daysInMonth = 31;
       }
 
+      const catalogRing = document.getElementById("catalog-ring-progress");
+      if (catalogRing) {
+        catalogRing.rings = [
+          { value: 0.78, max: 1, label: "Tokens" },
+          { value: 0.45, max: 1, label: "Budget" },
+          { value: 1.05, max: 1, label: "Sessions" },
+        ];
+      }
+
+      const catalogAnimVal = document.getElementById("catalog-animated-value");
+      if (catalogAnimVal) {
+        catalogAnimVal.value = 12847;
+        catalogAnimVal.format = "compact";
+        catalogAnimVal.showDelta = true;
+      }
+
+      const catalogRadial = document.getElementById("catalog-radial-gauge");
+      if (catalogRadial) {
+        catalogRadial.value = 60;
+        catalogRadial.label = "Health";
+      }
+
+      const catalogTimelineChart = document.getElementById("catalog-timeline-chart");
+      if (catalogTimelineChart) {
+        const t = Date.now();
+        catalogTimelineChart.bars = [
+          {
+            id: "a",
+            label: "Ingest",
+            start: new Date(t - 86400000 * 5).toISOString(),
+            end: new Date(t - 86400000 * 2).toISOString(),
+            status: "complete",
+          },
+          {
+            id: "b",
+            label: "Train",
+            start: new Date(t - 86400000 * 3).toISOString(),
+            end: new Date(t + 86400000 * 2).toISOString(),
+            status: "active",
+          },
+        ];
+        catalogTimelineChart.today = new Date(t).toISOString();
+      }
+
+      const catalogSankey = document.getElementById("catalog-sankey");
+      if (catalogSankey) {
+        catalogSankey.nodes = [
+          { id: "in", label: "Prompt", column: 0 },
+          { id: "route", label: "Router", column: 1 },
+          { id: "model", label: "Model", column: 2 },
+          { id: "out", label: "Response", column: 3 },
+        ];
+        catalogSankey.links = [
+          { from: "in", to: "route", value: 12 },
+          { from: "route", to: "model", value: 10 },
+          { from: "model", to: "out", value: 10 },
+        ];
+      }
+
       // JSON viewer
       const jsonViewerPreview = document.getElementById("json-viewer-preview");
       if (jsonViewerPreview) {
         jsonViewerPreview.data = { name: "h-uman", version: "1.0", features: ["AI", "Channels", "Tools"] };
+      }
+
+      // hu-hula-tree
+      const catalogHulaTree = document.getElementById("catalog-hula-tree");
+      if (catalogHulaTree) {
+        catalogHulaTree.steps = [
+          { id: "trace-1", op: "plan", status: "ok" },
+          { id: "trace-2", op: "call", tool: "read_file", status: "ok" },
+          { id: "trace-3", op: "call", tool: "shell", status: "running" },
+        ];
       }
 
       // hu-skill-card

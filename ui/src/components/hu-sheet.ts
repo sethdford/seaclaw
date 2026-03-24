@@ -92,6 +92,12 @@ export class ScSheet extends LitElement {
       cursor: grabbing;
     }
 
+    .handle-wrapper:focus-visible {
+      outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
+      outline-offset: var(--hu-focus-ring-offset, 2px);
+      box-shadow: 0 0 12px var(--hu-focus-glow);
+    }
+
     .handle {
       width: 2rem;
       height: var(--hu-space-xs);

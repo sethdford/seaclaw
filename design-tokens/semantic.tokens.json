@@ -234,24 +234,24 @@
       "$type": "color"
     },
     "hover-overlay": {
-      "$value": "rgba(122, 182, 72, 0.08)",
+      "$value": "rgba(255, 255, 255, 0.08)",
       "$type": "color",
-      "$description": "M3 tinted state layer — primary green tint on hover"
+      "$description": "Neutral hover veil on dark surfaces (warm white, not brand-tinted)"
     },
     "pressed-overlay": {
-      "$value": "rgba(122, 182, 72, 0.12)",
+      "$value": "rgba(255, 255, 255, 0.12)",
       "$type": "color",
-      "$description": "M3 tinted state layer — primary green tint on press"
+      "$description": "Neutral pressed veil on dark surfaces"
     },
     "focus-overlay": {
-      "$value": "rgba(122, 182, 72, 0.12)",
+      "$value": "rgba(255, 255, 255, 0.12)",
       "$type": "color",
-      "$description": "M3 tinted state layer — primary green tint on focus"
+      "$description": "Neutral focus veil on dark surfaces (pair with --hu-focus-ring for brand)"
     },
     "dragged-overlay": {
-      "$value": "rgba(122, 182, 72, 0.16)",
+      "$value": "rgba(255, 255, 255, 0.16)",
       "$type": "color",
-      "$description": "M3 tinted state layer — primary green tint while dragging"
+      "$description": "Neutral drag veil on dark surfaces"
     },
     "disabled-overlay": {
       "$value": "rgba(252, 248, 242, 0.04)",
@@ -563,24 +563,24 @@
       "$type": "color"
     },
     "hover-overlay": {
-      "$value": "rgba(90, 154, 48, 0.06)",
+      "$value": "rgba(0, 0, 0, 0.06)",
       "$type": "color",
-      "$description": "M3 tinted state layer — human green tint on hover"
+      "$description": "Neutral hover veil on light surfaces"
     },
     "pressed-overlay": {
-      "$value": "rgba(90, 154, 48, 0.10)",
+      "$value": "rgba(0, 0, 0, 0.10)",
       "$type": "color",
-      "$description": "M3 tinted state layer — human green tint on press"
+      "$description": "Neutral pressed veil on light surfaces"
     },
     "focus-overlay": {
-      "$value": "rgba(90, 154, 48, 0.10)",
+      "$value": "rgba(0, 0, 0, 0.10)",
       "$type": "color",
-      "$description": "M3 tinted state layer — human green tint on focus"
+      "$description": "Neutral focus veil on light surfaces (pair with --hu-focus-ring for brand)"
     },
     "dragged-overlay": {
-      "$value": "rgba(90, 154, 48, 0.14)",
+      "$value": "rgba(0, 0, 0, 0.14)",
       "$type": "color",
-      "$description": "M3 tinted state layer — human green tint while dragging"
+      "$description": "Neutral drag veil on light surfaces"
     },
     "disabled-overlay": {
       "$value": "rgba(0, 0, 0, 0.04)",

@@ -123,6 +123,12 @@ export class ScToast extends LitElement {
       color: var(--hu-accent-hover, var(--hu-accent));
     }
 
+    .action-btn:focus-visible {
+      outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
+      outline-offset: var(--hu-focus-ring-offset, 2px);
+      box-shadow: 0 0 12px var(--hu-focus-glow);
+    }
+
     .dismiss-btn {
       padding: var(--hu-space-xs);
       background: transparent;
@@ -139,6 +145,12 @@ export class ScToast extends LitElement {
 
     .dismiss-btn:hover {
       color: var(--hu-text);
+    }
+
+    .dismiss-btn:focus-visible {
+      outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
+      outline-offset: var(--hu-focus-ring-offset, 2px);
+      box-shadow: 0 0 12px var(--hu-focus-glow);
     }
 
     .dismiss-btn svg {

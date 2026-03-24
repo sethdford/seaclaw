@@ -1810,7 +1810,7 @@ export class DemoGatewayClient extends EventTarget {
 
       case "hula.traces.list":
         return {
-          directory: "~/.human/hula_traces",
+          directory: "${HU_HULA_TRACE_DIR:-~/.human/hula_traces}",
           traces: [
             { id: "deadbeef_demo.json", size: 420, mtime: Math.floor(Date.now() / 1000) - 120 },
             { id: "cafebabe_ops.json", size: 890, mtime: Math.floor(Date.now() / 1000) - 3600 },

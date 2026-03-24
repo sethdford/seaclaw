@@ -70,7 +70,7 @@ When `hula_program_protocol` is set on `hu_prompt_config_t`, the system prompt i
 
 ## Traces and emergence
 
-- **`hu_hula_trace_persist`**: writes a JSON file under `trace_dir` or `~/.human/hula_traces/` (POSIX). Callers may pass optional `program_json` / `program_json_len` to embed the source program for **`human hula replay`**. In `HU_IS_TEST`, passing `NULL` for `trace_dir` is a no-op; tests pass an explicit temp directory.
+- **`hu_hula_trace_persist`**: writes a JSON file under `trace_dir` or `~/.human/hula_traces/` (POSIX). Callers may pass optional `program_json` / `program_json_len` to embed the source program for **`human hula replay`**. The agent (`agent_turn.c`) and LLM compiler (`hula_compiler.c`) pass **`hu_hula_to_json`** output when persisting so traces are replayable even without the original chat text. In `HU_IS_TEST`, passing `NULL` for `trace_dir` is a no-op; tests pass an explicit temp directory.
 - **`hu_hula_emergence_scan`**: reads `*.json` traces, extracts ordered `call` tools from the `trace` array, counts n-grams (e.g. `echo|grep`), returns patterns meeting `min_occurrences`.
 - **`hu_hula_emergence_promote`**: materializes a pattern as `*.skill.json` plus `*_HULA.md` under `skills_dir` or `~/.human/skills/`, with a `seq` of `call` nodes (empty args).
 

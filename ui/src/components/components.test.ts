@@ -191,6 +191,26 @@ describe("hu-activity-heatmap", () => {
   });
 });
 
+describe("hu-hula-tree", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./hu-hula-tree.js");
+    expect(customElements.get("hu-hula-tree")).toBeDefined();
+  });
+
+  it("should default to empty steps", async () => {
+    const { HuHulaTree } = await import("./hu-hula-tree.js");
+    const el = new HuHulaTree();
+    expect(el.steps).toEqual([]);
+  });
+
+  it("should accept trace steps", async () => {
+    const { HuHulaTree } = await import("./hu-hula-tree.js");
+    const el = new HuHulaTree();
+    el.steps = [{ id: "1", op: "call", tool: "x", status: "ok" }];
+    expect(el.steps).toHaveLength(1);
+  });
+});
+
 describe("hu-progress", () => {
   it("should be defined as a custom element", async () => {
     await import("./hu-progress.js");

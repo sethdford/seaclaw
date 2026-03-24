@@ -111,7 +111,7 @@ Example files live under [`examples/hula/`](../../examples/hula/).
 ### Persisted traces and dashboard
 
 - **Filesystem:** Traces are written under `~/.human/hula_traces/` when `HU_HULA_TRACE_DIR` is unset (POSIX), or to the directory you set. New writes include a **`program`** field (source JSON) so **`human hula replay <file.json>`** can execute the same plan again with demo tools.
-- **Gateway RPC** (control protocol): `hula.traces.list`, `hula.traces.get`, `hula.traces.delete`, `hula.traces.analytics` power the **HuLa traces** view in the web dashboard.
+- **Gateway RPC** (control protocol): `hula.traces.list`, `hula.traces.get`, `hula.traces.delete`, `hula.traces.analytics` power the **HuLa traces** view in the web dashboard. The gateway reads the **same** trace directory as the CLI: **`HU_HULA_TRACE_DIR`** when set, otherwise `~/.human/hula_traces` (POSIX). **Observability** shows **HuLa tool turns (BTH)** with a shortcut to that view.
 - **Provider JSON mode:** For compiler reliability, see [`docs/providers/hula-json-mode-matrix.md`](../providers/hula-json-mode-matrix.md).
 
 ## Opcodes at a glance
@@ -136,7 +136,7 @@ After runs, trace JSON may be written under:
 
 APIs (for tooling and advanced users):
 
-- **`hu_hula_trace_persist`** — write a trace file.
+- **`hu_hula_trace_persist`** — write a trace file (CLI, agent, and compiler paths embed a **`program`** snapshot via `hu_hula_to_json` when possible so **`hula replay`** works on `~/.human/hula_traces/*.json`).
 - **`hu_hula_emergence_scan`** — find repeated tool-call n-grams in trace files.
 - **`hu_hula_emergence_promote`** — materialize a pattern as `*.skill.json` and `*_HULA.md` under your skills directory.
 

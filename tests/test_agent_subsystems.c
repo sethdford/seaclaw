@@ -499,6 +499,91 @@ static void test_context_compact_pressure_with_tool_calls(void) {
     alloc.free(alloc.ctx, history, cap * sizeof(hu_owned_message_t));
 }
 
+/* Pressure compact must not leave tool messages after dropping the assistant tool_calls row
+ * (OpenAI HTTP 400: tool_call_id not in previous message's tool_calls). */
+static void test_context_compact_pressure_swallows_tools_after_assistant(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    size_t cap = 16;
+    hu_owned_message_t *history =
+        (hu_owned_message_t *)alloc.alloc(alloc.ctx, cap * sizeof(hu_owned_message_t));
+    HU_ASSERT_NOT_NULL(history);
+    memset(history, 0, cap * sizeof(hu_owned_message_t));
+
+    history[0].role = HU_ROLE_SYSTEM;
+    history[0].content = hu_strndup(&alloc, "You are helpful", 15);
+    history[0].content_len = 15;
+
+    history[1].role = HU_ROLE_USER;
+    history[1].content = hu_strndup(&alloc, "open the file", 13);
+    history[1].content_len = 13;
+
+    history[2].role = HU_ROLE_ASSISTANT;
+    history[2].content = hu_strndup(&alloc, "I'll read it.", 13);
+    history[2].content_len = 13;
+    {
+        hu_tool_call_t *tcs = (hu_tool_call_t *)alloc.alloc(alloc.ctx, sizeof(hu_tool_call_t));
+        HU_ASSERT_NOT_NULL(tcs);
+        memset(tcs, 0, sizeof(hu_tool_call_t));
+        tcs[0].id = hu_strndup(&alloc, "t0", 2);
+        tcs[0].id_len = 2;
+        tcs[0].name = hu_strndup(&alloc, "read_file", 9);
+        tcs[0].name_len = 9;
+        tcs[0].arguments = hu_strndup(&alloc, "{}", 2);
+        tcs[0].arguments_len = 2;
+        history[2].tool_calls = tcs;
+        history[2].tool_calls_count = 1;
+    }
+
+    history[3].role = HU_ROLE_TOOL;
+    history[3].content = hu_strndup(&alloc, "file contents here", 18);
+    history[3].content_len = 18;
+    history[3].tool_call_id = hu_strndup(&alloc, "t0", 2);
+    history[3].tool_call_id_len = 2;
+    history[3].name = hu_strndup(&alloc, "read_file", 9);
+    history[3].name_len = 9;
+
+    {
+        char tail[512];
+        memset(tail, 'y', sizeof(tail) - 1);
+        tail[sizeof(tail) - 1] = '\0';
+        history[4].role = HU_ROLE_USER;
+        history[4].content = hu_strndup(&alloc, tail, strlen(tail));
+        history[4].content_len = strlen(tail);
+    }
+
+    size_t count = 5;
+    hu_error_t err = hu_context_compact_for_pressure(&alloc, history, &count, &cap, 100, 0.70f);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(history[0].role == HU_ROLE_SYSTEM);
+    HU_ASSERT_TRUE(strstr(history[1].content, "Previous context compacted") != NULL);
+    /* Tail user must still be present; no orphan tool row before it */
+    HU_ASSERT_TRUE(count >= 3);
+    HU_ASSERT_EQ(history[2].role, HU_ROLE_USER);
+
+    for (size_t i = 0; i < count; i++) {
+        if (history[i].content)
+            alloc.free(alloc.ctx, history[i].content, history[i].content_len + 1);
+        if (history[i].name)
+            alloc.free(alloc.ctx, history[i].name, history[i].name_len + 1);
+        if (history[i].tool_call_id)
+            alloc.free(alloc.ctx, history[i].tool_call_id, history[i].tool_call_id_len + 1);
+        if (history[i].tool_calls) {
+            for (size_t j = 0; j < history[i].tool_calls_count; j++) {
+                hu_tool_call_t *tc = &history[i].tool_calls[j];
+                if (tc->id && tc->id_len > 0)
+                    alloc.free(alloc.ctx, (void *)tc->id, tc->id_len + 1);
+                if (tc->name && tc->name_len > 0)
+                    alloc.free(alloc.ctx, (void *)tc->name, tc->name_len + 1);
+                if (tc->arguments && tc->arguments_len > 0)
+                    alloc.free(alloc.ctx, (void *)tc->arguments, tc->arguments_len + 1);
+            }
+            alloc.free(alloc.ctx, history[i].tool_calls,
+                       history[i].tool_calls_count * sizeof(hu_tool_call_t));
+        }
+    }
+    alloc.free(alloc.ctx, history, cap * sizeof(hu_owned_message_t));
+}
+
 static void test_estimate_tokens(void) {
     hu_owned_message_t msgs[2] = {
         {.content = "hello", .content_len = 5, .role = HU_ROLE_USER},
@@ -736,6 +821,7 @@ void run_agent_subsystems_tests(void) {
     HU_RUN_TEST(test_compaction_keep_recent_preserved);
     HU_RUN_TEST(test_compaction_frees_tool_calls);
     HU_RUN_TEST(test_context_compact_pressure_with_tool_calls);
+    HU_RUN_TEST(test_context_compact_pressure_swallows_tools_after_assistant);
     HU_RUN_TEST(test_estimate_tokens);
     HU_RUN_TEST(test_estimate_tokens_text_known_string);
     HU_RUN_TEST(test_context_pressure_50_no_warning);

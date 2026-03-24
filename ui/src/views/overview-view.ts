@@ -145,6 +145,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
         grid-template-columns: repeat(4, 1fr);
         grid-template-areas:
           "activity activity channels channels"
+          "activity activity heatmap heatmap"
           "activity activity sessions sessions";
         gap: var(--hu-space-xl);
       }
@@ -155,6 +156,10 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
       .bento .channels {
         grid-area: channels;
+      }
+
+      .bento .heatmap {
+        grid-area: heatmap;
       }
 
       .bento .sessions {
@@ -219,6 +224,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
         grid-template-columns: repeat(4, 1fr);
         grid-template-areas:
           "activity activity channels channels"
+          "activity activity heatmap heatmap"
           "activity activity sessions sessions";
         gap: var(--hu-space-xl);
       }
@@ -229,6 +235,10 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
       .skeleton-bento .channels {
         grid-area: channels;
+      }
+
+      .skeleton-bento .heatmap {
+        grid-area: heatmap;
       }
 
       .skeleton-bento .sessions {
@@ -243,6 +253,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
           grid-template-areas:
             "activity"
             "channels"
+            "heatmap"
             "sessions";
         }
         .skeleton-bento {
@@ -250,6 +261,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
           grid-template-areas:
             "activity"
             "channels"
+            "heatmap"
             "sessions";
         }
         .skeleton-metrics {
@@ -657,6 +669,18 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
   /* ── Stats row ─────────────────────────────────────── */
 
+  /** Deterministic activity levels for overview heatmap (12 weeks × 7 days). */
+  private _overviewHeatmapData(): number[] {
+    const total = 12 * 7;
+    const out: number[] = [];
+    let seed = 42;
+    for (let i = 0; i < total; i++) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      out.push(seed % 5);
+    }
+    return out;
+  }
+
   /** Deterministic mock trend data for sparklines (no flicker on re-render). */
   private _mockTrendData(base: number, variance: number, points = 12): number[] {
     const out: number[] = [];
@@ -823,6 +847,14 @@ export class ScOverviewView extends GatewayAwareLitElement {
                 `}
           </hu-card>
 
+          <hu-card hoverable accent surface="high" class="heatmap">
+            <div class="section-label">Activity</div>
+            <hu-activity-heatmap
+              .data=${this._overviewHeatmapData()}
+              weeks=${12}
+            ></hu-activity-heatmap>
+          </hu-card>
+
           <hu-card hoverable accent surface="high" class="sessions">
             <div class="section-label">Recent Sessions</div>
             <hu-sessions-table
@@ -863,6 +895,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
       <div class="skeleton-bento">
         <hu-skeleton variant="card" height="280px" class="activity"></hu-skeleton>
         <hu-skeleton variant="card" height="140px" class="channels"></hu-skeleton>
+        <hu-skeleton variant="card" height="100px" class="heatmap"></hu-skeleton>
         <hu-skeleton variant="card" height="140px" class="sessions"></hu-skeleton>
       </div>
     `;

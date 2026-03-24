@@ -359,9 +359,21 @@ hu_error_t hu_context_compact_for_pressure(hu_allocator_t *alloc, hu_owned_messa
         return HU_OK;
 
     size_t compact_end = start + compact_count;
+    /* OpenAI-compatible APIs require every tool message to follow an assistant message that
+     * includes matching tool_calls. If we drop an assistant-with-tools but keep its tool
+     * results, the next request returns HTTP 400 (tool_call_id not in previous tool_calls). */
+    if (compact_end > start && compact_end <= count) {
+        hu_owned_message_t *last_removed = &history[compact_end - 1];
+        if (last_removed->role == HU_ROLE_ASSISTANT && last_removed->tool_calls &&
+            last_removed->tool_calls_count > 0) {
+            while (compact_end < count && history[compact_end].role == HU_ROLE_TOOL)
+                compact_end++;
+        }
+    }
+    size_t n_freed = compact_end - start;
     char buf[96];
     int n = snprintf(buf, sizeof(buf), "[Previous context compacted: %zu messages summarized]",
-                     compact_count);
+                     n_freed);
     if (n < 0 || (size_t)n >= sizeof(buf))
         return HU_ERR_INVALID_ARGUMENT;
     size_t marker_len = (size_t)n;

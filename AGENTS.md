@@ -459,9 +459,9 @@ Surfaces are tinted with the primary accent for branded depth hierarchy:
 - Use tonal surfaces instead of `--hu-bg-surface` when brand identity matters.
 - Token source: `base.tokens.json` (color.tonal.\*) + `semantic.tokens.json`
 
-#### Tinted State Layers (M3)
+#### Neutral State Layers (M3)
 
-Interactive overlays are tinted with Human green, not neutral white/black:
+Interactive overlays are **neutral** (white veil on dark theme, black veil on light theme), not accent-tinted washes:
 
 - `--hu-hover-overlay` / `--hu-pressed-overlay` / `--hu-focus-overlay` / `--hu-dragged-overlay`
 - `--hu-disabled-overlay` remains neutral (no brand color on disabled states)
@@ -557,6 +557,31 @@ Required:
 - New design patterns must reference which competitor inspired them and how Human exceeds them.
 - Benchmark brands: Linear, Vercel, Raycast, Stripe, Figma, Superhuman, Apple, Spotify + Awwwards winners.
 - Every quarter, evaluate and adopt one emerging web platform feature before competitors (see `docs/standards/design/design-strategy.md` §Design Innovation Pipeline).
+
+### 12.14 Key Component APIs
+
+- **`hu-card`**: `glass`, `solid`, `hoverable`, `clickable`, `tilt`, `mesh`, `chromatic`, `entrance` (IO-driven reveal), `surface` (`"default"` | `"high"` | `"highest"`)
+- **`hu-input`**: `variant="tonal"` for branded surface background
+- **`hu-badge`**: `info` variant uses `--hu-accent-tertiary` (steel blue)
+
+### 12.15 CSS Utility Classes (theme.css)
+
+| Class | Purpose |
+|-------|---------|
+| `.hu-interactive` | Layered hover/pressed with accent-tinted border |
+| `.hu-interactive-subtle` | Lighter variant for dense UIs |
+| `.hu-link-structural` | Steel blue link for informational content |
+| `.hu-stagger` | Stagger children entrance (50ms steps, 300ms cap) |
+| `.hu-cascade` | Cascade children entrance (30ms steps, 200ms cap) |
+| `.hu-scroll-reveal` | Scroll-driven viewport entrance |
+| `.hu-scroll-reveal-stagger` | Scroll-driven entrance for container children |
+
+### 12.16 View Transitions
+
+Two distinct transition types:
+
+- **Route**: `main-content` view-transition with spring animation (`app.ts`)
+- **Theme**: `root` crossfade via `document.startViewTransition()` on theme toggle
 
 ## 13) Vibe Coding Guardrails
 

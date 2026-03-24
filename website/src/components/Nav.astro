@@ -32,195 +32,214 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     <div class="flex items-center gap-8">
       <div class="flex items-center gap-4 md:gap-8">
         <div class="hidden md:flex items-center gap-6">
-        <a href="#use-cases" class="nav-link text-[13px] transition-colors"
-          >Use Cases</a
+          <a href="#use-cases" class="nav-link text-[13px] transition-colors"
+            >Use Cases</a
+          >
+          <a href="#architecture" class="nav-link text-[13px] transition-colors"
+            >Architecture</a
+          >
+          <a
+            href={`${base}brand/`}
+            class="nav-link text-[13px] transition-colors">Brand</a
+          >
+          <a
+            href={`${base}design/`}
+            class="nav-link text-[13px] transition-colors">Design</a
+          >
+          <a
+            href={`${base}getting-started/installation/`}
+            class="nav-link text-[13px] transition-colors">Docs</a
+          >
+        </div>
+        <button
+          class="theme-toggle nav-link flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
+          aria-label="Toggle theme"
+          type="button"
         >
-        <a href="#architecture" class="nav-link text-[13px] transition-colors"
-          >Architecture</a
+          <svg
+            class="theme-icon-sun w-5 h-5 hidden"
+            viewBox="0 0 256 256"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"
+            ></path>
+          </svg>
+          <svg
+            class="theme-icon-moon w-5 h-5"
+            viewBox="0 0 256 256"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"
+            ></path>
+          </svg>
+        </button>
+        <a
+          href="https://github.com/sethdford/h-uman"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="nav-link transition-colors"
+          aria-label="GitHub"
         >
-        <a href={`${base}brand/`} class="nav-link text-[13px] transition-colors"
-          >Brand</a
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 256 256"
+            ><path
+              d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.42-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.55a43.81,43.81,0,0,1,.79-23.87,43.83,43.83,0,0,1,32.32,20.06A8,8,0,0,0,119.82,72h32.35a8,8,0,0,0,6.74-3.69,43.83,43.83,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,72.05a8,8,0,0,0,1.14,7.7A41.74,41.74,0,0,1,200,104Z"
+            ></path></svg
+          >
+        </a>
+        <button
+          id="mobile-menu-btn"
+          type="button"
+          class="mobile-menu-toggle md:hidden flex items-center justify-center w-8 h-8 nav-link"
+          aria-label="Menu"
+          aria-expanded="false"
+          aria-controls="mobile-menu"
+          popovertarget="mobile-menu"
+        >
+          <svg
+            class="hamburger-icon w-5 h-5"
+            fill="currentColor"
+            viewBox="0 0 256 256"
+            ><path
+              d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"
+            ></path></svg
+          >
+          <svg
+            class="close-icon w-5 h-5 hidden"
+            fill="currentColor"
+            viewBox="0 0 256 256"
+            ><path
+              d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"
+            ></path></svg
+          >
+        </button>
+      </div>
+    </div>
+    <nav
+      id="mobile-menu"
+      popover="auto"
+      class="mobile-menu-popover md:hidden"
+      aria-label="Mobile navigation"
+    >
+      <div class="mobile-menu-inner">
+        <a
+          href="#use-cases"
+          class="mobile-menu-link text-[15px] py-2 transition-colors"
+          style="color: var(--hu-text-secondary)">Use Cases</a
+        >
+        <a
+          href="#architecture"
+          class="mobile-menu-link text-[15px] py-2 transition-colors"
+          style="color: var(--hu-text-secondary)">Architecture</a
+        >
+        <a
+          href={`${base}brand/`}
+          class="mobile-menu-link text-[15px] py-2 transition-colors"
+          style="color: var(--hu-text-secondary)">Brand</a
         >
         <a
           href={`${base}design/`}
-          class="nav-link text-[13px] transition-colors">Design</a
+          class="mobile-menu-link text-[15px] py-2 transition-colors"
+          style="color: var(--hu-text-secondary)">Design</a
         >
         <a
           href={`${base}getting-started/installation/`}
-          class="nav-link text-[13px] transition-colors">Docs</a
+          class="mobile-menu-link text-[15px] py-2 transition-colors"
+          style="color: var(--hu-text-secondary)">Docs</a
+        >
+        <a
+          href="https://github.com/sethdford/h-uman"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mobile-menu-link text-[15px] py-2 transition-colors"
+          style="color: var(--hu-text-secondary)">GitHub</a
         >
       </div>
-      <button
-        class="theme-toggle nav-link flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
-        aria-label="Toggle theme"
-        type="button"
-      >
-        <svg class="theme-icon-sun w-5 h-5 hidden" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
-          <path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z" />
-        </svg>
-        <svg class="theme-icon-moon w-5 h-5" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
-          <path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z" />
-        </svg>
-      </button>
-      <a
-        href="https://github.com/sethdford/h-uman"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="nav-link transition-colors"
-        aria-label="GitHub"
-      >
-        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 256 256"
-          ><path
-            d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.42-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.55a43.81,43.81,0,0,1,.79-23.87,43.83,43.83,0,0,1,32.32,20.06A8,8,0,0,0,119.82,72h32.35a8,8,0,0,0,6.74-3.69,43.83,43.83,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,72.05a8,8,0,0,0,1.14,7.7A41.74,41.74,0,0,1,200,104Z"
-          ></path></svg
-        >
-      </a>
-      <button
-        id="mobile-menu-btn"
-        type="button"
-        class="mobile-menu-toggle md:hidden flex items-center justify-center w-8 h-8 nav-link"
-        aria-label="Menu"
-        aria-expanded="false"
-        aria-controls="mobile-menu"
-        popovertarget="mobile-menu"
-      >
-        <svg
-          class="hamburger-icon w-5 h-5"
-          fill="currentColor"
-          viewBox="0 0 256 256"
-          ><path
-            d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"
-          ></path></svg
-        >
-        <svg
-          class="close-icon w-5 h-5 hidden"
-          fill="currentColor"
-          viewBox="0 0 256 256"
-          ><path
-            d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"
-          ></path></svg
-        >
-      </button>
-    </div>
+    </nav>
   </div>
-  <nav
-    id="mobile-menu"
-    popover="auto"
-    class="mobile-menu-popover md:hidden"
-    aria-label="Mobile navigation"
-  >
-    <div class="mobile-menu-inner">
-      <a
-        href="#use-cases"
-        class="mobile-menu-link text-[15px] py-2 transition-colors"
-        style="color: var(--hu-text-secondary)">Use Cases</a
-      >
-      <a
-        href="#architecture"
-        class="mobile-menu-link text-[15px] py-2 transition-colors"
-        style="color: var(--hu-text-secondary)">Architecture</a
-      >
-      <a
-        href={`${base}brand/`}
-        class="mobile-menu-link text-[15px] py-2 transition-colors"
-        style="color: var(--hu-text-secondary)">Brand</a
-      >
-      <a
-        href={`${base}design/`}
-        class="mobile-menu-link text-[15px] py-2 transition-colors"
-        style="color: var(--hu-text-secondary)">Design</a
-      >
-      <a
-        href={`${base}getting-started/installation/`}
-        class="mobile-menu-link text-[15px] py-2 transition-colors"
-        style="color: var(--hu-text-secondary)">Docs</a
-      >
-      <a
-        href="https://github.com/sethdford/h-uman"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="mobile-menu-link text-[15px] py-2 transition-colors"
-        style="color: var(--hu-text-secondary)">GitHub</a
-      >
-    </div>
-  </nav>
-</nav>
 
-<style>
-  .nav-link {
-    color: var(--hu-text-secondary);
-  }
-  .nav-link:hover,
-  .nav-link:focus-visible {
-    color: var(--hu-text);
-  }
-  [data-theme="dark"] .theme-icon-sun {
-    display: block;
-  }
-  [data-theme="dark"] .theme-icon-moon {
-    display: none;
-  }
-  .theme-icon-sun {
-    display: none;
-  }
-  .theme-icon-moon {
-    display: block;
-  }
-</style>
+  <style>
+    .nav-link {
+      color: var(--hu-text-secondary);
+    }
+    .nav-link:hover,
+    .nav-link:focus-visible {
+      color: var(--hu-text);
+    }
+    [data-theme="dark"] .theme-icon-sun {
+      display: block;
+    }
+    [data-theme="dark"] .theme-icon-moon {
+      display: none;
+    }
+    .theme-icon-sun {
+      display: none;
+    }
+    .theme-icon-moon {
+      display: block;
+    }
+  </style>
 
-<script>
-  (function initTheme() {
-    const stored = localStorage.getItem("hu-theme");
-    const system = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    const theme = stored || system;
-    document.documentElement.dataset.theme = theme;
-  })();
+  <script>
+    (function initTheme() {
+      const stored = localStorage.getItem("hu-theme");
+      const system = window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+      const theme = stored || system;
+      document.documentElement.dataset.theme = theme;
+    })();
 
-  const toggle = document.querySelector(".theme-toggle");
-  toggle?.addEventListener("click", () => {
-    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    if (document.startViewTransition) {
-      document.startViewTransition(() => {
+    const toggle = document.querySelector(".theme-toggle");
+    toggle?.addEventListener("click", () => {
+      const next =
+        document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      if (document.startViewTransition) {
+        document.startViewTransition(() => {
+          document.documentElement.dataset.theme = next;
+        });
+      } else {
         document.documentElement.dataset.theme = next;
+      }
+      localStorage.setItem("hu-theme", next);
+    });
+
+    const btn = document.getElementById("mobile-menu-btn");
+    const menu = document.getElementById("mobile-menu");
+    const hamburger = btn?.querySelector(".hamburger-icon");
+    const closeIcon = btn?.querySelector(".close-icon");
+
+    const supportsPopover = "showPopover" in document.createElement("div");
+
+    function setExpanded(open: boolean) {
+      btn?.setAttribute("aria-expanded", String(open));
+      btn?.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+      hamburger?.classList.toggle("hidden", open);
+      closeIcon?.classList.toggle("hidden", !open);
+    }
+
+    if (supportsPopover && menu) {
+      menu.addEventListener("toggle", () => {
+        setExpanded(menu.matches(":popover-open"));
+      });
+      menu.querySelectorAll(".mobile-menu-link").forEach((link) => {
+        link.addEventListener("click", () => menu.hidePopover());
       });
     } else {
-      document.documentElement.dataset.theme = next;
-    }
-    localStorage.setItem("hu-theme", next);
-  });
-
-  const btn = document.getElementById("mobile-menu-btn");
-  const menu = document.getElementById("mobile-menu");
-  const hamburger = btn?.querySelector(".hamburger-icon");
-  const closeIcon = btn?.querySelector(".close-icon");
-
-  const supportsPopover = "showPopover" in document.createElement("div");
-
-  function setExpanded(open: boolean) {
-    btn?.setAttribute("aria-expanded", String(open));
-    btn?.setAttribute("aria-label", open ? "Close menu" : "Open menu");
-    hamburger?.classList.toggle("hidden", open);
-    closeIcon?.classList.toggle("hidden", !open);
-  }
-
-  if (supportsPopover && menu) {
-    menu.addEventListener("toggle", () => {
-      setExpanded(menu.matches(":popover-open"));
-    });
-    menu.querySelectorAll(".mobile-menu-link").forEach((link) => {
-      link.addEventListener("click", () => menu.hidePopover());
-    });
-  } else {
-    if (menu) menu.classList.remove("is-open");
-    btn?.addEventListener("click", () => {
-      const open = menu?.classList.toggle("is-open") ?? false;
-      setExpanded(open);
-    });
-    menu?.querySelectorAll(".mobile-menu-link").forEach((link) => {
-      link.addEventListener("click", () => {
-        menu.classList.remove("is-open");
-        setExpanded(false);
+      if (menu) menu.classList.remove("is-open");
+      btn?.addEventListener("click", () => {
+        const open = menu?.classList.toggle("is-open") ?? false;
+        setExpanded(open);
       });
-    });
-  }
-</script>
+      menu?.querySelectorAll(".mobile-menu-link").forEach((link) => {
+        link.addEventListener("click", () => {
+          menu.classList.remove("is-open");
+          setExpanded(false);
+        });
+      });
+    }
+  </script>
+</nav>

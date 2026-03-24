@@ -163,6 +163,19 @@ Use this to find the right files for a given task without searching the full cod
 | **Eval**                                               | `src/eval.c`, `eval_suites/*.json`, `scripts/adversarial-eval-harness.py`, `scripts/redteam-eval-fleet.sh`, `scripts/redteam-live.sh` | `test_eval.c`, `test_adversarial_detect.c`                                         |
 | **A2A**                                                | `src/a2a.c`                                                                                                                     | `test_a2a.c`                                                                       |
 
+## Design system / tokens
+
+### UI Dashboard
+
+- Web dashboard shell / routing — `ui/src/app.ts`
+- Theme CSS + utilities — `ui/src/styles/theme.css`
+- Scroll-driven motion — `ui/src/styles/scroll-driven.css`
+- Scroll entrance (Lit module + IO fallback) — `ui/src/styles/scroll-entrance.ts`, `ui/src/utils/scroll-entrance.ts`
+- Card component (glass, tilt, mesh, entrance) — `ui/src/components/hu-card.ts`
+- Input component (tonal variant) — `ui/src/components/hu-input.ts`
+- Component catalog — `ui/catalog.html`
+- View tests — `ui/src/views/views.test.ts`
+
 ## AGI Frontiers / Intelligence
 
 | Concept                     | Primary Source Files                                                                                     | Test Files               |

@@ -21,7 +21,12 @@ fi
 
 "$BIN" hula validate "$PROG"
 "$BIN" hula run "$PROG"
-json_file="$(find "$TRACE_DIR" -maxdepth 1 -name '*.json' 2>/dev/null | head -1)"
+# Prefer newest trace when multiple JSON files exist (e.g. after a prior replay persist).
+json_file=""
+if compgen -G "$TRACE_DIR"/*.json > /dev/null; then
+  # shellcheck disable=SC2012
+  json_file="$(ls -t "$TRACE_DIR"/*.json 2>/dev/null | head -1)"
+fi
 if [[ -n "$json_file" ]]; then
   "$BIN" hula replay "$json_file"
 fi

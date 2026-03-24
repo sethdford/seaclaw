@@ -82,6 +82,12 @@ function main(): void {
   tokens = resolveRefs(tokens);
 
   const sections: string[] = [
+    "---",
+    "title: Design Tokens Reference",
+    "generated: true",
+    "source: design-tokens/",
+    "---",
+    "",
     "# Design Tokens Reference",
     "",
     "Auto-generated from W3C token files in `design-tokens/`.",

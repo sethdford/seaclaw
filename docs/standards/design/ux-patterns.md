@@ -273,6 +273,15 @@ Anti-patterns:
 - Never auto-scroll to chapter boundaries (user controls pace)
 - Never use horizontal scroll within chapters
 
+### Dashboard Scroll Reveal
+
+Dashboard views use two entrance systems (see Motion Design standard for details):
+
+- `scrollEntranceStyles` (CSS scroll-timeline + IO fallback) for card grids and stat rows
+- `staggerMotion9Styles` (fixed nth-child stagger) for list-style views
+
+Apply `hu-scroll-reveal-stagger` class to content containers. Children animate in as they enter the viewport. For conversational views (chat, voice), entrance choreography should be minimal — content is the primary element.
+
 ---
 
 ## 3. Component Interaction Patterns

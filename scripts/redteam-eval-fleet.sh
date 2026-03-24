@@ -24,6 +24,7 @@
 # Optional: HARNESS_AGENT_CONFIG_PATH=/path/config.json — harness passes HUMAN_CONFIG_PATH to each `human agent` child.
 # Optional: REDTEAM_FLEET_AGENT_SMOKE=1 runs one human agent -m (uses HUMAN_PROVIDER / keys in env).
 # Live harness: REDTEAM_PROBE_PROFILE=safety|capability_honesty|human_likeness|tool_capability for generated probes.
+# Live harness: REDTEAM_AGENT_TIMEOUT=300 (default) seconds per `human agent -m` subprocess (raise if slow provider).
 #
 # Examples:
 #   bash scripts/redteam-eval-fleet.sh
@@ -173,7 +174,7 @@ if [ "${REDTEAM_FLEET_LIVE:-0}" = 1 ]; then
       --include-suite "$ROOT/eval_suites/tool_capability.json" \
       --include-suite "$ROOT/eval_suites/hula_orchestration.json" \
       --include-suite "$ROOT/eval_suites/multi_turn.json" \
-      --timeout "${REDTEAM_AGENT_TIMEOUT:-180}" \
+      --timeout "${REDTEAM_AGENT_TIMEOUT:-300}" \
       --output "$LIVE_DIR/harness-report.json" 2>&1 | tee "$LIVE_DIR/harness-console.log"; then
       echo "--- OK: dynamic harness"
     else

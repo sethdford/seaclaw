@@ -411,7 +411,7 @@ describe("hu-overview-view deep", () => {
     const skeletonBento = el.shadowRoot?.querySelector(".skeleton-bento");
     if (skeletonBento) {
       const cells = skeletonBento.querySelectorAll("hu-skeleton");
-      expect(cells.length).toBe(3);
+      expect(cells.length).toBe(4);
     }
     el.remove();
   });

@@ -117,6 +117,12 @@ export class ScMetricsView extends GatewayAwareLitElement {
       .section {
         margin-bottom: var(--hu-space-2xl);
       }
+      .hula-cta {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-md);
+        align-items: flex-start;
+      }
       .metric-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
@@ -347,6 +353,41 @@ export class ScMetricsView extends GatewayAwareLitElement {
     `;
   }
 
+  private _goToHulaView(): void {
+    window.location.hash = "hula";
+  }
+
+  private _renderHulaObservability() {
+    const turns =
+      this.snapshot.bth && typeof this.snapshot.bth.hula_tool_turns === "number"
+        ? this.snapshot.bth.hula_tool_turns
+        : 0;
+    return html`
+      <div class="section hu-scroll-reveal" role="region" aria-label="HuLa orchestration metrics">
+        <hu-section-header
+          heading="HuLa orchestration"
+          description="Multi-step HuLa programs and persisted execution traces (same directory as HU_HULA_TRACE_DIR or ~/.human/hula_traces on POSIX)."
+        ></hu-section-header>
+        <hu-card glass>
+          <div class="card-inner hula-cta">
+            <div class="metric-grid">
+              <div class="metric-item">
+                <span class="metric-label">HuLa tool turns (BTH)</span>
+                <span class="metric-value">${turns.toLocaleString()}</span>
+              </div>
+            </div>
+            <hu-button
+              variant="secondary"
+              @click=${this._goToHulaView}
+              aria-label="Open HuLa traces view"
+              >Open HuLa traces</hu-button
+            >
+          </div>
+        </hu-card>
+      </div>
+    `;
+  }
+
   private _renderEvalCalibration() {
     const bth = this.snapshot.bth;
     if (!bth) return nothing;
@@ -494,7 +535,8 @@ export class ScMetricsView extends GatewayAwareLitElement {
         ? this._renderSkeleton()
         : html`
             ${this._renderIntelligenceStats()} ${this._renderEvalCalibration()}
-            ${this._renderSystemHealth()} ${this._renderIntelligencePipeline()}
+            ${this._renderHulaObservability()} ${this._renderSystemHealth()}
+            ${this._renderIntelligencePipeline()}
           `}
     `;
   }

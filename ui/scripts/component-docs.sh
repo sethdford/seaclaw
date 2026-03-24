@@ -6,10 +6,18 @@ cd "$(dirname "$0")/.."
 
 OUTPUT="../docs/components.md"
 
-echo "# Component API Reference" > "$OUTPUT"
-echo "" >> "$OUTPUT"
-echo "Auto-generated from \`ui/src/components/\`" >> "$OUTPUT"
-echo "" >> "$OUTPUT"
+{
+  echo "---"
+  echo "title: Component API Reference"
+  echo "generated: true"
+  echo "source: ui/src/components/"
+  echo "---"
+  echo ""
+  echo "# Component API Reference"
+  echo ""
+  echo "Auto-generated from \`ui/src/components/\`"
+  echo ""
+} > "$OUTPUT"
 
 for file in src/components/hu-*.ts; do
   [ -f "$file" ] || continue
@@ -26,12 +34,12 @@ for file in src/components/hu-*.ts; do
   echo "| Property | Type | Default |" >> "$OUTPUT"
   echo "|----------|------|---------|" >> "$OUTPUT"
 
-  (grep -E '@property|@state' "$file" 2>/dev/null || true) | while read -r line; do
+  while IFS= read -r line || [ -n "$line" ]; do
     TYPE=$(echo "$line" | grep -oE "type: *[A-Za-z]+" | sed 's/type: *//') || TYPE=""
     [ -z "$TYPE" ] && TYPE="unknown"
     PROP=$(echo "$line" | sed -n 's/.*)  *\([a-zA-Z_][a-zA-Z0-9_]*\).*/\1/p')
     [ -n "$PROP" ] && echo "| \`$PROP\` | $TYPE | |" >> "$OUTPUT"
-  done
+  done < <(grep -E '@property|@state' "$file" 2>/dev/null || true)
 
   echo "" >> "$OUTPUT"
 
