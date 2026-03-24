@@ -3,8 +3,8 @@
  */
 #include "human/feeds/awareness.h"
 
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -30,6 +30,7 @@ void hu_feed_awareness_topics_free(hu_allocator_t *alloc, hu_awareness_topic_t *
     alloc->free(alloc->ctx, topics, topic_count * sizeof(*topics));
 }
 
+#ifdef HU_ENABLE_SQLITE
 static hu_feed_type_t awareness_parse_content_type(const char *ct) {
     if (!ct || ct[0] == '\0')
         return HU_FEED_NEWS_RSS;
@@ -40,8 +41,6 @@ static hu_feed_type_t awareness_parse_content_type(const char *ct) {
     }
     return HU_FEED_NEWS_RSS;
 }
-
-#ifdef HU_ENABLE_SQLITE
 void hu_feed_awareness_item_from_stored(const hu_feed_item_stored_t *stored, hu_feed_item_t *out) {
     if (!stored || !out)
         return;
@@ -57,7 +56,8 @@ void hu_feed_awareness_item_from_stored(const hu_feed_item_stored_t *stored, hu_
 }
 #endif
 
-static double max_interest_score(const char *text, size_t text_len, char **lines, size_t lines_count) {
+static double max_interest_score(const char *text, size_t text_len, char **lines,
+                                 size_t lines_count) {
     double best = 0.0;
     if (!text || text_len == 0 || !lines)
         return 0.0;
@@ -109,8 +109,8 @@ static void pick_suggested_contact(const hu_feed_item_t *item, const hu_persona_
     const char *pick = NULL;
     for (size_t ci = 0; ci < persona->contacts_count; ci++) {
         const hu_contact_profile_t *c = &persona->contacts[ci];
-        double s = max_interest_score(item->content, item->content_len, c->interests,
-                                        c->interests_count);
+        double s =
+            max_interest_score(item->content, item->content_len, c->interests, c->interests_count);
         if (s > best) {
             best = s;
             if (c->name && c->name[0])
@@ -167,18 +167,16 @@ static double score_item_for_persona(const hu_feed_item_t *item, const hu_person
     for (size_t ti = 0; ti < persona->context_awareness.sports_teams_count; ti++) {
         if (persona->context_awareness.sports_teams[ti][0] == '\0')
             continue;
-        v = hu_feeds_score_relevance(
-            combined, clen, persona->context_awareness.sports_teams[ti],
-            strlen(persona->context_awareness.sports_teams[ti]));
+        v = hu_feeds_score_relevance(combined, clen, persona->context_awareness.sports_teams[ti],
+                                     strlen(persona->context_awareness.sports_teams[ti]));
         if (v > best)
             best = v;
     }
     for (size_t ni = 0; ni < persona->context_awareness.news_topics_count; ni++) {
         if (persona->context_awareness.news_topics[ni][0] == '\0')
             continue;
-        v = hu_feeds_score_relevance(
-            combined, clen, persona->context_awareness.news_topics[ni],
-            strlen(persona->context_awareness.news_topics[ni]));
+        v = hu_feeds_score_relevance(combined, clen, persona->context_awareness.news_topics[ni],
+                                     strlen(persona->context_awareness.news_topics[ni]));
         if (v > best)
             best = v;
     }
@@ -187,10 +185,10 @@ static double score_item_for_persona(const hu_feed_item_t *item, const hu_person
 }
 #endif /* !HU_IS_TEST */
 
-hu_error_t hu_feed_awareness_synthesize(hu_allocator_t *alloc,
-                                        const hu_feed_item_t *feed_items, size_t feed_count,
-                                        const hu_persona_t *persona,
-                                        hu_awareness_topic_t **out_topics, size_t *out_topic_count) {
+hu_error_t hu_feed_awareness_synthesize(hu_allocator_t *alloc, const hu_feed_item_t *feed_items,
+                                        size_t feed_count, const hu_persona_t *persona,
+                                        hu_awareness_topic_t **out_topics,
+                                        size_t *out_topic_count) {
     if (!alloc || !out_topics || !out_topic_count)
         return HU_ERR_INVALID_ARGUMENT;
     *out_topics = NULL;
@@ -201,8 +199,7 @@ hu_error_t hu_feed_awareness_synthesize(hu_allocator_t *alloc,
     (void)feed_count;
     (void)persona;
     size_t n = sizeof(k_awareness_mock_topics) / sizeof(k_awareness_mock_topics[0]);
-    hu_awareness_topic_t *buf =
-        (hu_awareness_topic_t *)alloc->alloc(alloc->ctx, n * sizeof(*buf));
+    hu_awareness_topic_t *buf = (hu_awareness_topic_t *)alloc->alloc(alloc->ctx, n * sizeof(*buf));
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
     memcpy(buf, k_awareness_mock_topics, n * sizeof(*buf));
@@ -246,8 +243,7 @@ hu_error_t hu_feed_awareness_synthesize(hu_allocator_t *alloc,
 
     qsort(stack, n, sizeof(stack[0]), cmp_awareness_desc);
 
-    hu_awareness_topic_t *buf =
-        (hu_awareness_topic_t *)alloc->alloc(alloc->ctx, n * sizeof(*buf));
+    hu_awareness_topic_t *buf = (hu_awareness_topic_t *)alloc->alloc(alloc->ctx, n * sizeof(*buf));
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
     memcpy(buf, stack, n * sizeof(*buf));
@@ -285,8 +281,8 @@ bool hu_feed_awareness_should_share(const hu_awareness_topic_t *topic,
             suggested_for_them = true;
     }
 
-    double shared = max_interest_score(txt, tlen, contact_profile->interests,
-                                       contact_profile->interests_count);
+    double shared =
+        max_interest_score(txt, tlen, contact_profile->interests, contact_profile->interests_count);
     double recent = max_interest_score(txt, tlen, contact_profile->recent_topics,
                                        contact_profile->recent_topics_count);
 
@@ -304,7 +300,8 @@ bool hu_feed_awareness_should_share(const hu_awareness_topic_t *topic,
 #ifdef HU_ENABLE_SQLITE
 bool hu_feed_awareness_contact_has_high_topics(hu_allocator_t *alloc, sqlite3 *db,
                                                const hu_persona_t *persona,
-                                               const hu_contact_profile_t *cp, double min_relevance) {
+                                               const hu_contact_profile_t *cp,
+                                               double min_relevance) {
     if (!alloc || !db || !persona || !cp || min_relevance <= 0.0)
         return false;
 
@@ -315,8 +312,7 @@ bool hu_feed_awareness_contact_has_high_topics(hu_allocator_t *alloc, sqlite3 *d
         !stored || scount == 0)
         return false;
 
-    hu_feed_item_t *items =
-        (hu_feed_item_t *)alloc->alloc(alloc->ctx, scount * sizeof(*items));
+    hu_feed_item_t *items = (hu_feed_item_t *)alloc->alloc(alloc->ctx, scount * sizeof(*items));
     if (!items) {
         hu_feed_items_free(alloc, stored, scount);
         return false;
@@ -340,7 +336,8 @@ bool hu_feed_awareness_contact_has_high_topics(hu_allocator_t *alloc, sqlite3 *d
 
     bool hit = false;
     for (size_t i = 0; i < tcount; i++) {
-        if (topics[i].relevance >= min_relevance && hu_feed_awareness_should_share(&topics[i], cp)) {
+        if (topics[i].relevance >= min_relevance &&
+            hu_feed_awareness_should_share(&topics[i], cp)) {
             hit = true;
             break;
         }
