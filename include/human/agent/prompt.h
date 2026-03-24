@@ -64,20 +64,27 @@ typedef struct hu_prompt_config {
     size_t autonomy_rules_len;
     const char *reasoning_instruction;
     size_t reasoning_instruction_len;
-    const char *intelligence_context;   /* AGI frontier context: goals, values, learning, self-improvement */
+    const char
+        *intelligence_context; /* AGI frontier context: goals, values, learning, self-improvement */
     size_t intelligence_context_len;
-    const char *skills_context;         /* available SkillForge skills for this agent */
+    const char *skills_context; /* available SkillForge skills for this agent */
     size_t skills_context_len;
-    bool native_tools;                  /* provider supports structured tool calls */
-    bool hula_program_protocol;       /* teach <hula_program> JSON in system prompt */
-    const char *emotional_context;      /* from hu_emotional_cognition_build_prompt */
+    bool native_tools;             /* provider supports structured tool calls */
+    bool hula_program_protocol;    /* teach <hula_program> JSON in system prompt */
+    const char *emotional_context; /* from hu_emotional_cognition_build_prompt */
     size_t emotional_context_len;
-    const char *cognition_mode;         /* "fast", "slow", "emotional"; NULL = unset */
+    const char *cognition_mode; /* "fast", "slow", "emotional"; NULL = unset */
     size_t cognition_mode_len;
-    const char *episodic_replay;        /* cognitive replay from episodic patterns */
+    const char *episodic_replay; /* cognitive replay from episodic patterns */
     size_t episodic_replay_len;
     const char *constitutional_principles; /* formatted principles for prompt injection */
     size_t constitutional_principles_len;
+    const char *humanness_context; /* shared refs, curiosity, absence, opinions */
+    size_t humanness_context_len;
+    const char *imperfect_delivery; /* certainty/uncertainty framing directive */
+    size_t imperfect_delivery_len;
+    const char *residue_carryover; /* emotional carryover from prior conversations */
+    size_t residue_carryover_len;
 } hu_prompt_config_t;
 
 /* Build the full system prompt. Caller owns returned string; free with alloc. */

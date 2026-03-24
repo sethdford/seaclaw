@@ -20,18 +20,13 @@
 #include "human/agent/theory_of_mind.h"
 #include "human/agent/weather_awareness.h"
 #include "human/agent/weather_fetch.h"
+#include "human/channels/format.h"
 #include "human/config.h"
-#include "human/voice.h"
-#include "human/voice/session.h"
-#include "human/tts/audio_pipeline.h"
-#include "human/tts/cartesia.h"
 #include "human/context/conversation.h"
 #include "human/context/event_extract.h"
-#include "human/context/style_tracker.h"
 #include "human/context/mood.h"
+#include "human/context/style_tracker.h"
 #include "human/context/vision.h"
-#include "human/channels/format.h"
-#include "human/multimodal.h"
 #include "human/core/error.h"
 #include "human/core/process_util.h"
 #include "human/core/string.h"
@@ -39,88 +34,95 @@
 #include "human/memory/consolidation.h"
 #include "human/memory/consolidation_engine.h"
 #include "human/memory/deep_extract.h"
-#include "human/memory/episodic.h"
-#include "human/memory/emotional_residue.h"
-#include "human/memory/forgetting.h"
-#include "human/memory/forgetting_curve.h"
-#include "human/memory/prospective.h"
 #include "human/memory/emotional_graph.h"
 #include "human/memory/emotional_moments.h"
+#include "human/memory/emotional_residue.h"
+#include "human/memory/episodic.h"
+#include "human/memory/evolved_opinions.h"
 #include "human/memory/fast_capture.h"
+#include "human/memory/forgetting.h"
+#include "human/memory/forgetting_curve.h"
 #include "human/memory/graph.h"
 #include "human/memory/inbox.h"
 #include "human/memory/promotion.h"
+#include "human/memory/prospective.h"
 #include "human/memory/retrieval.h"
 #include "human/memory/superhuman.h"
+#include "human/multimodal.h"
+#include "human/tts/audio_pipeline.h"
+#include "human/tts/cartesia.h"
+#include "human/voice.h"
+#include "human/voice/session.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/memory.h"
 #include "human/memory/contact_graph.h"
 #endif
-#include "human/observability/bth_metrics.h"
+#include "human/agent/arbitrator.h"
 #include "human/agent/governor.h"
 #include "human/agent/timing.h"
 #include "human/eval/turing_score.h"
-#include "human/memory/rag_pipeline.h"
-#include "human/memory/knowledge.h"
-#include "human/memory/compression.h"
-#include "human/visual/content.h"
-#include "human/feeds/processor.h"
 #include "human/feeds/awareness.h"
 #include "human/feeds/findings.h"
+#include "human/feeds/processor.h"
 #include "human/feeds/research.h"
-#include "human/agent/arbitrator.h"
+#include "human/memory/compression.h"
+#include "human/memory/knowledge.h"
+#include "human/memory/rag_pipeline.h"
+#include "human/observability/bth_metrics.h"
+#include "human/visual/content.h"
 #define HU_COGNITIVE_SKIP_LIFE_CHAPTER 1
 #include "human/memory/cognitive.h"
 #undef HU_COGNITIVE_SKIP_LIFE_CHAPTER
+#include "human/channel_monitor.h"
 #include "human/context/context_ext.h"
+#include "human/humanness.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona/voice_maturity.h"
 #endif
 #ifdef HU_HAS_SKILLS
-#include "human/intelligence/reflection.h"
-#include "human/intelligence/skills.h"
 #include "human/intelligence/feedback.h"
 #include "human/intelligence/meta_learning.h"
+#include "human/intelligence/reflection.h"
+#include "human/intelligence/skills.h"
 #endif
 #ifdef HU_ENABLE_SQLITE
-#include "human/intelligence/self_improve.h"
+#include "human/agent/goals.h"
+#include "human/intelligence/cycle.h"
 #include "human/intelligence/online_learning.h"
+#include "human/intelligence/self_improve.h"
 #include "human/intelligence/value_learning.h"
 #include "human/intelligence/world_model.h"
-#include "human/intelligence/cycle.h"
-#include "human/agent/goals.h"
 #endif
 #include "human/platform.h"
 #include "human/platform/calendar.h"
 #include <stdlib.h>
 #ifdef HU_HAS_PERSONA
+#include "human/context/anticipatory.h"
+#include "human/context/authentic.h"
+#include "human/context/humor.h"
+#include "human/context/protective.h"
+#include "human/context/self_awareness.h"
+#include "human/context/social_graph.h"
+#include "human/context/theory_of_mind.h"
+#include "human/memory/degradation.h"
+#include "human/memory/life_chapters.h"
 #include "human/persona.h"
 #include "human/persona/auto_profile.h"
 #include "human/persona/auto_tune.h"
-#include "human/persona/replay.h"
 #include "human/persona/life_sim.h"
 #include "human/persona/mood.h"
-#include "human/context/theory_of_mind.h"
-#include "human/context/anticipatory.h"
-#include "human/context/self_awareness.h"
-#include "human/memory/life_chapters.h"
-#include "human/context/social_graph.h"
-#include "human/context/humor.h"
-#include "human/memory/degradation.h"
-#include "human/context/protective.h"
-#include "human/context/authentic.h"
+#include "human/persona/replay.h"
 #ifdef HU_ENABLE_AUTHENTIC
 #include "human/context/cognitive_load.h"
 #endif
+#include "human/agent/collab_planning.h"
+#include "human/context/behavioral.h"
 #include "human/context/intelligence.h"
 #include "human/context/rel_dynamics.h"
-#include "human/context/behavioral.h"
-#include "human/agent/collab_planning.h"
 #include "human/persona/training.h"
 /* Forward declaration — avoids type conflict with context/style_tracker.h hu_style_fingerprint_t */
-hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc,
-                                       const char **own_messages, size_t own_msg_count,
-                                       char **prompt_out, size_t *prompt_len);
+hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc, const char **own_messages,
+                                       size_t own_msg_count, char **prompt_out, size_t *prompt_len);
 #endif
 #ifdef HU_HAS_CRON
 #include "human/cron.h"
@@ -134,8 +136,8 @@ hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc,
 #endif
 #if defined(HU_ENABLE_CARTESIA)
 #include "human/context/voice_decision.h"
-#include "human/tts/cartesia.h"
 #include "human/tts/audio_pipeline.h"
+#include "human/tts/cartesia.h"
 #include "human/tts/emotion_map.h"
 #endif
 #include <ctype.h>
@@ -193,18 +195,18 @@ typedef struct {
 } hu_daemon_config_entry_t;
 
 static const hu_daemon_config_entry_t k_daemon_configs[] = {
-    {"discord", offsetof(hu_channels_config_t, discord) + offsetof(hu_discord_channel_config_t,
-                                                                   daemon)},
+    {"discord",
+     offsetof(hu_channels_config_t, discord) + offsetof(hu_discord_channel_config_t, daemon)},
     {"email", offsetof(hu_channels_config_t, email) + offsetof(hu_email_channel_config_t, daemon)},
     {"gmail", offsetof(hu_channels_config_t, gmail) + offsetof(hu_gmail_channel_config_t, daemon)},
     {"imessage",
      offsetof(hu_channels_config_t, imessage) + offsetof(hu_imessage_channel_config_t, daemon)},
     {"irc", offsetof(hu_channels_config_t, irc) + offsetof(hu_irc_channel_config_t, daemon)},
-    {"matrix", offsetof(hu_channels_config_t, matrix) + offsetof(hu_matrix_channel_config_t,
-                                                                   daemon)},
+    {"matrix",
+     offsetof(hu_channels_config_t, matrix) + offsetof(hu_matrix_channel_config_t, daemon)},
     {"nostr", offsetof(hu_channels_config_t, nostr) + offsetof(hu_nostr_channel_config_t, daemon)},
-    {"signal", offsetof(hu_channels_config_t, signal) + offsetof(hu_signal_channel_config_t,
-                                                                  daemon)},
+    {"signal",
+     offsetof(hu_channels_config_t, signal) + offsetof(hu_signal_channel_config_t, daemon)},
     {"slack", offsetof(hu_channels_config_t, slack) + offsetof(hu_slack_channel_config_t, daemon)},
     {"telegram",
      offsetof(hu_channels_config_t, telegram) + offsetof(hu_telegram_channel_config_t, daemon)},
@@ -221,7 +223,8 @@ static const hu_channel_daemon_config_t *get_active_daemon_config(const hu_confi
     for (size_t i = 0; i < sizeof(k_daemon_configs) / sizeof(k_daemon_configs[0]); i++) {
         if (strcmp(ch_name, k_daemon_configs[i].name) == 0) {
             const char *base = (const char *)&config->channels;
-            return (const hu_channel_daemon_config_t *)(void *)(base + k_daemon_configs[i].daemon_offset);
+            return (const hu_channel_daemon_config_t *)(void *)(base +
+                                                                k_daemon_configs[i].daemon_offset);
         }
     }
     return &config->channels.default_daemon;
@@ -400,9 +403,9 @@ static char *build_callback_context(hu_allocator_t *alloc, hu_memory_t *memory,
         if (!entries[i].content || entries[i].content_len == 0)
             continue;
 #ifdef HU_HAS_PERSONA
-        if (agent && !hu_protective_memory_ok(alloc, memory, session_id, session_id_len,
-                                             entries[i].content, entries[i].content_len,
-                                             0.0f, hour_local))
+        if (agent &&
+            !hu_protective_memory_ok(alloc, memory, session_id, session_id_len, entries[i].content,
+                                     entries[i].content_len, 0.0f, hour_local))
             continue;
 #endif
         const char *content = entries[i].content;
@@ -411,8 +414,8 @@ static char *build_callback_context(hu_allocator_t *alloc, hu_memory_t *memory,
         size_t degraded_len = 0;
 #ifdef HU_HAS_PERSONA
         uint32_t seed = (uint32_t)now * 1103515245u + 12345u + (uint32_t)i;
-        degraded = hu_memory_degradation_apply(alloc, content, content_len, seed, deg_rate,
-                                              &degraded_len);
+        degraded =
+            hu_memory_degradation_apply(alloc, content, content_len, seed, deg_rate, &degraded_len);
         if (degraded && degraded_len > 0) {
             content = degraded;
             content_len = degraded_len;
@@ -495,20 +498,19 @@ static void classify_comfort_response_type(const char *response, size_t response
 /* F23: Extract significant topic keywords from user text and record baselines.
  * Skips stopwords, records each significant word (3–32 chars) via topic_baselines. */
 #define HU_DAEMON_TOPIC_BASELINE_MAX 8
-#define HU_DAEMON_TOPIC_BUF 32
+#define HU_DAEMON_TOPIC_BUF          32
 
 static void record_topic_baselines_from_text(hu_memory_t *memory, const char *contact_id,
-                                              size_t contact_id_len, const char *text,
-                                              size_t text_len) {
+                                             size_t contact_id_len, const char *text,
+                                             size_t text_len) {
     if (!memory || !contact_id || contact_id_len == 0 || !text || text_len == 0)
         return;
     static const char *const stop[] = {
-        "i", "the", "a", "is", "was", "that", "this", "it", "to", "and", "but", "so",
-        "just", "really", "what", "how", "why", "when", "where", "who", "can", "will",
-        "would", "could", "should", "have", "has", "had", "do", "does", "did", "am",
-        "are", "were", "be", "been", "being", "of", "in", "on", "at", "for", "with",
-        "about", "from", "as", "or", "if", "not", "no", "yes", "oh", "um", "like",
-        NULL,
+        "i",     "the",   "a",      "is",    "was", "that", "this", "it",    "to",  "and",  "but",
+        "so",    "just",  "really", "what",  "how", "why",  "when", "where", "who", "can",  "will",
+        "would", "could", "should", "have",  "has", "had",  "do",   "does",  "did", "am",   "are",
+        "were",  "be",    "been",   "being", "of",  "in",   "on",   "at",    "for", "with", "about",
+        "from",  "as",    "or",     "if",    "not", "no",   "yes",  "oh",    "um",  "like", NULL,
     };
     char topics[HU_DAEMON_TOPIC_BASELINE_MAX][HU_DAEMON_TOPIC_BUF];
     size_t topic_count = 0;
@@ -897,18 +899,16 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
 
         /* Rebuild research agent prompt with fresh digest */
 #ifdef HU_ENABLE_SQLITE
-        if (jobs[i].name && strcmp(jobs[i].name, "research-agent") == 0 &&
-            agent->memory) {
+        if (jobs[i].name && strcmp(jobs[i].name, "research-agent") == 0 && agent->memory) {
             sqlite3 *fresh_db = hu_sqlite_memory_get_db(agent->memory);
             if (fresh_db) {
                 int64_t since = (int64_t)now - 86400;
                 char *digest = NULL;
                 size_t digest_len = 0;
-                hu_feed_build_daily_digest(alloc, fresh_db, since, 4000,
-                                           &digest, &digest_len);
+                hu_feed_build_daily_digest(alloc, fresh_db, since, 4000, &digest, &digest_len);
                 if (digest && digest_len > 0) {
-                    if (hu_research_build_prompt(alloc, digest, digest_len,
-                                                 &fresh_prompt, &fresh_prompt_len) == HU_OK &&
+                    if (hu_research_build_prompt(alloc, digest, digest_len, &fresh_prompt,
+                                                 &fresh_prompt_len) == HU_OK &&
                         fresh_prompt) {
                         prompt = fresh_prompt;
                     }
@@ -1013,7 +1013,7 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
 
 /* Last inbound channel per persona contact — proactive routing prefers recent activity (48h). */
 #define HU_DAEMON_CONTACT_ACTIVITY_CAP 256
-#define HU_DAEMON_ACTIVITY_FRESH_SECS (48 * 3600)
+#define HU_DAEMON_ACTIVITY_FRESH_SECS  (48 * 3600)
 
 typedef struct {
     char contact_id[128];
@@ -1125,14 +1125,15 @@ static void daemon_proactive_parse_route(const hu_contact_profile_t *cp, char *c
 /* If contact has fresh inbound activity on an enabled channel, override route. */
 static void daemon_contact_activity_apply_route(const char *contact_id, time_t now,
                                                 const hu_service_channel_t *channels,
-                                                size_t channel_count, char *ch_buf, char *target_buf,
-                                                size_t *target_len) {
+                                                size_t channel_count, char *ch_buf,
+                                                char *target_buf, size_t *target_len) {
     for (size_t i = 0; i < g_contact_activity_count; i++) {
         if (strcmp(g_contact_activity[i].contact_id, contact_id) != 0)
             continue;
         if (g_contact_activity[i].last_session_key[0] == '\0')
             return;
-        if (difftime(now, g_contact_activity[i].last_activity) > (double)HU_DAEMON_ACTIVITY_FRESH_SECS)
+        if (difftime(now, g_contact_activity[i].last_activity) >
+            (double)HU_DAEMON_ACTIVITY_FRESH_SECS)
             return;
         if (!daemon_channel_list_has_name(channels, channel_count,
                                           g_contact_activity[i].last_channel))
@@ -1209,8 +1210,8 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
 #ifdef HU_HAS_PERSONA
     if (agent && agent->persona && agent->persona->location[0]) {
         hu_weather_context_t wx = {0};
-        (void)hu_weather_fetch(alloc, agent->persona->location,
-                               strlen(agent->persona->location), NULL, &wx);
+        (void)hu_weather_fetch(alloc, agent->persona->location, strlen(agent->persona->location),
+                               NULL, &wx);
         time_t now_ts = time(NULL);
         struct tm tm_buf;
         uint8_t bth_hour = 12;
@@ -1219,8 +1220,8 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
         if (hu_weather_awareness_should_mention(&wx, bth_hour)) {
             char *wx_dir = NULL;
             size_t wx_len = 0;
-            if (hu_weather_awareness_build_directive(alloc, &wx, bth_hour,
-                                                    &wx_dir, &wx_len) == HU_OK &&
+            if (hu_weather_awareness_build_directive(alloc, &wx, bth_hour, &wx_dir, &wx_len) ==
+                    HU_OK &&
                 wx_dir && wx_len > 0) {
                 weather_ctx = wx_dir;
                 weather_ctx_len = wx_len;
@@ -1265,9 +1266,9 @@ static char *proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *age
                         if (need > 96) {
                             char *abuf = (char *)alloc->alloc(alloc->ctx, need);
                             if (abuf) {
-                                size_t ap = (size_t)snprintf(
-                                    abuf, need,
-                                    "FEED AWARENESS — optional natural bring-up (high relevance):\n");
+                                size_t ap = (size_t)snprintf(abuf, need,
+                                                             "FEED AWARENESS — optional natural "
+                                                             "bring-up (high relevance):\n");
                                 for (size_t ti = 0; ti < tcount; ti++) {
                                     if (topics[ti].relevance < 0.65)
                                         continue;
@@ -1421,11 +1422,11 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
     static hu_proactive_budget_t gov_budget;
     static bool gov_inited = false;
     if (!gov_inited) {
-        hu_proactive_budget_config_t gcfg = {
-            .daily_max = 6, .weekly_max = 15,
-            .relationship_multiplier = 1.0,
-            .cool_off_after_unanswered = 2, .cool_off_hours = 72
-        };
+        hu_proactive_budget_config_t gcfg = {.daily_max = 6,
+                                             .weekly_max = 15,
+                                             .relationship_multiplier = 1.0,
+                                             .cool_off_after_unanswered = 2,
+                                             .cool_off_hours = 72};
         hu_governor_init(&gcfg, &gov_budget);
         gov_inited = true;
     }
@@ -1473,8 +1474,9 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     char target_route_buf[128] = {0};
                     daemon_proactive_parse_route(cp, ch_buf, target_route_buf);
                     size_t target_len = strlen(target_route_buf);
-                    daemon_contact_activity_apply_route(cp->contact_id, now, channels, channel_count,
-                                                        ch_buf, target_route_buf, &target_len);
+                    daemon_contact_activity_apply_route(cp->contact_id, now, channels,
+                                                        channel_count, ch_buf, target_route_buf,
+                                                        &target_len);
                     const char *ch_part = ch_buf;
                     const char *target_part = target_route_buf;
 
@@ -1544,8 +1546,9 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
         if (agent->memory) {
             hu_emotional_prediction_t *preds = NULL;
             size_t pred_count = 0;
-            (void)hu_anticipatory_predict(alloc, agent->memory, cp->contact_id,
-                                         strlen(cp->contact_id), (int64_t)now, &preds, &pred_count);
+            (void)hu_anticipatory_predict_with_provider(
+                alloc, agent->memory, &agent->provider, agent->model_name, agent->model_name_len,
+                cp->contact_id, strlen(cp->contact_id), (int64_t)now, &preds, &pred_count);
             if (preds)
                 hu_anticipatory_predictions_free(alloc, preds, pred_count);
         }
@@ -1560,8 +1563,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     fprintf(stderr, "[human] Phase 9: recovery needed for %s\n", cp->contact_id);
                     hu_interaction_quality_mark_recovered(p9_db, cp->contact_id, (int64_t)now);
                 }
-                int thread_followups = hu_thread_needs_followup(
-                    p9_db, cp->contact_id, 14400, 259200, (int64_t)now);
+                int thread_followups =
+                    hu_thread_needs_followup(p9_db, cp->contact_id, 14400, 259200, (int64_t)now);
                 if (thread_followups > 0)
                     fprintf(stderr, "[human] Phase 9: %d thread follow-ups for %s\n",
                             thread_followups, cp->contact_id);
@@ -1610,9 +1613,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
             /* Strong feed–contact match can justify outreach before the 24h window. */
             if (!should_checkin && agent->memory && agent->persona) {
                 sqlite3 *aware_db = hu_sqlite_memory_get_db(agent->memory);
-                if (aware_db &&
-                    hu_feed_awareness_contact_has_high_topics(alloc, aware_db, agent->persona, cp,
-                                                              0.72))
+                if (aware_db && hu_feed_awareness_contact_has_high_topics(alloc, aware_db,
+                                                                          agent->persona, cp, 0.72))
                     should_checkin = true;
             }
 #endif
@@ -1664,10 +1666,12 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
             if (agent && agent->memory && cp->contact_id) {
                 int qday = 0, qstart = 0, qend = 1;
                 if (hu_superhuman_temporal_get_quiet_hours(agent->memory, alloc, cp->contact_id,
-                        strlen(cp->contact_id), &qday, &qstart, &qend) == HU_OK) {
-                    if (tm_now.tm_wday == qday && tm_now.tm_hour >= qstart && tm_now.tm_hour < qend) {
+                                                           strlen(cp->contact_id), &qday, &qstart,
+                                                           &qend) == HU_OK) {
+                    if (tm_now.tm_wday == qday && tm_now.tm_hour >= qstart &&
+                        tm_now.tm_hour < qend) {
                         uint32_t seed = (uint32_t)now * 1103515245u + 12345u +
-                            (uint32_t)(uintptr_t)cp->contact_id;
+                                        (uint32_t)(uintptr_t)cp->contact_id;
                         if ((seed >> 16u) % 100u < 50u)
                             should_checkin = false;
                     }
@@ -1714,8 +1718,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
             if (agent && agent->memory && cp->contact_id) {
                 hu_superhuman_commitment_t *due = NULL;
                 size_t due_count = 0;
-                if (hu_superhuman_commitment_list_due(agent->memory, alloc, (int64_t)now, 3,
-                                                    &due, &due_count) == HU_OK &&
+                if (hu_superhuman_commitment_list_due(agent->memory, alloc, (int64_t)now, 3, &due,
+                                                      &due_count) == HU_OK &&
                     due && due_count > 0) {
                     size_t cid_len = strlen(cp->contact_id);
                     char ctx_buf[1024];
@@ -1761,22 +1765,19 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 }
             }
             if (!important_date_sent_today &&
-                hu_proactive_check_important_dates(agent->persona, cp->contact_id,
-                                                   strlen(cp->contact_id), tm_now.tm_mon + 1,
-                                                   tm_now.tm_mday, important_date_msg,
-                                                   sizeof(important_date_msg), important_date_type,
-                                                   sizeof(important_date_type))) {
+                hu_proactive_check_important_dates(
+                    agent->persona, cp->contact_id, strlen(cp->contact_id), tm_now.tm_mon + 1,
+                    tm_now.tm_mday, important_date_msg, sizeof(important_date_msg),
+                    important_date_type, sizeof(important_date_type))) {
                 char ctx_buf[384];
-                int n = snprintf(ctx_buf, sizeof(ctx_buf),
-                                 "IMPORTANT DATE (%s): %s",
+                int n = snprintf(ctx_buf, sizeof(ctx_buf), "IMPORTANT DATE (%s): %s",
                                  important_date_type, important_date_msg);
                 if (n > 0 && (size_t)n < sizeof(ctx_buf)) {
                     if (strcmp(important_date_type, "birthday") == 0)
                         n += snprintf(ctx_buf + n, sizeof(ctx_buf) - (size_t)n,
                                       " Use confetti effect when sending.");
                     if (n > 0 && (size_t)n < sizeof(ctx_buf)) {
-                        important_date_ctx =
-                            (char *)alloc->alloc(alloc->ctx, (size_t)n + 1);
+                        important_date_ctx = (char *)alloc->alloc(alloc->ctx, (size_t)n + 1);
                         if (important_date_ctx) {
                             memcpy(important_date_ctx, ctx_buf, (size_t)n);
                             important_date_ctx[(size_t)n] = '\0';
@@ -1805,8 +1806,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 if (btype != HU_BOOKEND_NONE) {
                     char *bdir = NULL;
                     size_t bdir_len = 0;
-                    if (hu_bookend_build_prompt(alloc, btype, &bdir, &bdir_len) == HU_OK &&
-                        bdir && bdir_len > 0) {
+                    if (hu_bookend_build_prompt(alloc, btype, &bdir, &bdir_len) == HU_OK && bdir &&
+                        bdir_len > 0) {
                         bookend_ctx = bdir;
                         bookend_ctx_len = bdir_len;
                     } else if (bdir)
@@ -1869,8 +1870,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 size_t cid_len = strlen(cp->contact_id);
                 if (agent->memory &&
                     hu_superhuman_topic_absence_list(agent->memory, alloc, cp->contact_id, cid_len,
-                                                    now_ts, 14, &topic_absence_json,
-                                                    &topic_absence_len) == HU_OK &&
+                                                     now_ts, 14, &topic_absence_json,
+                                                     &topic_absence_len) == HU_OK &&
                     topic_absence_json && topic_absence_len > 0 &&
                     strstr(topic_absence_json, "- ") != NULL &&
                     ((uint32_t)((uintptr_t)cp + (uintptr_t)now) % 100) < 20) {
@@ -1908,13 +1909,13 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 size_t cid_len = strlen(cp->contact_id);
                 if (agent->memory && (uint32_t)((uintptr_t)cp + (uintptr_t)now) % 100 < 15 &&
                     hu_superhuman_growth_list_recent(agent->memory, alloc, cp->contact_id, cid_len,
-                                                    1, &growth_pro, &growth_pro_len) == HU_OK &&
+                                                     1, &growth_pro, &growth_pro_len) == HU_OK &&
                     growth_pro && growth_pro_len > 0 && strstr(growth_pro, "(none)") == NULL) {
                     char celebrate_buf[512];
-                    int cb = snprintf(celebrate_buf, sizeof(celebrate_buf),
-                                      "CELEBRATE: %.*s Acknowledge their progress.",
-                                      (int)(growth_pro_len < 450 ? growth_pro_len : 450),
-                                      growth_pro);
+                    int cb =
+                        snprintf(celebrate_buf, sizeof(celebrate_buf),
+                                 "CELEBRATE: %.*s Acknowledge their progress.",
+                                 (int)(growth_pro_len < 450 ? growth_pro_len : 450), growth_pro);
                     if (cb > 0 && (size_t)cb < sizeof(celebrate_buf) && prompt) {
                         size_t merged_len = prompt_len + 1 + (size_t)cb + 1;
                         char *merged = (char *)alloc->alloc(alloc->ctx, merged_len);
@@ -1931,14 +1932,15 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     alloc->free(alloc->ctx, growth_pro, growth_pro_len);
                 }
             }
-            /* F30: Spontaneous curiosity — 10–15% chance, inject random question from micro-moments */
+            /* F30: Spontaneous curiosity — 10–15% chance, inject random question from micro-moments
+             */
             {
                 char curiosity_buf[384];
                 uint32_t seed_cur = (uint32_t)((uintptr_t)cp + (uintptr_t)now);
                 if (agent->memory &&
                     hu_proactive_check_curiosity(alloc, agent->memory, cp->contact_id,
-                                                strlen(cp->contact_id), seed_cur, curiosity_buf,
-                                                sizeof(curiosity_buf))) {
+                                                 strlen(cp->contact_id), seed_cur, curiosity_buf,
+                                                 sizeof(curiosity_buf))) {
                     size_t cb_len = strlen(curiosity_buf);
                     if (prompt && cb_len > 0) {
                         size_t merged_len = prompt_len + 1 + cb_len + 1;
@@ -1955,14 +1957,15 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     }
                 }
             }
-            /* F31: Callback opportunities — 30% chance, inject follow-up from delayed/commitments */
+            /* F31: Callback opportunities — 30% chance, inject follow-up from delayed/commitments
+             */
             {
                 char callback_buf[512];
                 uint32_t seed_cb = (uint32_t)((uintptr_t)cp + (uintptr_t)now + 1);
                 if (agent->memory &&
                     hu_proactive_check_callbacks(alloc, agent->memory, cp->contact_id,
-                                                strlen(cp->contact_id), seed_cb, callback_buf,
-                                                sizeof(callback_buf))) {
+                                                 strlen(cp->contact_id), seed_cb, callback_buf,
+                                                 sizeof(callback_buf))) {
                     size_t cb_len = strlen(callback_buf);
                     if (prompt && cb_len > 0) {
                         size_t merged_len = prompt_len + 1 + cb_len + 1;
@@ -2034,8 +2037,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 hu_inside_joke_t *jokes_pro = NULL;
                 size_t jokes_pro_count = 0;
                 size_t cid_len = strlen(cp->contact_id);
-                if (hu_superhuman_inside_joke_list(agent->memory, alloc, cp->contact_id, cid_len,
-                                                   3, &jokes_pro, &jokes_pro_count) == HU_OK &&
+                if (hu_superhuman_inside_joke_list(agent->memory, alloc, cp->contact_id, cid_len, 3,
+                                                   &jokes_pro, &jokes_pro_count) == HU_OK &&
                     jokes_pro && jokes_pro_count > 0) {
                     size_t idx = (uint32_t)((uintptr_t)cp + (uintptr_t)now + 1) % jokes_pro_count;
                     joke_id_to_reference = jokes_pro[idx].id;
@@ -2043,9 +2046,9 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     size_t ctx_pl = strnlen(jokes_pro[idx].context, 120);
                     size_t pl_pl = strnlen(jokes_pro[idx].punchline, 80);
                     int w = snprintf(cb_buf, sizeof(cb_buf),
-                                    "CALLBACK: Reference this inside joke naturally: [%.*s] %.*s",
-                                    (int)ctx_pl, jokes_pro[idx].context, (int)pl_pl,
-                                    jokes_pro[idx].punchline);
+                                     "CALLBACK: Reference this inside joke naturally: [%.*s] %.*s",
+                                     (int)ctx_pl, jokes_pro[idx].context, (int)pl_pl,
+                                     jokes_pro[idx].punchline);
                     if (w > 0 && (size_t)w < sizeof(cb_buf) && prompt) {
                         size_t merged_len = prompt_len + 1 + (size_t)w + 1;
                         char *merged = (char *)alloc->alloc(alloc->ctx, merged_len);
@@ -2077,7 +2080,7 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     /* F68: Protective boundary — skip proactive if topic is boundary */
                     if (!skip && agent->memory &&
                         hu_protective_is_boundary(agent->memory, cp->contact_id,
-                                                 strlen(cp->contact_id), "proactive", 9))
+                                                  strlen(cp->contact_id), "proactive", 9))
                         skip = true;
 #endif
                     if (!skip && channels[c].channel->vtable->send) {
@@ -2087,9 +2090,9 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                         fprintf(stderr, "[human] proactive check-in sent to %s: %.*s\n",
                                 cp->name ? cp->name : cp->contact_id, (int)response_len, response);
                         hu_governor_record_sent(&gov_budget, (uint64_t)time(NULL) * 1000ULL);
-                        if (had_important_date &&
-                            strcmp(important_date_type, "birthday") == 0)
-                            fprintf(stderr, "[human] F53: birthday message — use confetti effect\n");
+                        if (had_important_date && strcmp(important_date_type, "birthday") == 0)
+                            fprintf(stderr,
+                                    "[human] F53: birthday message — use confetti effect\n");
                         if (had_important_date && g_sent_important_date_count < 8) {
                             size_t cid_len = strlen(cp->contact_id);
                             if (cid_len < 64) {
@@ -2104,7 +2107,7 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
 #ifdef HU_ENABLE_SQLITE
                         for (size_t mi = 0; mi < commitment_ids_count; mi++)
                             (void)hu_superhuman_commitment_mark_followed_up(agent->memory,
-                                                                           commitment_ids[mi]);
+                                                                            commitment_ids[mi]);
 #endif
                     }
                 }
@@ -2280,6 +2283,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     time_t proactive_due_at = 0;
 #endif
 
+    /* Channel health monitor: periodic checks, auto-reconnect, backoff */
+    hu_channel_monitor_t *chan_monitor = NULL;
+    {
+        hu_channel_monitor_config_t mon_cfg = hu_channel_monitor_config_default();
+        if (hu_channel_monitor_create(alloc, &mon_cfg, &chan_monitor) == HU_OK) {
+            for (size_t i = 0; i < channel_count; i++) {
+                if (channels[i].channel)
+                    hu_channel_monitor_add(chan_monitor, channels[i].channel);
+            }
+        }
+    }
+    int64_t chan_monitor_last_ts = 0;
+
     hu_graph_t *graph = NULL;
 #ifdef HU_ENABLE_SQLITE
     {
@@ -2330,7 +2346,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     static size_t promotion_counter = 0;
 
     /* Per-contact Theory of Mind belief states */
-#define HU_TOM_MAX_CONTACTS    16
+#define HU_TOM_MAX_CONTACTS 16
     static hu_belief_state_t tom_states[HU_TOM_MAX_CONTACTS];
     static char tom_contact_keys[HU_TOM_MAX_CONTACTS][64];
     static size_t tom_contact_count = 0;
@@ -2407,8 +2423,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
         if (skill_init_db) {
             hu_skill_t *preloaded = NULL;
             size_t preloaded_count = 0;
-            if (hu_skill_load_active(alloc, skill_init_db, NULL, 0, &preloaded,
-                                      &preloaded_count) == HU_OK && preloaded) {
+            if (hu_skill_load_active(alloc, skill_init_db, NULL, 0, &preloaded, &preloaded_count) ==
+                    HU_OK &&
+                preloaded) {
                 fprintf(stderr, "[human] pre-loaded %zu active skills\n", preloaded_count);
                 hu_skill_free(alloc, preloaded, preloaded_count);
             }
@@ -2492,7 +2509,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             !reflection_done_today && agent && agent->memory) {
                             sqlite3 *refl_db = hu_sqlite_memory_get_db(agent->memory);
                             if (refl_db) {
-                                hu_reflection_engine_t refl_engine = {.alloc = alloc, .db = refl_db};
+                                hu_reflection_engine_t refl_engine = {.alloc = alloc,
+                                                                      .db = refl_db};
                                 hu_reflection_daily(&refl_engine, (int64_t)t);
                                 reflection_done_today = true;
                                 if (agent->bth_metrics)
@@ -2504,8 +2522,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 static int64_t last_consol_monthly = 0;
                                 hu_consolidation_engine_t consol = {.alloc = alloc, .db = refl_db};
                                 (void)hu_consolidation_engine_run_scheduled(
-                                    &consol, (int64_t)t, last_consol_nightly,
-                                    last_consol_weekly, last_consol_monthly);
+                                    &consol, (int64_t)t, last_consol_nightly, last_consol_weekly,
+                                    last_consol_monthly);
                                 last_consol_nightly = (int64_t)t;
 
                                 /* P7: Forgetting curve batch decay */
@@ -2514,12 +2532,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 /* Vtable-based memory decay + prune */
                                 if (agent && agent->memory) {
                                     hu_forgetting_stats_t decay_stats = {0};
-                                    if (hu_memory_decay(alloc, agent->memory, 0.05, &decay_stats) == HU_OK &&
+                                    if (hu_memory_decay(alloc, agent->memory, 0.05, &decay_stats) ==
+                                            HU_OK &&
                                         decay_stats.decayed > 0)
                                         fprintf(stderr, "[human] memory decay: %zu decayed\n",
                                                 decay_stats.decayed);
                                     hu_forgetting_stats_t prune_stats = {0};
-                                    if (hu_memory_prune(alloc, agent->memory, 0.01, &prune_stats) == HU_OK &&
+                                    if (hu_memory_prune(alloc, agent->memory, 0.01, &prune_stats) ==
+                                            HU_OK &&
                                         prune_stats.pruned > 0)
                                         fprintf(stderr, "[human] memory prune: %zu pruned\n",
                                                 prune_stats.pruned);
@@ -2528,14 +2548,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 /* P7: Emotional residue decay (reduce intensity of old entries) */
                                 /* Decay is applied on read via exponential formula; no separate
                                  * batch call needed — hu_emotional_residue_get_active already
-                                 * applies intensity * exp(-decay_rate * days) on every retrieval. */
+                                 * applies intensity * exp(-decay_rate * days) on every retrieval.
+                                 */
 
-                                /* P8: Refresh skill cache after reflection (new skills may exist) */
+                                /* P8: Refresh skill cache after reflection (new skills may exist)
+                                 */
                                 {
                                     hu_skill_t *refreshed = NULL;
                                     size_t ref_count = 0;
                                     if (hu_skill_load_active(alloc, refl_db, NULL, 0, &refreshed,
-                                                              &ref_count) == HU_OK && refreshed)
+                                                             &ref_count) == HU_OK &&
+                                        refreshed)
                                         hu_skill_free(alloc, refreshed, ref_count);
                                 }
                             }
@@ -2544,11 +2567,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             reflection_done_today = false;
 
                         /* Weekly: Sunday 3 AM */
-                        if (lt_refl->tm_wday == 0 && lt_refl->tm_hour == 3 && lt_refl->tm_min == 0 &&
-                            !reflection_done_week && agent && agent->memory) {
+                        if (lt_refl->tm_wday == 0 && lt_refl->tm_hour == 3 &&
+                            lt_refl->tm_min == 0 && !reflection_done_week && agent &&
+                            agent->memory) {
                             sqlite3 *refl_db = hu_sqlite_memory_get_db(agent->memory);
                             if (refl_db) {
-                                hu_reflection_engine_t refl_engine = {.alloc = alloc, .db = refl_db};
+                                hu_reflection_engine_t refl_engine = {.alloc = alloc,
+                                                                      .db = refl_db};
                                 hu_reflection_weekly(&refl_engine, (int64_t)t);
                                 reflection_done_week = true;
                                 if (agent->bth_metrics)
@@ -2559,15 +2584,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             reflection_done_week = false;
 
                         /* Monthly: 1st 3 AM */
-                        if (lt_refl->tm_mday == 1 && lt_refl->tm_hour == 3 && lt_refl->tm_min == 0 &&
-                            !reflection_done_month && agent && agent->memory) {
+                        if (lt_refl->tm_mday == 1 && lt_refl->tm_hour == 3 &&
+                            lt_refl->tm_min == 0 && !reflection_done_month && agent &&
+                            agent->memory) {
                             sqlite3 *refl_db = hu_sqlite_memory_get_db(agent->memory);
                             if (refl_db) {
-                                hu_reflection_engine_t refl_engine = {.alloc = alloc, .db = refl_db};
+                                hu_reflection_engine_t refl_engine = {.alloc = alloc,
+                                                                      .db = refl_db};
                                 hu_reflection_extract_general_lessons(&refl_engine, (int64_t)t);
                                 hu_meta_params_t meta_params = {0};
                                 hu_meta_learning_optimize(refl_db, &meta_params);
-                                fprintf(stderr, "[human] meta-learning: confidence=%.2f, refinement=%dw, discovery_min=%d\n",
+                                fprintf(stderr,
+                                        "[human] meta-learning: confidence=%.2f, refinement=%dw, "
+                                        "discovery_min=%d\n",
                                         meta_params.default_confidence_threshold,
                                         meta_params.refinement_frequency_weeks,
                                         meta_params.discovery_min_feedback_count);
@@ -2586,7 +2615,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     static uint64_t last_feed_poll_global = 0;
                     uint64_t fp_now = (uint64_t)t * 1000ULL;
                     if (agent && agent->memory &&
-                        (last_feed_poll_global == 0 || (fp_now - last_feed_poll_global) >= 300000ULL)) {
+                        (last_feed_poll_global == 0 ||
+                         (fp_now - last_feed_poll_global) >= 300000ULL)) {
                         sqlite3 *fdb = hu_sqlite_memory_get_db(agent->memory);
                         if (fdb) {
                             hu_feed_processor_t fp = {.alloc = alloc, .db = fdb};
@@ -2602,62 +2632,90 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                                 if (config->feeds.gmail_client_secret) {
                                     fp.gmail_client_secret = config->feeds.gmail_client_secret;
-                                    fp.gmail_client_secret_len = strlen(config->feeds.gmail_client_secret);
+                                    fp.gmail_client_secret_len =
+                                        strlen(config->feeds.gmail_client_secret);
                                 }
                                 if (config->feeds.gmail_refresh_token) {
                                     fp.gmail_refresh_token = config->feeds.gmail_refresh_token;
-                                    fp.gmail_refresh_token_len = strlen(config->feeds.gmail_refresh_token);
+                                    fp.gmail_refresh_token_len =
+                                        strlen(config->feeds.gmail_refresh_token);
                                 }
                                 if (config->feeds.twitter_bearer_token) {
                                     fp.twitter_bearer_token = config->feeds.twitter_bearer_token;
-                                    fp.twitter_bearer_token_len = strlen(config->feeds.twitter_bearer_token);
+                                    fp.twitter_bearer_token_len =
+                                        strlen(config->feeds.twitter_bearer_token);
                                 }
                             }
                             hu_feed_config_t fconf;
                             memset(&fconf, 0, sizeof(fconf));
-                            fconf.enabled[HU_FEED_NEWS_RSS]    = true;
+                            fconf.enabled[HU_FEED_NEWS_RSS] = true;
                             fconf.enabled[HU_FEED_FILE_INGEST] = true;
-                            fconf.enabled[HU_FEED_GMAIL]       = true;
-                            fconf.enabled[HU_FEED_IMESSAGE]    = true;
-                            fconf.enabled[HU_FEED_TWITTER]     = true;
+                            fconf.enabled[HU_FEED_GMAIL] = true;
+                            fconf.enabled[HU_FEED_IMESSAGE] = true;
+                            fconf.enabled[HU_FEED_TWITTER] = true;
                             fconf.enabled[HU_FEED_SOCIAL_FACEBOOK] = true;
                             fconf.enabled[HU_FEED_SOCIAL_INSTAGRAM] = true;
-                            fconf.poll_interval_minutes[HU_FEED_FILE_INGEST] = (config && config->feeds.poll_interval_file_ingest > 0) ? config->feeds.poll_interval_file_ingest : 5;
-                            fconf.poll_interval_minutes[HU_FEED_NEWS_RSS] = (config && config->feeds.poll_interval_rss > 0) ? config->feeds.poll_interval_rss : 360;
-                            fconf.poll_interval_minutes[HU_FEED_GMAIL] = (config && config->feeds.poll_interval_gmail > 0) ? config->feeds.poll_interval_gmail : 60;
-                            fconf.poll_interval_minutes[HU_FEED_IMESSAGE] = (config && config->feeds.poll_interval_imessage > 0) ? config->feeds.poll_interval_imessage : 30;
-                            fconf.poll_interval_minutes[HU_FEED_TWITTER] = (config && config->feeds.poll_interval_twitter > 0) ? config->feeds.poll_interval_twitter : 120;
+                            fconf.poll_interval_minutes[HU_FEED_FILE_INGEST] =
+                                (config && config->feeds.poll_interval_file_ingest > 0)
+                                    ? config->feeds.poll_interval_file_ingest
+                                    : 5;
+                            fconf.poll_interval_minutes[HU_FEED_NEWS_RSS] =
+                                (config && config->feeds.poll_interval_rss > 0)
+                                    ? config->feeds.poll_interval_rss
+                                    : 360;
+                            fconf.poll_interval_minutes[HU_FEED_GMAIL] =
+                                (config && config->feeds.poll_interval_gmail > 0)
+                                    ? config->feeds.poll_interval_gmail
+                                    : 60;
+                            fconf.poll_interval_minutes[HU_FEED_IMESSAGE] =
+                                (config && config->feeds.poll_interval_imessage > 0)
+                                    ? config->feeds.poll_interval_imessage
+                                    : 30;
+                            fconf.poll_interval_minutes[HU_FEED_TWITTER] =
+                                (config && config->feeds.poll_interval_twitter > 0)
+                                    ? config->feeds.poll_interval_twitter
+                                    : 120;
                             fconf.poll_interval_minutes[HU_FEED_SOCIAL_FACEBOOK] = 120;
                             fconf.poll_interval_minutes[HU_FEED_SOCIAL_INSTAGRAM] = 120;
-                            fconf.max_items_per_poll = (config && config->feeds.max_items_per_poll > 0) ? config->feeds.max_items_per_poll : 20;
+                            fconf.max_items_per_poll =
+                                (config && config->feeds.max_items_per_poll > 0)
+                                    ? config->feeds.max_items_per_poll
+                                    : 20;
                             size_t ingested = 0;
-                            (void)hu_feed_processor_poll(&fp, &fconf, last_feed_poll_types,
-                                                         fp_now, &ingested);
+                            (void)hu_feed_processor_poll(&fp, &fconf, last_feed_poll_types, fp_now,
+                                                         &ingested);
                             last_feed_poll_global = fp_now;
                         }
                     }
                 }
 #endif
 #if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_SKILLS)
-                /* Intelligence cycle — run every 6 hours to process findings, extract lessons, reflect */
+                /* Intelligence cycle — run every 6 hours to process findings, extract lessons,
+                 * reflect */
                 {
                     static int64_t last_intelligence_cycle = 0;
                     int64_t cycle_interval = 6 * 3600;
                     if (agent && agent->memory &&
-                        (last_intelligence_cycle == 0 || ((int64_t)t - last_intelligence_cycle) >= cycle_interval)) {
+                        (last_intelligence_cycle == 0 ||
+                         ((int64_t)t - last_intelligence_cycle) >= cycle_interval)) {
                         sqlite3 *cycle_db = hu_sqlite_memory_get_db(agent->memory);
                         if (cycle_db) {
                             hu_intelligence_cycle_result_t cycle_result = {0};
-                            hu_error_t cycle_err = hu_intelligence_run_cycle(alloc, cycle_db, &cycle_result);
+                            hu_error_t cycle_err =
+                                hu_intelligence_run_cycle(alloc, cycle_db, &cycle_result);
                             if (cycle_err == HU_OK) {
-                                fprintf(stderr, "[human] intelligence cycle: %zu findings, %zu lessons, %zu events\n",
-                                        cycle_result.findings_actioned, cycle_result.lessons_extracted,
+                                fprintf(stderr,
+                                        "[human] intelligence cycle: %zu findings, %zu lessons, "
+                                        "%zu events\n",
+                                        cycle_result.findings_actioned,
+                                        cycle_result.lessons_extracted,
                                         cycle_result.events_recorded);
                             }
                             if (cycle_err == HU_OK && (cycle_result.findings_actioned > 0 ||
-                                cycle_result.lessons_extracted > 0)) {
+                                                       cycle_result.lessons_extracted > 0)) {
                                 char cycle_lesson[256];
-                                int cl_len = snprintf(cycle_lesson, sizeof(cycle_lesson),
+                                int cl_len = snprintf(
+                                    cycle_lesson, sizeof(cycle_lesson),
                                     "Intelligence cycle completed: %zu findings actioned, "
                                     "%zu lessons extracted, %zu values learned, %zu skills updated",
                                     cycle_result.findings_actioned, cycle_result.lessons_extracted,
@@ -2665,10 +2723,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 if (cl_len > 0 && (size_t)cl_len < sizeof(cycle_lesson)) {
                                     sqlite3_stmt *cl_stmt = NULL;
                                     const char *cl_sql = "INSERT OR IGNORE INTO general_lessons "
-                                        "(lesson, confidence, source_count, first_learned, last_confirmed) "
-                                        "VALUES (?, 0.6, 1, ?, ?)";
-                                    if (sqlite3_prepare_v2(cycle_db, cl_sql, -1, &cl_stmt, NULL) == SQLITE_OK) {
-                                        sqlite3_bind_text(cl_stmt, 1, cycle_lesson, cl_len, SQLITE_STATIC);
+                                                         "(lesson, confidence, source_count, "
+                                                         "first_learned, last_confirmed) "
+                                                         "VALUES (?, 0.6, 1, ?, ?)";
+                                    if (sqlite3_prepare_v2(cycle_db, cl_sql, -1, &cl_stmt, NULL) ==
+                                        SQLITE_OK) {
+                                        sqlite3_bind_text(cl_stmt, 1, cycle_lesson, cl_len,
+                                                          SQLITE_STATIC);
                                         sqlite3_bind_int64(cl_stmt, 2, (int64_t)t);
                                         sqlite3_bind_int64(cl_stmt, 3, (int64_t)t);
                                         (void)sqlite3_step(cl_stmt);
@@ -2696,8 +2757,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         turing_eval_today = false;
                     }
                     /* Turing evaluation cron: daily at 3 AM */
-                    if (lt_tune && lt_tune->tm_hour == 3 && lt_tune->tm_min == 0 &&
-                        agent && agent->memory && !turing_eval_today) {
+                    if (lt_tune && lt_tune->tm_hour == 3 && lt_tune->tm_min == 0 && agent &&
+                        agent->memory && !turing_eval_today) {
 #ifdef HU_ENABLE_SQLITE
                         sqlite3 *tdb = hu_sqlite_memory_get_db(agent->memory);
                         if (tdb) {
@@ -2716,7 +2777,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         "[human] turing eval: weakest dimension = %s (%d/10)\n",
                                         hu_turing_dimension_name((hu_turing_dimension_t)worst_dim),
                                         worst_val);
-                                /* Auto-correct: adjust humanization params based on weak dimensions */
+                                /* Auto-correct: adjust humanization params based on weak dimensions
+                                 */
 #ifdef HU_HAS_PERSONA
                                 if (agent->persona) {
                                     /* non_robotic or natural_language low: increase disfluency */
@@ -2724,37 +2786,45 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                          dim_avgs[HU_TURING_NON_ROBOTIC] < 6) ||
                                         (dim_avgs[HU_TURING_NATURAL_LANGUAGE] > 0 &&
                                          dim_avgs[HU_TURING_NATURAL_LANGUAGE] < 6)) {
-                                        float old = agent->persona->humanization.disfluency_frequency;
+                                        float old =
+                                            agent->persona->humanization.disfluency_frequency;
                                         agent->persona->humanization.disfluency_frequency =
                                             old < 0.30f ? old + 0.05f : 0.30f;
-                                        fprintf(stderr,
-                                                "[human] auto-tune: disfluency %.2f -> %.2f\n",
-                                                (double)old,
-                                                (double)agent->persona->humanization.disfluency_frequency);
+                                        fprintf(
+                                            stderr, "[human] auto-tune: disfluency %.2f -> %.2f\n",
+                                            (double)old,
+                                            (double)
+                                                agent->persona->humanization.disfluency_frequency);
                                     }
                                     /* imperfection low: increase disfluency and double-text */
                                     if (dim_avgs[HU_TURING_IMPERFECTION] > 0 &&
                                         dim_avgs[HU_TURING_IMPERFECTION] < 6) {
-                                        float old_dt = agent->persona->humanization.double_text_probability;
+                                        float old_dt =
+                                            agent->persona->humanization.double_text_probability;
                                         agent->persona->humanization.double_text_probability =
                                             old_dt < 0.15f ? old_dt + 0.02f : 0.15f;
                                         fprintf(stderr,
                                                 "[human] auto-tune: double_text %.2f -> %.2f\n",
                                                 (double)old_dt,
-                                                (double)agent->persona->humanization.double_text_probability);
+                                                (double)agent->persona->humanization
+                                                    .double_text_probability);
                                     }
-                                    /* energy_matching low: increase backchannel for narrative flow */
+                                    /* energy_matching low: increase backchannel for narrative flow
+                                     */
                                     if (dim_avgs[HU_TURING_ENERGY_MATCHING] > 0 &&
                                         dim_avgs[HU_TURING_ENERGY_MATCHING] < 6) {
-                                        float old_bc = agent->persona->humanization.backchannel_probability;
+                                        float old_bc =
+                                            agent->persona->humanization.backchannel_probability;
                                         agent->persona->humanization.backchannel_probability =
                                             old_bc < 0.45f ? old_bc + 0.05f : 0.45f;
                                         fprintf(stderr,
                                                 "[human] auto-tune: backchannel %.2f -> %.2f\n",
                                                 (double)old_bc,
-                                                (double)agent->persona->humanization.backchannel_probability);
+                                                (double)agent->persona->humanization
+                                                    .backchannel_probability);
                                     }
-                                    /* humor_naturalness high: scores are good, slightly reduce to avoid overdoing */
+                                    /* humor_naturalness high: scores are good, slightly reduce to
+                                     * avoid overdoing */
                                     if (dim_avgs[HU_TURING_HUMOR_NATURALNESS] > 8 &&
                                         agent->persona->humanization.disfluency_frequency > 0.10f) {
                                         agent->persona->humanization.disfluency_frequency -= 0.02f;
@@ -2779,21 +2849,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (pair_count > 0) {
                                 char dpo_path[HU_MAX_PATH];
                                 int dpo_plen;
-                                if (config && config->dpo_export_dir &&
-                                    config->dpo_export_dir[0]) {
-                                    dpo_plen = snprintf(dpo_path, sizeof(dpo_path), "%s/dpo_preferences.jsonl",
+                                if (config && config->dpo_export_dir && config->dpo_export_dir[0]) {
+                                    dpo_plen = snprintf(dpo_path, sizeof(dpo_path),
+                                                        "%s/dpo_preferences.jsonl",
                                                         config->dpo_export_dir);
                                 } else {
                                     dpo_plen = snprintf(dpo_path, sizeof(dpo_path),
-                                                          "data/dpo/dpo_preferences.jsonl");
+                                                        "data/dpo/dpo_preferences.jsonl");
                                 }
                                 size_t exported = 0;
                                 if (dpo_plen > 0 && (size_t)dpo_plen < sizeof(dpo_path) &&
                                     hu_dpo_export_jsonl(&agent->dpo_collector, dpo_path,
-                                                        (size_t)dpo_plen,
-                                                        &exported) == HU_OK) {
-                                    fprintf(stderr,
-                                            "[human] weekly DPO export: %zu pairs -> %s\n",
+                                                        (size_t)dpo_plen, &exported) == HU_OK) {
+                                    fprintf(stderr, "[human] weekly DPO export: %zu pairs -> %s\n",
                                             exported, dpo_path);
                                     hu_dpo_clear(&agent->dpo_collector);
                                 }
@@ -2812,8 +2880,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                 &tune_len) == HU_OK &&
                             tune_summary && tune_len > 0) {
                             size_t ctx_len = 0;
-                            char *tone_ctx = hu_replay_tune_build_context(
-                                alloc, tune_summary, tune_len, &ctx_len);
+                            char *tone_ctx = hu_replay_tune_build_context(alloc, tune_summary,
+                                                                          tune_len, &ctx_len);
                             const char *src = tone_ctx ? tone_ctx : tune_summary;
                             size_t src_len = tone_ctx ? ctx_len : tune_len;
                             size_t copy_len = src_len < sizeof(replay_insights) - 1
@@ -2937,16 +3005,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     /* Per-message attachment: images via vision; local audio/video via multimodal
                      * route. Injects description or transcription into batch text. */
                     if (msgs[m].has_attachment && msgs[m].message_id > 0 && agent &&
-                        agent->provider.vtable &&
-                        ch->channel->vtable->get_attachment_path) {
+                        agent->provider.vtable && ch->channel->vtable->get_attachment_path) {
                         char *path = ch->channel->vtable->get_attachment_path(
                             ch->channel->ctx, alloc, msgs[m].message_id);
                         if (path) {
-                            const char *model =
-                                agent->model_name ? agent->model_name : "gpt-4o";
-                            size_t model_len = agent->model_name_len > 0
-                                                   ? agent->model_name_len
-                                                   : (size_t)strlen(model);
+                            const char *model = agent->model_name ? agent->model_name : "gpt-4o";
+                            size_t model_len = agent->model_name_len > 0 ? agent->model_name_len
+                                                                         : (size_t)strlen(model);
                             size_t plen = strlen(path);
                             const char *ext = NULL;
                             for (size_t ei = plen; ei > 0; ei--) {
@@ -2956,13 +3021,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                             }
                             bool is_audio =
-                                ext &&
-                                (strcmp(ext, ".mp3") == 0 || strcmp(ext, ".wav") == 0 ||
-                                 strcmp(ext, ".ogg") == 0 || strcmp(ext, ".m4a") == 0 ||
-                                 strcmp(ext, ".caf") == 0);
-                            bool is_video = ext && (strcmp(ext, ".mp4") == 0 ||
-                                                    strcmp(ext, ".mov") == 0 ||
-                                                    strcmp(ext, ".webm") == 0);
+                                ext && (strcmp(ext, ".mp3") == 0 || strcmp(ext, ".wav") == 0 ||
+                                        strcmp(ext, ".ogg") == 0 || strcmp(ext, ".m4a") == 0 ||
+                                        strcmp(ext, ".caf") == 0);
+                            bool is_video =
+                                ext && (strcmp(ext, ".mp4") == 0 || strcmp(ext, ".mov") == 0 ||
+                                        strcmp(ext, ".webm") == 0);
 
                             if (is_audio || is_video) {
                                 char *media_desc = NULL;
@@ -2982,10 +3046,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                 "%.*s\n[Audio transcription: %.*s]", (int)mlen,
                                                 content_to_add, (int)desc_copy, media_desc);
                                         } else {
-                                            n = snprintf(
-                                                attachment_augmented, sizeof(attachment_augmented),
-                                                "[Audio transcription: %.*s]", (int)desc_copy,
-                                                media_desc);
+                                            n = snprintf(attachment_augmented,
+                                                         sizeof(attachment_augmented),
+                                                         "[Audio transcription: %.*s]",
+                                                         (int)desc_copy, media_desc);
                                         }
                                     } else {
                                         if (mlen > 0 && strcmp(content_to_add, "[Video]") != 0) {
@@ -2994,10 +3058,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                 "%.*s\n[Video transcription: %.*s]", (int)mlen,
                                                 content_to_add, (int)desc_copy, media_desc);
                                         } else {
-                                            n = snprintf(
-                                                attachment_augmented, sizeof(attachment_augmented),
-                                                "[Video transcription: %.*s]", (int)desc_copy,
-                                                media_desc);
+                                            n = snprintf(attachment_augmented,
+                                                         sizeof(attachment_augmented),
+                                                         "[Video transcription: %.*s]",
+                                                         (int)desc_copy, media_desc);
                                         }
                                     }
                                     alloc->free(alloc->ctx, media_desc, media_desc_len + 1);
@@ -3013,23 +3077,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                            agent->provider.ctx)) {
                                 char *desc = NULL;
                                 size_t desc_len = 0;
-                                hu_error_t verr = hu_vision_describe_image(
-                                    alloc, &agent->provider, path, plen, model, model_len, &desc,
-                                    &desc_len);
+                                hu_error_t verr =
+                                    hu_vision_describe_image(alloc, &agent->provider, path, plen,
+                                                             model, model_len, &desc, &desc_len);
                                 if (verr == HU_OK && desc && desc_len > 0) {
                                     static char attachment_augmented[4096];
                                     size_t desc_copy = desc_len > 3800 ? 3800 : desc_len;
                                     int n;
                                     if (mlen > 0 && strcmp(content_to_add, "[Photo]") != 0) {
-                                        n = snprintf(
-                                            attachment_augmented, sizeof(attachment_augmented),
-                                            "%.*s\n[They sent a photo: %.*s]", (int)mlen,
-                                            content_to_add, (int)desc_copy, desc);
-                                    } else {
                                         n = snprintf(attachment_augmented,
                                                      sizeof(attachment_augmented),
-                                                     "[They sent a photo: %.*s]", (int)desc_copy,
-                                                     desc);
+                                                     "%.*s\n[They sent a photo: %.*s]", (int)mlen,
+                                                     content_to_add, (int)desc_copy, desc);
+                                    } else {
+                                        n = snprintf(
+                                            attachment_augmented, sizeof(attachment_augmented),
+                                            "[They sent a photo: %.*s]", (int)desc_copy, desc);
                                     }
                                     alloc->free(alloc->ctx, desc, desc_len + 1);
                                     if (n > 0 && (size_t)n < sizeof(attachment_augmented)) {
@@ -3098,8 +3161,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         continue;
                     }
                     /* Never respond to messages from the persona owner's own number */
-                    if (cp_gate->relationship &&
-                        strcmp(cp_gate->relationship, "self") == 0) {
+                    if (cp_gate->relationship && strcmp(cp_gate->relationship, "self") == 0) {
                         if (getenv("HU_DEBUG"))
                             fprintf(stderr, "[human] ignoring message from self: %.*s\n",
                                     (int)(key_len > 20 ? 20 : key_len), batch_key);
@@ -3116,8 +3178,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #ifdef HU_ENABLE_SQLITE
                 /* F23: Topic absence detection — record topic baselines from user message */
                 if (agent->memory && combined_len > 0)
-                    record_topic_baselines_from_text(agent->memory, batch_key, key_len,
-                                                    combined, combined_len);
+                    record_topic_baselines_from_text(agent->memory, batch_key, key_len, combined,
+                                                     combined_len);
                 /* F26: Temporal pattern learning — record message frequency by day/hour */
                 if (agent->memory && batch_key && key_len > 0) {
                     time_t now_t = time(NULL);
@@ -3126,7 +3188,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (lt) {
                         int64_t response_time_ms = 0; /* not available from poll pipeline */
                         (void)hu_superhuman_temporal_record(agent->memory, batch_key, key_len,
-                            lt->tm_wday, lt->tm_hour, response_time_ms);
+                                                            lt->tm_wday, lt->tm_hour,
+                                                            response_time_ms);
                     }
                 }
 #endif
@@ -3545,9 +3608,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (lt2)
                                 tm_dow = lt2->tm_wday;
                         }
-                        uint64_t stm_delay = hu_timing_model_sample(
-                            agent->timing_model, (uint8_t)bth_hour, (uint8_t)tm_dow,
-                            combined_len, tm_seed);
+                        uint64_t stm_delay =
+                            hu_timing_model_sample(agent->timing_model, (uint8_t)bth_hour,
+                                                   (uint8_t)tm_dow, combined_len, tm_seed);
                         if (stm_delay > 0 && stm_delay < 120000) {
                             uint64_t blended = ((uint64_t)adjusted + stm_delay) / 2;
                             adjusted = (int32_t)blended;
@@ -3561,9 +3624,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             (uint8_t)(agent->history_count > 255 ? 255 : agent->history_count);
                         double emo_intensity = 0.0;
                         if (combined_len > 0) {
-                            const char *emo_words[] = {"love", "hate", "angry", "sad", "worried",
-                                                       "scared", "happy", "excited", "miss",
-                                                       "frustrated", "hurt", "crying"};
+                            const char *emo_words[] = {"love",    "hate",       "angry", "sad",
+                                                       "worried", "scared",     "happy", "excited",
+                                                       "miss",    "frustrated", "hurt",  "crying"};
                             for (size_t ew = 0; ew < 12; ew++) {
                                 if (strstr(combined, emo_words[ew]))
                                     emo_intensity += 0.15;
@@ -3571,10 +3634,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (emo_intensity > 1.0)
                                 emo_intensity = 1.0;
                         }
-                        adjusted = (int32_t)hu_timing_adjust(
-                            (uint64_t)adjusted, conv_depth, emo_intensity, false, 0);
+                        adjusted = (int32_t)hu_timing_adjust((uint64_t)adjusted, conv_depth,
+                                                             emo_intensity, false, 0);
                         if (adjusted < 1000)
                             adjusted = 1000;
+                        if (adjusted > 60000)
+                            adjusted = 60000;
+                    }
+                    /* Humanness: emotional weight adds thoughtful pause for heavy content */
+                    {
+                        hu_emotional_weight_t ew =
+                            hu_emotional_weight_classify(combined, combined_len);
+                        adjusted = (int32_t)hu_emotional_pacing_adjust((uint64_t)adjusted, ew);
                         if (adjusted > 60000)
                             adjusted = 60000;
                     }
@@ -3630,36 +3701,34 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     char desc_buf[512];
                     char who_buf[64];
                     if (hu_conversation_detect_commitment(combined, combined_len, desc_buf,
-                                                         sizeof(desc_buf), who_buf,
-                                                         sizeof(who_buf), false)) {
-                        int64_t deadline =
-                            hu_conversation_parse_deadline(combined, combined_len,
-                                                          (int64_t)time(NULL));
-                        (void)hu_superhuman_commitment_store(agent->memory, alloc, batch_key,
-                                                            key_len, desc_buf,
-                                                            (size_t)strlen(desc_buf), who_buf,
-                                                            (size_t)strlen(who_buf), deadline);
+                                                          sizeof(desc_buf), who_buf,
+                                                          sizeof(who_buf), false)) {
+                        int64_t deadline = hu_conversation_parse_deadline(combined, combined_len,
+                                                                          (int64_t)time(NULL));
+                        (void)hu_superhuman_commitment_store(
+                            agent->memory, alloc, batch_key, key_len, desc_buf,
+                            (size_t)strlen(desc_buf), who_buf, (size_t)strlen(who_buf), deadline);
                     }
-                    /* F24: Growth celebration — detect positive outcomes, store for later reference */
+                    /* F24: Growth celebration — detect positive outcomes, store for later reference
+                     */
                     {
                         char topic_buf[128];
                         char after_buf[64];
-                        if (hu_conversation_detect_growth_opportunity(combined, combined_len,
-                                                                      topic_buf, sizeof(topic_buf),
-                                                                      after_buf, sizeof(after_buf))) {
-                            (void)hu_superhuman_growth_store(agent->memory, alloc, batch_key,
-                                                             key_len, topic_buf,
-                                                             (size_t)strlen(topic_buf),
-                                                             "worried/stressed", 15, after_buf,
-                                                             (size_t)strlen(after_buf));
+                        if (hu_conversation_detect_growth_opportunity(
+                                combined, combined_len, topic_buf, sizeof(topic_buf), after_buf,
+                                sizeof(after_buf))) {
+                            (void)hu_superhuman_growth_store(
+                                agent->memory, alloc, batch_key, key_len, topic_buf,
+                                (size_t)strlen(topic_buf), "worried/stressed", 15, after_buf,
+                                (size_t)strlen(after_buf));
                         }
                     }
-                    /* F22: Pattern mirror — record topic + emotional tone for behavioral patterns */
+                    /* F22: Pattern mirror — record topic + emotional tone for behavioral patterns
+                     */
                     {
                         char topic_buf[64];
-                        size_t topic_len =
-                            hu_conversation_extract_topic(combined, combined_len, topic_buf,
-                                                          sizeof(topic_buf));
+                        size_t topic_len = hu_conversation_extract_topic(
+                            combined, combined_len, topic_buf, sizeof(topic_buf));
                         if (topic_len > 0) {
                             const char *tone =
                                 hu_conversation_classify_emotional_tone(combined, combined_len);
@@ -3671,8 +3740,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 int dow = tm ? tm->tm_wday : 0;
                                 int hour = tm ? tm->tm_hour : 0;
                                 (void)hu_superhuman_pattern_record(agent->memory, batch_key,
-                                                                    key_len, topic_buf, topic_len,
-                                                                    tone, tone_len, dow, hour);
+                                                                   key_len, topic_buf, topic_len,
+                                                                   tone, tone_len, dow, hour);
                             }
                         }
                     }
@@ -3847,8 +3916,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     sqlite3 *link_db = hu_sqlite_memory_get_db(agent->memory);
                                     if (link_db) {
                                         hu_contact_graph_link(link_db, cp->contact_id, act_ch,
-                                                              batch_key,
-                                                              cp->name ? cp->name : "", 1.0);
+                                                              batch_key, cp->name ? cp->name : "",
+                                                              1.0);
                                     }
                                 }
 #endif
@@ -3937,23 +4006,23 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             profile_buf[0] = '\0';
 
                             if (auto_ov.formality) {
-                                int w = snprintf(profile_buf + pb_n,
-                                                 sizeof(profile_buf) - (size_t)pb_n,
-                                                 "Contact formality: %s. ", auto_ov.formality);
+                                int w =
+                                    snprintf(profile_buf + pb_n, sizeof(profile_buf) - (size_t)pb_n,
+                                             "Contact formality: %s. ", auto_ov.formality);
                                 if (w > 0 && (size_t)pb_n + (size_t)w < sizeof(profile_buf))
                                     pb_n += w;
                             }
                             if (auto_ov.avg_length) {
-                                int w = snprintf(profile_buf + pb_n,
-                                                 sizeof(profile_buf) - (size_t)pb_n,
-                                                 "Avg message length: %s. ", auto_ov.avg_length);
+                                int w =
+                                    snprintf(profile_buf + pb_n, sizeof(profile_buf) - (size_t)pb_n,
+                                             "Avg message length: %s. ", auto_ov.avg_length);
                                 if (w > 0 && (size_t)pb_n + (size_t)w < sizeof(profile_buf))
                                     pb_n += w;
                             }
                             if (auto_ov.emoji_usage) {
-                                int w = snprintf(profile_buf + pb_n,
-                                                 sizeof(profile_buf) - (size_t)pb_n,
-                                                 "Emoji usage: %s. ", auto_ov.emoji_usage);
+                                int w =
+                                    snprintf(profile_buf + pb_n, sizeof(profile_buf) - (size_t)pb_n,
+                                             "Emoji usage: %s. ", auto_ov.emoji_usage);
                                 if (w > 0 && (size_t)pb_n + (size_t)w < sizeof(profile_buf))
                                     pb_n += w;
                             }
@@ -4062,8 +4131,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 size_t ctx_count = history_count;
 
 #if defined(HU_ENABLE_SQLITE) && !defined(HU_IS_TEST)
-                /* 2b. Cross-channel awareness: other platforms for the same contact (contact graph).
-                 * Formatted lines are prepended to convo_ctx for the LLM, not merged into history. */
+                /* 2b. Cross-channel awareness: other platforms for the same contact (contact
+                 * graph). Formatted lines are prepended to convo_ctx for the LLM, not merged into
+                 * history. */
                 if (agent->memory && ch->channel->vtable->name && batch_key && key_len > 0 &&
                     key_len < 512) {
                     sqlite3 *cg_db = hu_sqlite_memory_get_db(agent->memory);
@@ -4114,15 +4184,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                                          sizeof(plabel));
                                             for (size_t ei = start; ei < onc; ei++) {
                                                 char when[48];
-                                                cross_channel_format_when(
-                                                    when, sizeof(when), oent[ei].timestamp);
-                                                const char *role =
-                                                    oent[ei].from_me ? " (you)" : "";
+                                                cross_channel_format_when(when, sizeof(when),
+                                                                          oent[ei].timestamp);
+                                                const char *role = oent[ei].from_me ? " (you)" : "";
                                                 char line[768];
-                                                int lw = snprintf(
-                                                    line, sizeof(line),
-                                                    "[From %s, %s]%s %s", plabel, when, role,
-                                                    oent[ei].text);
+                                                int lw = snprintf(line, sizeof(line),
+                                                                  "[From %s, %s]%s %s", plabel,
+                                                                  when, role, oent[ei].text);
                                                 if (lw > 0 && (size_t)lw < sizeof(line)) {
                                                     (void)daemon_cross_ctx_append_line(
                                                         alloc, &cross_channel_ctx,
@@ -4152,26 +4220,26 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     const hu_contact_profile_t *cp_p6 =
                         hu_persona_find_contact(agent->persona, batch_key, key_len);
                     (void)cp_p6;
-#define PHASE6_APPEND(str, len)                                                  \
-    do {                                                                         \
-        if ((str) && (len) > 0) {                                                \
-            size_t new_len = phase6_len + (len) + (phase6_len ? 2 : 1);         \
-            char *p6m = (char *)alloc->realloc(alloc->ctx, phase6_prefix,      \
-                                             phase6_len ? phase6_len + 1 : 0, new_len); \
-            if (p6m) {                                                          \
-                phase6_prefix = p6m;                                              \
-                if (phase6_len) {                                               \
-                    phase6_prefix[phase6_len] = '\n';                            \
-                    phase6_prefix[phase6_len + 1] = '\n';                        \
-                    memcpy(phase6_prefix + phase6_len + 2, (str), (len));      \
-                } else                                                           \
-                    memcpy(phase6_prefix, (str), (len));                         \
-                phase6_prefix[new_len - 1] = '\0';                               \
-                phase6_len = new_len - 1;                                       \
-                alloc->free(alloc->ctx, (str), (len) + 1);                       \
-            } else if ((str))                                                    \
-                alloc->free(alloc->ctx, (str), (len) + 1);                       \
-        }                                                                       \
+#define PHASE6_APPEND(str, len)                                                           \
+    do {                                                                                  \
+        if ((str) && (len) > 0) {                                                         \
+            size_t new_len = phase6_len + (len) + (phase6_len ? 2 : 1);                   \
+            char *p6m = (char *)alloc->realloc(alloc->ctx, phase6_prefix,                 \
+                                               phase6_len ? phase6_len + 1 : 0, new_len); \
+            if (p6m) {                                                                    \
+                phase6_prefix = p6m;                                                      \
+                if (phase6_len) {                                                         \
+                    phase6_prefix[phase6_len] = '\n';                                     \
+                    phase6_prefix[phase6_len + 1] = '\n';                                 \
+                    memcpy(phase6_prefix + phase6_len + 2, (str), (len));                 \
+                } else                                                                    \
+                    memcpy(phase6_prefix, (str), (len));                                  \
+                phase6_prefix[new_len - 1] = '\0';                                        \
+                phase6_len = new_len - 1;                                                 \
+                alloc->free(alloc->ctx, (str), (len) + 1);                                \
+            } else if ((str))                                                             \
+                alloc->free(alloc->ctx, (str), (len) + 1);                                \
+        }                                                                                 \
     } while (0)
 
                     /* 1. Life sim context (F59) */
@@ -4215,8 +4283,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (agent->memory && ctx_entries && ctx_count > 0) {
                         hu_contact_baseline_t tom_baseline;
                         memset(&tom_baseline, 0, sizeof(tom_baseline));
-                        if (hu_theory_of_mind_get_baseline(agent->memory, alloc, batch_key,
-                                                           key_len, &tom_baseline) == HU_OK &&
+                        if (hu_theory_of_mind_get_baseline(agent->memory, alloc, batch_key, key_len,
+                                                           &tom_baseline) == HU_OK &&
                             tom_baseline.messages_sampled >= 5) {
                             hu_theory_of_mind_deviation_t dev = hu_theory_of_mind_detect_deviation(
                                 &tom_baseline, ctx_entries, ctx_count);
@@ -4247,12 +4315,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (agent->memory) {
                         hu_emotional_prediction_t *preds = NULL;
                         size_t pred_count = 0;
-                        if (hu_anticipatory_predict(alloc, agent->memory, batch_key, key_len,
-                                                    (int64_t)time(NULL), &preds, &pred_count) ==
-                                HU_OK &&
+                        if (hu_anticipatory_predict_with_provider(
+                                alloc, agent->memory, &agent->provider, agent->model_name,
+                                agent->model_name_len, batch_key, key_len, (int64_t)time(NULL),
+                                &preds, &pred_count) == HU_OK &&
                             preds && pred_count > 0) {
                             const char *cname = (cp_p6 && cp_p6->name) ? cp_p6->name : batch_key;
-                            size_t cname_len = (cp_p6 && cp_p6->name) ? strlen(cp_p6->name) : key_len;
+                            size_t cname_len =
+                                (cp_p6 && cp_p6->name) ? strlen(cp_p6->name) : key_len;
                             size_t ant_len = 0;
                             char *ant_dir = hu_anticipatory_build_directive(
                                 alloc, preds, pred_count, cname, cname_len, &ant_len);
@@ -4271,8 +4341,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         char *sa_dir = NULL;
                         size_t sa_len = 0;
                         if (hu_self_awareness_build_directive_from_memory(
-                                alloc, agent->memory, batch_key, key_len,
-                                (int64_t)time(NULL), &sa_dir, &sa_len) == HU_OK &&
+                                alloc, agent->memory, batch_key, key_len, (int64_t)time(NULL),
+                                &sa_dir, &sa_len) == HU_OK &&
                             sa_dir && sa_len > 0) {
                             PHASE6_APPEND(sa_dir, sa_len);
                         }
@@ -4319,11 +4389,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (agent->memory) {
                         hu_relationship_t *rels = NULL;
                         size_t rel_count = 0;
-                        if (hu_social_graph_get(alloc, agent->memory, batch_key, key_len,
-                                                &rels, &rel_count) == HU_OK &&
+                        if (hu_social_graph_get(alloc, agent->memory, batch_key, key_len, &rels,
+                                                &rel_count) == HU_OK &&
                             rels && rel_count > 0) {
                             const char *cname = (cp_p6 && cp_p6->name) ? cp_p6->name : batch_key;
-                            size_t cname_len = (cp_p6 && cp_p6->name) ? strlen(cp_p6->name) : key_len;
+                            size_t cname_len =
+                                (cp_p6 && cp_p6->name) ? strlen(cp_p6->name) : key_len;
                             size_t sg_len = 0;
                             char *sg_dir = hu_social_graph_build_directive(
                                 alloc, cname, cname_len, rels, rel_count, &sg_len);
@@ -4353,7 +4424,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             size_t tz_len = 0;
                             char *tz_dir = NULL;
                             if (hu_timezone_build_directive(alloc, &tz, cname_tz, cname_tz_len,
-                                                           &tz_dir, &tz_len) == HU_OK &&
+                                                            &tz_dir, &tz_len) == HU_OK &&
                                 tz_dir && tz_len > 0)
                                 PHASE6_APPEND(tz_dir, tz_len);
                             else if (tz_dir)
@@ -4367,19 +4438,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (agent->persona && agent->persona->humor.type) {
                         hu_emotional_state_t emo_humor =
                             history_entries && history_count > 0
-                                ? hu_daemon_detect_emotion(alloc, agent, history_entries, history_count)
+                                ? hu_daemon_detect_emotion(alloc, agent, history_entries,
+                                                           history_count)
                                 : (hu_emotional_state_t){0};
-                        bool playful = (combined_len > 0) && (
-                            strstr(combined, "lol") || strstr(combined, "haha") ||
-                            strstr(combined, "😂") || strstr(combined, "😄"));
+                        bool playful = (combined_len > 0) &&
+                                       (strstr(combined, "lol") || strstr(combined, "haha") ||
+                                        strstr(combined, "😂") || strstr(combined, "😄"));
                         if (playful && !emo_humor.concerning) {
-                            const char *dom = emo_humor.dominant_emotion
-                                                  ? emo_humor.dominant_emotion
-                                                  : "neutral";
+                            const char *dom =
+                                emo_humor.dominant_emotion ? emo_humor.dominant_emotion : "neutral";
                             size_t hum_len = 0;
                             char *hum_dir = hu_humor_build_persona_directive(
-                                alloc, &agent->persona->humor, dom, strlen(dom),
-                                true, &hum_len);
+                                alloc, &agent->persona->humor, dom, strlen(dom), true, &hum_len);
                             if (hum_dir && hum_len > 0)
                                 PHASE6_APPEND(hum_dir, hum_len);
                             else if (hum_dir)
@@ -4388,7 +4458,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 #endif /* HU_HAS_PERSONA humor */
 
-                    /* 10. Weather awareness (F51) — inject notable weather when location available */
+                    /* 10. Weather awareness (F51) — inject notable weather when location available
+                     */
 #ifdef HU_HAS_PERSONA
                     if (agent->persona && agent->persona->location[0]) {
                         hu_weather_context_t wx = {0};
@@ -4402,8 +4473,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (hu_weather_awareness_should_mention(&wx, wx_hour)) {
                             char *wx_dir = NULL;
                             size_t wx_len = 0;
-                            if (hu_weather_awareness_build_directive(alloc, &wx, wx_hour,
-                                                                     &wx_dir, &wx_len) == HU_OK &&
+                            if (hu_weather_awareness_build_directive(alloc, &wx, wx_hour, &wx_dir,
+                                                                     &wx_len) == HU_OK &&
                                 wx_dir && wx_len > 0)
                                 PHASE6_APPEND(wx_dir, wx_len);
                             else if (wx_dir)
@@ -4423,35 +4494,36 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (combined_len > 0) {
                                 hu_prospective_entry_t *prosp_entries = NULL;
                                 size_t prosp_count = 0;
-                                if (hu_prospective_check_triggers(alloc, db, "keyword", combined,
-                                                                 combined_len, batch_key, key_len,
-                                                                 now_ts, &prosp_entries,
-                                                                 &prosp_count) == HU_OK &&
+                                if (hu_prospective_check_triggers(
+                                        alloc, db, "keyword", combined, combined_len, batch_key,
+                                        key_len, now_ts, &prosp_entries, &prosp_count) == HU_OK &&
                                     prosp_entries && prosp_count > 0) {
                                     char prosp_buf[1024];
                                     size_t prosp_pos = 0;
                                     int n = snprintf(prosp_buf, sizeof(prosp_buf),
-                                                    "[PROSPECTIVE MEMORY: Remember to: ");
+                                                     "[PROSPECTIVE MEMORY: Remember to: ");
                                     if (n > 0)
                                         prosp_pos = (size_t)n;
-                                    for (size_t pi = 0; pi < prosp_count && pi < 3 && prosp_pos < sizeof(prosp_buf) - 64; pi++) {
+                                    for (size_t pi = 0; pi < prosp_count && pi < 3 &&
+                                                        prosp_pos < sizeof(prosp_buf) - 64;
+                                         pi++) {
                                         if (pi > 0) {
                                             prosp_buf[prosp_pos++] = ' ';
                                             prosp_buf[prosp_pos++] = '|';
                                             prosp_buf[prosp_pos++] = ' ';
                                         }
-                                        int w = snprintf(prosp_buf + prosp_pos,
-                                                        sizeof(prosp_buf) - prosp_pos,
-                                                        "%s (triggered by: %s)",
-                                                        prosp_entries[pi].action,
-                                                        prosp_entries[pi].trigger_value);
+                                        int w = snprintf(
+                                            prosp_buf + prosp_pos, sizeof(prosp_buf) - prosp_pos,
+                                            "%s (triggered by: %s)", prosp_entries[pi].action,
+                                            prosp_entries[pi].trigger_value);
                                         if (w > 0 && prosp_pos + (size_t)w < sizeof(prosp_buf))
                                             prosp_pos += (size_t)w;
                                     }
                                     if (prosp_pos + 2 < sizeof(prosp_buf)) {
                                         prosp_buf[prosp_pos++] = ']';
                                         prosp_buf[prosp_pos] = '\0';
-                                        char *prosp_str = (char *)alloc->alloc(alloc->ctx, prosp_pos + 1);
+                                        char *prosp_str =
+                                            (char *)alloc->alloc(alloc->ctx, prosp_pos + 1);
                                         if (prosp_str) {
                                             memcpy(prosp_str, prosp_buf, prosp_pos + 1);
                                             PHASE6_APPEND(prosp_str, prosp_pos);
@@ -4467,8 +4539,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 hu_emotional_residue_t *residues = NULL;
                                 size_t res_count = 0;
                                 if (hu_emotional_residue_get_active(alloc, db, batch_key, key_len,
-                                                                   now_ts, &residues,
-                                                                   &res_count) == HU_OK &&
+                                                                    now_ts, &residues,
+                                                                    &res_count) == HU_OK &&
                                     residues && res_count > 0) {
                                     size_t dir_len = 0;
                                     char *dir = hu_emotional_residue_build_directive(
@@ -4479,6 +4551,74 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         alloc->free(alloc->ctx, dir, dir_len + 1);
                                     alloc->free(alloc->ctx, residues,
                                                 res_count * sizeof(hu_emotional_residue_t));
+                                }
+                            }
+
+                            /* 10b. Emotional residue carryover — conversation-opening tone shift
+                             * when starting a new conversation after a heavy prior exchange */
+                            if (agent->history_count == 0) {
+                                hu_emotional_residue_t *carry_res = NULL;
+                                size_t carry_count = 0;
+                                if (hu_emotional_residue_get_active(alloc, db, batch_key, key_len,
+                                                                    now_ts, &carry_res,
+                                                                    &carry_count) == HU_OK &&
+                                    carry_res && carry_count > 0) {
+                                    double *valences = (double *)alloc->alloc(
+                                        alloc->ctx, carry_count * sizeof(double));
+                                    double *intensities = (double *)alloc->alloc(
+                                        alloc->ctx, carry_count * sizeof(double));
+                                    int64_t *timestamps = (int64_t *)alloc->alloc(
+                                        alloc->ctx, carry_count * sizeof(int64_t));
+                                    if (valences && intensities && timestamps) {
+                                        for (size_t cr = 0; cr < carry_count; cr++) {
+                                            valences[cr] = carry_res[cr].valence;
+                                            intensities[cr] = carry_res[cr].intensity;
+                                            timestamps[cr] = carry_res[cr].created_at;
+                                        }
+                                        hu_residue_carryover_t carryover = {0};
+                                        if (hu_residue_carryover_compute(
+                                                valences, intensities, timestamps, carry_count,
+                                                now_ts, &carryover) == HU_OK) {
+                                            size_t carry_dir_len = 0;
+                                            char *carry_dir = hu_residue_carryover_build_directive(
+                                                alloc, &carryover, &carry_dir_len);
+                                            if (carry_dir && carry_dir_len > 0)
+                                                PHASE6_APPEND(carry_dir, carry_dir_len);
+                                            else if (carry_dir)
+                                                alloc->free(alloc->ctx, carry_dir,
+                                                            carry_dir_len + 1);
+                                        }
+                                    }
+                                    if (valences)
+                                        alloc->free(alloc->ctx, valences,
+                                                    carry_count * sizeof(double));
+                                    if (intensities)
+                                        alloc->free(alloc->ctx, intensities,
+                                                    carry_count * sizeof(double));
+                                    if (timestamps)
+                                        alloc->free(alloc->ctx, timestamps,
+                                                    carry_count * sizeof(int64_t));
+                                    alloc->free(alloc->ctx, carry_res,
+                                                carry_count * sizeof(hu_emotional_residue_t));
+                                }
+                            }
+
+                            /* 10c. Evolving opinions — inject developed perspectives */
+                            {
+                                hu_evolved_opinions_ensure_table(db);
+                                hu_evolved_opinion_t *evo_opinions = NULL;
+                                size_t evo_count = 0;
+                                if (hu_evolved_opinions_get(alloc, db, 0.4, 5, &evo_opinions,
+                                                            &evo_count) == HU_OK &&
+                                    evo_opinions && evo_count > 0) {
+                                    size_t op_dir_len = 0;
+                                    char *op_dir = hu_evolved_opinion_build_directive(
+                                        alloc, evo_opinions, evo_count, 0.4, &op_dir_len);
+                                    if (op_dir && op_dir_len > 0)
+                                        PHASE6_APPEND(op_dir, op_dir_len);
+                                    else if (op_dir)
+                                        alloc->free(alloc->ctx, op_dir, op_dir_len + 1);
+                                    hu_evolved_opinions_free(alloc, evo_opinions, evo_count);
                                 }
                             }
 
@@ -4497,7 +4637,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     int n = snprintf(ep_buf, sizeof(ep_buf), "%s", ep_hdr);
                                     if (n > 0)
                                         ep_pos = (size_t)n;
-                                    for (size_t ei = 0; ei < ep_count && ep_pos < sizeof(ep_buf) - 64; ei++) {
+                                    for (size_t ei = 0;
+                                         ei < ep_count && ep_pos < sizeof(ep_buf) - 64; ei++) {
                                         if (ei > 0) {
                                             ep_buf[ep_pos++] = ' ';
                                             ep_buf[ep_pos++] = '|';
@@ -4522,7 +4663,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     }
                                     /* P7: Reinforce referenced episodes */
                                     for (size_t ei = 0; ei < ep_count; ei++)
-                                        (void)hu_episode_reinforce(db, episodes[ei].id, (int64_t)time(NULL));
+                                        (void)hu_episode_reinforce(db, episodes[ei].id,
+                                                                   (int64_t)time(NULL));
                                     hu_episode_free(alloc, episodes, ep_count);
                                 }
                             }
@@ -4533,11 +4675,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     /* F148 (Pillar 29): On-device message classification */
                     if (batch_key && key_len > 0) {
                         double cls_conf = 0.0;
-                        hu_classify_result_t cls = hu_classify_message(batch_key, key_len, &cls_conf);
+                        hu_classify_result_t cls =
+                            hu_classify_message(batch_key, key_len, &cls_conf);
                         if (cls_conf > 0.5) {
                             char *cls_dir = NULL;
                             size_t cls_len = 0;
-                            if (hu_classifier_build_prompt(alloc, cls, cls_conf, &cls_dir, &cls_len) == HU_OK &&
+                            if (hu_classifier_build_prompt(alloc, cls, cls_conf, &cls_dir,
+                                                           &cls_len) == HU_OK &&
                                 cls_dir && cls_len > 0)
                                 PHASE6_APPEND(cls_dir, cls_len);
                             else if (cls_dir)
@@ -4552,16 +4696,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (kdb) {
                             char ksql[512];
                             size_t ksql_len = 0;
-                            if (hu_knowledge_query_sql(batch_key, key_len, 0.5,
-                                    ksql, sizeof(ksql), &ksql_len) == HU_OK) {
+                            if (hu_knowledge_query_sql(batch_key, key_len, 0.5, ksql, sizeof(ksql),
+                                                       &ksql_len) == HU_OK) {
                                 sqlite3_stmt *kstmt = NULL;
-                                if (sqlite3_prepare_v2(kdb, ksql, (int)ksql_len, &kstmt, NULL) == SQLITE_OK) {
+                                if (sqlite3_prepare_v2(kdb, ksql, (int)ksql_len, &kstmt, NULL) ==
+                                    SQLITE_OK) {
                                     hu_knowledge_entry_t kentries[8];
                                     size_t kcount = 0;
                                     while (sqlite3_step(kstmt) == SQLITE_ROW && kcount < 8) {
                                         hu_knowledge_entry_t *ke = &kentries[kcount];
                                         memset(ke, 0, sizeof(*ke));
-                                        const char *kt = (const char *)sqlite3_column_text(kstmt, 0);
+                                        const char *kt =
+                                            (const char *)sqlite3_column_text(kstmt, 0);
                                         if (kt) {
                                             ke->topic_len = (size_t)sqlite3_column_bytes(kstmt, 0);
                                             ke->topic = hu_strndup(alloc, kt, ke->topic_len);
@@ -4573,11 +4719,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     if (kcount > 0) {
                                         hu_knowledge_summary_t ksummary = {0};
                                         if (hu_knowledge_build_summary(alloc, kentries, kcount,
-                                                batch_key, key_len, NULL, 0, &ksummary) == HU_OK) {
+                                                                       batch_key, key_len, NULL, 0,
+                                                                       &ksummary) == HU_OK) {
                                             char *kprompt = NULL;
                                             size_t kprompt_len = 0;
-                                            if (hu_knowledge_summary_to_prompt(alloc, &ksummary,
-                                                    &kprompt, &kprompt_len) == HU_OK &&
+                                            if (hu_knowledge_summary_to_prompt(
+                                                    alloc, &ksummary, &kprompt, &kprompt_len) ==
+                                                    HU_OK &&
                                                 kprompt && kprompt_len > 0)
                                                 PHASE6_APPEND(kprompt, kprompt_len);
                                             else if (kprompt)
@@ -4600,19 +4748,23 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (cdb) {
                             char csql[512];
                             size_t csql_len = 0;
-                            if (hu_compression_query_sql(batch_key, key_len,
-                                    csql, sizeof(csql), &csql_len) == HU_OK) {
+                            if (hu_compression_query_sql(batch_key, key_len, csql, sizeof(csql),
+                                                         &csql_len) == HU_OK) {
                                 sqlite3_stmt *cstmt = NULL;
-                                if (sqlite3_prepare_v2(cdb, csql, (int)csql_len, &cstmt, NULL) == SQLITE_OK) {
+                                if (sqlite3_prepare_v2(cdb, csql, (int)csql_len, &cstmt, NULL) ==
+                                    SQLITE_OK) {
                                     hu_shared_ref_t crefs[8];
                                     size_t ccount = 0;
                                     while (sqlite3_step(cstmt) == SQLITE_ROW && ccount < 8) {
                                         hu_shared_ref_t *cr = &crefs[ccount];
                                         memset(cr, 0, sizeof(*cr));
-                                        const char *ck = (const char *)sqlite3_column_text(cstmt, 0);
+                                        const char *ck =
+                                            (const char *)sqlite3_column_text(cstmt, 0);
                                         if (ck) {
-                                            cr->compressed_form_len = (size_t)sqlite3_column_bytes(cstmt, 0);
-                                            cr->compressed_form = hu_strndup(alloc, ck, cr->compressed_form_len);
+                                            cr->compressed_form_len =
+                                                (size_t)sqlite3_column_bytes(cstmt, 0);
+                                            cr->compressed_form =
+                                                hu_strndup(alloc, ck, cr->compressed_form_len);
                                         }
                                         cr->strength = sqlite3_column_double(cstmt, 1);
                                         ccount++;
@@ -4622,7 +4774,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         char *cprompt = NULL;
                                         size_t cprompt_len = 0;
                                         if (hu_compression_build_prompt(alloc, crefs, ccount,
-                                                &cprompt, &cprompt_len) == HU_OK &&
+                                                                        &cprompt,
+                                                                        &cprompt_len) == HU_OK &&
                                             cprompt && cprompt_len > 0)
                                             PHASE6_APPEND(cprompt, cprompt_len);
                                         else if (cprompt)
@@ -4643,23 +4796,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (skill_db) {
                             hu_skill_t *matched = NULL;
                             size_t matched_count = 0;
-                            hu_error_t skill_err = hu_skill_match_triggers(alloc, skill_db,
-                                batch_key, key_len, NULL, 0, NULL, 0, 0.5,
-                                &matched, &matched_count);
+                            hu_error_t skill_err =
+                                hu_skill_match_triggers(alloc, skill_db, batch_key, key_len, NULL,
+                                                        0, NULL, 0, 0.5, &matched, &matched_count);
                             if (skill_err == HU_OK && matched && matched_count > 0) {
                                 size_t max_skills = matched_count > 3 ? 3 : matched_count;
                                 for (size_t si = 0; si < max_skills; si++) {
                                     /* Inject skill strategy as directive */
                                     size_t strat_len = matched[si].strategy_len > 0
-                                        ? matched[si].strategy_len
-                                        : strlen(matched[si].strategy);
+                                                           ? matched[si].strategy_len
+                                                           : strlen(matched[si].strategy);
                                     if (strat_len > 0 && strat_len < 500) {
-                                        fprintf(stderr, "[human] skill: %s\n",
-                                                matched[si].name);
+                                        fprintf(stderr, "[human] skill: %s\n", matched[si].name);
                                         char skill_buf[512];
                                         int sb = snprintf(skill_buf, sizeof(skill_buf),
-                                            "[SKILL %s]: %.*s", matched[si].name,
-                                            (int)strat_len, matched[si].strategy);
+                                                          "[SKILL %s]: %.*s", matched[si].name,
+                                                          (int)strat_len, matched[si].strategy);
                                         if (sb > 0 && (size_t)sb < sizeof(skill_buf)) {
                                             char *skill_str =
                                                 (char *)alloc->alloc(alloc->ctx, (size_t)sb + 1);
@@ -4671,11 +4823,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     }
                                     /* Record attempt and update success rate */
                                     int64_t attempt_id = 0;
-                                    hu_skill_record_attempt(skill_db, matched[si].id,
-                                        batch_key, key_len, (int64_t)time(NULL),
-                                        NULL, 0, NULL, 0, NULL, 0, &attempt_id);
-                                    (void)hu_skill_update_success_rate(skill_db,
-                                        matched[si].id, 1, 0);
+                                    hu_skill_record_attempt(skill_db, matched[si].id, batch_key,
+                                                            key_len, (int64_t)time(NULL), NULL, 0,
+                                                            NULL, 0, NULL, 0, &attempt_id);
+                                    (void)hu_skill_update_success_rate(skill_db, matched[si].id, 1,
+                                                                       0);
                                     if (agent->bth_metrics)
                                         agent->bth_metrics->skills_applied++;
                                 }
@@ -4690,12 +4842,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         time_t t_p9 = time(NULL);
 #ifdef HU_ENABLE_AUTHENTIC
                         /* F102: Cognitive load */
-                        hu_cognitive_load_config_t cog_cfg = {
-                            .peak_hour_start = 9, .peak_hour_end = 12,
-                            .low_hour_start = 22, .low_hour_end = 6,
-                            .fatigue_threshold = 12,
-                            .monday_penalty = 0.15f, .friday_bonus = 0.1f
-                        };
+                        hu_cognitive_load_config_t cog_cfg = {.peak_hour_start = 9,
+                                                              .peak_hour_end = 12,
+                                                              .low_hour_start = 22,
+                                                              .low_hour_end = 6,
+                                                              .fatigue_threshold = 12,
+                                                              .monday_penalty = 0.15f,
+                                                              .friday_bonus = 0.1f};
                         hu_cognitive_load_state_t cog =
                             hu_cognitive_load_calculate(&cog_cfg, 0, t_p9);
                         const char *cog_hint = hu_cognitive_load_prompt_hint(&cog);
@@ -4704,15 +4857,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                         /* F104: Physical state */
-                        hu_physical_config_t phys_cfg = {
-                            .exercises = true,
-                            .exercise_days = {1, 3, 5},
-                            .exercise_day_count = 3,
-                            .coffee_drinker = true,
-                            .mentions_frequency = 0.3f
-                        };
-                        hu_physical_state_t phys =
-                            hu_physical_state_from_schedule(&phys_cfg, t_p9);
+                        hu_physical_config_t phys_cfg = {.exercises = true,
+                                                         .exercise_days = {1, 3, 5},
+                                                         .exercise_day_count = 3,
+                                                         .coffee_drinker = true,
+                                                         .mentions_frequency = 0.3f};
+                        hu_physical_state_t phys = hu_physical_state_from_schedule(&phys_cfg, t_p9);
                         const char *phys_hint = hu_physical_state_prompt_hint(phys);
 
                         if (cog_hint) {
@@ -4745,7 +4895,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (err_p) {
                                 size_t el = strlen(err_p);
                                 char *ec = (char *)alloc->alloc(alloc->ctx, el + 1);
-                                if (ec) { memcpy(ec, err_p, el + 1); PHASE6_APPEND(ec, el); }
+                                if (ec) {
+                                    memcpy(ec, err_p, el + 1);
+                                    PHASE6_APPEND(ec, el);
+                                }
                             }
                             fprintf(stderr, "[human] Phase 9: error injection active\n");
                         }
@@ -4759,14 +4912,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (complaint) {
                                 size_t cl = strlen(complaint);
                                 char *cc = (char *)alloc->alloc(alloc->ctx, cl + 1);
-                                if (cc) { memcpy(cc, complaint, cl + 1); PHASE6_APPEND(cc, cl); }
+                                if (cc) {
+                                    memcpy(cc, complaint, cl + 1);
+                                    PHASE6_APPEND(cc, cl);
+                                }
                             }
                         }
                     }
 
                     /* 9. Authentic existence (F103-F115) */
                     {
-                        uint32_t auth_seed = (uint32_t)((uint64_t)time(NULL) ^ (uintptr_t)batch_key);
+                        uint32_t auth_seed =
+                            (uint32_t)((uint64_t)time(NULL) ^ (uintptr_t)batch_key);
                         hu_authentic_config_t auth_cfg = {
                             .narration_probability = 0.10,
                             .embodiment_probability = 0.08,
@@ -4788,8 +4945,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (behavior != HU_AUTH_NONE) {
                             size_t auth_len = 0;
                             char *auth_dir = NULL;
-                            hu_authentic_build_directive(alloc, behavior, NULL, 0,
-                                                        &auth_dir, &auth_len);
+                            hu_authentic_build_directive(alloc, behavior, NULL, 0, &auth_dir,
+                                                         &auth_len);
                             if (auth_dir && auth_len > 0)
                                 PHASE6_APPEND(auth_dir, auth_len);
                             else if (auth_dir)
@@ -4832,8 +4989,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             hu_repair_state_t repair = {0};
                             char *rel_dir = NULL;
                             size_t rel_len = 0;
-                            hu_rel_dynamics_build_prompt(
-                                alloc, &rel_vel, &drift, &repair, &rel_dir, &rel_len);
+                            hu_rel_dynamics_build_prompt(alloc, &rel_vel, &drift, &repair, &rel_dir,
+                                                         &rel_len);
                             if (rel_dir && rel_len > 0)
                                 PHASE6_APPEND(rel_dir, rel_len);
                             else if (rel_dir)
@@ -4848,24 +5005,28 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (op_db) {
                             char op_sql[512];
                             size_t op_sql_len = 0;
-                            if (hu_opinions_query_current_sql(batch_key, key_len,
-                                    op_sql, sizeof(op_sql), &op_sql_len) == HU_OK) {
+                            if (hu_opinions_query_current_sql(batch_key, key_len, op_sql,
+                                                              sizeof(op_sql),
+                                                              &op_sql_len) == HU_OK) {
                                 sqlite3_stmt *op_stmt = NULL;
-                                if (sqlite3_prepare_v2(op_db, op_sql, (int)op_sql_len,
-                                        &op_stmt, NULL) == SQLITE_OK) {
+                                if (sqlite3_prepare_v2(op_db, op_sql, (int)op_sql_len, &op_stmt,
+                                                       NULL) == SQLITE_OK) {
                                     hu_opinion_t ops[8];
                                     size_t op_count = 0;
                                     while (sqlite3_step(op_stmt) == SQLITE_ROW && op_count < 8) {
                                         hu_opinion_t *o = &ops[op_count];
                                         memset(o, 0, sizeof(*o));
-                                        const char *t = (const char *)sqlite3_column_text(op_stmt, 1);
-                                        const char *p = (const char *)sqlite3_column_text(op_stmt, 2);
+                                        const char *t =
+                                            (const char *)sqlite3_column_text(op_stmt, 1);
+                                        const char *p =
+                                            (const char *)sqlite3_column_text(op_stmt, 2);
                                         if (t) {
                                             o->topic_len = (size_t)sqlite3_column_bytes(op_stmt, 1);
                                             o->topic = hu_strndup(alloc, t, o->topic_len);
                                         }
                                         if (p) {
-                                            o->position_len = (size_t)sqlite3_column_bytes(op_stmt, 2);
+                                            o->position_len =
+                                                (size_t)sqlite3_column_bytes(op_stmt, 2);
                                             o->position = hu_strndup(alloc, p, o->position_len);
                                         }
                                         o->confidence = sqlite3_column_double(op_stmt, 3);
@@ -4876,7 +5037,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         char *op_prompt = NULL;
                                         size_t op_prompt_len = 0;
                                         if (hu_opinions_build_prompt(alloc, ops, op_count,
-                                                &op_prompt, &op_prompt_len) == HU_OK &&
+                                                                     &op_prompt,
+                                                                     &op_prompt_len) == HU_OK &&
                                             op_prompt && op_prompt_len > 0)
                                             PHASE6_APPEND(op_prompt, op_prompt_len);
                                         else if (op_prompt)
@@ -4896,9 +5058,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         hu_feed_item_stored_t *fitems = NULL;
                         size_t fcount = 0;
                         sqlite3 *fdb = hu_sqlite_memory_get_db(agent->memory);
-                        if (fdb && hu_feed_processor_get_for_contact(
-                                alloc, fdb, batch_key, key_len, 5,
-                                &fitems, &fcount) == HU_OK &&
+                        if (fdb &&
+                            hu_feed_processor_get_for_contact(alloc, fdb, batch_key, key_len, 5,
+                                                              &fitems, &fcount) == HU_OK &&
                             fitems && fcount > 0) {
                             hu_feed_item_t *conv_items = (hu_feed_item_t *)alloc->alloc(
                                 alloc->ctx, fcount * sizeof(hu_feed_item_t));
@@ -4912,13 +5074,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                                 char *feed_prompt = NULL;
                                 size_t feed_prompt_len = 0;
-                                if (hu_feeds_build_prompt(alloc, conv_items, fcount,
-                                        &feed_prompt, &feed_prompt_len) == HU_OK &&
+                                if (hu_feeds_build_prompt(alloc, conv_items, fcount, &feed_prompt,
+                                                          &feed_prompt_len) == HU_OK &&
                                     feed_prompt && feed_prompt_len > 0)
                                     PHASE6_APPEND(feed_prompt, feed_prompt_len);
                                 else if (feed_prompt)
                                     alloc->free(alloc->ctx, feed_prompt, feed_prompt_len + 1);
-                                alloc->free(alloc->ctx, conv_items, fcount * sizeof(hu_feed_item_t));
+                                alloc->free(alloc->ctx, conv_items,
+                                            fcount * sizeof(hu_feed_item_t));
                             }
                             hu_feed_items_free(alloc, fitems, fcount);
                         }
@@ -4933,8 +5096,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             hu_visual_entry_t *ventries = NULL;
                             size_t vcount = 0;
                             if (hu_visual_match_for_contact(alloc, vdb, batch_key, key_len,
-                                    combined, combined_len,
-                                    &ventries, &vcount) == HU_OK &&
+                                                            combined, combined_len, &ventries,
+                                                            &vcount) == HU_OK &&
                                 ventries && vcount > 0) {
                                 bool should_share = false;
                                 double vconf = 0.0;
@@ -4949,8 +5112,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     vc.relevance_score = vconf;
                                     char *vprompt = NULL;
                                     size_t vprompt_len = 0;
-                                    if (hu_visual_build_prompt(alloc, &vc, 1,
-                                            &vprompt, &vprompt_len) == HU_OK &&
+                                    if (hu_visual_build_prompt(alloc, &vc, 1, &vprompt,
+                                                               &vprompt_len) == HU_OK &&
                                         vprompt && vprompt_len > 0)
                                         PHASE6_APPEND(vprompt, vprompt_len);
                                     else if (vprompt)
@@ -4969,18 +5132,23 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (fwd_db) {
                             char fwd_sql[512];
                             size_t fwd_sql_len = 0;
-                            if (hu_forwarding_query_for_contact_sql(batch_key, key_len,
-                                    fwd_sql, sizeof(fwd_sql), &fwd_sql_len) == HU_OK) {
+                            if (hu_forwarding_query_for_contact_sql(batch_key, key_len, fwd_sql,
+                                                                    sizeof(fwd_sql),
+                                                                    &fwd_sql_len) == HU_OK) {
                                 sqlite3_stmt *fwd_stmt = NULL;
-                                if (sqlite3_prepare_v2(fwd_db, fwd_sql, (int)fwd_sql_len,
-                                        &fwd_stmt, NULL) == SQLITE_OK) {
+                                if (sqlite3_prepare_v2(fwd_db, fwd_sql, (int)fwd_sql_len, &fwd_stmt,
+                                                       NULL) == SQLITE_OK) {
                                     if (sqlite3_step(fwd_stmt) == SQLITE_ROW) {
-                                        const char *fc = (const char *)sqlite3_column_text(fwd_stmt, 1);
-                                        const char *fs = (const char *)sqlite3_column_text(fwd_stmt, 2);
+                                        const char *fc =
+                                            (const char *)sqlite3_column_text(fwd_stmt, 1);
+                                        const char *fs =
+                                            (const char *)sqlite3_column_text(fwd_stmt, 2);
                                         if (fc && fs) {
-                                            size_t fc_len = (size_t)sqlite3_column_bytes(fwd_stmt, 1);
+                                            size_t fc_len =
+                                                (size_t)sqlite3_column_bytes(fwd_stmt, 1);
                                             char fwd_buf[512];
-                                            int fw = snprintf(fwd_buf, sizeof(fwd_buf),
+                                            int fw = snprintf(
+                                                fwd_buf, sizeof(fwd_buf),
                                                 "[SHAREABLE CONTENT from %s]: %.*s — "
                                                 "Share this naturally if relevant.",
                                                 fs, (int)(fc_len > 300 ? 300 : fc_len), fc);
@@ -5001,7 +5169,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 #endif
 
-                    /* F52: Sports/current events — inject relevant events matching persona interests */
+                    /* F52: Sports/current events — inject relevant events matching persona
+                     * interests */
 #if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_PERSONA)
                     if (agent->memory && agent->persona) {
                         sqlite3 *ev_db = hu_sqlite_memory_get_db(agent->memory);
@@ -5017,34 +5186,36 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 char ev_sql[512];
                                 size_t ev_sql_len = 0;
                                 if (hu_events_create_table_sql(ev_sql, sizeof(ev_sql),
-                                        &ev_sql_len) != HU_OK)
+                                                               &ev_sql_len) != HU_OK)
                                     break;
                                 /* Query events by topic */
                                 char eq_sql[512];
                                 size_t eq_len = 0;
-                                int qn = snprintf(eq_sql, sizeof(eq_sql),
-                                    "SELECT topic, summary, source FROM current_events "
-                                    "WHERE topic LIKE '%%%.*s%%' ORDER BY published_at DESC LIMIT 3",
-                                    (int)tlen, topic);
+                                int qn =
+                                    snprintf(eq_sql, sizeof(eq_sql),
+                                             "SELECT topic, summary, source FROM current_events "
+                                             "WHERE topic LIKE '%%%.*s%%' ORDER BY published_at "
+                                             "DESC LIMIT 3",
+                                             (int)tlen, topic);
                                 if (qn <= 0 || (size_t)qn >= sizeof(eq_sql))
                                     continue;
                                 eq_len = (size_t)qn;
                                 sqlite3_stmt *ev_stmt = NULL;
-                                if (sqlite3_prepare_v2(ev_db, eq_sql, (int)eq_len,
-                                        &ev_stmt, NULL) == SQLITE_OK) {
+                                if (sqlite3_prepare_v2(ev_db, eq_sql, (int)eq_len, &ev_stmt,
+                                                       NULL) == SQLITE_OK) {
                                     if (sqlite3_step(ev_stmt) == SQLITE_ROW) {
                                         const char *summary =
                                             (const char *)sqlite3_column_text(ev_stmt, 1);
                                         if (summary) {
                                             size_t slen = (size_t)sqlite3_column_bytes(ev_stmt, 1);
                                             char ev_buf[384];
-                                            int ew = snprintf(ev_buf, sizeof(ev_buf),
-                                                "[CURRENT EVENT — %.*s]: %.*s",
-                                                (int)tlen, topic,
+                                            int ew = snprintf(
+                                                ev_buf, sizeof(ev_buf),
+                                                "[CURRENT EVENT — %.*s]: %.*s", (int)tlen, topic,
                                                 (int)(slen > 250 ? 250 : slen), summary);
                                             if (ew > 0 && (size_t)ew < sizeof(ev_buf)) {
-                                                char *ev_str = (char *)alloc->alloc(
-                                                    alloc->ctx, (size_t)ew + 1);
+                                                char *ev_str = (char *)alloc->alloc(alloc->ctx,
+                                                                                    (size_t)ew + 1);
                                                 if (ev_str) {
                                                     memcpy(ev_str, ev_buf, (size_t)ew + 1);
                                                     PHASE6_APPEND(ev_str, (size_t)ew);
@@ -5068,8 +5239,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (target_chars < phase6_len) {
                                 phase6_prefix[target_chars] = '\0';
                                 phase6_len = target_chars;
-                                fprintf(stderr, "[human] arbitrator: trimmed phase6 directives "
-                                        "from %zu to %zu tokens\n", est_tokens, max_tokens);
+                                fprintf(stderr,
+                                        "[human] arbitrator: trimmed phase6 directives "
+                                        "from %zu to %zu tokens\n",
+                                        est_tokens, max_tokens);
                             }
                         }
                     }
@@ -5130,15 +5303,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (agent->memory && ctx_count >= 2) {
                         char topic_before[64], topic_after[64];
                         if (hu_conversation_detect_topic_change(ctx_entries, ctx_count,
-                                                               topic_before,
-                                                               sizeof(topic_before),
-                                                               topic_after,
-                                                               sizeof(topic_after))) {
+                                                                topic_before, sizeof(topic_before),
+                                                                topic_after, sizeof(topic_after))) {
                             size_t tb_len = strlen(topic_before);
                             if (tb_len > 0)
-                                (void)hu_superhuman_avoidance_record(agent->memory, batch_key,
-                                                                     key_len, topic_before,
-                                                                     tb_len, true);
+                                (void)hu_superhuman_avoidance_record(
+                                    agent->memory, batch_key, key_len, topic_before, tb_len, true);
                         }
                     }
                 }
@@ -5202,20 +5372,20 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         &style_ctx_len);
                 }
 
-                /* F32: Style fingerprint — our texting style with this contact (haha vs lol, etc.) */
+                /* F32: Style fingerprint — our texting style with this contact (haha vs lol, etc.)
+                 */
                 if (agent->memory && batch_key && key_len > 0) {
                     hu_style_fingerprint_t fp;
                     memset(&fp, 0, sizeof(fp));
                     if (hu_style_fingerprint_get(agent->memory, alloc, batch_key, key_len, &fp) ==
-                            HU_OK) {
+                        HU_OK) {
                         char fp_buf[256];
                         size_t fp_len =
                             hu_style_fingerprint_build_directive(&fp, fp_buf, sizeof(fp_buf));
                         if (fp_len > 0) {
                             if (style_ctx && style_ctx_len > 0) {
                                 size_t merged_len = style_ctx_len + fp_len + 2;
-                                char *merged =
-                                    (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                                char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
                                 if (merged) {
                                     memcpy(merged, style_ctx, style_ctx_len);
                                     merged[style_ctx_len] = '\n';
@@ -5251,8 +5421,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (own_count >= 10) {
                         char *clone_prompt = NULL;
                         size_t clone_len = 0;
-                        if (hu_style_clone_from_history(alloc, own_msgs, own_count,
-                                                        &clone_prompt, &clone_len) == HU_OK &&
+                        if (hu_style_clone_from_history(alloc, own_msgs, own_count, &clone_prompt,
+                                                        &clone_len) == HU_OK &&
                             clone_prompt && clone_len > 0) {
                             if (style_ctx && style_ctx_len > 0) {
                                 size_t merged_len = style_ctx_len + clone_len + 2;
@@ -5518,8 +5688,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (!use_escalation && combined_len > 0) {
                     hu_energy_level_t energy = hu_conversation_detect_energy(
                         combined, combined_len, history_entries, history_count);
-                    hu_thread_energy_update(&g_energy_tracker, batch_key, key_len,
-                                            energy, (uint64_t)time(NULL) * 1000ULL);
+                    hu_thread_energy_update(&g_energy_tracker, batch_key, key_len, energy,
+                                            (uint64_t)time(NULL) * 1000ULL);
                     if (energy != HU_ENERGY_NEUTRAL) {
                         char energy_buf[128];
                         size_t energy_len = hu_conversation_build_energy_directive(
@@ -5669,11 +5839,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* F17: First-time vulnerability detection — extra care when they share
                  * something personal for the first time. */
                 {
-                    hu_vulnerability_state_t vuln =
-                        hu_conversation_detect_first_time_vulnerability(
-                            combined, combined_len,
-                            agent ? agent->memory : NULL,
-                            batch_key, key_len);
+                    hu_vulnerability_state_t vuln = hu_conversation_detect_first_time_vulnerability(
+                        combined, combined_len, agent ? agent->memory : NULL, batch_key, key_len);
                     if (vuln.first_time && vuln.topic_category) {
                         char vuln_buf[512];
                         size_t vuln_len = hu_conversation_build_vulnerability_directive(
@@ -5705,9 +5872,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             /* Record so future calls return first_time=false */
                             if (agent && agent->memory) {
                                 size_t tl = strlen(vuln.topic_category);
-                                (void)hu_emotional_moment_record(
-                                    alloc, agent->memory, batch_key, key_len,
-                                    vuln.topic_category, tl, "vulnerable", 9, vuln.intensity);
+                                (void)hu_emotional_moment_record(alloc, agent->memory, batch_key,
+                                                                 key_len, vuln.topic_category, tl,
+                                                                 "vulnerable", 9, vuln.intensity);
                             }
 #endif
                         }
@@ -5790,7 +5957,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     char *attach_ctx = hu_conversation_attachment_context(
                         alloc, history_entries, history_count, &attach_ctx_len);
 #ifndef HU_IS_TEST
-                    /* Vision: provider supports vision and channel exposes latest attachment path. */
+                    /* Vision: provider supports vision and channel exposes latest attachment path.
+                     */
                     if (attach_ctx && attach_ctx_len > 0 && agent->provider.vtable &&
                         agent->provider.vtable->supports_vision &&
                         agent->provider.vtable->supports_vision(agent->provider.ctx) &&
@@ -5799,34 +5967,33 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         char *img_path = ch->channel->vtable->get_latest_attachment_path(
                             ch->channel->ctx, alloc, batch_key, key_len);
                         if (img_path) {
-                                char *desc = NULL;
-                                size_t desc_len = 0;
-                                const char *model =
-                                    agent->model_name ? agent->model_name : "gpt-4o";
-                                size_t model_len = agent->model_name_len > 0 ? agent->model_name_len
-                                                                             : strlen(model);
-                                hu_error_t verr = hu_vision_describe_image(
-                                    alloc, &agent->provider, img_path, strlen(img_path), model,
-                                    model_len, &desc, &desc_len);
-                                alloc->free(alloc->ctx, img_path, strlen(img_path) + 1);
-                                if (verr == HU_OK && desc && desc_len > 0) {
-                                    size_t vision_ctx_len = 0;
-                                    char *vision_ctx = hu_vision_build_context(
-                                        alloc, desc, desc_len, &vision_ctx_len);
-                                    alloc->free(alloc->ctx, desc, desc_len + 1);
-                                    if (vision_ctx && vision_ctx_len > 0) {
-                                        alloc->free(alloc->ctx, attach_ctx, attach_ctx_len + 1);
-                                        attach_ctx = vision_ctx;
-                                        attach_ctx_len = vision_ctx_len;
+                            char *desc = NULL;
+                            size_t desc_len = 0;
+                            const char *model = agent->model_name ? agent->model_name : "gpt-4o";
+                            size_t model_len =
+                                agent->model_name_len > 0 ? agent->model_name_len : strlen(model);
+                            hu_error_t verr = hu_vision_describe_image(
+                                alloc, &agent->provider, img_path, strlen(img_path), model,
+                                model_len, &desc, &desc_len);
+                            alloc->free(alloc->ctx, img_path, strlen(img_path) + 1);
+                            if (verr == HU_OK && desc && desc_len > 0) {
+                                size_t vision_ctx_len = 0;
+                                char *vision_ctx =
+                                    hu_vision_build_context(alloc, desc, desc_len, &vision_ctx_len);
+                                alloc->free(alloc->ctx, desc, desc_len + 1);
+                                if (vision_ctx && vision_ctx_len > 0) {
+                                    alloc->free(alloc->ctx, attach_ctx, attach_ctx_len + 1);
+                                    attach_ctx = vision_ctx;
+                                    attach_ctx_len = vision_ctx_len;
 #ifndef HU_IS_TEST
-                                        if (agent && agent->bth_metrics)
-                                            agent->bth_metrics->vision_descriptions++;
+                                    if (agent && agent->bth_metrics)
+                                        agent->bth_metrics->vision_descriptions++;
 #endif
-                                    }
-                                } else if (desc) {
-                                    alloc->free(alloc->ctx, desc, desc_len + 1);
                                 }
+                            } else if (desc) {
+                                alloc->free(alloc->ctx, desc, desc_len + 1);
                             }
+                        }
                     }
 #endif
                     if (attach_ctx && attach_ctx_len > 0) {
@@ -5934,8 +6101,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     jokes_ctx && jokes_count > 0) {
                     char jokes_buf[768];
                     const size_t jokes_cap = sizeof(jokes_buf);
-                    size_t jokes_pos = (size_t)snprintf(jokes_buf, jokes_cap,
-                                                        "Inside jokes with this contact: ");
+                    size_t jokes_pos =
+                        (size_t)snprintf(jokes_buf, jokes_cap, "Inside jokes with this contact: ");
                     if (jokes_pos >= jokes_cap)
                         jokes_pos = jokes_cap - 1;
                     for (size_t j = 0; j < jokes_count && jokes_pos < 700; j++) {
@@ -5947,24 +6114,21 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                         size_t ctx_len = strnlen(jokes_ctx[j].context, 80);
                         size_t pl_len = strnlen(jokes_ctx[j].punchline, 60);
-                        jokes_pos += (size_t)snprintf(jokes_buf + jokes_pos,
-                                                      jokes_cap - jokes_pos,
-                                                      "[%.*s] %.*s", (int)ctx_len,
-                                                      jokes_ctx[j].context,
-                                                      (int)pl_len, jokes_ctx[j].punchline);
+                        jokes_pos +=
+                            (size_t)snprintf(jokes_buf + jokes_pos, jokes_cap - jokes_pos,
+                                             "[%.*s] %.*s", (int)ctx_len, jokes_ctx[j].context,
+                                             (int)pl_len, jokes_ctx[j].punchline);
                         if (jokes_pos >= jokes_cap)
                             jokes_pos = jokes_cap - 1;
                     }
                     if (jokes_pos < jokes_cap - 32) {
-                        jokes_pos += (size_t)snprintf(jokes_buf + jokes_pos,
-                                                      jokes_cap - jokes_pos,
+                        jokes_pos += (size_t)snprintf(jokes_buf + jokes_pos, jokes_cap - jokes_pos,
                                                       ". Use naturally when relevant.");
                         if (jokes_pos >= jokes_cap)
                             jokes_pos = jokes_cap - 1;
                     }
                     if (jokes_pos > 0 && jokes_pos < sizeof(jokes_buf)) {
-                        char *jokes_str =
-                            (char *)alloc->alloc(alloc->ctx, jokes_pos + 1);
+                        char *jokes_str = (char *)alloc->alloc(alloc->ctx, jokes_pos + 1);
                         if (jokes_str) {
                             memcpy(jokes_str, jokes_buf, jokes_pos);
                             jokes_str[jokes_pos] = '\0';
@@ -5994,8 +6158,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 char *mm_json = NULL;
                 size_t mm_len = 0;
                 if (agent->memory &&
-                    hu_superhuman_micro_moment_list(agent->memory, alloc, batch_key, key_len,
-                                                    10, &mm_json, &mm_len) == HU_OK &&
+                    hu_superhuman_micro_moment_list(agent->memory, alloc, batch_key, key_len, 10,
+                                                    &mm_json, &mm_len) == HU_OK &&
                     mm_json && mm_len > 0) {
                     char mm_buf[1024];
                     int mb = snprintf(mm_buf, sizeof(mm_buf),
@@ -6033,12 +6197,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (agent->memory &&
                     hu_superhuman_avoidance_list(agent->memory, alloc, batch_key, key_len,
                                                  &avoidance_json, &avoidance_len) == HU_OK &&
-                    avoidance_json && avoidance_len > 0 &&
-                    strstr(avoidance_json, "- ") != NULL) {
+                    avoidance_json && avoidance_len > 0 && strstr(avoidance_json, "- ") != NULL) {
                     char avoid_buf[512];
-                    int ab = snprintf(avoid_buf, sizeof(avoid_buf),
-                                     "Topics they may avoid: %.*s Don't push; use for context.",
-                                     (int)(avoidance_len < 400 ? avoidance_len : 400), avoidance_json);
+                    int ab =
+                        snprintf(avoid_buf, sizeof(avoid_buf),
+                                 "Topics they may avoid: %.*s Don't push; use for context.",
+                                 (int)(avoidance_len < 400 ? avoidance_len : 400), avoidance_json);
                     if (ab > 0 && (size_t)ab < sizeof(avoid_buf)) {
                         char *avoid_str = (char *)alloc->alloc(alloc->ctx, (size_t)ab + 1);
                         if (avoid_str) {
@@ -6077,10 +6241,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                    &pattern_json, &pattern_len) == HU_OK &&
                         pattern_json && pattern_len > 0 && strstr(pattern_json, "(none)") == NULL) {
                         char pattern_buf[1024];
-                        int pb = snprintf(pattern_buf, sizeof(pattern_buf),
-                                         "Behavioral patterns observed: %.*s "
-                                         "Surface naturally for friend+ contacts.",
-                                         (int)(pattern_len < 900 ? pattern_len : 900), pattern_json);
+                        int pb =
+                            snprintf(pattern_buf, sizeof(pattern_buf),
+                                     "Behavioral patterns observed: %.*s "
+                                     "Surface naturally for friend+ contacts.",
+                                     (int)(pattern_len < 900 ? pattern_len : 900), pattern_json);
                         if (pb > 0 && (size_t)pb < sizeof(pattern_buf)) {
                             char *pattern_str = (char *)alloc->alloc(alloc->ctx, (size_t)pb + 1);
                             if (pattern_str) {
@@ -6092,8 +6257,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     if (merged) {
                                         memcpy(merged, convo_ctx, convo_ctx_len);
                                         merged[convo_ctx_len] = '\n';
-                                        memcpy(merged + convo_ctx_len + 1, pattern_str,
-                                               (size_t)pb);
+                                        memcpy(merged + convo_ctx_len + 1, pattern_str, (size_t)pb);
                                         merged[convo_ctx_len + 1 + (size_t)pb] = '\n';
                                         merged[total - 1] = '\0';
                                         alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
@@ -6120,9 +6284,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         growth_json && growth_len > 0 && strstr(growth_json, "(none)") == NULL) {
                         char growth_buf[1024];
                         int gb = snprintf(growth_buf, sizeof(growth_buf),
-                                         "Recent growth to celebrate: %.*s "
-                                         "Reference naturally when relevant.",
-                                         (int)(growth_len < 900 ? growth_len : 900), growth_json);
+                                          "Recent growth to celebrate: %.*s "
+                                          "Reference naturally when relevant.",
+                                          (int)(growth_len < 900 ? growth_len : 900), growth_json);
                         if (gb > 0 && (size_t)gb < sizeof(growth_buf)) {
                             char *growth_str = (char *)alloc->alloc(alloc->ctx, (size_t)gb + 1);
                             if (growth_str) {
@@ -6939,20 +7103,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             rel_len = strlen(cp_mr->relationship);
                         }
                     }
-                    hu_model_selection_t sel = hu_model_route(
-                        &mr_cfg, combined, combined_len, rel, rel_len,
-                        bth_hour, history_count);
+                    hu_model_selection_t sel = hu_model_route(&mr_cfg, combined, combined_len, rel,
+                                                              rel_len, bth_hour, history_count);
                     agent->turn_model = sel.model;
                     agent->turn_model_len = sel.model_len;
                     agent->turn_temperature = sel.temperature;
                     agent->turn_thinking_budget = sel.thinking_budget;
-                    static const char *tier_names[] = {"reflexive", "conversational",
-                                                       "analytical", "deep"};
+                    static const char *tier_names[] = {"reflexive", "conversational", "analytical",
+                                                       "deep"};
                     fprintf(stderr, "[human] model route: %.*s (tier=%s, thinking=%d) for %.*s\n",
-                            (int)sel.model_len, sel.model,
-                            tier_names[sel.tier < 4 ? sel.tier : 0],
-                            sel.thinking_budget,
-                            (int)(key_len > 20 ? 20 : key_len), batch_key);
+                            (int)sel.model_len, sel.model, tier_names[sel.tier < 4 ? sel.tier : 0],
+                            sel.thinking_budget, (int)(key_len > 20 ? 20 : key_len), batch_key);
                 }
 #endif
 
@@ -7154,6 +7315,42 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 #endif
 
+                /* Humanness: silence intuition — skip LLM for messages that
+                 * deserve presence, not a full response */
+                {
+                    hu_emotional_weight_t s_ew =
+                        hu_emotional_weight_classify(combined, combined_len);
+                    bool s_has_question = false;
+                    for (size_t qi = 0; qi < combined_len; qi++) {
+                        if (combined[qi] == '?') {
+                            s_has_question = true;
+                            break;
+                        }
+                    }
+                    hu_silence_response_t s_resp =
+                        hu_silence_intuit(combined, combined_len, s_ew,
+                                          (uint32_t)agent->history_count, s_has_question);
+                    if (s_resp == HU_SILENCE_ACTUAL_SILENCE) {
+                        fprintf(stderr, "[human] silence intuition: actual silence for %.*s\n",
+                                (int)(key_len > 20 ? 20 : key_len), batch_key);
+                        goto skip_llm_this_batch;
+                    }
+                    if (s_resp == HU_SILENCE_PRESENCE_ONLY ||
+                        s_resp == HU_SILENCE_BRIEF_ACKNOWLEDGE) {
+                        size_t ack_len = 0;
+                        char *ack = hu_silence_build_acknowledgment(alloc, s_resp, &ack_len);
+                        if (ack && ack_len > 0) {
+                            fprintf(stderr, "[human] silence intuition: \"%.*s\" for %.*s\n",
+                                    (int)ack_len, ack, (int)(key_len > 20 ? 20 : key_len),
+                                    batch_key);
+                            ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, ack,
+                                                      ack_len, NULL, 0);
+                            alloc->free(alloc->ctx, ack, ack_len + 1);
+                            goto skip_llm_this_batch;
+                        }
+                    }
+                }
+
                 bool retried = false;
                 fprintf(stderr, "[human] calling agent turn for %.*s...\n",
                         (int)(key_len > 20 ? 20 : key_len), batch_key);
@@ -7201,8 +7398,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         for (size_t ati = 0; ati < sizeof(ai_tells) / sizeof(ai_tells[0]); ati++) {
                             if (strcasestr(response, ai_tells[ati])) {
                                 has_ai_tell = true;
-                                fprintf(stderr,
-                                        "[human] ai-tell detected: \"%s\" in response\n",
+                                fprintf(stderr, "[human] ai-tell detected: \"%s\" in response\n",
                                         ai_tells[ati]);
                                 break;
                             }
@@ -7428,7 +7624,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
-                /* ── Phase 6 post-turn: ToM baseline, self-awareness, reciprocity (F58, F62, F63) ── */
+                /* ── Phase 6 post-turn: ToM baseline, self-awareness, reciprocity (F58, F62, F63)
+                 * ── */
 #ifdef HU_HAS_PERSONA
 #ifndef HU_IS_TEST
 #ifdef HU_ENABLE_SQLITE
@@ -7450,18 +7647,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         topic_buf[copy] = '\0';
                         topic_len = strlen(topic_buf);
                     }
-                    (void)hu_self_awareness_record_send(alloc, agent->memory, batch_key, key_len,
-                                                       we_initiated,
-                                                       topic_len > 0 ? topic_buf : NULL, topic_len);
+                    (void)hu_self_awareness_record_send(
+                        alloc, agent->memory, batch_key, key_len, we_initiated,
+                        topic_len > 0 ? topic_buf : NULL, topic_len);
                     bool we_asked = (response && (memchr(response, '?', response_len) != NULL));
                     bool we_shared = (response_len > 40);
                     (void)hu_self_awareness_update_reciprocity(alloc, agent->memory, batch_key,
-                                                              key_len, we_initiated, we_asked,
-                                                              we_shared);
+                                                               key_len, we_initiated, we_asked,
+                                                               we_shared);
                     /* Optional: set mood from life_sim state when notable */
-                    if (agent->persona &&
-                        (agent->persona->daily_routine.weekday_count > 0 ||
-                         agent->persona->daily_routine.weekend_count > 0)) {
+                    if (agent->persona && (agent->persona->daily_routine.weekday_count > 0 ||
+                                           agent->persona->daily_routine.weekend_count > 0)) {
                         time_t now_ts = time(NULL);
                         struct tm tm_buf;
                         struct tm *lt = hu_platform_localtime_r(&now_ts, &tm_buf);
@@ -7472,14 +7668,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (ls.mood_modifier && strcmp(ls.mood_modifier, "neutral") != 0) {
                             if (strcmp(ls.mood_modifier, "tired") == 0)
                                 (void)hu_mood_set(alloc, agent->memory, HU_MOOD_TIRED, 0.4f,
-                                                 "life_sim", 8);
+                                                  "life_sim", 8);
                             else if (strcmp(ls.mood_modifier, "stressed") == 0)
                                 (void)hu_mood_set(alloc, agent->memory, HU_MOOD_STRESSED, 0.4f,
-                                                 "life_sim", 8);
+                                                  "life_sim", 8);
                             else if (strcmp(ls.mood_modifier, "energetic") == 0 ||
                                      strcmp(ls.mood_modifier, "energetic_after") == 0)
                                 (void)hu_mood_set(alloc, agent->memory, HU_MOOD_ENERGIZED, 0.4f,
-                                                 "life_sim", 8);
+                                                  "life_sim", 8);
                         }
                     }
                 }
@@ -7490,17 +7686,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* F144-F146 (Pillar 25): LoRA training sample collection */
 #ifdef HU_ENABLE_SQLITE
 #ifdef HU_HAS_PERSONA
-                if (err == HU_OK && response && response_len > 0 && agent->memory &&
-                    batch_key && key_len > 0) {
+                if (err == HU_OK && response && response_len > 0 && agent->memory && batch_key &&
+                    key_len > 0) {
                     sqlite3 *lora_db = hu_sqlite_memory_get_db(agent->memory);
                     if (lora_db) {
                         char lsql[1024];
                         size_t lsql_len = 0;
-                        if (hu_lora_insert_training_sample_sql(response, response_len,
-                                combined, combined_len, (uint64_t)time(NULL),
-                                lsql, sizeof(lsql), &lsql_len) == HU_OK) {
+                        if (hu_lora_insert_training_sample_sql(
+                                response, response_len, combined, combined_len,
+                                (uint64_t)time(NULL), lsql, sizeof(lsql), &lsql_len) == HU_OK) {
                             sqlite3_stmt *ls = NULL;
-                            if (sqlite3_prepare_v2(lora_db, lsql, (int)lsql_len, &ls, NULL) == SQLITE_OK) {
+                            if (sqlite3_prepare_v2(lora_db, lsql, (int)lsql_len, &ls, NULL) ==
+                                SQLITE_OK) {
                                 sqlite3_step(ls);
                                 sqlite3_finalize(ls);
                             }
@@ -7510,27 +7707,33 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* F160-F161 (Pillar 32): Behavioral feedback from response outcomes */
 #ifdef HU_HAS_SKILLS
-                if (err == HU_OK && response && response_len > 0 && agent->memory &&
-                    batch_key && key_len > 0) {
+                if (err == HU_OK && response && response_len > 0 && agent->memory && batch_key &&
+                    key_len > 0) {
                     sqlite3 *fb_db = hu_sqlite_memory_get_db(agent->memory);
                     if (fb_db) {
                         bool fb_emoji = false, fb_laugh = false;
                         if (combined_len > 0) {
                             for (size_t fi = 0; fi < combined_len; fi++) {
                                 unsigned char fc = (unsigned char)combined[fi];
-                                if (fc >= 0xF0) { fb_emoji = true; break; }
+                                if (fc >= 0xF0) {
+                                    fb_emoji = true;
+                                    break;
+                                }
                             }
-                            static const char *const laugh_words[] = {"lol", "haha", "lmao", "rofl", NULL};
+                            static const char *const laugh_words[] = {"lol", "haha", "lmao", "rofl",
+                                                                      NULL};
                             for (const char *const *lw = laugh_words; *lw; lw++) {
-                                if (memmem(combined, combined_len, *lw, strlen(*lw)))
-                                    { fb_laugh = true; break; }
+                                if (memmem(combined, combined_len, *lw, strlen(*lw))) {
+                                    fb_laugh = true;
+                                    break;
+                                }
                             }
                         }
                         hu_feedback_class_t fb_class = hu_feedback_classify(
                             0, combined_len, fb_emoji, false, false, fb_laugh, false, false);
                         const char *fb_sig = hu_feedback_class_str(fb_class);
-                        hu_feedback_record(fb_db, "response_style", 14, batch_key, key_len,
-                                           fb_sig, strlen(fb_sig), response, response_len,
+                        hu_feedback_record(fb_db, "response_style", 14, batch_key, key_len, fb_sig,
+                                           strlen(fb_sig), response, response_len,
                                            (int64_t)time(NULL));
                     }
                 }
@@ -7546,7 +7749,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (db) {
                         char summary_buf[1024];
                         size_t sum_len = 0;
-                        int n = snprintf(summary_buf, sizeof(summary_buf), "User: %.*s. Assistant: %.*s",
+                        int n = snprintf(summary_buf, sizeof(summary_buf),
+                                         "User: %.*s. Assistant: %.*s",
                                          (int)(combined_len > 200 ? 200 : combined_len), combined,
                                          (int)(response_len > 200 ? 200 : response_len), response);
                         if (n > 0 && (size_t)n < sizeof(summary_buf))
@@ -7554,9 +7758,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (sum_len > 0) {
                             int64_t episode_id = 0;
                             (void)hu_episode_store_insert(alloc, db, batch_key, key_len,
-                                                          summary_buf, sum_len,
-                                                          NULL, 0, NULL, 0, 0.5,
-                                                          "conversation", 12, &episode_id);
+                                                          summary_buf, sum_len, NULL, 0, NULL, 0,
+                                                          0.5, "conversation", 12, &episode_id);
                         }
                     }
                 }
@@ -7726,7 +7929,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Task 18: Extraction pipeline — post-turn storage */
                 if (err == HU_OK && response && response_len > 0 && agent->memory) {
                     (void)hu_superhuman_extract_and_store(agent->memory, alloc, batch_key, key_len,
-                        combined, combined_len, response, response_len, NULL, 0);
+                                                          combined, combined_len, response,
+                                                          response_len, NULL, 0);
+                }
+
+                /* Evolved opinions: extract opinionated statements from responses */
+                if (err == HU_OK && response && response_len > 0 && agent->memory) {
+                    sqlite3 *op_db = hu_sqlite_memory_get_db(agent->memory);
+                    if (op_db) {
+                        (void)hu_evolved_opinions_extract_and_store(op_db, response, response_len,
+                                                                    (int64_t)time(NULL));
+                    }
                 }
 #endif
 
@@ -7777,7 +7990,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 history_entries = NULL;
                 history_count = 0;
 
-                /* Episodic: summarize this interaction (LLM when provider available, else rule-based) */
+                /* Episodic: summarize this interaction (LLM when provider available, else
+                 * rule-based) */
                 if (err == HU_OK && response && response_len > 0 && agent->memory) {
                     const char *ep_msgs[2] = {combined, response};
                     size_t ep_lens[2] = {combined_len, response_len};
@@ -7885,7 +8099,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         pv_pro_gov = hu_daemon_visual_attach_gov_allow(pv_now);
 #endif
                         if (hu_visual_should_send_media(combined, combined_len, &pv_kind,
-                                                         &pv_reason) &&
+                                                        &pv_reason) &&
                             pv_kind != HU_VISUAL_MEDIA_NONE &&
                             hu_visual_proactive_media_governor_allow(pv_now) && pv_pro_gov) {
                             if (pv_kind == HU_VISUAL_MEDIA_IMAGE_SEARCH) {
@@ -7894,15 +8108,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                        (combined[qlen - 1] == ' ' || combined[qlen - 1] == '\n' ||
                                         combined[qlen - 1] == '\t' || combined[qlen - 1] == '\r'))
                                     qlen--;
-                                if (qlen > 0 &&
-                                    hu_visual_search_image(alloc, combined, qlen, proactive_vis_storage,
-                                                          sizeof proactive_vis_storage) == HU_OK) {
+                                if (qlen > 0 && hu_visual_search_image(
+                                                    alloc, combined, qlen, proactive_vis_storage,
+                                                    sizeof proactive_vis_storage) == HU_OK) {
                                     proactive_vis_m[0] = proactive_vis_storage;
                                     proactive_vis_n = 1;
                                 }
                             } else if (pv_kind == HU_VISUAL_MEDIA_SCREENSHOT) {
-                                if (hu_visual_generate_screenshot(alloc, agent->policy, proactive_vis_storage,
-                                                                  sizeof proactive_vis_storage) == HU_OK) {
+                                if (hu_visual_generate_screenshot(
+                                        alloc, agent->policy, proactive_vis_storage,
+                                        sizeof proactive_vis_storage) == HU_OK) {
                                     proactive_vis_m[0] = proactive_vis_storage;
                                     proactive_vis_n = 1;
                                 }
@@ -7946,8 +8161,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                         const char *ch_name =
                             agent->active_channel ? agent->active_channel : "unknown";
-                        size_t ch_name_len =
-                            agent->active_channel ? agent->active_channel_len : 7;
+                        size_t ch_name_len = agent->active_channel ? agent->active_channel_len : 7;
                         response_len = hu_conversation_apply_fillers(
                             response, response_len, filler_cap, (uint32_t)time(NULL), ch_name,
                             ch_name_len);
@@ -8078,14 +8292,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     /* ── Voice decision: TTS when channel has voice_enabled ───── */
                     bool sent_voice = false;
                     {
-                        const char *chn_voice =
-                            ch->channel->vtable->name
-                                ? ch->channel->vtable->name(ch->channel->ctx)
-                                : NULL;
+                        const char *chn_voice = ch->channel->vtable->name
+                                                    ? ch->channel->vtable->name(ch->channel->ctx)
+                                                    : NULL;
                         const hu_channel_daemon_config_t *dcfg_voice =
                             get_active_daemon_config(config, chn_voice);
-                        bool voice_channel_ok =
-                            dcfg_voice && dcfg_voice->voice_enabled;
+                        bool voice_channel_ok = dcfg_voice && dcfg_voice->voice_enabled;
 
                         /* Unified duplex + Realtime (`voice.mode`: "realtime" or legacy
                          * `voice.tts_provider`: "realtime"). */
@@ -8124,10 +8336,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         voice_transcript, vt_len, sizeof(voice_transcript),
                                         (uint32_t)time(NULL), agent->persona->voice.nonverbals);
 
-                                    const char *emo_str =
-                                        hu_cartesia_emotion_from_context(
-                                            combined, combined_len, response, response_len,
-                                            (uint8_t)bth_hour);
+                                    const char *emo_str = hu_cartesia_emotion_from_context(
+                                        combined, combined_len, response, response_len,
+                                        (uint8_t)bth_hour);
 
                                     hu_cartesia_tts_config_t tts_cfg = {
                                         .model_id = agent->persona->voice.model[0]
@@ -8152,15 +8363,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         char audio_path[512];
                                         hu_error_t pipe_err;
                                         if (strcmp(voice_fmt, "caf") == 0) {
-                                            pipe_err = hu_audio_mp3_to_caf(
-                                                alloc, audio_bytes, audio_len, audio_path,
-                                                sizeof(audio_path));
+                                            pipe_err =
+                                                hu_audio_mp3_to_caf(alloc, audio_bytes, audio_len,
+                                                                    audio_path, sizeof(audio_path));
                                         } else {
                                             const char *temp_ext = "mp3";
                                             if (strcmp(voice_fmt, "wav") == 0)
                                                 temp_ext = "wav";
                                             else if (strcmp(voice_fmt, "ogg") == 0)
-                                                /* Cartesia has no OGG; WAV on disk until Opus encode */
+                                                /* Cartesia has no OGG; WAV on disk until Opus
+                                                 * encode */
                                                 temp_ext = "wav";
                                             pipe_err = hu_audio_tts_bytes_to_temp(
                                                 alloc, audio_bytes, audio_len, temp_ext, audio_path,
@@ -8183,7 +8395,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             }
                         }
 #endif
-                        /* Fallback: unified voice pipeline when persona Cartesia path did not send. */
+                        /* Fallback: unified voice pipeline when persona Cartesia path did not send.
+                         */
                         if (!sent_voice && voice_channel_ok && !unified_voice_active && config) {
                             hu_voice_config_t voice_cfg = {0};
                             if (hu_voice_config_from_settings(config, &voice_cfg) == HU_OK &&
@@ -8191,18 +8404,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 void *audio = NULL;
                                 size_t audio_len = 0;
                                 hu_error_t tts_err = hu_voice_tts(alloc, &voice_cfg, response,
-                                                                 response_len, &audio, &audio_len);
+                                                                  response_len, &audio, &audio_len);
                                 if (tts_err == HU_OK && audio && audio_len > 0) {
                                     unsigned char *audio_bytes = (unsigned char *)audio;
                                     char audio_path[512];
                                     hu_error_t pipe_err = HU_ERR_IO;
 #if defined(HU_ENABLE_CARTESIA)
                                     {
-                                        const char *voice_fmt = hu_tts_format_for_channel(chn_voice);
+                                        const char *voice_fmt =
+                                            hu_tts_format_for_channel(chn_voice);
                                         if (strcmp(voice_fmt, "caf") == 0) {
-                                            pipe_err = hu_audio_mp3_to_caf(
-                                                alloc, audio_bytes, audio_len, audio_path,
-                                                sizeof(audio_path));
+                                            pipe_err =
+                                                hu_audio_mp3_to_caf(alloc, audio_bytes, audio_len,
+                                                                    audio_path, sizeof(audio_path));
                                         } else {
                                             const char *temp_ext = "mp3";
                                             if (strcmp(voice_fmt, "wav") == 0)
@@ -8262,161 +8476,167 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                     if (!sent_voice) {
-                    const char *eff_ch = ch->channel->vtable->name
-                                             ? ch->channel->vtable->name(ch->channel->ctx)
-                                             : "unknown";
-                    /* F10: Missed-message acknowledgment — prepend if delay > 30 min */
-                    const char *send_ptr = response;
-                    size_t send_len = response_len;
-                    char *send_buf_ack = NULL;
-                    {
-                        time_t now_ts = time(NULL);
-                        int64_t delay_secs = (int64_t)(now_ts - poll_receive_time);
-                        struct tm tm_recv, tm_now;
-                        struct tm *pr = localtime_r(&poll_receive_time, &tm_recv);
-                        struct tm *pn = localtime_r(&now_ts, &tm_now);
-                        int recv_hr = pr ? pr->tm_hour : 0;
-                        int curr_hr = pn ? pn->tm_hour : 0;
-                        const char *ack = hu_missed_message_acknowledgment(
-                            delay_secs, recv_hr, curr_hr, (uint32_t)now_ts);
-                        if (ack) {
-                            size_t ack_len = strlen(ack);
-                            send_buf_ack =
-                                (char *)alloc->alloc(alloc->ctx, ack_len + 2 + response_len + 1);
-                            if (send_buf_ack) {
-                                memcpy(send_buf_ack, ack, ack_len);
-                                send_buf_ack[ack_len] = '\n';
-                                send_buf_ack[ack_len + 1] = '\n';
-                                memcpy(send_buf_ack + ack_len + 2, response, response_len + 1);
-                                send_ptr = send_buf_ack;
-                                send_len = ack_len + 2 + response_len;
-                            }
-                        }
-                    }
-                    /* Split response into natural multi-message fragments */
-                    uint32_t split_max = 0;
-                    if (ch->channel->vtable->get_response_constraints) {
-                        hu_channel_response_constraints_t constraints = {0};
-                        if (ch->channel->vtable->get_response_constraints(ch->channel->ctx,
-                                                                          &constraints) == HU_OK) {
-                            split_max = constraints.max_chars;
-                        }
-                    }
-                    hu_message_fragment_t fragments[4];
-                    size_t frag_count = hu_conversation_split_response(
-                        alloc, send_ptr, send_len, fragments, 4, split_max);
-                    if (frag_count > 0) {
-                        /* Stephanie2 active waiting: thinking + typing time per fragment */
-                        for (size_t f = 0; f < frag_count; f++) {
-                            if (f > 0) {
-                                /* Thinking time: 500-1500ms between fragments */
-                                uint32_t think_ms = 500 + ((uint32_t)(f * 397 + send_len) % 1000);
-                                /* Typing time: ~60 WPM -> ~5 chars/sec */
-                                uint32_t type_ms = (uint32_t)(fragments[f].text_len * 200);
-                                if (type_ms > 3000)
-                                    type_ms = 3000;
-                                uint32_t total_ms = think_ms + type_ms;
-                                if (fragments[f].delay_ms > total_ms)
-                                    total_ms = fragments[f].delay_ms;
-                                /* Late-night: stretch inter-fragment delay too */
-                                if (bth_hour >= 1 && bth_hour < 7)
-                                    total_ms = total_ms * 4;
-                                else if (bth_hour >= 0 && bth_hour < 1)
-                                    total_ms = total_ms * 3;
-                                else if (bth_hour >= 22)
-                                    total_ms = total_ms * 2;
-                                usleep((useconds_t)(total_ms * 1000));
-                            }
-#ifndef HU_IS_TEST
-                            {
-                                const char *eff = hu_conversation_classify_effect(
-                                    fragments[f].text, fragments[f].text_len);
-                                if (eff)
-                                    fprintf(stderr, "[human] %s effect: %s (%.*s)\n", eff_ch, eff,
-                                            (int)(fragments[f].text_len > 60
-                                                      ? 60
-                                                      : fragments[f].text_len),
-                                            fragments[f].text);
-                            }
-#endif
-                            const char *const *pv_ptr =
-                                (f == 0 && proactive_vis_n > 0) ? proactive_vis_m : NULL;
-                            size_t pv_cnt = (f == 0 && proactive_vis_n > 0) ? proactive_vis_n : 0;
-                            ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
-                                                      fragments[f].text, fragments[f].text_len,
-                                                      pv_ptr, pv_cnt);
-                            if (pv_cnt > 0) {
-                                uint64_t pv_rec = (uint64_t)time(NULL) * 1000ULL;
-                                hu_visual_proactive_media_governor_record(pv_rec);
-#ifndef HU_IS_TEST
-                                hu_daemon_visual_attach_gov_after_send(pv_rec);
-#endif
-                            }
-                        }
-                        for (size_t f = 0; f < frag_count; f++) {
-                            if (fragments[f].text)
-                                alloc->free(alloc->ctx, fragments[f].text,
-                                            fragments[f].text_len + 1);
-                        }
-                    } else {
-#ifndef HU_IS_TEST
+                        const char *eff_ch = ch->channel->vtable->name
+                                                 ? ch->channel->vtable->name(ch->channel->ctx)
+                                                 : "unknown";
+                        /* F10: Missed-message acknowledgment — prepend if delay > 30 min */
+                        const char *send_ptr = response;
+                        size_t send_len = response_len;
+                        char *send_buf_ack = NULL;
                         {
-                            const char *eff = hu_conversation_classify_effect(send_ptr, send_len);
-                            if (eff)
-                                fprintf(stderr, "[human] %s effect: %s (%.*s)\n", eff_ch, eff,
-                                        (int)(send_len > 60 ? 60 : send_len), send_ptr);
-                        }
-#endif
-                        {
-                            char *fmt_text = NULL;
-                            size_t fmt_len = 0;
-                            const char *send_text = send_ptr;
-                            size_t send_text_len = send_len;
-                            if (ch->channel->vtable->name) {
-                                const char *fmt_ch = ch->channel->vtable->name(ch->channel->ctx);
-                                if (fmt_ch &&
-                                    hu_channel_format_outbound(alloc, fmt_ch, strlen(fmt_ch),
-                                                               send_ptr, send_len, &fmt_text,
-                                                               &fmt_len) == HU_OK &&
-                                    fmt_text) {
-                                    send_text = fmt_text;
-                                    send_text_len = fmt_len;
+                            time_t now_ts = time(NULL);
+                            int64_t delay_secs = (int64_t)(now_ts - poll_receive_time);
+                            struct tm tm_recv, tm_now;
+                            struct tm *pr = localtime_r(&poll_receive_time, &tm_recv);
+                            struct tm *pn = localtime_r(&now_ts, &tm_now);
+                            int recv_hr = pr ? pr->tm_hour : 0;
+                            int curr_hr = pn ? pn->tm_hour : 0;
+                            const char *ack = hu_missed_message_acknowledgment(
+                                delay_secs, recv_hr, curr_hr, (uint32_t)now_ts);
+                            if (ack) {
+                                size_t ack_len = strlen(ack);
+                                send_buf_ack = (char *)alloc->alloc(alloc->ctx,
+                                                                    ack_len + 2 + response_len + 1);
+                                if (send_buf_ack) {
+                                    memcpy(send_buf_ack, ack, ack_len);
+                                    send_buf_ack[ack_len] = '\n';
+                                    send_buf_ack[ack_len + 1] = '\n';
+                                    memcpy(send_buf_ack + ack_len + 2, response, response_len + 1);
+                                    send_ptr = send_buf_ack;
+                                    send_len = ack_len + 2 + response_len;
                                 }
                             }
-                            const char *const *pv_ptr = proactive_vis_n > 0 ? proactive_vis_m : NULL;
-                            size_t pv_cnt = proactive_vis_n;
-                            ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
-                                                      send_text, send_text_len, pv_ptr, pv_cnt);
-                            if (fmt_text)
-                                alloc->free(alloc->ctx, fmt_text, fmt_len + 1);
-                            if (pv_cnt > 0) {
-                                uint64_t pv_rec = (uint64_t)time(NULL) * 1000ULL;
-                                hu_visual_proactive_media_governor_record(pv_rec);
+                        }
+                        /* Split response into natural multi-message fragments */
+                        uint32_t split_max = 0;
+                        if (ch->channel->vtable->get_response_constraints) {
+                            hu_channel_response_constraints_t constraints = {0};
+                            if (ch->channel->vtable->get_response_constraints(
+                                    ch->channel->ctx, &constraints) == HU_OK) {
+                                split_max = constraints.max_chars;
+                            }
+                        }
+                        hu_message_fragment_t fragments[4];
+                        size_t frag_count = hu_conversation_split_response(
+                            alloc, send_ptr, send_len, fragments, 4, split_max);
+                        if (frag_count > 0) {
+                            /* Stephanie2 active waiting: thinking + typing time per fragment */
+                            for (size_t f = 0; f < frag_count; f++) {
+                                if (f > 0) {
+                                    /* Thinking time: 500-1500ms between fragments */
+                                    uint32_t think_ms =
+                                        500 + ((uint32_t)(f * 397 + send_len) % 1000);
+                                    /* Typing time: ~60 WPM -> ~5 chars/sec */
+                                    uint32_t type_ms = (uint32_t)(fragments[f].text_len * 200);
+                                    if (type_ms > 3000)
+                                        type_ms = 3000;
+                                    uint32_t total_ms = think_ms + type_ms;
+                                    if (fragments[f].delay_ms > total_ms)
+                                        total_ms = fragments[f].delay_ms;
+                                    /* Late-night: stretch inter-fragment delay too */
+                                    if (bth_hour >= 1 && bth_hour < 7)
+                                        total_ms = total_ms * 4;
+                                    else if (bth_hour >= 0 && bth_hour < 1)
+                                        total_ms = total_ms * 3;
+                                    else if (bth_hour >= 22)
+                                        total_ms = total_ms * 2;
+                                    usleep((useconds_t)(total_ms * 1000));
+                                }
 #ifndef HU_IS_TEST
-                                hu_daemon_visual_attach_gov_after_send(pv_rec);
+                                {
+                                    const char *eff = hu_conversation_classify_effect(
+                                        fragments[f].text, fragments[f].text_len);
+                                    if (eff)
+                                        fprintf(stderr, "[human] %s effect: %s (%.*s)\n", eff_ch,
+                                                eff,
+                                                (int)(fragments[f].text_len > 60
+                                                          ? 60
+                                                          : fragments[f].text_len),
+                                                fragments[f].text);
+                                }
 #endif
-                            }
-                        }
-                    }
-#ifdef HU_HAS_PERSONA
-                    /* Send correction after main message (2.5–5s delay) */
-                    if (original_response) {
-                        if (has_typo_quirk && typo_seed != 0 && response && response_len > 0) {
-                            char correction[128];
-                            size_t corr_len = hu_conversation_generate_correction(
-                                original_response, original_len, response, response_len, correction,
-                                sizeof(correction), typo_seed + 1, 40);
-                            if (corr_len > 0) {
-                                unsigned int delay_ms = 2500 + (unsigned int)(typo_seed % 2500);
-                                usleep((useconds_t)(delay_ms * 1000));
+                                const char *const *pv_ptr =
+                                    (f == 0 && proactive_vis_n > 0) ? proactive_vis_m : NULL;
+                                size_t pv_cnt =
+                                    (f == 0 && proactive_vis_n > 0) ? proactive_vis_n : 0;
                                 ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
-                                                          correction, corr_len, NULL, 0);
-                                if (agent->bth_metrics)
-                                    agent->bth_metrics->corrections_sent++;
+                                                          fragments[f].text, fragments[f].text_len,
+                                                          pv_ptr, pv_cnt);
+                                if (pv_cnt > 0) {
+                                    uint64_t pv_rec = (uint64_t)time(NULL) * 1000ULL;
+                                    hu_visual_proactive_media_governor_record(pv_rec);
+#ifndef HU_IS_TEST
+                                    hu_daemon_visual_attach_gov_after_send(pv_rec);
+#endif
+                                }
+                            }
+                            for (size_t f = 0; f < frag_count; f++) {
+                                if (fragments[f].text)
+                                    alloc->free(alloc->ctx, fragments[f].text,
+                                                fragments[f].text_len + 1);
+                            }
+                        } else {
+#ifndef HU_IS_TEST
+                            {
+                                const char *eff =
+                                    hu_conversation_classify_effect(send_ptr, send_len);
+                                if (eff)
+                                    fprintf(stderr, "[human] %s effect: %s (%.*s)\n", eff_ch, eff,
+                                            (int)(send_len > 60 ? 60 : send_len), send_ptr);
+                            }
+#endif
+                            {
+                                char *fmt_text = NULL;
+                                size_t fmt_len = 0;
+                                const char *send_text = send_ptr;
+                                size_t send_text_len = send_len;
+                                if (ch->channel->vtable->name) {
+                                    const char *fmt_ch =
+                                        ch->channel->vtable->name(ch->channel->ctx);
+                                    if (fmt_ch &&
+                                        hu_channel_format_outbound(alloc, fmt_ch, strlen(fmt_ch),
+                                                                   send_ptr, send_len, &fmt_text,
+                                                                   &fmt_len) == HU_OK &&
+                                        fmt_text) {
+                                        send_text = fmt_text;
+                                        send_text_len = fmt_len;
+                                    }
+                                }
+                                const char *const *pv_ptr =
+                                    proactive_vis_n > 0 ? proactive_vis_m : NULL;
+                                size_t pv_cnt = proactive_vis_n;
+                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                          send_text, send_text_len, pv_ptr, pv_cnt);
+                                if (fmt_text)
+                                    alloc->free(alloc->ctx, fmt_text, fmt_len + 1);
+                                if (pv_cnt > 0) {
+                                    uint64_t pv_rec = (uint64_t)time(NULL) * 1000ULL;
+                                    hu_visual_proactive_media_governor_record(pv_rec);
+#ifndef HU_IS_TEST
+                                    hu_daemon_visual_attach_gov_after_send(pv_rec);
+#endif
+                                }
                             }
                         }
-                        alloc->free(alloc->ctx, original_response, original_len + 1);
-                    }
+#ifdef HU_HAS_PERSONA
+                        /* Send correction after main message (2.5–5s delay) */
+                        if (original_response) {
+                            if (has_typo_quirk && typo_seed != 0 && response && response_len > 0) {
+                                char correction[128];
+                                size_t corr_len = hu_conversation_generate_correction(
+                                    original_response, original_len, response, response_len,
+                                    correction, sizeof(correction), typo_seed + 1, 40);
+                                if (corr_len > 0) {
+                                    unsigned int delay_ms = 2500 + (unsigned int)(typo_seed % 2500);
+                                    usleep((useconds_t)(delay_ms * 1000));
+                                    ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                              correction, corr_len, NULL, 0);
+                                    if (agent->bth_metrics)
+                                        agent->bth_metrics->corrections_sent++;
+                                }
+                            }
+                            alloc->free(alloc->ctx, original_response, original_len + 1);
+                        }
 #endif
 #else
 #ifndef HU_IS_TEST
@@ -8443,7 +8663,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     send_text_len = fmt_len;
                                 }
                             }
-                            const char *const *pv_ptr = proactive_vis_n > 0 ? proactive_vis_m : NULL;
+                            const char *const *pv_ptr =
+                                proactive_vis_n > 0 ? proactive_vis_m : NULL;
                             size_t pv_cnt = proactive_vis_n;
                             ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
                                                       send_text, send_text_len, pv_ptr, pv_cnt);
@@ -8458,10 +8679,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             }
                         }
 #endif
-                    if (send_buf_ack)
-                        alloc->free(alloc->ctx, send_buf_ack, send_len + 1);
+                        if (send_buf_ack)
+                            alloc->free(alloc->ctx, send_buf_ack, send_len + 1);
                     }
-
                 }
 
                 /* F32: Update style fingerprint with our sent response */
@@ -8473,12 +8693,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Turing score: evaluate response human-likeness post-send */
                 if (response && response_len > 0 && agent->memory) {
                     hu_turing_score_t tscore;
-                    hu_error_t ts_err = hu_turing_score_heuristic(
-                        response, response_len, combined, combined_len, &tscore);
+                    hu_error_t ts_err = hu_turing_score_heuristic(response, response_len, combined,
+                                                                  combined_len, &tscore);
                     if (ts_err == HU_OK) {
-                        fprintf(stderr,
-                                "[human] turing: %d/10 [%s] for %.*s\n",
-                                tscore.overall, hu_turing_verdict_name(tscore.verdict),
+                        fprintf(stderr, "[human] turing: %d/10 [%s] for %.*s\n", tscore.overall,
+                                hu_turing_verdict_name(tscore.verdict),
                                 (int)(key_len > 20 ? 20 : key_len), batch_key);
                         sqlite3 *ts_db = hu_sqlite_memory_get_db(agent->memory);
                         if (ts_db) {
@@ -8495,16 +8714,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #if !defined(HU_IS_TEST) && defined(HU_HAS_PERSONA)
                 /* F9: Double-text — natural afterthought follow-up */
                 if (response && response_len > 0 && agent->persona && ch->channel->vtable->send &&
-                    agent->provider.vtable &&
-                    agent->provider.vtable->chat_with_system) {
+                    agent->provider.vtable && agent->provider.vtable->chat_with_system) {
                     float dt_prob = agent->persona->humanization.double_text_probability;
-                    uint32_t dt_seed = (uint32_t)time(NULL) * 1103515245u + 12345u +
-                                       (uint32_t)(uintptr_t)response;
-                    if (hu_conversation_should_double_text(
-                            response, response_len, history_entries, history_count,
-                            bth_hour, dt_seed, dt_prob)) {
+                    uint32_t dt_seed =
+                        (uint32_t)time(NULL) * 1103515245u + 12345u + (uint32_t)(uintptr_t)response;
+                    if (hu_conversation_should_double_text(response, response_len, history_entries,
+                                                           history_count, bth_hour, dt_seed,
+                                                           dt_prob)) {
                         char dt_user[512];
-                        int dt_n = snprintf(dt_user, sizeof(dt_user),
+                        int dt_n = snprintf(
+                            dt_user, sizeof(dt_user),
                             "You just sent this message: \"%.*s\"\n"
                             "Add a brief, natural follow-up thought (1 short sentence max). "
                             "Something you'd double-text a moment later.",
@@ -8512,14 +8731,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (dt_n > 0 && (size_t)dt_n < sizeof(dt_user)) {
                             char *dt_resp = NULL;
                             size_t dt_resp_len = 0;
-                            const char *dt_model = agent->model_name ? agent->model_name : "gemini-3.1-flash-lite-preview";
+                            const char *dt_model = agent->model_name
+                                                       ? agent->model_name
+                                                       : "gemini-3.1-flash-lite-preview";
                             size_t dt_model_len = agent->model_name ? agent->model_name_len : 31;
                             hu_error_t dt_err = agent->provider.vtable->chat_with_system(
                                 agent->provider.ctx, alloc,
                                 "You are texting as this person. Keep it casual, short, lowercase. "
-                                "No quotes, no explanation, just the follow-up text.", 93,
-                                dt_user, (size_t)dt_n, dt_model, dt_model_len,
-                                0.9, &dt_resp, &dt_resp_len);
+                                "No quotes, no explanation, just the follow-up text.",
+                                93, dt_user, (size_t)dt_n, dt_model, dt_model_len, 0.9, &dt_resp,
+                                &dt_resp_len);
                             if (dt_err == HU_OK && dt_resp && dt_resp_len > 0 &&
                                 dt_resp_len < 200) {
                                 unsigned int dt_delay = 10000u + (dt_seed % 35000u);
@@ -8582,6 +8803,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 #endif
 
+        /* Channel health monitor tick (every 30s by default) */
+        if (chan_monitor) {
+            int64_t mon_now = (int64_t)time(NULL);
+            if (mon_now - chan_monitor_last_ts >= 30) {
+                hu_channel_monitor_tick(chan_monitor, mon_now);
+                chan_monitor_last_ts = mon_now;
+            }
+        }
+
         struct timespec sleep_ts = {.tv_sec = tick_interval_ms / 1000,
                                     .tv_nsec = (long)(tick_interval_ms % 1000) * 1000000L};
         nanosleep(&sleep_ts, NULL);
@@ -8589,6 +8819,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
 #undef HU_STOP_FLAG
     hu_inbox_deinit(&inbox_watcher);
+    if (chan_monitor)
+        hu_channel_monitor_destroy(chan_monitor);
     if (agent)
         agent->bth_metrics = NULL;
     if (graph)

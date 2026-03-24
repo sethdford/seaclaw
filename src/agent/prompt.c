@@ -21,8 +21,7 @@ static size_t g_tone_hints_len[3] = {0, 0, 0};
 static const char *DEFAULT_TONE_HINTS[3] = {
     "The user communicates casually. Match their tone.",
     "The user is discussing technical details. Be precise and specific.",
-    "The user communicates formally. Use clear, professional language."
-};
+    "The user communicates formally. Use clear, professional language."};
 static const size_t DEFAULT_TONE_HINTS_LEN[3] = {49, 66, 65};
 
 static hu_error_t hu_prompt_data_init(hu_allocator_t *alloc) {
@@ -113,8 +112,9 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
                 goto fail;
         } else {
             /* Fallback to inline if loading fails */
-            err = append(alloc, &buf, &len, &cap,
-                         "You are Human, an AI assistant. Respond helpfully and concisely.\n\n", 64);
+            err =
+                append(alloc, &buf, &len, &cap,
+                       "You are Human, an AI assistant. Respond helpfully and concisely.\n\n", 64);
             if (err != HU_OK)
                 goto fail;
         }
@@ -230,7 +230,8 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
                 /* Fallback to inline if loading fails */
                 static const char reinforce_fallback[] =
                     "\nYou are a real person, not an AI. Stay in character.\n";
-                err = append(alloc, &buf, &len, &cap, reinforce_fallback, sizeof(reinforce_fallback) - 1);
+                err = append(alloc, &buf, &len, &cap, reinforce_fallback,
+                             sizeof(reinforce_fallback) - 1);
                 if (err != HU_OK)
                     goto fail;
             }
@@ -365,7 +366,8 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
             "<hula_program>{\"name\":\"plan\",\"version\":1,\"root\":{...}}</hula_program>\n\n"
             "Ops: call (tool + args), seq, par, branch (pred success|failure|…, then, else), "
             "loop (pred, max_iter, body), delegate (goal), emit (emit_key, emit_value). "
-            "Tool names must match the catalog above. Text outside the tag is shown to the user.\n\n";
+            "Tool names must match the catalog above. Text outside the tag is shown to the "
+            "user.\n\n";
         err = append(alloc, &buf, &len, &cap, hula_section, sizeof(hula_section) - 1);
         if (err != HU_OK)
             goto fail;
@@ -449,7 +451,8 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
         err = append(alloc, &buf, &len, &cap, "\n## Intelligence\n\n", 18);
         if (err != HU_OK)
             goto fail;
-        err = append(alloc, &buf, &len, &cap, config->intelligence_context, config->intelligence_context_len);
+        err = append(alloc, &buf, &len, &cap, config->intelligence_context,
+                     config->intelligence_context_len);
         if (err != HU_OK)
             goto fail;
         err = append(alloc, &buf, &len, &cap, "\n\n", 2);
@@ -483,8 +486,7 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
         err = append(alloc, &buf, &len, &cap, "\n## Cognition Mode: ", 20);
         if (err != HU_OK)
             goto fail;
-        err = append(alloc, &buf, &len, &cap, config->cognition_mode,
-                     config->cognition_mode_len);
+        err = append(alloc, &buf, &len, &cap, config->cognition_mode, config->cognition_mode_len);
         if (err != HU_OK)
             goto fail;
         err = append(alloc, &buf, &len, &cap, "\n\n", 2);
@@ -494,8 +496,7 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
 
     /* Episodic replay (cognitive patterns from past sessions) */
     if (config->episodic_replay && config->episodic_replay_len > 0) {
-        err = append(alloc, &buf, &len, &cap, config->episodic_replay,
-                     config->episodic_replay_len);
+        err = append(alloc, &buf, &len, &cap, config->episodic_replay, config->episodic_replay_len);
         if (err != HU_OK)
             goto fail;
     }
@@ -613,10 +614,11 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
             alloc->free(alloc->ctx, autonomy_supervised, autonomy_supervised_len + 1);
         } else {
             /* Fallback to inline if loading fails */
-            err = append(alloc, &buf, &len, &cap,
-                         "## Rules\n\nYou are in supervised mode. Ask before running destructive or "
-                         "high-impact commands.\n\n",
-                         89);
+            err =
+                append(alloc, &buf, &len, &cap,
+                       "## Rules\n\nYou are in supervised mode. Ask before running destructive or "
+                       "high-impact commands.\n\n",
+                       89);
         }
         if (err != HU_OK)
             goto fail;
@@ -725,6 +727,43 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
             goto fail;
         err = append(alloc, &buf, &len, &cap, config->constitutional_principles,
                      config->constitutional_principles_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* Humanness layer: shared references, curiosity, absence detection, opinions */
+    if (config->humanness_context && config->humanness_context_len > 0) {
+        static const char hum_hdr[] = "\n## Humanness\n\n";
+        err = append(alloc, &buf, &len, &cap, hum_hdr, sizeof(hum_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->humanness_context,
+                     config->humanness_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* Imperfect delivery: express genuine uncertainty */
+    if (config->imperfect_delivery && config->imperfect_delivery_len > 0) {
+        err = append(alloc, &buf, &len, &cap, config->imperfect_delivery,
+                     config->imperfect_delivery_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* Emotional residue carryover from prior conversations */
+    if (config->residue_carryover && config->residue_carryover_len > 0) {
+        err = append(alloc, &buf, &len, &cap, config->residue_carryover,
+                     config->residue_carryover_len);
         if (err != HU_OK)
             goto fail;
         err = append(alloc, &buf, &len, &cap, "\n", 1);
