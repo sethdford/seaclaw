@@ -10,14 +10,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define HU_VOICE_TARGET_FIRST_BYTE_MS   200
-#define HU_VOICE_TARGET_ROUND_TRIP_MS   500
-#define HU_VOICE_TARGET_INTERRUPT_MS    100
+#define HU_VOICE_TARGET_FIRST_BYTE_MS 200
+#define HU_VOICE_TARGET_ROUND_TRIP_MS 500
+#define HU_VOICE_TARGET_INTERRUPT_MS  100
 
 /** Unified duplex FSM + optional OpenAI Realtime WebSocket session. */
 typedef struct hu_voice_session {
     hu_duplex_session_t duplex;
     hu_voice_rt_session_t *rt;
+    hu_turn_action_t last_action;
     bool active;
     int64_t started_at;
     int64_t last_audio_ms;
@@ -69,5 +70,24 @@ void hu_voice_session_note_interrupt_silence(hu_voice_session_t *session);
  * Safe no-op when there are no measurements or session is inactive.
  */
 void hu_voice_session_warn_first_byte_latency_if_needed(const hu_voice_session_t *session);
+
+/* ── Micro-turn API ─────────────────────────────────────────────── */
+
+/**
+ * Inject a user-side turn signal into the duplex FSM.
+ * Returns the recommended action in *out_action.
+ */
+hu_error_t hu_voice_session_user_turn_signal(hu_voice_session_t *session, hu_turn_signal_t signal,
+                                             hu_turn_action_t *out_action);
+
+/**
+ * Inject an agent-side turn signal into the duplex FSM.
+ * Returns the recommended action in *out_action.
+ */
+hu_error_t hu_voice_session_agent_turn_signal(hu_voice_session_t *session, hu_turn_signal_t signal,
+                                              hu_turn_action_t *out_action);
+
+/** Retrieve the action recommended by the most recent FSM transition. */
+hu_turn_action_t hu_voice_session_last_action(const hu_voice_session_t *session);
 
 #endif
