@@ -48,6 +48,7 @@
 #include "human/persona.h"
 #endif
 #include "human/provider.h"
+#include "human/security/arg_inspector.h"
 #include "human/voice.h"
 
 #include <stdint.h>
@@ -916,6 +917,19 @@ hu_policy_action_t hu_agent_internal_evaluate_tool_policy(hu_agent_t *agent, con
         if (pr.action == HU_POLICY_REQUIRE_APPROVAL)
             return HU_POLICY_REQUIRE_APPROVAL;
     }
+
+    /* AEGIS-style deep argument inspection (arXiv:2603.12621) */
+    if (args_json && args_json[0]) {
+        hu_arg_inspection_t insp;
+        memset(&insp, 0, sizeof(insp));
+        if (hu_arg_inspect(tool_name, args_json, strlen(args_json), &insp) == HU_OK) {
+            if (hu_arg_inspection_should_block(&insp, agent->policy))
+                return HU_POLICY_DENY;
+            if (hu_arg_inspection_needs_approval(&insp, agent->policy))
+                return HU_POLICY_REQUIRE_APPROVAL;
+        }
+    }
+
     return base;
 }
 

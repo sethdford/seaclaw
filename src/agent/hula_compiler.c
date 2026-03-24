@@ -172,18 +172,17 @@ hu_error_t hu_hula_expand_template(hu_allocator_t *alloc, const char *tmpl, size
 }
 
 hu_error_t hu_hula_compiler_build_prompt(hu_allocator_t *alloc, const char *goal, size_t goal_len,
-                                         hu_tool_t *tools, size_t tools_count,
-                                         const char *domain, size_t domain_len, char **out,
-                                         size_t *out_len) {
+                                         hu_tool_t *tools, size_t tools_count, const char *domain,
+                                         size_t domain_len, char **out, size_t *out_len) {
     if (!alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_len = 0;
 
     size_t ex_len = 0;
-    const char *ex =
-        (domain && domain_len > 0) ? hu_hula_compiler_examples_for_domain(domain, domain_len, &ex_len)
-                                   : NULL;
+    const char *ex = (domain && domain_len > 0)
+                         ? hu_hula_compiler_examples_for_domain(domain, domain_len, &ex_len)
+                         : NULL;
 
     size_t cap = sizeof(HULA_COMPILER_SCHEMA) + sizeof(HULA_COMPILER_GOAL) + goal_len +
                  sizeof(HULA_COMPILER_TOOLS) + sizeof(HULA_COMPILER_SUFFIX) + 256 + ex_len + 32;
@@ -191,8 +190,8 @@ hu_error_t hu_hula_compiler_build_prompt(hu_allocator_t *alloc, const char *goal
         if (!tools[i].vtable || !tools[i].vtable->name)
             continue;
         const char *nm = tools[i].vtable->name(tools[i].ctx);
-        const char *ds = tools[i].vtable->description ? tools[i].vtable->description(tools[i].ctx)
-                                                        : "";
+        const char *ds =
+            tools[i].vtable->description ? tools[i].vtable->description(tools[i].ctx) : "";
         cap += (nm ? strlen(nm) : 0) + (ds ? strlen(ds) : 0) + 8;
     }
 
@@ -201,15 +200,15 @@ hu_error_t hu_hula_compiler_build_prompt(hu_allocator_t *alloc, const char *goal
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-#define APPEND(s, n)                                                                           \
-    do {                                                                                       \
-        size_t nn = (n);                                                                       \
-        if (pos + nn >= cap)                                                                   \
-            nn = cap - pos - 1;                                                                \
-        if (nn > 0) {                                                                          \
-            memcpy(buf + pos, (s), nn);                                                       \
-            pos += nn;                                                                         \
-        }                                                                                      \
+#define APPEND(s, n)                    \
+    do {                                \
+        size_t nn = (n);                \
+        if (pos + nn >= cap)            \
+            nn = cap - pos - 1;         \
+        if (nn > 0) {                   \
+            memcpy(buf + pos, (s), nn); \
+            pos += nn;                  \
+        }                               \
     } while (0)
 
     APPEND(HULA_COMPILER_SCHEMA, sizeof(HULA_COMPILER_SCHEMA) - 1);
@@ -228,8 +227,8 @@ hu_error_t hu_hula_compiler_build_prompt(hu_allocator_t *alloc, const char *goal
         if (!tools[i].vtable || !tools[i].vtable->name)
             continue;
         const char *nm = tools[i].vtable->name(tools[i].ctx);
-        const char *ds = tools[i].vtable->description ? tools[i].vtable->description(tools[i].ctx)
-                                                        : "";
+        const char *ds =
+            tools[i].vtable->description ? tools[i].vtable->description(tools[i].ctx) : "";
         if (!nm)
             continue;
         int ln = snprintf(buf + pos, cap > pos ? cap - pos : 0, "- %s: %s\n", nm, ds ? ds : "");
@@ -277,8 +276,8 @@ static const char *find_hula_tag(const char *haystack, size_t haystack_len, cons
     return NULL;
 }
 
-hu_error_t hu_hula_extract_program_from_text(hu_allocator_t *alloc, const char *text, size_t text_len,
-                                             hu_hula_program_t *out) {
+hu_error_t hu_hula_extract_program_from_text(hu_allocator_t *alloc, const char *text,
+                                             size_t text_len, hu_hula_program_t *out) {
     if (!alloc || !out)
         return HU_ERR_INVALID_ARGUMENT;
     memset(out, 0, sizeof(*out));
@@ -296,8 +295,8 @@ hu_error_t hu_hula_extract_program_from_text(hu_allocator_t *alloc, const char *
         return HU_ERR_NOT_FOUND;
 
     size_t json_len = (size_t)(close - json_start);
-    while (json_len > 0 && (json_start[0] == ' ' || json_start[0] == '\n' || json_start[0] == '\r' ||
-                            json_start[0] == '\t')) {
+    while (json_len > 0 && (json_start[0] == ' ' || json_start[0] == '\n' ||
+                            json_start[0] == '\r' || json_start[0] == '\t')) {
         json_start++;
         json_len--;
     }
@@ -379,17 +378,16 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
     hu_allocator_t *alloc, const char *goal, size_t goal_len, hu_tool_t *tools, size_t tools_count,
     hu_security_policy_t *policy, hu_observer_t *observer, hu_agent_pool_t *pool,
     hu_spawn_config_t *spawn_tpl, hu_hula_compiler_chat_fn chat_fn, void *chat_ctx,
-    const char *model_name, size_t model_name_len, double temperature,
-    const char *domain, size_t domain_len, hu_hula_compiler_done_fn done_fn, void *done_ctx,
-    bool *out_ok) {
+    const char *model_name, size_t model_name_len, double temperature, const char *domain,
+    size_t domain_len, hu_hula_compiler_done_fn done_fn, void *done_ctx, bool *out_ok) {
     if (!alloc || !out_ok || !chat_fn)
         return HU_ERR_INVALID_ARGUMENT;
     *out_ok = false;
 
     char *hprompt = NULL;
     size_t hprompt_len = 0;
-    hu_error_t err = hu_hula_compiler_build_prompt(alloc, goal, goal_len, tools, tools_count, domain,
-                                                   domain_len, &hprompt, &hprompt_len);
+    hu_error_t err = hu_hula_compiler_build_prompt(alloc, goal, goal_len, tools, tools_count,
+                                                   domain, domain_len, &hprompt, &hprompt_len);
     if (err != HU_OK)
         return err;
     if (!hprompt)
@@ -406,8 +404,9 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
             return HU_ERR_OUT_OF_MEMORY;
         }
         for (size_t ui = 0; ui < tools_count; ui++) {
-            tnames[ui] =
-                (tools[ui].vtable && tools[ui].vtable->name) ? tools[ui].vtable->name(tools[ui].ctx) : "";
+            tnames[ui] = (tools[ui].vtable && tools[ui].vtable->name)
+                             ? tools[ui].vtable->name(tools[ui].ctx)
+                             : "";
         }
         tnc = tools_count;
     }
@@ -436,7 +435,8 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
             last_err = HU_ERR_NOT_FOUND;
             if (attempt + 1 >= max_attempts)
                 break;
-            const char *note = "\n\nPrevious response was empty. Emit one valid HuLa JSON object.\n";
+            const char *note =
+                "\n\nPrevious response was empty. Emit one valid HuLa JSON object.\n";
             char *np = append_repair_suffix(alloc, hprompt, hprompt_len, note, strlen(note));
             if (!np) {
                 last_err = HU_ERR_OUT_OF_MEMORY;
@@ -482,8 +482,9 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
 
         char diag[768];
         size_t dpos = 0;
-        dpos += (size_t)snprintf(diag + dpos, sizeof(diag) - dpos,
-                                 "\n\nThe program failed validation. Fix and respond with JSON only.\n");
+        dpos += (size_t)snprintf(
+            diag + dpos, sizeof(diag) - dpos,
+            "\n\nThe program failed validation. Fix and respond with JSON only.\n");
         for (size_t di = 0; di < hv.diag_count && di < HU_HULA_MAX_DIAGS && dpos + 2 < sizeof(diag);
              di++) {
             const char *m = hv.diags[di].message ? hv.diags[di].message : "?";
@@ -514,6 +515,15 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
     if (last_err != HU_OK || !hcp.root) {
         hu_hula_program_deinit(&hcp);
         return last_err;
+    }
+
+    /* Auto-insert VERIFY nodes after high-risk tool calls */
+    {
+        static const char *const default_high_risk[] = {
+            "shell", "write_file", "delete_file", "http_request", "run_sql",
+        };
+        (void)hu_hula_auto_verify(&hcp, default_high_risk,
+                                  sizeof(default_high_risk) / sizeof(default_high_risk[0]));
     }
 
     hu_hula_exec_t hcx;
@@ -554,4 +564,70 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
     hu_hula_exec_deinit(&hcx);
     hu_hula_program_deinit(&hcp);
     return err;
+}
+
+/* ── Auto-VERIFY insertion ────────────────────────────────────────────── */
+
+static bool is_high_risk_tool(const char *name, const char *const *list, size_t list_count) {
+    if (!name || !list)
+        return false;
+    size_t nlen = strlen(name);
+    for (size_t i = 0; i < list_count; i++) {
+        if (list[i] && strlen(list[i]) == nlen && memcmp(list[i], name, nlen) == 0)
+            return true;
+    }
+    return false;
+}
+
+static size_t auto_verify_walk(hu_hula_program_t *prog, hu_hula_node_t *node,
+                               const char *const *high_risk_tools, size_t hrt_count) {
+    if (!node)
+        return 0;
+    size_t inserted = 0;
+
+    if (node->op == HU_HULA_SEQ) {
+        /*
+         * For SEQ nodes, scan children for high-risk CALLs and insert
+         * a VERIFY sibling after each one. We iterate backwards so
+         * insertions don't shift unprocessed indices.
+         */
+        for (size_t i = node->children_count; i > 0; i--) {
+            hu_hula_node_t *child = node->children[i - 1];
+            if (!child)
+                continue;
+            inserted += auto_verify_walk(prog, child, high_risk_tools, hrt_count);
+
+            if (child->op == HU_HULA_CALL && child->tool_name && child->id &&
+                is_high_risk_tool(child->tool_name, high_risk_tools, hrt_count)) {
+                if (node->children_count < HU_HULA_MAX_CHILDREN) {
+                    char vid[64];
+                    snprintf(vid, sizeof(vid), "auto_verify_%s", child->id);
+                    hu_hula_node_t *vn = hu_hula_program_alloc_node(prog, HU_HULA_VERIFY, vid);
+                    if (vn) {
+                        vn->verify_node_id = hu_strndup(&prog->alloc, child->id, strlen(child->id));
+                        vn->verify_node_id_len = strlen(child->id);
+                        vn->pred = HU_HULA_PRED_SUCCESS;
+
+                        /* Shift children to make room after current index */
+                        for (size_t j = node->children_count; j > i; j--)
+                            node->children[j] = node->children[j - 1];
+                        node->children[i] = vn;
+                        node->children_count++;
+                        inserted++;
+                    }
+                }
+            }
+        }
+    } else {
+        for (size_t i = 0; i < node->children_count; i++)
+            inserted += auto_verify_walk(prog, node->children[i], high_risk_tools, hrt_count);
+    }
+    return inserted;
+}
+
+size_t hu_hula_auto_verify(hu_hula_program_t *prog, const char *const *high_risk_tools,
+                           size_t high_risk_tool_count) {
+    if (!prog || !prog->root || !high_risk_tools || high_risk_tool_count == 0)
+        return 0;
+    return auto_verify_walk(prog, prog->root, high_risk_tools, high_risk_tool_count);
 }

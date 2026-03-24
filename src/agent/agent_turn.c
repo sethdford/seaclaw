@@ -87,6 +87,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #endif
 #include "human/cost.h"
 #include "human/provider.h"
+#include "human/security/cot_audit.h"
 #include "human/voice.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/agent/goals.h"
@@ -2354,6 +2355,36 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
         }
 
+        /* CoT audit: scan reasoning content for goal hijack / exfiltration signals */
+        if (resp.reasoning_content && resp.reasoning_content_len > 0) {
+            hu_cot_audit_result_t cot_result;
+            memset(&cot_result, 0, sizeof(cot_result));
+            if (hu_cot_audit(agent->alloc, resp.reasoning_content, resp.reasoning_content_len,
+                             &cot_result) == HU_OK) {
+                if (cot_result.verdict == HU_COT_BLOCKED) {
+                    if (agent->audit_logger) {
+                        hu_audit_event_t aev;
+                        hu_audit_event_init(&aev, HU_AUDIT_POLICY_VIOLATION);
+                        hu_audit_event_with_identity(
+                            &aev, agent->agent_id,
+                            agent->model_name ? agent->model_name : "unknown", NULL);
+                        hu_audit_event_with_action(
+                            &aev, "cot_audit", cot_result.reason ? cot_result.reason : "blocked",
+                            false, false);
+                        hu_audit_logger_log(agent->audit_logger, &aev);
+                    }
+                    hu_cot_audit_result_free(agent->alloc, &cot_result);
+                    hu_chat_response_free(agent->alloc, &resp);
+                    memset(&resp, 0, sizeof(resp));
+                    resp.content =
+                        hu_strndup(agent->alloc, "I need to reconsider my approach.", 33);
+                    resp.content_len = resp.content ? 33 : 0;
+                    continue;
+                }
+                hu_cot_audit_result_free(agent->alloc, &cot_result);
+            }
+        }
+
         /* Text-based tool call parsing for providers without native tool support */
         if (resp.tool_calls_count == 0 && resp.content && resp.content_len > 0 &&
             agent->provider.vtable->supports_native_tools &&
@@ -3880,9 +3911,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         const char *tr = hu_hula_exec_trace(&hula_exec, &trl);
                                         bool root_ok = false;
                                         if (hula_prog.root && hula_prog.root->id)
-                                            root_ok = hu_hula_exec_result(&hula_exec,
-                                                                          hula_prog.root->id)
-                                                         ->status == HU_HULA_DONE;
+                                            root_ok =
+                                                hu_hula_exec_result(&hula_exec, hula_prog.root->id)
+                                                    ->status == HU_HULA_DONE;
                                         else
                                             root_ok = true;
                                         char *pj = NULL;
