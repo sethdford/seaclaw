@@ -1,28 +1,31 @@
 /* Tests for ML subsystem: BPE tokenizer, dataloader, prepare, experiment. */
 
+#include "human/agent/speculative.h"
+#include "human/context/anticipatory.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/ml/checkpoint.h"
+#include "human/ml/cli.h"
 #include "human/ml/dataloader.h"
 #include "human/ml/evaluator.h"
 #include "human/ml/experiment.h"
+#include "human/ml/experiment_store.h"
+#include "human/ml/lora.h"
 #include "human/ml/ml.h"
 #include "human/ml/model.h"
 #include "human/ml/optimizer.h"
 #include "human/ml/prepare.h"
-#include "human/ml/cli.h"
 #include "human/ml/tokenizer_ml.h"
 #include "human/ml/train.h"
-#include "human/ml/checkpoint.h"
-#include "human/ml/experiment_store.h"
-#include "human/ml/lora.h"
+#include "human/providers/huml.h"
 #include "test_framework.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -249,8 +252,8 @@ static void test_experiment_loop_null_config(void) {
 static void test_dataloader_missing_dir(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_ml_dataloader_t *dl = NULL;
-    hu_error_t err = hu_ml_dataloader_create(&alloc, "/tmp/nonexistent_ml_dir_xyz",
-                                              4, 32, "train", &dl);
+    hu_error_t err =
+        hu_ml_dataloader_create(&alloc, "/tmp/nonexistent_ml_dir_xyz", 4, 32, "train", &dl);
     /* Should fail because directory doesn't exist or has no .bin files */
     HU_ASSERT(err != HU_OK || dl == NULL);
     if (dl)
@@ -384,11 +387,11 @@ static void test_bpe_utf8_roundtrip(void) {
     hu_bpe_tokenizer_t *tok = NULL;
     hu_bpe_tokenizer_create(&alloc, &tok);
 
-    const char *text = "\xc3\xa9\xc3\xa0\xc3\xbc";  /* éàü in UTF-8 */
+    const char *text = "\xc3\xa9\xc3\xa0\xc3\xbc"; /* éàü in UTF-8 */
     int32_t *ids = NULL;
     size_t count = 0;
     hu_bpe_tokenizer_encode(tok, text, strlen(text), &ids, &count);
-    HU_ASSERT_EQ(count, 6);  /* 3 chars * 2 bytes each */
+    HU_ASSERT_EQ(count, 6); /* 3 chars * 2 bytes each */
 
     char *decoded = NULL;
     size_t decoded_len = 0;
@@ -628,8 +631,8 @@ static void test_train_pipeline(void) {
     train_cfg.eval_tokens = 32;
 
     hu_ml_train_result_t result = {0};
-    err = hu_ml_train(&alloc, &model, &optimizer, train_dl, val_dl,
-                     &train_cfg, token_bytes, 128, &result);
+    err = hu_ml_train(&alloc, &model, &optimizer, train_dl, val_dl, &train_cfg, token_bytes, 128,
+                      &result);
 
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_GT(result.num_steps, 0);
@@ -662,17 +665,24 @@ static void test_gpt_backward_runs(void) {
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
     int32_t ids[] = {0, 1, 2, 3};
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 4*sizeof(int32_t) };
+    hu_ml_tensor_t input = {.data = ids,
+                            .shape = {1, 4, 0, 0},
+                            .ndim = 2,
+                            .dtype = HU_ML_DTYPE_I32,
+                            .size_bytes = 4 * sizeof(int32_t)};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
     size_t logits_sz = 1 * 4 * 32;
     float *d_logits = (float *)alloc.alloc(alloc.ctx, logits_sz * sizeof(float));
-    for (size_t i = 0; i < logits_sz; i++) d_logits[i] = 0.001f;
+    for (size_t i = 0; i < logits_sz; i++)
+        d_logits[i] = 0.001f;
 
-    hu_ml_tensor_t grad = { .data = d_logits, .shape = {1, 4, 32, 0}, .ndim = 3,
-                            .dtype = HU_ML_DTYPE_F32, .size_bytes = logits_sz * sizeof(float) };
+    hu_ml_tensor_t grad = {.data = d_logits,
+                           .shape = {1, 4, 32, 0},
+                           .ndim = 3,
+                           .dtype = HU_ML_DTYPE_F32,
+                           .size_bytes = logits_sz * sizeof(float)};
     HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad), HU_OK);
 
     alloc.free(alloc.ctx, d_logits, logits_sz * sizeof(float));
@@ -714,20 +724,24 @@ static void seed_output_projections(hu_model_t *model, float val) {
     for (size_t base = 2; base + 7 < pcount; base += 8) {
         float *aow = (float *)params[base + 3].data;
         size_t aow_n = params[base + 3].size_bytes / sizeof(float);
-        for (size_t j = 0; j < aow_n; j++) aow[j] = val;
+        for (size_t j = 0; j < aow_n; j++)
+            aow[j] = val;
         float *mdw = (float *)params[base + 5].data;
         size_t mdw_n = params[base + 5].size_bytes / sizeof(float);
-        for (size_t j = 0; j < mdw_n; j++) mdw[j] = val;
+        for (size_t j = 0; j < mdw_n; j++)
+            mdw[j] = val;
     }
 }
 
 /* ─── Helper: compute cross-entropy loss for given model + input/targets ── */
 
-static float compute_ce_loss(hu_allocator_t *alloc, hu_model_t *model,
-                             int32_t *ids, int32_t *targets, size_t BS, size_t V)
-{
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, BS, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = BS * sizeof(int32_t) };
+static float compute_ce_loss(hu_allocator_t *alloc, hu_model_t *model, int32_t *ids,
+                             int32_t *targets, size_t BS, size_t V) {
+    hu_ml_tensor_t input = {.data = ids,
+                            .shape = {1, BS, 0, 0},
+                            .ndim = 2,
+                            .dtype = HU_ML_DTYPE_I32,
+                            .size_bytes = BS * sizeof(int32_t)};
     hu_ml_tensor_t output = {0};
     model->vtable->forward(model->ctx, &input, &output);
     float *logits = (float *)output.data;
@@ -735,9 +749,12 @@ static float compute_ce_loss(hu_allocator_t *alloc, hu_model_t *model,
     for (size_t i = 0; i < BS; i++) {
         float *li = logits + i * V;
         float mx = li[0];
-        for (size_t k = 1; k < V; k++) if (li[k] > mx) mx = li[k];
+        for (size_t k = 1; k < V; k++)
+            if (li[k] > mx)
+                mx = li[k];
         float sum = 0.0f;
-        for (size_t k = 0; k < V; k++) sum += expf(li[k] - mx);
+        for (size_t k = 0; k < V; k++)
+            sum += expf(li[k] - mx);
         loss += -(li[targets[i]] - mx - logf(sum));
     }
     alloc->free(alloc->ctx, output.data, output.size_bytes);
@@ -786,8 +803,10 @@ static void test_gpt_backward_finite_diff(void) {
         lm_data[j] = orig;
 
         float numerical_grad = (loss_plus - loss_minus) / (2.0f * eps);
-        if (isfinite(numerical_grad)) finite_count++;
-        if (fabsf(numerical_grad) > 1e-8f) nonzero_count++;
+        if (isfinite(numerical_grad))
+            finite_count++;
+        if (fabsf(numerical_grad) > 1e-8f)
+            nonzero_count++;
     }
 
     HU_ASSERT_EQ(finite_count, (int)check_n);
@@ -812,9 +831,13 @@ static void test_gpt_register_params(void) {
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.01f, .weight_decay = 0.0f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.01f,
+                                     .unembedding_lr = 0.01f,
+                                     .matrix_lr = 0.01f,
+                                     .scalar_lr = 0.01f,
+                                     .weight_decay = 0.0f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
@@ -840,9 +863,13 @@ static void test_train_with_backward(void) {
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &gpt_cfg, &model), HU_OK);
 
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .weight_decay = 0.0f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.01f,
+                                     .unembedding_lr = 0.01f,
+                                     .matrix_lr = 0.01f,
+                                     .scalar_lr = 0.001f,
+                                     .weight_decay = 0.0f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
@@ -855,7 +882,8 @@ static void test_train_with_backward(void) {
     FILE *f = fopen(path, "wb");
     HU_ASSERT(f != NULL);
     int32_t data[16];
-    for (int i = 0; i < 16; i++) data[i] = i % 16;
+    for (int i = 0; i < 16; i++)
+        data[i] = i % 16;
     fwrite(data, sizeof(int32_t), 16, f);
     fclose(f);
 
@@ -869,11 +897,11 @@ static void test_train_with_backward(void) {
     HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, tmpdir, 2, 4, "train", &train_dl), HU_OK);
     HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, tmpdir, 2, 4, "val", &val_dl), HU_OK);
 
-    hu_training_config_t train_cfg = { .device_batch_size = 2,
-        .time_budget_secs = 5, .eval_tokens = 8, .grad_accum_steps = 1 };
+    hu_training_config_t train_cfg = {
+        .device_batch_size = 2, .time_budget_secs = 5, .eval_tokens = 8, .grad_accum_steps = 1};
     hu_ml_train_result_t result = {0};
-    hu_error_t err = hu_ml_train(&alloc, &model, &opt, train_dl, val_dl,
-                                  &train_cfg, NULL, 16, &result);
+    hu_error_t err =
+        hu_ml_train(&alloc, &model, &opt, train_dl, val_dl, &train_cfg, NULL, 16, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT(result.num_steps > 0);
 
@@ -911,7 +939,8 @@ static void test_gpt_forward_logits_finite(void) {
     for (size_t i = 0; i < 16; i++)
         ids[i] = (int32_t)(i % 128);
 
-    hu_ml_tensor_t input = {.data = ids, .shape = {2, 8, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32};
+    hu_ml_tensor_t input = {
+        .data = ids, .shape = {2, 8, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
@@ -968,7 +997,7 @@ static void test_muon_adamw_step_direction(void) {
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &cfg, &opt), HU_OK);
 
     float param[4] = {1.0f, 2.0f, 3.0f, 4.0f};
-    float grad[4]  = {1.0f, 1.0f, 1.0f, 1.0f};
+    float grad[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     float before[4];
     memcpy(before, param, sizeof(param));
 
@@ -991,7 +1020,7 @@ static void test_muon_adamw_zero_grad(void) {
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &cfg, &opt), HU_OK);
 
     float param[4] = {1.0f, 2.0f, 3.0f, 4.0f};
-    float grad[4]  = {0.5f, -0.3f, 0.2f, -0.1f};
+    float grad[4] = {0.5f, -0.3f, 0.2f, -0.1f};
     HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, 1, 4, HU_PARAM_SCALAR), HU_OK);
 
     opt.vtable->zero_grad(opt.ctx);
@@ -1012,7 +1041,7 @@ static void test_muon_adamw_lr_multiplier(void) {
 
     /* Step with multiplier=1 */
     float param_a[2] = {1.0f, 1.0f};
-    float grad_a[2]  = {1.0f, 1.0f};
+    float grad_a[2] = {1.0f, 1.0f};
     hu_ml_optimizer_t opt_a = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &cfg, &opt_a), HU_OK);
     HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt_a, param_a, grad_a, 1, 2, HU_PARAM_SCALAR), HU_OK);
@@ -1020,7 +1049,7 @@ static void test_muon_adamw_lr_multiplier(void) {
 
     /* Step with multiplier=0 (effectively no update) */
     float param_b[2] = {1.0f, 1.0f};
-    float grad_b[2]  = {1.0f, 1.0f};
+    float grad_b[2] = {1.0f, 1.0f};
     hu_ml_optimizer_t opt_b = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &cfg, &opt_b), HU_OK);
     HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt_b, param_b, grad_b, 1, 2, HU_PARAM_SCALAR), HU_OK);
@@ -1044,7 +1073,8 @@ static void test_muon_adamw_null_args(void) {
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, NULL, &opt), HU_ERR_INVALID_ARGUMENT);
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &cfg, NULL), HU_ERR_INVALID_ARGUMENT);
 
-    HU_ASSERT_EQ(hu_muon_adamw_add_param(NULL, NULL, NULL, 1, 1, HU_PARAM_SCALAR), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(NULL, NULL, NULL, 1, 1, HU_PARAM_SCALAR),
+                 HU_ERR_INVALID_ARGUMENT);
 }
 
 /* ─── MuonAdamW: add_param with zero size ──────────────────────────────── */
@@ -1056,8 +1086,10 @@ static void test_muon_adamw_add_param_zero(void) {
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &cfg, &opt), HU_OK);
 
     float param = 1.0f, grad = 0.5f;
-    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, &param, &grad, 0, 1, HU_PARAM_SCALAR), HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, &param, &grad, 1, 0, HU_PARAM_SCALAR), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, &param, &grad, 0, 1, HU_PARAM_SCALAR),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, &param, &grad, 1, 0, HU_PARAM_SCALAR),
+                 HU_ERR_INVALID_ARGUMENT);
 
     opt.vtable->deinit(opt.ctx, &alloc);
 }
@@ -1107,9 +1139,12 @@ static void test_dataloader_reset(void) {
 static void test_dataloader_null_args(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_ml_dataloader_t *dl = NULL;
-    HU_ASSERT_EQ(hu_ml_dataloader_create(NULL, "/tmp", 1, 1, "train", &dl), HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, NULL, 1, 1, "train", &dl), HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, "/tmp", 1, 1, "train", NULL), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_dataloader_create(NULL, "/tmp", 1, 1, "train", &dl),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, NULL, 1, 1, "train", &dl),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, "/tmp", 1, 1, "train", NULL),
+                 HU_ERR_INVALID_ARGUMENT);
 }
 
 /* ─── BPE tokenizer: token_byte_length ─────────────────────────────────── */
@@ -1224,14 +1259,18 @@ static int keep_count;
 static int discard_count;
 static int crash_count;
 
-static void track_status_callback(const hu_experiment_result_t *result,
-                                   void *user_data)
-{
+static void track_status_callback(const hu_experiment_result_t *result, void *user_data) {
     (void)user_data;
     switch (result->status) {
-    case HU_EXPERIMENT_KEEP: keep_count++; break;
-    case HU_EXPERIMENT_DISCARD: discard_count++; break;
-    case HU_EXPERIMENT_CRASH: crash_count++; break;
+    case HU_EXPERIMENT_KEEP:
+        keep_count++;
+        break;
+    case HU_EXPERIMENT_DISCARD:
+        discard_count++;
+        break;
+    case HU_EXPERIMENT_CRASH:
+        crash_count++;
+        break;
     }
 }
 
@@ -1330,9 +1369,7 @@ static void test_prepare_null_args(void) {
 static int experiment_callback_count;
 static hu_experiment_result_t last_callback_result;
 
-static void test_experiment_callback(const hu_experiment_result_t *result,
-                                      void *user_data)
-{
+static void test_experiment_callback(const hu_experiment_result_t *result, void *user_data) {
     (void)user_data;
     experiment_callback_count++;
     last_callback_result = *result;
@@ -1369,8 +1406,7 @@ static void test_experiment_loop_runs(void) {
     loop_cfg.convergence_threshold = 0.0;
 
     experiment_callback_count = 0;
-    hu_error_t err = hu_experiment_loop(&alloc, &loop_cfg,
-                                         test_experiment_callback, NULL);
+    hu_error_t err = hu_experiment_loop(&alloc, &loop_cfg, test_experiment_callback, NULL);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(experiment_callback_count, 2);
     HU_ASSERT(last_callback_result.status == HU_EXPERIMENT_KEEP ||
@@ -1439,8 +1475,7 @@ static void test_experiment_loop_convergence(void) {
     loop_cfg.convergence_threshold = 999.0;
 
     experiment_callback_count = 0;
-    hu_error_t err = hu_experiment_loop(&alloc, &loop_cfg,
-                                         test_experiment_callback, NULL);
+    hu_error_t err = hu_experiment_loop(&alloc, &loop_cfg, test_experiment_callback, NULL);
     HU_ASSERT_EQ(err, HU_OK);
     /* Should run but crash experiments due to missing data dir */
     HU_ASSERT(experiment_callback_count > 0);
@@ -1464,22 +1499,32 @@ static void test_train_loss_decreases(void) {
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &gpt_cfg, &model), HU_OK);
 
     /* Conservative LRs for SOTA init + Newton-Schulz Muon */
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.005f, .unembedding_lr = 0.005f,
-        .matrix_lr = 0.002f, .scalar_lr = 0.001f, .weight_decay = 0.0f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.005f,
+                                     .unembedding_lr = 0.005f,
+                                     .matrix_lr = 0.002f,
+                                     .scalar_lr = 0.001f,
+                                     .weight_decay = 0.0f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
 
     int32_t ids[8], targets[8];
-    for (int i = 0; i < 8; i++) { ids[i] = i % 16; targets[i] = (i + 1) % 16; }
+    for (int i = 0; i < 8; i++) {
+        ids[i] = i % 16;
+        targets[i] = (i + 1) % 16;
+    }
     size_t V = 16, BS = 8;
 
     float first_loss = 0.0f, final_loss = 0.0f;
 
     for (int step = 0; step < 40; step++) {
-        hu_ml_tensor_t input = { .data = ids, .shape = {1, 8, 0, 0}, .ndim = 2,
-                                 .dtype = HU_ML_DTYPE_I32, .size_bytes = 8 * sizeof(int32_t) };
+        hu_ml_tensor_t input = {.data = ids,
+                                .shape = {1, 8, 0, 0},
+                                .ndim = 2,
+                                .dtype = HU_ML_DTYPE_I32,
+                                .size_bytes = 8 * sizeof(int32_t)};
         hu_ml_tensor_t output = {0};
         HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
@@ -1491,21 +1536,32 @@ static void test_train_loss_decreases(void) {
             float *li = logits + i * V;
             float *di = d_logits + i * V;
             float mx = li[0];
-            for (size_t k = 1; k < V; k++) if (li[k] > mx) mx = li[k];
+            for (size_t k = 1; k < V; k++)
+                if (li[k] > mx)
+                    mx = li[k];
             float sum = 0;
-            for (size_t k = 0; k < V; k++) { di[k] = expf(li[k] - mx); sum += di[k]; }
-            for (size_t k = 0; k < V; k++) di[k] /= sum;
+            for (size_t k = 0; k < V; k++) {
+                di[k] = expf(li[k] - mx);
+                sum += di[k];
+            }
+            for (size_t k = 0; k < V; k++)
+                di[k] /= sum;
             loss += -logf(di[targets[i]] + 1e-10f);
             di[targets[i]] -= 1.0f;
-            for (size_t k = 0; k < V; k++) di[k] /= (float)BS;
+            for (size_t k = 0; k < V; k++)
+                di[k] /= (float)BS;
         }
         loss /= (float)BS;
 
-        if (step == 0) first_loss = loss;
+        if (step == 0)
+            first_loss = loss;
         final_loss = loss;
 
-        hu_ml_tensor_t grad = { .data = d_logits, .shape = {1, 8, 16, 0}, .ndim = 3,
-                                .dtype = HU_ML_DTYPE_F32, .size_bytes = BS * V * sizeof(float) };
+        hu_ml_tensor_t grad = {.data = d_logits,
+                               .shape = {1, 8, 16, 0},
+                               .ndim = 3,
+                               .dtype = HU_ML_DTYPE_F32,
+                               .size_bytes = BS * V * sizeof(float)};
         HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad), HU_OK);
 
         opt.vtable->step(opt.ctx, NULL, NULL, 0);
@@ -1531,7 +1587,8 @@ static void test_grad_accumulation(void) {
     HU_ASSERT(mkdtemp(tmpdir) != NULL);
 
     int32_t data[64];
-    for (int i = 0; i < 64; i++) data[i] = i % 16;
+    for (int i = 0; i < 64; i++)
+        data[i] = i % 16;
     char path[256];
     snprintf(path, sizeof(path), "%s/train.bin", tmpdir);
     FILE *f = fopen(path, "wb");
@@ -1554,9 +1611,13 @@ static void test_grad_accumulation(void) {
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &gpt_cfg, &model), HU_OK);
 
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .weight_decay = 0.0f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.01f,
+                                     .unembedding_lr = 0.01f,
+                                     .matrix_lr = 0.01f,
+                                     .scalar_lr = 0.001f,
+                                     .weight_decay = 0.0f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
@@ -1566,11 +1627,11 @@ static void test_grad_accumulation(void) {
     HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, tmpdir, 2, 4, "val", &val_dl), HU_OK);
 
     /* Train with grad_accum_steps = 2 */
-    hu_training_config_t train_cfg = { .device_batch_size = 2,
-        .time_budget_secs = 5, .eval_tokens = 8, .grad_accum_steps = 2 };
+    hu_training_config_t train_cfg = {
+        .device_batch_size = 2, .time_budget_secs = 5, .eval_tokens = 8, .grad_accum_steps = 2};
     hu_ml_train_result_t result = {0};
-    hu_error_t err = hu_ml_train(&alloc, &model, &opt, train_dl, val_dl,
-                                  &train_cfg, NULL, 16, &result);
+    hu_error_t err =
+        hu_ml_train(&alloc, &model, &opt, train_dl, val_dl, &train_cfg, NULL, 16, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT(result.num_steps > 0);
 
@@ -1603,8 +1664,8 @@ static void test_checkpoint_roundtrip(void) {
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
     hu_ml_optimizer_t opt = {0};
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.001f };
+    hu_optimizer_config_t opt_cfg = {
+        .embedding_lr = 0.01f, .unembedding_lr = 0.01f, .matrix_lr = 0.01f, .scalar_lr = 0.001f};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
 
     const char *ckpt_path = "/tmp/test_ml_checkpoint.bin";
@@ -1632,7 +1693,10 @@ static void test_checkpoint_roundtrip(void) {
     int match = 1;
     float *restored = (float *)params[0].data;
     for (size_t i = 0; i < first_sz / sizeof(float); i++) {
-        if (fabsf(restored[i] - orig_vals[i]) > 1e-8f) { match = 0; break; }
+        if (fabsf(restored[i] - orig_vals[i]) > 1e-8f) {
+            match = 0;
+            break;
+        }
     }
     HU_ASSERT_EQ(match, 1);
 
@@ -1721,15 +1785,22 @@ static void test_experiment_store_null_args(void) {
 
 static void test_newton_schulz_orthogonal(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .weight_decay = 0.0f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.01f,
+                                     .unembedding_lr = 0.01f,
+                                     .matrix_lr = 0.01f,
+                                     .scalar_lr = 0.001f,
+                                     .weight_decay = 0.0f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
 
     /* 4×8 matrix param and grad */
     float param[32], grad[32];
-    for (int i = 0; i < 32; i++) { param[i] = 0.1f * (float)i; grad[i] = 0.01f * (float)(i + 1); }
+    for (int i = 0; i < 32; i++) {
+        param[i] = 0.1f * (float)i;
+        grad[i] = 0.01f * (float)(i + 1);
+    }
     HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, 4, 8, HU_PARAM_MATRIX), HU_OK);
 
     /* Run one step — the internal NS orthogonalizes the update direction */
@@ -1739,16 +1810,19 @@ static void test_newton_schulz_orthogonal(void) {
     int changed = 0;
     for (int i = 0; i < 32; i++) {
         HU_ASSERT(isfinite(param[i]));
-        if (fabsf(param[i] - 0.1f * (float)i) > 1e-8f) changed = 1;
+        if (fabsf(param[i] - 0.1f * (float)i) > 1e-8f)
+            changed = 1;
     }
     HU_ASSERT(changed);
 
     /* Verify the update was non-trivial: run a few more steps */
     for (int step = 0; step < 5; step++) {
-        for (int i = 0; i < 32; i++) grad[i] = 0.01f * (float)(i + step + 2);
+        for (int i = 0; i < 32; i++)
+            grad[i] = 0.01f * (float)(i + step + 2);
         HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
     }
-    for (int i = 0; i < 32; i++) HU_ASSERT(isfinite(param[i]));
+    for (int i = 0; i < 32; i++)
+        HU_ASSERT(isfinite(param[i]));
 
     opt.vtable->deinit(opt.ctx, &alloc);
 }
@@ -1757,15 +1831,19 @@ static void test_newton_schulz_orthogonal(void) {
 
 static void test_newton_schulz_tall_matrix(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_optimizer_config_t opt_cfg = { .matrix_lr = 0.01f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.matrix_lr = 0.01f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
 
     float param[24], grad[24];
-    for (int i = 0; i < 24; i++) { param[i] = (float)i * 0.05f; grad[i] = (float)(i + 1) * 0.02f; }
+    for (int i = 0; i < 24; i++) {
+        param[i] = (float)i * 0.05f;
+        grad[i] = (float)(i + 1) * 0.02f;
+    }
     HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, 6, 4, HU_PARAM_MATRIX), HU_OK);
     HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
-    for (int i = 0; i < 24; i++) HU_ASSERT(isfinite(param[i]));
+    for (int i = 0; i < 24; i++)
+        HU_ASSERT(isfinite(param[i]));
 
     opt.vtable->deinit(opt.ctx, &alloc);
 }
@@ -1774,9 +1852,14 @@ static void test_newton_schulz_tall_matrix(void) {
 
 static void test_grad_clipping(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.01f, .weight_decay = 0.0f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f, .grad_clip_norm = 1.0f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.01f,
+                                     .unembedding_lr = 0.01f,
+                                     .matrix_lr = 0.01f,
+                                     .scalar_lr = 0.01f,
+                                     .weight_decay = 0.0f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f,
+                                     .grad_clip_norm = 1.0f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
 
@@ -1790,13 +1873,15 @@ static void test_grad_clipping(void) {
     HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
 
     /* Params should have changed, but clipping limits the step size */
-    for (int i = 0; i < 4; i++) HU_ASSERT(isfinite(param[i]));
+    for (int i = 0; i < 4; i++)
+        HU_ASSERT(isfinite(param[i]));
     /* With clip_norm=1.0, the gradient norm (200) is clipped to 1.0,
      * so the effective gradient is ~(0.005, ...) — very small update */
     float max_delta = 0.0f;
     for (int i = 0; i < 4; i++) {
         float d = fabsf(param[i] - before[i]);
-        if (d > max_delta) max_delta = d;
+        if (d > max_delta)
+            max_delta = d;
     }
     HU_ASSERT(max_delta < 1.0f);
 
@@ -1807,23 +1892,30 @@ static void test_grad_clipping(void) {
 
 static void test_momentum_schedule(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_optimizer_config_t opt_cfg = { .matrix_lr = 0.01f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f,
-        .muon_beta_start = 0.5f, .muon_beta_end = 0.9f,
-        .muon_beta_ramp_steps = 10 };
+    hu_optimizer_config_t opt_cfg = {.matrix_lr = 0.01f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f,
+                                     .muon_beta_start = 0.5f,
+                                     .muon_beta_end = 0.9f,
+                                     .muon_beta_ramp_steps = 10};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
 
     float param[16], grad[16];
-    for (int i = 0; i < 16; i++) { param[i] = (float)i * 0.1f; grad[i] = 0.01f; }
+    for (int i = 0; i < 16; i++) {
+        param[i] = (float)i * 0.1f;
+        grad[i] = 0.01f;
+    }
     HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, 4, 4, HU_PARAM_MATRIX), HU_OK);
 
     /* Run 15 steps — beta should ramp from 0.5 to 0.9 over first 10, then stay at 0.9 */
     for (int step = 0; step < 15; step++) {
-        for (int i = 0; i < 16; i++) grad[i] = 0.01f * (float)(step + 1);
+        for (int i = 0; i < 16; i++)
+            grad[i] = 0.01f * (float)(step + 1);
         HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
     }
-    for (int i = 0; i < 16; i++) HU_ASSERT(isfinite(param[i]));
+    for (int i = 0; i < 16; i++)
+        HU_ASSERT(isfinite(param[i]));
 
     opt.vtable->deinit(opt.ctx, &alloc);
 }
@@ -1833,27 +1925,37 @@ static void test_momentum_schedule(void) {
 static void test_gpt_gelu_activation(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 8; cfg.vocab_size = 16; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 16; cfg.head_dim = 8;
+    cfg.sequence_len = 8;
+    cfg.vocab_size = 16;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 16;
+    cfg.head_dim = 8;
     cfg.activation = HU_ML_ACT_GELU;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
-    int32_t ids[8] = {0,1,2,3,4,5,6,7};
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, 8, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 32 };
+    int32_t ids[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    hu_ml_tensor_t input = {
+        .data = ids, .shape = {1, 8, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 32};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
     float *logits = (float *)output.data;
-    for (size_t i = 0; i < 8 * 16; i++) HU_ASSERT(isfinite(logits[i]));
+    for (size_t i = 0; i < 8 * 16; i++)
+        HU_ASSERT(isfinite(logits[i]));
 
     /* Backward should also work with GELU */
     float *d_logits = (float *)alloc.alloc(alloc.ctx, output.size_bytes);
-    for (size_t i = 0; i < 8 * 16; i++) d_logits[i] = 0.001f;
-    hu_ml_tensor_t grad = { .data = d_logits, .shape = {1, 8, 16, 0}, .ndim = 3,
-                            .dtype = HU_ML_DTYPE_F32, .size_bytes = output.size_bytes };
+    for (size_t i = 0; i < 8 * 16; i++)
+        d_logits[i] = 0.001f;
+    hu_ml_tensor_t grad = {.data = d_logits,
+                           .shape = {1, 8, 16, 0},
+                           .ndim = 3,
+                           .dtype = HU_ML_DTYPE_F32,
+                           .size_bytes = output.size_bytes};
     HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad), HU_OK);
 
     alloc.free(alloc.ctx, d_logits, output.size_bytes);
@@ -1866,27 +1968,37 @@ static void test_gpt_gelu_activation(void) {
 static void test_gpt_swiglu_activation(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 8; cfg.vocab_size = 16; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 16; cfg.head_dim = 8;
+    cfg.sequence_len = 8;
+    cfg.vocab_size = 16;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 16;
+    cfg.head_dim = 8;
     cfg.activation = HU_ML_ACT_SWIGLU;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
-    int32_t ids[8] = {0,1,2,3,4,5,6,7};
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, 8, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 32 };
+    int32_t ids[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    hu_ml_tensor_t input = {
+        .data = ids, .shape = {1, 8, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 32};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
     float *logits = (float *)output.data;
-    for (size_t i = 0; i < 8 * 16; i++) HU_ASSERT(isfinite(logits[i]));
+    for (size_t i = 0; i < 8 * 16; i++)
+        HU_ASSERT(isfinite(logits[i]));
 
     /* Backward should also work with SwiGLU */
     float *d_logits = (float *)alloc.alloc(alloc.ctx, output.size_bytes);
-    for (size_t i = 0; i < 8 * 16; i++) d_logits[i] = 0.001f;
-    hu_ml_tensor_t grad = { .data = d_logits, .shape = {1, 8, 16, 0}, .ndim = 3,
-                            .dtype = HU_ML_DTYPE_F32, .size_bytes = output.size_bytes };
+    for (size_t i = 0; i < 8 * 16; i++)
+        d_logits[i] = 0.001f;
+    hu_ml_tensor_t grad = {.data = d_logits,
+                           .shape = {1, 8, 16, 0},
+                           .ndim = 3,
+                           .dtype = HU_ML_DTYPE_F32,
+                           .size_bytes = output.size_bytes};
     HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad), HU_OK);
 
     alloc.free(alloc.ctx, d_logits, output.size_bytes);
@@ -1899,8 +2011,13 @@ static void test_gpt_swiglu_activation(void) {
 static void test_gpt_swiglu_fewer_params(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg_relu = {0};
-    cfg_relu.sequence_len = 8; cfg_relu.vocab_size = 16; cfg_relu.n_layer = 1;
-    cfg_relu.n_head = 2; cfg_relu.n_kv_head = 2; cfg_relu.n_embd = 16; cfg_relu.head_dim = 8;
+    cfg_relu.sequence_len = 8;
+    cfg_relu.vocab_size = 16;
+    cfg_relu.n_layer = 1;
+    cfg_relu.n_head = 2;
+    cfg_relu.n_kv_head = 2;
+    cfg_relu.n_embd = 16;
+    cfg_relu.head_dim = 8;
     cfg_relu.activation = HU_ML_ACT_RELU_SQ;
 
     hu_gpt_config_t cfg_swiglu = cfg_relu;
@@ -1924,22 +2041,29 @@ static void test_gpt_swiglu_fewer_params(void) {
 static void test_gpt_window_attention(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 16; cfg.vocab_size = 32; cfg.n_layer = 2;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 16; cfg.head_dim = 8;
+    cfg.sequence_len = 16;
+    cfg.vocab_size = 32;
+    cfg.n_layer = 2;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 16;
+    cfg.head_dim = 8;
     memcpy(cfg.window_pattern, "SL", 3);
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
     int32_t ids[16];
-    for (int i = 0; i < 16; i++) ids[i] = i % 32;
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, 16, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 64 };
+    for (int i = 0; i < 16; i++)
+        ids[i] = i % 32;
+    hu_ml_tensor_t input = {
+        .data = ids, .shape = {1, 16, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 64};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
     float *logits = (float *)output.data;
-    for (size_t i = 0; i < 16 * 32; i++) HU_ASSERT(isfinite(logits[i]));
+    for (size_t i = 0; i < 16 * 32; i++)
+        HU_ASSERT(isfinite(logits[i]));
 
     alloc.free(alloc.ctx, output.data, output.size_bytes);
     model.vtable->deinit(model.ctx, &alloc);
@@ -1950,8 +2074,13 @@ static void test_gpt_window_attention(void) {
 static void test_gpt_odd_head_dim_rejected(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 8; cfg.vocab_size = 16; cfg.n_layer = 1;
-    cfg.n_head = 3; cfg.n_kv_head = 3; cfg.n_embd = 9; cfg.head_dim = 3;
+    cfg.sequence_len = 8;
+    cfg.vocab_size = 16;
+    cfg.n_layer = 1;
+    cfg.n_head = 3;
+    cfg.n_kv_head = 3;
+    cfg.n_embd = 9;
+    cfg.head_dim = 3;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_ERR_INVALID_ARGUMENT);
@@ -1962,12 +2091,17 @@ static void test_gpt_odd_head_dim_rejected(void) {
 static void test_checkpoint_invalid_file(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 8; cfg.vocab_size = 16; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 16; cfg.head_dim = 8;
+    cfg.sequence_len = 8;
+    cfg.vocab_size = 16;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 16;
+    cfg.head_dim = 8;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
-    hu_optimizer_config_t opt_cfg = { .matrix_lr = 0.01f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.matrix_lr = 0.01f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
 
@@ -2006,26 +2140,36 @@ static void test_checkpoint_invalid_file(void) {
 static void test_gpt_gqa(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 8; cfg.vocab_size = 16; cfg.n_layer = 1;
-    cfg.n_head = 4; cfg.n_kv_head = 2; cfg.n_embd = 16; cfg.head_dim = 4;
+    cfg.sequence_len = 8;
+    cfg.vocab_size = 16;
+    cfg.n_layer = 1;
+    cfg.n_head = 4;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 16;
+    cfg.head_dim = 4;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
-    int32_t ids[8] = {0,1,2,3,4,5,6,7};
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, 8, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 32 };
+    int32_t ids[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    hu_ml_tensor_t input = {
+        .data = ids, .shape = {1, 8, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 32};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
     float *logits = (float *)output.data;
-    for (size_t i = 0; i < 8 * 16; i++) HU_ASSERT(isfinite(logits[i]));
+    for (size_t i = 0; i < 8 * 16; i++)
+        HU_ASSERT(isfinite(logits[i]));
 
     /* Backward should work with GQA */
     float *d_logits = (float *)alloc.alloc(alloc.ctx, output.size_bytes);
-    for (size_t i = 0; i < 8 * 16; i++) d_logits[i] = 0.001f;
-    hu_ml_tensor_t grad = { .data = d_logits, .shape = {1, 8, 16, 0}, .ndim = 3,
-                            .dtype = HU_ML_DTYPE_F32, .size_bytes = output.size_bytes };
+    for (size_t i = 0; i < 8 * 16; i++)
+        d_logits[i] = 0.001f;
+    hu_ml_tensor_t grad = {.data = d_logits,
+                           .shape = {1, 8, 16, 0},
+                           .ndim = 3,
+                           .dtype = HU_ML_DTYPE_F32,
+                           .size_bytes = output.size_bytes};
     HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad), HU_OK);
 
     alloc.free(alloc.ctx, d_logits, output.size_bytes);
@@ -2038,8 +2182,13 @@ static void test_gpt_gqa(void) {
 static void test_gpt_backward_finite_diff_deep(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 2; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 4; cfg.head_dim = 2;
+    cfg.sequence_len = 2;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 4;
+    cfg.head_dim = 2;
 
     int32_t ids[] = {0, 1};
     int32_t targets[] = {1, 2};
@@ -2059,7 +2208,8 @@ static void test_gpt_backward_finite_diff_deep(void) {
     size_t check_indices[] = {2, 6};
     for (int ci = 0; ci < 2; ci++) {
         size_t pi = check_indices[ci];
-        if (pi >= pcount) continue;
+        if (pi >= pcount)
+            continue;
         float *data = (float *)params[pi].data;
         size_t sz = params[pi].size_bytes / sizeof(float);
         size_t check_n = sz < 4 ? sz : 4;
@@ -2070,8 +2220,11 @@ static void test_gpt_backward_finite_diff_deep(void) {
 
         float *d_logits_tmp = (float *)alloc.alloc(alloc.ctx, BS * V * sizeof(float));
         {
-            hu_ml_tensor_t inp = { .data = ids, .shape = {1, BS, 0, 0}, .ndim = 2,
-                                   .dtype = HU_ML_DTYPE_I32, .size_bytes = BS * 4 };
+            hu_ml_tensor_t inp = {.data = ids,
+                                  .shape = {1, BS, 0, 0},
+                                  .ndim = 2,
+                                  .dtype = HU_ML_DTYPE_I32,
+                                  .size_bytes = BS * 4};
             hu_ml_tensor_t out = {0};
             model.vtable->forward(model.ctx, &inp, &out);
             float *logits = (float *)out.data;
@@ -2080,15 +2233,25 @@ static void test_gpt_backward_finite_diff_deep(void) {
                 float *li = logits + i * V;
                 float *di = d_logits_tmp + i * V;
                 float mx = li[0];
-                for (size_t k = 1; k < V; k++) if (li[k] > mx) mx = li[k];
+                for (size_t k = 1; k < V; k++)
+                    if (li[k] > mx)
+                        mx = li[k];
                 float sum = 0.0f;
-                for (size_t k = 0; k < V; k++) { di[k] = expf(li[k] - mx); sum += di[k]; }
-                for (size_t k = 0; k < V; k++) di[k] /= sum;
+                for (size_t k = 0; k < V; k++) {
+                    di[k] = expf(li[k] - mx);
+                    sum += di[k];
+                }
+                for (size_t k = 0; k < V; k++)
+                    di[k] /= sum;
                 di[targets[i]] -= 1.0f;
-                for (size_t k = 0; k < V; k++) di[k] /= (float)BS;
+                for (size_t k = 0; k < V; k++)
+                    di[k] /= (float)BS;
             }
-            hu_ml_tensor_t grad = { .data = d_logits_tmp, .shape = {1, BS, V, 0}, .ndim = 3,
-                                    .dtype = HU_ML_DTYPE_F32, .size_bytes = BS * V * 4 };
+            hu_ml_tensor_t grad = {.data = d_logits_tmp,
+                                   .shape = {1, BS, V, 0},
+                                   .ndim = 3,
+                                   .dtype = HU_ML_DTYPE_F32,
+                                   .size_bytes = BS * V * 4};
             model.vtable->backward(model.ctx, &grad);
             alloc.free(alloc.ctx, out.data, out.size_bytes);
         }
@@ -2124,15 +2287,20 @@ static void test_gpt_backward_finite_diff_deep(void) {
 static void test_gpt_soft_capping(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
-    int32_t ids[4] = {0,1,2,3};
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 16 };
+    int32_t ids[4] = {0, 1, 2, 3};
+    hu_ml_tensor_t input = {
+        .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
@@ -2152,14 +2320,19 @@ static void test_gpt_soft_capping(void) {
 static void test_gpt_residual_lambda(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
     seed_output_projections(&model, 0.01f);
 
-    int32_t ids[4] = {0,1,2,3};
+    int32_t ids[4] = {0, 1, 2, 3};
     hu_ml_tensor_t *params = NULL;
     size_t pcount = 0;
     model.vtable->get_params(model.ctx, &params, &pcount);
@@ -2171,15 +2344,15 @@ static void test_gpt_residual_lambda(void) {
 
     *rl = 1.0f;
     hu_ml_tensor_t output1 = {0};
-    hu_ml_tensor_t input1 = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                              .dtype = HU_ML_DTYPE_I32, .size_bytes = 16 };
+    hu_ml_tensor_t input1 = {
+        .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input1, &output1), HU_OK);
     float logit_a = ((float *)output1.data)[0];
 
     *rl = 10.0f;
     hu_ml_tensor_t output2 = {0};
-    hu_ml_tensor_t input2 = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                              .dtype = HU_ML_DTYPE_I32, .size_bytes = 16 };
+    hu_ml_tensor_t input2 = {
+        .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input2, &output2), HU_OK);
     float logit_b = ((float *)output2.data)[0];
 
@@ -2198,23 +2371,32 @@ static void test_gpt_residual_lambda(void) {
 static void test_gpt_multilayer_backward(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 3;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 3;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
     seed_output_projections(&model, 0.01f);
 
-    int32_t ids[4] = {0,1,2,3};
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 16 };
+    int32_t ids[4] = {0, 1, 2, 3};
+    hu_ml_tensor_t input = {
+        .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
     float *d_logits = (float *)alloc.alloc(alloc.ctx, output.size_bytes);
-    for (size_t i = 0; i < 4 * 8; i++) d_logits[i] = 0.001f;
-    hu_ml_tensor_t grad = { .data = d_logits, .shape = {1, 4, 8, 0}, .ndim = 3,
-                            .dtype = HU_ML_DTYPE_F32, .size_bytes = output.size_bytes };
+    for (size_t i = 0; i < 4 * 8; i++)
+        d_logits[i] = 0.001f;
+    hu_ml_tensor_t grad = {.data = d_logits,
+                           .shape = {1, 4, 8, 0},
+                           .ndim = 3,
+                           .dtype = HU_ML_DTYPE_F32,
+                           .size_bytes = output.size_bytes};
     HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad), HU_OK);
 
     hu_ml_tensor_t *params = NULL;
@@ -2226,7 +2408,7 @@ static void test_gpt_multilayer_backward(void) {
     float *lm = (float *)params[1].data;
     size_t lm_sz = params[1].size_bytes / sizeof(float);
 
-    int32_t targets[] = {1,2,3,4};
+    int32_t targets[] = {1, 2, 3, 4};
     float eps = 5e-3f;
     int nonzero = 0;
     size_t check_n = lm_sz < 4 ? lm_sz : 4;
@@ -2238,7 +2420,8 @@ static void test_gpt_multilayer_backward(void) {
         float lm_loss = compute_ce_loss(&alloc, &model, ids, targets, 4, 8);
         lm[j] = orig;
         float ng = (lp - lm_loss) / (2.0f * eps);
-        if (isfinite(ng) && fabsf(ng) > 1e-8f) nonzero++;
+        if (isfinite(ng) && fabsf(ng) > 1e-8f)
+            nonzero++;
     }
     HU_ASSERT(nonzero > 0);
 
@@ -2252,8 +2435,13 @@ static void test_gpt_multilayer_backward(void) {
 static void test_gpt_swiglu_finite_diff(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 16; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 16;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
     cfg.activation = HU_ML_ACT_SWIGLU;
 
     int32_t ids[] = {0, 1, 2, 3};
@@ -2285,8 +2473,10 @@ static void test_gpt_swiglu_finite_diff(void) {
         lm_data[j] = orig;
 
         float ng = (loss_plus - loss_minus) / (2.0f * eps);
-        if (isfinite(ng)) finite_count++;
-        if (fabsf(ng) > 1e-8f) nonzero_count++;
+        if (isfinite(ng))
+            finite_count++;
+        if (fabsf(ng) > 1e-8f)
+            nonzero_count++;
     }
 
     HU_ASSERT_EQ(finite_count, (int)check_n);
@@ -2315,7 +2505,8 @@ static void test_lr_schedule_edge_cases(void) {
     /* warmup + warmdown > 1.0 → no stable plateau, warmup transitions into warmdown */
     r = hu_ml_lr_schedule(0.5f, 0.6f, 0.6f, 0.0f);
     /* At 0.5, warmup region says 0.5/0.6 ≈ 0.833, warmdown hasn't started (1-0.6=0.4, 0.5>0.4).
-     * Since 0.5 > 0.4 (warmdown start), warmdown branch wins with (0.5-0.4)/0.6 = 0.167 → 1-0.167=0.833 */
+     * Since 0.5 > 0.4 (warmdown start), warmdown branch wins with (0.5-0.4)/0.6 = 0.167 →
+     * 1-0.167=0.833 */
     HU_ASSERT(r >= 0.0f && r <= 1.0f);
 
     /* Progress exactly at warmup boundary */
@@ -2352,14 +2543,21 @@ static void test_head_norm_backward_exact(void) {
     size_t BS = 4, V = 16;
 
     /* Verify forward+backward completes without error through head_norm */
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, BS, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = BS * 4 };
+    hu_ml_tensor_t input = {.data = ids,
+                            .shape = {1, BS, 0, 0},
+                            .ndim = 2,
+                            .dtype = HU_ML_DTYPE_I32,
+                            .size_bytes = BS * 4};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
     float *d = (float *)alloc.alloc(alloc.ctx, output.size_bytes);
-    for (size_t i = 0; i < BS * V; i++) d[i] = 0.01f;
-    hu_ml_tensor_t grad = { .data = d, .shape = {1, BS, V, 0}, .ndim = 3,
-                            .dtype = HU_ML_DTYPE_F32, .size_bytes = output.size_bytes };
+    for (size_t i = 0; i < BS * V; i++)
+        d[i] = 0.01f;
+    hu_ml_tensor_t grad = {.data = d,
+                           .shape = {1, BS, V, 0},
+                           .ndim = 3,
+                           .dtype = HU_ML_DTYPE_F32,
+                           .size_bytes = output.size_bytes};
     HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad), HU_OK);
     alloc.free(alloc.ctx, d, output.size_bytes);
     alloc.free(alloc.ctx, output.data, output.size_bytes);
@@ -2386,11 +2584,17 @@ static void test_window_attention_backward(void) {
     seed_output_projections(&model, 0.01f);
 
     int32_t ids[8], targets[8];
-    for (int i = 0; i < 8; i++) { ids[i] = i % 16; targets[i] = (i + 1) % 16; }
+    for (int i = 0; i < 8; i++) {
+        ids[i] = i % 16;
+        targets[i] = (i + 1) % 16;
+    }
 
     /* Backward must succeed without error */
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, 8, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 8 * sizeof(int32_t) };
+    hu_ml_tensor_t input = {.data = ids,
+                            .shape = {1, 8, 0, 0},
+                            .ndim = 2,
+                            .dtype = HU_ML_DTYPE_I32,
+                            .size_bytes = 8 * sizeof(int32_t)};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
     float *logits = (float *)output.data;
@@ -2401,15 +2605,22 @@ static void test_window_attention_backward(void) {
         float *li = logits + i * 16;
         float *di = dl + i * 16;
         float mx = li[0];
-        for (size_t k = 1; k < 16; k++) if (li[k] > mx) mx = li[k];
+        for (size_t k = 1; k < 16; k++)
+            if (li[k] > mx)
+                mx = li[k];
         float sum = 0.0f;
-        for (size_t k = 0; k < 16; k++) { di[k] = expf(li[k] - mx); sum += di[k]; }
-        for (size_t k = 0; k < 16; k++) di[k] /= sum;
+        for (size_t k = 0; k < 16; k++) {
+            di[k] = expf(li[k] - mx);
+            sum += di[k];
+        }
+        for (size_t k = 0; k < 16; k++)
+            di[k] /= sum;
         di[targets[i]] -= 1.0f;
-        for (size_t k = 0; k < 16; k++) di[k] /= 8.0f;
+        for (size_t k = 0; k < 16; k++)
+            di[k] /= 8.0f;
     }
-    hu_ml_tensor_t gt = { .data = dl, .shape = {1, 8, 16, 0}, .ndim = 3,
-                          .dtype = HU_ML_DTYPE_F32, .size_bytes = lsz };
+    hu_ml_tensor_t gt = {
+        .data = dl, .shape = {1, 8, 16, 0}, .ndim = 3, .dtype = HU_ML_DTYPE_F32, .size_bytes = lsz};
     HU_ASSERT_EQ(model.vtable->backward(model.ctx, &gt), HU_OK);
     alloc.free(alloc.ctx, dl, lsz);
     alloc.free(alloc.ctx, logits, lsz);
@@ -2432,7 +2643,8 @@ static void test_window_attention_backward(void) {
         float lm_loss = compute_ce_loss(&alloc, &model, ids, targets, 8, 16);
         lm[j] = orig;
         float ng = (lp - lm_loss) / (2.0f * eps);
-        if (isfinite(ng) && fabsf(ng) > 1e-8f) nonzero++;
+        if (isfinite(ng) && fabsf(ng) > 1e-8f)
+            nonzero++;
     }
     HU_ASSERT(nonzero > 0);
 
@@ -2466,8 +2678,11 @@ static void test_rope_theta_config(void) {
 
     int32_t ids[4] = {1, 2, 3, 4};
 
-    hu_ml_tensor_t in1 = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                           .dtype = HU_ML_DTYPE_I32, .size_bytes = 4 * sizeof(int32_t) };
+    hu_ml_tensor_t in1 = {.data = ids,
+                          .shape = {1, 4, 0, 0},
+                          .ndim = 2,
+                          .dtype = HU_ML_DTYPE_I32,
+                          .size_bytes = 4 * sizeof(int32_t)};
     hu_ml_tensor_t out1 = {0}, out2 = {0};
     m1.vtable->forward(m1.ctx, &in1, &out1);
     m2.vtable->forward(m2.ctx, &in1, &out2);
@@ -2505,8 +2720,11 @@ static void test_rope_theta_zero_default(void) {
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg2, &m2), HU_OK);
 
     int32_t ids[4] = {1, 2, 3, 4};
-    hu_ml_tensor_t in1 = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                           .dtype = HU_ML_DTYPE_I32, .size_bytes = 4 * sizeof(int32_t) };
+    hu_ml_tensor_t in1 = {.data = ids,
+                          .shape = {1, 4, 0, 0},
+                          .ndim = 2,
+                          .dtype = HU_ML_DTYPE_I32,
+                          .size_bytes = 4 * sizeof(int32_t)};
     hu_ml_tensor_t out1 = {0}, out2 = {0};
     m1.vtable->forward(m1.ctx, &in1, &out1);
     m2.vtable->forward(m2.ctx, &in1, &out2);
@@ -2514,7 +2732,8 @@ static void test_rope_theta_zero_default(void) {
     float *l1 = (float *)out1.data;
     float *l2 = (float *)out2.data;
     float diff = 0.0f;
-    for (size_t i = 0; i < 4 * 16; i++) diff += fabsf(l1[i] - l2[i]);
+    for (size_t i = 0; i < 4 * 16; i++)
+        diff += fabsf(l1[i] - l2[i]);
     HU_ASSERT_FLOAT_EQ(diff, 0.0f, 1e-6f);
 
     alloc.free(alloc.ctx, out1.data, out1.size_bytes);
@@ -2540,7 +2759,8 @@ static void test_dataloader_empty_shard(void) {
     char path2[256];
     snprintf(path2, sizeof(path2), "%s/shard_00001.bin", dir);
     int32_t data[32];
-    for (int i = 0; i < 32; i++) data[i] = i;
+    for (int i = 0; i < 32; i++)
+        data[i] = i;
     f = fopen(path2, "wb");
     fwrite(data, sizeof(int32_t), 32, f);
     fclose(f);
@@ -2551,7 +2771,8 @@ static void test_dataloader_empty_shard(void) {
     if (err == HU_OK && dl) {
         hu_ml_batch_t batch = {0};
         hu_ml_dataloader_next(dl, &batch);
-        if (batch.input_ids) hu_ml_batch_free(&alloc, &batch);
+        if (batch.input_ids)
+            hu_ml_batch_free(&alloc, &batch);
         hu_ml_dataloader_deinit(dl);
     }
 
@@ -2560,12 +2781,15 @@ static void test_dataloader_empty_shard(void) {
     rmdir(dir);
 }
 
-
 static void test_gpt_kv_head_validation(void) {
     hu_allocator_t a = hu_system_allocator();
     hu_gpt_config_t c = {0};
-    c.sequence_len = 8; c.vocab_size = 16; c.n_layer = 1;
-    c.n_head = 4; c.n_embd = 16; c.head_dim = 4;
+    c.sequence_len = 8;
+    c.vocab_size = 16;
+    c.n_layer = 1;
+    c.n_head = 4;
+    c.n_embd = 16;
+    c.head_dim = 4;
     hu_model_t m = {0};
     c.n_kv_head = 0;
     HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_ERR_INVALID_ARGUMENT);
@@ -2582,51 +2806,75 @@ static void test_train_byte_weighted_loss(void) {
     hu_allocator_t a = hu_system_allocator();
     char td[] = "/tmp/hu_bwl_XXXXXX";
     HU_ASSERT(mkdtemp(td));
-    int32_t d[64]; for (int i = 0; i < 64; i++) d[i] = i % 16;
+    int32_t d[64];
+    for (int i = 0; i < 64; i++)
+        d[i] = i % 16;
     char p1[256], p2[256];
     snprintf(p1, 256, "%s/shard_00000.bin", td);
     snprintf(p2, 256, "%s/shard_00001.bin", td);
     write_bin_file(p1, d, 64);
     write_bin_file(p2, d, 64);
     hu_gpt_config_t g = {0};
-    g.sequence_len = 8; g.vocab_size = 16; g.n_layer = 1;
-    g.n_head = 2; g.n_kv_head = 2; g.n_embd = 4; g.head_dim = 2;
+    g.sequence_len = 8;
+    g.vocab_size = 16;
+    g.n_layer = 1;
+    g.n_head = 2;
+    g.n_kv_head = 2;
+    g.n_embd = 4;
+    g.head_dim = 2;
     hu_model_t m = {0};
     HU_ASSERT_EQ(hu_gpt_create(&a, &g, &m), HU_OK);
-    hu_optimizer_config_t oc = {.embedding_lr = .01f, .unembedding_lr = .01f,
-        .matrix_lr = .01f, .scalar_lr = .001f, .adam_beta1 = .9f, .adam_beta2 = .999f};
+    hu_optimizer_config_t oc = {.embedding_lr = .01f,
+                                .unembedding_lr = .01f,
+                                .matrix_lr = .01f,
+                                .scalar_lr = .001f,
+                                .adam_beta1 = .9f,
+                                .adam_beta2 = .999f};
     hu_ml_optimizer_t o = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&a, &oc, &o), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&m, &o), HU_OK);
     hu_ml_dataloader_t *tl = NULL, *vl = NULL;
     HU_ASSERT_EQ(hu_ml_dataloader_create(&a, td, 2, 4, "train", &tl), HU_OK);
     HU_ASSERT_EQ(hu_ml_dataloader_create(&a, td, 2, 4, "val", &vl), HU_OK);
-    int32_t tb[16]; for (int i = 0; i < 16; i++) tb[i] = 1;
+    int32_t tb[16];
+    for (int i = 0; i < 16; i++)
+        tb[i] = 1;
     hu_training_config_t tc = {.device_batch_size = 2, .time_budget_secs = 2, .eval_tokens = 8};
     hu_ml_train_result_t r = {0};
     HU_ASSERT_EQ(hu_ml_train(&a, &m, &o, tl, vl, &tc, tb, 16, &r), HU_OK);
     HU_ASSERT(r.num_steps > 0);
-    hu_ml_dataloader_deinit(vl); hu_ml_dataloader_deinit(tl);
-    o.vtable->deinit(o.ctx, &a); m.vtable->deinit(m.ctx, &a);
-    remove(p1); remove(p2); rmdir(td);
+    hu_ml_dataloader_deinit(vl);
+    hu_ml_dataloader_deinit(tl);
+    o.vtable->deinit(o.ctx, &a);
+    m.vtable->deinit(m.ctx, &a);
+    remove(p1);
+    remove(p2);
+    rmdir(td);
 }
 
 static void test_rope_backward_through_k(void) {
     hu_allocator_t a = hu_system_allocator();
     hu_gpt_config_t c = {0};
-    c.sequence_len = 2; c.vocab_size = 8; c.n_layer = 1;
-    c.n_head = 2; c.n_kv_head = 2; c.n_embd = 4; c.head_dim = 2;
+    c.sequence_len = 2;
+    c.vocab_size = 8;
+    c.n_layer = 1;
+    c.n_head = 2;
+    c.n_kv_head = 2;
+    c.n_embd = 4;
+    c.head_dim = 2;
     hu_model_t m = {0};
     HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_OK);
     seed_output_projections(&m, 0.01f);
     int32_t ids[] = {0, 1}, tgt[] = {1, 2};
     size_t V = 8, BS = 2;
     float eps = 1e-3f;
-    hu_ml_tensor_t *p = NULL; size_t pc = 0;
+    hu_ml_tensor_t *p = NULL;
+    size_t pc = 0;
     m.vtable->get_params(m.ctx, &p, &pc);
     float *lm = (float *)p[1].data;
     size_t cn = p[1].size_bytes / 4;
-    if (cn > 4) cn = 4;
+    if (cn > 4)
+        cn = 4;
     int nz = 0;
     for (size_t j = 0; j < cn; j++) {
         float o2 = lm[j];
@@ -2635,7 +2883,8 @@ static void test_rope_backward_through_k(void) {
         lm[j] = o2 - eps;
         float lml = compute_ce_loss(&a, &m, ids, tgt, BS, V);
         lm[j] = o2;
-        if (isfinite((lp - lml) / (2 * eps)) && fabsf((lp - lml) / (2 * eps)) > 1e-8f) nz++;
+        if (isfinite((lp - lml) / (2 * eps)) && fabsf((lp - lml) / (2 * eps)) > 1e-8f)
+            nz++;
     }
     HU_ASSERT(nz > 0);
     m.vtable->deinit(m.ctx, &a);
@@ -2644,14 +2893,19 @@ static void test_rope_backward_through_k(void) {
 static void test_gpt_configurable_soft_cap(void) {
     hu_allocator_t a = hu_system_allocator();
     hu_gpt_config_t c = {0};
-    c.sequence_len = 4; c.vocab_size = 8; c.n_layer = 1;
-    c.n_head = 2; c.n_kv_head = 2; c.n_embd = 8; c.head_dim = 4;
+    c.sequence_len = 4;
+    c.vocab_size = 8;
+    c.n_layer = 1;
+    c.n_head = 2;
+    c.n_kv_head = 2;
+    c.n_embd = 8;
+    c.head_dim = 4;
     c.logit_soft_cap = 5.0f;
     hu_model_t m = {0};
     HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_OK);
     int32_t ids[4] = {0, 1, 2, 3};
-    hu_ml_tensor_t in = {.data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                         .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
+    hu_ml_tensor_t in = {
+        .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
     hu_ml_tensor_t out = {0};
     HU_ASSERT_EQ(m.vtable->forward(m.ctx, &in, &out), HU_OK);
     float *lo = (float *)out.data;
@@ -2660,9 +2914,13 @@ static void test_gpt_configurable_soft_cap(void) {
         HU_ASSERT(lo[i] >= -5.01f && lo[i] <= 5.01f);
     }
     float *dl = (float *)a.alloc(a.ctx, out.size_bytes);
-    for (size_t i = 0; i < 32; i++) dl[i] = .01f;
-    hu_ml_tensor_t gr = {.data = dl, .shape = {1, 4, 8, 0}, .ndim = 3,
-                         .dtype = HU_ML_DTYPE_F32, .size_bytes = out.size_bytes};
+    for (size_t i = 0; i < 32; i++)
+        dl[i] = .01f;
+    hu_ml_tensor_t gr = {.data = dl,
+                         .shape = {1, 4, 8, 0},
+                         .ndim = 3,
+                         .dtype = HU_ML_DTYPE_F32,
+                         .size_bytes = out.size_bytes};
     HU_ASSERT_EQ(m.vtable->backward(m.ctx, &gr), HU_OK);
     a.free(a.ctx, dl, out.size_bytes);
     a.free(a.ctx, out.data, out.size_bytes);
@@ -2672,28 +2930,42 @@ static void test_gpt_configurable_soft_cap(void) {
 static void test_gpt_value_embeds(void) {
     hu_allocator_t a = hu_system_allocator();
     hu_gpt_config_t c = {0};
-    c.sequence_len = 4; c.vocab_size = 8; c.n_layer = 2;
-    c.n_head = 2; c.n_kv_head = 2; c.n_embd = 8; c.head_dim = 4;
+    c.sequence_len = 4;
+    c.vocab_size = 8;
+    c.n_layer = 2;
+    c.n_head = 2;
+    c.n_kv_head = 2;
+    c.n_embd = 8;
+    c.head_dim = 4;
     c.use_value_embeds = 1;
     hu_model_t m = {0};
     HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_OK);
-    hu_gpt_config_t cn = c; cn.use_value_embeds = 0;
+    hu_gpt_config_t cn = c;
+    cn.use_value_embeds = 0;
     hu_model_t mn = {0};
     HU_ASSERT_EQ(hu_gpt_create(&a, &cn, &mn), HU_OK);
     HU_ASSERT(m.vtable->num_params(m.ctx) > mn.vtable->num_params(mn.ctx));
     mn.vtable->deinit(mn.ctx, &a);
     int32_t ids[4] = {0, 1, 2, 3};
-    hu_ml_tensor_t in = {.data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                         .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
+    hu_ml_tensor_t in = {
+        .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
     hu_ml_tensor_t out = {0};
     HU_ASSERT_EQ(m.vtable->forward(m.ctx, &in, &out), HU_OK);
     float *dl = (float *)a.alloc(a.ctx, out.size_bytes);
-    for (size_t i = 0; i < 32; i++) dl[i] = .01f;
-    hu_ml_tensor_t gr = {.data = dl, .shape = {1, 4, 8, 0}, .ndim = 3,
-                         .dtype = HU_ML_DTYPE_F32, .size_bytes = out.size_bytes};
+    for (size_t i = 0; i < 32; i++)
+        dl[i] = .01f;
+    hu_ml_tensor_t gr = {.data = dl,
+                         .shape = {1, 4, 8, 0},
+                         .ndim = 3,
+                         .dtype = HU_ML_DTYPE_F32,
+                         .size_bytes = out.size_bytes};
     HU_ASSERT_EQ(m.vtable->backward(m.ctx, &gr), HU_OK);
-    hu_optimizer_config_t oc = {.embedding_lr = .01f, .unembedding_lr = .01f,
-        .matrix_lr = .01f, .scalar_lr = .001f, .adam_beta1 = .9f, .adam_beta2 = .999f};
+    hu_optimizer_config_t oc = {.embedding_lr = .01f,
+                                .unembedding_lr = .01f,
+                                .matrix_lr = .01f,
+                                .scalar_lr = .001f,
+                                .adam_beta1 = .9f,
+                                .adam_beta2 = .999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&a, &oc, &opt), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&m, &opt), HU_OK);
@@ -2707,26 +2979,43 @@ static void test_grad_accum_equivalence(void) {
     hu_allocator_t a = hu_system_allocator();
     char td[] = "/tmp/hu_gae_XXXXXX";
     HU_ASSERT(mkdtemp(td));
-    int32_t d[128]; for (int i = 0; i < 128; i++) d[i] = i % 8;
+    int32_t d[128];
+    for (int i = 0; i < 128; i++)
+        d[i] = i % 8;
     char p1[256], p2[256];
     snprintf(p1, 256, "%s/shard_00000.bin", td);
     snprintf(p2, 256, "%s/shard_00001.bin", td);
-    write_bin_file(p1, d, 128); write_bin_file(p2, d, 128);
+    write_bin_file(p1, d, 128);
+    write_bin_file(p2, d, 128);
     hu_gpt_config_t gc = {0};
-    gc.sequence_len = 4; gc.vocab_size = 8; gc.n_layer = 1;
-    gc.n_head = 2; gc.n_kv_head = 2; gc.n_embd = 4; gc.head_dim = 2;
+    gc.sequence_len = 4;
+    gc.vocab_size = 8;
+    gc.n_layer = 1;
+    gc.n_head = 2;
+    gc.n_kv_head = 2;
+    gc.n_embd = 4;
+    gc.head_dim = 2;
     /* Run A: batch_size=4, accum=1 */
     hu_model_t mA = {0};
     HU_ASSERT_EQ(hu_gpt_create(&a, &gc, &mA), HU_OK);
-    hu_ml_tensor_t *pA = NULL; size_t pcA = 0;
+    hu_ml_tensor_t *pA = NULL;
+    size_t pcA = 0;
     mA.vtable->get_params(mA.ctx, &pA, &pcA);
     size_t tb = 0;
-    for (size_t i = 0; i < pcA; i++) tb += pA[i].size_bytes;
+    for (size_t i = 0; i < pcA; i++)
+        tb += pA[i].size_bytes;
     float *iw = (float *)a.alloc(a.ctx, tb);
     size_t off = 0;
-    for (size_t i = 0; i < pcA; i++) { memcpy((char *)iw + off, pA[i].data, pA[i].size_bytes); off += pA[i].size_bytes; }
-    hu_optimizer_config_t oc = {.embedding_lr = .01f, .unembedding_lr = .01f,
-        .matrix_lr = .01f, .scalar_lr = .001f, .adam_beta1 = 0, .adam_beta2 = .999f};
+    for (size_t i = 0; i < pcA; i++) {
+        memcpy((char *)iw + off, pA[i].data, pA[i].size_bytes);
+        off += pA[i].size_bytes;
+    }
+    hu_optimizer_config_t oc = {.embedding_lr = .01f,
+                                .unembedding_lr = .01f,
+                                .matrix_lr = .01f,
+                                .scalar_lr = .001f,
+                                .adam_beta1 = 0,
+                                .adam_beta2 = .999f};
     hu_ml_optimizer_t oA = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&a, &oc, &oA), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&mA, &oA), HU_OK);
@@ -2737,15 +3026,24 @@ static void test_grad_accum_equivalence(void) {
     HU_ASSERT_EQ(hu_ml_train(&a, &mA, &oA, dA, NULL, &tA, NULL, 8, &rA), HU_OK);
     float *wA = (float *)a.alloc(a.ctx, tb);
     off = 0;
-    for (size_t i = 0; i < pcA; i++) { memcpy((char *)wA + off, pA[i].data, pA[i].size_bytes); off += pA[i].size_bytes; }
-    hu_ml_dataloader_deinit(dA); oA.vtable->deinit(oA.ctx, &a); mA.vtable->deinit(mA.ctx, &a);
+    for (size_t i = 0; i < pcA; i++) {
+        memcpy((char *)wA + off, pA[i].data, pA[i].size_bytes);
+        off += pA[i].size_bytes;
+    }
+    hu_ml_dataloader_deinit(dA);
+    oA.vtable->deinit(oA.ctx, &a);
+    mA.vtable->deinit(mA.ctx, &a);
     /* Run B: batch_size=2, accum=2 */
     hu_model_t mB = {0};
     HU_ASSERT_EQ(hu_gpt_create(&a, &gc, &mB), HU_OK);
-    hu_ml_tensor_t *pB = NULL; size_t pcB = 0;
+    hu_ml_tensor_t *pB = NULL;
+    size_t pcB = 0;
     mB.vtable->get_params(mB.ctx, &pB, &pcB);
     off = 0;
-    for (size_t i = 0; i < pcB; i++) { memcpy(pB[i].data, (char *)iw + off, pB[i].size_bytes); off += pB[i].size_bytes; }
+    for (size_t i = 0; i < pcB; i++) {
+        memcpy(pB[i].data, (char *)iw + off, pB[i].size_bytes);
+        off += pB[i].size_bytes;
+    }
     hu_ml_optimizer_t oB = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&a, &oc, &oB), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&mB, &oB), HU_OK);
@@ -2762,36 +3060,50 @@ static void test_grad_accum_equivalence(void) {
         size_t n = pB[i].size_bytes / 4;
         for (size_t j = 0; j < n; j++) {
             tc2++;
-            if (fabsf(wa[j] - wb[j]) / (fabsf(wa[j]) + fabsf(wb[j]) + 1e-8f) < .1f) cc++;
+            if (fabsf(wa[j] - wb[j]) / (fabsf(wa[j]) + fabsf(wb[j]) + 1e-8f) < .1f)
+                cc++;
         }
         off += pB[i].size_bytes;
     }
     HU_ASSERT(cc > tc2 / 2);
-    hu_ml_dataloader_deinit(dB); oB.vtable->deinit(oB.ctx, &a); mB.vtable->deinit(mB.ctx, &a);
-    a.free(a.ctx, iw, tb); a.free(a.ctx, wA, tb);
-    remove(p1); remove(p2); rmdir(td);
+    hu_ml_dataloader_deinit(dB);
+    oB.vtable->deinit(oB.ctx, &a);
+    mB.vtable->deinit(mB.ctx, &a);
+    a.free(a.ctx, iw, tb);
+    a.free(a.ctx, wA, tb);
+    remove(p1);
+    remove(p2);
+    rmdir(td);
 }
 
 static void test_gpt_value_embeds_finite_diff(void) {
     hu_allocator_t a = hu_system_allocator();
     hu_gpt_config_t c = {0};
-    c.sequence_len = 2; c.vocab_size = 8; c.n_layer = 1;
-    c.n_head = 2; c.n_kv_head = 2; c.n_embd = 4; c.head_dim = 2;
+    c.sequence_len = 2;
+    c.vocab_size = 8;
+    c.n_layer = 1;
+    c.n_head = 2;
+    c.n_kv_head = 2;
+    c.n_embd = 4;
+    c.head_dim = 2;
     c.use_value_embeds = 1;
     hu_model_t m = {0};
     HU_ASSERT_EQ(hu_gpt_create(&a, &c, &m), HU_OK);
     seed_output_projections(&m, 0.1f);
-    hu_ml_tensor_t *p = NULL; size_t pc = 0;
+    hu_ml_tensor_t *p = NULL;
+    size_t pc = 0;
     m.vtable->get_params(m.ctx, &p, &pc);
     /* Scale lm_head 100x -- keep diverse random values, do NOT set uniform */
     float *lmh = (float *)p[1].data;
-    for (size_t j = 0; j < p[1].size_bytes / 4; j++) lmh[j] *= 100.0f;
+    for (size_t j = 0; j < p[1].size_bytes / 4; j++)
+        lmh[j] *= 100.0f;
     int32_t ids[] = {0, 1}, tgt[] = {1, 2};
     size_t V = 8, BS = 2;
     float eps = 0.01f;
     float *ve = (float *)p[pc - 1].data;
     size_t cn = p[pc - 1].size_bytes / 4;
-    if (cn > 8) cn = 8;
+    if (cn > 8)
+        cn = 8;
     int nz = 0;
     for (size_t j = 0; j < cn; j++) {
         float o2 = ve[j];
@@ -2801,7 +3113,8 @@ static void test_gpt_value_embeds_finite_diff(void) {
         float lml = compute_ce_loss(&a, &m, ids, tgt, BS, V);
         ve[j] = o2;
         float fd = (lp - lml) / (2 * eps);
-        if (isfinite(fd) && fabsf(fd) > 1e-10f) nz++;
+        if (isfinite(fd) && fabsf(fd) > 1e-10f)
+            nz++;
     }
     HU_ASSERT(nz > 0);
     m.vtable->deinit(m.ctx, &a);
@@ -2812,8 +3125,13 @@ static void test_gpt_value_embeds_finite_diff(void) {
 static void test_gpt_lora_forward(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
@@ -2830,8 +3148,8 @@ static void test_gpt_lora_forward(void) {
     }
 
     int32_t ids[4] = {0, 1, 2, 3};
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = 16 };
+    hu_ml_tensor_t input = {
+        .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2, .dtype = HU_ML_DTYPE_I32, .size_bytes = 16};
 
     /* Forward without LoRA — capture logit sums */
     hu_ml_tensor_t out_base = {0};
@@ -2843,16 +3161,18 @@ static void test_gpt_lora_forward(void) {
     alloc.free(alloc.ctx, out_base.data, out_base.size_bytes);
 
     /* Create and attach Q/V LoRA adapters */
-    hu_lora_config_t lora_cfg = { .rank = 2, .alpha = 2.0f, .dropout = 0.0f,
-                                   .targets = HU_LORA_TARGET_QV };
+    hu_lora_config_t lora_cfg = {
+        .rank = 2, .alpha = 2.0f, .dropout = 0.0f, .targets = HU_LORA_TARGET_QV};
     hu_lora_adapter_t *lora_q = NULL, *lora_v = NULL;
     HU_ASSERT_EQ(hu_lora_create(&alloc, &lora_cfg, 8, 8, 1, &lora_q), HU_OK);
     HU_ASSERT_EQ(hu_lora_create(&alloc, &lora_cfg, 8, 8, 1, &lora_v), HU_OK);
 
     float A_vals[16], B_vals[16];
     memset(A_vals, 0, sizeof(A_vals));
-    A_vals[0] = 5.0f; A_vals[9] = 5.0f;
-    for (int i = 0; i < 16; i++) B_vals[i] = 1.0f;
+    A_vals[0] = 5.0f;
+    A_vals[9] = 5.0f;
+    for (int i = 0; i < 16; i++)
+        B_vals[i] = 1.0f;
     hu_lora_set_layer_weights(lora_q, 0, A_vals, B_vals);
     hu_lora_set_layer_weights(lora_v, 0, A_vals, B_vals);
 
@@ -2879,22 +3199,31 @@ static void test_gpt_lora_forward(void) {
 static void test_gpt_lora_training(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
-    hu_lora_config_t lora_cfg = { .rank = 2, .alpha = 4.0f, .dropout = 0.0f,
-                                   .targets = HU_LORA_TARGET_QV };
+    hu_lora_config_t lora_cfg = {
+        .rank = 2, .alpha = 4.0f, .dropout = 0.0f, .targets = HU_LORA_TARGET_QV};
     hu_lora_adapter_t *lora_q = NULL, *lora_v = NULL;
     HU_ASSERT_EQ(hu_lora_create(&alloc, &lora_cfg, 8, 8, 1, &lora_q), HU_OK);
     HU_ASSERT_EQ(hu_lora_create(&alloc, &lora_cfg, 8, 8, 1, &lora_v), HU_OK);
     HU_ASSERT_EQ(hu_gpt_attach_lora(&model, lora_q, NULL, lora_v, NULL, NULL, NULL), HU_OK);
 
     /* Create optimizer and register base + LoRA params */
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.02f, .scalar_lr = 0.01f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.01f,
+                                     .unembedding_lr = 0.01f,
+                                     .matrix_lr = 0.02f,
+                                     .scalar_lr = 0.01f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
@@ -2909,8 +3238,11 @@ static void test_gpt_lora_training(void) {
 
     /* Train 10 steps */
     for (int step = 0; step < 10; step++) {
-        hu_ml_tensor_t input = { .data = ids, .shape = {1, 4, 0, 0}, .ndim = 2,
-                                 .dtype = HU_ML_DTYPE_I32, .size_bytes = 16 };
+        hu_ml_tensor_t input = {.data = ids,
+                                .shape = {1, 4, 0, 0},
+                                .ndim = 2,
+                                .dtype = HU_ML_DTYPE_I32,
+                                .size_bytes = 16};
         hu_ml_tensor_t output = {0};
         HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
 
@@ -2920,15 +3252,25 @@ static void test_gpt_lora_training(void) {
         for (size_t i = 0; i < BS; i++) {
             float *li = logits + i * V;
             float mx = li[0];
-            for (size_t k = 1; k < V; k++) if (li[k] > mx) mx = li[k];
+            for (size_t k = 1; k < V; k++)
+                if (li[k] > mx)
+                    mx = li[k];
             float sum = 0.0f;
-            for (size_t k = 0; k < V; k++) { dl[i * V + k] = expf(li[k] - mx); sum += dl[i * V + k]; }
-            for (size_t k = 0; k < V; k++) dl[i * V + k] /= sum;
+            for (size_t k = 0; k < V; k++) {
+                dl[i * V + k] = expf(li[k] - mx);
+                sum += dl[i * V + k];
+            }
+            for (size_t k = 0; k < V; k++)
+                dl[i * V + k] /= sum;
             dl[i * V + targets[i]] -= 1.0f;
-            for (size_t k = 0; k < V; k++) dl[i * V + k] /= (float)BS;
+            for (size_t k = 0; k < V; k++)
+                dl[i * V + k] /= (float)BS;
         }
-        hu_ml_tensor_t grad_t = { .data = dl, .shape = {1, 4, 8, 0}, .ndim = 3,
-                                  .dtype = HU_ML_DTYPE_F32, .size_bytes = BS * V * 4 };
+        hu_ml_tensor_t grad_t = {.data = dl,
+                                 .shape = {1, 4, 8, 0},
+                                 .ndim = 3,
+                                 .dtype = HU_ML_DTYPE_F32,
+                                 .size_bytes = BS * V * 4};
         HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad_t), HU_OK);
         alloc.free(alloc.ctx, dl, BS * V * 4);
         alloc.free(alloc.ctx, logits, output.size_bytes);
@@ -2952,8 +3294,13 @@ static void test_gpt_lora_training(void) {
 static void test_gpt_soft_cap_backward_finite_diff(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 2; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 4; cfg.head_dim = 2;
+    cfg.sequence_len = 2;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 4;
+    cfg.head_dim = 2;
     cfg.logit_soft_cap = 5.0f;
 
     int32_t ids[] = {0, 1};
@@ -2974,8 +3321,11 @@ static void test_gpt_soft_cap_backward_finite_diff(void) {
 
     /* Compute analytical gradient */
     float base_loss = compute_ce_loss(&alloc, &model, ids, targets, BS, V);
-    hu_ml_tensor_t input = { .data = ids, .shape = {1, BS, 0, 0}, .ndim = 2,
-                             .dtype = HU_ML_DTYPE_I32, .size_bytes = BS * 4 };
+    hu_ml_tensor_t input = {.data = ids,
+                            .shape = {1, BS, 0, 0},
+                            .ndim = 2,
+                            .dtype = HU_ML_DTYPE_I32,
+                            .size_bytes = BS * 4};
     hu_ml_tensor_t output = {0};
     HU_ASSERT_EQ(model.vtable->forward(model.ctx, &input, &output), HU_OK);
     float *logits = (float *)output.data;
@@ -2985,15 +3335,25 @@ static void test_gpt_soft_cap_backward_finite_diff(void) {
     for (size_t i = 0; i < BS; i++) {
         float *li = logits + i * V;
         float mx = li[0];
-        for (size_t k = 1; k < V; k++) if (li[k] > mx) mx = li[k];
+        for (size_t k = 1; k < V; k++)
+            if (li[k] > mx)
+                mx = li[k];
         float sum = 0.0f;
-        for (size_t k = 0; k < V; k++) { d_logits[i * V + k] = expf(li[k] - mx); sum += d_logits[i * V + k]; }
-        for (size_t k = 0; k < V; k++) d_logits[i * V + k] /= sum;
+        for (size_t k = 0; k < V; k++) {
+            d_logits[i * V + k] = expf(li[k] - mx);
+            sum += d_logits[i * V + k];
+        }
+        for (size_t k = 0; k < V; k++)
+            d_logits[i * V + k] /= sum;
         d_logits[i * V + targets[i]] -= 1.0f;
-        for (size_t k = 0; k < V; k++) d_logits[i * V + k] /= (float)BS;
+        for (size_t k = 0; k < V; k++)
+            d_logits[i * V + k] /= (float)BS;
     }
-    hu_ml_tensor_t grad_t = { .data = d_logits, .shape = {1, BS, V, 0}, .ndim = 3,
-                              .dtype = HU_ML_DTYPE_F32, .size_bytes = BS * V * 4 };
+    hu_ml_tensor_t grad_t = {.data = d_logits,
+                             .shape = {1, BS, V, 0},
+                             .ndim = 3,
+                             .dtype = HU_ML_DTYPE_F32,
+                             .size_bytes = BS * V * 4};
     HU_ASSERT_EQ(model.vtable->backward(model.ctx, &grad_t), HU_OK);
     alloc.free(alloc.ctx, d_logits, BS * V * 4);
     alloc.free(alloc.ctx, logits, output.size_bytes);
@@ -3011,7 +3371,8 @@ static void test_gpt_soft_cap_backward_finite_diff(void) {
         lm_data[j] = orig;
 
         float numerical = (loss_plus - loss_minus) / (2.0f * eps);
-        if (isfinite(numerical) && fabsf(numerical) > 1e-8f) matched++;
+        if (isfinite(numerical) && fabsf(numerical) > 1e-8f)
+            matched++;
     }
     HU_ASSERT_GT(matched, 0);
     (void)base_loss;
@@ -3023,9 +3384,8 @@ static void test_gpt_soft_cap_backward_finite_diff(void) {
 
 static void test_weight_decay_schedule(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_optimizer_config_t opt_cfg = { .matrix_lr = 0.02f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f,
-        .weight_decay = 0.1f };
+    hu_optimizer_config_t opt_cfg = {
+        .matrix_lr = 0.02f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f, .weight_decay = 0.1f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
 
@@ -3043,13 +3403,15 @@ static void test_weight_decay_schedule(void) {
 
     /* Step with progress=0.0 (full weight decay) */
     opt.vtable->set_training_progress(opt.ctx, 0.0f);
-    for (int i = 0; i < 16; i++) grad_a[i] = 0.01f;
+    for (int i = 0; i < 16; i++)
+        grad_a[i] = 0.01f;
     HU_ASSERT_EQ(opt.vtable->step(opt.ctx, NULL, NULL, 0), HU_OK);
     float after_full_wd = param_a[0];
 
     /* Step with progress=0.9 (10% weight decay) */
     opt2.vtable->set_training_progress(opt2.ctx, 0.9f);
-    for (int i = 0; i < 16; i++) grad_b[i] = 0.01f;
+    for (int i = 0; i < 16; i++)
+        grad_b[i] = 0.01f;
     HU_ASSERT_EQ(opt2.vtable->step(opt2.ctx, NULL, NULL, 0), HU_OK);
     float after_low_wd = param_b[0];
 
@@ -3067,9 +3429,13 @@ static void test_dmodel_lr_scaling(void) {
     hu_allocator_t alloc = hu_system_allocator();
 
     /* Optimizer with n_embd=768 (scale = 1.0) */
-    hu_optimizer_config_t cfg768 = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .scalar_lr = 0.01f, .matrix_lr = 0.01f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f, .n_embd = 768 };
+    hu_optimizer_config_t cfg768 = {.embedding_lr = 0.01f,
+                                    .unembedding_lr = 0.01f,
+                                    .scalar_lr = 0.01f,
+                                    .matrix_lr = 0.01f,
+                                    .adam_beta1 = 0.9f,
+                                    .adam_beta2 = 0.999f,
+                                    .n_embd = 768};
     hu_ml_optimizer_t opt768 = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &cfg768, &opt768), HU_OK);
 
@@ -3106,11 +3472,14 @@ static void test_experiment_loop_agent_fallback(void) {
     hu_allocator_t a = hu_system_allocator();
     char td[] = "/tmp/hu_elf_XXXXXX";
     HU_ASSERT(mkdtemp(td));
-    int32_t d[128]; for (int i = 0; i < 128; i++) d[i] = i % 8;
+    int32_t d[128];
+    for (int i = 0; i < 128; i++)
+        d[i] = i % 8;
     char p1[256], p2[256];
     snprintf(p1, 256, "%s/shard_00000.bin", td);
     snprintf(p2, 256, "%s/shard_00001.bin", td);
-    write_bin_file(p1, d, 128); write_bin_file(p2, d, 128);
+    write_bin_file(p1, d, 128);
+    write_bin_file(p2, d, 128);
     int dummy = 42;
     hu_experiment_loop_config_t lc = {0};
     lc.max_iterations = 2;
@@ -3129,7 +3498,9 @@ static void test_experiment_loop_agent_fallback(void) {
     lc.provider = &dummy;
     lc.persona = "test-researcher";
     HU_ASSERT_EQ(hu_experiment_loop(&a, &lc, NULL, NULL), HU_OK);
-    remove(p1); remove(p2); rmdir(td);
+    remove(p1);
+    remove(p2);
+    rmdir(td);
 }
 
 /* ─── Dataloader: invalid split name ──────────────────────────────────── */
@@ -3149,32 +3520,39 @@ static void test_dataloader_invalid_split(void) {
 static void test_evaluator_edge_args(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
     const char *dir = "/tmp/test_eval_edge";
     mkdir_p(dir);
     int32_t tokens[32];
-    for (int i = 0; i < 32; i++) tokens[i] = i % 8;
-    char p[256]; snprintf(p, sizeof(p), "%s/val_00000.bin", dir);
+    for (int i = 0; i < 32; i++)
+        tokens[i] = i % 8;
+    char p[256];
+    snprintf(p, sizeof(p), "%s/val_00000.bin", dir);
     FILE *f = fopen(p, "wb");
-    fwrite(tokens, sizeof(int32_t), 32, f); fclose(f);
+    fwrite(tokens, sizeof(int32_t), 32, f);
+    fclose(f);
     hu_ml_dataloader_t *dl = NULL;
     HU_ASSERT_EQ(hu_ml_dataloader_create(&alloc, dir, 1, 4, "val", &dl), HU_OK);
 
-    int32_t tb[8] = {1,1,1,1,1,1,1,1};
+    int32_t tb[8] = {1, 1, 1, 1, 1, 1, 1, 1};
     hu_ml_eval_result_t res = {0};
 
-    HU_ASSERT_EQ(hu_ml_evaluate_bpb(&alloc, &model, dl, tb, 0, 8, &res),
-                 HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_ml_evaluate_bpb(&alloc, &model, dl, tb, 8, 0, &res),
-                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_evaluate_bpb(&alloc, &model, dl, tb, 0, 8, &res), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_evaluate_bpb(&alloc, &model, dl, tb, 8, 0, &res), HU_ERR_INVALID_ARGUMENT);
 
     hu_ml_dataloader_deinit(dl);
     model.vtable->deinit(model.ctx, &alloc);
-    remove(p); rmdir(dir);
+    remove(p);
+    rmdir(dir);
 }
 
 /* ─── Prepare: tokenize directory ────────────────────────────────────── */
@@ -3206,11 +3584,17 @@ static void test_prepare_tokenize_dir(void) {
     FILE *f2 = fopen(o2, "rb");
     HU_ASSERT_NOT_NULL(f1);
     HU_ASSERT_NOT_NULL(f2);
-    if (f1) fclose(f1);
-    if (f2) fclose(f2);
+    if (f1)
+        fclose(f1);
+    if (f2)
+        fclose(f2);
 
-    remove(o1); remove(o2); rmdir(out_dir);
-    remove(p1); remove(p2); rmdir(in_dir);
+    remove(o1);
+    remove(o2);
+    rmdir(out_dir);
+    remove(p1);
+    remove(p2);
+    rmdir(in_dir);
     hu_bpe_tokenizer_deinit(tok);
 }
 
@@ -3219,15 +3603,24 @@ static void test_prepare_tokenize_dir(void) {
 static void test_checkpoint_optimizer_state(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .weight_decay = 0.01f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.01f,
+                                     .unembedding_lr = 0.01f,
+                                     .matrix_lr = 0.01f,
+                                     .scalar_lr = 0.001f,
+                                     .weight_decay = 0.01f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
@@ -3239,9 +3632,10 @@ static void test_checkpoint_optimizer_state(void) {
 
     float *fake_grad = (float *)alloc.alloc(alloc.ctx, params[0].size_bytes);
     size_t nf = params[0].size_bytes / sizeof(float);
-    for (size_t i = 0; i < nf; i++) fake_grad[i] = 0.1f * (float)(i % 7 - 3);
+    for (size_t i = 0; i < nf; i++)
+        fake_grad[i] = 0.1f * (float)(i % 7 - 3);
 
-    hu_ml_tensor_t gt = { .data = fake_grad, .size_bytes = params[0].size_bytes, .ndim = 1 };
+    hu_ml_tensor_t gt = {.data = fake_grad, .size_bytes = params[0].size_bytes, .ndim = 1};
     gt.shape[0] = nf;
     opt.vtable->step(opt.ctx, params, &gt, 1);
     opt.vtable->step(opt.ctx, params, &gt, 1);
@@ -3266,7 +3660,8 @@ static void test_checkpoint_optimizer_state(void) {
     int nonzero = 0;
     float *pd = (float *)params[0].data;
     for (size_t i = 0; i < nf; i++)
-        if (fabsf(pd[i]) > 1e-10f) nonzero++;
+        if (fabsf(pd[i]) > 1e-10f)
+            nonzero++;
     HU_ASSERT(nonzero > 0);
 
     /* Step both optimizers with same gradient — should produce same result */
@@ -3282,8 +3677,9 @@ static void test_checkpoint_optimizer_state(void) {
 
     int match = 1;
     for (size_t i = 0; i < nf; i++) {
-        if (fabsf(((float*)params[0].data)[i] - after_orig[i]) > 1e-6f) {
-            match = 0; break;
+        if (fabsf(((float *)params[0].data)[i] - after_orig[i]) > 1e-6f) {
+            match = 0;
+            break;
         }
     }
     HU_ASSERT_EQ(match, 1);
@@ -3346,7 +3742,7 @@ static void test_agent_apply_kv(void) {
 
 static void test_train_invalid_args(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_training_config_t tc = { .device_batch_size = 2, .time_budget_secs = 1 };
+    hu_training_config_t tc = {.device_batch_size = 2, .time_budget_secs = 1};
     hu_ml_train_result_t result = {0};
     hu_model_t model = {0};
     hu_ml_optimizer_t opt = {0};
@@ -3372,7 +3768,7 @@ static void test_train_invalid_args(void) {
     HU_ASSERT_EQ(hu_ml_train(&alloc, &model, &opt, NULL, NULL, &tc_bad, NULL, 0, &result),
                  HU_ERR_INVALID_ARGUMENT);
 
-    int32_t tb[4] = {1,1,1,1};
+    int32_t tb[4] = {1, 1, 1, 1};
     HU_ASSERT_EQ(hu_ml_train(&alloc, &model, &opt, NULL, NULL, &tc, tb, 0, &result),
                  HU_ERR_INVALID_ARGUMENT);
 }
@@ -3382,14 +3778,23 @@ static void test_train_invalid_args(void) {
 static void test_checkpoint_v1_compat(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.01f,
+                                     .unembedding_lr = 0.01f,
+                                     .matrix_lr = 0.01f,
+                                     .scalar_lr = 0.001f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
@@ -3400,8 +3805,9 @@ static void test_checkpoint_v1_compat(void) {
     HU_ASSERT_EQ(model.vtable->get_params(model.ctx, &params, &pcount), HU_OK);
     float *fake_grad = (float *)alloc.alloc(alloc.ctx, params[0].size_bytes);
     size_t nf = params[0].size_bytes / sizeof(float);
-    for (size_t i = 0; i < nf; i++) fake_grad[i] = 0.05f * (float)(i % 5);
-    hu_ml_tensor_t gt = { .data = fake_grad, .size_bytes = params[0].size_bytes, .ndim = 1 };
+    for (size_t i = 0; i < nf; i++)
+        fake_grad[i] = 0.05f * (float)(i % 5);
+    hu_ml_tensor_t gt = {.data = fake_grad, .size_bytes = params[0].size_bytes, .ndim = 1};
     gt.shape[0] = nf;
     opt.vtable->step(opt.ctx, params, &gt, 1);
 
@@ -3417,7 +3823,8 @@ static void test_checkpoint_v1_compat(void) {
     for (size_t i = 0; i < pcount; i++) {
         size_t sz = params[i].size_bytes;
         fwrite(&sz, sizeof(sz), 1, f);
-        if (sz > 0) fwrite(params[i].data, 1, sz, f);
+        if (sz > 0)
+            fwrite(params[i].data, 1, sz, f);
     }
     fclose(f);
 
@@ -3440,7 +3847,10 @@ static void test_checkpoint_v1_compat(void) {
     int match = 1;
     float *restored = (float *)params[0].data;
     for (size_t i = 0; i < nf; i++) {
-        if (fabsf(restored[i] - orig_vals[i]) > 1e-8f) { match = 0; break; }
+        if (fabsf(restored[i] - orig_vals[i]) > 1e-8f) {
+            match = 0;
+            break;
+        }
     }
     HU_ASSERT_EQ(match, 1);
 
@@ -3458,9 +3868,12 @@ static void test_adamw_math_reference(void) {
     hu_allocator_t alloc = hu_system_allocator();
 
     hu_optimizer_config_t opt_cfg = {
-        .embedding_lr = 0.1f, .unembedding_lr = 0.1f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.1f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f,
+        .embedding_lr = 0.1f,
+        .unembedding_lr = 0.1f,
+        .matrix_lr = 0.01f,
+        .scalar_lr = 0.1f,
+        .adam_beta1 = 0.9f,
+        .adam_beta2 = 0.999f,
         .weight_decay = 0.0f,
     };
     hu_ml_optimizer_t opt = {0};
@@ -3471,7 +3884,8 @@ static void test_adamw_math_reference(void) {
     HU_ASSERT_EQ(hu_muon_adamw_add_param(&opt, param, grad, 1, 2, HU_PARAM_SCALAR), HU_OK);
 
     /* Step 1: grad = [0.5, -0.3] */
-    grad[0] = 0.5f; grad[1] = -0.3f;
+    grad[0] = 0.5f;
+    grad[1] = -0.3f;
     opt.vtable->step(opt.ctx, NULL, NULL, 0);
 
     /* Hand-compute AdamW step 1 (beta1=0.9, beta2=0.999, lr=0.1, eps=1e-8):
@@ -3493,7 +3907,8 @@ static void test_adamw_math_reference(void) {
 
     /* Step 2: same gradient */
     opt.vtable->zero_grad(opt.ctx);
-    grad[0] = 0.5f; grad[1] = -0.3f;
+    grad[0] = 0.5f;
+    grad[1] = -0.3f;
     opt.vtable->step(opt.ctx, NULL, NULL, 0);
 
     /* Hand-compute step 2:
@@ -3522,12 +3937,21 @@ static void test_adamw_math_reference(void) {
 static void test_checkpoint_resume_training(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
 
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .weight_decay = 0.01f,
-        .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.01f,
+                                     .unembedding_lr = 0.01f,
+                                     .matrix_lr = 0.01f,
+                                     .scalar_lr = 0.001f,
+                                     .weight_decay = 0.01f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f};
 
     /* ── Run A: 4 uninterrupted steps ── */
     hu_model_t modelA = {0};
@@ -3541,8 +3965,9 @@ static void test_checkpoint_resume_training(void) {
     HU_ASSERT_EQ(modelA.vtable->get_params(modelA.ctx, &paramsA, &pcountA), HU_OK);
     size_t nf = paramsA[0].size_bytes / sizeof(float);
     float *fake_grad = (float *)alloc.alloc(alloc.ctx, paramsA[0].size_bytes);
-    for (size_t i = 0; i < nf; i++) fake_grad[i] = 0.1f * (float)(i % 7 - 3);
-    hu_ml_tensor_t gt = { .data = fake_grad, .size_bytes = paramsA[0].size_bytes, .ndim = 1 };
+    for (size_t i = 0; i < nf; i++)
+        fake_grad[i] = 0.1f * (float)(i % 7 - 3);
+    hu_ml_tensor_t gt = {.data = fake_grad, .size_bytes = paramsA[0].size_bytes, .ndim = 1};
     gt.shape[0] = nf;
 
     for (int s = 0; s < 4; s++)
@@ -3590,7 +4015,8 @@ static void test_checkpoint_resume_training(void) {
     int match = 1;
     for (size_t i = 0; i < nf; i++) {
         if (fabsf(((float *)paramsC[0].data)[i] - paramsA_final[i]) > 1e-5f) {
-            match = 0; break;
+            match = 0;
+            break;
         }
     }
     HU_ASSERT_EQ(match, 1);
@@ -3615,7 +4041,7 @@ static void test_agent_apply_kv_nembd(void) {
     /* Valid: 256 is divisible by head_dim=128 */
     hu_experiment_apply_agent_kv(&cfg, "n_embd", "256");
     HU_ASSERT_EQ(cfg.gpt.n_embd, 256u);
-    HU_ASSERT_EQ(cfg.gpt.n_head, 2u);     /* 256/128 */
+    HU_ASSERT_EQ(cfg.gpt.n_head, 2u); /* 256/128 */
     HU_ASSERT_EQ(cfg.gpt.n_kv_head, 2u);
 
     /* Valid: 384 is divisible by 128 */
@@ -3651,8 +4077,13 @@ static void test_agent_apply_kv_nembd(void) {
 static void test_evaluator_zero_bytes(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t gcfg = {0};
-    gcfg.sequence_len = 4; gcfg.vocab_size = 8; gcfg.n_layer = 1;
-    gcfg.n_head = 2; gcfg.n_kv_head = 2; gcfg.n_embd = 8; gcfg.head_dim = 4;
+    gcfg.sequence_len = 4;
+    gcfg.vocab_size = 8;
+    gcfg.n_layer = 1;
+    gcfg.n_head = 2;
+    gcfg.n_kv_head = 2;
+    gcfg.n_embd = 8;
+    gcfg.head_dim = 4;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &gcfg, &model), HU_OK);
@@ -3692,14 +4123,23 @@ static void test_evaluator_zero_bytes(void) {
 static void test_checkpoint_optimizer_mismatch(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gpt_config_t cfg = {0};
-    cfg.sequence_len = 4; cfg.vocab_size = 8; cfg.n_layer = 1;
-    cfg.n_head = 2; cfg.n_kv_head = 2; cfg.n_embd = 8; cfg.head_dim = 4;
+    cfg.sequence_len = 4;
+    cfg.vocab_size = 8;
+    cfg.n_layer = 1;
+    cfg.n_head = 2;
+    cfg.n_kv_head = 2;
+    cfg.n_embd = 8;
+    cfg.head_dim = 4;
 
     hu_model_t model = {0};
     HU_ASSERT_EQ(hu_gpt_create(&alloc, &cfg, &model), HU_OK);
 
-    hu_optimizer_config_t opt_cfg = { .embedding_lr = 0.01f, .unembedding_lr = 0.01f,
-        .matrix_lr = 0.01f, .scalar_lr = 0.001f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f };
+    hu_optimizer_config_t opt_cfg = {.embedding_lr = 0.01f,
+                                     .unembedding_lr = 0.01f,
+                                     .matrix_lr = 0.01f,
+                                     .scalar_lr = 0.001f,
+                                     .adam_beta1 = 0.9f,
+                                     .adam_beta2 = 0.999f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
     HU_ASSERT_EQ(hu_gpt_register_params(&model, &opt), HU_OK);
@@ -3744,7 +4184,7 @@ static void test_evaluator_null_args(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_model_t model = {0};
     hu_ml_dataloader_t *dl = (hu_ml_dataloader_t *)0x1; /* non-null sentinel */
-    int32_t token_bytes[4] = {1,1,1,1};
+    int32_t token_bytes[4] = {1, 1, 1, 1};
     hu_ml_eval_result_t result = {0};
 
     HU_ASSERT_EQ(hu_ml_evaluate_bpb(NULL, &model, dl, token_bytes, 4, 4, &result),
@@ -3767,31 +4207,26 @@ static void test_prepare_missing_input(void) {
     HU_ASSERT_EQ(hu_bpe_tokenizer_create(&alloc, &tok), HU_OK);
 
     /* Missing input file */
-    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, tok,
-        "/tmp/hu_nonexistent_input_xyz.txt", "/tmp/hu_out.bin"), HU_ERR_IO);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, tok, "/tmp/hu_nonexistent_input_xyz.txt",
+                                             "/tmp/hu_out.bin"),
+                 HU_ERR_IO);
 
     /* Missing input directory */
-    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, tok,
-        "/tmp/hu_nonexistent_dir_xyz", "/tmp"), HU_ERR_IO);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, tok, "/tmp/hu_nonexistent_dir_xyz", "/tmp"),
+                 HU_ERR_IO);
 
     /* Null args */
     HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(NULL, tok, "/tmp/a", "/tmp/b"),
                  HU_ERR_INVALID_ARGUMENT);
     HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, NULL, "/tmp/a", "/tmp/b"),
                  HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, tok, NULL, "/tmp/b"),
-                 HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, tok, "/tmp/a", NULL),
-                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, tok, NULL, "/tmp/b"), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_file(&alloc, tok, "/tmp/a", NULL), HU_ERR_INVALID_ARGUMENT);
 
-    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(NULL, tok, "/tmp", "/tmp"),
-                 HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, NULL, "/tmp", "/tmp"),
-                 HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, tok, NULL, "/tmp"),
-                 HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, tok, "/tmp", NULL),
-                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(NULL, tok, "/tmp", "/tmp"), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, NULL, "/tmp", "/tmp"), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, tok, NULL, "/tmp"), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_ml_prepare_tokenize_dir(&alloc, tok, "/tmp", NULL), HU_ERR_INVALID_ARGUMENT);
 
     hu_bpe_tokenizer_deinit(tok);
 }
@@ -3801,9 +4236,7 @@ static void test_prepare_missing_input(void) {
 static void test_newton_schulz_orthogonality_check(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_optimizer_config_t opt_cfg = {
-        .matrix_lr = 1.0f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f,
-        .weight_decay = 0.0f
-    };
+        .matrix_lr = 1.0f, .adam_beta1 = 0.9f, .adam_beta2 = 0.999f, .weight_decay = 0.0f};
     hu_ml_optimizer_t opt = {0};
     HU_ASSERT_EQ(hu_muon_adamw_create(&alloc, &opt_cfg, &opt), HU_OK);
 
@@ -3855,12 +4288,144 @@ static void test_newton_schulz_orthogonality_check(void) {
 
     for (size_t i = 0; i < rows; i++)
         for (size_t j = 0; j < rows; j++) {
-            if (i == j) continue;
+            if (i == j)
+                continue;
             float ratio = fabsf(gram[i * rows + j]) / diag_mean;
             HU_ASSERT(ratio < 0.3f);
         }
 
     opt.vtable->deinit(opt.ctx, &alloc);
+}
+
+/* ─── SOTA Pipeline: CLI help/arg tests ──────────────────────────────────── */
+
+static void test_ml_cli_dpo_train_help(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *argv[] = {"dpo-train", "--help"};
+    hu_error_t err = hu_ml_cli_dpo_train(&alloc, 2, argv);
+    HU_ASSERT_EQ(err, HU_OK);
+}
+
+static void test_ml_cli_prepare_conversations_help(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *argv[] = {"prepare-conversations", "--help"};
+    hu_error_t err = hu_ml_cli_prepare_conversations(&alloc, 2, argv);
+    HU_ASSERT_EQ(err, HU_OK);
+}
+
+static void test_ml_cli_lora_persona_help(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *argv[] = {"lora-persona", "--help"};
+    hu_error_t err = hu_ml_cli_lora_persona(&alloc, 2, argv);
+    HU_ASSERT_EQ(err, HU_OK);
+}
+
+static void test_ml_cli_lora_persona_no_persona(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *argv[] = {"lora-persona"};
+    hu_error_t err = hu_ml_cli_lora_persona(&alloc, 1, argv);
+    /* In test mode this returns HU_OK (skipped), in non-test it would return error */
+    HU_ASSERT_EQ(err, HU_OK);
+}
+
+static void test_ml_cli_train_feed_predictor_help(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *argv[] = {"train-feed-predictor", "--help"};
+    hu_error_t err = hu_ml_cli_train_feed_predictor(&alloc, 2, argv);
+    HU_ASSERT_EQ(err, HU_OK);
+}
+
+static void test_ml_cli_train_feed_predictor_no_db(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *argv[] = {"train-feed-predictor"};
+    hu_error_t err = hu_ml_cli_train_feed_predictor(&alloc, 1, argv);
+    HU_ASSERT_EQ(err, HU_OK);
+}
+
+/* ─── HUML Provider tests ────────────────────────────────────────────────── */
+
+static void test_huml_provider_create_and_deinit(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_huml_config_t config = {0};
+    config.checkpoint_path = "test-checkpoint.huml";
+    config.checkpoint_path_len = 21;
+    config.max_tokens = 64;
+
+    hu_provider_t provider = {0};
+    hu_error_t err = hu_huml_provider_create(&alloc, &config, &provider);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(provider.ctx);
+    HU_ASSERT_NOT_NULL(provider.vtable);
+
+    provider.vtable->deinit(provider.ctx, &alloc);
+}
+
+static void test_huml_provider_chat_test_mode(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_provider_t provider = {0};
+    hu_error_t err = hu_huml_provider_create(&alloc, NULL, &provider);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    err = provider.vtable->chat_with_system(provider.ctx, &alloc, "system", 6, "hello", 5, "", 0,
+                                            0.5, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_STR_EQ(out, "[huml test]");
+    HU_ASSERT_EQ(out_len, 11);
+
+    alloc.free(alloc.ctx, out, out_len + 1);
+    provider.vtable->deinit(provider.ctx, &alloc);
+}
+
+static void test_huml_provider_get_name(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_provider_t provider = {0};
+    hu_huml_provider_create(&alloc, NULL, &provider);
+    HU_ASSERT_STR_EQ(provider.vtable->get_name(provider.ctx), "huml");
+    HU_ASSERT_EQ(provider.vtable->supports_native_tools(provider.ctx), false);
+    provider.vtable->deinit(provider.ctx, &alloc);
+}
+
+/* ─── Speculative predict with model (test mode) ─────────────────────────── */
+
+static void test_speculative_predict_with_model_null_provider(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char *preds[4] = {0};
+    size_t pred_lens[4] = {0};
+    double confs[4] = {0};
+    size_t count = 0;
+
+    hu_error_t err = hu_speculative_predict_with_model(
+        &alloc, NULL, NULL, 0, "hello", 5, "hi there", 8, preds, pred_lens, confs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    /* With NULL provider, falls back to heuristic which may produce predictions */
+    for (size_t i = 0; i < count; i++) {
+        if (preds[i])
+            alloc.free(alloc.ctx, preds[i], pred_lens[i] + 1);
+    }
+}
+
+/* ─── Anticipatory emotion classification (test mode) ────────────────────── */
+
+static void test_anticipatory_classify_emotion_keywords(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char emotion[64] = {0};
+    float conf = 0.0f;
+
+    hu_error_t err = hu_anticipatory_classify_emotion(&alloc, NULL, NULL, 0, "kid's game tomorrow",
+                                                      19, emotion, sizeof(emotion), &conf);
+    HU_ASSERT_EQ(err, HU_OK);
+    /* Keyword "kid's game" should match "nervous" */
+    HU_ASSERT_TRUE(emotion[0] != '\0');
+    HU_ASSERT_TRUE(conf > 0.0f);
+}
+
+static void test_anticipatory_classify_emotion_null_args(void) {
+    hu_error_t err =
+        hu_anticipatory_classify_emotion(NULL, NULL, NULL, 0, "test", 4, NULL, 0, NULL);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
 void run_ml_tests(void) {
@@ -4004,4 +4569,20 @@ void run_ml_tests(void) {
     HU_RUN_TEST(test_evaluator_null_args);
     HU_RUN_TEST(test_prepare_missing_input);
     HU_RUN_TEST(test_newton_schulz_orthogonality_check);
+    /* SOTA pipeline CLI tests */
+    HU_RUN_TEST(test_ml_cli_dpo_train_help);
+    HU_RUN_TEST(test_ml_cli_prepare_conversations_help);
+    HU_RUN_TEST(test_ml_cli_lora_persona_help);
+    HU_RUN_TEST(test_ml_cli_lora_persona_no_persona);
+    HU_RUN_TEST(test_ml_cli_train_feed_predictor_help);
+    HU_RUN_TEST(test_ml_cli_train_feed_predictor_no_db);
+    /* HUML provider tests */
+    HU_RUN_TEST(test_huml_provider_create_and_deinit);
+    HU_RUN_TEST(test_huml_provider_chat_test_mode);
+    HU_RUN_TEST(test_huml_provider_get_name);
+    /* Speculative predict with model (test mode falls back to heuristic) */
+    HU_RUN_TEST(test_speculative_predict_with_model_null_provider);
+    /* Emotion classify (test mode uses keyword fallback) */
+    HU_RUN_TEST(test_anticipatory_classify_emotion_keywords);
+    HU_RUN_TEST(test_anticipatory_classify_emotion_null_args);
 }

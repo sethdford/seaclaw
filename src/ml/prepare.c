@@ -1,9 +1,9 @@
 /* Data preparation utilities for ML training. */
 
+#include "human/ml/prepare.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/ml/ml.h"
-#include "human/ml/prepare.h"
 #include "human/ml/tokenizer_ml.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,8 +15,7 @@
 /* ─── hu_ml_prepare_tokenize_file ─────────────────────────────────────────── */
 
 hu_error_t hu_ml_prepare_tokenize_file(hu_allocator_t *alloc, hu_bpe_tokenizer_t *tok,
-                                      const char *input_path, const char *output_path)
-{
+                                       const char *input_path, const char *output_path) {
     if (!alloc || !tok || !input_path || !output_path)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -81,8 +80,7 @@ hu_error_t hu_ml_prepare_tokenize_file(hu_allocator_t *alloc, hu_bpe_tokenizer_t
 /* ─── hu_ml_prepare_tokenize_dir ──────────────────────────────────────────── */
 
 hu_error_t hu_ml_prepare_tokenize_dir(hu_allocator_t *alloc, hu_bpe_tokenizer_t *tok,
-                                     const char *input_dir, const char *output_dir)
-{
+                                      const char *input_dir, const char *output_dir) {
     if (!alloc || !tok || !input_dir || !output_dir)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -111,8 +109,7 @@ hu_error_t hu_ml_prepare_tokenize_dir(hu_allocator_t *alloc, hu_bpe_tokenizer_t 
 
         int r1 = snprintf(in_path, sizeof(in_path), "%s/%s", input_dir, e->d_name);
         int r2 = snprintf(out_path, sizeof(out_path), "%s/%s.bin", output_dir, base);
-        if (r1 < 0 || (size_t)r1 >= sizeof(in_path) ||
-            r2 < 0 || (size_t)r2 >= sizeof(out_path))
+        if (r1 < 0 || (size_t)r1 >= sizeof(in_path) || r2 < 0 || (size_t)r2 >= sizeof(out_path))
             continue;
 
         hu_error_t err = hu_ml_prepare_tokenize_file(alloc, tok, in_path, out_path);
@@ -133,8 +130,7 @@ hu_error_t hu_ml_prepare_tokenize_dir(hu_allocator_t *alloc, hu_bpe_tokenizer_t 
 /* ─── hu_ml_prepare_token_bytes ───────────────────────────────────────────── */
 
 hu_error_t hu_ml_prepare_token_bytes(hu_allocator_t *alloc, hu_bpe_tokenizer_t *tok,
-                                    int32_t **token_bytes_out, size_t *count)
-{
+                                     int32_t **token_bytes_out, size_t *count) {
     if (!alloc || !tok || !token_bytes_out || !count)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -153,10 +149,182 @@ hu_error_t hu_ml_prepare_token_bytes(hu_allocator_t *alloc, hu_bpe_tokenizer_t *
     return HU_OK;
 }
 
+/* ─── hu_ml_prepare_conversations ─────────────────────────────────────────── */
+
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+
+static hu_error_t append_text(hu_allocator_t *alloc, char **buf, size_t *buf_len, size_t *buf_cap,
+                              const char *text, size_t text_len) {
+    if (*buf_len + text_len + 1 > *buf_cap) {
+        size_t new_cap = (*buf_cap == 0) ? 65536 : *buf_cap;
+        while (new_cap < *buf_len + text_len + 1)
+            new_cap *= 2;
+        char *nb = (char *)alloc->alloc(alloc->ctx, new_cap);
+        if (!nb)
+            return HU_ERR_OUT_OF_MEMORY;
+        if (*buf && *buf_len > 0)
+            memcpy(nb, *buf, *buf_len);
+        if (*buf)
+            alloc->free(alloc->ctx, *buf, *buf_cap);
+        *buf = nb;
+        *buf_cap = new_cap;
+    }
+    memcpy(*buf + *buf_len, text, text_len);
+    *buf_len += text_len;
+    (*buf)[*buf_len] = '\0';
+    return HU_OK;
+}
+
+static hu_error_t collect_imessage(hu_allocator_t *alloc, const char *chat_db_path, char **buf,
+                                   size_t *buf_len, size_t *buf_cap, size_t *count) {
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(chat_db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK)
+        return HU_OK;
+
+    sqlite3_stmt *stmt = NULL;
+    const char *sql = "SELECT m.is_from_me, m.text FROM message m "
+                      "WHERE m.text IS NOT NULL AND m.text != '' "
+                      "ORDER BY m.date ASC";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return HU_OK;
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int is_from_me = sqlite3_column_int(stmt, 0);
+        const char *text = (const char *)sqlite3_column_text(stmt, 1);
+        if (!text || text[0] == '\0')
+            continue;
+        size_t tlen = strlen(text);
+
+        const char *prefix = is_from_me ? "<|user|>" : "<|other|>";
+        size_t plen = strlen(prefix);
+        static const char suffix[] = "<|end|>\n";
+
+        append_text(alloc, buf, buf_len, buf_cap, prefix, plen);
+        append_text(alloc, buf, buf_len, buf_cap, text, tlen);
+        append_text(alloc, buf, buf_len, buf_cap, suffix, sizeof(suffix) - 1);
+        (*count)++;
+    }
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return HU_OK;
+}
+
+static hu_error_t collect_memories(hu_allocator_t *alloc, const char *memory_db_path, char **buf,
+                                   size_t *buf_len, size_t *buf_cap, size_t *count) {
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(memory_db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK)
+        return HU_OK;
+
+    sqlite3_stmt *stmt = NULL;
+    const char *sql = "SELECT content FROM memories WHERE content IS NOT NULL "
+                      "ORDER BY timestamp ASC";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return HU_OK;
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *content = (const char *)sqlite3_column_text(stmt, 0);
+        if (!content || content[0] == '\0')
+            continue;
+        size_t clen = strlen(content);
+
+        static const char prefix[] = "<|memory|>";
+        static const char suffix[] = "<|end|>\n";
+        append_text(alloc, buf, buf_len, buf_cap, prefix, sizeof(prefix) - 1);
+        append_text(alloc, buf, buf_len, buf_cap, content, clen);
+        append_text(alloc, buf, buf_len, buf_cap, suffix, sizeof(suffix) - 1);
+        (*count)++;
+    }
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return HU_OK;
+}
+#endif
+
+hu_error_t hu_ml_prepare_conversations(hu_allocator_t *alloc, hu_bpe_tokenizer_t *tok,
+                                       const char *chat_db_path, const char *memory_db_path,
+                                       const char *output_dir, size_t *messages_processed) {
+    if (!alloc || !tok || !output_dir || !messages_processed)
+        return HU_ERR_INVALID_ARGUMENT;
+    *messages_processed = 0;
+
+#ifdef HU_IS_TEST
+    (void)chat_db_path;
+    (void)memory_db_path;
+    return HU_OK;
+#else
+#ifdef HU_ENABLE_SQLITE
+    char *buf = NULL;
+    size_t buf_len = 0;
+    size_t buf_cap = 0;
+
+    if (chat_db_path)
+        collect_imessage(alloc, chat_db_path, &buf, &buf_len, &buf_cap, messages_processed);
+    if (memory_db_path)
+        collect_memories(alloc, memory_db_path, &buf, &buf_len, &buf_cap, messages_processed);
+
+    if (buf_len == 0) {
+        if (buf)
+            alloc->free(alloc->ctx, buf, buf_cap);
+        return HU_OK;
+    }
+
+    int32_t *ids = NULL;
+    size_t ids_count = 0;
+    hu_error_t err = hu_bpe_tokenizer_encode(tok, buf, buf_len, &ids, &ids_count);
+    alloc->free(alloc->ctx, buf, buf_cap);
+    if (err != HU_OK)
+        return err;
+
+    if (ids_count == 0) {
+        if (ids)
+            alloc->free(alloc->ctx, ids, ids_count * sizeof(int32_t));
+        return HU_OK;
+    }
+
+    /* 90/10 train/val split */
+    size_t val_start = ids_count * 9 / 10;
+    if (val_start == 0)
+        val_start = 1;
+    if (val_start >= ids_count)
+        val_start = ids_count - 1;
+
+    char train_path[1024];
+    char val_path[1024];
+    snprintf(train_path, sizeof(train_path), "%s/train.bin", output_dir);
+    snprintf(val_path, sizeof(val_path), "%s/val.bin", output_dir);
+
+    FILE *tf = fopen(train_path, "wb");
+    if (tf) {
+        fwrite(ids, sizeof(int32_t), val_start, tf);
+        fclose(tf);
+    }
+    FILE *vf = fopen(val_path, "wb");
+    if (vf) {
+        fwrite(ids + val_start, sizeof(int32_t), ids_count - val_start, vf);
+        fclose(vf);
+    }
+
+    printf("[prepare] Tokenized %zu messages -> %zu tokens (train=%zu, val=%zu)\n",
+           *messages_processed, ids_count, val_start, ids_count - val_start);
+
+    alloc->free(alloc->ctx, ids, ids_count * sizeof(int32_t));
+    return (tf && vf) ? HU_OK : HU_ERR_IO;
+#else
+    (void)chat_db_path;
+    (void)memory_db_path;
+    return HU_ERR_NOT_SUPPORTED;
+#endif
+#endif
+}
+
 /* ─── hu_experiment_config_default ─────────────────────────────────────────── */
 
-hu_experiment_config_t hu_experiment_config_default(void)
-{
+hu_experiment_config_t hu_experiment_config_default(void) {
     hu_experiment_config_t c = {0};
 
     c.gpt.sequence_len = 2048;

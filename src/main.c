@@ -14,6 +14,7 @@
 #include "human/agent/cli.h"
 #include "human/agent/episodic.h"
 #include "human/agent/outcomes.h"
+#include "human/agent/registry.h"
 #include "human/agent/spawn.h"
 #include "human/bootstrap.h"
 #include "human/bus.h"
@@ -29,6 +30,7 @@
 #include "human/crontab.h"
 #include "human/daemon.h"
 #include "human/doctor.h"
+#include "human/doctor_fix.h"
 #include "human/gateway.h"
 #include "human/gateway/control_protocol.h"
 #include "human/health.h"
@@ -42,6 +44,7 @@
 #include "human/migration.h"
 #include "human/observability/log_observer.h"
 #include "human/onboard.h"
+#include "human/plugin_discovery.h"
 #include "human/provider.h"
 #include "human/providers/factory.h"
 #include "human/runtime.h"
@@ -50,8 +53,8 @@
 #include "human/security/sandbox.h"
 #include "human/security/sandbox_internal.h"
 #include "human/session.h"
-#include "human/agent/registry.h"
 #include "human/skill_registry.h"
+#include "human/skill_scaffold.h"
 #ifdef HU_HAS_SKILLS
 #include "human/skillforge.h"
 #endif
@@ -73,10 +76,10 @@
 #ifdef HU_HAS_UPDATE
 #include "human/update.h"
 #endif
+#include "human/plugin_loader.h"
 #include "human/pwa.h"
 #include "human/pwa_context.h"
 #include "human/pwa_learner.h"
-#include "human/plugin_loader.h"
 #include "human/tool.h"
 #include "human/tools/factory.h"
 #if HU_HAS_EMAIL
@@ -175,6 +178,7 @@ static hu_error_t cmd_onboard(hu_allocator_t *alloc, int argc, char **argv);
 static hu_error_t cmd_service(hu_allocator_t *alloc, int argc, char **argv);
 static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv);
 static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv);
+static hu_error_t cmd_plugins(hu_allocator_t *alloc, int argc, char **argv);
 static hu_error_t cmd_agents(hu_allocator_t *alloc, int argc, char **argv);
 static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv);
 static hu_error_t cmd_migrate(hu_allocator_t *alloc, int argc, char **argv);
@@ -206,32 +210,47 @@ static bool svc_agent_on_message_locked(hu_bus_event_type_t type, const hu_bus_e
 
 #ifdef HU_ENABLE_ML
 static hu_error_t cmd_ml(hu_allocator_t *alloc, int argc, char **argv) {
-    if (argc < 2) {
-        fprintf(stderr,
-                "Usage: human ml <subcommand>\n\n"
-                "Subcommands:\n"
-                "  train       Train a model from config\n"
-                "  experiment  Run experiment loop\n"
-                "  prepare     Tokenize data for training\n"
-                "  status      Show experiment results\n");
+    if (argc < 3) {
+        fprintf(stderr, "Usage: human ml <subcommand>\n\n"
+                        "Subcommands:\n"
+                        "  train                   Train a model from config\n"
+                        "  experiment              Run experiment loop\n"
+                        "  prepare                 Tokenize data for training\n"
+                        "  prepare-conversations   Tokenize chat.db + memory.db for training\n"
+                        "  dpo-train               Run DPO preference training step\n"
+                        "  lora-persona            Train LoRA adapter from persona examples\n"
+                        "  train-feed-predictor    Train topic/trend predictor from feed data\n"
+                        "  status                  Show experiment results\n");
         return HU_ERR_INVALID_ARGUMENT;
     }
-    const char *sub = argv[1];
+    const char *sub = argv[2];
     if (strcmp(sub, "train") == 0)
-        return hu_ml_cli_train(alloc, argc - 1, (const char **)(argv + 1));
+        return hu_ml_cli_train(alloc, argc - 2, (const char **)(argv + 2));
     if (strcmp(sub, "experiment") == 0)
-        return hu_ml_cli_experiment(alloc, argc - 1, (const char **)(argv + 1));
+        return hu_ml_cli_experiment(alloc, argc - 2, (const char **)(argv + 2));
     if (strcmp(sub, "prepare") == 0)
-        return hu_ml_cli_prepare(alloc, argc - 1, (const char **)(argv + 1));
+        return hu_ml_cli_prepare(alloc, argc - 2, (const char **)(argv + 2));
     if (strcmp(sub, "status") == 0)
-        return hu_ml_cli_status(alloc, argc - 1, (const char **)(argv + 1));
+        return hu_ml_cli_status(alloc, argc - 2, (const char **)(argv + 2));
+    if (strcmp(sub, "dpo-train") == 0)
+        return hu_ml_cli_dpo_train(alloc, argc - 2, (const char **)(argv + 2));
+    if (strcmp(sub, "prepare-conversations") == 0)
+        return hu_ml_cli_prepare_conversations(alloc, argc - 2, (const char **)(argv + 2));
+    if (strcmp(sub, "lora-persona") == 0)
+        return hu_ml_cli_lora_persona(alloc, argc - 2, (const char **)(argv + 2));
+    if (strcmp(sub, "train-feed-predictor") == 0)
+        return hu_ml_cli_train_feed_predictor(alloc, argc - 2, (const char **)(argv + 2));
     if (strcmp(sub, "--help") == 0 || strcmp(sub, "help") == 0) {
         printf("Usage: human ml <subcommand>\n\n"
                "Subcommands:\n"
-               "  train       Train a model from config\n"
-               "  experiment  Run experiment loop\n"
-               "  prepare     Tokenize data for training\n"
-               "  status      Show experiment results\n");
+               "  train                   Train a model from config\n"
+               "  experiment              Run experiment loop\n"
+               "  prepare                 Tokenize data for training\n"
+               "  prepare-conversations   Tokenize chat.db + memory.db for training\n"
+               "  dpo-train               Run DPO preference training step\n"
+               "  lora-persona            Train LoRA adapter from persona examples\n"
+               "  train-feed-predictor    Train topic/trend predictor from feed data\n"
+               "  status                  Show experiment results\n");
         return HU_OK;
     }
     fprintf(stderr, "Unknown ml subcommand: %s\n", sub);
@@ -264,6 +283,7 @@ static const hu_command_t commands[] = {
 #endif
     {"channel", "Channel management", cmd_channel},
     {"skills", "Skill discovery and integration", cmd_skills},
+    {"plugins", "Plugin management", cmd_plugins},
     {"agents", "Manage named agent definitions", cmd_agents},
     {"pwa", "Drive installed PWA web apps", cmd_pwa},
     {"hardware", "Hardware peripheral management", cmd_hardware},
@@ -353,16 +373,47 @@ static hu_error_t cmd_status(hu_allocator_t *alloc, int argc, char **argv) {
 }
 
 static hu_error_t cmd_doctor(hu_allocator_t *alloc, int argc, char **argv) {
-    (void)argc;
-    (void)argv;
+    bool do_fix = false;
+    for (int i = 2; i < argc; i++) {
+        if (argv[i] && strcmp(argv[i], "--fix") == 0)
+            do_fix = true;
+    }
+
+    if (do_fix) {
+        printf("\n  human doctor --fix — auto-repair\n\n");
+        hu_doctor_fix_result_t *fixes = NULL;
+        size_t fix_count = 0;
+        hu_config_t fix_cfg;
+        hu_config_load(alloc, &fix_cfg);
+        hu_error_t fix_err = hu_doctor_fix(alloc, &fix_cfg, &fixes, &fix_count);
+        if (fix_err == HU_OK && fixes) {
+            size_t fixed = 0, failed = 0;
+            for (size_t i = 0; i < fix_count; i++) {
+                printf("  %-20s %s  %s\n", fixes[i].issue ? fixes[i].issue : "?",
+                       fixes[i].fixed ? "fixed" : "FAILED",
+                       fixes[i].action_taken ? fixes[i].action_taken : "");
+                if (fixes[i].fixed)
+                    fixed++;
+                else
+                    failed++;
+            }
+            printf("\n  %zu fixed, %zu failed\n\n", fixed, failed);
+            hu_doctor_fix_results_free(alloc, fixes, fix_count);
+        }
+        hu_config_deinit(&fix_cfg);
+        return HU_OK;
+    }
+
+    printf("\n  human doctor — system diagnostics\n\n");
+
     hu_config_t cfg;
     hu_error_t err = hu_config_load(alloc, &cfg);
     if (err != HU_OK) {
-        printf("[doctor] config: error — %s\n", hu_error_string(err));
+        printf("  config        error    %s\n", hu_error_string(err));
         return err;
     }
 
-    printf("[doctor] config: ok (loaded from %s)\n",
+    printf("  config        ok       loaded from %s\n",
            cfg.config_path && cfg.config_path[0] ? cfg.config_path : "defaults");
 
     const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
@@ -372,31 +423,49 @@ static hu_error_t cmd_doctor(hu_allocator_t *alloc, int argc, char **argv) {
         bool has_vertex_adc =
             burl && strstr(burl, "aiplatform.googleapis.com") != NULL && (!key || !key[0]);
         if (has_vertex_adc) {
-            printf("[doctor] provider (%s): ok (Vertex AI with ADC)\n", prov);
+            printf("  provider      ok       %s (Vertex AI with ADC)\n", prov);
         } else if (key && key[0]) {
-            printf("[doctor] provider (%s): ok (API key configured)\n", prov);
+            printf("  provider      ok       %s (API key configured)\n", prov);
         } else {
-            printf("[doctor] provider (%s): warning — no API key\n", prov);
+            printf("  provider      warn     %s — no API key\n", prov);
         }
     } else {
-        printf("[doctor] provider (%s): ok (local — no API key required)\n", prov);
+        printf("  provider      ok       %s (local — no API key required)\n", prov);
     }
 
     const char *backend = cfg.memory_backend ? cfg.memory_backend : "none";
-    printf("[doctor] memory engine: %s\n", backend);
+    printf("  memory        %s%s\n", strcmp(backend, "none") == 0 ? "warn     " : "ok       ",
+           backend);
+
+    /* Context engine */
+    printf("  context       ok       legacy engine (pluggable via hu_context_engine_t)\n");
 
     hu_diag_item_t *items = NULL;
     size_t item_count = 0;
     err = hu_doctor_check_config_semantics(alloc, &cfg, &items, &item_count);
+
+    size_t ok_count = 0, warn_count = 0, err_count = 0;
     if (err == HU_OK && items && item_count > 0) {
+        printf("\n");
         for (size_t i = 0; i < item_count; i++) {
-            const char *sev = items[i].severity == HU_DIAG_ERR    ? "error"
-                              : items[i].severity == HU_DIAG_WARN ? "warning"
-                                                                  : "info";
-            printf("[doctor] %s: %s — %s\n", sev, items[i].category ? items[i].category : "config",
+            const char *sev_str;
+            if (items[i].severity == HU_DIAG_ERR) {
+                sev_str = "error   ";
+                err_count++;
+            } else if (items[i].severity == HU_DIAG_WARN) {
+                sev_str = "warn    ";
+                warn_count++;
+            } else {
+                sev_str = "ok      ";
+                ok_count++;
+            }
+            printf("  %-12s %s %s\n", items[i].category ? items[i].category : "config", sev_str,
                    items[i].message ? items[i].message : "");
         }
     }
+
+    printf("\n  Summary: %zu ok, %zu warnings, %zu errors\n\n", ok_count, warn_count, err_count);
+
     if (items) {
         for (size_t i = 0; i < item_count; i++) {
             if (items[i].category)
@@ -553,10 +622,12 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
     }
 
     alloc->free(alloc->ctx, path, path_len + 1);
-    fprintf(stderr, "[%s] cron: use 'list', 'add', 'add-digest', 'add-learn', or 'remove'\n", HU_CODENAME);
+    fprintf(stderr, "[%s] cron: use 'list', 'add', 'add-digest', 'add-learn', or 'remove'\n",
+            HU_CODENAME);
     fprintf(stderr, "  human cron list\n");
     fprintf(stderr, "  human cron add <schedule> <command>\n");
-    fprintf(stderr, "  human cron add-digest <schedule>   (schedule PWA digest, e.g. \"0 9 * * *\")\n");
+    fprintf(stderr,
+            "  human cron add-digest <schedule>   (schedule PWA digest, e.g. \"0 9 * * *\")\n");
     fprintf(stderr, "  human cron remove <id>\n");
     return HU_ERR_INVALID_ARGUMENT;
 }
@@ -784,8 +855,10 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
                 hu_feed_trend_t *trends = NULL;
                 size_t trend_count = 0;
                 if (hu_feed_detect_trends(alloc, feed_db, config->feeds.interests,
-                        strlen(config->feeds.interests), &trends, &trend_count) == HU_OK) {
-                    hu_feed_trends_build_section(alloc, trends, trend_count, &trend_section, &trend_len);
+                                          strlen(config->feeds.interests), &trends,
+                                          &trend_count) == HU_OK) {
+                    hu_feed_trends_build_section(alloc, trends, trend_count, &trend_section,
+                                                 &trend_len);
                     hu_feed_trends_free(alloc, trends, trend_count);
                 }
             }
@@ -797,16 +870,25 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
                 char *combined = (char *)alloc->alloc(alloc->ctx, combined_len + 1);
                 if (combined) {
                     size_t p = 0;
-                    if (trend_section) { memcpy(combined + p, trend_section, trend_len); p += trend_len; }
-                    if (digest) { memcpy(combined + p, digest, digest_len); p += digest_len; }
+                    if (trend_section) {
+                        memcpy(combined + p, trend_section, trend_len);
+                        p += trend_len;
+                    }
+                    if (digest) {
+                        memcpy(combined + p, digest, digest_len);
+                        p += digest_len;
+                    }
                     combined[p] = '\0';
-                    if (hu_research_build_prompt(alloc, combined, p, &full_prompt, &full_len) == HU_OK && full_prompt)
+                    if (hu_research_build_prompt(alloc, combined, p, &full_prompt, &full_len) ==
+                            HU_OK &&
+                        full_prompt)
                         prompt_to_use = full_prompt;
                     alloc->free(alloc->ctx, combined, combined_len + 1);
                 }
             }
 
-            if (trend_section) alloc->free(alloc->ctx, trend_section, trend_len + 1);
+            if (trend_section)
+                alloc->free(alloc->ctx, trend_section, trend_len + 1);
 
             if (config->feeds.retention_days > 0) {
                 hu_feed_processor_t cleanup_proc = {.alloc = alloc, .db = feed_db};
@@ -816,14 +898,45 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
 #endif
 
         uint64_t rid = 0;
-        hu_error_t je = hu_cron_add_agent_job((hu_cron_scheduler_t *)app_ctx.agent->scheduler, alloc, rc, prompt_to_use, "cli", "research-agent", &rid);
+        hu_error_t je =
+            hu_cron_add_agent_job((hu_cron_scheduler_t *)app_ctx.agent->scheduler, alloc, rc,
+                                  prompt_to_use, "cli", "research-agent", &rid);
         if (je == HU_OK)
             fprintf(stderr, "[%s] research agent registered with %s (id=%llu sched=%s)\n",
                     HU_CODENAME, full_prompt ? "feed digest" : "base prompt",
                     (unsigned long long)rid, rc);
 
-        if (digest) alloc->free(alloc->ctx, digest, digest_len + 1);
-        if (full_prompt) alloc->free(alloc->ctx, full_prompt, full_len + 1);
+        if (digest)
+            alloc->free(alloc->ctx, digest, digest_len + 1);
+        if (full_prompt)
+            alloc->free(alloc->ctx, full_prompt, full_len + 1);
+    }
+#endif
+
+#ifdef HU_ENABLE_ML
+    /* Weekly DPO preference training — runs every Sunday at 3 AM */
+    if (app_ctx.agent && app_ctx.agent->scheduler && app_ctx.agent->sota_initialized) {
+        uint64_t dpo_id = 0;
+        hu_error_t dpo_err = hu_cron_add_agent_job(
+            (hu_cron_scheduler_t *)app_ctx.agent->scheduler, alloc, "0 3 * * 0",
+            "Evaluate DPO preference pairs and report alignment score. "
+            "Use the dpo-train tool if available, or summarize recent feedback quality.",
+            "cli", "dpo-train-weekly", &dpo_id);
+        if (dpo_err == HU_OK)
+            fprintf(stderr, "[%s] DPO training registered (weekly, id=%llu)\n", HU_CODENAME,
+                    (unsigned long long)dpo_id);
+
+        /* Nightly experiment loop — runs at 2 AM to search for better model configs */
+        uint64_t exp_id = 0;
+        hu_error_t exp_err = hu_cron_add_agent_job(
+            (hu_cron_scheduler_t *)app_ctx.agent->scheduler, alloc, "0 2 * * *",
+            "Run ML experiment loop with max 3 iterations to search for better "
+            "hyperparameters. Use the ml experiment tool if available. "
+            "Report training loss and bits-per-byte improvement.",
+            "cli", "ml-experiment-nightly", &exp_id);
+        if (exp_err == HU_OK)
+            fprintf(stderr, "[%s] ML experiment loop registered (nightly, id=%llu)\n", HU_CODENAME,
+                    (unsigned long long)exp_id);
     }
 #endif
 
@@ -853,7 +966,8 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
                 if (np > 0 && (size_t)np < sizeof(graph_path)) {
                     hu_error_t graph_err = hu_graph_open(alloc, graph_path, (size_t)np, &svc_graph);
                     if (graph_err != HU_OK)
-                        fprintf(stderr, "[main] graph open failed: %s\n", hu_error_string(graph_err));
+                        fprintf(stderr, "[main] graph open failed: %s\n",
+                                hu_error_string(graph_err));
                 }
             }
         }
@@ -895,10 +1009,9 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
     }
 
     /* Initialize behavior thresholds from config */
-    hu_conversation_set_thresholds(app_ctx.cfg->behavior.consecutive_limit,
-                                   app_ctx.cfg->behavior.participation_pct,
-                                   app_ctx.cfg->behavior.max_response_chars,
-                                   app_ctx.cfg->behavior.min_response_chars);
+    hu_conversation_set_thresholds(
+        app_ctx.cfg->behavior.consecutive_limit, app_ctx.cfg->behavior.participation_pct,
+        app_ctx.cfg->behavior.max_response_chars, app_ctx.cfg->behavior.min_response_chars);
     hu_daemon_set_missed_msg_threshold(app_ctx.cfg->behavior.missed_msg_threshold_sec);
 
     /* Initialize conversation data (load word lists from embedded JSON) */
@@ -1084,7 +1197,57 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_ERR_NOT_FOUND;
     }
 
-    fprintf(stderr, "[%s] skills: use list, search, install, info, uninstall, update, or publish\n",
+    if (strcmp(sub, "init") == 0) {
+        const char *name = (argc >= 4 && argv[3]) ? argv[3] : NULL;
+        if (!name) {
+            fprintf(stderr, "[%s] skills init <name> [--category <cat>] [--author <author>]\n",
+                    HU_CODENAME);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        hu_skill_scaffold_opts_t opts = {
+            .name = name,
+            .description = NULL,
+            .author = NULL,
+            .category = HU_SKILL_CATEGORY_GENERAL,
+            .output_dir = NULL,
+        };
+        for (int i = 4; i < argc - 1; i++) {
+            if (argv[i] && strcmp(argv[i], "--category") == 0 && argv[i + 1]) {
+                if (strcmp(argv[i + 1], "data") == 0)
+                    opts.category = HU_SKILL_CATEGORY_DATA;
+                else if (strcmp(argv[i + 1], "automation") == 0)
+                    opts.category = HU_SKILL_CATEGORY_AUTOMATION;
+                else if (strcmp(argv[i + 1], "integration") == 0)
+                    opts.category = HU_SKILL_CATEGORY_INTEGRATION;
+                else if (strcmp(argv[i + 1], "analysis") == 0)
+                    opts.category = HU_SKILL_CATEGORY_ANALYSIS;
+                i++;
+            } else if (argv[i] && strcmp(argv[i], "--author") == 0 && argv[i + 1]) {
+                opts.author = argv[i + 1];
+                i++;
+            } else if (argv[i] && strcmp(argv[i], "--description") == 0 && argv[i + 1]) {
+                opts.description = argv[i + 1];
+                i++;
+            }
+        }
+        hu_error_t err = hu_skill_scaffold_init(alloc, &opts);
+        if (err != HU_OK) {
+            fprintf(stderr, "[%s] skills init: %s\n", HU_CODENAME, hu_error_string(err));
+            return err;
+        }
+        printf("Created skill project: %s/\n", name);
+        printf("  manifest.json  — skill metadata\n");
+        printf("  SKILL.md       — instructions\n");
+        printf("\nNext steps:\n");
+        printf("  1. Edit manifest.json with your parameters\n");
+        printf("  2. Write instructions in SKILL.md\n");
+        printf("  3. human skills install %s/\n", name);
+        printf("  4. human skills publish %s/\n", name);
+        return HU_OK;
+    }
+
+    fprintf(stderr,
+            "[%s] skills: use list, search, install, info, init, uninstall, update, or publish\n",
             HU_CODENAME);
     fprintf(stderr, "  human skills list\n");
     fprintf(stderr, "  human skills search <query>\n");
@@ -1092,6 +1255,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
     fprintf(stderr, "  human skills uninstall <name>\n");
     fprintf(stderr, "  human skills update <path>\n");
     fprintf(stderr, "  human skills info <name>\n");
+    fprintf(stderr, "  human skills init <name>        — scaffold a new skill project\n");
     fprintf(stderr, "  human skills publish [directory]\n");
     fprintf(stderr, "See docs/standards/ai/skills-vs-agents.md (skills vs spawned agents).\n");
     return HU_ERR_INVALID_ARGUMENT;
@@ -1106,6 +1270,70 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
     return HU_ERR_NOT_SUPPORTED;
 }
 #endif
+
+/* ─── plugins subcommand ─────────────────────────────────────────────────── */
+
+static hu_error_t cmd_plugins(hu_allocator_t *alloc, int argc, char **argv) {
+    const char *sub = (argc >= 3 && argv[2]) ? argv[2] : "list";
+
+    if (strcmp(sub, "list") == 0) {
+        hu_plugin_discovery_result_t *results = NULL;
+        size_t count = 0;
+        hu_error_t err = hu_plugin_discover_and_load(alloc, NULL, NULL, &results, &count);
+        if (err != HU_OK) {
+            fprintf(stderr, "[%s] plugins list: %s\n", HU_CODENAME, hu_error_string(err));
+            return err;
+        }
+        printf("Discovered plugins: %zu\n", count);
+        for (size_t i = 0; i < count; i++) {
+            if (results[i].load_error == HU_OK) {
+                printf("  + %s v%s  (%s)\n", results[i].name ? results[i].name : "?",
+                       results[i].version ? results[i].version : "?",
+                       results[i].path ? results[i].path : "?");
+            } else {
+                printf("  ! %s  FAILED: %s  (%s)\n", results[i].name ? results[i].name : "?",
+                       hu_error_string(results[i].load_error),
+                       results[i].path ? results[i].path : "?");
+            }
+        }
+        hu_plugin_discovery_results_free(alloc, results, count);
+        return HU_OK;
+    }
+
+    if (strcmp(sub, "scan") == 0) {
+        const char *dir = (argc >= 4 && argv[3]) ? argv[3] : NULL;
+        hu_plugin_discovery_result_t *results = NULL;
+        size_t count = 0;
+        hu_error_t err = hu_plugin_discover_and_load(alloc, dir, NULL, &results, &count);
+        if (err != HU_OK) {
+            fprintf(stderr, "[%s] plugins scan: %s\n", HU_CODENAME, hu_error_string(err));
+            return err;
+        }
+        printf("Scanned %s: %zu plugins found\n", dir ? dir : "~/.human/plugins/", count);
+        for (size_t i = 0; i < count; i++) {
+            printf("  %s %s\n", results[i].load_error == HU_OK ? "+" : "!",
+                   results[i].name ? results[i].name : results[i].path);
+        }
+        hu_plugin_discovery_results_free(alloc, results, count);
+        return HU_OK;
+    }
+
+    if (strcmp(sub, "dir") == 0) {
+        char dir[512];
+        size_t n = hu_plugin_get_default_dir(dir, sizeof(dir));
+        if (n > 0)
+            printf("%s\n", dir);
+        else
+            fprintf(stderr, "Could not determine plugin directory\n");
+        return n > 0 ? HU_OK : HU_ERR_NOT_FOUND;
+    }
+
+    fprintf(stderr, "[%s] plugins: use list, scan, or dir\n", HU_CODENAME);
+    fprintf(stderr, "  human plugins list             — list installed plugins\n");
+    fprintf(stderr, "  human plugins scan [directory]  — scan directory for plugins\n");
+    fprintf(stderr, "  human plugins dir              — show plugin directory\n");
+    return HU_ERR_INVALID_ARGUMENT;
+}
 
 /* ─── agents subcommand ──────────────────────────────────────────────────── */
 
@@ -1202,14 +1430,16 @@ static hu_error_t cmd_agents(hu_allocator_t *alloc, int argc, char **argv) {
 
     hu_agent_registry_destroy(&reg);
     fprintf(stderr, "Usage: human agents [list|show <name>]\n");
-    fprintf(stderr, "Runtime spawn: /spawn or agent_spawn tool; see docs/standards/ai/skills-vs-agents.md\n");
+    fprintf(
+        stderr,
+        "Runtime spawn: /spawn or agent_spawn tool; see docs/standards/ai/skills-vs-agents.md\n");
     return HU_ERR_INVALID_ARGUMENT;
 }
 
 /* ─── pwa subcommand ─────────────────────────────────────────────────── */
 
-static const char *const PWA_APP_NAMES[] = {"slack",    "discord",  "whatsapp", "gmail",
-                                            "calendar", "notion",   "twitter",  "telegram",
+static const char *const PWA_APP_NAMES[] = {"slack",    "discord", "whatsapp", "gmail",
+                                            "calendar", "notion",  "twitter",  "telegram",
                                             "linkedin", "facebook"};
 #define PWA_APP_COUNT (sizeof(PWA_APP_NAMES) / sizeof(PWA_APP_NAMES[0]))
 
@@ -1269,10 +1499,8 @@ static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv) {
             if (!d)
                 continue;
             printf("  %-10s %-16s [%s]  %s%s%s\n", d->app_name,
-                   d->display_name ? d->display_name : "?",
-                   d->url_pattern ? d->url_pattern : "?",
-                   d->read_messages_js ? "read " : "",
-                   d->send_message_js ? "send " : "",
+                   d->display_name ? d->display_name : "?", d->url_pattern ? d->url_pattern : "?",
+                   d->read_messages_js ? "read " : "", d->send_message_js ? "send " : "",
                    d->navigate_js ? "navigate" : "");
         }
         return HU_OK;
@@ -1289,7 +1517,8 @@ static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv) {
         hu_pwa_browser_t browser;
         hu_error_t err = hu_pwa_detect_browser(&browser);
         if (err != HU_OK) {
-            fprintf(stderr, "PWA: no supported browser found (Chrome, Arc, Brave, Edge on macOS)\n");
+            fprintf(stderr,
+                    "PWA: no supported browser found (Chrome, Arc, Brave, Edge on macOS)\n");
             return err;
         }
         const char *url_pattern = (argc >= 4 && argv[3]) ? argv[3] : NULL;
@@ -1306,8 +1535,7 @@ static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv) {
             const hu_pwa_driver_t *drv =
                 tabs[i].url ? hu_pwa_driver_find_by_url(tabs[i].url) : NULL;
             printf("  [%d:%d] %s — %s", tabs[i].window_idx, tabs[i].tab_idx,
-                   tabs[i].title ? tabs[i].title : "?",
-                   tabs[i].url ? tabs[i].url : "?");
+                   tabs[i].title ? tabs[i].title : "?", tabs[i].url ? tabs[i].url : "?");
             if (drv)
                 printf(" [PWA: %s]", drv->app_name);
             printf("\n");
@@ -1437,8 +1665,7 @@ static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv) {
         printf("Browser: %s\n\n", hu_pwa_browser_name(browser));
         fflush(stdout);
 
-        uint32_t *hashes = (uint32_t *)alloc->alloc(alloc->ctx,
-                                                      PWA_APP_COUNT * sizeof(uint32_t));
+        uint32_t *hashes = (uint32_t *)alloc->alloc(alloc->ctx, PWA_APP_COUNT * sizeof(uint32_t));
         if (!hashes)
             return HU_ERR_OUT_OF_MEMORY;
         memset(hashes, 0, PWA_APP_COUNT * sizeof(uint32_t));
@@ -1626,15 +1853,16 @@ static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv) {
         if (err != HU_OK)
             fprintf(stderr, "PWA learn: scan error: %s\n", hu_error_string(err));
         else
-            printf("Ingested %zu new items into memory (total: %zu)\n",
-                   ingested, learner.ingest_count);
+            printf("Ingested %zu new items into memory (total: %zu)\n", ingested,
+                   learner.ingest_count);
         hu_pwa_learner_destroy(&learner);
         mem.vtable->deinit(mem.ctx);
         return err;
 #endif
     }
 
-    fprintf(stderr, "Usage: human pwa [list|context|tabs|digest|scan|watch [secs]|learn|read <app>|send <app> [target] <message>]\n");
+    fprintf(stderr, "Usage: human pwa [list|context|tabs|digest|scan|watch [secs]|learn|read "
+                    "<app>|send <app> [target] <message>]\n");
     return HU_ERR_INVALID_ARGUMENT;
 }
 

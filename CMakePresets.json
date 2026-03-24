@@ -16,7 +16,9 @@
         "HU_ENABLE_SKILLS": "ON",
         "HU_ENABLE_FEEDS": "ON",
         "HU_ENABLE_TUI": "ON",
-        "HU_ENABLE_UPDATE": "ON"
+        "HU_ENABLE_UPDATE": "ON",
+        "HU_ENABLE_ML": "ON",
+        "HU_ENABLE_EMBEDDED_MODEL": "ON"
       }
     },
     {
@@ -44,7 +46,10 @@
         "HU_ENABLE_SQLITE": "ON",
         "HU_ENABLE_PERSONA": "ON",
         "HU_ENABLE_SKILLS": "ON",
-        "HU_ENABLE_UPDATE": "ON"
+        "HU_ENABLE_FEEDS": "ON",
+        "HU_ENABLE_UPDATE": "ON",
+        "HU_ENABLE_ML": "ON",
+        "HU_ENABLE_EMBEDDED_MODEL": "ON"
       }
     },
     {

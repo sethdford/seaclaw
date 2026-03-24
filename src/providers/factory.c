@@ -9,6 +9,12 @@
 #ifdef HU_ENABLE_COREML
 #include "human/providers/coreml.h"
 #endif
+#ifdef HU_ENABLE_EMBEDDED_MODEL
+#include "human/providers/embedded.h"
+#endif
+#ifdef HU_ENABLE_ML
+#include "human/providers/huml.h"
+#endif
 #include "human/providers/gemini.h"
 #include "human/providers/ollama.h"
 #include "human/providers/openai.h"
@@ -174,6 +180,34 @@ hu_error_t hu_provider_create(hu_allocator_t *alloc, const char *name, size_t na
     if (name_len == 3 && memcmp(name, "mlx", 3) == 0) {
         hu_coreml_config_t cc = {.model_path = base_url, .model_path_len = base_url_len};
         return hu_coreml_provider_create(alloc, &cc, out);
+    }
+#endif
+
+#ifdef HU_ENABLE_EMBEDDED_MODEL
+    if (name_len == 8 && memcmp(name, "embedded", 8) == 0) {
+        hu_embedded_config_t ec = {0};
+        if (base_url && base_url_len > 0) {
+            ec.model_path = (char *)base_url;
+        }
+        return hu_embedded_provider_create(alloc, &ec, out);
+    }
+    if (name_len == 9 && memcmp(name, "llama-cli", 9) == 0) {
+        hu_embedded_config_t ec = {0};
+        if (base_url && base_url_len > 0) {
+            ec.model_path = (char *)base_url;
+        }
+        return hu_embedded_provider_create(alloc, &ec, out);
+    }
+#endif
+
+#ifdef HU_ENABLE_ML
+    if (name_len == 4 && memcmp(name, "huml", 4) == 0) {
+        hu_huml_config_t hc = {0};
+        if (base_url && base_url_len > 0) {
+            hc.checkpoint_path = base_url;
+            hc.checkpoint_path_len = base_url_len;
+        }
+        return hu_huml_provider_create(alloc, &hc, out);
     }
 #endif
 
