@@ -1,4 +1,5 @@
 import { LitElement, html, css, nothing } from "lit";
+import type { PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import brandLogoSvg from "../assets/logo.svg?raw";
@@ -80,6 +81,11 @@ const SECTIONS: NavSection[] = [
     ],
   },
 ];
+
+/** Pointer-proximity pull for expanded sidebar nav (see magnetic listeners). */
+const HU_SIDEBAR_MAGNETIC_RADIUS_PX = 200;
+const HU_SIDEBAR_MAGNETIC_MAX_SHIFT_PX = 3;
+const HU_SIDEBAR_MAGNETIC_MAX_ITEMS = 20;
 
 @customElement("hu-sidebar")
 export class ScSidebar extends LitElement {
@@ -214,6 +220,7 @@ export class ScSidebar extends LitElement {
       width: var(--hu-icon-lg);
       height: var(--hu-icon-lg);
       color: var(--hu-accent-text, var(--hu-accent));
+      view-transition-name: hu-sidebar-logo;
     }
 
     .logo svg {
@@ -452,6 +459,17 @@ export class ScSidebar extends LitElement {
 
     .nav-item-wrap {
       position: relative;
+      transition: transform var(--hu-duration-fast) var(--hu-ease-out);
+    }
+
+    .nav.nav--magnetic-tracking .nav-item-wrap {
+      transition: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .nav-item-wrap {
+        transition: none;
+      }
     }
 
     .shortcut-tooltip {
@@ -499,6 +517,38 @@ export class ScSidebar extends LitElement {
   @state() private _hoveredItemId: string | null = null;
   @state() private _showShortcutTooltip = false;
   private _hoverTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private _mqlHoverNone: MediaQueryList | null = null;
+  private _mqlReduceMotion: MediaQueryList | null = null;
+  private _magneticNav: HTMLElement | null = null;
+  private _magneticRafId: number | null = null;
+  private _magneticPointer: { clientX: number; clientY: number } | null = null;
+
+  private readonly _onMagneticMql = (): void => {
+    this._syncMagneticNavListeners();
+  };
+
+  private readonly _onMagneticPointerMove = (e: PointerEvent): void => {
+    if (!this._magneticInteractionAllowed() || !this._magneticNav) return;
+    this._magneticPointer = { clientX: e.clientX, clientY: e.clientY };
+    this._magneticNav.classList.add("nav--magnetic-tracking");
+    if (this._magneticRafId === null) {
+      this._magneticRafId = requestAnimationFrame(() => this._flushMagneticFrame());
+    }
+  };
+
+  private readonly _onMagneticPointerEnd = (): void => {
+    if (this._magneticRafId !== null) {
+      cancelAnimationFrame(this._magneticRafId);
+      this._magneticRafId = null;
+    }
+    this._magneticPointer = null;
+    const nav = this._magneticNav;
+    if (nav) {
+      nav.classList.remove("nav--magnetic-tracking");
+      this._resetMagneticNavItemWraps(nav);
+    }
+  };
 
   override render() {
     return html`
@@ -638,6 +688,22 @@ export class ScSidebar extends LitElement {
   override connectedCallback() {
     super.connectedCallback();
     this._applyTheme();
+    this._mqlHoverNone = window.matchMedia("(hover: none)");
+    this._mqlReduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    this._mqlHoverNone.addEventListener("change", this._onMagneticMql);
+    this._mqlReduceMotion.addEventListener("change", this._onMagneticMql);
+  }
+
+  override firstUpdated(changed: PropertyValues): void {
+    super.firstUpdated(changed);
+    this._syncMagneticNavListeners();
+  }
+
+  override updated(changed: PropertyValues): void {
+    super.updated(changed);
+    if (changed.has("collapsed")) {
+      this._syncMagneticNavListeners();
+    }
   }
 
   private _onNavItemEnter(itemId: string): void {
@@ -680,7 +746,90 @@ export class ScSidebar extends LitElement {
     return Array.from(nav.querySelectorAll<HTMLElement>("button.nav-item"));
   }
 
+  private _magneticInteractionAllowed(): boolean {
+    return (
+      !this.collapsed &&
+      !window.matchMedia("(hover: none)").matches &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+  }
+
+  private _resetMagneticNavItemWraps(nav: HTMLElement): void {
+    nav.querySelectorAll<HTMLElement>(".nav-item-wrap").forEach((w) => {
+      w.style.transform = "";
+    });
+  }
+
+  private _teardownMagneticNavListeners(): void {
+    if (this._magneticRafId !== null) {
+      cancelAnimationFrame(this._magneticRafId);
+      this._magneticRafId = null;
+    }
+    this._magneticPointer = null;
+    const nav = this._magneticNav;
+    if (nav) {
+      nav.removeEventListener("pointermove", this._onMagneticPointerMove);
+      nav.removeEventListener("pointerleave", this._onMagneticPointerEnd);
+      nav.removeEventListener("pointercancel", this._onMagneticPointerEnd);
+      nav.classList.remove("nav--magnetic-tracking");
+      this._resetMagneticNavItemWraps(nav);
+    }
+    this._magneticNav = null;
+  }
+
+  private _syncMagneticNavListeners(): void {
+    this._teardownMagneticNavListeners();
+    if (!this.isConnected || !this._magneticInteractionAllowed()) return;
+    const nav = this.renderRoot.querySelector<HTMLElement>(".nav");
+    if (!nav) return;
+    this._magneticNav = nav;
+    nav.addEventListener("pointermove", this._onMagneticPointerMove);
+    nav.addEventListener("pointerleave", this._onMagneticPointerEnd);
+    nav.addEventListener("pointercancel", this._onMagneticPointerEnd);
+  }
+
+  private _flushMagneticFrame(): void {
+    this._magneticRafId = null;
+    const nav = this._magneticNav;
+    const ptr = this._magneticPointer;
+    if (!nav || ptr === null || !this._magneticInteractionAllowed()) {
+      if (nav) this._resetMagneticNavItemWraps(nav);
+      return;
+    }
+    const py = ptr.clientY;
+    const buttons = Array.from(nav.querySelectorAll<HTMLElement>("button.nav-item")).slice(
+      0,
+      HU_SIDEBAR_MAGNETIC_MAX_ITEMS,
+    );
+    const radius = HU_SIDEBAR_MAGNETIC_RADIUS_PX;
+    const maxShift = HU_SIDEBAR_MAGNETIC_MAX_SHIFT_PX;
+
+    for (const btn of buttons) {
+      const wrap = btn.parentElement;
+      if (!wrap?.classList.contains("nav-item-wrap")) continue;
+      const rect = btn.getBoundingClientRect();
+      const cy = rect.top + rect.height * 0.5;
+      const dist = Math.abs(py - cy);
+      let ty = 0;
+      if (dist < radius) {
+        const t = 1 - dist / radius;
+        const falloff = t * t;
+        ty = Math.sign(py - cy) * maxShift * falloff;
+      }
+      (wrap as HTMLElement).style.transform = ty === 0 ? "" : `translateY(${ty.toFixed(2)}px)`;
+    }
+  }
+
   override disconnectedCallback(): void {
+    if (this._mqlHoverNone) {
+      this._mqlHoverNone.removeEventListener("change", this._onMagneticMql);
+      this._mqlHoverNone = null;
+    }
+    if (this._mqlReduceMotion) {
+      this._mqlReduceMotion.removeEventListener("change", this._onMagneticMql);
+      this._mqlReduceMotion = null;
+    }
+    this._teardownMagneticNavListeners();
     this._onNavItemLeave();
     super.disconnectedCallback();
   }

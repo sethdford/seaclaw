@@ -19,7 +19,7 @@ for f in $ENTRY_FILES; do
 done
 
 KB=$((TOTAL / 1024))
-BUDGET=350
+BUDGET=200
 PCT=$((KB * 100 / BUDGET))
 
 echo "Entry bundle: ${KB} KB / ${BUDGET} KB (${PCT}%)"

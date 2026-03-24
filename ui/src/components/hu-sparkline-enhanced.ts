@@ -1,4 +1,5 @@
 import { LitElement, html, css, nothing } from "lit";
+import type { PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 @customElement("hu-sparkline-enhanced")
@@ -16,6 +17,10 @@ export class ScSparklineEnhanced extends LitElement {
   @state() private _tooltipX = 0;
   @state() private _tooltipY = 0;
 
+  private _lastDrawSignature = "";
+  private _drawAnimPath: SVGPathElement | null = null;
+  private _drawAnimListener: ((e: AnimationEvent) => void) | null = null;
+
   static override styles = css`
     :host {
       display: block;
@@ -31,6 +36,29 @@ export class ScSparklineEnhanced extends LitElement {
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
+    }
+    .line.hu-sparkline-draw {
+      stroke-dasharray: var(--sparkline-path-length);
+      stroke-dashoffset: var(--sparkline-path-length);
+      animation: hu-sparkline-draw var(--hu-duration-slow) var(--hu-ease-out) forwards;
+      animation-delay: var(
+        --sparkline-delay,
+        calc(var(--sparkline-index, 0) * var(--hu-stagger-delay))
+      );
+      will-change: stroke-dashoffset;
+    }
+    @keyframes hu-sparkline-draw {
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .line.hu-sparkline-draw {
+        animation: none;
+        stroke-dasharray: none;
+        stroke-dashoffset: 0;
+        will-change: auto;
+      }
     }
     .area {
       fill: url(#gradient);
@@ -60,6 +88,77 @@ export class ScSparklineEnhanced extends LitElement {
       }
     }
   `;
+
+  private _drawSignature(): string {
+    const pts = this.data.length >= 2 ? this.data : [0, 0];
+    return `${this.width}:${this.height}:${pts.join(",")}`;
+  }
+
+  private _teardownLineDraw() {
+    if (this._drawAnimPath && this._drawAnimListener) {
+      this._drawAnimPath.removeEventListener("animationend", this._drawAnimListener);
+    }
+    if (this._drawAnimPath) {
+      this._drawAnimPath.classList.remove("hu-sparkline-draw");
+      this._drawAnimPath.style.willChange = "";
+      this._drawAnimPath.style.removeProperty("--sparkline-path-length");
+    }
+    this._drawAnimPath = null;
+    this._drawAnimListener = null;
+  }
+
+  private _applyLineDrawAnimation() {
+    this._teardownLineDraw();
+
+    const path = this.renderRoot.querySelector<SVGPathElement>(".line");
+    if (!path) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    const len = path.getTotalLength();
+    if (!Number.isFinite(len) || len <= 0) return;
+
+    path.classList.remove("hu-sparkline-draw");
+    path.style.removeProperty("--sparkline-path-length");
+    void path.getBoundingClientRect();
+    path.style.setProperty("--sparkline-path-length", String(len));
+
+    requestAnimationFrame(() => {
+      const again = this.renderRoot.querySelector<SVGPathElement>(".line");
+      if (again !== path) return;
+
+      path.style.willChange = "stroke-dashoffset";
+      path.classList.add("hu-sparkline-draw");
+
+      const onEnd = (ev: AnimationEvent) => {
+        if (ev.target !== path) return;
+        path.removeEventListener("animationend", onEnd);
+        path.classList.remove("hu-sparkline-draw");
+        path.style.willChange = "";
+        path.style.removeProperty("--sparkline-path-length");
+        this._drawAnimPath = null;
+        this._drawAnimListener = null;
+      };
+      this._drawAnimPath = path;
+      this._drawAnimListener = onEnd;
+      path.addEventListener("animationend", onEnd);
+    });
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    this._teardownLineDraw();
+  }
+
+  override updated(_changed: PropertyValues<this>) {
+    super.updated(_changed);
+    const sig = this._drawSignature();
+    if (sig === this._lastDrawSignature) return;
+    this._lastDrawSignature = sig;
+    void this.updateComplete.then(() => this._applyLineDrawAnimation());
+  }
 
   private _buildPath(points: number[]): { line: string; area: string } {
     if (points.length < 2) return { line: "", area: "" };

@@ -1,30 +1,27 @@
 const WARMTH_UPDATE_INTERVAL = 300_000; // 5 minutes
-const WARMTH_MIX_MAX = 0.03;
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function isMobile(): boolean {
-  return window.matchMedia("(max-width: 768px)").matches; /* --hu-breakpoint-md */
-}
-
+/** Sepia driver 0–0.12 — dawn/dusk, twilight bands, neutral day (dashboard). */
 function getTimeWarmth(): number {
   const hour = new Date().getHours();
-  if (hour >= 6 && hour < 10) return 0.0; // cool morning
-  if (hour >= 10 && hour < 16) return 0.5; // neutral day
-  if (hour >= 16 && hour < 22) return 1.0; // warm evening
-  return 0.3; // slightly cool night
+  if (hour < 7 || hour >= 19) return 0.12;
+  if ((hour >= 7 && hour < 10) || (hour >= 17 && hour < 19)) return 0.06;
+  return 0;
 }
 
 export class AmbientIntelligence {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private started = false;
+  private target: HTMLElement = document.documentElement;
 
-  start(): void {
+  start(host?: HTMLElement): void {
     if (this.started) return;
-    if (prefersReducedMotion() || isMobile()) return;
+    if (prefersReducedMotion()) return;
 
+    this.target = host ?? document.documentElement;
     this.started = true;
     this.updateWarmth();
     this.intervalId = setInterval(() => this.updateWarmth(), WARMTH_UPDATE_INTERVAL);
@@ -36,19 +33,13 @@ export class AmbientIntelligence {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    const root = document.documentElement;
-    root.style.removeProperty("--hu-ambient-warmth");
-    root.style.removeProperty("--hu-ambient-warmth-mix");
+    this.target.style.removeProperty("--hu-ambient-warmth");
+    this.target = document.documentElement;
   }
 
   private updateWarmth(): void {
     const warmth = getTimeWarmth();
-    const root = document.documentElement;
-    root.style.setProperty("--hu-ambient-warmth", warmth.toFixed(2));
-    root.style.setProperty(
-      "--hu-ambient-warmth-mix",
-      `${(warmth * WARMTH_MIX_MAX * 100).toFixed(1)}%`,
-    );
+    this.target.style.setProperty("--hu-ambient-warmth", warmth.toFixed(2));
   }
 }
 

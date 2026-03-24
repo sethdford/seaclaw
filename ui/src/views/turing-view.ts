@@ -91,13 +91,123 @@ export class ScTuringView extends GatewayAwareLitElement {
   static override styles = [
     scrollEntranceStyles,
     css`
-      :host {
-        view-transition-name: view-turing;
-        display: block;
-        max-width: 75rem;
-        contain: layout style;
-        padding: var(--hu-space-lg) var(--hu-space-xl);
-        font-family: var(--hu-font);
+    :host {
+      view-transition-name: view-turing;
+      display: block;
+      max-width: 75rem;
+      contain: layout style;
+      padding: var(--hu-space-lg) var(--hu-space-xl);
+      font-family: var(--hu-font);
+    }
+
+    .hero-score {
+      display: flex;
+      align-items: baseline;
+      gap: var(--hu-space-md);
+      flex-wrap: wrap;
+    }
+
+    .hero-score-value {
+      font-size: var(--hu-text-4xl);
+      font-weight: var(--hu-weight-bold);
+      color: var(--hu-text);
+      line-height: var(--hu-leading-tight);
+    }
+
+    .hero-score-max {
+      font-size: var(--hu-text-xl);
+      font-weight: var(--hu-weight-medium);
+      color: var(--hu-text-muted);
+    }
+
+    .hero-subtitle {
+      font-size: var(--hu-text-sm);
+      color: var(--hu-text-muted);
+      margin-top: var(--hu-space-xs);
+    }
+
+    .staleness {
+      font-size: var(--hu-text-xs);
+      color: var(--hu-text-muted);
+    }
+
+    .dimensions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+      gap: var(--hu-space-lg);
+      margin-bottom: var(--hu-space-2xl);
+    }
+
+    .dimension-card {
+      display: flex;
+      flex-direction: column;
+      gap: var(--hu-space-sm);
+    }
+
+    .dimension-name {
+      font-size: var(--hu-text-sm);
+      font-weight: var(--hu-weight-medium);
+      color: var(--hu-text);
+    }
+
+    .dimension-bar-wrap {
+      height: var(--hu-space-md);
+      background: var(--hu-bg-inset);
+      border-radius: var(--hu-radius-sm);
+      overflow: hidden;
+    }
+
+    .dimension-bar-fill {
+      height: 100%;
+      border-radius: var(--hu-radius-sm);
+      transition: width var(--hu-duration-normal) var(--hu-ease-out);
+    }
+
+    .dimension-score {
+      font-size: var(--hu-text-xs);
+      font-weight: var(--hu-weight-semibold);
+      color: var(--hu-text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .section-label {
+      font-size: var(--hu-text-xs);
+      font-weight: var(--hu-weight-semibold);
+      letter-spacing: var(--hu-tracking-xs);
+      text-transform: uppercase;
+      color: var(--hu-text-secondary);
+      margin-bottom: var(--hu-space-md);
+    }
+
+    .scores-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--hu-text-sm);
+    }
+
+    .scores-table th,
+    .scores-table td {
+      padding: var(--hu-space-sm) var(--hu-space-md);
+      text-align: left;
+      border-bottom: 1px solid var(--hu-border-subtle);
+    }
+
+    .scores-table th {
+      font-weight: var(--hu-weight-medium);
+      color: var(--hu-text-muted);
+    }
+
+    .scores-table td {
+      color: var(--hu-text);
+    }
+
+    .scores-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .dimension-bar-fill {
+        transition: none;
       }
 
       .hero-score {

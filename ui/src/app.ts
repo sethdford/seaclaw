@@ -7,7 +7,6 @@ import { DemoGatewayClient } from "./demo-gateway.js";
 import { setGateway } from "./gateway-provider.js";
 import { AUTH_FAILED } from "./gateway-aware.js";
 import { dynamicLight } from "./lib/dynamic-light.js";
-import { pointerProximity } from "./lib/pointer-proximity.js";
 import { ambientIntelligence } from "./lib/ambient-intelligence.js";
 import { icons } from "./icons.js";
 import "./components/floating-mic.js";
@@ -173,10 +172,22 @@ export class ScApp extends LitElement {
     main {
       display: flex;
       flex-direction: column;
-      overflow: auto;
+      overflow: hidden;
+      min-height: 0;
       padding: var(--hu-space-2xl);
       background: var(--hu-bg);
-      view-transition-name: main-content;
+      view-transition-name: hu-main-content;
+      position: relative;
+      outline: none;
+    }
+
+    /* Keyboard-accessible scrollport (axe scrollable-region-focusable; nested views use shadow DOM). */
+    .main-scroll {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: auto;
       position: relative;
       outline: none;
     }
@@ -212,7 +223,8 @@ export class ScApp extends LitElement {
       }
     }
 
-    main:focus-visible {
+    main:focus-visible,
+    .main-scroll:focus-visible {
       outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
       outline-offset: calc(-1 * var(--hu-focus-ring-width, 2px));
     }
@@ -528,6 +540,10 @@ export class ScApp extends LitElement {
     return LIST_DETAIL_TABS.includes(this.tab);
   }
 
+  private get prefersReducedMotion(): boolean {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
   private get _effectiveSidebarCollapsed(): boolean {
     return this.sidebarCollapsed || this._isMediumViewport;
   }
@@ -548,8 +564,7 @@ export class ScApp extends LitElement {
     window.addEventListener("hashchange", this._hashHandler);
     this._onHashChange();
     dynamicLight.start();
-    pointerProximity.start();
-    ambientIntelligence.start();
+    ambientIntelligence.start(this);
 
     const wsUrl =
       typeof window !== "undefined" &&
@@ -653,7 +668,6 @@ export class ScApp extends LitElement {
     document.removeEventListener(AUTH_FAILED, this._authFailedHandler);
     window.removeEventListener("hashchange", this._hashHandler);
     dynamicLight.stop();
-    pointerProximity.stop();
     ambientIntelligence.stop();
     if (this._fallbackTimer) {
       clearTimeout(this._fallbackTimer);
@@ -713,23 +727,19 @@ export class ScApp extends LitElement {
       if (targetTab === "chat" && sessionPart) {
         this.chatSessionKey = sessionPart;
       }
-      this._ensureLoaded(targetTab).then(() => {
-        if (this._viewError) {
-          this.tab = targetTab;
-          return;
-        }
-        if (!document.startViewTransition) {
-          this.tab = targetTab;
-          return;
-        }
-        document.startViewTransition(() => {
-          this.tab = targetTab;
-          return this.updateComplete;
-        });
-      });
+      void this._applyHashRoute(targetTab);
     } else {
       window.location.hash = "overview";
     }
+  }
+
+  private async _applyHashRoute(targetTab: TabId): Promise<void> {
+    await this._ensureLoaded(targetTab);
+    if (this._viewError) {
+      this.tab = targetTab;
+      return;
+    }
+    await this._switchView(targetTab);
   }
 
   private _onGlobalKey(e: KeyboardEvent): void {
@@ -870,7 +880,7 @@ export class ScApp extends LitElement {
 
   /** @deprecated Replaced by AmbientIntelligence module */
   private _initAmbientIntelligence(): void {
-    ambientIntelligence.start();
+    ambientIntelligence.start(this);
   }
 
   private _switchToDemo(): void {
@@ -926,20 +936,29 @@ export class ScApp extends LitElement {
     if (idx < VALID_TABS.length - 1) this._prefetchSilent(VALID_TABS[idx + 1]!);
   }
 
+  private _performViewSwitch(newTab: TabId): void {
+    this.tab = newTab;
+  }
+
+  private async _switchView(newTab: TabId): Promise<void> {
+    if (document.startViewTransition && !this.prefersReducedMotion) {
+      const transition = document.startViewTransition(() => {
+        this._performViewSwitch(newTab);
+        return this.updateComplete;
+      });
+      await transition.finished;
+    } else {
+      this._performViewSwitch(newTab);
+      await this.updateComplete;
+    }
+  }
+
   private async _switchTab(tab: TabId): Promise<void> {
     if (this.tab === tab) return;
     await this._ensureLoaded(tab);
     const hash = tab === "chat" ? `#chat:${this.chatSessionKey}` : `#${tab}`;
     window.history.replaceState(null, "", hash);
-    if (!document.startViewTransition) {
-      this.tab = tab;
-      this._prefetchAdjacent(tab);
-      return;
-    }
-    document.startViewTransition(() => {
-      this.tab = tab;
-      return this.updateComplete;
-    });
+    await this._switchView(tab);
     this._prefetchAdjacent(tab);
   }
 
@@ -974,7 +993,7 @@ export class ScApp extends LitElement {
       <button
         class="hu-skip-link"
         @click=${() => {
-          this.shadowRoot?.getElementById("main-content")?.focus();
+          this.shadowRoot?.getElementById("main-scroll")?.focus();
         }}
       >
         Skip to content
@@ -1002,11 +1021,19 @@ export class ScApp extends LitElement {
         ></hu-sidebar>
 
         <main id="main-content" tabindex="-1" role="main">
-          <div class="scroll-progress" role="presentation" aria-hidden="true"></div>
-          <div class="view-enter">
-            <hu-error-boundary .error=${this._viewError} @retry=${this._onViewRetry}>
-              ${this._renderWrappedView()}
-            </hu-error-boundary>
+          <div
+            id="main-scroll"
+            class="main-scroll view-content"
+            tabindex="0"
+            role="region"
+            aria-label="Main content"
+          >
+            <div class="scroll-progress" role="presentation" aria-hidden="true"></div>
+            <div class="view-enter">
+              <hu-error-boundary .error=${this._viewError} @retry=${this._onViewRetry}>
+                ${this._renderWrappedView()}
+              </hu-error-boundary>
+            </div>
           </div>
         </main>
 

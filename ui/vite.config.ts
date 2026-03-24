@@ -4,7 +4,7 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
-    chunkSizeWarningLimit: 800,
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -14,7 +14,6 @@ export default defineConfig({
             "lit/directives/class-map.js",
             "lit/directives/style-map.js",
           ],
-          markdown: ["marked", "dompurify"],
         },
       },
     },

@@ -6,6 +6,10 @@
 :root {
   --hu-color-white: #fffefa;
   --hu-color-black: #0c0a08;
+  /* Ambient intelligence (dashboard + shared utilities) */
+  --hu-ambient-warmth: 0;
+  --hu-ambient-breathing-duration: 4000ms;
+  --hu-ambient-gradient-angle: 135deg;
   /* Canonical breakpoints (4-tier responsive system) */
   --hu-breakpoint-compact: 600px;
   --hu-breakpoint-medium: 904px;
@@ -365,7 +369,14 @@ hu-card.hu-entrance.hu-visible {
   }
 }
 
-/* ─── Scrollbar ────────────────────────────────────────────────────── */
+/* ─── Branded scrollbar ─────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--hu-accent) 40%, transparent) transparent;
+}
+*:hover {
+  scrollbar-color: color-mix(in srgb, var(--hu-accent) 60%, transparent) transparent;
+}
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -376,32 +387,38 @@ hu-card.hu-entrance.hu-visible {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--hu-bg-elevated);
-  border-radius: var(--hu-radius-full);
+  background: color-mix(in srgb, var(--hu-accent) 40%, transparent);
+  border-radius: var(--hu-radius);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--hu-border);
+  background: color-mix(in srgb, var(--hu-accent) 60%, transparent);
 }
 
 /* ─── Status Breathing (ambient intelligence) ─────────────────────────── */
 @keyframes hu-status-breathe {
   0%,
   100% {
-    opacity: 1;
-    transform: scale(1);
+    opacity: 0.6;
+    transform: scale(0.98);
   }
   50% {
-    opacity: 0.7;
-    transform: scale(1.05);
+    opacity: 1;
+    transform: scale(1.02);
   }
 }
+.hu-ambient-breathe {
+  animation: hu-status-breathe var(--hu-ambient-breathing-duration) var(--hu-ease-in-out) infinite;
+}
 .hu-status-breathing {
-  animation: hu-status-breathe calc(var(--hu-duration-slow) * 8) var(--hu-ease-in-out) infinite;
+  animation: hu-status-breathe var(--hu-ambient-breathing-duration) var(--hu-ease-in-out) infinite;
 }
 @media (prefers-reduced-motion: reduce) {
+  .hu-ambient-breathe,
   .hu-status-breathing {
     animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -741,12 +758,12 @@ hu-card.hu-entrance.hu-visible {
 
 /* ─── View Transitions ─────────────────────────────────────────────── */
 @supports (view-transition-name: none) {
-  ::view-transition-old(main-content) {
-    animation: var(--hu-duration-normal) var(--hu-spring-out) both hu-fade-out;
+  ::view-transition-old(hu-main-content) {
+    animation: hu-view-out var(--hu-duration-fast) var(--hu-ease-out);
   }
 
-  ::view-transition-new(main-content) {
-    animation: var(--hu-duration-normal) var(--hu-spring-out) both hu-slide-up;
+  ::view-transition-new(hu-main-content) {
+    animation: hu-view-in var(--hu-duration-fast) var(--hu-ease-out);
   }
 
   ::view-transition-old(hu-page-hero) {
@@ -764,6 +781,34 @@ hu-card.hu-entrance.hu-visible {
 
   ::view-transition-new(hu-sidebar-indicator) {
     animation: var(--hu-duration-normal) var(--hu-spring-out) both hu-fade-in;
+  }
+
+  ::view-transition-old(hu-selected-item),
+  ::view-transition-new(hu-selected-item) {
+    animation-duration: var(--hu-duration-normal);
+    animation-timing-function: var(--hu-ease-spring);
+  }
+
+  ::view-transition-old(hu-selected-item) {
+    animation-name: hu-morph-out;
+  }
+
+  ::view-transition-new(hu-selected-item) {
+    animation-name: hu-morph-in;
+  }
+}
+
+@keyframes hu-morph-out {
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes hu-morph-in {
+  from {
+    opacity: 0;
+    transform: scale(1.05);
   }
 }
 
@@ -1199,15 +1244,6 @@ hu-card.hu-entrance.hu-visible {
   ::view-transition-new(root) {
     animation: hu-fade-in var(--hu-duration-fast) var(--hu-ease-out) both;
   }
-
-  ::view-transition-old(main-content) {
-    animation: hu-vt-slide-out var(--hu-duration-fast, 100ms) var(--hu-ease-in, ease-in) forwards;
-  }
-
-  ::view-transition-new(main-content) {
-    animation: hu-vt-slide-in var(--hu-duration-moderate, 300ms) var(--hu-ease-out, ease-out)
-      forwards;
-  }
 }
 
 /* ─── Glass choreography keyframes ─────────────────────────────────── */
@@ -1241,25 +1277,17 @@ hu-card.hu-entrance.hu-visible {
   }
 }
 
-@keyframes hu-vt-slide-out {
-  from {
-    opacity: 1;
-    transform: translateX(0);
-  }
+@keyframes hu-view-out {
   to {
     opacity: 0;
-    transform: translateX(-20px);
+    transform: translateY(calc(-1 * var(--hu-space-sm)));
   }
 }
 
-@keyframes hu-vt-slide-in {
+@keyframes hu-view-in {
   from {
     opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
+    transform: translateY(var(--hu-space-sm));
   }
 }
 
@@ -1321,8 +1349,10 @@ hu-card.hu-entrance.hu-visible {
 
   ::view-transition-old(root),
   ::view-transition-new(root),
-  ::view-transition-old(main-content),
-  ::view-transition-new(main-content) {
+  ::view-transition-old(hu-main-content),
+  ::view-transition-new(hu-main-content),
+  ::view-transition-old(hu-selected-item),
+  ::view-transition-new(hu-selected-item) {
     animation-duration: 0.01ms !important;
   }
 }
@@ -1494,19 +1524,18 @@ hu-card.hu-entrance.hu-visible {
 
 /* ── Ambient Intelligence ── */
 :root {
-  --hu-ambient-warmth: 0;
   --hu-ambient-hour: 12;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  :root:not(.hu-evening-mode) {
+  :root:not(.hu-evening-mode) hu-app:not(.hu-evening-mode) {
     filter: sepia(var(--hu-ambient-warmth)) saturate(calc(1 + var(--hu-ambient-warmth) * 0.2));
     transition: filter 3s ease;
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  :root {
+  hu-app {
     filter: none;
     transition: none;
   }
@@ -1752,4 +1781,19 @@ dd {
 .hu-cv-defer {
   content-visibility: auto;
   contain-intrinsic-size: auto 300px;
+}
+
+/* :has() — contextual layout and state (progressive enhancement; host props pierce shadow via CSS vars) */
+@supports selector(:has(*)) {
+  hu-app:has(hu-sidebar[collapsed]) main {
+    margin-left: 0;
+  }
+
+  hu-card:has(hu-badge) {
+    --hu-card-border-color: var(--hu-accent);
+  }
+
+  .view-content:has(.error-banner) {
+    opacity: 0.8;
+  }
 }

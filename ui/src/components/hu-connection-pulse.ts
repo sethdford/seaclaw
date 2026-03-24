@@ -63,6 +63,23 @@ export class HuConnectionPulse extends LitElement {
       }
     }
 
+    @keyframes hu-status-breathe {
+      0%,
+      100% {
+        opacity: 0.6;
+        transform: scale(0.98);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.02);
+      }
+    }
+
+    .dot.hu-ambient-breathe {
+      animation: hu-status-breathe var(--hu-ambient-breathing-duration) var(--hu-ease-in-out)
+        infinite;
+    }
+
     .label {
       font-family: var(--hu-font);
       font-size: var(--hu-text-xs);
@@ -74,13 +91,18 @@ export class HuConnectionPulse extends LitElement {
       .ring {
         animation: none !important;
       }
+      .dot.hu-ambient-breathe {
+        animation: none;
+        opacity: 1;
+        transform: none;
+      }
     }
   `;
 
   override render() {
     return html`
       <div class="pulse-container" role="status" aria-label=${`Connection: ${this.status}`}>
-        <div class="dot"></div>
+        <div class="dot ${this.status === "disconnected" ? "" : "hu-ambient-breathe"}"></div>
         <div class="ring"></div>
       </div>
       ${this.status !== "disconnected"

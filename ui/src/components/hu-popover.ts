@@ -6,7 +6,7 @@ type PopoverPosition = "top" | "bottom" | "left" | "right";
 @customElement("hu-popover")
 export class ScPopover extends LitElement {
   @property({ type: Boolean }) open = false;
-  @property({ type: String }) position: PopoverPosition = "bottom";
+  @property({ type: String, reflect: true }) position: PopoverPosition = "bottom";
   @property({ type: Boolean }) arrow = true;
 
   private _nativePopover = typeof HTMLElement.prototype.togglePopover === "function";
@@ -158,6 +158,36 @@ export class ScPopover extends LitElement {
       transform: translateY(-50%);
       border-right-color: var(--hu-surface-container-high);
       border-left: none;
+    }
+
+    /* CSS Anchor Positioning — progressive enhancement for default bottom placement. */
+    @supports (anchor-name: --test) {
+      .trigger {
+        display: inline-flex;
+        align-items: center;
+        anchor-name: --hu-popover-anchor;
+      }
+
+      :host([position="bottom"]) .popover.position-bottom {
+        position-anchor: --hu-popover-anchor;
+        position: fixed;
+        inset-area: block-end;
+        position-try-fallbacks: flip-block;
+        margin-block-start: var(--hu-space-xs);
+        top: auto;
+        left: auto;
+        right: auto;
+        bottom: auto;
+        transform: scale(0.96);
+      }
+
+      :host([position="bottom"]) .popover.position-bottom.open {
+        transform: scale(1);
+      }
+
+      :host([position="bottom"]) .popover.position-bottom:popover-open {
+        transform: scale(1);
+      }
     }
   `;
 

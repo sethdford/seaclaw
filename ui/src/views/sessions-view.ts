@@ -58,10 +58,63 @@ export class ScSessionsView extends GatewayAwareLitElement {
         max-width: 20rem;
       }
 
+      .sessions-layout {
+        display: block;
+      }
+
+      .sessions-list-col {
+        min-width: 0;
+      }
+
+      @media (min-width: 1240px) /* --hu-breakpoint-wide */ {
+        .sessions-layout.has-detail {
+          display: grid;
+          grid-template-columns: 1fr var(--hu-detail-panel-width);
+          gap: var(--hu-space-lg);
+          align-items: start;
+        }
+      }
+
       .sessions-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
         gap: var(--hu-space-lg);
+      }
+
+      .session-detail {
+        padding: var(--hu-space-lg);
+        border-radius: var(--hu-radius-xl);
+        border: 1px solid var(--hu-border-subtle);
+        background: var(--hu-surface-container);
+        box-shadow: var(--hu-shadow-card);
+      }
+
+      .session-detail-header {
+        view-transition-name: hu-selected-item;
+        margin: 0 0 var(--hu-space-md);
+      }
+
+      .session-detail-title {
+        font-size: var(--hu-text-lg);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+        margin: 0;
+        line-height: var(--hu-leading-tight);
+      }
+
+      .session-detail-meta {
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text-secondary);
+        margin-bottom: var(--hu-space-lg);
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-xs);
+      }
+
+      .session-detail-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--hu-space-sm);
       }
 
       .session-card {
@@ -135,7 +188,26 @@ export class ScSessionsView extends GatewayAwareLitElement {
   @state() private error = "";
   @state() private searchQuery = "";
   @state() private _deleteTarget: Session | null = null;
+  @state() private selectedSession: Session | null = null;
+  @state() private _wideListDetail = false;
   private _scrollEntranceObserver: IntersectionObserver | null = null;
+  private _wideMq: MediaQueryList | null = null;
+  private readonly _wideMqHandler = (): void => {
+    this._wideListDetail = this._wideMq?.matches ?? false;
+  };
+
+  private get _showSessionDetail(): boolean {
+    return this.selectedSession != null && this._wideListDetail;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+      this._wideMq = window.matchMedia("(min-width: 1240px)"); /* --hu-breakpoint-wide */
+      this._wideListDetail = this._wideMq.matches;
+      this._wideMq.addEventListener("change", this._wideMqHandler);
+    }
+  }
 
   override updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
@@ -145,6 +217,8 @@ export class ScSessionsView extends GatewayAwareLitElement {
   override disconnectedCallback(): void {
     this._scrollEntranceObserver?.disconnect();
     this._scrollEntranceObserver = null;
+    this._wideMq?.removeEventListener("change", this._wideMqHandler);
+    this._wideMq = null;
     super.disconnectedCallback();
   }
 
@@ -230,9 +304,53 @@ export class ScSessionsView extends GatewayAwareLitElement {
     this.searchQuery = e.detail?.value ?? "";
   }
 
-  private _onSessionClick(s: Session): void {
-    const key = s.key ?? "default";
-    this.dispatchNavigate("chat:" + key);
+  private _prefersReducedMotion(): boolean {
+    return (
+      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+  }
+
+  private async _onSessionClick(s: Session, e: Event): Promise<void> {
+    const wide = typeof window !== "undefined" && window.matchMedia("(min-width: 1240px)").matches;
+    if (!wide) {
+      const key = s.key ?? "default";
+      this.dispatchNavigate("chat:" + key);
+      return;
+    }
+
+    if (this.selectedSession?.key != null && this.selectedSession.key === s.key) {
+      return;
+    }
+
+    const clicked = e.currentTarget as HTMLElement;
+    clicked.style.viewTransitionName = "hu-selected-item";
+
+    const doc = document as Document & {
+      startViewTransition?: (cb: () => void | Promise<void>) => { finished: Promise<void> };
+    };
+
+    const clearVtName = (): void => {
+      clicked.style.viewTransitionName = "";
+    };
+
+    if (typeof doc.startViewTransition === "function" && !this._prefersReducedMotion()) {
+      try {
+        const transition = doc.startViewTransition(async () => {
+          this.selectedSession = s;
+          await this.updateComplete;
+          clearVtName();
+        });
+        await transition.finished;
+      } catch {
+        clearVtName();
+      } finally {
+        clearVtName();
+      }
+    } else {
+      this.selectedSession = s;
+      await this.updateComplete;
+      clearVtName();
+    }
   }
 
   private _onDeleteClick(e: Event, s: Session): void {
@@ -243,8 +361,12 @@ export class ScSessionsView extends GatewayAwareLitElement {
   private _onDeleteConfirm(): void {
     if (!this._deleteTarget) return;
     const key = this._deleteTarget.key;
+    const deleted = this._deleteTarget;
     this._deleteTarget = null;
     if (!key) return;
+    if (this.selectedSession?.key === deleted.key) {
+      this.selectedSession = null;
+    }
     const gw = this.gateway;
     if (!gw) return;
     gw.request("sessions.delete", { key })
@@ -357,45 +479,79 @@ export class ScSessionsView extends GatewayAwareLitElement {
         ></hu-empty-state>
       `;
     }
+    const showDetail = this._showSessionDetail;
     return html`
-      <div class="sessions-grid hu-scroll-reveal-stagger" role="list">
-        ${filtered.map(
-          (s) => html`
-            <hu-card
-              class="session-card"
-              hoverable
-              clickable
-              @click=${() => this._onSessionClick(s)}
-              role="listitem"
-            >
-              <div class="session-card-header">
-                <span class="session-card-title">${this.sessionTitle(s)}</span>
-                <div class="session-card-actions">
-                  <hu-badge variant=${s.status === "archived" ? "neutral" : "success"}>
-                    ${s.status === "archived" ? "Archived" : "Active"}
-                  </hu-badge>
-                  <hu-button
-                    variant="ghost"
-                    size="sm"
-                    .iconOnly=${true}
-                    aria-label="Delete session"
-                    @click=${(e: Event) => this._onDeleteClick(e, s)}
-                  >
-                    ${icons.trash}
-                  </hu-button>
-                </div>
-              </div>
-              ${s.last_message
-                ? html`<p class="session-card-preview">${s.last_message}</p>`
-                : nothing}
-              <div class="session-card-meta">
-                <span>${this.sessionMessageCount(s)} messages</span>
-                <span>${formatRelative(this.sessionTimestamp(s))}</span>
-              </div>
-            </hu-card>
-          `,
-        )}
+      <div class="sessions-layout ${showDetail ? "has-detail" : ""}">
+        <div class="sessions-list-col">
+          <div class="sessions-grid hu-scroll-reveal-stagger" role="list">
+            ${filtered.map(
+              (s) => html`
+                <hu-card
+                  class="session-card"
+                  hoverable
+                  clickable
+                  ?accent=${this.selectedSession?.key === s.key}
+                  @click=${(e: Event) => void this._onSessionClick(s, e)}
+                  role="listitem"
+                >
+                  <div class="session-card-header">
+                    <span class="session-card-title">${this.sessionTitle(s)}</span>
+                    <div class="session-card-actions">
+                      <hu-badge variant=${s.status === "archived" ? "neutral" : "success"}>
+                        ${s.status === "archived" ? "Archived" : "Active"}
+                      </hu-badge>
+                      <hu-button
+                        variant="ghost"
+                        size="sm"
+                        .iconOnly=${true}
+                        aria-label="Delete session"
+                        @click=${(e: Event) => this._onDeleteClick(e, s)}
+                      >
+                        ${icons.trash}
+                      </hu-button>
+                    </div>
+                  </div>
+                  ${s.last_message
+                    ? html`<p class="session-card-preview">${s.last_message}</p>`
+                    : nothing}
+                  <div class="session-card-meta">
+                    <span>${this.sessionMessageCount(s)} messages</span>
+                    <span>${formatRelative(this.sessionTimestamp(s))}</span>
+                  </div>
+                </hu-card>
+              `,
+            )}
+          </div>
+        </div>
+        ${this._renderSessionDetail()}
       </div>
+    `;
+  }
+
+  private _renderSessionDetail() {
+    if (!this._showSessionDetail || !this.selectedSession) return nothing;
+    const s = this.selectedSession;
+    const key = s.key ?? "default";
+    return html`
+      <section class="session-detail" aria-label="Session detail">
+        <header class="session-detail-header">
+          <h2 class="session-detail-title">${this.sessionTitle(s)}</h2>
+        </header>
+        <div class="session-detail-meta">
+          <span>${this.sessionMessageCount(s)} messages</span>
+          <span>${formatRelative(this.sessionTimestamp(s))}</span>
+          <span>Status: ${s.status === "archived" ? "Archived" : "Active"}</span>
+        </div>
+        <div class="session-detail-actions">
+          <hu-button
+            variant="primary"
+            size="sm"
+            @click=${() => this.dispatchNavigate("chat:" + key)}
+          >
+            Open in chat
+          </hu-button>
+        </div>
+      </section>
     `;
   }
 

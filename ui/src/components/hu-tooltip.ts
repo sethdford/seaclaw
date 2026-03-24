@@ -88,17 +88,58 @@ export class ScTooltip extends LitElement {
         background: var(--hu-bg-overlay);
       }
     }
+
+    /* CSS Anchor Positioning — progressive enhancement (default top + other positions). */
+    @supports (anchor-name: --test) {
+      :host {
+        anchor-name: --hu-tooltip-anchor;
+      }
+
+      .tooltip-content {
+        position-anchor: --hu-tooltip-anchor;
+        position: fixed;
+        position-try-fallbacks: flip-block, flip-inline;
+        bottom: auto;
+        left: auto;
+        right: auto;
+        top: auto;
+        transform: none;
+        margin: 0;
+      }
+
+      :host([position="top"]) .tooltip-content {
+        inset-area: block-start;
+        margin-block-end: var(--hu-space-xs);
+      }
+
+      :host([position="bottom"]) .tooltip-content {
+        inset-area: block-end;
+        margin-block-start: var(--hu-space-xs);
+      }
+
+      :host([position="left"]) .tooltip-content {
+        inset-area: inline-start;
+        margin-inline-end: var(--hu-space-xs);
+      }
+
+      :host([position="right"]) .tooltip-content {
+        inset-area: inline-end;
+        margin-inline-start: var(--hu-space-xs);
+      }
+    }
   `;
 
   @property({ type: String }) text = "";
-  @property({ type: String }) position: TooltipPosition = "top";
+  @property({ type: String, reflect: true }) position: TooltipPosition = "top";
   @state() private _tipId = `hu-tip-${tooltipIdCounter++}`;
 
   override render() {
     return html`
       <div class="wrapper" aria-describedby=${this._tipId}>
         <slot></slot>
-        <div id=${this._tipId} class="tip ${this.position}" role="tooltip">${this.text}</div>
+        <div id=${this._tipId} class="tip tooltip-content ${this.position}" role="tooltip">
+          ${this.text}
+        </div>
       </div>
     `;
   }

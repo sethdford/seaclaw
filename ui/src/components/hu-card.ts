@@ -1,8 +1,9 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { pointerProximity } from "../lib/pointer-proximity.js";
 
 export type CardSurface = "default" | "high" | "highest";
+
+const HU_TILT_MAX_DEG = 8;
 
 @customElement("hu-card")
 export class ScCard extends LitElement {
@@ -12,8 +13,8 @@ export class ScCard extends LitElement {
   @property({ type: Boolean }) elevated = false;
   @property({ type: Boolean }) glass = true;
   @property({ type: Boolean }) solid = false;
-  /** Enable 3D perspective tilt on pointer proximity. */
-  @property({ type: Boolean }) tilt = false;
+  /** Opt-in 3D perspective tilt following pointer (overview-style cards). */
+  @property({ type: Boolean, reflect: true }) tilt = false;
   /** Enable mesh gradient background overlay. */
   @property({ type: Boolean }) mesh = false;
   /** Enable chromatic prismatic border. */
@@ -32,7 +33,7 @@ export class ScCard extends LitElement {
       position: relative;
       background: var(--hu-card-surface, var(--hu-surface-container));
       background-image: var(--hu-surface-gradient);
-      border: 1px solid var(--hu-border-subtle);
+      border: 1px solid var(--hu-card-border-color, var(--hu-border-subtle));
       border-radius: var(--hu-radius-xl);
       padding: var(--hu-space-xl);
       box-shadow:
@@ -135,7 +136,8 @@ export class ScCard extends LitElement {
       );
       backdrop-filter: blur(var(--hu-blur-lg)) saturate(var(--hu-glass-standard-saturate));
       -webkit-backdrop-filter: blur(var(--hu-blur-lg)) saturate(var(--hu-glass-standard-saturate));
-      border: 1px solid color-mix(in srgb, var(--hu-border-subtle) 40%, transparent);
+      border: 1px solid
+        color-mix(in srgb, var(--hu-card-border-color, var(--hu-border-subtle)) 40%, transparent);
       box-shadow:
         var(--hu-shadow-card),
         inset 0 1px 0 color-mix(in srgb, var(--hu-color-white) 60%, transparent),
@@ -177,30 +179,35 @@ export class ScCard extends LitElement {
       outline-offset: var(--hu-focus-ring-offset);
     }
 
-    /* 3D perspective tilt — pointer proximity driven */
+    /* 3D tilt: perspective on host, rotation on inner shell */
     :host([tilt]) {
-      perspective: 1200px;
+      perspective: 800px;
     }
-    :host([tilt]) .card {
+
+    .tilt-inner {
+      position: relative;
+      z-index: 2;
       transform-style: preserve-3d;
-      transform: rotateY(calc(var(--hu-pointer-x, 0px) * 0.02deg))
-        rotateX(calc(var(--hu-pointer-y, 0px) * -0.02deg));
-      transition: transform var(--hu-duration-fast) var(--hu-spring-out);
+      border-radius: inherit;
+      min-height: 100%;
     }
-    /* Pointer proximity glow overlay */
-    :host([tilt]) .card .proximity-glow {
+
+    .tilt-inner > ::slotted(*) {
+      position: relative;
+      z-index: 2;
+    }
+
+    .tilt-light {
       position: absolute;
       inset: 0;
       border-radius: inherit;
       pointer-events: none;
       z-index: 1;
-      opacity: var(--hu-proximity, 0);
       background: radial-gradient(
-        200px at calc(50% + var(--hu-pointer-x, 0px)) calc(50% + var(--hu-pointer-y, 0px)),
-        color-mix(in srgb, var(--hu-accent) 6%, transparent),
-        transparent
+        circle farthest-side at var(--hu-tilt-light-x, 50%) var(--hu-tilt-light-y, 50%),
+        color-mix(in srgb, var(--hu-color-white) 5%, transparent),
+        transparent 62%
       );
-      transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     /* Mesh gradient background */
@@ -269,7 +276,7 @@ export class ScCard extends LitElement {
     @media (prefers-reduced-motion: reduce) {
       :host([hoverable]),
       :host([clickable]),
-      :host([tilt]) .card {
+      :host([tilt]) .tilt-inner {
         transition: none !important;
         animation: none !important;
         transform: none !important;
@@ -292,6 +299,152 @@ export class ScCard extends LitElement {
   `;
 
   private _entranceObserver: IntersectionObserver | null = null;
+  private _tiltVisibilityObserver: IntersectionObserver | null = null;
+  private _tiltIntersecting = false;
+  private _tiltTracking = false;
+  private _tiltRaf: number | null = null;
+  private _tiltPointer: { x: number; y: number } | null = null;
+
+  private _tiltSupported(): boolean {
+    if (typeof window === "undefined") return false;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+    if (window.matchMedia("(hover: none)").matches) return false;
+    return true;
+  }
+
+  private _syncTiltIntersecting(): void {
+    const r = this.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+    this._tiltIntersecting =
+      r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < vh && r.left < vw;
+  }
+
+  private _teardownTiltVisibilityObserver(): void {
+    if (this._tiltVisibilityObserver) {
+      this._tiltVisibilityObserver.disconnect();
+      this._tiltVisibilityObserver = null;
+    }
+    this._tiltIntersecting = false;
+  }
+
+  private _setupTiltVisibilityObserver(): void {
+    this._teardownTiltVisibilityObserver();
+    if (!this.tilt || !this._tiltSupported()) {
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") {
+      this._syncTiltIntersecting();
+      return;
+    }
+    this._tiltVisibilityObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.target === this) {
+            this._tiltIntersecting = entry.isIntersecting;
+            if (!entry.isIntersecting) {
+              this._resetTiltImmediate();
+            }
+          }
+        }
+      },
+      { threshold: 0 },
+    );
+    this._tiltVisibilityObserver.observe(this);
+    this._syncTiltIntersecting();
+  }
+
+  private _getTiltInner(): HTMLElement | null {
+    return this.shadowRoot?.querySelector(".tilt-inner") ?? null;
+  }
+
+  private _cancelTiltRaf(): void {
+    if (this._tiltRaf !== null) {
+      cancelAnimationFrame(this._tiltRaf);
+      this._tiltRaf = null;
+    }
+    this._tiltPointer = null;
+  }
+
+  private _resetTiltImmediate(): void {
+    this._tiltTracking = false;
+    this._cancelTiltRaf();
+    const inner = this._getTiltInner();
+    if (!inner) return;
+    inner.style.willChange = "";
+    inner.style.transition = "";
+    inner.style.transform = "";
+    inner.style.removeProperty("--hu-tilt-light-x");
+    inner.style.removeProperty("--hu-tilt-light-y");
+  }
+
+  private _onTiltPointerEnter = (e: PointerEvent): void => {
+    if (!this.tilt || !this._tiltSupported() || !this._tiltIntersecting) return;
+    const inner = this._getTiltInner();
+    if (!inner) return;
+    this._tiltTracking = true;
+    inner.style.transition = "none";
+    inner.style.willChange = "transform";
+    this._tiltPointer = { x: e.clientX, y: e.clientY };
+    if (this._tiltRaf === null) {
+      this._tiltRaf = requestAnimationFrame(() => this._applyTiltFrame());
+    }
+  };
+
+  private _onTiltPointerMove = (e: PointerEvent): void => {
+    if (!this.tilt || !this._tiltSupported() || !this._tiltIntersecting || !this._tiltTracking) {
+      return;
+    }
+    this._tiltPointer = { x: e.clientX, y: e.clientY };
+    if (this._tiltRaf === null) {
+      this._tiltRaf = requestAnimationFrame(() => this._applyTiltFrame());
+    }
+  };
+
+  private _onTiltPointerLeave = (): void => {
+    if (!this.tilt) return;
+    this._tiltTracking = false;
+    this._cancelTiltRaf();
+    const inner = this._getTiltInner();
+    if (!inner || !this._tiltSupported()) return;
+    inner.style.willChange = "";
+    inner.style.transition = `transform var(--hu-duration-normal) var(--hu-ease-spring)`;
+    inner.style.transform = "rotateX(0deg) rotateY(0deg)";
+    inner.style.setProperty("--hu-tilt-light-x", "50%");
+    inner.style.setProperty("--hu-tilt-light-y", "50%");
+  };
+
+  private _applyTiltFrame(): void {
+    this._tiltRaf = null;
+    if (
+      !this.tilt ||
+      !this._tiltSupported() ||
+      !this._tiltIntersecting ||
+      !this._tiltTracking ||
+      !this._tiltPointer
+    ) {
+      return;
+    }
+    const card = this.shadowRoot?.querySelector(".card") as HTMLElement | null;
+    const inner = this._getTiltInner();
+    if (!card || !inner) return;
+
+    const rect = card.getBoundingClientRect();
+    const halfW = Math.max(rect.width / 2, 1);
+    const halfH = Math.max(rect.height / 2, 1);
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    const rotateY = ((this._tiltPointer.x - cx) / halfW) * HU_TILT_MAX_DEG;
+    const rotateX = (-(this._tiltPointer.y - cy) / halfH) * HU_TILT_MAX_DEG;
+
+    inner.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+
+    const lx = ((this._tiltPointer.x - rect.left) / Math.max(rect.width, 1)) * 100;
+    const ly = ((this._tiltPointer.y - rect.top) / Math.max(rect.height, 1)) * 100;
+    inner.style.setProperty("--hu-tilt-light-x", `${lx}%`);
+    inner.style.setProperty("--hu-tilt-light-y", `${ly}%`);
+  }
 
   private _teardownEntranceObserver(): void {
     if (this._entranceObserver) {
@@ -327,7 +480,7 @@ export class ScCard extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     if (this.tilt) {
-      pointerProximity.observe(this);
+      this._setupTiltVisibilityObserver();
     }
     if (this.entrance) {
       this._setupEntranceObserver();
@@ -336,16 +489,18 @@ export class ScCard extends LitElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    pointerProximity.unobserve(this);
+    this._resetTiltImmediate();
+    this._teardownTiltVisibilityObserver();
     this._teardownEntranceObserver();
   }
 
   override updated(changed: Map<string, unknown>): void {
     if (changed.has("tilt")) {
+      this._resetTiltImmediate();
       if (this.tilt) {
-        pointerProximity.observe(this);
+        this._setupTiltVisibilityObserver();
       } else {
-        pointerProximity.unobserve(this);
+        this._teardownTiltVisibilityObserver();
       }
     }
     if (changed.has("entrance")) {
@@ -385,6 +540,10 @@ export class ScCard extends LitElement {
       .filter(Boolean)
       .join(" ");
 
+    const onTiltEnter = this.tilt ? this._onTiltPointerEnter : undefined;
+    const onTiltMove = this.tilt ? this._onTiltPointerMove : undefined;
+    const onTiltLeave = this.tilt ? this._onTiltPointerLeave : undefined;
+
     return html`
       <div
         class=${classes}
@@ -392,9 +551,18 @@ export class ScCard extends LitElement {
         role=${this.clickable ? "button" : undefined}
         tabindex=${this.clickable ? 0 : undefined}
         @keydown=${this._onKeyDown}
+        @pointerenter=${onTiltEnter}
+        @pointermove=${onTiltMove}
+        @pointerleave=${onTiltLeave}
       >
-        ${this.tilt ? html`<div class="proximity-glow"></div>` : ""}
-        <slot></slot>
+        ${this.tilt
+          ? html`
+              <div class="tilt-inner">
+                <div class="tilt-light" aria-hidden="true"></div>
+                <slot></slot>
+              </div>
+            `
+          : html`<slot></slot>`}
       </div>
     `;
   }

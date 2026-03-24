@@ -136,7 +136,7 @@ export class ScStatCard extends LitElement {
       ? `${this.prefix}${this.valueStr}${this.suffix}`
       : `${this.prefix}${this.value}${this.suffix}`;
     return html`
-      <hu-card glass hoverable>
+      <hu-card glass hoverable tilt>
         <div class="stat-card" role="group" aria-label="${this.label}: ${displayValue}">
           ${this.trend
             ? html`

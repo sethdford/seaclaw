@@ -760,6 +760,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
             <hu-card
               glass
               clickable
+              tilt
               surface="high"
               class="quick-action-card"
               role="button"
@@ -794,11 +795,11 @@ export class ScOverviewView extends GatewayAwareLitElement {
     return html`
       <div class="details hu-cv-defer">
         <div class="bento hu-scroll-reveal-stagger">
-          <hu-card hoverable accent surface="high" class="activity">
+          <hu-card hoverable accent tilt surface="high" class="activity">
             <hu-activity-timeline .events=${this.activityEvents}></hu-activity-timeline>
           </hu-card>
 
-          <hu-card hoverable accent surface="high" class="channels">
+          <hu-card hoverable accent tilt surface="high" class="channels">
             <div class="section-label">Channels</div>
             ${this.channels.length === 0
               ? html`
@@ -855,7 +856,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
             ></hu-activity-heatmap>
           </hu-card>
 
-          <hu-card hoverable accent surface="high" class="sessions">
+          <hu-card hoverable accent tilt surface="high" class="sessions">
             <div class="section-label">Recent Sessions</div>
             <hu-sessions-table
               .sessions=${this.recentSessions}
