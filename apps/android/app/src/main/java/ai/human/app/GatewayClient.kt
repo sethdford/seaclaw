@@ -298,6 +298,11 @@ class GatewayClient {
         send("health", emptyMap())
     }
 
+    /** Fetch memory entries. Updates _memoryEntries when response received. */
+    fun fetchMemoryList() {
+        send("memory.list", emptyMap())
+    }
+
     /** Prefetch sessions list for adjacent tab navigation. */
     fun prefetchSessions() {
         fetchSessions()

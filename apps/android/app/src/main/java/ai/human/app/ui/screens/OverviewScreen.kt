@@ -276,7 +276,7 @@ fun OverviewScreen(
                     )
                     StatCard(
                         title = "HuLa Success",
-                        value = if (showSkeletons) null else "${gateway.hulaSuccessRate.collectAsState().value}%",
+                        value = if (showSkeletons) "" else "${gateway.hulaSuccessRate.collectAsState().value}%",
                         modifier = Modifier.weight(1f),
                         isSkeleton = showSkeletons,
                     )
