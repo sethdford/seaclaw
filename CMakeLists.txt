@@ -1653,7 +1653,8 @@ if(NOT HU_ENABLE_ML)
         src/ml/tokenizer_bpe.c src/ml/dataloader.c src/ml/prepare.c
         src/ml/evaluator.c src/ml/experiment.c src/ml/experiment_store.c src/ml/gpt.c
         src/ml/muon_adamw.c src/ml/train.c src/ml/checkpoint.c src/ml/cli.c
-        src/ml/lora.c src/ml/agent_trainer.c src/ml/training_data.c)
+        src/ml/lora.c src/ml/agent_trainer.c src/ml/training_data.c
+        src/providers/huml.c)
 endif()
 # Phase 7 modules (experience, forgetting, weakness) — tests need them when SQLite is OFF (minimal build)
 if(NOT HU_ENABLE_SQLITE)
