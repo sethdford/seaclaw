@@ -87,7 +87,7 @@ static bool check_semantic(const hu_validation_rule_t *rule, const hu_tool_resul
 
     size_t plen = strlen(rule->contains_pattern);
     if (plen > result->output_len) {
-        snprintf(reason, reason_size, "output missing required pattern '%s'",
+        snprintf(reason, reason_size, "output missing required pattern '%.128s'",
                  rule->contains_pattern);
         return false;
     }
@@ -97,7 +97,8 @@ static bool check_semantic(const hu_validation_rule_t *rule, const hu_tool_resul
             return true;
     }
 
-    snprintf(reason, reason_size, "output missing required pattern '%s'", rule->contains_pattern);
+    snprintf(reason, reason_size, "output missing required pattern '%.128s'",
+             rule->contains_pattern);
     return false;
 }
 

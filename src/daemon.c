@@ -3892,8 +3892,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 size_t convo_ctx_len = 0;
                 hu_channel_history_entry_t *history_entries = NULL;
                 size_t history_count = 0;
+#if defined(HU_ENABLE_SQLITE) && !defined(HU_IS_TEST)
                 char *cross_channel_ctx = NULL;
                 size_t cross_channel_ctx_len = 0;
+#endif
 #ifdef HU_HAS_PERSONA
                 const hu_contact_profile_t *contact_for_tapback = NULL;
 #endif
