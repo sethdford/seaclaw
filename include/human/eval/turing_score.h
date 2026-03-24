@@ -7,9 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define HU_TURING_DIM_COUNT 12
+#define HU_TURING_DIM_COUNT 18
 
 typedef enum {
+    /* Original 12 text-based dimensions */
     HU_TURING_NATURAL_LANGUAGE = 0,
     HU_TURING_EMOTIONAL_INTELLIGENCE,
     HU_TURING_APPROPRIATE_LENGTH,
@@ -22,6 +23,13 @@ typedef enum {
     HU_TURING_CONTEXT_AWARENESS,
     HU_TURING_NON_ROBOTIC,
     HU_TURING_GENUINE_WARMTH,
+    /* S2S voice dimensions (arXiv:2602.24080 taxonomy) */
+    HU_TURING_PROSODY_NATURALNESS,    /* intonation, rhythm, stress patterns */
+    HU_TURING_TURN_TIMING,            /* response latency, turn-taking fluency */
+    HU_TURING_FILLER_USAGE,           /* natural hesitations (um, uh, like) */
+    HU_TURING_EMOTIONAL_PROSODY,      /* vocal emotion expression (not just word choice) */
+    HU_TURING_CONVERSATIONAL_REPAIR,  /* self-correction, rephrasing mid-utterance */
+    HU_TURING_PARALINGUISTIC_CUES,    /* laughter, sighs, breath, vocal quality */
 } hu_turing_dimension_t;
 
 typedef enum {

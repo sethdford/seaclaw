@@ -27,6 +27,7 @@ Key extension points:
 - `src/runtime/` (`hu_runtime_t`) — execution environments
 - `src/peripherals/` (`hu_peripheral_t`) — hardware boards (Arduino, STM32, RPi)
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
+- `src/ml/` — on-device ML training (BPE, GPT, DPO, LoRA, feed predictor) — `HU_ENABLE_ML`
 
 Current scale: **1,093 source + header files, ~233K lines of C, ~98K lines of tests, 6374+ tests, 38 channels**.
 
@@ -109,7 +110,7 @@ src/
   persona/              persona profiles, prompt builder, example banks
   config.c              schema + config loading/merging (~/.human/config.json)
   gateway/gateway.c     webhook/HTTP gateway server
-  ml/                   ML training (BPE, GPT, MuonAdamW, experiment loop) — HU_ENABLE_ML
+  ml/                   ML training (BPE, GPT, DPO, LoRA, feed predictor, experiment loop, CLI) — HU_ENABLE_ML
   feeds/                Feed processor, research agent, social feeds, file ingest
   pwa/                  Progressive web app bridge, context, entities, CDP
   voice/                Voice pipeline, realtime, WebRTC
@@ -227,6 +228,25 @@ Summary: vtable-first extension, inward dependency direction, no cross-subsystem
 - Implementation: `src/persona/persona.c` (loading/parsing), `creator.c` (generation), `analyzer.c` (analysis), `sampler.c` (sampling), `examples.c` (example selection), `feedback.c` (feedback loop), `cli.c` (CLI subcommands).
 - Prompt builder composes system prompts from persona identity + traits + channel overlay + selected examples.
 - Add tests for JSON parsing, overlay lookup, prompt composition, and edge cases (missing fields, empty arrays).
+
+### 7.7 ML Training / CLI
+
+The `human ml` subcommand exposes on-device ML training. All gated behind `HU_ENABLE_ML`.
+
+| Subcommand | What it does |
+| --- | --- |
+| `train` | Run time-budgeted training on tokenized data |
+| `experiment` | Autonomous experiment loop (mutate config, train, eval, keep/discard) |
+| `prepare` | Tokenize files into binary training data |
+| `prepare-conversations` | Prepare conversation history as training data |
+| `dpo-train` | Train with Direct Preference Optimization on collected pairs |
+| `lora-persona` | Fine-tune LoRA adapter on persona example bank |
+| `train-feed-predictor` | Train topic/trend predictor on feed data |
+| `status` | Show ML subsystem status |
+
+Key files: `src/ml/cli.c` (CLI handlers), `src/ml/dpo.c`, `src/ml/lora.c`, `src/ml/train.c`, `src/ml/experiment.c`.
+Providers: `src/providers/huml.c` (HUML checkpoint inference), `src/providers/embedded.c` (llama-cli local inference).
+Tests: `tests/test_ml.c`.
 
 ## 8) Validation Matrix
 

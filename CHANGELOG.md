@@ -12,6 +12,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **`hu_spawn_config_apply_current_tool_agent()`**: merges thread-local tool agent into spawn cfg (used by named spawn; covered by `agent_registry` tests)
 - **Docs**: `docs/operations/metacog-hula-production.md` (tuning, telemetry, CI parity)
 - **Delegate / named spawn**: inherit parent metacognition policy via `hu_agent_pool_spawn_named`
+- **ML pipeline**: DPO training (`hu_ml_cli_dpo_train`), LoRA persona fine-tuning (`hu_ml_cli_lora_persona`), feed topic predictor (`hu_ml_cli_train_feed_predictor`), conversation data prep (`hu_ml_cli_prepare_conversations`)
+- **HUML provider**: `hu_huml_provider_create` for local inference from trained HUML checkpoints
+- **Embedded provider**: `hu_embedded_provider_create` registered for `embedded` and `llama-cli` local inference
+- **Model-based speculative prediction**: `hu_speculative_predict_with_model` replaces heuristic prediction in agent turn
+- **Model-based emotion classification**: `hu_anticipatory_predict_with_provider` uses provider for emotion classification with keyword fallback
+- **ML cron jobs**: weekly DPO training and nightly experiment loop registered in service daemon
+- **HuLa promotion (website)**: new chapter 9 "Programs, not prompts" with glass tiles, code sample, and CTA
+- **HuLa promotion (dashboard)**: "HuLa Programs" stat card on overview, session HuLa badges, `orchestration_quality` Turing dimension
+- **HuLa promotion (native apps)**: HuLa analytics stat cards on iOS, macOS, and Android overview screens
+- **HuLa promotion (CLI)**: updated `print_usage()` tagline and `hula` command description
+- **HuLa gateway methods**: `hula.traces.analytics` consumed by dashboard overview + native apps
+- **Shared protocol**: `Methods.hulaTracesAnalytics`, `hulaTracesList`, `hulaTracesGet` in HumanKit
 
 ### Fixed
 

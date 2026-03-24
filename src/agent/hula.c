@@ -232,6 +232,7 @@ static const char *const op_names[] = {
     [HU_HULA_DELEGATE]  = "delegate",
     [HU_HULA_EMIT]     = "emit",
     [HU_HULA_TRY]      = "try",
+    [HU_HULA_VERIFY]   = "verify",
 };
 
 static const char *const pred_names[] = {
@@ -294,6 +295,7 @@ static void hula_node_clear(hu_allocator_t *alloc, hu_hula_node_t *n) {
     if (n->delegate_context)     hu_str_free(alloc, n->delegate_context);
     if (n->delegate_result_key)  hu_str_free(alloc, n->delegate_result_key);
     if (n->delegate_agent_id)    hu_str_free(alloc, n->delegate_agent_id);
+    if (n->verify_node_id)       hu_str_free(alloc, n->verify_node_id);
     if (n->required_capability)   hu_str_free(alloc, n->required_capability);
     if (n->description)        hu_str_free(alloc, n->description);
     memset(n, 0, sizeof(*n));
@@ -423,6 +425,10 @@ static hu_hula_node_t *parse_node(hu_hula_program_t *prog, const hu_json_value_t
     if ((s = hu_json_get_string(obj, "agent_id"))) {
         n->delegate_agent_id = hu_strdup(&prog->alloc, s);
         n->delegate_agent_id_len = strlen(s);
+    }
+    if ((s = hu_json_get_string(obj, "verify_node_id"))) {
+        n->verify_node_id = hu_strdup(&prog->alloc, s);
+        n->verify_node_id_len = strlen(s);
     }
     if ((s = hu_json_get_string(obj, "required_capability"))) {
         n->required_capability = hu_strdup(&prog->alloc, s);
@@ -748,6 +754,10 @@ static void validate_node(const hu_hula_node_t *n, hu_allocator_t *alloc,
     case HU_HULA_TRY:
         if (n->children_count < 1)
             add_diag(v, alloc, n, "try needs a body child");
+        break;
+    case HU_HULA_VERIFY:
+        if (!n->verify_node_id || n->verify_node_id_len == 0)
+            add_diag(v, alloc, n, "verify needs verify_node_id");
         break;
     default:
         add_diag(v, alloc, n, "unknown opcode");
@@ -1249,6 +1259,53 @@ static hu_error_t exec_try(hu_hula_exec_t *exec, hu_hula_node_t *n, int depth) {
     return HU_OK;
 }
 
+/* VERIFY: validate a preceding node's output against a predicate (VMAO-inspired). */
+static hu_error_t exec_verify(hu_hula_exec_t *exec, hu_hula_node_t *n) {
+    if (!n->verify_node_id || n->verify_node_id_len == 0) {
+        set_result(exec, n, HU_HULA_FAILED, NULL, 0, "verify: missing node_id", 22);
+        return HU_OK;
+    }
+    const hu_hula_result_t *target = hu_hula_exec_result(exec, n->verify_node_id);
+    if (!target) {
+        set_result(exec, n, HU_HULA_FAILED, NULL, 0, "verify: target not found", 24);
+        return HU_OK;
+    }
+    if (target->status != HU_HULA_DONE) {
+        set_result(exec, n, HU_HULA_FAILED, NULL, 0, "verify: target not done", 23);
+        return HU_OK;
+    }
+
+    bool pass = false;
+    switch (n->pred) {
+    case HU_HULA_PRED_SUCCESS:
+        pass = (target->status == HU_HULA_DONE);
+        break;
+    case HU_HULA_PRED_FAILURE:
+        pass = (target->status == HU_HULA_FAILED);
+        break;
+    case HU_HULA_PRED_CONTAINS:
+        pass = target->output && n->match_str &&
+               strstr(target->output, n->match_str) != NULL;
+        break;
+    case HU_HULA_PRED_NOT_CONTAINS:
+        pass = !target->output || !n->match_str ||
+               strstr(target->output, n->match_str) == NULL;
+        break;
+    case HU_HULA_PRED_ALWAYS:
+        pass = true;
+        break;
+    }
+
+    if (pass) {
+        set_result(exec, n, HU_HULA_DONE, "verified", 8, NULL, 0);
+    } else {
+        static const char msg[] = "verify: assertion failed";
+        set_result(exec, n, HU_HULA_FAILED, NULL, 0, msg, sizeof(msg) - 1);
+        hu_hula_exec_cancel(exec, msg, sizeof(msg) - 1);
+    }
+    return HU_OK;
+}
+
 #if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
 static hu_error_t delegate_embed_children_json(hu_allocator_t *alloc, hu_hula_node_t *n,
                                                 char **out_json, size_t *out_len) {
@@ -1495,6 +1552,9 @@ static hu_error_t exec_dispatch(hu_hula_exec_t *exec, hu_hula_node_t *n, int dep
         break;
     case HU_HULA_TRY:
         err = exec_try(exec, n, depth);
+        break;
+    case HU_HULA_VERIFY:
+        err = exec_verify(exec, n);
         break;
     default:
         set_result(exec, n, HU_HULA_FAILED, NULL, 0, "unknown opcode", 14);
@@ -1797,6 +1857,8 @@ static void cost_visit(const hu_hula_node_t *n, size_t *calls, size_t *par_max, 
     case HU_HULA_TRY:
         for (size_t i = 0; i < n->children_count; i++)
             cost_visit(n->children[i], calls, par_max, loop_sum, max_risk);
+        break;
+    case HU_HULA_VERIFY:
         break;
     default:
         break;

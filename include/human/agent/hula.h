@@ -38,6 +38,8 @@ struct hu_spawn_config;
  *   DELEGATE  — spawn a sub-agent with a goal string
  *   EMIT      — produce a named output (return value, side-channel message)
  *   TRY       — run body child; on failure optionally run catch child
+ *   VERIFY    — validate preceding node output against predicate; halts on mismatch
+ *               (arXiv:2603.11445 VMAO-inspired verification-driven execution)
  *
  * Wire format: JSON (parse/serialize), with a compact text notation for
  * human-readable debugging.
@@ -109,6 +111,11 @@ struct hu_hula_node {
     size_t delegate_result_key_len;
     char *delegate_agent_id; /* owned; optional registry agent name for spawn_named */
     size_t delegate_agent_id_len;
+
+    /* VERIFY: validate a preceding node's output */
+    char *verify_node_id;      /* owned; the node whose output to check */
+    size_t verify_node_id_len;
+    /* Uses pred + match_str for the validation condition (shared with BRANCH/LOOP) */
 
     /* Policy: node requires this capability token in policy->hula_capability_allowlist */
     char *required_capability; /* owned */

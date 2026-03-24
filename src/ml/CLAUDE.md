@@ -40,6 +40,21 @@ All public headers in `include/human/ml/`:
 - `prepare.h` — data preparation utilities
 - `train.h` — training loop API
 
+## CLI Subcommands (`human ml <subcommand>`)
+
+| Subcommand | Handler | Description |
+| --- | --- | --- |
+| `train` | `hu_ml_cli_train` | Time-budgeted training on tokenized data |
+| `experiment` | `hu_ml_cli_experiment` | Autonomous experiment loop (config mutation, train/eval, keep/discard) |
+| `prepare` | `hu_ml_cli_prepare` | Tokenize files into binary training data |
+| `prepare-conversations` | `hu_ml_cli_prepare_conversations` | Prepare conversation history as ML training data |
+| `dpo-train` | `hu_ml_cli_dpo_train` | Train with Direct Preference Optimization on collected pairs |
+| `lora-persona` | `hu_ml_cli_lora_persona` | Fine-tune LoRA adapter on persona example bank |
+| `train-feed-predictor` | `hu_ml_cli_train_feed_predictor` | Train topic/trend predictor on feed item data |
+| `status` | `hu_ml_cli_status` | Show ML subsystem status |
+
+All handlers declared in `include/human/ml/cli.h`. Routed from `cmd_ml()` in `src/main.c`.
+
 ## Rules
 
 - All gated behind `HU_ENABLE_ML`

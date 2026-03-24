@@ -12,6 +12,11 @@ Jetpack Compose app.
 - Typography: use `AvenirFontFamily` and `AvenirTypography` from `Theme.kt`.
 - Theme: use `MaterialTheme.colorScheme.primary` — not `HumanTheme.Coral` directly.
 
+## Gateway Integrations
+
+- **HuLa analytics**: `GatewayClient` sends `hula.traces.analytics` in `fetchOverviewData()` and exposes `hulaProgramCount` / `hulaSuccessRate` as `StateFlow<Int>`. Response parsed in `onMessage`.
+- **Overview stat cards**: `OverviewScreen` renders "HuLa Programs" and "HuLa Success" `StatCard` composables from the gateway state flows.
+
 ## Fleet / CI (instrumented)
 
 - Tests: `app/src/androidTest/...` (`connectedDebugAndroidTest`). Intent extra `EXTRA_SKIP_ONBOARDING_FOR_TEST` skips onboarding for automation.

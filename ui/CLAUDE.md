@@ -41,6 +41,13 @@ LitElement renders inside Shadow DOM. Playwright selectors must account for this
 - Use realistic sample data — not empty arrays or minimal stubs
 - Wire protocol: WebSocket JSON-RPC, methods use `noun.verb` (e.g., `chat.send`, `sessions.list`)
 
+## HuLa Integration
+
+- **Overview view** (`views/overview-view.ts`): fetches `hula.traces.analytics` on load; renders a "HuLa Programs" stat card alongside Providers/Channels/Tools/Memory.
+- **Sessions view** (`views/sessions-view.ts`): session cards show a HuLa badge (`.session-hula-badge`) when `hula_count > 0`; session detail panel shows "HuLa Programs" count.
+- **Turing view** (`views/turing-view.ts`): `DIMENSION_ORDER` includes `orchestration_quality` for HuLa program execution quality scoring.
+- **Demo gateway** (`demo-gateway.ts`): mocks `hula.traces.analytics`, `hula_count` on sessions, and `orchestration_quality` in Turing dimensions.
+
 ## Error & State Handling
 
 - Every view must handle 3 states: loading (skeleton), populated, error

@@ -12,6 +12,11 @@ SwiftUI app using HumanKit shared library.
 - Animation: `HUTokens.springMicro`, `HUTokens.springStandard`, `HUTokens.springExpressive`, `HUTokens.springDramatic`.
 - Accessibility: support Dynamic Type, VoiceOver, reduce motion.
 
+## Gateway Integrations
+
+- **HuLa analytics**: `ConnectionManager.fetchHulaAnalytics()` calls `hula.traces.analytics` and populates `hulaProgramCount`. Prefetched on overview tab.
+- **Overview stat card**: `OverviewView` renders a "HuLa" `StatCard` showing `hulaProgramsStat` (program count from gateway).
+
 ## Fleet / CI (XCUITest)
 
 - Xcode project is generated: `brew install xcodegen && cd apps/ios && xcodegen generate` → `HumaniOS.xcodeproj`.

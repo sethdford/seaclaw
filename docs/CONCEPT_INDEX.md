@@ -48,6 +48,8 @@ Use this to find the right files for a given task without searching the full cod
 | **Ollama / local**              | `src/providers/ollama.c`                            | `test_ollama_integration.c`              |
 | **CoreML / MLX (on-device)**    | `src/providers/coreml.c`, `include/human/providers/coreml.h` | `test_coreml_provider.c`            |
 | **SSE streaming**               | `src/providers/sse.c`, `src/sse/sse_client.c`       | `test_sse.c`, `test_streaming.c`         |
+| **HUML checkpoint (on-device)** | `src/providers/huml.c`, `include/human/providers/huml.h` | `test_ml.c`                          |
+| **Embedded / llama-cli**        | `src/providers/embedded.c`, `include/human/providers/embedded.h` | `test_ml.c`                    |
 
 ### Voice session (unified)
 
@@ -114,7 +116,7 @@ Use this to find the right files for a given task without searching the full cod
 | Concept              | Primary Source Files                                                                      | Test Files                              |
 | -------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------- |
 | **HTTP gateway**     | `src/gateway/gateway.c`                                                                   | `test_gateway.c`, `test_gateway_http.c` |
-| **Control protocol** | `src/gateway/control_protocol.c`, `cp_chat.c`, `cp_config.c`, `cp_admin.c`, `cp_voice.c`, `cp_memory.c` | `test_gateway_extended.c`               |
+| **Control protocol** | `src/gateway/control_protocol.c`, `cp_chat.c`, `cp_config.c`, `cp_admin.c` (incl. `hula.traces.*`), `cp_voice.c`, `cp_memory.c` | `test_gateway_extended.c` |
 | **WebSocket server** | `src/gateway/ws_server.c`                                                                 | `test_gateway_extended.c`               |
 | **OAuth**            | `src/gateway/oauth.c`                                                                     | `test_oauth.c`, `test_gateway_auth.c`   |
 | **OpenAI compat**    | `src/gateway/openai_compat.c`                                                             | `test_gateway_extended.c`               |
@@ -197,7 +199,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Skills ↔ agents**         | `docs/standards/ai/skills-vs-agents.md`, `docs/plans/2026-03-20-static-skills-dynamic-agents-unification.md` | `test_subsystems` (catalog) |
 | **Skill prompt catalog**    | `src/skillforge.c` (`hu_skillforge_build_prompt_catalog`), `src/agent/agent_turn.c`                     | `test_subsystems`        |
 | **PWA bridge**              | `src/pwa/bridge.c`, `context.c`, `drivers.c`, `learner.c`                                                | `test_pwa.c`             |
-| **ML subsystem**            | `src/ml/gpt.c`, `train.c`, `prepare.c`, `tokenizer_bpe.c`, `dataloader.c`, `evaluator.c`, `experiment.c` | `test_ml.c`              |
+| **ML subsystem**            | `src/ml/gpt.c`, `train.c`, `prepare.c`, `tokenizer_bpe.c`, `dataloader.c`, `evaluator.c`, `experiment.c`, `dpo.c`, `lora.c`, `cli.c`, `checkpoint.c`, `agent_trainer.c` | `test_ml.c` |
 | **Research feeds**          | `src/feeds/research.c`, `file_ingest.c`, `gmail.c`, `imessage.c`, `twitter.c`                            | `test_research_feeds.c`  |
 
 ## Native client apps (`apps/`)
