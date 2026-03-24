@@ -139,12 +139,14 @@ hu_error_t hu_voice_rt_response_cancel(hu_voice_rt_session_t *session) {
 #endif
 }
 
+#if HU_IS_TEST || defined(HU_HTTP_CURL)
 static void copy_event_type(const char *type, hu_voice_rt_event_t *out) {
     if (type) {
         strncpy(out->type, type, sizeof(out->type) - 1);
         out->type[sizeof(out->type) - 1] = '\0';
     }
 }
+#endif
 
 hu_error_t hu_voice_rt_recv_event(hu_voice_rt_session_t *session, hu_allocator_t *alloc,
                                   hu_voice_rt_event_t *out, int timeout_ms) {
