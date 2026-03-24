@@ -1,7 +1,7 @@
 #include "human/channels/imessage.h"
 #include "human/channel_loop.h"
-#include "human/core/process_util.h"
 #include "human/core/error.h"
+#include "human/core/process_util.h"
 #include "human/core/string.h"
 #ifndef HU_CODENAME
 #define HU_CODENAME "human"
@@ -401,36 +401,36 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
         if (!clean)
             return HU_ERR_OUT_OF_MEMORY;
         {
-        size_t out_i = 0;
-        size_t i = 0;
-        while (i < message_len) {
-            if (message[i] == '*') {
-                while (i < message_len && message[i] == '*')
+            size_t out_i = 0;
+            size_t i = 0;
+            while (i < message_len) {
+                if (message[i] == '*') {
+                    while (i < message_len && message[i] == '*')
+                        i++;
+                    continue;
+                }
+                if ((i == 0 || message[i - 1] == '\n') && message[i] == '#') {
+                    while (i < message_len && message[i] == '#')
+                        i++;
+                    if (i < message_len && message[i] == ' ')
+                        i++;
+                    continue;
+                }
+                if ((i == 0 || message[i - 1] == '\n') && i + 1 < message_len &&
+                    (message[i] == '-' || message[i] == '*') && message[i + 1] == ' ') {
+                    i += 2;
+                    continue;
+                }
+                if (message[i] == '`') {
                     i++;
-                continue;
-            }
-            if ((i == 0 || message[i - 1] == '\n') && message[i] == '#') {
-                while (i < message_len && message[i] == '#')
-                    i++;
-                if (i < message_len && message[i] == ' ')
-                    i++;
-                continue;
-            }
-            if ((i == 0 || message[i - 1] == '\n') && i + 1 < message_len &&
-                (message[i] == '-' || message[i] == '*') && message[i + 1] == ' ') {
-                i += 2;
-                continue;
-            }
-            if (message[i] == '`') {
+                    continue;
+                }
+                clean[out_i++] = message[i];
                 i++;
-                continue;
             }
-            clean[out_i++] = message[i];
-            i++;
-        }
-        clean[out_i] = '\0';
-        message = clean;
-        message_len = out_i;
+            clean[out_i] = '\0';
+            message = clean;
+            message_len = out_i;
         }
 
         message_len = imessage_sanitize_output(clean, message_len);
@@ -642,24 +642,30 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
         return HU_ERR_INTERNAL;
     }
 
-    const char *sql =
-        "SELECT m.is_from_me, m.text, "
-        "  datetime(m.date/1000000000 + 978307200, 'unixepoch', 'localtime') as ts, "
-        "  (SELECT COUNT(*) FROM message_attachment_join maj "
-        "   JOIN attachment a ON maj.attachment_id = a.ROWID "
-        "   WHERE maj.message_id = m.ROWID AND a.filename IS NOT NULL "
-        "   AND (LOWER(a.filename) LIKE '%.mov' OR LOWER(a.filename) LIKE '%.mp4' "
-        "     OR LOWER(a.filename) LIKE '%.m4v')) > 0 AS has_video, "
-        "  (SELECT COUNT(*) FROM message_attachment_join maj2 "
-        "   JOIN attachment a2 ON maj2.attachment_id = a2.ROWID "
-        "   WHERE maj2.message_id = m.ROWID AND a2.filename IS NOT NULL "
-        "   AND (LOWER(a2.filename) LIKE '%.jpg' OR LOWER(a2.filename) LIKE '%.jpeg' "
-        "     OR LOWER(a2.filename) LIKE '%.png' OR LOWER(a2.filename) LIKE '%.heic' "
-        "     OR LOWER(a2.filename) LIKE '%.gif' OR LOWER(a2.filename) LIKE '%.webp')) > 0 AS has_image "
-        "FROM message m "
-        "JOIN handle h ON m.handle_id = h.ROWID "
-        "WHERE h.id = ?1 AND m.associated_message_type = 0 "
-        "ORDER BY m.date DESC LIMIT ?2";
+    const char *sql = "SELECT m.is_from_me, m.text, "
+                      "  datetime(m.date/1000000000 + 978307200, 'unixepoch', 'localtime') as ts, "
+                      "  (SELECT COUNT(*) FROM message_attachment_join maj "
+                      "   JOIN attachment a ON maj.attachment_id = a.ROWID "
+                      "   WHERE maj.message_id = m.ROWID AND a.filename IS NOT NULL "
+                      "   AND (LOWER(a.filename) LIKE '%.mov' OR LOWER(a.filename) LIKE '%.mp4' "
+                      "     OR LOWER(a.filename) LIKE '%.m4v')) > 0 AS has_video, "
+                      "  (SELECT COUNT(*) FROM message_attachment_join maj2 "
+                      "   JOIN attachment a2 ON maj2.attachment_id = a2.ROWID "
+                      "   WHERE maj2.message_id = m.ROWID AND a2.filename IS NOT NULL "
+                      "   AND (LOWER(a2.filename) LIKE '%.jpg' OR LOWER(a2.filename) LIKE '%.jpeg' "
+                      "     OR LOWER(a2.filename) LIKE '%.png' OR LOWER(a2.filename) LIKE '%.heic' "
+                      "     OR LOWER(a2.filename) LIKE '%.gif' OR LOWER(a2.filename) LIKE "
+                      "'%.webp')) > 0 AS has_image, "
+                      "  (SELECT COUNT(*) FROM message_attachment_join maj3 "
+                      "   JOIN attachment a3 ON maj3.attachment_id = a3.ROWID "
+                      "   WHERE maj3.message_id = m.ROWID AND a3.filename IS NOT NULL "
+                      "   AND (LOWER(a3.filename) LIKE '%.caf' OR LOWER(a3.filename) LIKE '%.m4a' "
+                      "     OR LOWER(a3.filename) LIKE '%.mp3' OR LOWER(a3.filename) LIKE '%.aac' "
+                      "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio "
+                      "FROM message m "
+                      "JOIN handle h ON m.handle_id = h.ROWID "
+                      "WHERE h.id = ?1 AND m.associated_message_type = 0 "
+                      "ORDER BY m.date DESC LIMIT ?2";
 
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
@@ -693,6 +699,7 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
         const char *ts = (const char *)sqlite3_column_text(stmt, 2);
         int has_video = sqlite3_column_int(stmt, 3);
         int has_image = sqlite3_column_int(stmt, 4);
+        int has_audio = sqlite3_column_int(stmt, 5);
         if (txt && strlen(txt) > 0) {
             size_t tlen = strlen(txt);
             if (tlen >= sizeof(entries[0].text))
@@ -702,10 +709,9 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
         } else if (entries[count].from_me) {
             snprintf(entries[count].text, sizeof(entries[0].text), "[you replied]");
         } else {
-            /* Empty text = attachment. Use specific placeholder when known; prompt builder
-             * should call hu_conversation_attachment_context() to inject guidance
-             * for natural acknowledgment ("love that!", "that looks great", etc.). */
-            if (has_video)
+            if (has_audio)
+                snprintf(entries[count].text, sizeof(entries[0].text), "[Voice Message]");
+            else if (has_video)
                 snprintf(entries[count].text, sizeof(entries[0].text), "[Video]");
             else if (has_image)
                 snprintf(entries[count].text, sizeof(entries[0].text), "[Photo]");
@@ -742,9 +748,8 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
 }
 
 #if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__) && defined(HU_ENABLE_SQLITE)
-hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
-                                             const char *contact_id, size_t contact_id_len,
-                                             char **out, size_t *out_len) {
+hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *contact_id,
+                                             size_t contact_id_len, char **out, size_t *out_len) {
     if (!alloc || !contact_id || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -781,7 +786,8 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
     }
 
     char contact_buf[128];
-    size_t clen = contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
+    size_t clen =
+        contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
     memcpy(contact_buf, contact_id, clen);
     contact_buf[clen] = '\0';
     sqlite3_bind_text(stmt, 1, contact_buf, (int)clen, SQLITE_STATIC);
@@ -791,12 +797,24 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
         int type = sqlite3_column_int(stmt, 0);
         int cnt = sqlite3_column_int(stmt, 1);
         switch (type) {
-        case 2000: hearts = cnt; break;
-        case 2001: likes = cnt; break;
-        case 2002: dislikes = cnt; break;
-        case 2003: laughs = cnt; break;
-        case 2004: emphasis = cnt; break;
-        case 2005: questions = cnt; break;
+        case 2000:
+            hearts = cnt;
+            break;
+        case 2001:
+            likes = cnt;
+            break;
+        case 2002:
+            dislikes = cnt;
+            break;
+        case 2003:
+            laughs = cnt;
+            break;
+        case 2004:
+            emphasis = cnt;
+            break;
+        case 2005:
+            questions = cnt;
+            break;
         }
     }
     sqlite3_finalize(stmt);
@@ -808,20 +826,24 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
 
     char buf[256];
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "[REACTIONS on your recent messages:");
+    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "[REACTIONS on your recent messages:");
     if (hearts > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d heart%s", hearts, hearts > 1 ? "s" : "");
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d heart%s", hearts,
+                                hearts > 1 ? "s" : "");
     if (likes > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d like%s", likes, likes > 1 ? "s" : "");
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d like%s", likes,
+                                likes > 1 ? "s" : "");
     if (laughs > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d laugh%s", laughs, laughs > 1 ? "s" : "");
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d laugh%s", laughs,
+                                laughs > 1 ? "s" : "");
     if (emphasis > 0)
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d emphasis", emphasis);
     if (questions > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d question%s", questions, questions > 1 ? "s" : "");
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d question%s", questions,
+                                questions > 1 ? "s" : "");
     if (dislikes > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d dislike%s", dislikes, dislikes > 1 ? "s" : "");
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d dislike%s", dislikes,
+                                dislikes > 1 ? "s" : "");
     pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "]");
 
     *out = hu_strndup(alloc, buf, pos);
@@ -831,9 +853,9 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
     return HU_OK;
 }
 
-hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
-                                                  const char *contact_id, size_t contact_id_len,
-                                                  char **out, size_t *out_len) {
+hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const char *contact_id,
+                                                  size_t contact_id_len, char **out,
+                                                  size_t *out_len) {
     if (!alloc || !contact_id || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -850,12 +872,11 @@ hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
         return HU_ERR_IO;
 
     /* Find our last sent message to this contact and check its read status */
-    const char *sql =
-        "SELECT m.date, m.date_delivered, m.date_read, m.text "
-        "FROM message m "
-        "JOIN handle h ON m.handle_id = h.ROWID "
-        "WHERE h.id = ?1 AND m.is_from_me = 1 "
-        "ORDER BY m.date DESC LIMIT 1";
+    const char *sql = "SELECT m.date, m.date_delivered, m.date_read, m.text "
+                      "FROM message m "
+                      "JOIN handle h ON m.handle_id = h.ROWID "
+                      "WHERE h.id = ?1 AND m.is_from_me = 1 "
+                      "ORDER BY m.date DESC LIMIT 1";
 
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
@@ -864,7 +885,8 @@ hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
     }
 
     char contact_buf[128];
-    size_t clen = contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
+    size_t clen =
+        contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
     memcpy(contact_buf, contact_id, clen);
     contact_buf[clen] = '\0';
     sqlite3_bind_text(stmt, 1, contact_buf, (int)clen, SQLITE_STATIC);
@@ -886,11 +908,10 @@ hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
 
         /* Also check: has there been a reply from them after our message? */
         sqlite3_stmt *reply_stmt = NULL;
-        const char *reply_sql =
-            "SELECT COUNT(*) FROM message m "
-            "JOIN handle h ON m.handle_id = h.ROWID "
-            "WHERE h.id = ?1 AND m.is_from_me = 0 AND m.date > ?2 "
-            "AND m.associated_message_type = 0";
+        const char *reply_sql = "SELECT COUNT(*) FROM message m "
+                                "JOIN handle h ON m.handle_id = h.ROWID "
+                                "WHERE h.id = ?1 AND m.is_from_me = 0 AND m.date > ?2 "
+                                "AND m.associated_message_type = 0";
         bool has_reply = false;
         if (sqlite3_prepare_v2(db, reply_sql, -1, &reply_stmt, NULL) == SQLITE_OK) {
             sqlite3_bind_text(reply_stmt, 1, contact_buf, (int)clen, SQLITE_STATIC);
@@ -907,21 +928,25 @@ hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
             if (since_read > 60) {
                 int mins = (int)(since_read / 60);
                 if (mins > 60) {
-                    pos = (size_t)snprintf(buf, sizeof(buf),
+                    pos = (size_t)snprintf(
+                        buf, sizeof(buf),
                         "[READ RECEIPT: They read your last message %dh ago but haven't replied. "
                         "Don't mention this — just be natural, don't guilt-trip.]",
                         mins / 60);
                 } else {
-                    pos = (size_t)snprintf(buf, sizeof(buf),
-                        "[READ RECEIPT: They read your last message %d min ago but haven't replied. "
-                        "Don't mention this — just be natural, don't guilt-trip.]",
-                        mins);
+                    pos =
+                        (size_t)snprintf(buf, sizeof(buf),
+                                         "[READ RECEIPT: They read your last message %d min ago "
+                                         "but haven't replied. "
+                                         "Don't mention this — just be natural, don't guilt-trip.]",
+                                         mins);
                 }
             }
         } else if (!has_reply && delivered > 0 && read_date == 0 && age_seconds > 600) {
             /* Delivered but not read */
             pos = (size_t)snprintf(buf, sizeof(buf),
-                "[READ RECEIPT: Your last message was delivered but not yet read. They may be busy.]");
+                                   "[READ RECEIPT: Your last message was delivered but not yet "
+                                   "read. They may be busy.]");
         }
     }
 
@@ -937,9 +962,8 @@ hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
     return HU_OK;
 }
 #else
-hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
-                                             const char *contact_id, size_t contact_id_len,
-                                             char **out, size_t *out_len) {
+hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *contact_id,
+                                             size_t contact_id_len, char **out, size_t *out_len) {
     (void)alloc;
     (void)contact_id;
     (void)contact_id_len;
@@ -950,9 +974,9 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc,
     return HU_OK;
 }
 
-hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc,
-                                                  const char *contact_id, size_t contact_id_len,
-                                                  char **out, size_t *out_len) {
+hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const char *contact_id,
+                                                  size_t contact_id_len, char **out,
+                                                  size_t *out_len) {
     (void)alloc;
     (void)contact_id;
     (void)contact_id_len;
@@ -1026,8 +1050,7 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
                 sqlite3 *db = NULL;
                 if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK) {
                     sqlite3_stmt *stmt = NULL;
-                    if (sqlite3_prepare_v2(db,
-                                           "SELECT text, guid FROM message WHERE ROWID = ?", -1,
+                    if (sqlite3_prepare_v2(db, "SELECT text, guid FROM message WHERE ROWID = ?", -1,
                                            &stmt, NULL) == SQLITE_OK) {
                         sqlite3_bind_int64(stmt, 1, message_id);
                         if (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -1054,13 +1077,12 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
                     /* Row offset: count non-tapback messages after this one in the same chat.
                      * Gives us a reliable index from the bottom of the transcript view. */
                     sqlite3_stmt *off_stmt = NULL;
-                    const char *off_sql =
-                        "SELECT COUNT(*) FROM message m "
-                        "JOIN chat_message_join cmj ON m.ROWID = cmj.message_id "
-                        "WHERE cmj.chat_id = ("
-                        "  SELECT cmj2.chat_id FROM chat_message_join cmj2 "
-                        "  WHERE cmj2.message_id = ?1 LIMIT 1"
-                        ") AND m.ROWID > ?1 AND m.associated_message_type = 0";
+                    const char *off_sql = "SELECT COUNT(*) FROM message m "
+                                          "JOIN chat_message_join cmj ON m.ROWID = cmj.message_id "
+                                          "WHERE cmj.chat_id = ("
+                                          "  SELECT cmj2.chat_id FROM chat_message_join cmj2 "
+                                          "  WHERE cmj2.message_id = ?1 LIMIT 1"
+                                          ") AND m.ROWID > ?1 AND m.associated_message_type = 0";
                     if (sqlite3_prepare_v2(db, off_sql, -1, &off_stmt, NULL) == SQLITE_OK) {
                         sqlite3_bind_int64(off_stmt, 1, message_id);
                         if (sqlite3_step(off_stmt) == SQLITE_ROW)
@@ -1248,7 +1270,7 @@ static char *imessage_vt_get_latest_attachment_path(void *ctx, hu_allocator_t *a
 
 static bool imessage_vt_human_active_recently(void *ctx, const char *contact, size_t contact_len,
                                               int window_sec) {
-#if defined(HU_ENABLE_SQLITE) && !HU_IS_TEST
+#if defined(HU_ENABLE_SQLITE) && !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
     return hu_imessage_user_responded_recently(ctx, contact, contact_len, window_sec);
 #else
     (void)ctx;
@@ -1260,8 +1282,8 @@ static bool imessage_vt_human_active_recently(void *ctx, const char *contact, si
 }
 
 static hu_error_t imessage_vt_build_reaction_context(void *ctx, hu_allocator_t *alloc,
-                                                   const char *contact_id, size_t contact_id_len,
-                                                   char **out, size_t *out_len) {
+                                                     const char *contact_id, size_t contact_id_len,
+                                                     char **out, size_t *out_len) {
     (void)ctx;
     return hu_imessage_build_tapback_context(alloc, contact_id, contact_id_len, out, out_len);
 }
@@ -1626,14 +1648,24 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         return HU_OK;
     }
 
-    /* Include text messages, photo-only, and video-only messages.
-     * COALESCE: when text is NULL, use '[Video]' if video attachment else '[Photo]'.
-     * has_image/has_video: subqueries check attachment table for extensions.
+    /* Include text, photo-only, video-only, and audio-only (voice message) messages.
+     * COALESCE: when text is NULL, classify by attachment type:
+     *   audio (.caf/.m4a/.mp3/.aac/.opus) → '[Voice Message]'
+     *   video (.mov/.mp4/.m4v) → '[Video]'
+     *   image → '[Photo]'
+     * has_image/has_video/has_audio: subqueries check attachment table for extensions.
      * m.guid: message GUID for inline reply (associated_message_guid) tracking. */
     const char *sql =
         "SELECT m.ROWID, m.guid, "
         "  COALESCE(m.text, "
         "    (SELECT CASE "
+        "       WHEN (SELECT COUNT(*) FROM message_attachment_join maja "
+        "             JOIN attachment aa ON maja.attachment_id = aa.ROWID "
+        "             WHERE maja.message_id = m.ROWID AND aa.filename IS NOT NULL "
+        "             AND (LOWER(aa.filename) LIKE '%.caf' OR LOWER(aa.filename) LIKE '%.m4a' "
+        "               OR LOWER(aa.filename) LIKE '%.mp3' OR LOWER(aa.filename) LIKE '%.aac' "
+        "               OR LOWER(aa.filename) LIKE '%.opus')) > 0 "
+        "       THEN '[Voice Message]' "
         "       WHEN (SELECT COUNT(*) FROM message_attachment_join majv "
         "             JOIN attachment av ON majv.attachment_id = av.ROWID "
         "             WHERE majv.message_id = m.ROWID AND av.filename IS NOT NULL "
@@ -1655,7 +1687,13 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "   JOIN attachment a2 ON maj2.attachment_id = a2.ROWID "
         "   WHERE maj2.message_id = m.ROWID AND a2.filename IS NOT NULL "
         "   AND (LOWER(a2.filename) LIKE '%.mov' OR LOWER(a2.filename) LIKE '%.mp4' "
-        "     OR LOWER(a2.filename) LIKE '%.m4v')) > 0 AS has_video "
+        "     OR LOWER(a2.filename) LIKE '%.m4v')) > 0 AS has_video, "
+        "  (SELECT COUNT(*) FROM message_attachment_join maj3 "
+        "   JOIN attachment a3 ON maj3.attachment_id = a3.ROWID "
+        "   WHERE maj3.message_id = m.ROWID AND a3.filename IS NOT NULL "
+        "   AND (LOWER(a3.filename) LIKE '%.caf' OR LOWER(a3.filename) LIKE '%.m4a' "
+        "     OR LOWER(a3.filename) LIKE '%.mp3' OR LOWER(a3.filename) LIKE '%.aac' "
+        "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio "
         "FROM message m "
         "JOIN handle h ON m.handle_id = h.ROWID "
         "WHERE m.is_from_me = 0 AND m.associated_message_type = 0 "
@@ -1668,7 +1706,10 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "           OR LOWER(a.filename) LIKE '%.png' OR LOWER(a.filename) LIKE '%.heic' "
         "           OR LOWER(a.filename) LIKE '%.gif' OR LOWER(a.filename) LIKE '%.webp') "
         "           OR (LOWER(a.filename) LIKE '%.mov' OR LOWER(a.filename) LIKE '%.mp4' "
-        "             OR LOWER(a.filename) LIKE '%.m4v'))))) "
+        "             OR LOWER(a.filename) LIKE '%.m4v') "
+        "           OR (LOWER(a.filename) LIKE '%.caf' OR LOWER(a.filename) LIKE '%.m4a' "
+        "             OR LOWER(a.filename) LIKE '%.mp3' OR LOWER(a.filename) LIKE '%.aac' "
+        "             OR LOWER(a.filename) LIKE '%.opus'))))) "
         "ORDER BY m.ROWID ASC LIMIT ?";
 
     sqlite3_stmt *stmt = NULL;
@@ -1691,6 +1732,8 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         int participant_count = sqlite3_column_int(stmt, 4);
         int has_image = sqlite3_column_int(stmt, 5);
         int has_video = sqlite3_column_int(stmt, 6);
+        int has_audio = sqlite3_column_int(stmt, 7);
+        (void)has_audio;
 
         if (!text || !handle)
             continue;
@@ -1766,6 +1809,138 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
     return HU_OK;
 #endif
 }
+
+/* ── GIF search + download via Tenor API v2 ──────────────────────────── */
+
+#if !HU_IS_TEST && defined(HU_HTTP_CURL)
+#include "human/core/http.h"
+
+/* Simple JSON string extractor: find "key":"value" and return value.
+ * Writes into out (up to cap). Returns length or 0 on failure. */
+static size_t gif_json_extract(const char *json, size_t json_len, const char *key, char *out,
+                               size_t cap) {
+    size_t key_len = strlen(key);
+    for (size_t i = 0; i + key_len + 3 < json_len; i++) {
+        if (json[i] == '"' && memcmp(json + i + 1, key, key_len) == 0 &&
+            json[i + 1 + key_len] == '"') {
+            /* Skip ": or ":" */
+            size_t j = i + 1 + key_len + 1;
+            while (j < json_len && (json[j] == ':' || json[j] == ' '))
+                j++;
+            if (j < json_len && json[j] == '"') {
+                j++;
+                size_t start = j;
+                while (j < json_len && json[j] != '"')
+                    j++;
+                size_t vlen = j - start;
+                if (vlen >= cap)
+                    vlen = cap - 1;
+                memcpy(out, json + start, vlen);
+                out[vlen] = '\0';
+                return vlen;
+            }
+        }
+    }
+    return 0;
+}
+
+char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t query_len,
+                            const char *api_key, size_t api_key_len) {
+    if (!alloc || !query || query_len == 0 || !api_key || api_key_len == 0)
+        return NULL;
+
+    /* URL-encode the query (simple: replace spaces with +, skip unsafe chars) */
+    char encoded[256];
+    size_t eidx = 0;
+    for (size_t i = 0; i < query_len && eidx + 3 < sizeof(encoded); i++) {
+        if (query[i] == ' ') {
+            encoded[eidx++] = '+';
+        } else if ((query[i] >= 'a' && query[i] <= 'z') || (query[i] >= 'A' && query[i] <= 'Z') ||
+                   (query[i] >= '0' && query[i] <= '9') || query[i] == '-' || query[i] == '_' ||
+                   query[i] == '.') {
+            encoded[eidx++] = query[i];
+        }
+    }
+    encoded[eidx] = '\0';
+
+    char url[512];
+    int n = snprintf(url, sizeof(url),
+                     "https://tenor.googleapis.com/v2/search?q=%s&key=%.*s"
+                     "&client_key=human_app&limit=1&media_filter=gif",
+                     encoded, (int)api_key_len, api_key);
+    if (n < 0 || (size_t)n >= sizeof(url))
+        return NULL;
+
+    hu_http_response_t resp = {0};
+    hu_error_t err = hu_http_get(alloc, url, NULL, &resp);
+    if (err != HU_OK || resp.status_code != 200 || !resp.body || resp.body_len == 0) {
+        if (resp.owned && resp.body)
+            hu_http_response_free(alloc, &resp);
+        return NULL;
+    }
+
+    /* Extract the GIF URL from the JSON response.
+     * Tenor v2 nests it at results[0].media_formats.gif.url */
+    char gif_url[512];
+    size_t gif_url_len = 0;
+
+    /* Find "gif" media format section, then extract "url" within it */
+    const char *gif_section = NULL;
+    for (size_t i = 0; i + 5 < resp.body_len; i++) {
+        if (resp.body[i] == '"' && memcmp(resp.body + i, "\"gif\"", 5) == 0) {
+            gif_section = resp.body + i;
+            break;
+        }
+    }
+    if (gif_section) {
+        size_t remaining = resp.body_len - (size_t)(gif_section - resp.body);
+        gif_url_len = gif_json_extract(gif_section, remaining, "url", gif_url, sizeof(gif_url));
+    }
+
+    hu_http_response_free(alloc, &resp);
+
+    if (gif_url_len == 0)
+        return NULL;
+
+    /* Download the GIF to a temp file */
+    hu_http_response_t gif_resp = {0};
+    err = hu_http_get(alloc, gif_url, NULL, &gif_resp);
+    if (err != HU_OK || gif_resp.status_code != 200 || !gif_resp.body || gif_resp.body_len == 0) {
+        if (gif_resp.owned && gif_resp.body)
+            hu_http_response_free(alloc, &gif_resp);
+        return NULL;
+    }
+
+    char tmp_path[256];
+    snprintf(tmp_path, sizeof(tmp_path), "/tmp/human_gif_%u.gif", (unsigned)time(NULL));
+
+    FILE *f = fopen(tmp_path, "wb");
+    if (!f) {
+        hu_http_response_free(alloc, &gif_resp);
+        return NULL;
+    }
+    fwrite(gif_resp.body, 1, gif_resp.body_len, f);
+    fclose(f);
+    hu_http_response_free(alloc, &gif_resp);
+
+    size_t path_len = strlen(tmp_path);
+    char *result = (char *)alloc->alloc(alloc->ctx, path_len + 1);
+    if (!result)
+        return NULL;
+    memcpy(result, tmp_path, path_len + 1);
+    return result;
+}
+#else
+char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t query_len,
+                            const char *api_key, size_t api_key_len) {
+    (void)alloc;
+    (void)query;
+    (void)query_len;
+    (void)api_key;
+    (void)api_key_len;
+    return NULL;
+}
+#endif
 
 #if HU_IS_TEST
 hu_error_t hu_imessage_test_inject_mock(hu_channel_t *ch, const char *session_key,
