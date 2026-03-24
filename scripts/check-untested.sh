@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-SKIP_PATTERNS="^factory$|^meta_common$|^main$|^main_wasi$|_common$|^bootstrap$|^config_schema$|^config_getters$|^config_migrate$|^cp_admin$|^cp_chat$|^cp_config$|^cp_memory$|^cp_voice$|^thread_pool$|^agent_stream$|^superhuman_predictive$|^embedder_gemini_adapter$|^provider_http$|^data_|^embedded_registry$|^anticipatory$|^conversation_plan$|^info_asymmetry$|^theory_of_mind$|^voice_maturity$|^tokenizer_bpe$|^store_mem$|^sqlite_fts$|^sqlite_lucid$"
+SKIP_PATTERNS="^factory$|^meta_common$|^main$|^main_wasi$|_common$|^bootstrap$|^config_schema$|^config_getters$|^config_migrate$|^cp_admin$|^cp_chat$|^cp_config$|^cp_memory$|^cp_voice$|^cp_hula$|^cp_mcp$|^cp_turing$|^cp_voice_stream$|^thread_pool$|^agent_stream$|^superhuman_predictive$|^embedder_gemini_adapter$|^provider_http$|^data_|^embedded_registry$|^anticipatory$|^conversation_plan$|^info_asymmetry$|^theory_of_mind$|^voice_maturity$|^tokenizer_bpe$|^store_mem$|^sqlite_fts$|^sqlite_lucid$|^hula_compiler_examples$|^style_analyzer$|^timing_analyzer$|^accel$|^bff_memory$|^doc_ingest$|^meeting_transcribe$|^webrtc_dtls$"
 FOUND=0
 
 while IFS= read -r src; do
