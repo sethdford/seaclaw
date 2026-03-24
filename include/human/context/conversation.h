@@ -23,9 +23,9 @@ int64_t hu_conversation_parse_deadline(const char *msg, size_t msg_len, int64_t 
 
 /* Detect if message contains a commitment. Fills description_out, who_out ("me"/"them").
  * from_me: true if speaker is the user/agent. Returns true if commitment detected. */
-bool hu_conversation_detect_commitment(const char *msg, size_t msg_len,
-                                       char *description_out, size_t desc_cap,
-                                       char *who_out, size_t who_cap, bool from_me);
+bool hu_conversation_detect_commitment(const char *msg, size_t msg_len, char *description_out,
+                                       size_t desc_cap, char *who_out, size_t who_cap,
+                                       bool from_me);
 
 /* Group chat prompt hint — prepended to conversation_context when is_group is true */
 #define HU_GROUP_CHAT_PROMPT_HINT                     \
@@ -113,9 +113,11 @@ hu_emotional_state_t hu_conversation_detect_emotion(const hu_channel_history_ent
                                                     size_t count);
 
 /* LLM-backed emotion analysis with heuristic fallback when no provider or low confidence. */
-hu_emotional_state_t hu_conversation_detect_emotion_llm(
-    hu_allocator_t *alloc, hu_provider_t *provider, const char *model, size_t model_len,
-    const hu_channel_history_entry_t *entries, size_t count);
+hu_emotional_state_t hu_conversation_detect_emotion_llm(hu_allocator_t *alloc,
+                                                        hu_provider_t *provider, const char *model,
+                                                        size_t model_len,
+                                                        const hu_channel_history_entry_t *entries,
+                                                        size_t count);
 
 /* Energy level for matching emotional energy of incoming message.
  * Used to inject [ENERGY: ...] directive into the prompt. */
@@ -139,9 +141,8 @@ size_t hu_conversation_build_energy_directive(hu_energy_level_t energy, char *bu
 /* Extract small but significant details from a message. Returns count (0–3).
  * Heuristic extraction: named entities, places, preferences, life events.
  * Caller provides facts[][256] and significances[][128], max_facts typically 3. */
-int hu_conversation_extract_micro_moments(const char *msg, size_t msg_len,
-                                         char facts[][256], char significances[][128],
-                                         size_t max_facts);
+int hu_conversation_extract_micro_moments(const char *msg, size_t msg_len, char facts[][256],
+                                          char significances[][128], size_t max_facts);
 
 /* ── Inside joke detection (F19) ────────────────────────────────────────── */
 
@@ -158,7 +159,8 @@ bool hu_conversation_detect_inside_joke(const char *msg, size_t msg_len,
  * Static string; do not free. */
 const char *hu_conversation_classify_emotional_tone(const char *msg, size_t msg_len);
 
-/* Extract first 2-3 significant words (skip stopwords) as topic. Writes into out, returns length. */
+/* Extract first 2-3 significant words (skip stopwords) as topic. Writes into out, returns length.
+ */
 size_t hu_conversation_extract_topic(const char *msg, size_t msg_len, char *out, size_t cap);
 
 /* ── Growth celebration detection (F24) ─────────────────────────────────── */
@@ -167,9 +169,9 @@ size_t hu_conversation_extract_topic(const char *msg, size_t msg_len, char *out,
  * nailed it, crushed it, i passed, got promoted, it worked out, turned out well).
  * Extracts topic from context. Returns true if growth opportunity detected.
  * Fills topic_out and after_state_out for storage. */
-bool hu_conversation_detect_growth_opportunity(const char *msg, size_t msg_len,
-                                                char *topic_out, size_t topic_cap,
-                                                char *after_state_out, size_t after_cap);
+bool hu_conversation_detect_growth_opportunity(const char *msg, size_t msg_len, char *topic_out,
+                                               size_t topic_cap, char *after_state_out,
+                                               size_t after_cap);
 
 /* ── Avoidance pattern detection (F21) ─────────────────────────────────── */
 
@@ -177,8 +179,8 @@ bool hu_conversation_detect_growth_opportunity(const char *msg, size_t msg_len,
  * first 2-3 significant words (skip "i", "the", "a", etc.). Returns true if
  * topic change detected; fills topic_before (older) and topic_after (newer). */
 bool hu_conversation_detect_topic_change(const hu_channel_history_entry_t *entries, size_t count,
-                                         char *topic_before, size_t before_cap,
-                                         char *topic_after, size_t after_cap);
+                                         char *topic_before, size_t before_cap, char *topic_after,
+                                         size_t after_cap);
 
 /* ── Call escalation (F49) ───────────────────────────────────────────────── */
 
@@ -191,9 +193,9 @@ typedef struct hu_call_escalation {
     float score;
 } hu_call_escalation_t;
 
-hu_call_escalation_t hu_conversation_should_escalate_to_call(
-    const char *msg, size_t msg_len,
-    const hu_channel_history_entry_t *entries, size_t count);
+hu_call_escalation_t
+hu_conversation_should_escalate_to_call(const char *msg, size_t msg_len,
+                                        const hu_channel_history_entry_t *entries, size_t count);
 
 /* Build [CALL: ...] directive for prompt injection when classifier triggers.
  * Writes into buf (up to cap bytes). Returns bytes written (0 if invalid args). */
@@ -201,16 +203,17 @@ size_t hu_conversation_build_call_directive(const char *msg, size_t msg_len, cha
 
 /* ── Linguistic mirroring (F28) ──────────────────────────────────────────── */
 size_t hu_conversation_build_mirror_directive(const char *distinctive_words, size_t words_len,
-    uint32_t seed, float probability, char *buf, size_t cap);
+                                              uint32_t seed, float probability, char *buf,
+                                              size_t cap);
 
 /* ── Delayed follow-up topic extraction (F8) ─────────────────────────────── */
-size_t hu_conversation_extract_followup_topic(const char *msg, size_t msg_len,
-    char *topic_out, size_t cap);
+size_t hu_conversation_extract_followup_topic(const char *msg, size_t msg_len, char *topic_out,
+                                              size_t cap);
 
 /* ── Double-text decision (F9) ───────────────────────────────────────────── */
 bool hu_conversation_should_double_text(const char *last_response, size_t resp_len,
-    const hu_channel_history_entry_t *entries, size_t count,
-    uint8_t hour_local, uint32_t seed, float probability);
+                                        const hu_channel_history_entry_t *entries, size_t count,
+                                        uint8_t hour_local, uint32_t seed, float probability);
 
 /* ── Emotional escalation detection (F14) ────────────────────────────────── */
 
@@ -244,9 +247,9 @@ const char *hu_conversation_extract_vulnerability_topic(const char *msg, size_t 
 /* Check if contact has ever had an emotional_moment with this topic before.
  * Returns true if count == 0 (first time). If memory/db NULL, returns true. */
 #ifdef HU_ENABLE_SQLITE
-bool hu_conversation_is_first_time_topic(hu_memory_t *memory,
-                                         const char *contact_id, size_t contact_id_len,
-                                         const char *topic, size_t topic_len);
+bool hu_conversation_is_first_time_topic(hu_memory_t *memory, const char *contact_id,
+                                         size_t contact_id_len, const char *topic,
+                                         size_t topic_len);
 #endif
 
 typedef struct hu_vulnerability_state {
@@ -255,12 +258,14 @@ typedef struct hu_vulnerability_state {
     float intensity;
 } hu_vulnerability_state_t;
 
-hu_vulnerability_state_t hu_conversation_detect_first_time_vulnerability(
-    const char *msg, size_t msg_len,
-    hu_memory_t *memory, const char *contact_id, size_t contact_id_len);
+hu_vulnerability_state_t hu_conversation_detect_first_time_vulnerability(const char *msg,
+                                                                         size_t msg_len,
+                                                                         hu_memory_t *memory,
+                                                                         const char *contact_id,
+                                                                         size_t contact_id_len);
 
 size_t hu_conversation_build_vulnerability_directive(const hu_vulnerability_state_t *state,
-                                                    char *buf, size_t cap);
+                                                     char *buf, size_t cap);
 
 /* ── Context modifiers (F16) ─────────────────────────────────────────────── */
 
@@ -632,8 +637,8 @@ bool hu_conversation_is_media_message(const char *msg, size_t msg_len,
 
 /* Inject nonverbal sounds into transcript for TTS. Max 1 injection per message.
  * Modifies buf in-place. Returns new length. */
-size_t hu_conversation_inject_nonverbals(char *buf, size_t len, size_t cap,
-                                         uint32_t seed, bool enabled);
+size_t hu_conversation_inject_nonverbals(char *buf, size_t len, size_t cap, uint32_t seed,
+                                         bool enabled);
 
 /* F57: Multi-thread energy management — track per-conversation energy to
    prevent tone leakage across simultaneous chats. */
@@ -651,13 +656,55 @@ typedef struct hu_thread_energy_tracker {
 } hu_thread_energy_tracker_t;
 
 void hu_thread_energy_init(hu_thread_energy_tracker_t *tracker);
-void hu_thread_energy_update(hu_thread_energy_tracker_t *tracker,
-                             const char *contact_id, size_t cid_len,
-                             hu_energy_level_t energy, uint64_t now_ms);
+void hu_thread_energy_update(hu_thread_energy_tracker_t *tracker, const char *contact_id,
+                             size_t cid_len, hu_energy_level_t energy, uint64_t now_ms);
 hu_energy_level_t hu_thread_energy_get(const hu_thread_energy_tracker_t *tracker,
-                                        const char *contact_id, size_t cid_len);
+                                       const char *contact_id, size_t cid_len);
 size_t hu_thread_energy_build_isolation_hint(const hu_thread_energy_tracker_t *tracker,
-                                             const char *contact_id, size_t cid_len,
-                                             char *buf, size_t cap);
+                                             const char *contact_id, size_t cid_len, char *buf,
+                                             size_t cap);
+
+/* ── Cold restart detection ──────────────────────────────────────────── */
+
+/* Detect when there's been a significant time gap (>4 hours) between messages.
+ * Injects a directive telling the LLM to start fresh instead of picking up
+ * a stale conversation thread. Writes into buf, returns bytes written. */
+size_t hu_conversation_build_cold_restart_hint(const hu_channel_history_entry_t *entries,
+                                               size_t count, char *buf, size_t cap);
+
+/* ── Self-reaction on own messages ───────────────────────────────────── */
+
+/* Occasionally react to your own sent message (~2% chance).
+ * Self-deprecating haha on jokes/awkward messages, emphasis on strong statements.
+ * Only call for from_me=true messages. Returns HU_REACTION_NONE most of the time. */
+hu_reaction_type_t hu_conversation_classify_self_reaction(const char *msg, size_t msg_len,
+                                                          uint32_t seed);
+
+/* ── Group chat participant mention ──────────────────────────────────── */
+
+/* Build a hint for group chats that includes the sender's first name,
+ * encouraging natural name-addressing. Writes into buf, returns bytes written. */
+size_t hu_conversation_build_group_mention_hint(const char *first_name, size_t first_name_len,
+                                                bool is_group, char *buf, size_t cap);
+
+/* ── Link content awareness ──────────────────────────────────────────── */
+
+/* Detect URLs in inbound message and build prompt context for natural reactions.
+ * Writes into buf, returns bytes written. */
+size_t hu_conversation_build_link_context(const char *msg, size_t msg_len, char *buf, size_t cap);
+
+/* ── GIF decision engine ─────────────────────────────────────────────── */
+
+/* Decide whether to respond with a GIF instead of (or alongside) text.
+ * Returns true when message is humor/excitement/reaction-worthy AND
+ * probability roll passes. gif_probability: 0.0-1.0 (suggest 0.08-0.15). */
+bool hu_conversation_should_send_gif(const char *msg, size_t msg_len,
+                                     const hu_channel_history_entry_t *entries, size_t count,
+                                     uint32_t seed, float gif_probability);
+
+/* Build a prompt for the LLM to generate a GIF search query.
+ * Returns a prompt string asking for 2-4 word search terms. */
+size_t hu_conversation_build_gif_search_prompt(const char *msg, size_t msg_len, char *buf,
+                                               size_t cap);
 
 #endif /* HU_CONTEXT_CONVERSATION_H */

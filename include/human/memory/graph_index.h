@@ -82,4 +82,31 @@ hu_error_t hu_graph_index_entity_neighbors(const hu_graph_index_t *idx, const ch
                                            size_t key_len, const char **out_keys, size_t *out_count,
                                            size_t max_results);
 
+/* ── Spreading activation (SYNAPSE-inspired, arXiv:2501.xxxxx) ─────── */
+
+typedef struct hu_spread_activation_config {
+    double initial_energy; /* energy given to seed nodes (default: 1.0) */
+    double decay_factor;   /* energy decay per hop (default: 0.5) */
+    double threshold;      /* minimum energy to keep propagating (default: 0.05) */
+    uint32_t max_hops;     /* max propagation depth (default: 3) */
+    size_t max_activated;  /* cap on returned nodes (default: 16) */
+} hu_spread_activation_config_t;
+
+typedef struct hu_activated_node {
+    uint32_t node_idx;
+    double energy;
+} hu_activated_node_t;
+
+void hu_spread_activation_config_default(hu_spread_activation_config_t *cfg);
+
+/**
+ * Spread activation energy from seed nodes through entity + temporal edges.
+ * Returns the top-K activated nodes sorted by descending energy.
+ * out_nodes must be pre-allocated to at least max_activated entries.
+ */
+hu_error_t hu_graph_index_spread_activation(const hu_graph_index_t *idx,
+                                            const hu_spread_activation_config_t *cfg,
+                                            const uint32_t *seed_indices, size_t seed_count,
+                                            hu_activated_node_t *out_nodes, size_t *out_count);
+
 #endif /* HU_MEMORY_GRAPH_INDEX_H */

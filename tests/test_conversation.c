@@ -1,9 +1,9 @@
 #include "human/context/conversation.h"
 #include "human/core/allocator.h"
 #include "human/memory.h"
-#include "human/platform/calendar.h"
 #include "human/memory/emotional_moments.h"
 #include "human/persona.h"
+#include "human/platform/calendar.h"
 #include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
@@ -648,8 +648,8 @@ static void tone_neutral_returns_neutral(void) {
 
 static void tone_extract_topic_returns_significant_words(void) {
     char buf[64];
-    size_t len = hu_conversation_extract_topic("i was thinking about the project deadline", 42,
-                                               buf, sizeof(buf));
+    size_t len = hu_conversation_extract_topic("i was thinking about the project deadline", 42, buf,
+                                               sizeof(buf));
     HU_ASSERT_TRUE(len > 0);
     HU_ASSERT_TRUE(strstr(buf, "project") != NULL || strstr(buf, "deadline") != NULL);
 }
@@ -831,8 +831,8 @@ static void detect_commitment_ill_call_dentist(void) {
     char desc[256];
     char who[64];
     const char *msg = "i'll call the dentist";
-    bool ok = hu_conversation_detect_commitment(msg, strlen(msg), desc, sizeof(desc),
-                                                who, sizeof(who), false);
+    bool ok = hu_conversation_detect_commitment(msg, strlen(msg), desc, sizeof(desc), who,
+                                                sizeof(who), false);
     HU_ASSERT_TRUE(ok);
     HU_ASSERT_TRUE(strstr(desc, "call") != NULL || strstr(desc, "dentist") != NULL);
     HU_ASSERT_STR_EQ(who, "them");
@@ -842,8 +842,8 @@ static void detect_commitment_nice_weather_false(void) {
     char desc[256];
     char who[64];
     const char *msg = "nice weather today";
-    bool ok = hu_conversation_detect_commitment(msg, strlen(msg), desc, sizeof(desc),
-                                                who, sizeof(who), false);
+    bool ok = hu_conversation_detect_commitment(msg, strlen(msg), desc, sizeof(desc), who,
+                                                sizeof(who), false);
     HU_ASSERT_TRUE(!ok);
 }
 
@@ -936,8 +936,8 @@ static void detect_growth_ordinary_message_false(void) {
 static void detect_growth_null_input_returns_false(void) {
     char topic[128];
     char after[64];
-    bool ok = hu_conversation_detect_growth_opportunity(NULL, 0, topic, sizeof(topic),
-                                                        after, sizeof(after));
+    bool ok = hu_conversation_detect_growth_opportunity(NULL, 0, topic, sizeof(topic), after,
+                                                        sizeof(after));
     HU_ASSERT_TRUE(!ok);
 }
 
@@ -1992,8 +1992,8 @@ static void classify_selective_mode_downgrades_full_to_brief_for_no_question(voi
     /* Selective mode (default): downgrade FULL response when message has no '?' */
     uint32_t delay = 0;
     /* Using a narrative that might classify as FULL based on content */
-    hu_response_action_t action =
-        hu_conversation_classify_response("i think we should try something different this time", 50, NULL, 0, &delay);
+    hu_response_action_t action = hu_conversation_classify_response(
+        "i think we should try something different this time", 50, NULL, 0, &delay);
 
     /* Apply selective mode override logic manually */
     const char *rmode = "selective";
@@ -2144,6 +2144,130 @@ static void effect_substring_in_sentence(void) {
         hu_conversation_classify_effect("I just wanted to say happy birthday to you!", 47);
     HU_ASSERT_NOT_NULL(eff);
     HU_ASSERT_STR_EQ(eff, "confetti");
+}
+
+/* ── Expanded iMessage effects tests ────────────────────────────────── */
+
+static void effect_halloween_echo(void) {
+    const char *eff = hu_conversation_classify_effect("happy halloween!", 16);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "echo");
+}
+
+static void effect_valentines_heart(void) {
+    const char *eff = hu_conversation_classify_effect("Happy Valentine's Day!", 22);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "heart");
+}
+
+static void effect_christmas_confetti(void) {
+    const char *eff = hu_conversation_classify_effect("Merry Christmas!", 16);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "confetti");
+}
+
+static void effect_fourth_july_fireworks(void) {
+    const char *eff = hu_conversation_classify_effect("happy 4th of july!", 18);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "fireworks");
+}
+
+static void effect_anniversary_heart(void) {
+    const char *eff = hu_conversation_classify_effect("happy anniversary babe", 22);
+    HU_ASSERT_NOT_NULL(eff);
+    HU_ASSERT_STR_EQ(eff, "heart");
+}
+
+/* ── Cold restart tests ─────────────────────────────────────────────── */
+
+static void cold_restart_recent_messages_returns_zero(void) {
+    hu_channel_history_entry_t entries[3] = {
+        {.from_me = false, .text = "hey", .timestamp = "2026-03-24 14:00:00"},
+        {.from_me = true, .text = "hey whats up", .timestamp = "2026-03-24 14:01:00"},
+        {.from_me = false, .text = "not much", .timestamp = "2026-03-24 14:02:00"},
+    };
+    char buf[512];
+    size_t len = hu_conversation_build_cold_restart_hint(entries, 3, buf, sizeof(buf));
+    HU_ASSERT_EQ(len, 0u);
+}
+
+static void cold_restart_null_returns_zero(void) {
+    char buf[512];
+    size_t len = hu_conversation_build_cold_restart_hint(NULL, 0, buf, sizeof(buf));
+    HU_ASSERT_EQ(len, 0u);
+}
+
+/* ── Self-reaction tests ────────────────────────────────────────────── */
+
+static void self_reaction_returns_none_most_of_time(void) {
+    int none_count = 0;
+    for (uint32_t seed = 0; seed < 100; seed++) {
+        hu_reaction_type_t r = hu_conversation_classify_self_reaction("haha nice", 9, seed);
+        if (r == HU_REACTION_NONE)
+            none_count++;
+    }
+    HU_ASSERT_TRUE(none_count >= 90);
+}
+
+static void self_reaction_null_returns_none(void) {
+    hu_reaction_type_t r = hu_conversation_classify_self_reaction(NULL, 0, 42);
+    HU_ASSERT_EQ(r, HU_REACTION_NONE);
+}
+
+/* ── Group mention hint tests ───────────────────────────────────────── */
+
+static void group_mention_non_group_returns_zero(void) {
+    char buf[256];
+    size_t len = hu_conversation_build_group_mention_hint("Mike", 4, false, buf, sizeof(buf));
+    HU_ASSERT_EQ(len, 0u);
+}
+
+static void group_mention_group_returns_content(void) {
+    char buf[256];
+    size_t len = hu_conversation_build_group_mention_hint("Mike", 4, true, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "Mike") != NULL);
+}
+
+/* ── Link context tests ─────────────────────────────────────────────── */
+
+static void link_context_no_url_returns_zero(void) {
+    char buf[512];
+    size_t len = hu_conversation_build_link_context("hey how are you", 15, buf, sizeof(buf));
+    HU_ASSERT_EQ(len, 0u);
+}
+
+static void link_context_with_url_returns_content(void) {
+    char buf[512];
+    const char *msg = "check this out https://example.com/cool";
+    size_t len = hu_conversation_build_link_context(msg, strlen(msg), buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "LINK") != NULL);
+}
+
+/* ── GIF decision tests ─────────────────────────────────────────────── */
+
+static void gif_decision_sad_message_returns_false(void) {
+    bool r = hu_conversation_should_send_gif("i'm so sad today", 16, NULL, 0, 42, 1.0f);
+    HU_ASSERT_FALSE(r);
+}
+
+static void gif_decision_funny_message_prob_one_returns_true(void) {
+    bool r = hu_conversation_should_send_gif("lmao that's hilarious", 21, NULL, 0, 42, 1.0f);
+    HU_ASSERT_TRUE(r);
+}
+
+static void gif_decision_question_returns_false(void) {
+    bool r = hu_conversation_should_send_gif("what time is the meeting?", 25, NULL, 0, 42, 1.0f);
+    HU_ASSERT_FALSE(r);
+}
+
+static void gif_search_prompt_nonempty(void) {
+    char buf[512];
+    size_t len =
+        hu_conversation_build_gif_search_prompt("lmao that's so funny", 20, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "GIF") != NULL || strstr(buf, "search") != NULL);
 }
 
 /* ── Banned AI phrases expansion tests ──────────────────────────────── */
@@ -2656,8 +2780,8 @@ static void vulnerability_cancer_no_prior_first_time(void) {
     HU_ASSERT_NOT_NULL(mem.ctx);
 
     const char *msg = "i got diagnosed with cancer";
-    hu_vulnerability_state_t state = hu_conversation_detect_first_time_vulnerability(
-        msg, strlen(msg), &mem, "contact_a", 9);
+    hu_vulnerability_state_t state =
+        hu_conversation_detect_first_time_vulnerability(msg, strlen(msg), &mem, "contact_a", 9);
 
     HU_ASSERT_TRUE(state.first_time);
     HU_ASSERT_NOT_NULL(state.topic_category);
@@ -2672,13 +2796,13 @@ static void vulnerability_cancer_with_prior_not_first_time(void) {
     HU_ASSERT_NOT_NULL(mem.ctx);
 
     /* Record prior emotional moment with topic "illness" */
-    hu_error_t err = hu_emotional_moment_record(&alloc, &mem, "contact_b", 9, "illness", 7,
-                                                "stressed", 8, 0.8f);
+    hu_error_t err =
+        hu_emotional_moment_record(&alloc, &mem, "contact_b", 9, "illness", 7, "stressed", 8, 0.8f);
     HU_ASSERT_EQ(err, HU_OK);
 
     const char *msg = "i got diagnosed with cancer";
-    hu_vulnerability_state_t state = hu_conversation_detect_first_time_vulnerability(
-        msg, strlen(msg), &mem, "contact_b", 9);
+    hu_vulnerability_state_t state =
+        hu_conversation_detect_first_time_vulnerability(msg, strlen(msg), &mem, "contact_b", 9);
 
     HU_ASSERT_FALSE(state.first_time);
     HU_ASSERT_NOT_NULL(state.topic_category);
@@ -2689,8 +2813,8 @@ static void vulnerability_cancer_with_prior_not_first_time(void) {
 
 static void vulnerability_whats_for_dinner_no_topic_first_time_false(void) {
     const char *msg = "what's for dinner";
-    hu_vulnerability_state_t state = hu_conversation_detect_first_time_vulnerability(
-        msg, strlen(msg), NULL, "contact_c", 9);
+    hu_vulnerability_state_t state =
+        hu_conversation_detect_first_time_vulnerability(msg, strlen(msg), NULL, "contact_c", 9);
 
     /* No topic → first_time is false (out struct init), topic_category NULL */
     HU_ASSERT_NULL(state.topic_category);
@@ -2811,12 +2935,17 @@ static void double_text_energy_boost_increases_chance(void) {
 static void double_text_suppresses_when_too_many_from_me(void) {
     hu_channel_history_entry_t entries[4];
     memset(entries, 0, sizeof(entries));
-    entries[0].from_me = true; snprintf(entries[0].text, sizeof(entries[0].text), "first");
-    entries[1].from_me = true; snprintf(entries[1].text, sizeof(entries[1].text), "second");
-    entries[2].from_me = true; snprintf(entries[2].text, sizeof(entries[2].text), "third");
-    entries[3].from_me = true; snprintf(entries[3].text, sizeof(entries[3].text), "fourth");
+    entries[0].from_me = true;
+    snprintf(entries[0].text, sizeof(entries[0].text), "first");
+    entries[1].from_me = true;
+    snprintf(entries[1].text, sizeof(entries[1].text), "second");
+    entries[2].from_me = true;
+    snprintf(entries[2].text, sizeof(entries[2].text), "third");
+    entries[3].from_me = true;
+    snprintf(entries[3].text, sizeof(entries[3].text), "fourth");
     const char *resp = "hey what's up";
-    HU_ASSERT_FALSE(hu_conversation_should_double_text(resp, strlen(resp), entries, 4, 14, 42, 1.0f));
+    HU_ASSERT_FALSE(
+        hu_conversation_should_double_text(resp, strlen(resp), entries, 4, 14, 42, 1.0f));
 }
 
 /* ── Test suite registration ─────────────────────────────────────────── */
@@ -3222,4 +3351,33 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(double_text_zero_probability_returns_false);
     HU_RUN_TEST(double_text_energy_boost_increases_chance);
     HU_RUN_TEST(double_text_suppresses_when_too_many_from_me);
+
+    /* Expanded iMessage effects */
+    HU_RUN_TEST(effect_halloween_echo);
+    HU_RUN_TEST(effect_valentines_heart);
+    HU_RUN_TEST(effect_christmas_confetti);
+    HU_RUN_TEST(effect_fourth_july_fireworks);
+    HU_RUN_TEST(effect_anniversary_heart);
+
+    /* Cold restart detection */
+    HU_RUN_TEST(cold_restart_recent_messages_returns_zero);
+    HU_RUN_TEST(cold_restart_null_returns_zero);
+
+    /* Self-reaction classifier */
+    HU_RUN_TEST(self_reaction_returns_none_most_of_time);
+    HU_RUN_TEST(self_reaction_null_returns_none);
+
+    /* Group mention hint */
+    HU_RUN_TEST(group_mention_non_group_returns_zero);
+    HU_RUN_TEST(group_mention_group_returns_content);
+
+    /* Link context */
+    HU_RUN_TEST(link_context_no_url_returns_zero);
+    HU_RUN_TEST(link_context_with_url_returns_content);
+
+    /* GIF decision */
+    HU_RUN_TEST(gif_decision_sad_message_returns_false);
+    HU_RUN_TEST(gif_decision_funny_message_prob_one_returns_true);
+    HU_RUN_TEST(gif_decision_question_returns_false);
+    HU_RUN_TEST(gif_search_prompt_nonempty);
 }

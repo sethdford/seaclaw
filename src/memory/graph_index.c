@@ -216,3 +216,110 @@ hu_error_t hu_graph_index_entity_neighbors(const hu_graph_index_t *idx, const ch
     }
     return HU_OK;
 }
+
+/* ── Spreading activation ─────────────────────────────────────────────── */
+
+void hu_spread_activation_config_default(hu_spread_activation_config_t *cfg) {
+    if (!cfg)
+        return;
+    cfg->initial_energy = 1.0;
+    cfg->decay_factor = 0.5;
+    cfg->threshold = 0.05;
+    cfg->max_hops = 3;
+    cfg->max_activated = 16;
+}
+
+hu_error_t hu_graph_index_spread_activation(const hu_graph_index_t *idx,
+                                            const hu_spread_activation_config_t *cfg,
+                                            const uint32_t *seed_indices, size_t seed_count,
+                                            hu_activated_node_t *out_nodes, size_t *out_count) {
+    if (!idx || !cfg || !out_nodes || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_count = 0;
+    if (seed_count == 0 || idx->node_count == 0)
+        return HU_OK;
+
+    size_t nc = idx->node_count;
+    if (nc > HU_GRAPH_MAX_ENTRIES)
+        nc = HU_GRAPH_MAX_ENTRIES;
+
+    double energy[HU_GRAPH_MAX_ENTRIES];
+    memset(energy, 0, nc * sizeof(double));
+
+    for (size_t i = 0; i < seed_count; i++) {
+        if (seed_indices[i] < nc)
+            energy[seed_indices[i]] = cfg->initial_energy;
+    }
+
+    for (uint32_t hop = 0; hop < cfg->max_hops; hop++) {
+        double next[HU_GRAPH_MAX_ENTRIES];
+        memset(next, 0, nc * sizeof(double));
+
+        for (size_t n = 0; n < nc; n++) {
+            if (energy[n] < cfg->threshold)
+                continue;
+            double spread = energy[n] * cfg->decay_factor;
+            const hu_graph_node_t *node = &idx->nodes[n];
+
+            /* Spread through entity edges */
+            for (size_t e = 0; e < node->entity_edge_count; e++) {
+                uint32_t ti = node->entity_edges[e].target_idx;
+                if (ti < nc)
+                    next[ti] += spread * (double)node->entity_edges[e].weight;
+            }
+
+            /* Spread through temporal edges */
+            if (node->temporal_prev >= 0 && (size_t)node->temporal_prev < nc)
+                next[node->temporal_prev] += spread * 0.7;
+            if (node->temporal_next >= 0 && (size_t)node->temporal_next < nc)
+                next[node->temporal_next] += spread * 0.7;
+
+            /* Spread through causal edges */
+            if (node->causal_next >= 0 && (size_t)node->causal_next < nc)
+                next[node->causal_next] += spread * 0.9;
+        }
+
+        for (size_t n = 0; n < nc; n++) {
+            energy[n] += next[n];
+            if (energy[n] > cfg->initial_energy * 2.0)
+                energy[n] = cfg->initial_energy * 2.0;
+        }
+    }
+
+    /* Collect activated nodes above threshold, excluding seeds */
+    hu_activated_node_t candidates[HU_GRAPH_MAX_ENTRIES];
+    size_t cand_count = 0;
+    for (size_t n = 0; n < nc; n++) {
+        if (energy[n] < cfg->threshold)
+            continue;
+        bool is_seed = false;
+        for (size_t s = 0; s < seed_count; s++) {
+            if (seed_indices[s] == (uint32_t)n) {
+                is_seed = true;
+                break;
+            }
+        }
+        if (is_seed)
+            continue;
+        candidates[cand_count].node_idx = (uint32_t)n;
+        candidates[cand_count].energy = energy[n];
+        cand_count++;
+    }
+
+    /* Sort by descending energy (simple insertion sort — bounded by MAX_ENTRIES) */
+    for (size_t i = 1; i < cand_count; i++) {
+        hu_activated_node_t tmp = candidates[i];
+        size_t j = i;
+        while (j > 0 && candidates[j - 1].energy < tmp.energy) {
+            candidates[j] = candidates[j - 1];
+            j--;
+        }
+        candidates[j] = tmp;
+    }
+
+    size_t out_cap = cfg->max_activated < cand_count ? cfg->max_activated : cand_count;
+    for (size_t i = 0; i < out_cap; i++)
+        out_nodes[i] = candidates[i];
+    *out_count = out_cap;
+    return HU_OK;
+}

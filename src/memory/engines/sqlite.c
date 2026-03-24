@@ -12,6 +12,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "human/memory/entropy_gate.h"
+#include "human/memory/graph_index.h"
 #include "human/memory/sql_common.h"
 
 #define HU_SQLITE_BUSY_TIMEOUT_MS 5000
@@ -19,6 +21,8 @@
 typedef struct hu_sqlite_memory {
     sqlite3 *db;
     hu_allocator_t *alloc;
+    hu_graph_index_t graph_index;
+    bool graph_initialized;
 } hu_sqlite_memory_t;
 
 static const char *const schema_parts[] = {
@@ -85,7 +89,8 @@ static const char *const schema_parts[] = {
     "created_at INTEGER NOT NULL,"
     "followed_up_at INTEGER)",
     "CREATE INDEX IF NOT EXISTS idx_commitments_contact ON commitments(contact_id)",
-    "CREATE INDEX IF NOT EXISTS idx_commitments_deadline ON commitments(deadline) WHERE status='pending'",
+    "CREATE INDEX IF NOT EXISTS idx_commitments_deadline ON commitments(deadline) WHERE "
+    "status='pending'",
     "CREATE TABLE IF NOT EXISTS temporal_patterns("
     "contact_id TEXT NOT NULL,"
     "day_of_week INTEGER NOT NULL,"
@@ -100,7 +105,8 @@ static const char *const schema_parts[] = {
     "scheduled_at INTEGER NOT NULL,"
     "sent INTEGER DEFAULT 0)",
     "CREATE INDEX IF NOT EXISTS idx_delayed_followups_contact ON delayed_followups(contact_id)",
-    "CREATE INDEX IF NOT EXISTS idx_delayed_followups_scheduled ON delayed_followups(scheduled_at) WHERE sent=0",
+    "CREATE INDEX IF NOT EXISTS idx_delayed_followups_scheduled ON delayed_followups(scheduled_at) "
+    "WHERE sent=0",
     "CREATE TABLE IF NOT EXISTS avoidance_patterns("
     "contact_id TEXT NOT NULL,"
     "topic TEXT NOT NULL,"
@@ -137,7 +143,8 @@ static const char *const schema_parts[] = {
     "day_of_week INTEGER,"
     "hour INTEGER,"
     "observed_at INTEGER NOT NULL)",
-    "CREATE INDEX IF NOT EXISTS idx_pattern_observations_contact ON pattern_observations(contact_id)",
+    "CREATE INDEX IF NOT EXISTS idx_pattern_observations_contact ON "
+    "pattern_observations(contact_id)",
     "CREATE TABLE IF NOT EXISTS style_fingerprints("
     "contact_id TEXT NOT NULL PRIMARY KEY,"
     "uses_lowercase INTEGER DEFAULT 0,"
@@ -212,7 +219,8 @@ static const char *const schema_parts[] = {
     "basis TEXT,"
     "target_date INTEGER,"
     "verified INTEGER)",
-    "CREATE INDEX IF NOT EXISTS idx_emotional_predictions_contact ON emotional_predictions(contact_id)",
+    "CREATE INDEX IF NOT EXISTS idx_emotional_predictions_contact ON "
+    "emotional_predictions(contact_id)",
     "CREATE TABLE IF NOT EXISTS boundaries("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
     "contact_id TEXT,"
@@ -250,7 +258,8 @@ static const char *const schema_parts[] = {
     "expires_at INTEGER,"
     "fired INTEGER DEFAULT 0,"
     "created_at INTEGER NOT NULL)",
-    "CREATE INDEX IF NOT EXISTS idx_prospective_trigger ON prospective_memories(trigger_type, trigger_value)",
+    "CREATE INDEX IF NOT EXISTS idx_prospective_trigger ON prospective_memories(trigger_type, "
+    "trigger_value)",
     "CREATE INDEX IF NOT EXISTS idx_prospective_expires ON prospective_memories(expires_at)",
     "CREATE TABLE IF NOT EXISTS prospective_tasks("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -261,7 +270,8 @@ static const char *const schema_parts[] = {
     "fired INTEGER DEFAULT 0,"
     "created_at INTEGER NOT NULL,"
     "fired_at INTEGER)",
-    "CREATE INDEX IF NOT EXISTS idx_prospective_tasks_trigger ON prospective_tasks(trigger_type, trigger_value) WHERE fired=0",
+    "CREATE INDEX IF NOT EXISTS idx_prospective_tasks_trigger ON prospective_tasks(trigger_type, "
+    "trigger_value) WHERE fired=0",
     "CREATE TABLE IF NOT EXISTS emotional_residue("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
     "episode_id INTEGER,"
@@ -285,10 +295,16 @@ static const char *const schema_parts[] = {
     "CREATE INDEX IF NOT EXISTS idx_feed_items_source ON feed_items(source)",
     "CREATE INDEX IF NOT EXISTS idx_feed_items_contact ON feed_items(contact_id)",
     "CREATE INDEX IF NOT EXISTS idx_feed_items_ingested ON feed_items(ingested_at)",
-    "CREATE UNIQUE INDEX IF NOT EXISTS idx_feed_items_dedup ON feed_items(source, substr(content, 1, 200))",
-    "CREATE VIRTUAL TABLE IF NOT EXISTS feed_items_fts USING fts5(content, source, content_type, content=feed_items, content_rowid=id)",
-    "CREATE TRIGGER IF NOT EXISTS feed_items_ai AFTER INSERT ON feed_items BEGIN INSERT INTO feed_items_fts(rowid, content, source, content_type) VALUES (new.id, new.content, new.source, new.content_type); END",
-    "CREATE TRIGGER IF NOT EXISTS feed_items_ad AFTER DELETE ON feed_items BEGIN INSERT INTO feed_items_fts(feed_items_fts, rowid, content, source, content_type) VALUES ('delete', old.id, old.content, old.source, old.content_type); END",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_feed_items_dedup ON feed_items(source, substr(content, "
+    "1, 200))",
+    "CREATE VIRTUAL TABLE IF NOT EXISTS feed_items_fts USING fts5(content, source, content_type, "
+    "content=feed_items, content_rowid=id)",
+    "CREATE TRIGGER IF NOT EXISTS feed_items_ai AFTER INSERT ON feed_items BEGIN INSERT INTO "
+    "feed_items_fts(rowid, content, source, content_type) VALUES (new.id, new.content, new.source, "
+    "new.content_type); END",
+    "CREATE TRIGGER IF NOT EXISTS feed_items_ad AFTER DELETE ON feed_items BEGIN INSERT INTO "
+    "feed_items_fts(feed_items_fts, rowid, content, source, content_type) VALUES ('delete', "
+    "old.id, old.content, old.source, old.content_type); END",
     "CREATE TABLE IF NOT EXISTS research_findings("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
     "source TEXT,"
@@ -350,7 +366,8 @@ static const char *const schema_parts[] = {
     "context TEXT,"
     "timestamp INTEGER NOT NULL)",
     "CREATE INDEX IF NOT EXISTS idx_behavioral_feedback_contact ON behavioral_feedback(contact_id)",
-    "CREATE INDEX IF NOT EXISTS idx_behavioral_feedback_timestamp ON behavioral_feedback(timestamp)",
+    "CREATE INDEX IF NOT EXISTS idx_behavioral_feedback_timestamp ON "
+    "behavioral_feedback(timestamp)",
     "CREATE TABLE IF NOT EXISTS self_evaluations("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
     "contact_id TEXT NOT NULL,"
@@ -381,7 +398,8 @@ static const char *const schema_parts[] = {
     "status TEXT DEFAULT 'open',"
     "last_update_at INTEGER NOT NULL,"
     "created_at INTEGER NOT NULL)",
-    "CREATE INDEX IF NOT EXISTS idx_active_threads_contact_status ON active_threads(contact_id, status)",
+    "CREATE INDEX IF NOT EXISTS idx_active_threads_contact_status ON active_threads(contact_id, "
+    "status)",
     "CREATE TABLE IF NOT EXISTS interaction_quality("
     "id INTEGER PRIMARY KEY,"
     "contact_id TEXT NOT NULL,"
@@ -391,7 +409,8 @@ static const char *const schema_parts[] = {
     "recovery_sent INTEGER DEFAULT 0,"
     "recovery_at INTEGER,"
     "timestamp INTEGER NOT NULL)",
-    "CREATE INDEX IF NOT EXISTS idx_interaction_quality_contact_recovery ON interaction_quality(contact_id, recovery_sent)",
+    "CREATE INDEX IF NOT EXISTS idx_interaction_quality_contact_recovery ON "
+    "interaction_quality(contact_id, recovery_sent)",
     "CREATE TABLE IF NOT EXISTS life_narration_events("
     "id INTEGER PRIMARY KEY,"
     "event_type TEXT NOT NULL,"
@@ -571,6 +590,12 @@ static hu_error_t impl_store(void *ctx, const char *key, size_t key_len, const c
 
     if (rc != SQLITE_DONE)
         return HU_ERR_MEMORY_STORE;
+
+    /* Feed into MAGMA graph index for multi-dimensional reranking */
+    if (self->graph_initialized && content && content_len > 0)
+        (void)hu_graph_index_add(&self->graph_index, key, key_len, content, content_len,
+                                 (int64_t)time(NULL));
+
     return HU_OK;
 }
 
@@ -705,6 +730,63 @@ static hu_error_t impl_recall(void *ctx, hu_allocator_t *alloc, const char *quer
             }
             sqlite3_finalize(stmt);
             if (count > 0) {
+                /* MAGMA graph reranking: boost results connected by entity/temporal edges */
+                if (self->graph_initialized && count > 1) {
+                    const char **rkeys =
+                        (const char **)alloc->alloc(alloc->ctx, count * sizeof(const char *));
+                    size_t *rkl = (size_t *)alloc->alloc(alloc->ctx, count * sizeof(size_t));
+                    double *scores = (double *)alloc->alloc(alloc->ctx, count * sizeof(double));
+                    if (rkeys && rkl && scores) {
+                        for (size_t ri = 0; ri < count; ri++) {
+                            rkeys[ri] = entries[ri].key;
+                            rkl[ri] = entries[ri].key_len;
+                            scores[ri] = isnan(entries[ri].score) ? 0.5 : entries[ri].score;
+                        }
+                        (void)hu_graph_index_rerank(&self->graph_index, query, query_len, rkeys,
+                                                    rkl, scores, count);
+                        for (size_t ri = 0; ri < count; ri++)
+                            entries[ri].score = scores[ri];
+                    }
+                    if (rkeys)
+                        alloc->free(alloc->ctx, (void *)rkeys, count * sizeof(const char *));
+                    if (rkl)
+                        alloc->free(alloc->ctx, rkl, count * sizeof(size_t));
+                    if (scores)
+                        alloc->free(alloc->ctx, scores, count * sizeof(double));
+                }
+
+                /* Entropy gate: drop low-information results */
+                if (count > 2) {
+                    hu_entropy_gate_config_t eg_cfg = hu_entropy_gate_config_default();
+                    eg_cfg.threshold = 0.15;
+                    hu_memory_chunk_t *echunks = (hu_memory_chunk_t *)alloc->alloc(
+                        alloc->ctx, count * sizeof(hu_memory_chunk_t));
+                    if (echunks) {
+                        for (size_t ei = 0; ei < count; ei++) {
+                            echunks[ei].text = entries[ei].content;
+                            echunks[ei].text_len = entries[ei].content_len;
+                            echunks[ei].entropy = 0.0;
+                            echunks[ei].passed = true;
+                        }
+                        size_t passed = 0;
+                        if (hu_entropy_gate_filter(&eg_cfg, echunks, count, &passed) == HU_OK &&
+                            passed > 0 && passed < count) {
+                            size_t wp = 0;
+                            for (size_t ei = 0; ei < count; ei++) {
+                                if (echunks[ei].passed) {
+                                    if (wp != ei)
+                                        entries[wp] = entries[ei];
+                                    wp++;
+                                } else {
+                                    free_entry(alloc, &entries[ei]);
+                                }
+                            }
+                            count = wp;
+                        }
+                        alloc->free(alloc->ctx, echunks, count * sizeof(hu_memory_chunk_t));
+                    }
+                }
+
                 *out = entries;
                 *out_count = count;
                 return HU_OK;
@@ -890,6 +972,8 @@ static bool impl_health_check(void *ctx) {
 
 static void impl_deinit(void *ctx) {
     hu_sqlite_memory_t *self = (hu_sqlite_memory_t *)ctx;
+    if (self->graph_initialized)
+        hu_graph_index_deinit(&self->graph_index);
     if (self->db)
         sqlite3_close(self->db);
     self->alloc->free(self->alloc->ctx, self, sizeof(hu_sqlite_memory_t));
@@ -1057,6 +1141,7 @@ hu_memory_t hu_sqlite_memory_create(hu_allocator_t *alloc, const char *db_path) 
     }
     self->db = db;
     self->alloc = alloc;
+    self->graph_initialized = (hu_graph_index_init(&self->graph_index, alloc) == HU_OK);
     return (hu_memory_t){
         .ctx = self,
         .vtable = &sqlite_vtable,
