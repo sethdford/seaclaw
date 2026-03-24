@@ -11,9 +11,9 @@
 #include <dirent.h>
 #include <errno.h>
 #endif
+#include <time.h>
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
-#include <time.h>
 #endif
 
 #define EVAL_MAX_TASKS               256
