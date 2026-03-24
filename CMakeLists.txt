@@ -389,6 +389,8 @@ set(HU_CORE_SOURCES
     src/gateway/cp_hula.c
     src/gateway/cp_voice.c
     src/gateway/cp_voice_stream.c
+    src/gateway/cp_turing.c
+    src/gateway/cp_mcp.c
     src/gateway/event_bridge.c
     src/gateway/tenant.c
     src/runtime/native.c
@@ -776,6 +778,7 @@ list(APPEND HU_CORE_SOURCES
     src/voice/realtime.c
     src/voice/duplex.c
     src/voice/session.c
+    src/voice/turn_signal.c
     src/providers/embedded.c
 )
 
@@ -1899,6 +1902,7 @@ set(HU_TEST_SOURCES
     tests/test_multimodal_audio.c
     tests/test_multimodal_video.c
     tests/test_voice_duplex.c
+    tests/test_turn_signal.c
     tests/test_voice_rt_openai.c
     tests/test_voice_session.c
     tests/test_autonomy.c
@@ -2040,7 +2044,6 @@ set(HU_TEST_SOURCES
     tests/test_weather_fetch.c
     tests/test_save_for_later.c
     tests/test_news_health_email.c
-    tests/test_intelligence_reflection.c
     tests/test_feedback.c
     tests/test_intelligence_skills.c
     tests/test_skill_unified.c
@@ -2072,7 +2075,6 @@ set(HU_TEST_SOURCES
     tests/test_metacognition.c
     tests/test_skill_routing.c
     tests/test_dual_process.c
-    tests/test_episodic.c
 )
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c
