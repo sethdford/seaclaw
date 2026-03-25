@@ -86,7 +86,7 @@ jobs:
           enable-curl: "true"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -95,7 +95,7 @@ jobs:
 
       - name: Upload fleet output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: redteam-fleet-offline
           path: build/redteam-fleet-reports/
@@ -115,7 +115,7 @@ jobs:
           enable-curl: "true"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -130,7 +130,7 @@ jobs:
             --output eval_results.json
 
       - name: Upload results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: eval-results
           path: eval_results.json
