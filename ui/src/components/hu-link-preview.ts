@@ -19,9 +19,12 @@ export class ScLinkPreview extends LitElement {
   @state() private _fetched = false;
   private _observer: IntersectionObserver | null = null;
   private _lastUrl = "";
+  private _fetchAbort: AbortController | null = null;
 
   override updated(changed: Map<string, unknown>): void {
     if (changed.has("url") && this.url !== this._lastUrl) {
+      this._fetchAbort?.abort();
+      this._fetchAbort = null;
       this._lastUrl = this.url;
       this._fetched = false;
       this._observer?.disconnect();
@@ -252,6 +255,8 @@ export class ScLinkPreview extends LitElement {
   }
 
   override disconnectedCallback(): void {
+    this._fetchAbort?.abort();
+    this._fetchAbort = null;
     this._observer?.disconnect();
     this._observer = null;
     super.disconnectedCallback();
@@ -286,11 +291,15 @@ export class ScLinkPreview extends LitElement {
 
   private async _fetchMetadata(): Promise<void> {
     if (!this.url) return;
+    this._fetchAbort?.abort();
+    const ac = new AbortController();
+    this._fetchAbort = ac;
     this.loading = true;
     this.requestUpdate();
     try {
       const res = await fetch(
         `${METADATA_API}?url=${encodeURIComponent(this.url)}&screenshot=false&video=false`,
+        { signal: ac.signal },
       );
       const data = (await res.json()) as {
         data?: {
@@ -301,6 +310,7 @@ export class ScLinkPreview extends LitElement {
         };
         status?: string;
       };
+      if (!this.isConnected || this._fetchAbort !== ac) return;
       if (data?.status === "success" && data.data) {
         const d = data.data;
         if (d.title) this.title = d.title;
@@ -310,11 +320,15 @@ export class ScLinkPreview extends LitElement {
       } else {
         this.failed = true;
       }
-    } catch {
-      this.failed = true;
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      if (this.isConnected && this._fetchAbort === ac) this.failed = true;
     } finally {
-      this.loading = false;
-      this.requestUpdate();
+      if (this._fetchAbort === ac) this._fetchAbort = null;
+      if (this.isConnected) {
+        this.loading = false;
+        this.requestUpdate();
+      }
     }
   }
 

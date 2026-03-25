@@ -59,7 +59,8 @@ hu_error_t hu_provider_degrade_chat(hu_provider_degradation_config_t *config,
         char *msg = hu_degradation_honest_failure_msg(alloc, &out->response.content_len);
         if (!msg) return HU_ERR_OUT_OF_MEMORY;
         out->response.content = msg;
-        return HU_OK;
+        /* Non-OK so CLI/scripts exit non-zero while still returning user-visible text in out->response. */
+        return HU_ERR_PROVIDER_RESPONSE;
     }
 
     /* Try primary model */
@@ -99,5 +100,5 @@ hu_error_t hu_provider_degrade_chat(hu_provider_degradation_config_t *config,
     char *msg = hu_degradation_honest_failure_msg(alloc, &out->response.content_len);
     if (!msg) return HU_ERR_OUT_OF_MEMORY;
     out->response.content = msg;
-    return HU_OK;
+    return HU_ERR_PROVIDER_RESPONSE;
 }

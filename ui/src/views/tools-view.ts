@@ -77,7 +77,7 @@ export class ScToolsView extends GatewayAwareLitElement {
         font-size: var(--hu-text-base);
         color: var(--hu-text);
       }
-      @container (max-width: 480px) {
+      @container (max-width: 480px) /* --hu-breakpoint-sm */ {
         .expand-panel {
           padding: var(--hu-space-sm);
         }

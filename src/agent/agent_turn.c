@@ -26,6 +26,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/agent/compaction.h"
 #include "human/agent/dag.h"
 #include "human/agent/dag_executor.h"
+#include "human/agent/degradation.h"
 #include "human/agent/dispatcher.h"
 #include "human/agent/hula.h"
 #include "human/agent/hula_compiler.h"
@@ -2257,16 +2258,19 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 
         /* Provider graceful degradation: try primary -> fallback -> honest failure */
+        hu_degrade_strategy_t degrade_strategy = HU_DEGRADE_PRIMARY;
         if (agent->degradation_config.enabled) {
             hu_degradation_result_t degrade_result;
             err = hu_provider_degrade_chat(&agent->degradation_config, &agent->provider,
                                            agent->alloc, &req, turn_model, turn_model_len,
                                            turn_temp, &degrade_result);
             resp = degrade_result.response;
+            degrade_strategy = degrade_result.strategy_used;
         } else {
             err = agent->provider.vtable->chat(agent->provider.ctx, agent->alloc, &req, turn_model,
                                                turn_model_len, turn_temp, &resp);
         }
+        (void)degrade_strategy;
         uint64_t llm_duration_ms = hu_agent_internal_clock_diff_ms(llm_start, clock());
         if (llm_span)
             hu_otlp_span_end(llm_span, (err == HU_OK) ? 1 : 2);
@@ -2281,6 +2285,45 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
         }
 
+        /* Degradation honest failure: show message but return non-OK for CLI exit codes. */
+        if (err == HU_ERR_PROVIDER_RESPONSE && agent->degradation_config.enabled &&
+            degrade_strategy == HU_DEGRADE_HONEST_FAILURE && resp.content && resp.content_len > 0) {
+            char *dup = hu_strndup(agent->alloc, resp.content, resp.content_len);
+            size_t dup_len = dup ? strlen(dup) : 0;
+            hu_chat_response_free(agent->alloc, &resp);
+            memset(&resp, 0, sizeof(resp));
+            if (dup) {
+                *response_out = dup;
+                if (response_len_out)
+                    *response_len_out = dup_len;
+                (void)hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT, dup, dup_len, NULL, 0,
+                                                       NULL, 0);
+                {
+                    hu_observer_event_t ev = {.tag = HU_OBSERVER_EVENT_ERR, .data = {{0}}};
+                    ev.data.err.component = "agent";
+                    ev.data.err.message = "provider degraded (honest failure)";
+                    HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
+                }
+                hu_agent_clear_current_for_tools();
+                if (dpo_rejected_resp)
+                    agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
+                                       dpo_rejected_resp_len + 1);
+                if (system_prompt)
+                    agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+                if (plan_ctx)
+                    agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+                if (routed_specs)
+                    agent->alloc->free(agent->alloc->ctx, routed_specs,
+                                       routed_specs_count * sizeof(hu_tool_spec_t));
+                if (turn_cache)
+                    hu_tool_cache_destroy(agent->alloc, turn_cache);
+                if (agent->turn_arena)
+                    hu_arena_reset(agent->turn_arena);
+                return HU_ERR_PROVIDER_RESPONSE;
+            }
+            err = HU_ERR_OUT_OF_MEMORY;
+        }
+
         if (err != HU_OK) {
             {
                 hu_observer_event_t ev = {.tag = HU_OBSERVER_EVENT_ERR, .data = {{0}}};
@@ -2288,6 +2331,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 ev.data.err.message = "provider chat failed";
                 HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
             }
+            hu_chat_response_free(agent->alloc, &resp);
+            memset(&resp, 0, sizeof(resp));
             hu_agent_clear_current_for_tools();
             if (dpo_rejected_resp)
                 agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp, dpo_rejected_resp_len + 1);

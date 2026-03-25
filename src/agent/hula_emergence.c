@@ -1,6 +1,7 @@
 #include "human/agent/hula_emergence.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/platform.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,31 +22,54 @@ typedef struct {
     size_t count;
 } emergence_bucket_t;
 
-static hu_error_t ensure_dir(const char *path) {
-#if defined(__unix__) || defined(__APPLE__)
-    if (mkdir(path, 0755) != 0 && errno != EEXIST)
-        return HU_ERR_IO;
-    return HU_OK;
-#else
-    (void)path;
-    return HU_ERR_NOT_SUPPORTED;
-#endif
-}
-
 static void default_trace_dir(char *buf, size_t cap) {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+    const char *p = getenv("USERPROFILE");
+    if (!p || !p[0]) {
+        buf[0] = '\0';
+        return;
+    }
+    (void)snprintf(buf, cap, "%s/.human/hula_traces", p);
+#else
     const char *home = getenv("HOME");
     if (!home || !home[0]) {
         buf[0] = '\0';
         return;
     }
     (void)snprintf(buf, cap, "%s/.human/hula_traces", home);
+#endif
+}
+
+/* Create ~/.human then ~/.human/hula_traces (or USERPROFILE equivalent). Single dir when explicit. */
+static hu_error_t hula_trace_prepare_dir(const char *dir_buf, bool is_default_path) {
+    if (is_default_path) {
+        const char *slash = strrchr(dir_buf, '/');
+        if (!slash || slash == dir_buf)
+            return HU_ERR_INVALID_ARGUMENT;
+        size_t plen = (size_t)(slash - dir_buf);
+        if (plen >= 512)
+            return HU_ERR_INVALID_ARGUMENT;
+        char parent[512];
+        memcpy(parent, dir_buf, plen);
+        parent[plen] = '\0';
+        if (hu_platform_mkdir(parent, 0755) != 0 && errno != EEXIST)
+            return HU_ERR_IO;
+    }
+    if (hu_platform_mkdir(dir_buf, 0755) != 0 && errno != EEXIST)
+        return HU_ERR_IO;
+    return HU_OK;
 }
 
 hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
                                  const char *trace_json, size_t trace_json_len,
                                  const char *program_name, size_t program_name_len, bool success,
                                  const char *program_json, size_t program_json_len) {
-#if !(defined(__unix__) || defined(__APPLE__))
+#if defined(HU_IS_TEST)
+    if (!trace_dir)
+        return HU_OK;
+#endif
+
+#if !((defined(__unix__) || defined(__APPLE__)) || (defined(_WIN32) && !defined(__CYGWIN__)))
     (void)alloc;
     (void)trace_dir;
     (void)trace_json;
@@ -57,11 +81,8 @@ hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
     (void)program_json_len;
     return HU_ERR_NOT_SUPPORTED;
 #else
-#if defined(HU_IS_TEST)
-    if (!trace_dir)
-        return HU_OK;
-#endif
     char dir_buf[512];
+    bool is_default = false;
     if (trace_dir && trace_dir[0]) {
         size_t dl = strlen(trace_dir);
         if (dl >= sizeof(dir_buf))
@@ -69,10 +90,11 @@ hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
         memcpy(dir_buf, trace_dir, dl + 1);
     } else {
         default_trace_dir(dir_buf, sizeof(dir_buf));
+        is_default = true;
     }
     if (!dir_buf[0])
         return HU_ERR_NOT_FOUND;
-    if (ensure_dir(dir_buf) != HU_OK)
+    if (hula_trace_prepare_dir(dir_buf, is_default) != HU_OK)
         return HU_ERR_IO;
 
     time_t t = time(NULL);
@@ -123,7 +145,7 @@ hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
     fclose(f);
     hu_str_free(alloc, file_body);
     return HU_OK;
-#endif
+#endif /* platform */
 }
 
 static int bucket_find_or_add(emergence_bucket_t *buckets, size_t *bucket_count, const char *key) {
@@ -321,7 +343,7 @@ hu_error_t hu_hula_emergence_promote(hu_allocator_t *alloc, const char *skills_d
         if (snprintf(base, sizeof(base), "%s/.human/skills", home) >= (int)sizeof(base))
             return HU_ERR_INVALID_ARGUMENT;
     }
-    if (ensure_dir(base) != HU_OK)
+    if (hula_trace_prepare_dir(base, true) != HU_OK)
         return HU_ERR_IO;
 
     /* Build HuLa program: seq of calls with empty args */

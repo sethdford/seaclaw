@@ -76,6 +76,21 @@ hu_error_t hu_control_send_response(hu_ws_conn_t *conn, const char *id,
     bool ok, const char *payload_json);
 ```
 
+## WebSocket RPC (Control UI)
+
+JSON-RPC-style messages over the `/ws` WebSocket after auth. Method names use `noun.verb`. Selected methods (see `src/gateway/control_protocol.c` for the full table):
+
+| Method | Purpose |
+| ------ | ------- |
+| `connect`, `health`, `capabilities` | Session and capability discovery |
+| `chat.send`, `chat.history`, `chat.abort` | Agent chat |
+| `config.get`, `config.set`, `config.schema`, `config.apply` | Configuration |
+| `metrics.snapshot` | Health + BTH counters (includes `hula_tool_turns`) |
+| `hula.traces.list` | List `*.json` trace files (POSIX gateway; directory = `HU_HULA_TRACE_DIR` or `~/.human/hula_traces`) |
+| `hula.traces.get` | Load one trace file. Params: **`id`** (filename). Optional **`trace_offset`**, **`trace_limit`** (include either to page the `trace` array; max limit 1000). Response may include **`trace_total_steps`**, **`trace_truncated`**, **`trace_returned_count`**. |
+| `hula.traces.delete` | Remove a trace file by `id` |
+| `hula.traces.analytics` | Aggregate counts over trace directory |
+
 ## Push (`gateway/push.h`)
 
 ```c

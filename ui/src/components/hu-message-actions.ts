@@ -46,8 +46,8 @@ export class ScMessageActions extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: var(--hu-icon-lg);
-      height: var(--hu-icon-lg);
+      min-width: 2.75rem;
+      min-height: 2.75rem;
       padding: 0;
       background: transparent;
       border: none;

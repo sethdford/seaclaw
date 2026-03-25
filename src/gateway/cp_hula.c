@@ -3,6 +3,7 @@
 #include "cp_internal.h"
 #include "human/agent/hula_analytics.h"
 #include "human/core/string.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,6 +54,61 @@ static bool safe_trace_basename(const char *name) {
             return false;
     }
     return true;
+}
+
+static bool hula_traces_params_want_trace_window(const hu_json_value_t *params) {
+    if (!params || params->type != HU_JSON_OBJECT)
+        return false;
+    return hu_json_object_get(params, "trace_limit") != NULL ||
+           hu_json_object_get(params, "trace_offset") != NULL;
+}
+
+/* Optional trace array window: steal moved elements into a new array, replace `trace` on record. */
+static void hula_traces_apply_trace_window(hu_allocator_t *alloc, hu_json_value_t *record,
+                                           const hu_json_value_t *params, hu_json_value_t *wrap) {
+    if (!alloc || !record || record->type != HU_JSON_OBJECT || !params || !wrap)
+        return;
+    hu_json_value_t *tr = hu_json_object_get(record, "trace");
+    if (!tr || tr->type != HU_JSON_ARRAY)
+        return;
+
+    size_t total = tr->data.array.len;
+    double offd = hu_json_get_number(params, "trace_offset", 0.0);
+    double limd = hu_json_get_number(params, "trace_limit", 200.0);
+    size_t off = 0;
+    if (offd == offd && offd > 0.0 && offd < 1e15)
+        off = (size_t)offd;
+    if (off > total)
+        off = total;
+    size_t lim = 200;
+    if (limd == limd && limd > 0.0 && limd < 1e9)
+        lim = (size_t)limd;
+    if (lim > 1000)
+        lim = 1000;
+    size_t avail = total > off ? total - off : 0;
+    size_t cnt = avail < lim ? avail : lim;
+
+    hu_json_value_t *na = hu_json_array_new(alloc);
+    if (!na)
+        return;
+    for (size_t j = 0; j < cnt; j++) {
+        hu_json_value_t *it = tr->data.array.items[off + j];
+        if (hu_json_array_push(alloc, na, it) != HU_OK) {
+            hu_json_free(alloc, na);
+            return;
+        }
+        tr->data.array.items[off + j] = NULL;
+    }
+    if (hu_json_object_set(alloc, record, "trace", na) != HU_OK) {
+        hu_json_free(alloc, na);
+        return;
+    }
+    bool trunc = (off + cnt < total);
+    hu_json_object_set(alloc, wrap, "trace_total_steps", hu_json_number_new(alloc, (double)total));
+    hu_json_object_set(alloc, wrap, "trace_offset", hu_json_number_new(alloc, (double)off));
+    hu_json_object_set(alloc, wrap, "trace_limit", hu_json_number_new(alloc, (double)lim));
+    hu_json_object_set(alloc, wrap, "trace_returned_count", hu_json_number_new(alloc, (double)cnt));
+    hu_json_object_set(alloc, wrap, "trace_truncated", hu_json_bool_new(alloc, trunc));
 }
 
 hu_error_t cp_hula_traces_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -176,9 +232,12 @@ hu_error_t cp_hula_traces_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     }
     cp_json_set_str(alloc, obj, "id", id);
     hu_json_value_t *parsed = NULL;
-    if (hu_json_parse(alloc, buf, rd, &parsed) == HU_OK && parsed)
+    if (hu_json_parse(alloc, buf, rd, &parsed) == HU_OK && parsed) {
+        if (parsed->type == HU_JSON_OBJECT && params &&
+            hula_traces_params_want_trace_window(params))
+            hula_traces_apply_trace_window(alloc, parsed, params, obj);
         hu_json_object_set(alloc, obj, "record", parsed);
-    else
+    } else
         hu_json_object_set(alloc, obj, "raw", hu_json_string_new(alloc, buf, rd));
     alloc->free(alloc->ctx, buf, (size_t)sz + 1);
 

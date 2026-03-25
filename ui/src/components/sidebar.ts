@@ -282,6 +282,7 @@ export class ScSidebar extends LitElement {
       align-items: center;
       gap: var(--hu-space-sm);
       width: 100%;
+      min-height: 2.75rem;
       padding: var(--hu-space-sm) var(--hu-space-md);
       background: transparent;
       border: none;

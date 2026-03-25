@@ -247,7 +247,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
       /* ── Responsive (container queries) ─────────────────── */
 
-      @container (max-width: 768px) {
+      @container (max-width: 768px) /* --hu-breakpoint-lg */ {
         .bento {
           grid-template-columns: 1fr;
           grid-template-areas:
@@ -272,7 +272,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
         }
       }
 
-      @container (max-width: 480px) {
+      @container (max-width: 480px) /* --hu-breakpoint-sm */ {
         :host {
           padding: var(--hu-space-md) var(--hu-space-lg);
         }
@@ -326,7 +326,8 @@ export class ScOverviewView extends GatewayAwareLitElement {
       }
       .show-more-btn {
         margin-top: var(--hu-space-sm);
-        padding: var(--hu-space-2xs) var(--hu-space-sm);
+        min-height: 2.75rem;
+        padding: var(--hu-space-xs) var(--hu-space-md);
         font-size: var(--hu-text-xs);
         font-weight: var(--hu-weight-medium);
         color: var(--hu-accent-tertiary-text);
@@ -347,7 +348,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
         outline: 2px solid var(--hu-accent-tertiary);
         outline-offset: 2px;
       }
-      @container (max-width: 768px) {
+      @container (max-width: 768px) /* --hu-breakpoint-lg */ {
         .quick-actions {
           grid-template-columns: 1fr;
         }
@@ -376,6 +377,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
   @state() private connectionStatus: "connected" | "connecting" | "disconnected" = "disconnected";
   private _scrollEntranceObserver: IntersectionObserver | null = null;
   private _countUpDone = false;
+  private _countUpCleanups: Array<() => void> = [];
 
   private _connectionStatusHandler = ((e: CustomEvent<string>) => {
     const s = e.detail as "connected" | "connecting" | "disconnected";
@@ -412,6 +414,8 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    for (const stop of this._countUpCleanups) stop();
+    this._countUpCleanups = [];
     this._scrollEntranceObserver?.disconnect();
     this._scrollEntranceObserver = null;
     this.gateway?.removeEventListener("status", this._connectionStatusHandler);
@@ -465,7 +469,9 @@ export class ScOverviewView extends GatewayAwareLitElement {
     const duration = 800;
     elements.forEach((el) => {
       const target = parseInt(el.dataset.countTarget ?? "0", 10);
-      if (!Number.isNaN(target)) animateCountUp(el, target, duration);
+      if (!Number.isNaN(target)) {
+        this._countUpCleanups.push(animateCountUp(el, target, duration));
+      }
     });
   }
 

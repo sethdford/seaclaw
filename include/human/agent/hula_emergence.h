@@ -10,11 +10,13 @@ struct hu_skillforge;
 
 /* Write a trace record JSON file under dir (or ~/.human/hula_traces when dir is NULL).
  * No-op in HU_IS_TEST when dir is NULL.
- * When program_json is non-NULL, embeds it under "program" so `human hula replay` can re-execute. */
+ * When program_json is non-NULL, embeds it under "program" so `human hula replay` can re-execute.
+ * When program_source is non-NULL, embeds it under "program_source" (raw model / source text). */
 hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
                                  const char *trace_json, size_t trace_json_len,
                                  const char *program_name, size_t program_name_len, bool success,
-                                 const char *program_json, size_t program_json_len);
+                                 const char *program_json, size_t program_json_len,
+                                 const char *program_source, size_t program_source_len);
 
 /* Scan JSON trace files in trace_dir; find n-grams of tool names (length ngram_len) that
  * appear at least min_occurrences times across files. Caller frees *out_patterns and *out_counts. */

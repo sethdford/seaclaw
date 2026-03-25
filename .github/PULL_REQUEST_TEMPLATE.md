@@ -2,3 +2,5 @@
 - [ ] No ASan errors
 - [ ] Code follows naming conventions
 - [ ] One concern per change
+- [ ] Agent / provider / eval / harness changes: targeted tests or `scripts/agent-preflight.sh`; before merge consider `scripts/redteam-eval-fleet.sh` (see `docs/eval-runs/README.md`)
+- [ ] Meaningful prompt or model-behavior changes: note eval or live fleet evidence in the PR (scores or “not run — why”)

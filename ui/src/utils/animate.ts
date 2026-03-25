@@ -22,31 +22,42 @@ export function prefersReducedMotion(): boolean {
 /**
  * Animates a numeric value from 0 to target in an element.
  * Respects prefers-reduced-motion: skips animation and shows final value immediately.
+ * @returns Cancel function — call on disconnect to avoid updating detached DOM.
  */
-export function animateCountUp(element: HTMLElement, target: number, duration = 800): void {
-  if (prefersReducedMotion()) {
-    const format = element.dataset.format || "number";
-    if (format === "percent") element.textContent = target + "%";
-    else if (format === "time") element.textContent = target + "ms";
-    else element.textContent = target.toLocaleString();
-    return;
-  }
-  const start = performance.now();
+export function animateCountUp(element: HTMLElement, target: number, duration = 800): () => void {
   const format = element.dataset.format || "number";
+  const apply = (value: number): void => {
+    if (format === "percent") element.textContent = value + "%";
+    else if (format === "time") element.textContent = value + "ms";
+    else element.textContent = value.toLocaleString();
+  };
 
-  function update(now: number) {
+  if (prefersReducedMotion()) {
+    apply(target);
+    return () => {};
+  }
+
+  let cancelled = false;
+  let rafId = 0;
+  const start = performance.now();
+
+  function update(now: number): void {
+    if (cancelled) return;
     const elapsed = now - start;
     const progress = Math.min(elapsed / duration, 1);
     const eased = 1 - Math.pow(1 - progress, 3);
     const current = Math.round(target * eased);
-
-    if (format === "percent") element.textContent = current + "%";
-    else if (format === "time") element.textContent = current + "ms";
-    else element.textContent = current.toLocaleString();
-
-    if (progress < 1) requestAnimationFrame(update);
+    apply(current);
+    if (progress < 1) {
+      rafId = requestAnimationFrame(update);
+    }
   }
-  requestAnimationFrame(update);
+
+  rafId = requestAnimationFrame(update);
+  return () => {
+    cancelled = true;
+    cancelAnimationFrame(rafId);
+  };
 }
 
 /** Matches --hu-duration-normal (200ms). */

@@ -289,6 +289,12 @@ export class ScCommandPalette extends LitElement {
   }
 
   private _onKeyDown(e: KeyboardEvent): void {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      this._close();
+      return;
+    }
+
     const items = this.filteredCommands;
     if (items.length === 0) return;
 
@@ -304,10 +310,6 @@ export class ScCommandPalette extends LitElement {
       case "Enter":
         e.preventDefault();
         this._execute(items[this.selectedIndex]);
-        break;
-      case "Escape":
-        e.preventDefault();
-        this._close();
         break;
       default:
         break;
@@ -338,7 +340,15 @@ export class ScCommandPalette extends LitElement {
           <div class="input-wrap">
             <input
               class="input"
+              id="hu-command-combobox"
               type="text"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded=${items.length > 0 ? "true" : "false"}
+              aria-controls="hu-command-listbox"
+              aria-activedescendant=${items.length > 0
+                ? `hu-command-opt-${this.selectedIndex}`
+                : nothing}
               placeholder="Search commands..."
               aria-label="Search commands"
               .value=${this.query}
@@ -348,12 +358,15 @@ export class ScCommandPalette extends LitElement {
               @keydown=${this._onKeyDown}
             />
           </div>
-          <div class="results">
+          <div class="results" id="hu-command-listbox" role="listbox" aria-label="Commands">
             ${items.length === 0
-              ? html`<div class="item" style="color: var(--hu-text-muted)">No results</div>`
+              ? html`<div class="item" role="status" style="color: var(--hu-text-muted)">
+                  No results
+                </div>`
               : items.map(
                   (cmd, i) => html`
                     <div
+                      id="hu-command-opt-${i}"
                       class="item ${i === this.selectedIndex ? "selected" : ""}"
                       role="option"
                       aria-selected=${i === this.selectedIndex}

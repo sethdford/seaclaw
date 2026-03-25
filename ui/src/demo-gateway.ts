@@ -1820,20 +1820,46 @@ export class DemoGatewayClient extends EventTarget {
             { id: "cafebabe_ops.json", size: 890, mtime: Math.floor(Date.now() / 1000) - 3600 },
           ],
         };
-      case "hula.traces.get":
-        return {
-          id: "deadbeef_demo.json",
+      case "hula.traces.get": {
+        const fullTrace = [
+          { id: "n1", op: "call", tool: "echo", status: "done", output_len: 5 },
+          { id: "n2", op: "emit", status: "done", output_len: 3 },
+          { id: "n3", op: "call", tool: "search", status: "done", output_len: 12 },
+          { id: "n4", op: "call", tool: "analyze", status: "done", output_len: 8 },
+          { id: "n5", op: "call", tool: "write", status: "done", output_len: 2 },
+          { id: "n6", op: "emit", status: "done", output_len: 1 },
+        ];
+        const hasWin =
+          params &&
+          (typeof params.trace_limit === "number" || typeof params.trace_offset === "number");
+        const off =
+          typeof params?.trace_offset === "number" && params.trace_offset >= 0
+            ? Math.floor(params.trace_offset as number)
+            : 0;
+        let lim = 200;
+        if (typeof params?.trace_limit === "number" && (params.trace_limit as number) > 0) {
+          lim = Math.min(1000, Math.floor(params.trace_limit as number));
+        }
+        const slice = hasWin ? fullTrace.slice(off, off + lim) : fullTrace;
+        const out: Record<string, unknown> = {
+          id: (params?.id as string) ?? "deadbeef_demo.json",
           record: {
             version: 1,
             success: true,
             ts: Math.floor(Date.now() / 1000),
             program_name: "demo",
-            trace: [
-              { id: "n1", op: "call", tool: "echo", status: "done", output_len: 5 },
-              { id: "n2", op: "emit", status: "done", output_len: 3 },
-            ],
+            trace: slice,
           },
         };
+        if (hasWin) {
+          out.trace_total_steps = fullTrace.length;
+          out.trace_offset = off;
+          out.trace_limit = lim;
+          out.trace_returned_count = slice.length;
+          out.trace_truncated = off + slice.length < fullTrace.length;
+        }
+        return out;
+      }
       case "hula.traces.delete":
         return { deleted: true };
       case "hula.traces.analytics":

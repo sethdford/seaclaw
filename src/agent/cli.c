@@ -898,6 +898,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     if (!single_message_mode)
         print_banner(prov_name, model, tools_count);
 
+    /* `-m` / `--message`: propagate turn errors to process exit (scripts, harness, CI smoke). */
+    hu_error_t single_message_exit = HU_OK;
+
     int one_shot = single_message_mode;
     while (1) {
         char *line = NULL;
@@ -999,6 +1002,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
 
         pthread_join(tid, NULL);
         err = tctx.err;
+        if (single_message_mode)
+            single_message_exit = err;
 
         if (err == HU_ERR_CANCELLED) {
             if (use_ansi)
@@ -1025,6 +1030,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         fflush(stdout);
         err = hu_agent_turn_stream(&agent, line, line_len, cli_stream_token, NULL, &response,
                                    &response_len);
+        if (single_message_mode)
+            single_message_exit = err;
         if (use_ansi && !cli_stream_started) {
             printf("                    \r");
             fflush(stdout);
@@ -1089,8 +1096,10 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_awareness_deinit(&cli_awareness);
     hu_bus_deinit(&cli_bus);
 #ifdef HU_HAS_VOICE_CHANNEL
-    hu_channel_voice_destroy(&cli_voice_ch);
+        hu_channel_voice_destroy(&cli_voice_ch);
 #endif
     hu_config_deinit(&cfg);
+    if (single_message_mode && single_message_exit != HU_OK)
+        return single_message_exit;
     return HU_OK;
 }

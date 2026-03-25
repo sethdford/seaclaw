@@ -320,7 +320,8 @@ export class ScApp extends LitElement {
       background: color-mix(in srgb, var(--hu-on-accent) 20%, transparent);
       border: 1px solid color-mix(in srgb, var(--hu-on-accent) 40%, transparent);
       color: var(--hu-on-accent);
-      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      min-height: 2.75rem;
+      padding: var(--hu-space-xs) var(--hu-space-md);
       border-radius: var(--hu-radius-sm);
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font);
@@ -335,6 +336,11 @@ export class ScApp extends LitElement {
       display: none;
     }
 
+    /*
+     * Shell layout breakpoints (599 / 904 / 1240px) are intentional for sidebar +
+     * mobile nav; they differ slightly from token ladder (480 / 640 / 768 / 1024)
+     * used in views via @container. Keep both — do not merge without retesting grid.
+     */
     /* Compact (<600px): mobile bottom nav, single column */
     @media (max-width: 599px) /* --hu-breakpoint-compact */ {
       .layout {

@@ -788,12 +788,18 @@ static const char *browser_use_parameters_json(void *ctx) {
     return k_params;
 }
 
+static void browser_use_deinit(void *ctx, hu_allocator_t *alloc) {
+    if (!ctx || !alloc)
+        return;
+    alloc->free(alloc->ctx, ctx, sizeof(hu_browser_use_ctx_t));
+}
+
 static const hu_tool_vtable_t browser_use_vtable = {
     .execute = browser_use_execute,
     .name = browser_use_name,
     .description = browser_use_description,
     .parameters_json = browser_use_parameters_json,
-    .deinit = NULL,
+    .deinit = browser_use_deinit,
 };
 
 hu_error_t hu_browser_use_create(hu_allocator_t *alloc, hu_tool_t *out) {

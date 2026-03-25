@@ -30,7 +30,9 @@ typedef struct hu_degradation_result {
 } hu_degradation_result_t;
 
 /* Try primary model, fall back to fallback model, then honest failure.
- * When disabled or config is NULL, behaves identically to a direct provider->vtable->chat. */
+ * When disabled or config is NULL, behaves identically to a direct provider->vtable->chat.
+ * Returns HU_ERR_PROVIDER_RESPONSE when emitting the honest-failure message (circuit open or
+ * exhausted retries); out->response.content still holds the user-visible string. */
 hu_error_t hu_provider_degrade_chat(hu_provider_degradation_config_t *config,
                                     hu_provider_t *provider, hu_allocator_t *alloc,
                                     const hu_chat_request_t *request,

@@ -136,11 +136,104 @@ static void gateway_hula_traces_env_dir_list_get_analytics_delete(void) {
     (void)rmdir(tmpdir);
 }
 
+static const char *trace_first_id(hu_allocator_t *alloc, const char *wrap_json, size_t wrap_len) {
+    static char buf[64];
+    buf[0] = '\0';
+    hu_json_value_t *root = NULL;
+    if (hu_json_parse(alloc, wrap_json, wrap_len, &root) != HU_OK || !root)
+        return buf;
+    hu_json_value_t *rec = hu_json_object_get(root, "record");
+    hu_json_value_t *tr = rec ? hu_json_object_get(rec, "trace") : NULL;
+    if (tr && tr->type == HU_JSON_ARRAY && tr->data.array.len > 0) {
+        hu_json_value_t *row = tr->data.array.items[0];
+        if (row && row->type == HU_JSON_OBJECT) {
+            const char *id = hu_json_get_string(row, "id");
+            if (id)
+                (void)snprintf(buf, sizeof(buf), "%s", id);
+        }
+    }
+    hu_json_free(alloc, root);
+    return buf;
+}
+
+static void gateway_hula_traces_get_respects_trace_limit_offset(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_control_protocol_t proto = {.alloc = &alloc, .ws = NULL, .event_seq = 0, .app_ctx = NULL};
+
+    char tmpl[] = "/tmp/hgwXXXXXX";
+    char *tmpdir = mkdtemp(tmpl);
+    HU_ASSERT_NOT_NULL(tmpdir);
+    HU_ASSERT_EQ(setenv("HU_HULA_TRACE_DIR", tmpdir, 1), 0);
+
+    char path[512];
+    int pn = snprintf(path, sizeof(path), "%s/window_case.json", tmpdir);
+    HU_ASSERT_TRUE(pn > 0 && (size_t)pn < sizeof(path));
+    FILE *wf = fopen(path, "w");
+    HU_ASSERT_NOT_NULL(wf);
+    static const char wdoc[] =
+        "{\"version\":1,\"program_name\":\"win\",\"trace\":["
+        "{\"id\":\"t0\"},{\"id\":\"t1\"},{\"id\":\"t2\"},{\"id\":\"t3\"},{\"id\":\"t4\"}]}";
+    HU_ASSERT_EQ(fwrite(wdoc, 1, sizeof(wdoc) - 1, wf), sizeof(wdoc) - 1);
+    HU_ASSERT_EQ(fclose(wf), 0);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_json_value_t *req = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc,
+                    "{\"params\":{\"id\":\"window_case.json\",\"trace_limit\":2}}",
+                    strlen("{\"params\":{\"id\":\"window_case.json\",\"trace_limit\":2}}"), &req),
+                 HU_OK);
+    HU_ASSERT_EQ(cp_hula_traces_get(&alloc, NULL, NULL, &proto, req, &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_STR_EQ(trace_first_id(&alloc, out, out_len), "t0");
+    hu_json_value_t *w0 = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, out, out_len, &w0), HU_OK);
+    HU_ASSERT_TRUE(hu_json_get_bool(w0, "trace_truncated", false));
+    HU_ASSERT_EQ(hu_json_get_number(w0, "trace_total_steps", -1), 5.0);
+    HU_ASSERT_EQ(hu_json_get_number(w0, "trace_returned_count", -1), 2.0);
+    hu_json_free(&alloc, w0);
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, req);
+    out = NULL;
+
+    HU_ASSERT_EQ(hu_json_parse(&alloc,
+                    "{\"params\":{\"id\":\"window_case.json\",\"trace_offset\":2,\"trace_limit\":2}}",
+                    strlen(
+                        "{\"params\":{\"id\":\"window_case.json\",\"trace_offset\":2,\"trace_limit\":2}}"),
+                 &req),
+                 HU_OK);
+    HU_ASSERT_EQ(cp_hula_traces_get(&alloc, NULL, NULL, &proto, req, &out, &out_len), HU_OK);
+    HU_ASSERT_STR_EQ(trace_first_id(&alloc, out, out_len), "t2");
+    hu_json_free(&alloc, req);
+    alloc.free(alloc.ctx, out, out_len + 1);
+    out = NULL;
+
+    HU_ASSERT_EQ(hu_json_parse(&alloc,
+                    "{\"params\":{\"id\":\"window_case.json\",\"trace_offset\":4,\"trace_limit\":10}}",
+                    strlen(
+                        "{\"params\":{\"id\":\"window_case.json\",\"trace_offset\":4,\"trace_limit\":10}}"),
+                 &req),
+                 HU_OK);
+    HU_ASSERT_EQ(cp_hula_traces_get(&alloc, NULL, NULL, &proto, req, &out, &out_len), HU_OK);
+    hu_json_value_t *w1 = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, out, out_len, &w1), HU_OK);
+    HU_ASSERT_FALSE(hu_json_get_bool(w1, "trace_truncated", true));
+    HU_ASSERT_EQ(hu_json_get_number(w1, "trace_returned_count", -1), 1.0);
+    hu_json_free(&alloc, w1);
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, req);
+
+    (void)unlink(path);
+    (void)unsetenv("HU_HULA_TRACE_DIR");
+    (void)rmdir(tmpdir);
+}
+
 #endif /* HU_GATEWAY_POSIX && unix */
 
 void run_gateway_hula_traces_tests(void) {
 #if defined(HU_GATEWAY_POSIX) && (defined(__unix__) || defined(__APPLE__))
     HU_TEST_SUITE("gateway_hula_traces");
     HU_RUN_TEST(gateway_hula_traces_env_dir_list_get_analytics_delete);
+    HU_RUN_TEST(gateway_hula_traces_get_respects_trace_limit_offset);
 #endif
 }

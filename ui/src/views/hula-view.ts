@@ -21,6 +21,12 @@ interface HulaTraceListItem {
 
 interface HulaTraceRecord {
   id?: string;
+  /** Present when `trace_limit` / `trace_offset` were sent (gateway slices `record.trace`). */
+  trace_truncated?: boolean;
+  trace_total_steps?: number;
+  trace_returned_count?: number;
+  trace_offset?: number;
+  trace_limit?: number;
   record?: {
     program_name?: string;
     success?: boolean;
@@ -38,7 +44,21 @@ interface HulaAnalyticsSummary {
 
 @customElement("hu-hula-view")
 export class ScHulaView extends GatewayAwareLitElement {
-  override autoRefreshInterval = 45_000;
+  override autoRefreshInterval = 12_000;
+
+  private readonly _visHandler = (): void => {
+    if (document.visibilityState === "visible") void this.load();
+  };
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    document.addEventListener("visibilitychange", this._visHandler);
+  }
+
+  override disconnectedCallback(): void {
+    document.removeEventListener("visibilitychange", this._visHandler);
+    super.disconnectedCallback();
+  }
 
   static override styles = [
     staggerMotion9Styles,
@@ -127,6 +147,14 @@ export class ScHulaView extends GatewayAwareLitElement {
         font-size: var(--hu-text-sm);
         margin-bottom: var(--hu-space-md);
       }
+      .trace-window-note {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+        margin-bottom: var(--hu-space-md);
+        padding: var(--hu-space-sm) var(--hu-space-md);
+        border-radius: var(--hu-radius);
+        background: var(--hu-surface-container);
+      }
       .stats {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
@@ -192,7 +220,11 @@ export class ScHulaView extends GatewayAwareLitElement {
     this.detailLoading = true;
     this.detailError = "";
     try {
-      const res = await gw.request<HulaTraceRecord>("hula.traces.get", { id });
+      const res = await gw.request<HulaTraceRecord>("hula.traces.get", {
+        id,
+        trace_limit: 500,
+        trace_offset: 0,
+      });
       this.detail = res;
     } catch (e) {
       this.detailError = friendlyError(e);
@@ -269,7 +301,7 @@ export class ScHulaView extends GatewayAwareLitElement {
           ${!this.loading && !this.traces.length
             ? html`<hu-empty-state
                 headline="No traces yet"
-                description="Run a HuLa program with HU_HULA_TRACE_DIR set (or use the default ~/.human/hula_traces on POSIX)."
+                description="Run a HuLa program with HU_HULA_TRACE_DIR set (or use the default ~/.human/hula_traces on POSIX). The gateway lists traces on POSIX builds only."
               ></hu-empty-state>`
             : nothing}
           <div class="trace-list hu-stagger-motion9" role="list">
@@ -322,6 +354,14 @@ export class ScHulaView extends GatewayAwareLitElement {
                     <strong>${this.detail.record.program_name ?? "program"}</strong>
                     · ${this.detail.record.success ? "success" : "failed"}
                   </p>
+                  ${this.detail.trace_truncated
+                    ? html`<p class="trace-window-note" role="status">
+                        Showing ${this.detail.trace_returned_count ?? "—"} of
+                        ${this.detail.trace_total_steps ?? "—"} steps (offset
+                        ${this.detail.trace_offset ?? 0}; limit ${this.detail.trace_limit ?? "—"}).
+                        Re-fetch with RPC params to page.
+                      </p>`
+                    : nothing}
                   <hu-hula-tree .steps=${this.detail.record.trace ?? []}></hu-hula-tree>
                 `
               : this.selected?.id

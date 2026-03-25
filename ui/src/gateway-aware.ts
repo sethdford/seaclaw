@@ -91,8 +91,10 @@ export class GatewayAwareLitElement extends LitElement {
   private async _doLoad(): Promise<void> {
     try {
       await this.load();
+      if (!this.isConnected) return;
       this.lastLoadedAt = Date.now();
       this.updateComplete.then(() => {
+        if (!this.isConnected) return;
         if (this.shadowRoot) observeAllCards(this.shadowRoot);
       });
     } catch (e) {

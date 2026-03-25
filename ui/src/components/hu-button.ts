@@ -29,6 +29,8 @@ export class ScButton extends LitElement {
       align-items: center;
       justify-content: center;
       gap: var(--hu-space-xs);
+      box-sizing: border-box;
+      min-height: 2.75rem;
       border: none;
       outline: none;
       font-family: var(--hu-font);
@@ -40,6 +42,10 @@ export class ScButton extends LitElement {
         box-shadow var(--hu-duration-moderate) var(--hu-emphasize),
         transform var(--hu-duration-fast) var(--hu-ease-spring, var(--hu-ease-out));
       border-radius: var(--hu-radius);
+    }
+
+    button.icon-only {
+      min-width: 2.75rem;
     }
 
     button:focus-visible {

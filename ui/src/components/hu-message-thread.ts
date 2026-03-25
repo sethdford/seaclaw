@@ -142,7 +142,8 @@ export class ScMessageThread extends LitElement {
       align-items: center;
       justify-content: center;
       width: 4rem;
-      height: 2.5rem;
+      min-height: 2.75rem;
+      height: 2.75rem;
       font-family: var(--hu-font);
       font-size: var(--hu-text-xs);
       color: var(--hu-accent);

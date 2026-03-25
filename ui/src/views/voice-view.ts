@@ -20,7 +20,6 @@ import "../components/hu-status-dot.js";
 import "../components/hu-voice-orb.js";
 import "../components/hu-voice-conversation.js";
 import "../components/hu-empty-state.js";
-import { icons } from "../icons.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
 
@@ -763,22 +762,10 @@ export class ScVoiceView extends GatewayAwareLitElement {
     return html`
       <div class="container hu-mesh-gradient">
         ${this._renderStatusBar()} ${this._renderErrorBanner()}
-        ${this._messages.length === 0
-          ? html`
-              <div class="conversation-area hu-scroll-reveal-stagger">
-                <hu-empty-state
-                  .icon=${icons.mic}
-                  heading="No voice session"
-                  description="Start by speaking or typing a message below."
-                ></hu-empty-state>
-              </div>
-            `
-          : html`
-              <hu-voice-conversation
-                .items=${this._chatItems}
-                .isWaiting=${this.voiceStatus === "processing"}
-              ></hu-voice-conversation>
-            `}
+        <hu-voice-conversation
+          .items=${this._chatItems}
+          .isWaiting=${this.voiceStatus === "processing"}
+        ></hu-voice-conversation>
         ${this._renderControls()}
       </div>
     `;

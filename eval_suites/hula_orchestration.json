@@ -2,7 +2,7 @@
   "name": "hula-orchestration",
   "description": "Can the assistant emit a short HuLa IR plan: parallel gather (par + calls) then conditional (branch with then/else)? Scored by LLM judge in static eval and harness.",
   "match_mode": "llm_judge",
-  "default_rubric": "Pass if the reply contains a coherent HuLa-shaped JSON tree: top-level name/version/root; root uses seq; includes par with at least three call children; includes branch with pred and both then and else subtrees (then often seq+call, else emit or call). Accept minor field order or extra harmless fields. Fail if only prose, wrong op vocabulary, missing parallel or missing branch, or invalid JSON.",
+  "default_rubric": "Pass if the reply contains a coherent HuLa-shaped JSON tree: top-level name/version/root; root uses seq; includes par with at least three call children; includes branch with pred and both then and else subtrees (then often seq+call, else emit or call). When the task mentions $node_id or delegate, those fields must appear and be wired plausibly. Accept minor field order or extra harmless fields. Fail if only prose, wrong op vocabulary, missing parallel or missing branch, or invalid JSON.",
   "tasks": [
     {
       "id": "hula-001",
@@ -23,6 +23,26 @@
       "prompt": "This HuLa program is incomplete: it has a seq with only a par of two calls. Extend it to full JSON: keep existing nodes, then add as the second child of the root seq a branch node with pred \"success\", then: seq with one call id \"summarize\" tool \"summarize\" args {\"text\":\"combined\"}, else: emit with emit_key \"error\" and emit_value \"gather failed\". Return the complete program JSON only (no markdown).\n\n{\"name\":\"gather_then_decide\",\"version\":1,\"root\":{\"op\":\"seq\",\"id\":\"main\",\"children\":[{\"op\":\"par\",\"id\":\"gather\",\"children\":[{\"op\":\"call\",\"id\":\"a\",\"tool\":\"fetch\",\"args\":{}},{\"op\":\"call\",\"id\":\"b\",\"tool\":\"fetch\",\"args\":{}}]}]}}",
       "expected": "Same program extended: root seq has two children: original par, then branch with then/else as specified.",
       "rubric": "5=Preserves par + adds branch with summarize seq and error emit; 3=Branch present but wrong wiring; 1=No branch or broken JSON"
+    },
+    {
+      "id": "hula-003",
+      "category": "hula_call_arg_refs",
+      "difficulty": 3,
+      "timeout_ms": 90000,
+      "judge_profile": "hula_structure",
+      "prompt": "Emit HuLa JSON only (no markdown). Program name \"pipe_refs\", version 1. Root: seq id \"main\" with two children in order: (1) call id \"first\" tool \"memory_recall\" args {\"query\":\"topic\"}; (2) call id \"second\" tool \"memory_store\" args {\"key\":\"k\",\"value\":\"prefix.$first.suffix\"} — the value must use $first to reference the first node's output with a non-id delimiter before literal suffix text. Use only those opcodes and fields.",
+      "expected": "Valid JSON; seq(first call, second call); second args.value contains $first with a delimiter boundary (e.g. dot) before literal suffix.",
+      "rubric": "5=Exact shape + plausible tools + $first in second call args; 3=seq+calls but weak ref wiring; 1=Not JSON or missing seq"
+    },
+    {
+      "id": "hula-004",
+      "category": "hula_delegate_shape",
+      "difficulty": 4,
+      "timeout_ms": 90000,
+      "judge_profile": "hula_structure",
+      "prompt": "Emit HuLa JSON only (no markdown). name \"subagent\", version 1. Root seq id \"r\" with two children: first child par id \"g\" with two call children (ids \"a\" and \"b\", tools \"web_fetch\" and \"web_fetch\", args objects with different \"url\" strings). Second child delegate id \"d\" with non-empty \"goal\" string and optional \"model\" string. No markdown fences.",
+      "expected": "seq containing par(2 calls) then delegate with goal (+ optional model).",
+      "rubric": "5=Matches structure; 3=delegate present but par wrong; 1=Prose or invalid JSON"
     }
   ]
 }

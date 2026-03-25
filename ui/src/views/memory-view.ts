@@ -208,7 +208,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
         gap: var(--hu-space-md);
       }
 
-      @container (max-width: 48rem) /* --hu-breakpoint-md */ {
+      @container (max-width: 48rem) /* --hu-breakpoint-lg (48rem ≈ 768px at 16px root) */ {
         .memory-grid {
           grid-template-columns: 1fr;
         }

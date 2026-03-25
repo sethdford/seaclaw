@@ -97,6 +97,27 @@ static hu_error_t hula_expand_dollar_refs(hu_hula_exec_t *exec, const char *in, 
         return HU_ERR_OUT_OF_MEMORY;
     size_t pos = 0;
     for (size_t i = 0; i < in_len;) {
+        /* Literal dollar: `$$` → `$` (so e.g. `$$5` → `$5`, not a failed ref). */
+        if (i + 1 < in_len && in[i] == '$' && in[i + 1] == '$') {
+            size_t need = pos + 2;
+            while (cap < need) {
+                size_t oldc = cap;
+                if (cap > SIZE_MAX / 2) {
+                    a->free(a->ctx, buf, oldc);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                cap *= 2;
+                void *nb = a->realloc(a->ctx, buf, oldc, cap);
+                if (!nb) {
+                    a->free(a->ctx, buf, oldc);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                buf = (char *)nb;
+            }
+            buf[pos++] = '$';
+            i += 2;
+            continue;
+        }
         if (in[i] == '$' && i + 1 < in_len && hula_id_char_start(in[i + 1])) {
             size_t rem = in_len - (i + 1);
             size_t skl = hula_slot_key_longest_match(exec, in + i + 1, rem);

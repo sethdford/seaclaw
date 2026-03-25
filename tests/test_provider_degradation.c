@@ -87,7 +87,7 @@ static void test_degrade_honest_failure(void) {
     hu_degradation_result_t result;
     hu_error_t err =
         hu_provider_degrade_chat(&config, &provider, &alloc, &req, "fail-model", 10, 0.7, &result);
-    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(err, HU_ERR_PROVIDER_RESPONSE);
     HU_ASSERT_EQ((int)result.strategy_used, (int)HU_DEGRADE_HONEST_FAILURE);
     HU_ASSERT_NOT_NULL(result.response.content);
     HU_ASSERT_STR_CONTAINS(result.response.content, "trouble connecting");
@@ -117,7 +117,7 @@ static void test_degrade_circuit_breaker_trips(void) {
     memset(&result, 0, sizeof(result));
     hu_error_t err =
         hu_provider_degrade_chat(&config, &provider, &alloc, &req, "good-model", 10, 0.7, &result);
-    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(err, HU_ERR_PROVIDER_RESPONSE);
     HU_ASSERT_EQ((int)result.strategy_used, (int)HU_DEGRADE_HONEST_FAILURE);
     HU_ASSERT_EQ((int)result.attempts, 0);
     HU_ASSERT_NOT_NULL(result.response.content);

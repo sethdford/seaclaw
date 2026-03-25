@@ -121,6 +121,8 @@ export class ScChatView extends GatewayAwareLitElement {
         display: flex;
         align-items: center;
         justify-content: center;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
         padding: var(--hu-space-2xs) var(--hu-space-sm);
         background: transparent;
         border: 1px solid var(--hu-border);
@@ -167,7 +169,7 @@ export class ScChatView extends GatewayAwareLitElement {
       .skeleton-composer {
         width: 100%;
       }
-      @container (max-width: 600px) /* --hu-breakpoint-md */ {
+      @container (max-width: 640px) /* --hu-breakpoint-md */ {
         .container {
           padding: 0 var(--hu-space-sm);
         }
@@ -179,7 +181,7 @@ export class ScChatView extends GatewayAwareLitElement {
           padding: var(--hu-space-sm);
         }
       }
-      @container (max-width: 400px) /* --hu-breakpoint-sm */ {
+      @container (max-width: 480px) /* --hu-breakpoint-sm */ {
         .status-left span:not(.status-title),
         .status-right .kbd-hint {
           display: none;

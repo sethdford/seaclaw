@@ -378,6 +378,7 @@ export class ScMetricsView extends GatewayAwareLitElement {
             </div>
             <hu-button
               variant="secondary"
+              data-testid="metrics-open-hula-traces"
               @click=${this._goToHulaView}
               aria-label="Open HuLa traces view"
               >Open HuLa traces</hu-button

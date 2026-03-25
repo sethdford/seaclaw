@@ -36,6 +36,10 @@ Prefer `YYYY-MM-DD-<short-label>.md` (e.g. `2026-03-22-gemini-agent-openai-judge
 
 - [2026-03-22 — OpenAI agent gpt-4o-mini, local `.env`](2026-03-22-fleet-summary.md) (harness mean **0.935**, static `reasoning_basic` **100%**).
 
+## In-repo validation notes (no API required to read)
+
+- [2026-03-22 — Compaction, harness hardening, `agent -m` exit codes](2026-03-22-validation-and-cli-exit.md) — runbook after the validation batch; live fleet still requires your keys locally.
+
 ## HuLa execute + trace (CLI)
 
 - `human hula run <file-or-json>` prints an execution trace to stdout.

@@ -144,12 +144,21 @@ static const char *diff_params(void *ctx) {
     return TOOL_PARAMS;
 }
 
+static void diff_deinit(void *ctx, hu_allocator_t *alloc) {
+    hu_diff_ctx_t *c = (hu_diff_ctx_t *)ctx;
+    if (!c || !alloc)
+        return;
+    if (c->workspace_dir)
+        alloc->free(alloc->ctx, (void *)c->workspace_dir, c->workspace_dir_len + 1);
+    alloc->free(alloc->ctx, c, sizeof(*c));
+}
+
 static const hu_tool_vtable_t diff_vtable = {
     .execute = diff_execute,
     .name = diff_name,
     .description = diff_desc,
     .parameters_json = diff_params,
-    .deinit = NULL,
+    .deinit = diff_deinit,
 };
 
 hu_error_t hu_diff_tool_create(hu_allocator_t *alloc, const char *workspace_dir,

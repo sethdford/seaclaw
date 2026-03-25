@@ -71,11 +71,13 @@ Human can build a minimal program (`par` or a single `call`) from the model’s 
 | `delegate` | Spawn a sub-agent with a `goal` (POSIX, non-test, pool + inheritance when configured). |
 | `emit`     | Produce a string; `emit_value` can use `$node_id` for prior outputs.                   |
 
-`$node_id` applies to **`emit_value`** and to **string values in `call` `args`** (longest id match; referenced node must be done). Expansion per string is capped at 256 KiB. The character after the id must not continue an identifier (`A–Z`, `a–z`, `0–9`, `_`); use a delimiter such as `.` before literal suffix text (for example `prefix.$node.suffix`).
+`$node_id` applies to **`emit_value`** and to **string values in `call` `args`** (longest id match; referenced node must be done). Expansion per string is capped at 256 KiB. The character after the id must not continue an identifier (`A–Z`, `a–z`, `0–9`, `_`); use a delimiter such as `.` before literal suffix text (for example `prefix.$node.suffix`). For a **literal** `$`, use **`$$`** in the string (e.g. `$$5` → `$5`).
+
+The gateway **`hula.traces.get`** method accepts optional **`trace_offset`** and **`trace_limit`** (pass at least one to page the **`trace`** array; max limit 1000). The UI requests a window by default to keep large traces responsive.
 
 ## Web dashboard (gateway)
 
-When you run **`human gateway`** and open the bundled UI, use **HuLa** in the sidebar to browse persisted trace files. The gateway uses the same directory as the CLI: **`HU_HULA_TRACE_DIR`** if set, otherwise **`~/.human/hula_traces`** (POSIX). **Observability** shows **HuLa tool turns** (BTH) and links to the HuLa view.
+When you run **`human gateway`** and open the bundled UI, use **HuLa** in the sidebar to browse persisted trace files. The gateway uses the same directory as the CLI: **`HU_HULA_TRACE_DIR`** if set, otherwise **`~/.human/hula_traces`** (POSIX). **Observability** shows **HuLa tool turns** (BTH) and links to the HuLa view. **Windows:** trace listing over the gateway is **not** available in non-POSIX gateway builds; use **WSL**, **macOS**, or **Linux** for the **HuLa** dashboard RPC, or inspect trace files on disk from the OS.
 
 ## Emergence from traces
 

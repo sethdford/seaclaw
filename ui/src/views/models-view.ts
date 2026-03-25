@@ -74,6 +74,7 @@ export class ScModelsView extends GatewayAwareLitElement {
         display: flex;
         flex-direction: column;
         gap: var(--hu-space-xs);
+        min-width: 0;
       }
       .chart-section {
         margin-bottom: var(--hu-space-2xl);
