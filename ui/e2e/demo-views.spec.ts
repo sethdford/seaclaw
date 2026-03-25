@@ -4,7 +4,6 @@ import {
   shadowCount,
   shadowCountIn,
   shadowExists,
-  shadowExistsIn,
   shadowElementText,
   shadowText,
   shadowTextIn,
