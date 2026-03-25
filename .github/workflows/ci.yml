@@ -252,6 +252,29 @@ jobs:
         run: cd ui && npx playwright install --with-deps chromium
       - name: Build UI
         run: cd ui && npm run build
+      - name: Create gateway config
+        run: |
+          mkdir -p ~/.human
+          UI_DIR="$(pwd)/ui/dist"
+          cat > ~/.human/config.json << CONF
+          {
+            "default_provider": "ollama",
+            "default_model": "test",
+            "gateway": {
+              "port": 3000,
+              "host": "127.0.0.1",
+              "require_pairing": false,
+              "control_ui_dir": "${UI_DIR}",
+              "rate_limit_requests": 1000,
+              "rate_limit_window": 60
+            }
+          }
+          CONF
+      - name: Start gateway
+        run: |
+          nohup ./build/human gateway &>/dev/null &
+          sleep 2
+          curl -sf http://127.0.0.1:3000/health || (echo "Gateway failed to start" && exit 1)
       - name: E2E tests (demo mode)
         run: cd ui && npx playwright test --ignore-snapshots --grep-invert "Visual Regression|Smoke"
       - uses: actions/upload-artifact@v7

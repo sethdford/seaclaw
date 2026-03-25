@@ -28,6 +28,25 @@ final class HumaniOSFleetUITests: XCTestCase {
 
     // MARK: - Lifecycle helpers
 
+    /// Resolves a tab bar button: exact title, compound VoiceOver-style label, or first tab for Overview (SwiftUI / OS differences on CI simulators).
+    private func tabBarButton(for title: String) -> XCUIElement {
+        let bar = app.tabBars.firstMatch
+        let exact = bar.buttons[title]
+        if exact.waitForExistence(timeout: 2) {
+            return exact
+        }
+        let fuzzy = bar.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] %@", title))
+            .firstMatch
+        if fuzzy.waitForExistence(timeout: 2) {
+            return fuzzy
+        }
+        if title == "Overview" {
+            return bar.buttons.element(boundBy: 0)
+        }
+        return exact
+    }
+
     private func launchAndSettle() {
         app.launch()
         XCTAssertTrue(
@@ -39,8 +58,8 @@ final class HumaniOSFleetUITests: XCTestCase {
             "Tab bar should appear after launch",
         )
         XCTAssertTrue(
-            app.tabBars.buttons["Overview"].waitForExistence(timeout: Timeout.tabBar),
-            "Primary shell should expose Overview",
+            tabBarButton(for: "Overview").waitForExistence(timeout: Timeout.tabBar),
+            "Primary shell should expose Overview (or first tab when labels differ)",
         )
     }
 
@@ -52,7 +71,7 @@ final class HumaniOSFleetUITests: XCTestCase {
 
     /// Selects a root tab, using **More** when the item is not on the main tab bar (six tabs on iPhone).
     private func selectPrimaryTab(_ label: String) {
-        let direct = app.tabBars.buttons[label]
+        let direct = tabBarButton(for: label)
         if direct.waitForExistence(timeout: 3), direct.isHittable {
             direct.tap()
             return
@@ -66,7 +85,7 @@ final class HumaniOSFleetUITests: XCTestCase {
 
     /// Asserts the tab is reachable with a proper touch target: main bar button or **More** list row.
     private func assertPrimaryTabHittable(_ label: String) {
-        let direct = app.tabBars.buttons[label]
+        let direct = tabBarButton(for: label)
         if direct.waitForExistence(timeout: 4) {
             XCTAssertTrue(direct.isHittable, "Tab \(label) should be hittable")
             return
@@ -97,7 +116,7 @@ final class HumaniOSFleetUITests: XCTestCase {
         launchAndSettle()
         for label in ["Overview", "Chat", "Memory", "Sessions"] {
             XCTAssertTrue(
-                app.tabBars.buttons[label].waitForExistence(timeout: Timeout.tabItem),
+                tabBarButton(for: label).waitForExistence(timeout: Timeout.tabItem),
                 "Expected tab bar item \(label)",
             )
         }
@@ -149,6 +168,6 @@ final class HumaniOSFleetUITests: XCTestCase {
     func test_chat_tab_loads_without_crash() throws {
         launchAndSettle()
         selectPrimaryTab("Chat")
-        XCTAssertTrue(app.tabBars.buttons["Chat"].waitForExistence(timeout: Timeout.tabItem))
+        XCTAssertTrue(tabBarButton(for: "Chat").waitForExistence(timeout: Timeout.tabItem))
     }
 }

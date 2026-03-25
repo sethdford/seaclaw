@@ -556,118 +556,117 @@ export class ScChatView extends GatewayAwareLitElement {
           ${this.chat.historyLoading
             ? this._renderSkeleton()
             : html`
-                  <div
-                    class="hu-stagger-motion9"
-                    style="flex: 1; display: flex; flex-direction: column; min-height: 0;"
-                  >
-                    <hu-message-thread
-                      .items=${this.chat.items}
-                      .isWaiting=${this.chat.isWaiting}
-                      .streamElapsed=${this.chat.streamElapsed}
-                      .historyLoading=${this.chat.historyLoading}
-                      .hasEarlierMessages=${this.chat.hasEarlierMessages}
-                      .loadingEarlier=${this.chat.loadingEarlier}
-                      @hu-context-menu=${(e: CustomEvent<{ event: MouseEvent; item: ChatItem }>) =>
-                        this._onMessageContextMenu(e.detail.event, e.detail.item)}
-                      @hu-abort=${() => this.handleAbort()}
-                      @hu-load-earlier=${() => this.chat.loadEarlier()}
-                      @hu-branch-navigate=${(
-                        e: CustomEvent<{ index: number; direction: number }>,
-                      ) => {
-                        const item = this.chat.items[e.detail.index];
+                <div
+                  class="hu-stagger-motion9"
+                  style="flex: 1; display: flex; flex-direction: column; min-height: 0;"
+                >
+                  <hu-message-thread
+                    .items=${this.chat.items}
+                    .isWaiting=${this.chat.isWaiting}
+                    .streamElapsed=${this.chat.streamElapsed}
+                    .historyLoading=${this.chat.historyLoading}
+                    .hasEarlierMessages=${this.chat.hasEarlierMessages}
+                    .loadingEarlier=${this.chat.loadingEarlier}
+                    @hu-context-menu=${(e: CustomEvent<{ event: MouseEvent; item: ChatItem }>) =>
+                      this._onMessageContextMenu(e.detail.event, e.detail.item)}
+                    @hu-abort=${() => this.handleAbort()}
+                    @hu-load-earlier=${() => this.chat.loadEarlier()}
+                    @hu-branch-navigate=${(
+                      e: CustomEvent<{ index: number; direction: number }>,
+                    ) => {
+                      const item = this.chat.items[e.detail.index];
+                      if (
+                        item?.type === "message" &&
+                        item.id &&
+                        item.branchCount &&
+                        item.branchCount > 1
+                      ) {
+                        const newIndex = (item.branchIndex ?? 0) + e.detail.direction;
+                        if (newIndex >= 0 && newIndex < item.branchCount) {
+                          this.chat.items = [
+                            ...this.chat.items.slice(0, e.detail.index),
+                            { ...item, branchIndex: newIndex },
+                            ...this.chat.items.slice(e.detail.index + 1),
+                          ];
+                          this.requestUpdate();
+                        }
+                      }
+                    }}
+                    @hu-toggle-reaction=${(e: CustomEvent<{ index: number; value: string }>) =>
+                      this.chat.toggleReaction?.(e.detail.index, e.detail.value)}
+                    @hu-swipe-reply=${(e: CustomEvent<{ index: number; content: string }>) => {
+                      this.inputValue = e.detail.content;
+                      this.requestUpdate();
+                      this.updateComplete.then(() => this._composer?.focus?.());
+                    }}
+                    @hu-swipe-copy=${(e: CustomEvent<{ index: number; content: string }>) => {
+                      navigator.clipboard?.writeText(e.detail.content).then(
+                        () => ScToast.show({ message: "Copied to clipboard", variant: "success" }),
+                        () => ScToast.show({ message: "Failed to copy", variant: "error" }),
+                      );
+                    }}
+                    @hu-retry=${(e: CustomEvent<{ content?: string; index?: number }>) => {
+                      if (e.detail?.content != null) {
+                        const idx = e.detail.index ?? -1;
+                        const item = idx >= 0 ? this.chat.items[idx] : undefined;
                         if (
                           item?.type === "message" &&
-                          item.id &&
-                          item.branchCount &&
-                          item.branchCount > 1
+                          item.role === "user" &&
+                          item.status === "failed"
                         ) {
-                          const newIndex = (item.branchIndex ?? 0) + e.detail.direction;
-                          if (newIndex >= 0 && newIndex < item.branchCount) {
-                            this.chat.items = [
-                              ...this.chat.items.slice(0, e.detail.index),
-                              { ...item, branchIndex: newIndex },
-                              ...this.chat.items.slice(e.detail.index + 1),
-                            ];
-                            this.requestUpdate();
-                          }
+                          this.chat.items = [
+                            ...this.chat.items.slice(0, idx),
+                            ...this.chat.items.slice(idx + 1),
+                          ];
+                          this.chat.cacheMessages(this.sessionKey);
                         }
-                      }}
-                      @hu-toggle-reaction=${(e: CustomEvent<{ index: number; value: string }>) =>
-                        this.chat.toggleReaction?.(e.detail.index, e.detail.value)}
-                      @hu-swipe-reply=${(e: CustomEvent<{ index: number; content: string }>) => {
-                        this.inputValue = e.detail.content;
-                        this.requestUpdate();
-                        this.updateComplete.then(() => this._composer?.focus?.());
-                      }}
-                      @hu-swipe-copy=${(e: CustomEvent<{ index: number; content: string }>) => {
-                        navigator.clipboard?.writeText(e.detail.content).then(
-                          () =>
-                            ScToast.show({ message: "Copied to clipboard", variant: "success" }),
-                          () => ScToast.show({ message: "Failed to copy", variant: "error" }),
-                        );
-                      }}
-                      @hu-retry=${(e: CustomEvent<{ content?: string; index?: number }>) => {
-                        if (e.detail?.content != null) {
-                          const idx = e.detail.index ?? -1;
-                          const item = idx >= 0 ? this.chat.items[idx] : undefined;
-                          if (
-                            item?.type === "message" &&
-                            item.role === "user" &&
-                            item.status === "failed"
-                          ) {
-                            this.chat.items = [
-                              ...this.chat.items.slice(0, idx),
-                              ...this.chat.items.slice(idx + 1),
-                            ];
-                            this.chat.cacheMessages(this.sessionKey);
-                          }
-                          this._handleSend(e.detail.content);
-                        } else {
-                          this._retry();
-                        }
-                      }}
-                      @hu-regenerate=${(e: CustomEvent<{ content: string; index: number }>) => {
-                        this._handleRegenerate(e.detail.index);
-                      }}
-                      @hu-edit=${(e: CustomEvent<{ content: string; index: number }>) => {
-                        this._handleEdit(e.detail.content, e.detail.index);
-                      }}
-                      @hu-edit-message=${(e: CustomEvent<{ index: number }>) => {
-                        const item = this.chat.items[e.detail.index];
-                        if (item?.type === "message" && item.role === "user") {
-                          this._handleEdit(item.content, e.detail.index);
-                        }
-                      }}
-                      @hu-reply-message=${(e: CustomEvent<{ content: string }>) => {
-                        this.inputValue = e.detail.content;
-                        this.requestUpdate();
-                        this.updateComplete.then(() => this._composer?.focus?.());
-                      }}
-                      @hu-copy-message=${() => {
-                        ScToast.show({ message: "Copied to clipboard", variant: "success" });
-                      }}
-                      @hu-tapback=${(
-                        e: CustomEvent<{ x: number; y: number; index: number; content: string }>,
-                      ) => {
-                        this._tapback = {
-                          open: true,
-                          x: e.detail.x,
-                          y: e.detail.y,
-                          index: e.detail.index,
-                          content: e.detail.content,
-                        };
-                      }}
-                      @hu-suggestion-click=${(e: CustomEvent<{ text: string }>) =>
-                        this._handleSend(e.detail.text)}
-                      @hu-hero-suggestion=${(e: CustomEvent<{ text: string }>) =>
-                        this._handleSend(e.detail.text)}
-                      @open-artifact=${async (e: CustomEvent<{ id: string }>) => {
-                        await import("../components/hu-artifact-panel.js");
-                        this.chat.openArtifact(e.detail.id);
-                      }}
-                      .artifacts=${Array.from(this.chat.artifacts.values())}
-                    ></hu-message-thread>
-                  </div>
+                        this._handleSend(e.detail.content);
+                      } else {
+                        this._retry();
+                      }
+                    }}
+                    @hu-regenerate=${(e: CustomEvent<{ content: string; index: number }>) => {
+                      this._handleRegenerate(e.detail.index);
+                    }}
+                    @hu-edit=${(e: CustomEvent<{ content: string; index: number }>) => {
+                      this._handleEdit(e.detail.content, e.detail.index);
+                    }}
+                    @hu-edit-message=${(e: CustomEvent<{ index: number }>) => {
+                      const item = this.chat.items[e.detail.index];
+                      if (item?.type === "message" && item.role === "user") {
+                        this._handleEdit(item.content, e.detail.index);
+                      }
+                    }}
+                    @hu-reply-message=${(e: CustomEvent<{ content: string }>) => {
+                      this.inputValue = e.detail.content;
+                      this.requestUpdate();
+                      this.updateComplete.then(() => this._composer?.focus?.());
+                    }}
+                    @hu-copy-message=${() => {
+                      ScToast.show({ message: "Copied to clipboard", variant: "success" });
+                    }}
+                    @hu-tapback=${(
+                      e: CustomEvent<{ x: number; y: number; index: number; content: string }>,
+                    ) => {
+                      this._tapback = {
+                        open: true,
+                        x: e.detail.x,
+                        y: e.detail.y,
+                        index: e.detail.index,
+                        content: e.detail.content,
+                      };
+                    }}
+                    @hu-suggestion-click=${(e: CustomEvent<{ text: string }>) =>
+                      this._handleSend(e.detail.text)}
+                    @hu-hero-suggestion=${(e: CustomEvent<{ text: string }>) =>
+                      this._handleSend(e.detail.text)}
+                    @open-artifact=${async (e: CustomEvent<{ id: string }>) => {
+                      await import("../components/hu-artifact-panel.js");
+                      this.chat.openArtifact(e.detail.id);
+                    }}
+                    .artifacts=${Array.from(this.chat.artifacts.values())}
+                  ></hu-message-thread>
+                </div>
               `}
           ${this._renderRetryButton()}
           <hu-chat-composer
@@ -891,5 +890,4 @@ export class ScChatView extends GatewayAwareLitElement {
       </div>
     `;
   }
-
 }
