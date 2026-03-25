@@ -71,8 +71,7 @@ static void test_visual_query_recent_sql_valid(void) {
 static void test_visual_record_share_sql_valid(void) {
     char buf[256];
     size_t len = 0;
-    hu_error_t err =
-        hu_visual_record_share_sql(42, "alice", 5, buf, sizeof(buf), &len);
+    hu_error_t err = hu_visual_record_share_sql(42, "alice", 5, buf, sizeof(buf), &len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(strstr(buf, "share_count = share_count + 1") != NULL);
     HU_ASSERT_TRUE(strstr(buf, "42") != NULL);
@@ -81,8 +80,8 @@ static void test_visual_record_share_sql_valid(void) {
 static void test_visual_count_shares_today_sql_valid(void) {
     char buf[512];
     size_t len = 0;
-    hu_error_t err = hu_visual_count_shares_today_sql("user_123", 8, 1000000ULL, buf,
-                                                       sizeof(buf), &len);
+    hu_error_t err =
+        hu_visual_count_shares_today_sql("user_123", 8, 1000000ULL, buf, sizeof(buf), &len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(strstr(buf, "COUNT(*)") != NULL);
     HU_ASSERT_TRUE(strstr(buf, "shared_with") != NULL);
@@ -327,10 +326,11 @@ static void test_visual_match_for_contact_no_match(void) {
     uint64_t one_day_ms = 24ULL * 60ULL * 60ULL * 1000ULL;
     uint64_t recent_ms = (now_ms > one_day_ms) ? (now_ms - one_day_ms) : 1;
     char ins_buf[512];
-    int n = snprintf(ins_buf, sizeof(ins_buf),
-                     "INSERT INTO visual_content (source, path, description, tags, captured_at, indexed_at) "
-                     "VALUES ('camera', '/sunset.jpg', 'sunset at the lake', 'nature', %llu, %llu)",
-                     (unsigned long long)recent_ms, (unsigned long long)recent_ms);
+    int n = snprintf(
+        ins_buf, sizeof(ins_buf),
+        "INSERT INTO visual_content (source, path, description, tags, captured_at, indexed_at) "
+        "VALUES ('camera', '/sunset.jpg', 'sunset at the lake', 'nature', %llu, %llu)",
+        (unsigned long long)recent_ms, (unsigned long long)recent_ms);
     HU_ASSERT_TRUE(n > 0 && (size_t)n < sizeof(ins_buf));
     rc = sqlite3_exec(db, ins_buf, NULL, NULL, &errmsg);
     HU_ASSERT_EQ(rc, SQLITE_OK);
@@ -339,9 +339,8 @@ static void test_visual_match_for_contact_no_match(void) {
 
     hu_visual_entry_t *entries = NULL;
     size_t count = 0;
-    hu_error_t err = hu_visual_match_for_contact(&alloc, db, "contact_a", 9,
-                                                 "hiking trails and mountains", 27,
-                                                 &entries, &count);
+    hu_error_t err = hu_visual_match_for_contact(
+        &alloc, db, "contact_a", 9, "hiking trails and mountains", 27, &entries, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(count, 0u);
     HU_ASSERT_NULL(entries);
@@ -397,6 +396,32 @@ static void test_visual_proactive_media_governor_test_always_allows(void) {
     HU_ASSERT_TRUE(hu_visual_proactive_media_governor_allow(2000));
 }
 
+#ifdef HU_ENABLE_SQLITE
+static void test_visual_apple_photos_db_path_nonempty(void) {
+    char buf[512];
+#ifdef __APPLE__
+    size_t len = hu_visual_apple_photos_db_path(buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "Photos.sqlite") != NULL);
+#else
+    size_t len = hu_visual_apple_photos_db_path(buf, sizeof(buf));
+    HU_ASSERT_EQ(len, 0u);
+#endif
+}
+
+static void test_visual_scan_apple_photos_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    HU_ASSERT_EQ(hu_visual_scan_apple_photos(NULL, "/nonexistent", 7, NULL, NULL, 10),
+                 HU_ERR_INVALID_ARGUMENT);
+    size_t count = 0;
+    hu_visual_entry_t *out = NULL;
+    hu_error_t err = hu_visual_scan_apple_photos(&alloc, "/nonexistent/db", 7, &out, &count, 10);
+    /* In test mode this returns HU_OK with 0 results; non-test returns IO error */
+    HU_ASSERT_EQ(count, 0u);
+    (void)err;
+}
+#endif
+
 void run_visual_content_tests(void) {
     HU_TEST_SUITE("visual_content");
     HU_RUN_TEST(test_visual_create_table_sql_valid);
@@ -430,5 +455,7 @@ void run_visual_content_tests(void) {
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(test_visual_scan_recent_empty_returns_zero);
     HU_RUN_TEST(test_visual_match_for_contact_no_match);
+    HU_RUN_TEST(test_visual_apple_photos_db_path_nonempty);
+    HU_RUN_TEST(test_visual_scan_apple_photos_null_args);
 #endif
 }

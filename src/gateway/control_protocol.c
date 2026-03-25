@@ -96,6 +96,7 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"turing.scores", cp_turing_scores},
     {"turing.trend", cp_turing_trend},
     {"turing.dimensions", cp_turing_dimensions},
+    {"security.cot.summary", cp_security_cot_summary},
     {"mcp.resources.list", cp_mcp_resources_list},
     {"mcp.prompts.list", cp_mcp_prompts_list},
     {NULL, NULL},

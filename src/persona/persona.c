@@ -1433,6 +1433,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
             (float)hu_json_get_number(hum, "burst_message_probability", 0.03);
         out->humanization.double_text_probability =
             (float)hu_json_get_number(hum, "double_text_probability", 0.08);
+        out->humanization.gif_probability = (float)hu_json_get_number(hum, "gif_probability", 0.10);
     }
 
     /* Context modifiers (defaults applied when block absent) */

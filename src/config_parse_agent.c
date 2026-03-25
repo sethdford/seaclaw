@@ -21,8 +21,7 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
         hu_json_get_bool(obj, "speculative_cache", cfg->agent.speculative_cache);
     cfg->agent.tool_routing_enabled =
         hu_json_get_bool(obj, "tool_routing", cfg->agent.tool_routing_enabled);
-    cfg->agent.multi_agent =
-        hu_json_get_bool(obj, "multi_agent", cfg->agent.multi_agent);
+    cfg->agent.multi_agent = hu_json_get_bool(obj, "multi_agent", cfg->agent.multi_agent);
     cfg->agent.compact_context =
         hu_json_get_bool(obj, "compact_context", cfg->agent.compact_context);
     double mti = hu_json_get_number(obj, "max_tool_iterations", cfg->agent.max_tool_iterations);
@@ -66,7 +65,8 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
     double fmd = hu_json_get_number(obj, "fleet_max_spawn_depth", cfg->agent.fleet_max_spawn_depth);
     if (fmd >= 0 && fmd <= 256)
         cfg->agent.fleet_max_spawn_depth = (uint32_t)fmd;
-    double fmt = hu_json_get_number(obj, "fleet_max_total_spawns", cfg->agent.fleet_max_total_spawns);
+    double fmt =
+        hu_json_get_number(obj, "fleet_max_total_spawns", cfg->agent.fleet_max_total_spawns);
     if (fmt >= 0 && fmt <= 100000000)
         cfg->agent.fleet_max_total_spawns = (uint32_t)fmt;
     double fbu = hu_json_get_number(obj, "fleet_budget_usd", cfg->agent.fleet_budget_usd);
@@ -211,9 +211,11 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
                 size_t needed = pos + plen + 8;
                 if (needed >= buf_cap) {
                     size_t nc = buf_cap * 2;
-                    while (nc < needed) nc *= 2;
+                    while (nc < needed)
+                        nc *= 2;
                     char *nb = (char *)a->realloc(a->ctx, buf, buf_cap, nc);
-                    if (!nb) break;
+                    if (!nb)
+                        break;
                     buf = nb;
                     buf_cap = nc;
                 }
@@ -257,6 +259,18 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
         }
     }
 
+    cfg->agent.prompt_cache_enabled =
+        hu_json_get_bool(obj, "prompt_cache", cfg->agent.prompt_cache_enabled);
+    cfg->agent.agent_comm_enabled =
+        hu_json_get_bool(obj, "agent_comm", cfg->agent.agent_comm_enabled);
+    const char *ce_type = hu_json_get_string(obj, "context_engine");
+    if (ce_type) {
+        if (cfg->agent.context_engine_type)
+            a->free(a->ctx, cfg->agent.context_engine_type,
+                    strlen(cfg->agent.context_engine_type) + 1);
+        cfg->agent.context_engine_type = hu_strdup(a, ce_type);
+    }
+
     hu_json_value_t *mr_obj = hu_json_object_get(obj, "model_router");
     if (mr_obj && mr_obj->type == HU_JSON_OBJECT) {
         const char *mr_ref = hu_json_get_string(mr_obj, "reflexive_model");
@@ -283,8 +297,7 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
         const char *mr_deep = hu_json_get_string(mr_obj, "deep_model");
         if (mr_deep) {
             if (cfg->agent.mr_deep_model)
-                a->free(a->ctx, cfg->agent.mr_deep_model,
-                        strlen(cfg->agent.mr_deep_model) + 1);
+                a->free(a->ctx, cfg->agent.mr_deep_model, strlen(cfg->agent.mr_deep_model) + 1);
             cfg->agent.mr_deep_model = hu_strdup(a, mr_deep);
         }
     }

@@ -5395,6 +5395,20 @@ hu_reaction_type_t hu_conversation_classify_reaction(const char *msg, size_t msg
 
     uint32_t s = seed;
 
+    /* GIFs: usually haha (they're sent to be funny), sometimes no reaction */
+    if (str_contains_ci(msg, msg_len, "[GIF]") || str_contains_ci(msg, msg_len, ".gif")) {
+        uint32_t roll = reaction_prng_next(&s) % 100u;
+        if (roll < 40u)
+            return HU_REACTION_HAHA;
+        if (roll < 55u)
+            return HU_REACTION_HEART;
+        return HU_REACTION_NONE;
+    }
+
+    /* Voice messages: usually no reaction needed (will respond with text) */
+    if (str_contains_ci(msg, msg_len, "[Voice Message]"))
+        return HU_REACTION_NONE;
+
     /* Photos/media placeholders: 50% chance of heart */
     if (str_contains_ci(msg, msg_len, "[image") || str_contains_ci(msg, msg_len, "[attachment")) {
         uint32_t roll = reaction_prng_next(&s) % 100u;
@@ -6765,4 +6779,179 @@ size_t hu_conversation_build_gif_search_prompt(const char *msg, size_t msg_len, 
                      "reaction to: \"%.*s\". Return ONLY the search query, nothing else.",
                      (int)(msg_len > 120 ? 120 : msg_len), msg);
     return (n > 0 && (size_t)n < cap) ? (size_t)n : 0;
+}
+
+/* ── Contact-aware GIF probability (relationship-based) ──────────────── */
+
+float hu_conversation_adjust_gif_probability(float base_probability, const char *relationship_type,
+                                             size_t rel_len) {
+    if (!relationship_type || rel_len == 0)
+        return base_probability;
+
+    /* Close friends get more GIFs, formal relationships get fewer */
+    if (str_contains_ci(relationship_type, rel_len, "friend") ||
+        str_contains_ci(relationship_type, rel_len, "bestie") ||
+        str_contains_ci(relationship_type, rel_len, "sibling"))
+        return base_probability * 1.5f > 1.0f ? 1.0f : base_probability * 1.5f;
+
+    if (str_contains_ci(relationship_type, rel_len, "partner") ||
+        str_contains_ci(relationship_type, rel_len, "spouse"))
+        return base_probability * 1.3f > 1.0f ? 1.0f : base_probability * 1.3f;
+
+    if (str_contains_ci(relationship_type, rel_len, "coworker") ||
+        str_contains_ci(relationship_type, rel_len, "colleague") ||
+        str_contains_ci(relationship_type, rel_len, "boss") ||
+        str_contains_ci(relationship_type, rel_len, "professional"))
+        return base_probability * 0.3f;
+
+    if (str_contains_ci(relationship_type, rel_len, "parent") ||
+        str_contains_ci(relationship_type, rel_len, "family"))
+        return base_probability * 0.5f;
+
+    if (str_contains_ci(relationship_type, rel_len, "acquaintance"))
+        return base_probability * 0.2f;
+
+    return base_probability;
+}
+
+size_t hu_conversation_build_gif_style_hint(const char *relationship_type, size_t rel_len,
+                                            char *buf, size_t cap) {
+    if (!buf || cap < 32)
+        return 0;
+
+    const char *style = "funny reaction";
+    if (relationship_type && rel_len > 0) {
+        if (str_contains_ci(relationship_type, rel_len, "friend") ||
+            str_contains_ci(relationship_type, rel_len, "bestie"))
+            style = "absurd meme or chaotic reaction";
+        else if (str_contains_ci(relationship_type, rel_len, "partner") ||
+                 str_contains_ci(relationship_type, rel_len, "spouse"))
+            style = "cute or flirty reaction";
+        else if (str_contains_ci(relationship_type, rel_len, "parent") ||
+                 str_contains_ci(relationship_type, rel_len, "family"))
+            style = "wholesome or warm reaction";
+        else if (str_contains_ci(relationship_type, rel_len, "coworker"))
+            style = "professional but lighthearted";
+    }
+
+    int n = snprintf(buf, cap, "GIF style: %s", style);
+    return (n > 0 && (size_t)n < cap) ? (size_t)n : 0;
+}
+
+/* ── GIF rate limiter (per-contact, in-memory ring) ──────────────────── */
+
+#define HU_GIF_RATE_MAX_CONTACTS 32
+
+static struct {
+    char contact_id[128];
+    uint64_t last_gif_ms;
+    uint32_t gif_count_today;
+    uint64_t day_start_ms;
+} gif_rate_slots[HU_GIF_RATE_MAX_CONTACTS];
+static size_t gif_rate_count;
+
+bool hu_conversation_gif_rate_allow(const char *contact_id, size_t cid_len, uint64_t now_ms,
+                                    uint32_t max_per_day, uint64_t min_gap_ms) {
+    if (!contact_id || cid_len == 0)
+        return true;
+    if (max_per_day == 0)
+        max_per_day = 5;
+    if (min_gap_ms == 0)
+        min_gap_ms = 600000; /* 10 minutes */
+
+    size_t slot = SIZE_MAX;
+    for (size_t i = 0; i < gif_rate_count; i++) {
+        if (strncmp(gif_rate_slots[i].contact_id, contact_id, cid_len < 127 ? cid_len : 127) == 0 &&
+            gif_rate_slots[i].contact_id[cid_len < 127 ? cid_len : 127] == '\0') {
+            slot = i;
+            break;
+        }
+    }
+
+    if (slot == SIZE_MAX)
+        return true; /* first GIF to this contact is always allowed */
+
+    /* Reset daily count if new day (86400000 ms = 24h) */
+    if (now_ms - gif_rate_slots[slot].day_start_ms > 86400000) {
+        gif_rate_slots[slot].gif_count_today = 0;
+        gif_rate_slots[slot].day_start_ms = now_ms;
+    }
+
+    if (gif_rate_slots[slot].gif_count_today >= max_per_day)
+        return false;
+
+    if (now_ms - gif_rate_slots[slot].last_gif_ms < min_gap_ms)
+        return false;
+
+    return true;
+}
+
+void hu_conversation_gif_rate_record(const char *contact_id, size_t cid_len, uint64_t now_ms) {
+    if (!contact_id || cid_len == 0)
+        return;
+
+    size_t slot = SIZE_MAX;
+    for (size_t i = 0; i < gif_rate_count; i++) {
+        if (strncmp(gif_rate_slots[i].contact_id, contact_id, cid_len < 127 ? cid_len : 127) == 0 &&
+            gif_rate_slots[i].contact_id[cid_len < 127 ? cid_len : 127] == '\0') {
+            slot = i;
+            break;
+        }
+    }
+
+    if (slot == SIZE_MAX) {
+        if (gif_rate_count >= HU_GIF_RATE_MAX_CONTACTS)
+            slot = 0; /* overwrite oldest */
+        else
+            slot = gif_rate_count++;
+        size_t copy = cid_len < 127 ? cid_len : 127;
+        memcpy(gif_rate_slots[slot].contact_id, contact_id, copy);
+        gif_rate_slots[slot].contact_id[copy] = '\0';
+        gif_rate_slots[slot].day_start_ms = now_ms;
+        gif_rate_slots[slot].gif_count_today = 0;
+    }
+
+    gif_rate_slots[slot].last_gif_ms = now_ms;
+    gif_rate_slots[slot].gif_count_today++;
+}
+
+/* ── Seen behavior modeling (read receipt delay) ─────────────────────── */
+
+hu_seen_action_t hu_conversation_classify_seen_behavior(const char *msg, size_t msg_len,
+                                                        uint8_t hour_local, uint32_t seed,
+                                                        uint32_t *out_delay_ms) {
+    if (!msg || msg_len == 0) {
+        if (out_delay_ms)
+            *out_delay_ms = 0;
+        return HU_SEEN_RESPOND_NOW;
+    }
+    if (out_delay_ms)
+        *out_delay_ms = 0;
+
+    uint32_t s = seed;
+    uint32_t roll = reaction_prng_next(&s) % 100u;
+
+    /* During busy hours (9-17), higher chance of "seen but respond later" */
+    bool busy_hours = (hour_local >= 9 && hour_local <= 17);
+
+    /* Low-priority messages: "ok", "k", "sounds good", thumbs up only */
+    bool low_priority = (msg_len <= 3) || str_contains_ci(msg, msg_len, "sounds good") ||
+                        str_contains_ci(msg, msg_len, "👍");
+
+    if (low_priority && busy_hours && roll < 15) {
+        if (out_delay_ms)
+            *out_delay_ms = 300000 + (reaction_prng_next(&s) % 600000); /* 5-15 min */
+        return HU_SEEN_DELAY_THEN_RESPOND;
+    }
+
+    /* Non-urgent messages during busy hours: 5% chance of delay */
+    if (busy_hours && !str_contains_ci(msg, msg_len, "?") &&
+        !str_contains_ci(msg, msg_len, "urgent") && !str_contains_ci(msg, msg_len, "asap") &&
+        roll < 5) {
+        if (out_delay_ms)
+            *out_delay_ms = 180000 + (reaction_prng_next(&s) % 420000); /* 3-10 min */
+        return HU_SEEN_DELAY_THEN_RESPOND;
+    }
+
+    return HU_SEEN_RESPOND_NOW;
 }

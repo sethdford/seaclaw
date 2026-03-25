@@ -11,6 +11,7 @@
 #include "human/tts/cartesia_stream.h"
 #include "human/voice.h"
 #include "human/voice/duplex.h"
+#include "human/voice/emotion_voice_map.h"
 #include "human/voice/semantic_eot.h"
 #include "human/voice/turn_signal.h"
 #include <stdio.h>
@@ -43,6 +44,8 @@ typedef struct {
     char voice_id[128];
     char model_id[128];
     hu_duplex_session_t duplex;
+    hu_voice_emotion_t current_emotion;
+    hu_voice_params_t emotion_voice_params;
 } vs_slot_t;
 
 static vs_slot_t s_vs[VS_MAX_SLOTS];
@@ -190,6 +193,17 @@ static bool vs_bus_cb(hu_bus_event_type_t type, const hu_bus_event_t *ev, void *
                     tts_text = stripped;
                 else
                     return true;
+            }
+            /* Emotion-aware TTS: detect emotion from response text and update voice params */
+            {
+                hu_voice_emotion_t emo = HU_VOICE_EMOTION_NEUTRAL;
+                float emo_conf = 0.0f;
+                if (hu_emotion_detect_from_text(tts_text, strlen(tts_text), &emo, &emo_conf) ==
+                        HU_OK &&
+                    emo_conf > 0.3f && emo != sl->current_emotion) {
+                    sl->current_emotion = emo;
+                    sl->emotion_voice_params = hu_emotion_voice_map(emo);
+                }
             }
             if (hu_cartesia_stream_send_generation(sl->tts, a, sl->tts_context, tts_text, true) ==
                 HU_OK)

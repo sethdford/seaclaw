@@ -308,6 +308,18 @@ struct hu_agent {
 #ifdef HU_ENABLE_SQLITE
     struct sqlite3 *cognition_db; /* shared DB for evolving + episodic */
 #endif
+
+    /* SOTA: cross-turn prompt cache for system prompt deduplication */
+    struct hu_prompt_cache *prompt_cache; /* owned; NULL until first turn */
+
+    /* SOTA: cross-turn tool result cache with TTL */
+    struct hu_tool_cache_ttl *tool_cache_ttl; /* owned; NULL until first turn */
+
+    /* SOTA: pluggable context engine for RAG/graph/hybrid context assembly */
+    struct hu_context_engine *context_engine; /* owned; NULL = use legacy behavior */
+
+    /* SOTA: agent communication protocol inbox for multi-agent coordination */
+    struct hu_acp_inbox *acp_inbox; /* owned; NULL until multi_agent enabled */
 };
 
 /* Create agent from minimal config (no full config loader yet).

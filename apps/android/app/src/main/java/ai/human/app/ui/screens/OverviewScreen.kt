@@ -285,12 +285,42 @@ fun OverviewScreen(
         }
 
         item {
+            StaggeredItem(
+                index = 4,
+                reducedMotion = reducedMotion,
+                enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
+                    slideInVertically(
+                        animationSpec = listItemSpring,
+                        initialOffsetY = { it / 4 },
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(HUTokens.spaceMd),
+                ) {
+                    StatCard(
+                        title = "SOTA Features",
+                        value = if (showSkeletons) "" else "Active",
+                        modifier = Modifier.weight(1f),
+                        isSkeleton = showSkeletons,
+                    )
+                    StatCard(
+                        title = "CoT Audit",
+                        value = if (showSkeletons) "" else "Auditing",
+                        modifier = Modifier.weight(1f),
+                        isSkeleton = showSkeletons,
+                    )
+                }
+            }
+        }
+
+        item {
             Spacer(modifier = Modifier.height(HUTokens.spaceLg))
         }
 
         item {
             StaggeredItem(
-                index = 3,
+                index = 5,
                 reducedMotion = reducedMotion,
                 enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                     slideInVertically(
@@ -313,7 +343,7 @@ fun OverviewScreen(
         if (showSkeletons) {
             items(3) { index ->
                 StaggeredItem(
-                    index = 4 + index,
+                    index = 6 + index,
                     reducedMotion = reducedMotion,
                     enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                         slideInVertically(
@@ -328,7 +358,7 @@ fun OverviewScreen(
             items(displayActivity.size) { index ->
                 val activity = displayActivity[index]
                 StaggeredItem(
-                    index = 4 + index,
+                    index = 6 + index,
                     reducedMotion = reducedMotion,
                     enter = fadeIn(animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)) +
                         slideInVertically(

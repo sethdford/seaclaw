@@ -257,12 +257,13 @@ typedef struct hu_bookend_config {
     size_t phrases_evening_count;
 } hu_bookend_config_t;
 
-/* Humanization config — disfluency, backchannels, burst messages, double-text */
+/* Humanization config — disfluency, backchannels, burst messages, double-text, GIFs */
 typedef struct hu_humanization_config {
     float disfluency_frequency;      /* default 0.15 */
     float backchannel_probability;   /* default 0.3 */
     float burst_message_probability; /* default 0.03 */
     float double_text_probability;   /* default 0.08 */
+    float gif_probability;           /* default 0.10 */
 } hu_humanization_config_t;
 
 /* Context modifiers — topic/emotion/turn-based boosts */

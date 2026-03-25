@@ -2270,6 +2270,174 @@ static void gif_search_prompt_nonempty(void) {
     HU_ASSERT_TRUE(strstr(buf, "GIF") != NULL || strstr(buf, "search") != NULL);
 }
 
+/* ── GIF received reaction tests ────────────────────────────────────── */
+
+static void reaction_gif_returns_haha_or_heart(void) {
+    int haha = 0, heart = 0, none = 0;
+    for (uint32_t s = 0; s < 200; s++) {
+        hu_reaction_type_t r = hu_conversation_classify_reaction("[GIF]", 5, false, NULL, 0, s);
+        if (r == HU_REACTION_HAHA)
+            haha++;
+        else if (r == HU_REACTION_HEART)
+            heart++;
+        else
+            none++;
+    }
+    HU_ASSERT_TRUE(haha > 0);
+    HU_ASSERT_TRUE(heart > 0);
+    HU_ASSERT_TRUE(none > 0);
+}
+
+static void reaction_voice_message_returns_none(void) {
+    hu_reaction_type_t r =
+        hu_conversation_classify_reaction("[Voice Message]", 15, false, NULL, 0, 42);
+    HU_ASSERT_EQ(HU_REACTION_NONE, r);
+}
+
+/* ── Contact-aware GIF probability tests ────────────────────────────── */
+
+static void gif_prob_friend_increases(void) {
+    float base = 0.10f;
+    float adj = hu_conversation_adjust_gif_probability(base, "friend", 6);
+    HU_ASSERT_TRUE(adj > base);
+}
+
+static void gif_prob_coworker_decreases(void) {
+    float base = 0.10f;
+    float adj = hu_conversation_adjust_gif_probability(base, "coworker", 8);
+    HU_ASSERT_TRUE(adj < base);
+}
+
+static void gif_prob_null_relationship_unchanged(void) {
+    float base = 0.10f;
+    float adj = hu_conversation_adjust_gif_probability(base, NULL, 0);
+    HU_ASSERT_TRUE(adj >= base - 0.001f && adj <= base + 0.001f);
+}
+
+static void gif_prob_acquaintance_very_low(void) {
+    float base = 0.10f;
+    float adj = hu_conversation_adjust_gif_probability(base, "acquaintance", 12);
+    HU_ASSERT_TRUE(adj < base * 0.3f);
+}
+
+static void gif_style_hint_friend_absurd(void) {
+    char buf[128];
+    size_t len = hu_conversation_build_gif_style_hint("friend", 6, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "absurd") != NULL || strstr(buf, "meme") != NULL);
+}
+
+static void gif_style_hint_partner_cute(void) {
+    char buf[128];
+    size_t len = hu_conversation_build_gif_style_hint("partner", 7, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "cute") != NULL || strstr(buf, "flirty") != NULL);
+}
+
+static void gif_style_hint_null_default(void) {
+    char buf[128];
+    size_t len = hu_conversation_build_gif_style_hint(NULL, 0, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "funny") != NULL);
+}
+
+/* ── GIF rate limiting tests ────────────────────────────────────────── */
+
+static void gif_rate_first_send_allowed(void) {
+    HU_ASSERT_TRUE(hu_conversation_gif_rate_allow("unknown_contact", 15, 1000000, 5, 600000));
+}
+
+static void gif_rate_records_and_blocks(void) {
+    hu_conversation_gif_rate_record("rate_test_contact", 17, 1000000);
+    bool allowed = hu_conversation_gif_rate_allow("rate_test_contact", 17, 1000100, 5, 600000);
+    HU_ASSERT_TRUE(!allowed);
+}
+
+static void gif_rate_allows_after_gap(void) {
+    hu_conversation_gif_rate_record("gap_test_contact", 16, 1000000);
+    bool allowed =
+        hu_conversation_gif_rate_allow("gap_test_contact", 16, 1000000 + 700000, 5, 600000);
+    HU_ASSERT_TRUE(allowed);
+}
+
+/* ── Seen behavior modeling tests ───────────────────────────────────── */
+
+static void seen_respond_now_for_question(void) {
+    uint32_t delay = 0;
+    hu_seen_action_t act =
+        hu_conversation_classify_seen_behavior("hey what's up?", 14, 10, 42, &delay);
+    HU_ASSERT_EQ(HU_SEEN_RESPOND_NOW, act);
+}
+
+static void seen_respond_now_for_urgent(void) {
+    uint32_t delay = 0;
+    hu_seen_action_t act =
+        hu_conversation_classify_seen_behavior("this is urgent", 14, 12, 42, &delay);
+    HU_ASSERT_EQ(HU_SEEN_RESPOND_NOW, act);
+}
+
+static void seen_null_msg_respond_now(void) {
+    uint32_t delay = 0;
+    hu_seen_action_t act = hu_conversation_classify_seen_behavior(NULL, 0, 10, 42, &delay);
+    HU_ASSERT_EQ(HU_SEEN_RESPOND_NOW, act);
+    HU_ASSERT_EQ(0, (int)delay);
+}
+
+static void seen_low_priority_sometimes_delays(void) {
+    int delayed = 0;
+    for (uint32_t s = 0; s < 500; s++) {
+        uint32_t d = 0;
+        hu_seen_action_t act = hu_conversation_classify_seen_behavior("ok", 2, 12, s, &d);
+        if (act == HU_SEEN_DELAY_THEN_RESPOND) {
+            delayed++;
+            HU_ASSERT_TRUE(d > 0);
+        }
+    }
+    HU_ASSERT_TRUE(delayed > 0);
+    HU_ASSERT_TRUE(delayed < 250);
+}
+
+/* ── Cold restart test with 6+ hour gap ─────────────────────────────── */
+
+static void cold_restart_six_hour_gap(void) {
+    time_t now = time(NULL);
+    time_t old = now - 25200; /* 7 hours ago */
+    struct tm tm_old, tm_new;
+    localtime_r(&old, &tm_old);
+    localtime_r(&now, &tm_new);
+    hu_channel_history_entry_t entries[2];
+    memset(entries, 0, sizeof(entries));
+    entries[0].from_me = true;
+    strncpy(entries[0].text, "see you later", sizeof(entries[0].text) - 1);
+    strftime(entries[0].timestamp, sizeof(entries[0].timestamp), "%Y-%m-%d %H:%M", &tm_old);
+    entries[1].from_me = false;
+    strncpy(entries[1].text, "hey", sizeof(entries[1].text) - 1);
+    strftime(entries[1].timestamp, sizeof(entries[1].timestamp), "%Y-%m-%d %H:%M", &tm_new);
+    char buf[512];
+    size_t len = hu_conversation_build_cold_restart_hint(entries, 2, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "COLD RESTART") != NULL);
+}
+
+static void cold_restart_one_hour_gap_no_hint(void) {
+    time_t now = time(NULL);
+    time_t old = now - 3600; /* 1 hour ago */
+    struct tm tm_old, tm_new;
+    localtime_r(&old, &tm_old);
+    localtime_r(&now, &tm_new);
+    hu_channel_history_entry_t entries[2];
+    memset(entries, 0, sizeof(entries));
+    entries[0].from_me = true;
+    strncpy(entries[0].text, "brb", sizeof(entries[0].text) - 1);
+    strftime(entries[0].timestamp, sizeof(entries[0].timestamp), "%Y-%m-%d %H:%M", &tm_old);
+    entries[1].from_me = false;
+    strncpy(entries[1].text, "ok im back", sizeof(entries[1].text) - 1);
+    strftime(entries[1].timestamp, sizeof(entries[1].timestamp), "%Y-%m-%d %H:%M", &tm_new);
+    char buf[512];
+    size_t len = hu_conversation_build_cold_restart_hint(entries, 2, buf, sizeof(buf));
+    HU_ASSERT_EQ(0, (int)len);
+}
+
 /* ── Banned AI phrases expansion tests ──────────────────────────────── */
 
 static void strip_feel_free_to(void) {
@@ -3380,4 +3548,32 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(gif_decision_funny_message_prob_one_returns_true);
     HU_RUN_TEST(gif_decision_question_returns_false);
     HU_RUN_TEST(gif_search_prompt_nonempty);
+
+    /* GIF received reaction */
+    HU_RUN_TEST(reaction_gif_returns_haha_or_heart);
+    HU_RUN_TEST(reaction_voice_message_returns_none);
+
+    /* Contact-aware GIF probability */
+    HU_RUN_TEST(gif_prob_friend_increases);
+    HU_RUN_TEST(gif_prob_coworker_decreases);
+    HU_RUN_TEST(gif_prob_null_relationship_unchanged);
+    HU_RUN_TEST(gif_prob_acquaintance_very_low);
+    HU_RUN_TEST(gif_style_hint_friend_absurd);
+    HU_RUN_TEST(gif_style_hint_partner_cute);
+    HU_RUN_TEST(gif_style_hint_null_default);
+
+    /* GIF rate limiting */
+    HU_RUN_TEST(gif_rate_first_send_allowed);
+    HU_RUN_TEST(gif_rate_records_and_blocks);
+    HU_RUN_TEST(gif_rate_allows_after_gap);
+
+    /* Seen behavior modeling */
+    HU_RUN_TEST(seen_respond_now_for_question);
+    HU_RUN_TEST(seen_respond_now_for_urgent);
+    HU_RUN_TEST(seen_null_msg_respond_now);
+    HU_RUN_TEST(seen_low_priority_sometimes_delays);
+
+    /* Cold restart with real time gaps */
+    HU_RUN_TEST(cold_restart_six_hour_gap);
+    HU_RUN_TEST(cold_restart_one_hour_gap_no_hint);
 }

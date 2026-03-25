@@ -5,10 +5,12 @@
  */
 
 #include "human/bootstrap.h"
+#include "human/agent/agent_comm.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/spawn.h"
 #include "human/cognition/metacognition.h"
 #include "human/config.h"
+#include "human/context_engine.h"
 #include "human/data/loader.h"
 #include "human/memory.h"
 #include "human/memory/engines.h"
@@ -727,6 +729,29 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             bi->agent.policy_engine = hu_policy_engine_create(alloc);
         hu_agent_set_retrieval_engine(&bi->agent, &bi->retrieval_engine);
         hu_agent_set_skill_route_embedder(&bi->agent, &bi->embedder);
+
+        /* SOTA: pluggable context engine (defaults to legacy wrapper) */
+        if (!bi->cfg.agent.context_engine_type ||
+            strcmp(bi->cfg.agent.context_engine_type, "legacy") == 0 ||
+            bi->cfg.agent.context_engine_type[0] == '\0') {
+            hu_context_engine_t *ce =
+                (hu_context_engine_t *)alloc->alloc(alloc->ctx, sizeof(hu_context_engine_t));
+            if (ce && hu_context_engine_legacy_create(alloc, ce) == HU_OK)
+                bi->agent.context_engine = (struct hu_context_engine *)ce;
+            else if (ce)
+                alloc->free(alloc->ctx, ce, sizeof(hu_context_engine_t));
+        }
+
+        /* SOTA: ACP inbox for multi-agent coordination */
+        if (bi->cfg.agent.agent_comm_enabled || bi->cfg.agent.multi_agent) {
+            hu_acp_inbox_t *inbox =
+                (hu_acp_inbox_t *)alloc->alloc(alloc->ctx, sizeof(hu_acp_inbox_t));
+            if (inbox && hu_acp_inbox_init(inbox, alloc, 16) == HU_OK)
+                bi->agent.acp_inbox = (struct hu_acp_inbox *)inbox;
+            else if (inbox)
+                alloc->free(alloc->ctx, inbox, sizeof(hu_acp_inbox_t));
+        }
+
         if (bi->cfg.security.audit.enabled) {
             hu_audit_config_t acfg = HU_AUDIT_CONFIG_DEFAULT;
             acfg.enabled = true;

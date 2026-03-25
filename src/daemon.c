@@ -21,6 +21,7 @@
 #include "human/agent/weather_awareness.h"
 #include "human/agent/weather_fetch.h"
 #include "human/channels/format.h"
+#include "human/channels/imessage.h"
 #include "human/config.h"
 #include "human/context/conversation.h"
 #include "human/context/event_extract.h"
@@ -52,6 +53,7 @@
 #include "human/tts/audio_pipeline.h"
 #include "human/tts/cartesia.h"
 #include "human/voice.h"
+#include "human/voice/emotion_voice_map.h"
 #include "human/voice/session.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/memory.h"
@@ -2116,6 +2118,49 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 alloc->free(alloc->ctx, prompt, prompt_len + 1);
                 hu_agent_clear_history(agent);
             }
+
+#ifdef HU_ENABLE_SQLITE
+            /* Proactive photo sharing: scan Apple Photos for shareable content */
+            if (channels[c].channel->vtable->send && combined_len > 0) {
+                static uint64_t last_photo_scan_ms;
+                uint64_t pnow_ms = (uint64_t)time(NULL) * 1000ULL;
+                if (pnow_ms - last_photo_scan_ms > 3600000) { /* max once per hour */
+                    char photos_db[512];
+                    size_t pdb_len = hu_visual_apple_photos_db_path(photos_db, sizeof(photos_db));
+                    if (pdb_len > 0) {
+                        hu_visual_entry_t *photos = NULL;
+                        size_t photo_count = 0;
+                        if (hu_visual_scan_apple_photos(alloc, photos_db, 3, &photos, &photo_count,
+                                                        5) == HU_OK &&
+                            photos && photo_count > 0) {
+                            bool shared = false;
+                            double best_conf = 0.0;
+                            size_t best_idx = 0;
+                            for (size_t pi = 0; pi < photo_count && !shared; pi++) {
+                                bool should_share = false;
+                                double conf = 0.0;
+                                hu_visual_should_share(&photos[pi], combined, combined_len,
+                                                       &should_share, &conf);
+                                if (should_share && conf > best_conf) {
+                                    best_conf = conf;
+                                    best_idx = pi;
+                                }
+                            }
+                            if (best_conf > 0.3 && photos[best_idx].path[0]) {
+                                const char *media[] = {photos[best_idx].path};
+                                channels[c].channel->vtable->send(channels[c].channel->ctx,
+                                                                  target_part, target_len, "", 0,
+                                                                  media, 1);
+                                fprintf(stderr, "[human] proactive photo shared: %s\n",
+                                        photos[best_idx].path);
+                                last_photo_scan_ms = pnow_ms;
+                            }
+                            hu_visual_entries_free(alloc, photos, photo_count);
+                        }
+                    }
+                }
+            }
+#endif
             if (event_ctx)
                 alloc->free(alloc->ctx, event_ctx, event_ctx_len + 1);
             if (silence_ctx)
@@ -3464,6 +3509,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #ifndef HU_IS_TEST
                 if (agent && agent->bth_metrics)
                     agent->bth_metrics->total_turns++;
+#endif
+
+                /* Seen behavior: model realistic "read then wait" patterns */
+#ifndef HU_IS_TEST
+                {
+                    uint32_t seen_seed =
+                        (uint32_t)time(NULL) * 1103515245u + (uint32_t)(uintptr_t)combined;
+                    uint32_t seen_delay_ms = 0;
+                    hu_seen_action_t seen_action = hu_conversation_classify_seen_behavior(
+                        combined, combined_len, (uint8_t)bth_hour, seen_seed, &seen_delay_ms);
+                    if (seen_action == HU_SEEN_DELAY_THEN_RESPOND && seen_delay_ms > 0) {
+                        fprintf(stderr, "[human] seen-delay: waiting %u ms before responding\n",
+                                seen_delay_ms);
+                        usleep(seen_delay_ms * 1000u);
+                    }
+                }
 #endif
 
                 /* Adaptive timing based on message type. Variable delay with jitter,
@@ -7064,6 +7125,85 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
+                /* ── Situational context injections ─────────────────────────── */
+#ifndef HU_IS_TEST
+                {
+                    char inject_buf[2048];
+                    size_t inject_pos = 0;
+
+                    /* Cold restart: detect >4h conversation gap */
+                    if (history_entries && history_count > 0) {
+                        size_t n = hu_conversation_build_cold_restart_hint(
+                            history_entries, history_count, inject_buf + inject_pos,
+                            sizeof(inject_buf) - inject_pos);
+                        if (n > 0) {
+                            inject_pos += n;
+                            inject_buf[inject_pos++] = '\n';
+                        }
+                    }
+
+                    /* Group chat: mention sender's name for natural addressing */
+                    if (msgs[batch_start].is_group && combined_len > 0) {
+                        const char *sender = msgs[batch_start].session_key;
+                        size_t sender_len = strlen(sender);
+                        /* Use first name or handle prefix before @ */
+                        const char *at = memchr(sender, '@', sender_len);
+                        size_t first_len = at ? (size_t)(at - sender) : sender_len;
+                        if (first_len > 0 && first_len < 32) {
+                            size_t n = hu_conversation_build_group_mention_hint(
+                                sender, first_len, true, inject_buf + inject_pos,
+                                sizeof(inject_buf) - inject_pos);
+                            if (n > 0) {
+                                inject_pos += n;
+                                inject_buf[inject_pos++] = '\n';
+                            }
+                        }
+                    }
+
+                    /* Link awareness: detect URLs in their message */
+                    if (combined_len > 0) {
+                        size_t n = hu_conversation_build_link_context(
+                            combined, combined_len, inject_buf + inject_pos,
+                            sizeof(inject_buf) - inject_pos);
+                        if (n > 0) {
+                            inject_pos += n;
+                            inject_buf[inject_pos++] = '\n';
+                        }
+                    }
+
+                    /* Voice message awareness */
+                    if (combined_len > 0 &&
+                        (memmem(combined, combined_len, "[Voice Message]", 15) != NULL)) {
+                        static const char vm_hint[] =
+                            "[VOICE MESSAGE] They sent a voice message. React naturally — "
+                            "\"just listened\" or respond to the likely content. "
+                            "Don't say \"I can't listen to audio\".";
+                        size_t vm_len = sizeof(vm_hint) - 1;
+                        if (inject_pos + vm_len + 1 < sizeof(inject_buf)) {
+                            memcpy(inject_buf + inject_pos, vm_hint, vm_len);
+                            inject_pos += vm_len;
+                            inject_buf[inject_pos++] = '\n';
+                        }
+                    }
+
+                    /* Append all injections to convo_ctx */
+                    if (inject_pos > 0) {
+                        size_t new_len = inject_pos + (convo_ctx ? convo_ctx_len : 0);
+                        char *merged = (char *)alloc->alloc(alloc->ctx, new_len + 1);
+                        if (merged) {
+                            memcpy(merged, inject_buf, inject_pos);
+                            if (convo_ctx && convo_ctx_len > 0)
+                                memcpy(merged + inject_pos, convo_ctx, convo_ctx_len);
+                            merged[new_len] = '\0';
+                            if (convo_ctx)
+                                alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                            convo_ctx = merged;
+                            convo_ctx_len = new_len;
+                        }
+                    }
+                }
+#endif
+
                 /* Set agent per-turn context fields (prompt builder reads these) */
                 agent->contact_context = contact_ctx;
                 agent->contact_context_len = contact_ctx_len;
@@ -8344,15 +8484,26 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         combined, combined_len, response, response_len,
                                         (uint8_t)bth_hour);
 
+                                    /* Emotion voice map: detect emotion + derive expressive params
+                                     */
+                                    hu_voice_emotion_t detected_emotion = HU_VOICE_EMOTION_NEUTRAL;
+                                    float emotion_confidence = 0.0f;
+                                    hu_emotion_detect_from_text(response, response_len,
+                                                                &detected_emotion,
+                                                                &emotion_confidence);
+                                    hu_voice_params_t evo_params =
+                                        hu_emotion_voice_map(detected_emotion);
+                                    float base_speed = agent->persona->voice.default_speed > 0.f
+                                                           ? agent->persona->voice.default_speed
+                                                           : 0.95f;
+
                                     hu_cartesia_tts_config_t tts_cfg = {
                                         .model_id = agent->persona->voice.model[0]
                                                         ? agent->persona->voice.model
                                                         : "sonic-3-2026-01-12",
                                         .voice_id = agent->persona->voice.voice_id,
                                         .emotion = emo_str,
-                                        .speed = agent->persona->voice.default_speed > 0.f
-                                                     ? agent->persona->voice.default_speed
-                                                     : 0.95f,
+                                        .speed = base_speed * evo_params.rate_factor,
                                         .volume = 1.0f,
                                         .nonverbals = agent->persona->voice.nonverbals,
                                     };
@@ -8756,6 +8907,110 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             }
                             if (dt_resp)
                                 alloc->free(alloc->ctx, dt_resp, dt_resp_len + 1);
+                        }
+                    }
+                }
+
+                /* Self-reaction: occasionally haha/emphasize own message (~2%) */
+                if (response && response_len > 0 && ch->channel->vtable->react) {
+                    hu_reaction_type_t self_r = hu_conversation_classify_self_reaction(
+                        response, response_len, (uint32_t)time(NULL));
+                    if (self_r != HU_REACTION_NONE) {
+                        usleep(1500000 + ((uint32_t)time(NULL) % 3000000));
+                        int64_t last_msg_id = msgs[batch_end].message_id;
+                        if (last_msg_id > 0) {
+                            ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len,
+                                                       last_msg_id + 1, self_r);
+                            fprintf(stderr, "[human] self-reaction on own message: %d\n",
+                                    (int)self_r);
+                        }
+                    }
+                }
+
+                /* GIF reaction: send a GIF when the moment calls for it */
+                if (combined_len > 0 && ch->channel->vtable->send) {
+                    float gif_prob = 0.10f;
+                    const char *contact_rel = NULL;
+                    size_t contact_rel_len = 0;
+#ifdef HU_HAS_PERSONA
+                    if (agent->persona) {
+                        gif_prob = agent->persona->humanization.gif_probability > 0.0f
+                                       ? agent->persona->humanization.gif_probability
+                                       : 0.10f;
+                        for (size_t ci = 0; ci < agent->persona->contacts_count; ci++) {
+                            const hu_contact_profile_t *cpr = &agent->persona->contacts[ci];
+                            if (cpr->contact_id && batch_key &&
+                                strstr(batch_key, cpr->contact_id)) {
+                                contact_rel = cpr->relationship_type ? cpr->relationship_type
+                                                                     : cpr->relationship;
+                                contact_rel_len = contact_rel ? strlen(contact_rel) : 0;
+                                break;
+                            }
+                        }
+                    }
+#endif
+                    gif_prob = hu_conversation_adjust_gif_probability(gif_prob, contact_rel,
+                                                                      contact_rel_len);
+                    uint32_t gif_seed =
+                        (uint32_t)time(NULL) * 2654435761u + (uint32_t)(uintptr_t)combined;
+                    uint64_t gif_now_ms = (uint64_t)time(NULL) * 1000ULL;
+                    if (hu_conversation_should_send_gif(combined, combined_len, history_entries,
+                                                        history_count, gif_seed, gif_prob) &&
+                        hu_conversation_gif_rate_allow(batch_key, key_len, gif_now_ms, 5, 600000)) {
+                        const char *tenor_key =
+                            config ? hu_config_get_provider_key(config, "tenor") : NULL;
+                        if (tenor_key && tenor_key[0]) {
+                            char gif_style[128];
+                            size_t gs_len = hu_conversation_build_gif_style_hint(
+                                contact_rel, contact_rel_len, gif_style, sizeof(gif_style));
+                            char gif_prompt[640];
+                            size_t gp_len = hu_conversation_build_gif_search_prompt(
+                                combined, combined_len, gif_prompt, sizeof(gif_prompt));
+                            if (gp_len > 0 && gs_len > 0 &&
+                                gp_len + 1 + gs_len < sizeof(gif_prompt)) {
+                                gif_prompt[gp_len] = ' ';
+                                memcpy(gif_prompt + gp_len + 1, gif_style, gs_len);
+                                gp_len += 1 + gs_len;
+                                gif_prompt[gp_len] = '\0';
+                            }
+                            if (gp_len > 0) {
+                                char *gif_query = NULL;
+                                size_t gif_query_len = 0;
+                                const char *gif_model = agent->model_name
+                                                            ? agent->model_name
+                                                            : "gemini-3.1-flash-lite-preview";
+                                size_t gif_model_len =
+                                    agent->model_name ? agent->model_name_len : 31;
+                                if (agent->provider.vtable &&
+                                    agent->provider.vtable->chat_with_system) {
+                                    (void)agent->provider.vtable->chat_with_system(
+                                        agent->provider.ctx, alloc,
+                                        "Return ONLY a 2-4 word GIF search query. No quotes, no "
+                                        "explanation.",
+                                        68, gif_prompt, gp_len, gif_model, gif_model_len, 0.8,
+                                        &gif_query, &gif_query_len);
+                                }
+                                if (gif_query && gif_query_len > 0 && gif_query_len < 100) {
+                                    char *gif_path =
+                                        hu_imessage_fetch_gif(alloc, gif_query, gif_query_len,
+                                                              tenor_key, strlen(tenor_key));
+                                    if (gif_path) {
+                                        usleep(2000000 + (gif_seed % 3000000));
+                                        const char *media[] = {gif_path};
+                                        ch->channel->vtable->send(ch->channel->ctx, batch_key,
+                                                                  key_len, "", 0, media, 1);
+                                        (void)unlink(gif_path);
+                                        hu_conversation_gif_rate_record(batch_key, key_len,
+                                                                        gif_now_ms);
+                                        fprintf(stderr, "[human] sent GIF: query=\"%.*s\"\n",
+                                                (int)gif_query_len, gif_query);
+                                        size_t gp_path_len = strlen(gif_path);
+                                        alloc->free(alloc->ctx, gif_path, gp_path_len + 1);
+                                    }
+                                }
+                                if (gif_query)
+                                    alloc->free(alloc->ctx, gif_query, gif_query_len + 1);
+                            }
                         }
                     }
                 }

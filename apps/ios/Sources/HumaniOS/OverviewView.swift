@@ -200,8 +200,41 @@ struct OverviewView: View {
                             reduceMotion: reduceMotion,
                             icon: .terminal
                         )
+                        StatCard(
+                            title: "SOTA",
+                            value: connectionManager.isConnected ? "Active" : "—",
+                            trend: "features",
+                            trendUp: true,
+                            tokens: tokens,
+                            appeared: appeared,
+                            delay: 0.25,
+                            reduceMotion: reduceMotion,
+                            icon: .grid
+                        )
+                        StatCard(
+                            title: "Security CoT",
+                            value: connectionManager.isConnected ? "Auditing" : "—",
+                            trend: "chain of thought",
+                            trendUp: true,
+                            tokens: tokens,
+                            appeared: appeared,
+                            delay: 0.3,
+                            reduceMotion: reduceMotion,
+                            icon: .gear
+                        )
+                        StatCard(
+                            title: "Emotion Voice",
+                            value: connectionManager.isConnected ? "Active" : "—",
+                            trend: "pipeline",
+                            trendUp: true,
+                            tokens: tokens,
+                            appeared: appeared,
+                            delay: 0.35,
+                            reduceMotion: reduceMotion,
+                            icon: .chat
+                        )
                         } else {
-                            ForEach(0..<5, id: \.self) { _ in
+                            ForEach(0..<8, id: \.self) { _ in
                                 StatCardSkeleton()
                             }
                         }

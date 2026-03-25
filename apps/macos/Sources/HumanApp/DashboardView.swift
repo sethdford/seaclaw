@@ -213,12 +213,18 @@ struct MacOverviewPane: View {
         let modelLine = status.overviewModel
         let modelShort =
             modelLine.count > 20 ? String(modelLine.prefix(20)) + "…" : modelLine
+        let cotLine = status.isGatewayConnected ? "Auditing" : "—"
+        let promptCacheLine = status.isGatewayConnected ? "Active" : "—"
+        let emotionVoiceLine = status.isGatewayConnected ? "Active" : "—"
         return [
             ("Channels", status.overviewChannelCount, "bubble.left.and.bubble.right"),
             ("Tools", status.overviewToolCount, "wrench.and.screwdriver"),
             ("Model", modelShort == "—" ? "—" : modelShort, "cpu"),
             ("Uptime", status.overviewUptime, "clock"),
             ("HuLa", status.overviewHulaCount, "terminal"),
+            ("CoT Audit", cotLine, "checkmark.shield"),
+            ("Prompt Cache", promptCacheLine, "internaldrive"),
+            ("Emotion Voice", emotionVoiceLine, "waveform"),
         ]
     }
 
@@ -232,7 +238,7 @@ struct MacOverviewPane: View {
 
                 MacGatewayCard(status: status, tokens: tokens, reduceMotion: reduceMotion)
 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: HUTokens.spaceMd), count: 5), spacing: HUTokens.spaceMd) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: HUTokens.spaceMd), count: 4), spacing: HUTokens.spaceMd) {
                     ForEach(Array(overviewStats.enumerated()), id: \.offset) { index, stat in
                         MacStatCard(stat: stat, tokens: tokens, index: index, appeared: appeared, reduceMotion: reduceMotion)
                     }

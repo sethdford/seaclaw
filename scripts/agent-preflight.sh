@@ -51,7 +51,7 @@ printf "C=%d  UI=%d  Tokens=%d  Website=%d  Apps=%d  Docs=%d  Full=%d\n\n" \
     "$C_CHANGED" "$UI_CHANGED" "$TOKENS_CHANGED" "$WEBSITE_CHANGED" "${APPS_CHANGED:-0}" "${DOCS_CHANGED:-0}" "$FULL"
 
 if [ "$C_CHANGED" -eq 1 ]; then
-    printf "--- C Backend ---\n"
+    printf '%s\n' "--- C Backend ---"
 
     if cmake --build build -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)" 2>&1 | tail -3; then
         pass "C build"
@@ -97,7 +97,7 @@ if [ "$C_CHANGED" -eq 1 ]; then
 fi
 
 if [ "$UI_CHANGED" -eq 1 ]; then
-    printf "--- UI Dashboard ---\n"
+    printf '%s\n' "--- UI Dashboard ---"
 
     if (cd ui && npm run typecheck 2>&1 | tail -3); then
         pass "TypeScript typecheck"
@@ -120,7 +120,7 @@ if [ "$UI_CHANGED" -eq 1 ]; then
 fi
 
 if [ "$TOKENS_CHANGED" -eq 1 ]; then
-    printf "--- Design Tokens ---\n"
+    printf '%s\n' "--- Design Tokens ---"
     if design-tokens/check-drift.sh 2>&1 | tail -3; then
         pass "Token drift check"
     else
@@ -130,7 +130,7 @@ if [ "$TOKENS_CHANGED" -eq 1 ]; then
 fi
 
 if [ "$WEBSITE_CHANGED" -eq 1 ]; then
-    printf "--- Website ---\n"
+    printf '%s\n' "--- Website ---"
     if (cd website && npm run build 2>&1 | tail -3); then
         pass "Website build"
     else
@@ -140,7 +140,7 @@ if [ "$WEBSITE_CHANGED" -eq 1 ]; then
 fi
 
 if [ "${APPS_CHANGED:-0}" -eq 1 ]; then
-    printf "--- Native apps (apps/) ---\n"
+    printf '%s\n' "--- Native apps (apps/) ---"
     if (cd apps/shared/HumanKit && swift test 2>&1 | tail -5); then
         pass "HumanKit swift test"
     else
@@ -171,7 +171,7 @@ if [ "${APPS_CHANGED:-0}" -eq 1 ]; then
 fi
 
 if [ "${DOCS_CHANGED:-0}" -eq 1 ]; then
-    printf "--- Documentation (doc fleet) ---\n"
+    printf '%s\n' "--- Documentation (doc fleet) ---"
     if bash scripts/doc-fleet.sh; then
         pass "Doc fleet"
     else

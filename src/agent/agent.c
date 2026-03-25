@@ -18,6 +18,7 @@
 #include "human/persona/circadian.h"
 #include "human/persona/relationship.h"
 #endif
+#include "human/agent/agent_comm.h"
 #include "human/agent/commands.h"
 #include "human/agent/compaction.h"
 #include "human/agent/dispatcher.h"
@@ -29,12 +30,15 @@
 #include "human/agent/planner.h"
 #include "human/agent/preferences.h"
 #include "human/agent/prompt.h"
+#include "human/agent/prompt_cache.h"
 #include "human/agent/reflection.h"
 #include "human/agent/speculative.h"
 #include "human/agent/task_list.h"
 #include "human/agent/team.h"
 #include "human/agent/tool_context.h"
 #include "human/agent/undo.h"
+#include "human/context_engine.h"
+#include "human/tools/cache_ttl.h"
 #ifdef HU_HAS_SKILLS
 #include "human/skillforge.h"
 #endif
@@ -567,6 +571,28 @@ void hu_agent_deinit(hu_agent_t *agent) {
         agent->alloc->free(agent->alloc->ctx, agent->tool_specs,
                            agent->tool_specs_count * sizeof(hu_tool_spec_t));
         agent->tool_specs = NULL;
+    }
+    if (agent->prompt_cache) {
+        hu_prompt_cache_deinit((hu_prompt_cache_t *)agent->prompt_cache);
+        agent->alloc->free(agent->alloc->ctx, agent->prompt_cache, sizeof(hu_prompt_cache_t));
+        agent->prompt_cache = NULL;
+    }
+    if (agent->tool_cache_ttl) {
+        hu_tool_cache_ttl_deinit((hu_tool_cache_ttl_t *)agent->tool_cache_ttl);
+        agent->alloc->free(agent->alloc->ctx, agent->tool_cache_ttl, sizeof(hu_tool_cache_ttl_t));
+        agent->tool_cache_ttl = NULL;
+    }
+    if (agent->context_engine) {
+        hu_context_engine_t *ce = (hu_context_engine_t *)agent->context_engine;
+        if (ce->vtable && ce->vtable->deinit)
+            ce->vtable->deinit(ce->ctx, agent->alloc);
+        agent->alloc->free(agent->alloc->ctx, ce, sizeof(hu_context_engine_t));
+        agent->context_engine = NULL;
+    }
+    if (agent->acp_inbox) {
+        hu_acp_inbox_deinit((hu_acp_inbox_t *)agent->acp_inbox);
+        agent->alloc->free(agent->alloc->ctx, agent->acp_inbox, sizeof(hu_acp_inbox_t));
+        agent->acp_inbox = NULL;
     }
     if (agent->cached_static_prompt) {
         agent->alloc->free(agent->alloc->ctx, agent->cached_static_prompt,

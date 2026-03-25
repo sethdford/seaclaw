@@ -49,6 +49,8 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/cognition/dual_process.h"
 #include "human/cognition/emotional.h"
 #include "human/cognition/metacognition.h"
+#include "human/humanness.h"
+#include "human/memory/evolved_opinions.h"
 #include "human/memory/lifecycle/semantic_cache.h"
 #include "human/observability/bth_metrics.h"
 #include "human/observability/otlp.h"
@@ -72,6 +74,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/cognition/skill_routing.h"
 #include "human/memory/vector.h"
 #endif
+#include "human/agent/prompt_cache.h"
 #include "human/context.h"
 #include "human/context/conversation.h"
 #include "human/context_tokens.h"
@@ -83,6 +86,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/memory/stm.h"
 #include "human/memory/superhuman.h"
 #include "human/memory/tiers.h"
+#include "human/tools/cache_ttl.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #endif
@@ -1675,6 +1679,168 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
+    /* Humanness layer: shared references, curiosity, absence, imperfect delivery,
+     * evolved opinions, and emotional residue carryover directives */
+    char *humanness_ctx = NULL;
+    size_t humanness_ctx_len = 0;
+    char *imperfect_dir = NULL;
+    size_t imperfect_dir_len = 0;
+    char *residue_dir = NULL;
+    size_t residue_dir_len = 0;
+    {
+        char hum_buf[4096];
+        size_t hum_pos = 0;
+
+        /* Shared references — callbacks to past moments */
+        if (memory_ctx && memory_ctx_len > 0) {
+            hu_shared_reference_t *refs = NULL;
+            size_t ref_count = 0;
+            if (hu_shared_references_find(agent->alloc,
+                                          agent->memory_session_id ? agent->memory_session_id : "",
+                                          agent->memory_session_id_len, msg, msg_len, memory_ctx,
+                                          memory_ctx_len, &refs, &ref_count, 3) == HU_OK &&
+                ref_count > 0) {
+                size_t dir_len = 0;
+                char *dir =
+                    hu_shared_references_build_directive(agent->alloc, refs, ref_count, &dir_len);
+                if (dir && dir_len > 0 && hum_pos + dir_len + 2 < sizeof(hum_buf)) {
+                    memcpy(hum_buf + hum_pos, dir, dir_len);
+                    hum_pos += dir_len;
+                    hum_buf[hum_pos++] = '\n';
+                    hum_buf[hum_pos++] = '\n';
+                }
+                if (dir)
+                    agent->alloc->free(agent->alloc->ctx, dir, dir_len + 1);
+                hu_shared_references_free(agent->alloc, refs, ref_count);
+            }
+        }
+
+        /* Curiosity engine — spontaneous follow-ups from memory */
+        if (memory_ctx && memory_ctx_len > 0) {
+            hu_curiosity_prompt_t *prompts = NULL;
+            size_t cur_count = 0;
+            if (hu_curiosity_generate(agent->alloc,
+                                      agent->memory_session_id ? agent->memory_session_id : "",
+                                      agent->memory_session_id_len, memory_ctx, memory_ctx_len, msg,
+                                      msg_len, &prompts, &cur_count, 2) == HU_OK &&
+                cur_count > 0) {
+                size_t dir_len = 0;
+                char *dir =
+                    hu_curiosity_build_directive(agent->alloc, prompts, cur_count, &dir_len);
+                if (dir && dir_len > 0 && hum_pos + dir_len + 2 < sizeof(hum_buf)) {
+                    memcpy(hum_buf + hum_pos, dir, dir_len);
+                    hum_pos += dir_len;
+                    hum_buf[hum_pos++] = '\n';
+                    hum_buf[hum_pos++] = '\n';
+                }
+                if (dir)
+                    agent->alloc->free(agent->alloc->ctx, dir, dir_len + 1);
+                hu_curiosity_prompts_free(agent->alloc, prompts, cur_count);
+            }
+        }
+
+        /* Absence detection — notice what they didn't say */
+        if (msg_len >= 15) {
+            hu_absence_signal_t *abs_signals = NULL;
+            size_t abs_count = 0;
+            if (hu_absence_detect(agent->alloc, msg, msg_len, &abs_signals, &abs_count) == HU_OK &&
+                abs_count > 0) {
+                size_t dir_len = 0;
+                char *dir =
+                    hu_absence_build_directive(agent->alloc, abs_signals, abs_count, &dir_len);
+                if (dir && dir_len > 0 && hum_pos + dir_len + 2 < sizeof(hum_buf)) {
+                    memcpy(hum_buf + hum_pos, dir, dir_len);
+                    hum_pos += dir_len;
+                    hum_buf[hum_pos++] = '\n';
+                    hum_buf[hum_pos++] = '\n';
+                }
+                if (dir)
+                    agent->alloc->free(agent->alloc->ctx, dir, dir_len + 1);
+                hu_absence_signals_free(agent->alloc, abs_signals, abs_count);
+            }
+        }
+
+#ifdef HU_ENABLE_SQLITE
+        /* Evolved opinions — perspectives developed over time */
+        if (agent->memory) {
+            sqlite3 *eo_db = hu_sqlite_memory_get_db(agent->memory);
+            if (eo_db) {
+                hu_evolved_opinions_ensure_table(eo_db);
+                hu_evolved_opinion_t *opinions = NULL;
+                size_t op_count = 0;
+                if (hu_evolved_opinions_get(agent->alloc, eo_db, 0.4, 5, &opinions, &op_count) ==
+                        HU_OK &&
+                    opinions && op_count > 0) {
+                    size_t dir_len = 0;
+                    char *dir = hu_evolved_opinion_build_directive(agent->alloc, opinions, op_count,
+                                                                   0.4, &dir_len);
+                    if (dir && dir_len > 0 && hum_pos + dir_len + 2 < sizeof(hum_buf)) {
+                        memcpy(hum_buf + hum_pos, dir, dir_len);
+                        hum_pos += dir_len;
+                        hum_buf[hum_pos++] = '\n';
+                        hum_buf[hum_pos++] = '\n';
+                    }
+                    if (dir)
+                        agent->alloc->free(agent->alloc->ctx, dir, dir_len + 1);
+                    hu_evolved_opinions_free(agent->alloc, opinions, op_count);
+                }
+            }
+        }
+
+        /* Emotional residue carryover from prior conversations */
+        if (agent->memory) {
+            sqlite3 *rc_db = hu_sqlite_memory_get_db(agent->memory);
+            if (rc_db) {
+                sqlite3_stmt *rc_stmt = NULL;
+                const char *rc_sql = "SELECT valence, intensity, created_at FROM emotional_residues"
+                                     " WHERE contact_id = ?1 ORDER BY created_at DESC LIMIT 10";
+                if (sqlite3_prepare_v2(rc_db, rc_sql, -1, &rc_stmt, NULL) == SQLITE_OK) {
+                    if (agent->memory_session_id)
+                        sqlite3_bind_text(rc_stmt, 1, agent->memory_session_id,
+                                          (int)agent->memory_session_id_len, SQLITE_STATIC);
+                    double valences[10];
+                    double intensities[10];
+                    int64_t timestamps[10];
+                    size_t rc_count = 0;
+                    while (sqlite3_step(rc_stmt) == SQLITE_ROW && rc_count < 10) {
+                        valences[rc_count] = sqlite3_column_double(rc_stmt, 0);
+                        intensities[rc_count] = sqlite3_column_double(rc_stmt, 1);
+                        timestamps[rc_count] = sqlite3_column_int64(rc_stmt, 2);
+                        rc_count++;
+                    }
+                    sqlite3_finalize(rc_stmt);
+                    if (rc_count > 0) {
+                        hu_residue_carryover_t carryover = {0};
+                        if (hu_residue_carryover_compute(valences, intensities, timestamps,
+                                                         rc_count, (int64_t)time(NULL),
+                                                         &carryover) == HU_OK) {
+                            residue_dir = hu_residue_carryover_build_directive(
+                                agent->alloc, &carryover, &residue_dir_len);
+                        }
+                    }
+                } else if (rc_stmt) {
+                    sqlite3_finalize(rc_stmt);
+                }
+            }
+        }
+#endif
+
+        /* Imperfect delivery — express genuine uncertainty */
+        {
+            uint32_t tool_count = agent->tools_count > 0 ? (uint32_t)agent->tools_count : 0;
+            hu_certainty_level_t cert = hu_certainty_classify(
+                msg, msg_len, (memory_ctx != NULL && memory_ctx_len > 0), tool_count);
+            imperfect_dir = hu_imperfect_delivery_directive(agent->alloc, cert, &imperfect_dir_len);
+        }
+
+        if (hum_pos > 0) {
+            hum_buf[hum_pos] = '\0';
+            humanness_ctx = hu_strndup(agent->alloc, hum_buf, hum_pos);
+            if (humanness_ctx)
+                humanness_ctx_len = hum_pos;
+        }
+    }
+
     /* Cognition: episodic replay + emotional context strings for prompt */
 #ifdef HU_ENABLE_SQLITE
     if (agent->cognition_db && (agent->current_cognition_mode == HU_COGNITION_SLOW ||
@@ -1736,6 +1902,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, episodic_replay, episodic_replay_len + 1);
             if (plan_ctx)
                 agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+            if (humanness_ctx)
+                agent->alloc->free(agent->alloc->ctx, humanness_ctx, humanness_ctx_len + 1);
+            if (imperfect_dir)
+                agent->alloc->free(agent->alloc->ctx, imperfect_dir, imperfect_dir_len + 1);
+            if (residue_dir)
+                agent->alloc->free(agent->alloc->ctx, residue_dir, residue_dir_len + 1);
             hu_agent_clear_current_for_tools();
             return err;
         }
@@ -1804,6 +1976,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             .cognition_mode_len = cognition_mode_str_len,
             .episodic_replay = episodic_replay,
             .episodic_replay_len = episodic_replay_len,
+            .humanness_context = humanness_ctx,
+            .humanness_context_len = humanness_ctx_len,
+            .imperfect_delivery = imperfect_dir,
+            .imperfect_delivery_len = imperfect_dir_len,
+            .residue_carryover = residue_dir,
+            .residue_carryover_len = residue_dir_len,
         };
         err = hu_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
         if (persona_prompt)
@@ -1827,6 +2005,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (episodic_replay)
             agent->alloc->free(agent->alloc->ctx, episodic_replay, episodic_replay_len + 1);
         episodic_replay = NULL;
+        if (humanness_ctx)
+            agent->alloc->free(agent->alloc->ctx, humanness_ctx, humanness_ctx_len + 1);
+        humanness_ctx = NULL;
+        if (imperfect_dir)
+            agent->alloc->free(agent->alloc->ctx, imperfect_dir, imperfect_dir_len + 1);
+        imperfect_dir = NULL;
+        if (residue_dir)
+            agent->alloc->free(agent->alloc->ctx, residue_dir, residue_dir_len + 1);
+        residue_dir = NULL;
         cognition_skills_shown = (skills_ctx != NULL && skills_ctx_len > 0);
         if (skills_ctx)
             agent->alloc->free(agent->alloc->ctx, skills_ctx, skills_ctx_len + 1);
@@ -1889,6 +2076,31 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
+    /* Prompt cache: hash system prompt for provider-level deduplication.
+     * Store results in locals — they're applied to req after it's constructed. */
+    const char *prompt_cache_id = NULL;
+    uint64_t prompt_cache_hash = 0;
+    if (system_prompt && system_prompt_len > 0) {
+        if (!agent->prompt_cache) {
+            agent->prompt_cache = (struct hu_prompt_cache *)agent->alloc->alloc(
+                agent->alloc->ctx, sizeof(hu_prompt_cache_t));
+            if (agent->prompt_cache)
+                hu_prompt_cache_init((hu_prompt_cache_t *)agent->prompt_cache, agent->alloc);
+        }
+        if (agent->prompt_cache) {
+            prompt_cache_hash = hu_prompt_cache_hash(system_prompt, system_prompt_len);
+            size_t cached_id_len = 0;
+            prompt_cache_id = hu_prompt_cache_lookup((const hu_prompt_cache_t *)agent->prompt_cache,
+                                                     prompt_cache_hash, &cached_id_len);
+            if (!prompt_cache_id || cached_id_len == 0) {
+                prompt_cache_id = NULL;
+                (void)hu_prompt_cache_store((hu_prompt_cache_t *)agent->prompt_cache,
+                                            prompt_cache_hash, "active", 6, 3600);
+            }
+        }
+    }
+    (void)prompt_cache_hash;
+
     /* Tool routing: if enabled, select relevant subset of tools for this message */
     hu_tool_selection_t tool_selection;
     memset(&tool_selection, 0, sizeof(tool_selection));
@@ -1910,7 +2122,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
-    /* Tool cache: create per-turn cache to avoid re-executing identical tool calls */
+    /* Tool cache: use persistent TTL cache across turns, with per-turn fallback */
+    if (!agent->tool_cache_ttl) {
+        agent->tool_cache_ttl = (struct hu_tool_cache_ttl *)agent->alloc->alloc(
+            agent->alloc->ctx, sizeof(hu_tool_cache_ttl_t));
+        if (agent->tool_cache_ttl)
+            hu_tool_cache_ttl_init((hu_tool_cache_ttl_t *)agent->tool_cache_ttl, agent->alloc);
+    }
+    if (agent->tool_cache_ttl) {
+        int64_t now = (int64_t)time(NULL);
+        (void)hu_tool_cache_ttl_evict_expired((hu_tool_cache_ttl_t *)agent->tool_cache_ttl, now);
+    }
     hu_tool_cache_t *turn_cache = NULL;
     hu_tool_cache_create(agent->alloc, &turn_cache);
 
@@ -1994,6 +2216,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (mlp && (strcmp(mlp, "1") == 0 || strcmp(mlp, "true") == 0 || strcmp(mlp, "on") == 0))
             req.include_completion_logprobs = true;
     }
+
+    req.prompt_cache_id = prompt_cache_id;
+    req.prompt_cache_id_len = prompt_cache_id ? strlen(prompt_cache_id) : 0;
 
     clock_t turn_start = clock();
     uint64_t turn_tokens = 0;
@@ -4052,6 +4277,34 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         }
                     }
 #endif
+                    /* TTL cache: check for cached tool results before dispatching */
+                    hu_tool_cache_ttl_t *ttl_cache = (hu_tool_cache_ttl_t *)agent->tool_cache_ttl;
+                    bool *ttl_hits = NULL;
+                    hu_tool_result_t *ttl_results = NULL;
+                    if (ttl_cache && tc_count > 0) {
+                        ttl_hits =
+                            (bool *)agent->alloc->alloc(agent->alloc->ctx, tc_count * sizeof(bool));
+                        ttl_results = (hu_tool_result_t *)agent->alloc->alloc(
+                            agent->alloc->ctx, tc_count * sizeof(hu_tool_result_t));
+                        if (ttl_hits && ttl_results) {
+                            memset(ttl_hits, 0, tc_count * sizeof(bool));
+                            memset(ttl_results, 0, tc_count * sizeof(hu_tool_result_t));
+                            for (size_t ci = 0; ci < tc_count; ci++) {
+                                const hu_tool_call_t *cc = &calls_to_dispatch[ci];
+                                uint64_t ckey = hu_tool_cache_ttl_key(
+                                    cc->name, cc->name_len, cc->arguments, cc->arguments_len);
+                                size_t clen = 0;
+                                const char *cached = hu_tool_cache_ttl_get(ttl_cache, ckey, &clen);
+                                if (cached && clen > 0) {
+                                    ttl_results[ci].success = true;
+                                    ttl_results[ci].output = hu_strndup(agent->alloc, cached, clen);
+                                    ttl_results[ci].output_len = clen;
+                                    ttl_hits[ci] = true;
+                                }
+                            }
+                        }
+                    }
+
                     hu_dispatch_result_t dispatch_result;
                     memset(&dispatch_result, 0, sizeof(dispatch_result));
                     if (agent->tool_stream_cb) {
@@ -4249,6 +4502,18 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             }
 #endif
 
+                            /* TTL cache: store successful tool results */
+                            if (ttl_cache && result->success && result->output &&
+                                result->output_len > 0 && !(ttl_hits && ttl_hits[tc])) {
+                                uint64_t ckey =
+                                    hu_tool_cache_ttl_key(call->name, call->name_len,
+                                                          call->arguments, call->arguments_len);
+                                int64_t ttl = hu_tool_cache_ttl_default_for(tn_buf, tn);
+                                if (ttl > 0)
+                                    (void)hu_tool_cache_ttl_put(ttl_cache, ckey, result->output,
+                                                                result->output_len, ttl);
+                            }
+
                             const char *res_content =
                                 result->success ? result->output : result->error_msg;
                             size_t res_len =
@@ -4279,6 +4544,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         }
                         hu_dispatch_result_free(agent->alloc, &dispatch_result);
                     } else {
+                        /* Note: TTL cache hits/results not used in fallback path */
                         /* Fallback: sequential if dispatcher fails */
                         for (size_t tc = 0; tc < tc_count; tc++) {
                             const hu_tool_call_t *call = &calls[tc];
@@ -4407,6 +4673,19 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             if (agent->cancel_requested)
                                 break;
                         }
+                    }
+                    /* Free TTL cache lookup arrays */
+                    if (ttl_hits)
+                        agent->alloc->free(agent->alloc->ctx, ttl_hits, tc_count * sizeof(bool));
+                    if (ttl_results) {
+                        for (size_t ci = 0; ci < tc_count; ci++) {
+                            if (ttl_results[ci].output)
+                                agent->alloc->free(agent->alloc->ctx,
+                                                   (char *)ttl_results[ci].output,
+                                                   ttl_results[ci].output_len + 1);
+                        }
+                        agent->alloc->free(agent->alloc->ctx, ttl_results,
+                                           tc_count * sizeof(hu_tool_result_t));
                     }
                 }
             skip_dispatcher:

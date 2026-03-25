@@ -113,6 +113,123 @@ static int has_emotional_words(const char *s, size_t len) {
     return count;
 }
 
+static int has_vulnerability_markers(const char *s, size_t len) {
+    static const char *markers[] = {
+        "i feel",    "honestly",   "i'm not sure",  "to be honest", "i don't know",
+        "i've been", "struggling", "i'm scared",    "i'm worried",  "i miss",
+        "i'm sorry", "my fault",   "i messed up",   "i was wrong",  "it hurts",
+        "ngl",       "tbh",        "not gonna lie",
+    };
+    int count = 0;
+    for (size_t i = 0; i < sizeof(markers) / sizeof(markers[0]); i++) {
+        if (ci_has(s, len, markers[i]))
+            count++;
+    }
+    return count;
+}
+
+static int has_humor_markers(const char *s, size_t len) {
+    static const char *markers[] = {
+        "haha", "lol", "lmao",   "rofl", "dying", "dead", "i can't",   "omg",
+        "bruh", "bro", "no way", "😂",   "💀",    "😭",   "wait what", "literally",
+    };
+    int count = 0;
+    for (size_t i = 0; i < sizeof(markers) / sizeof(markers[0]); i++) {
+        if (ci_has(s, len, markers[i]))
+            count++;
+    }
+    return count;
+}
+
+static int has_opinion_markers(const char *s, size_t len) {
+    static const char *markers[] = {
+        "i think",    "i believe", "i prefer",   "in my opinion", "imo",
+        "honestly",   "to me",     "i disagree", "i'd say",       "personally",
+        "that's not", "i love",    "i hate",     "overrated",     "underrated",
+    };
+    int count = 0;
+    for (size_t i = 0; i < sizeof(markers) / sizeof(markers[0]); i++) {
+        if (ci_has(s, len, markers[i]))
+            count++;
+    }
+    return count;
+}
+
+static size_t last_user_msg_len(const char *ctx, size_t ctx_len) {
+    if (!ctx || ctx_len == 0)
+        return 0;
+    const char *last_nl = NULL;
+    for (size_t i = ctx_len; i > 0; i--) {
+        if (ctx[i - 1] == '\n') {
+            if (last_nl) {
+                return (size_t)(last_nl - &ctx[i]);
+            }
+            last_nl = &ctx[i - 1];
+        }
+    }
+    return last_nl ? (size_t)(last_nl - ctx) : ctx_len;
+}
+
+static int count_exclamations(const char *s, size_t len) {
+    int count = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (s[i] == '!')
+            count++;
+    }
+    return count;
+}
+
+static int count_uppercase_words(const char *s, size_t len) {
+    int count = 0;
+    bool in_upper = false;
+    int upper_run = 0;
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (c >= 'A' && c <= 'Z') {
+            upper_run++;
+            if (upper_run >= 3 && !in_upper) {
+                in_upper = true;
+                count++;
+            }
+        } else {
+            in_upper = false;
+            upper_run = 0;
+        }
+    }
+    return count;
+}
+
+static int has_context_references(const char *response, size_t resp_len, const char *ctx,
+                                  size_t ctx_len) {
+    static const char *ref_phrases[] = {
+        "you mentioned",   "earlier",     "you said",    "remember",
+        "like you said",   "you told me", "last time",   "before",
+        "we talked about", "going back",  "as you said", "you were saying",
+    };
+    int count = 0;
+    for (size_t i = 0; i < sizeof(ref_phrases) / sizeof(ref_phrases[0]); i++) {
+        if (ci_has(response, resp_len, ref_phrases[i]))
+            count++;
+    }
+
+    if (ctx && ctx_len > 0) {
+        for (size_t i = 0; i + 5 <= ctx_len; i++) {
+            if (ctx[i] == ' ' || i == 0) {
+                size_t wstart = (ctx[i] == ' ') ? i + 1 : i;
+                size_t wend = wstart;
+                while (wend < ctx_len && ctx[wend] != ' ' && ctx[wend] != '\n')
+                    wend++;
+                size_t wlen = wend - wstart;
+                if (wlen >= 5 && wlen <= 20 && ci_has(response, resp_len, ctx + wstart))
+                    count++;
+                if (count >= 3)
+                    break;
+            }
+        }
+    }
+    return count;
+}
+
 hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
                                      const char *conversation_context, size_t context_len,
                                      hu_turing_score_t *out) {
@@ -125,8 +242,11 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     int contractions = has_contractions(response, response_len);
     int casual = has_casual_markers(response, response_len);
     int emotional = has_emotional_words(response, response_len);
-    (void)conversation_context;
-    (void)context_len;
+    int vulnerability = has_vulnerability_markers(response, response_len);
+    int humor = has_humor_markers(response, response_len);
+    int opinions = has_opinion_markers(response, response_len);
+    int ctx_refs =
+        has_context_references(response, response_len, conversation_context, context_len);
 
     /* natural_language: penalize AI tells and structural markers */
     out->dimensions[HU_TURING_NATURAL_LANGUAGE] = 10 - ai_tells * 2 - structural;
@@ -139,6 +259,8 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     out->dimensions[HU_TURING_EMOTIONAL_INTELLIGENCE] = 5 + emotional;
     if (emotional > 2)
         out->dimensions[HU_TURING_EMOTIONAL_INTELLIGENCE] = 9;
+    if (vulnerability > 0)
+        out->dimensions[HU_TURING_EMOTIONAL_INTELLIGENCE] += 1;
 
     /* appropriate_length: iMessage-appropriate = under 300 chars */
     if (response_len < 50)
@@ -150,23 +272,32 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     else
         out->dimensions[HU_TURING_APPROPRIATE_LENGTH] = 4 - (int)(response_len / 200);
 
-    /* personality_consistency: hard to measure without history, use defaults */
+    /* personality_consistency: opinions + consistent register + no hedging */
     out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] = 6;
+    if (opinions > 0)
+        out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] += 1;
     if (casual > 1)
-        out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] = 7;
+        out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] += 1;
+    if (vulnerability > 0 && emotional > 0)
+        out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] += 1;
 
-    /* vulnerability_willingness: emotional words + first person */
+    /* vulnerability_willingness: authentic self-disclosure, not just emotional words */
     out->dimensions[HU_TURING_VULNERABILITY_WILLINGNESS] = 5;
-    if (emotional > 0 &&
-        (ci_has(response, response_len, "i feel") || ci_has(response, response_len, "i'm") ||
-         ci_has(response, response_len, "honestly")))
-        out->dimensions[HU_TURING_VULNERABILITY_WILLINGNESS] = 8;
+    if (vulnerability > 0)
+        out->dimensions[HU_TURING_VULNERABILITY_WILLINGNESS] += vulnerability * 2;
+    if (emotional > 0 && contractions)
+        out->dimensions[HU_TURING_VULNERABILITY_WILLINGNESS] += 1;
+    if (ai_tells > 0)
+        out->dimensions[HU_TURING_VULNERABILITY_WILLINGNESS] -= 1;
 
-    /* humor_naturalness: casual markers as proxy */
+    /* humor_naturalness: contextual humor markers, brevity, callbacks */
     out->dimensions[HU_TURING_HUMOR_NATURALNESS] = 5;
-    if (ci_has(response, response_len, "haha") || ci_has(response, response_len, "lol") ||
-        ci_has(response, response_len, "lmao"))
-        out->dimensions[HU_TURING_HUMOR_NATURALNESS] = 7;
+    if (humor > 0)
+        out->dimensions[HU_TURING_HUMOR_NATURALNESS] += humor;
+    if (humor > 0 && response_len < 100)
+        out->dimensions[HU_TURING_HUMOR_NATURALNESS] += 1;
+    if (humor > 0 && casual > 0)
+        out->dimensions[HU_TURING_HUMOR_NATURALNESS] += 1;
 
     /* imperfection: lowercase, no periods, typo-like patterns */
     {
@@ -181,26 +312,75 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
             out->dimensions[HU_TURING_IMPERFECTION] += 1;
     }
 
-    /* opinion_having: hedging language = bad */
-    out->dimensions[HU_TURING_OPINION_HAVING] = 7;
+    /* opinion_having: reward strong opinions, penalize hedging */
+    out->dimensions[HU_TURING_OPINION_HAVING] = 6;
+    if (opinions > 0)
+        out->dimensions[HU_TURING_OPINION_HAVING] += opinions;
     if (ci_has(response, response_len, "it depends") ||
         ci_has(response, response_len, "on one hand") ||
         ci_has(response, response_len, "there are many"))
-        out->dimensions[HU_TURING_OPINION_HAVING] = 4;
+        out->dimensions[HU_TURING_OPINION_HAVING] -= 2;
+    if (ci_has(response, response_len, "both are great") ||
+        ci_has(response, response_len, "that's a good point"))
+        out->dimensions[HU_TURING_OPINION_HAVING] -= 1;
 
-    /* energy_matching: rough proxy without context */
-    out->dimensions[HU_TURING_ENERGY_MATCHING] = 6;
+    /* energy_matching: compare response energy to context energy */
+    {
+        int score = 6;
+        if (conversation_context && context_len > 0) {
+            size_t user_len = last_user_msg_len(conversation_context, context_len);
+            int ctx_excl = count_exclamations(conversation_context, context_len);
+            int resp_excl = count_exclamations(response, response_len);
+            int ctx_upper = count_uppercase_words(conversation_context, context_len);
 
-    /* context_awareness: rough proxy */
-    out->dimensions[HU_TURING_CONTEXT_AWARENESS] = 6;
+            /* Length ratio matching */
+            if (user_len > 0 && user_len < 20 && response_len < 60)
+                score += 2; /* short-to-short is natural */
+            else if (user_len > 0 && user_len < 20 && response_len > 200)
+                score -= 2; /* essay response to a brief message */
+            else if (user_len > 100 && response_len < 30)
+                score += 1; /* brief acknowledgment to a long message is okay */
+
+            /* Exclamation energy matching */
+            if (ctx_excl > 0 && resp_excl > 0)
+                score += 1;
+            else if (ctx_excl > 2 && resp_excl == 0)
+                score -= 1;
+
+            /* ALL CAPS energy detection */
+            if (ctx_upper > 0 && resp_excl > 0)
+                score += 1;
+        } else {
+            if (casual > 0 && response_len < 150)
+                score += 1;
+        }
+        out->dimensions[HU_TURING_ENERGY_MATCHING] = score;
+    }
+
+    /* context_awareness: references to conversation context, temporal markers */
+    {
+        int score = 6;
+        if (conversation_context && context_len > 0) {
+            score += ctx_refs;
+            if (ci_has(response, response_len, "you") && ci_has(response, response_len, "your"))
+                score += 1;
+        }
+        if (emotional > 0 && contractions)
+            score += 1;
+        out->dimensions[HU_TURING_CONTEXT_AWARENESS] = score;
+    }
 
     /* non_robotic: inverse of AI tells + structural */
     out->dimensions[HU_TURING_NON_ROBOTIC] = 10 - ai_tells * 3 - structural * 2;
 
-    /* genuine_warmth: emotional + not formulaic */
+    /* genuine_warmth: emotional + personalized + not formulaic */
     out->dimensions[HU_TURING_GENUINE_WARMTH] = 5 + emotional;
     if (ai_tells > 0)
         out->dimensions[HU_TURING_GENUINE_WARMTH] -= ai_tells;
+    if (ctx_refs > 0)
+        out->dimensions[HU_TURING_GENUINE_WARMTH] += 1;
+    if (vulnerability > 0)
+        out->dimensions[HU_TURING_GENUINE_WARMTH] += 1;
 
     /* S2S voice dimensions — text heuristic provides limited signal */
 

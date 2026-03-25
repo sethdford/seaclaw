@@ -1,6 +1,21 @@
 import type { GatewayStatus, ServerFeatures } from "./gateway.js";
 import { SESSION_KEY_VOICE } from "./utils.js";
 
+function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const key of Object.keys(source)) {
+    const sv = source[key];
+    const tv = target[key];
+    if (
+      sv && typeof sv === "object" && !Array.isArray(sv) &&
+      tv && typeof tv === "object" && !Array.isArray(tv)
+    ) {
+      deepMerge(tv as Record<string, unknown>, sv as Record<string, unknown>);
+    } else {
+      target[key] = sv;
+    }
+  }
+}
+
 const DEMO_CHANNELS = [
   { key: "telegram", label: "Telegram", configured: true, healthy: true, status: "Connected" },
   { key: "discord", label: "Discord", configured: true, healthy: true, status: "Connected" },
@@ -1400,11 +1415,11 @@ export class DemoGatewayClient extends EventTarget {
       case "config.schema":
         return { schema: CONFIG_SCHEMA };
       case "config.set": {
-        if (params) Object.assign(this.state.config, params);
+        if (params) deepMerge(this.state.config, params);
         return { ok: true };
       }
       case "config.apply": {
-        if (params) Object.assign(this.state.config, params);
+        if (params) deepMerge(this.state.config, params);
         return { ok: true, applied: true };
       }
 
@@ -1932,6 +1947,70 @@ export class DemoGatewayClient extends EventTarget {
             genuine_warmth: 7,
             orchestration_quality: 7,
           },
+        };
+
+      // --- Security: CoT Audit ---
+      case "security.cot.summary":
+        return {
+          entries: [
+            {
+              timestamp: Math.floor(Date.now() / 1000) - 120,
+              verdict: "safe",
+              confidence: 0.95,
+              session_key: "sess-a1",
+              reason: null,
+            },
+            {
+              timestamp: Math.floor(Date.now() / 1000) - 3600,
+              verdict: "suspicious",
+              confidence: 0.72,
+              session_key: "sess-b2",
+              reason: "Potential prompt injection pattern detected in reasoning",
+            },
+            {
+              timestamp: Math.floor(Date.now() / 1000) - 7200,
+              verdict: "safe",
+              confidence: 0.98,
+              session_key: "sess-c3",
+              reason: null,
+            },
+            {
+              timestamp: Math.floor(Date.now() / 1000) - 14400,
+              verdict: "blocked",
+              confidence: 0.89,
+              session_key: "sess-d4",
+              reason: "Goal hijack detected: reasoning attempted to override safety constraints",
+            },
+          ],
+          total_audited: 247,
+          total_blocked: 3,
+          total_suspicious: 12,
+        };
+
+      // --- SOTA Metrics (prompt cache, tool cache, emotion, KV, persona fuse) ---
+      case "sota.metrics":
+        return {
+          prompt_cache: { hits: 142, misses: 38, hit_rate: 0.789, slots_used: 5, slots_max: 8 },
+          tool_cache: { hits: 89, misses: 156, hit_rate: 0.363, entries: 23, max_entries: 64 },
+          emotion_voice: {
+            detections: 67,
+            dominant_emotion: "empathy",
+            emotion_distribution: { neutral: 28, joy: 12, empathy: 15, calm: 8, concern: 4 },
+          },
+          kv_cache: { utilization: 0.73, segments: 42, pinned: 8, pruned_total: 15 },
+          persona_fuse: {
+            active_adapters: ["professional", "brief"],
+            channel: "slack",
+            fused_formality: 0.7,
+            fused_verbosity: -0.6,
+          },
+          graph_memory: {
+            nodes: 256,
+            entity_edges: 189,
+            temporal_edges: 251,
+            spread_activations: 34,
+          },
+          acp_bridge: { messages_sent: 45, messages_received: 41, active_correlations: 3 },
         };
 
       // --- MCP Resources + Prompts ---

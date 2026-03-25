@@ -707,4 +707,35 @@ bool hu_conversation_should_send_gif(const char *msg, size_t msg_len,
 size_t hu_conversation_build_gif_search_prompt(const char *msg, size_t msg_len, char *buf,
                                                size_t cap);
 
+/* Adjust GIF send probability based on relationship type (friend, coworker, parent, etc.).
+ * Returns adjusted probability clamped to [0.0, 1.0]. */
+float hu_conversation_adjust_gif_probability(float base_probability, const char *relationship_type,
+                                             size_t rel_len);
+
+/* Build a GIF style hint based on relationship type.
+ * E.g. "absurd meme" for friends, "wholesome" for family. */
+size_t hu_conversation_build_gif_style_hint(const char *relationship_type, size_t rel_len,
+                                            char *buf, size_t cap);
+
+/* Per-contact GIF rate limiting. Returns true if sending a GIF is allowed.
+ * max_per_day=0 defaults to 5, min_gap_ms=0 defaults to 10 minutes. */
+bool hu_conversation_gif_rate_allow(const char *contact_id, size_t cid_len, uint64_t now_ms,
+                                    uint32_t max_per_day, uint64_t min_gap_ms);
+
+/* Record that a GIF was sent to contact_id at now_ms. */
+void hu_conversation_gif_rate_record(const char *contact_id, size_t cid_len, uint64_t now_ms);
+
+/* Seen behavior classification result. */
+typedef enum hu_seen_action {
+    HU_SEEN_RESPOND_NOW,
+    HU_SEEN_DELAY_THEN_RESPOND,
+    HU_SEEN_IGNORE_FOR_NOW,
+} hu_seen_action_t;
+
+/* Classify whether to respond immediately or delay (modeling "seen" behavior).
+ * hour_local is 0-23 local time. out_delay_ms receives recommended delay (can be NULL). */
+hu_seen_action_t hu_conversation_classify_seen_behavior(const char *msg, size_t msg_len,
+                                                        uint8_t hour_local, uint32_t seed,
+                                                        uint32_t *out_delay_ms);
+
 #endif /* HU_CONTEXT_CONVERSATION_H */

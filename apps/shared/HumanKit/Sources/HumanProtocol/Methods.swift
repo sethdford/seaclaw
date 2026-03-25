@@ -46,6 +46,8 @@ public enum Methods {
 
     // Metrics & nodes
     public static let metricsSnapshot = "metrics.snapshot"
+    public static let sotaMetrics = "sota.metrics"
+    public static let securityCotSummary = "security.cot.summary"
     public static let nodesList = "nodes.list"
     public static let nodesAction = "nodes.action"
 
@@ -88,7 +90,7 @@ public enum Methods {
         updateCheck, updateRun,
         execApprovalResolve, usageSummary,
         activityRecent, agentsList, modelsList,
-        metricsSnapshot, nodesList, nodesAction,
+        metricsSnapshot, sotaMetrics, securityCotSummary, nodesList, nodesAction,
         voiceTranscribe, personaSet,
         authToken, authOauthStart, authOauthCallback, authOauthRefresh,
         memoryStatus, memoryList, memoryRecall, memoryStore, memoryForget, memoryIngest, memoryConsolidate,

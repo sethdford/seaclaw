@@ -755,6 +755,81 @@ static hu_error_t impl_recall(void *ctx, hu_allocator_t *alloc, const char *quer
                         alloc->free(alloc->ctx, scores, count * sizeof(double));
                 }
 
+                /* Spreading activation: discover entity-connected memories beyond FTS */
+                if (self->graph_initialized && count >= 1 && count < limit) {
+                    uint32_t *seeds =
+                        (uint32_t *)alloc->alloc(alloc->ctx, count * sizeof(uint32_t));
+                    size_t seed_count = 0;
+                    if (seeds) {
+                        for (size_t si = 0; si < count && si < self->graph_index.node_count; si++) {
+                            for (uint32_t ni = 0; ni < self->graph_index.node_count; ni++) {
+                                if (self->graph_index.nodes[ni].memory_key_len ==
+                                        entries[si].key_len &&
+                                    memcmp(self->graph_index.nodes[ni].memory_key, entries[si].key,
+                                           entries[si].key_len) == 0) {
+                                    seeds[seed_count++] = ni;
+                                    break;
+                                }
+                            }
+                        }
+                        if (seed_count > 0) {
+                            hu_spread_activation_config_t sa_cfg;
+                            hu_spread_activation_config_default(&sa_cfg);
+                            size_t max_act = limit - count;
+                            if (max_act > sa_cfg.max_activated)
+                                max_act = sa_cfg.max_activated;
+                            hu_activated_node_t *activated = (hu_activated_node_t *)alloc->alloc(
+                                alloc->ctx, max_act * sizeof(hu_activated_node_t));
+                            if (activated) {
+                                size_t act_count = 0;
+                                sa_cfg.max_activated = max_act;
+                                if (hu_graph_index_spread_activation(&self->graph_index, &sa_cfg,
+                                                                     seeds, seed_count, activated,
+                                                                     &act_count) == HU_OK &&
+                                    act_count > 0) {
+                                    for (size_t ai = 0; ai < act_count && count < limit; ai++) {
+                                        uint32_t ni = activated[ai].node_idx;
+                                        if (ni >= self->graph_index.node_count)
+                                            continue;
+                                        const hu_graph_node_t *gn = &self->graph_index.nodes[ni];
+                                        bool dup = false;
+                                        for (size_t di = 0; di < count; di++) {
+                                            if (entries[di].key_len == gn->memory_key_len &&
+                                                memcmp(entries[di].key, gn->memory_key,
+                                                       gn->memory_key_len) == 0) {
+                                                dup = true;
+                                                break;
+                                            }
+                                        }
+                                        if (dup)
+                                            continue;
+                                        /* Fetch the activated memory from SQLite */
+                                        sqlite3_stmt *sa_stmt = NULL;
+                                        if (sqlite3_prepare_v2(
+                                                self->db,
+                                                "SELECT key, content, metadata, timestamp, "
+                                                "score FROM memories WHERE key = ?1 LIMIT 1",
+                                                -1, &sa_stmt, NULL) == SQLITE_OK) {
+                                            sqlite3_bind_text(sa_stmt, 1, gn->memory_key,
+                                                              (int)gn->memory_key_len, NULL);
+                                            if (sqlite3_step(sa_stmt) == SQLITE_ROW) {
+                                                hu_memory_entry_t *e = &entries[count];
+                                                read_entry_from_row(sa_stmt, alloc, e);
+                                                e->score = activated[ai].energy * 0.5;
+                                                count++;
+                                            }
+                                            sqlite3_finalize(sa_stmt);
+                                        }
+                                    }
+                                }
+                                alloc->free(alloc->ctx, activated,
+                                            max_act * sizeof(hu_activated_node_t));
+                            }
+                        }
+                        alloc->free(alloc->ctx, seeds, count * sizeof(uint32_t));
+                    }
+                }
+
                 /* Entropy gate: drop low-information results */
                 if (count > 2) {
                     hu_entropy_gate_config_t eg_cfg = hu_entropy_gate_config_default();

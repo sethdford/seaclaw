@@ -1,3 +1,4 @@
+#include "human/visual/content.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/string.h"
@@ -5,7 +6,6 @@
 #include "human/tools/computer_use.h"
 #include "human/tools/image_gen.h"
 #include "human/tools/web_search_providers.h"
-#include "human/visual/content.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,10 +16,10 @@
 #include <unistd.h>
 #endif
 
-#define HU_VISUAL_GOV_MS_DAY       86400000ULL
-#define HU_VISUAL_GOV_MIN_GAP_MS   (12ULL * 60ULL * 1000ULL)
-#define HU_VISUAL_GOV_DAILY_MAX    3u
-#define HU_VISUAL_GOV_WEEKLY_MAX   10u
+#define HU_VISUAL_GOV_MS_DAY     86400000ULL
+#define HU_VISUAL_GOV_MIN_GAP_MS (12ULL * 60ULL * 1000ULL)
+#define HU_VISUAL_GOV_DAILY_MAX  3u
+#define HU_VISUAL_GOV_WEEKLY_MAX 10u
 
 #if !defined(HU_IS_TEST) || !HU_IS_TEST
 static uint64_t s_vis_gov_day;
@@ -48,8 +48,7 @@ bool hu_visual_proactive_media_governor_allow(uint64_t now_ms) {
     return true;
 #else
     visual_gov_apply_resets(now_ms);
-    if (s_vis_gov_daily >= HU_VISUAL_GOV_DAILY_MAX ||
-        s_vis_gov_weekly >= HU_VISUAL_GOV_WEEKLY_MAX)
+    if (s_vis_gov_daily >= HU_VISUAL_GOV_DAILY_MAX || s_vis_gov_weekly >= HU_VISUAL_GOV_WEEKLY_MAX)
         return false;
     if (s_vis_gov_last_ms != 0 && now_ms - s_vis_gov_last_ms < HU_VISUAL_GOV_MIN_GAP_MS)
         return false;
@@ -109,8 +108,8 @@ bool hu_visual_should_send_media(const char *conversation_context, size_t contex
     }
 
     static const char *const shot_needles[] = {
-        "screenshot",   "my screen",     "on my screen", "what's on my screen",
-        "full screen",  "my desktop",    "the desktop",  "share my screen",
+        "screenshot",  "my screen",  "on my screen", "what's on my screen",
+        "full screen", "my desktop", "the desktop",  "share my screen",
     };
     for (size_t i = 0; i < sizeof(shot_needles) / sizeof(shot_needles[0]); i++) {
         if (visual_haystack_contains_ci(conversation_context, context_len, shot_needles[i])) {
@@ -121,10 +120,9 @@ bool hu_visual_should_send_media(const char *conversation_context, size_t contex
     }
 
     static const char *const img_needles[] = {
-        "look at this", "have you seen", "check this out", "picture of",
-        "photo of",     "image of",      "show you",       "here's a",
-        "diagram",      "meme",          "what it looks",  "looks like",
-        "visual",       "illustration",
+        "look at this",  "have you seen", "check this out", "picture of",   "photo of",
+        "image of",      "show you",      "here's a",       "diagram",      "meme",
+        "what it looks", "looks like",    "visual",         "illustration",
     };
     for (size_t i = 0; i < sizeof(img_needles) / sizeof(img_needles[0]); i++) {
         if (visual_haystack_contains_ci(conversation_context, context_len, img_needles[i])) {
@@ -167,8 +165,8 @@ hu_error_t hu_visual_search_image(hu_allocator_t *alloc, const char *query, size
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    int n = snprintf(out_url, out_url_len,
-                     "https://duckduckgo.com/?q=%s&iax=images&ia=images", encoded);
+    int n = snprintf(out_url, out_url_len, "https://duckduckgo.com/?q=%s&iax=images&ia=images",
+                     encoded);
     alloc->free(alloc->ctx, encoded, enc_len + 1);
     if (n <= 0 || (size_t)n >= out_url_len)
         return HU_ERR_INVALID_ARGUMENT;
@@ -232,7 +230,7 @@ hu_error_t hu_visual_generate_screenshot(hu_allocator_t *alloc, hu_security_poli
 #endif
 
 #define HU_VISUAL_ESCAPE_BUF 1024
-#define HU_VISUAL_SQL_BUF 4096
+#define HU_VISUAL_SQL_BUF    4096
 
 static void escape_sql_string(const char *s, size_t len, char *buf, size_t cap, size_t *out_len) {
     size_t pos = 0;
@@ -251,19 +249,18 @@ static void escape_sql_string(const char *s, size_t len, char *buf, size_t cap, 
 hu_error_t hu_visual_create_table_sql(char *buf, size_t cap, size_t *out_len) {
     if (!buf || !out_len || cap < 512)
         return HU_ERR_INVALID_ARGUMENT;
-    static const char sql[] =
-        "CREATE TABLE IF NOT EXISTS visual_content (\n"
-        "    id INTEGER PRIMARY KEY,\n"
-        "    source TEXT NOT NULL,\n"
-        "    path TEXT NOT NULL,\n"
-        "    description TEXT,\n"
-        "    tags TEXT,\n"
-        "    location TEXT,\n"
-        "    captured_at INTEGER NOT NULL,\n"
-        "    indexed_at INTEGER NOT NULL,\n"
-        "    shared_with TEXT,\n"
-        "    share_count INTEGER DEFAULT 0\n"
-        ")";
+    static const char sql[] = "CREATE TABLE IF NOT EXISTS visual_content (\n"
+                              "    id INTEGER PRIMARY KEY,\n"
+                              "    source TEXT NOT NULL,\n"
+                              "    path TEXT NOT NULL,\n"
+                              "    description TEXT,\n"
+                              "    tags TEXT,\n"
+                              "    location TEXT,\n"
+                              "    captured_at INTEGER NOT NULL,\n"
+                              "    indexed_at INTEGER NOT NULL,\n"
+                              "    shared_with TEXT,\n"
+                              "    share_count INTEGER DEFAULT 0\n"
+                              ")";
     size_t len = sizeof(sql) - 1;
     if (len >= cap)
         return HU_ERR_INVALID_ARGUMENT;
@@ -331,8 +328,8 @@ hu_error_t hu_visual_query_recent_sql(uint64_t since_ms, char *buf, size_t cap, 
 }
 
 hu_error_t hu_visual_record_share_sql(int64_t content_id, const char *contact_id,
-                                     size_t contact_id_len, char *buf, size_t cap,
-                                     size_t *out_len) {
+                                      size_t contact_id_len, char *buf, size_t cap,
+                                      size_t *out_len) {
     (void)contact_id;
     (void)contact_id_len;
     if (!buf || !out_len || cap < 256)
@@ -455,8 +452,8 @@ double hu_visual_score_relevance(const char *description, size_t desc_len, const
 }
 
 hu_error_t hu_visual_build_sharing_context(hu_allocator_t *alloc, hu_visual_type_t type,
-                                          const char *description, size_t desc_len, char **out,
-                                          size_t *out_len) {
+                                           const char *description, size_t desc_len, char **out,
+                                           size_t *out_len) {
     if (!alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
     (void)description;
@@ -488,9 +485,8 @@ hu_error_t hu_visual_build_sharing_context(hu_allocator_t *alloc, hu_visual_type
     return HU_OK;
 }
 
-hu_error_t hu_visual_build_prompt(hu_allocator_t *alloc,
-                                  const hu_visual_candidate_t *candidates, size_t count, char **out,
-                                  size_t *out_len) {
+hu_error_t hu_visual_build_prompt(hu_allocator_t *alloc, const hu_visual_candidate_t *candidates,
+                                  size_t count, char **out, size_t *out_len) {
     if (!alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -516,9 +512,9 @@ hu_error_t hu_visual_build_prompt(hu_allocator_t *alloc,
             c->sharing_context && c->sharing_context_len > 0 ? c->sharing_context : "";
         size_t ctx_len = c->sharing_context_len;
 
-        int n = snprintf(buf + pos, sizeof(buf) - pos, "%zu. %s: %.*s (relevance: %.2f) — \"%.*s\"\n",
-                        i + 1, type_str, (int)desc_len, desc, c->relevance_score,
-                        (int)ctx_len, ctx);
+        int n =
+            snprintf(buf + pos, sizeof(buf) - pos, "%zu. %s: %.*s (relevance: %.2f) — \"%.*s\"\n",
+                     i + 1, type_str, (int)desc_len, desc, c->relevance_score, (int)ctx_len, ctx);
         if (n > 0 && pos + (size_t)n < sizeof(buf))
             pos += (size_t)n;
     }
@@ -577,8 +573,8 @@ void hu_visual_candidate_deinit(hu_allocator_t *alloc, hu_visual_candidate_t *c)
     }
 }
 
-void hu_visual_should_share(const hu_visual_entry_t *entry, const char *context,
-                            size_t context_len, bool *should_share, double *confidence) {
+void hu_visual_should_share(const hu_visual_entry_t *entry, const char *context, size_t context_len,
+                            bool *should_share, double *confidence) {
     if (!entry || !should_share || !confidence) {
         if (should_share)
             *should_share = false;
@@ -588,13 +584,13 @@ void hu_visual_should_share(const hu_visual_entry_t *entry, const char *context,
     }
     double rel = 0.0;
     if (context && context_len > 0) {
-        rel = hu_visual_score_relevance(entry->description,
-                                         (size_t)strnlen(entry->description, sizeof(entry->description)),
-                                         context, context_len);
+        rel = hu_visual_score_relevance(
+            entry->description, (size_t)strnlen(entry->description, sizeof(entry->description)),
+            context, context_len);
         if (entry->tags[0] != '\0') {
-            double tag_rel = hu_visual_score_relevance(entry->tags,
-                                                       (size_t)strnlen(entry->tags, sizeof(entry->tags)),
-                                                       context, context_len);
+            double tag_rel = hu_visual_score_relevance(
+                entry->tags, (size_t)strnlen(entry->tags, sizeof(entry->tags)), context,
+                context_len);
             if (tag_rel > rel)
                 rel = tag_rel;
         }
@@ -605,8 +601,7 @@ void hu_visual_should_share(const hu_visual_entry_t *entry, const char *context,
     *should_share = (rel >= 0.3);
 }
 
-void hu_visual_entries_free(hu_allocator_t *alloc, hu_visual_entry_t *entries,
-                            size_t count) {
+void hu_visual_entries_free(hu_allocator_t *alloc, hu_visual_entry_t *entries, size_t count) {
     if (!alloc || !entries)
         return;
     alloc->free(alloc->ctx, entries, count * sizeof(hu_visual_entry_t));
@@ -633,9 +628,8 @@ hu_error_t hu_visual_scan_recent(hu_allocator_t *alloc, sqlite3 *db, uint64_t si
     *out = NULL;
     *out_count = 0;
 
-    static const char sql[] =
-        "SELECT id, path, description, tags, captured_at FROM visual_content "
-        "WHERE captured_at > ? ORDER BY captured_at DESC LIMIT 50";
+    static const char sql[] = "SELECT id, path, description, tags, captured_at FROM visual_content "
+                              "WHERE captured_at > ? ORDER BY captured_at DESC LIMIT 50";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return HU_ERR_IO;
@@ -691,10 +685,10 @@ hu_error_t hu_visual_scan_recent(hu_allocator_t *alloc, sqlite3 *db, uint64_t si
     return HU_OK;
 }
 
-hu_error_t hu_visual_match_for_contact(hu_allocator_t *alloc, sqlite3 *db,
-                                      const char *contact_id, size_t contact_id_len,
-                                      const char *context, size_t context_len,
-                                      hu_visual_entry_t **out, size_t *out_count) {
+hu_error_t hu_visual_match_for_contact(hu_allocator_t *alloc, sqlite3 *db, const char *contact_id,
+                                       size_t contact_id_len, const char *context,
+                                       size_t context_len, hu_visual_entry_t **out,
+                                       size_t *out_count) {
     (void)contact_id;
     (void)contact_id_len;
     if (!alloc || !db || !out || !out_count)
@@ -736,13 +730,12 @@ hu_error_t hu_visual_match_for_contact(hu_allocator_t *alloc, sqlite3 *db,
     for (size_t i = 0; i < cand_count; i++) {
         hu_visual_entry_t *e = &candidates[i];
         double desc_rel = hu_visual_score_relevance(
-            e->description, (size_t)strnlen(e->description, sizeof(e->description)),
-            context, context_len);
+            e->description, (size_t)strnlen(e->description, sizeof(e->description)), context,
+            context_len);
         double tag_rel = 0.0;
         if (e->tags[0] != '\0') {
-            tag_rel = hu_visual_score_relevance(
-                e->tags, (size_t)strnlen(e->tags, sizeof(e->tags)),
-                context, context_len);
+            tag_rel = hu_visual_score_relevance(e->tags, (size_t)strnlen(e->tags, sizeof(e->tags)),
+                                                context, context_len);
         }
         double rel = (desc_rel > tag_rel) ? desc_rel : tag_rel;
         if (rel < 0.1)
@@ -792,4 +785,111 @@ hu_error_t hu_visual_match_for_contact(hu_allocator_t *alloc, sqlite3 *db,
     *out_count = n;
     return HU_OK;
 }
+
+/* ── Apple Photos library scanning (F116) ──────────────────────────────── */
+
+hu_error_t hu_visual_scan_apple_photos(hu_allocator_t *alloc, const char *photos_db_path,
+                                       uint32_t max_days_back, hu_visual_entry_t **out,
+                                       size_t *out_count, size_t max_results) {
+    if (!alloc || !photos_db_path || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_count = 0;
+    if (max_results == 0)
+        max_results = 20;
+
+#if HU_IS_TEST
+    (void)max_days_back;
+    (void)photos_db_path;
+    return HU_OK;
+#else
+    sqlite3 *db = NULL;
+    int rc = sqlite3_open_v2(photos_db_path, &db, SQLITE_OPEN_READONLY, NULL);
+    if (rc != SQLITE_OK) {
+        if (db)
+            sqlite3_close(db);
+        return HU_ERR_IO;
+    }
+
+    /* Apple Photos uses a CoreData epoch (2001-01-01). Query ZASSET for recent photos.
+     * ZDIRECTORY + ZFILENAME give the relative path within the library.
+     * Filter: ZTRASHEDSTATE=0 (not deleted), ZKIND=0 (photo, not video). */
+    double days_cutoff = (double)max_days_back * 86400.0;
+    const char *sql = "SELECT Z_PK, ZDIRECTORY, ZFILENAME, ZDATECREATED, ZUNIFORMTYPEIDENTIFIER "
+                      "FROM ZASSET "
+                      "WHERE ZTRASHEDSTATE = 0 "
+                      "AND ZDATECREATED > (strftime('%s','now') - 978307200 - ?1) "
+                      "ORDER BY ZDATECREATED DESC LIMIT ?2";
+
+    sqlite3_stmt *stmt = NULL;
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        sqlite3_close(db);
+        return HU_ERR_INTERNAL;
+    }
+
+    sqlite3_bind_double(stmt, 1, days_cutoff);
+    sqlite3_bind_int(stmt, 2, (int)max_results);
+
+    hu_visual_entry_t *entries =
+        (hu_visual_entry_t *)alloc->alloc(alloc->ctx, max_results * sizeof(hu_visual_entry_t));
+    if (!entries) {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memset(entries, 0, max_results * sizeof(hu_visual_entry_t));
+
+    size_t count = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW && count < max_results) {
+        entries[count].rowid = sqlite3_column_int64(stmt, 0);
+        const char *dir = (const char *)sqlite3_column_text(stmt, 1);
+        const char *fname = (const char *)sqlite3_column_text(stmt, 2);
+        double created = sqlite3_column_double(stmt, 3);
+        const char *uti = (const char *)sqlite3_column_text(stmt, 4);
+
+        if (!dir || !fname)
+            continue;
+
+        /* Only include image types */
+        if (uti && (strstr(uti, "image") == NULL && strstr(uti, "heic") == NULL &&
+                    strstr(uti, "jpeg") == NULL && strstr(uti, "png") == NULL))
+            continue;
+
+        snprintf(entries[count].path, sizeof(entries[0].path), "%s/%s", dir, fname);
+        entries[count].timestamp_ms = (uint64_t)((created + 978307200.0) * 1000.0);
+        entries[count].relevance = 1.0;
+        count++;
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    if (count == 0) {
+        alloc->free(alloc->ctx, entries, max_results * sizeof(hu_visual_entry_t));
+        return HU_OK;
+    }
+
+    *out = entries;
+    *out_count = count;
+    return HU_OK;
+#endif
+}
 #endif /* HU_ENABLE_SQLITE */
+
+size_t hu_visual_apple_photos_db_path(char *buf, size_t cap) {
+    if (!buf || cap < 64)
+        return 0;
+#ifdef __APPLE__
+    const char *home = getenv("HOME");
+    if (!home)
+        return 0;
+    int n =
+        snprintf(buf, cap, "%s/Pictures/Photos Library.photoslibrary/database/Photos.sqlite", home);
+    return (n > 0 && (size_t)n < cap) ? (size_t)n : 0;
+#else
+    (void)buf;
+    (void)cap;
+    return 0;
+#endif
+}

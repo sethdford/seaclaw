@@ -315,45 +315,45 @@ static void test_tool_cache_ttl_default_for_rw(void) {
 /* ═══ J: Emotion-to-voice mapping ═══════════════════════════════════ */
 
 static void test_emotion_voice_map_neutral(void) {
-    hu_voice_params_t p = hu_emotion_voice_map(HU_EMOTION_NEUTRAL);
+    hu_voice_params_t p = hu_emotion_voice_map(HU_VOICE_EMOTION_NEUTRAL);
     HU_ASSERT_FLOAT_EQ(p.pitch_shift, 0.0, 0.001);
     HU_ASSERT_FLOAT_EQ(p.rate_factor, 1.0, 0.001);
 }
 
 static void test_emotion_voice_map_joy_pitch(void) {
-    hu_voice_params_t p = hu_emotion_voice_map(HU_EMOTION_JOY);
+    hu_voice_params_t p = hu_emotion_voice_map(HU_VOICE_EMOTION_JOY);
     HU_ASSERT_TRUE(p.pitch_shift > 0.0f);
     HU_ASSERT_TRUE(p.warmth > 0.5f);
 }
 
 static void test_emotion_detect_joy(void) {
-    hu_emotion_class_t emo;
+    hu_voice_emotion_t emo;
     float conf;
     const char *text = "I'm so happy and glad this worked out wonderfully!";
     HU_ASSERT_EQ(hu_emotion_detect_from_text(text, strlen(text), &emo, &conf), HU_OK);
-    HU_ASSERT_EQ(emo, HU_EMOTION_JOY);
+    HU_ASSERT_EQ(emo, HU_VOICE_EMOTION_JOY);
     HU_ASSERT_TRUE(conf >= 0.3f);
 }
 
 static void test_emotion_detect_neutral_for_bland(void) {
-    hu_emotion_class_t emo;
+    hu_voice_emotion_t emo;
     float conf;
     const char *text = "The function returns a value.";
     HU_ASSERT_EQ(hu_emotion_detect_from_text(text, strlen(text), &emo, &conf), HU_OK);
-    HU_ASSERT_EQ(emo, HU_EMOTION_NEUTRAL);
+    HU_ASSERT_EQ(emo, HU_VOICE_EMOTION_NEUTRAL);
 }
 
 static void test_emotion_voice_blend(void) {
-    hu_voice_params_t a = hu_emotion_voice_map(HU_EMOTION_NEUTRAL);
-    hu_voice_params_t b = hu_emotion_voice_map(HU_EMOTION_JOY);
+    hu_voice_params_t a = hu_emotion_voice_map(HU_VOICE_EMOTION_NEUTRAL);
+    hu_voice_params_t b = hu_emotion_voice_map(HU_VOICE_EMOTION_JOY);
     hu_voice_params_t mid = hu_voice_params_blend(&a, &b, 0.5f);
     HU_ASSERT_TRUE(mid.pitch_shift > a.pitch_shift);
     HU_ASSERT_TRUE(mid.pitch_shift < b.pitch_shift);
 }
 
 static void test_emotion_class_names_valid(void) {
-    for (int i = 0; i < HU_EMOTION_COUNT; i++) {
-        const char *name = hu_emotion_class_name((hu_emotion_class_t)i);
+    for (int i = 0; i < HU_VOICE_EMOTION_COUNT; i++) {
+        const char *name = hu_emotion_class_name((hu_voice_emotion_t)i);
         HU_ASSERT_NOT_NULL(name);
         HU_ASSERT_TRUE(strlen(name) > 0);
     }

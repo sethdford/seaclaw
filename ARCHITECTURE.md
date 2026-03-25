@@ -197,6 +197,26 @@ Components: BPE tokenizer, GPT model, MuonAdamW optimizer, data loader, training
 
 HuLa is a JSON program tree for tool orchestration (`call`, `seq`, `par`, `branch`, `loop`, `delegate`, `emit`) executed by `src/agent/hula.c` with policy checks and trace logging. **Compiler mode** (`hu_hula_compiler_chat_compile_execute` in `hula_compiler.c`), **native mode** (`<hula_program>` in assistant text), and a **direct IR** path from tool calls integrate in `agent_turn.c` when `agent.hula_enabled` is set (default **on** after config merge). **`delegate`** uses `hu_hula_exec_set_spawn` with the session `agent_pool` and `hu_spawn_config_apply_parent_agent` when a pool exists (POSIX non-test). Traces can persist under `~/.human/hula_traces/`; `hula_emergence.c` scans n-grams and can promote hot paths to SkillForge-style manifests. Operator guide: `docs/guides/hula.md`. Full spec: `docs/plans/2026-03-22-hula-language.md`.
 
+## Voice pipeline
+
+Realtime and streaming voice layers add **semantic end-of-turn** detection (`semantic_eot.c`, Phoenix-VAD–style), **LLM turn signals** (`turn_signal.c` — yield/hold/backchannel tokens), and **emotion-aware TTS**: **emotion–voice mapping** (`emotion_voice_map.c`) plus **audio emotion** from STT-side features (`audio_emotion.c`), alongside existing session, WebRTC, and streaming TTS paths.
+
+## Memory
+
+Beyond vector and graph recall, a **multi-dimensional graph index** (`graph_index.c`, MAGMA-inspired) supports **spreading activation**–style linkage and reranking; **entropy-based gating** (`entropy_gate.c` under `memory/retrieval/`) filters low-signal chunks before they enter context.
+
+## Security
+
+Tooling adds **deep argument inspection** (`arg_inspector.c`, AEGIS-style) before policy decisions, and **chain-of-thought audit** (`cot_audit.c`) to score reasoning traces for misuse patterns.
+
+## Agent
+
+The loop can **deduplicate system prompts** via a **prompt cache** (`prompt_cache.c`), reuse **cross-turn tool results** with **TTL** (`tools/cache_ttl.c`), exchange messages through **ACP** (`agent_comm.c`) and an **ACP–mailbox bridge** (`acp_bridge.c`), prune **KV cache** entries with attention-aware policy (`kv_cache.c`), and apply **PersonaFuse** per-channel overlays (`persona_fuse.c`) without reloading full personas.
+
+## Evaluation
+
+**Turing-style scoring** (`turing_score.c`) implements an **18-dimension** heuristic (S2S taxonomy) for naturalness and conversational quality, complementing the broader eval harness in `src/eval.c` and adversarial suites.
+
 ## Key Directories
 
 ```

@@ -38,6 +38,11 @@ Use this to find the right files for a given task without searching the full cod
 | **Teams / collaboration**         | `src/agent/team.c`, `collab_planning.c`, `conv_goals.c`        | `test_agent_teams.c`, `test_collab_planning.c`, `test_conv_goals.c`          |
 | **Input guard**                   | `src/agent/input_guard.c`                                      | `test_input_guard.c`                                                         |
 | **Reflection**                    | `src/agent/reflection.c`                                       | `test_reflection.c`, `test_reflection_advanced.c`                            |
+| **Prompt cache**                  | `src/agent/prompt_cache.c`, `include/human/agent/prompt_cache.h` | `test_sota_wiring.c`                                                      |
+| **Agent Communication Protocol (ACP)** | `src/agent/agent_comm.c`, `include/human/agent/agent_comm.h` | `test_agent_communication.c`, `test_sota_wiring.c`                         |
+| **ACP bridge**                    | `src/agent/acp_bridge.c`, `include/human/agent/acp_bridge.h`   | `—`                                                                          |
+| **KV cache**                      | `src/agent/kv_cache.c`, `include/human/agent/kv_cache.h`       | `—`                                                                          |
+| **HuLa compiler (auto-verify)** | `src/agent/hula_compiler.c`, `include/human/agent/hula_compiler.h` | `test_hula.c`, `test_sota_wiring.c`                                      |
 
 ## Providers
 
@@ -68,6 +73,15 @@ Use this to find the right files for a given task without searching the full cod
 | **Gmail**                      | `src/channels/gmail.c`                                         | `test_gmail.c`                                                    |
 | **Voice**                      | `src/channels/voice_channel.c`, `src/voice.c`                  | `test_voice.c`, `test_cartesia.c`, `test_local_voice.c`           |
 
+## Voice
+
+| Concept                              | Primary Source Files                                                         | Test Files                                           |
+| ------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Semantic EOT (Phoenix-VAD)**     | `src/voice/semantic_eot.c`, `include/human/voice/semantic_eot.h`             | `test_sota_research.c`, `test_sota_wiring.c`         |
+| **Emotion–voice map**                | `src/voice/emotion_voice_map.c`, `include/human/voice/emotion_voice_map.h`   | `test_sota_wiring.c`                                 |
+| **Audio emotion (STT features)**   | `src/voice/audio_emotion.c`, `include/human/voice/audio_emotion.h`           | `—`                                                  |
+| **Turn signal (LLM turn-taking)**  | `src/voice/turn_signal.c`, `include/human/voice/turn_signal.h`               | `test_turn_signal.c`                                 |
+
 ## Tools
 
 | Concept                 | Primary Source Files                                                 | Test Files                                |
@@ -78,6 +92,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Memory tools**        | `src/tools/memory_recall.c`, `memory_store.c`                        | `test_tools_all.c` (Memory/Message suite) |
 | **Cron tools**          | `src/tools/cron_add.c`, `cron_remove.c`, `cron_list.c`, `cron_run.c` | `test_cron.c`                             |
 | **Computer use / LSP**  | `src/tools/computer_use.c`, `lsp.c`                                  | `test_computer_use.c`, `test_lsp.c`       |
+| **Tool result cache (TTL)** | `src/tools/cache_ttl.c`, `include/human/tools/cache_ttl.h`         | `test_sota_wiring.c`                      |
 
 ## Memory
 
@@ -97,6 +112,8 @@ Use this to find the right files for a given task without searching the full cod
 | **Cognitive**                   | `src/memory/cognitive.c`                                                                                       | `test_cognitive.c`                                                               |
 | **Graph (knowledge)**           | `src/memory/graph.c`, `fast_capture.c`                                                                         | `test_graph.c`, `test_fast_capture.c`                                            |
 | **Connections / promotion**     | `src/memory/connections.c`, `promotion.c`                                                                      | `test_promotion.c`                                                               |
+| **Graph index (MAGMA, spreading activation)** | `src/memory/graph_index.c`, `include/human/memory/graph_index.h`                               | `test_sota_research.c`, `test_sota_wiring.c`                                     |
+| **Entropy gate**                | `src/memory/retrieval/entropy_gate.c`, `include/human/memory/entropy_gate.h`                                   | `test_entropy_gate.c`, `test_sota_wiring.c`                                      |
 
 ## Security
 
@@ -110,6 +127,8 @@ Use this to find the right files for a given task without searching the full cod
 | **Auth**            | `src/auth.c`                                                         | `test_auth.c`                                                             |
 | **Path security**   | `src/net_security.c`                                                 | `test_net_security.c`, `test_path_security.c`                             |
 | **Privacy audit**   | `src/security/audit.c`                                               | `test_privacy_audit.c`                                                    |
+| **Arg inspector (AEGIS-style)** | `src/security/arg_inspector.c`, `include/human/security/arg_inspector.h`                       | `test_sota_wiring.c`                                                      |
+| **CoT audit**       | `src/security/cot_audit.c`, `include/human/security/cot_audit.h`     | `test_cot_audit.c`, `test_sota_wiring.c`                                  |
 
 ## Gateway
 
@@ -123,6 +142,14 @@ Use this to find the right files for a given task without searching the full cod
 | **Event bridge**     | `src/gateway/event_bridge.c`                                                              | `test_gateway_extended.c`               |
 | **Streaming voice**  | `src/gateway/cp_voice_stream.c`, `src/tts/cartesia_stream.c`, `docs/streaming-voice.md`   | `test_cartesia_stream.c`, `test_gateway_voice.c` |
 | **Tenancy**          | `src/gateway/tenant.c`                                                                    | `test_tenant.c`                         |
+| **Control protocol: security (CoT audit)** | `src/gateway/cp_security.c`                                                     | `test_gateway_extended.c`               |
+| **Control protocol: Turing score** | `src/gateway/cp_turing.c`                                                         | `test_gateway_extended.c`               |
+
+## MCP
+
+| Concept            | Primary Source Files                                      | Test Files           |
+| ------------------ | --------------------------------------------------------- | -------------------- |
+| **MCP context (timeout, SERF)** | `src/gateway/mcp_context.c`, `include/human/mcp_context.h` | `test_sota_wiring.c` |
 
 ## Persona
 
@@ -135,6 +162,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Relationship tracking**       | `src/persona/relationship.c`           | `test_relationship.c`                        |
 | **Style cloning**               | `src/persona/style_clone.c`            | `test_style_clone.c`                         |
 | **Training / feedback**         | `src/persona/training.c`, `feedback.c` | `test_persona_training.c`, `test_feedback.c` |
+| **PersonaFuse (per-channel overlays)** | `src/persona/persona_fuse.c`, `include/human/persona/persona_fuse.h` | `—`                                 |
 
 ## Context
 
@@ -146,6 +174,12 @@ Use this to find the right files for a given task without searching the full cod
 | **Vision**         | `src/context/vision.c`         | `test_vision.c`         |
 | **Style tracker**  | `src/context/style_tracker.c`  | `test_style_tracker.c`  |
 | **Self-awareness** | `src/context/self_awareness.c` | `test_self_awareness.c` |
+
+## Eval
+
+| Concept                         | Primary Source Files                                         | Test Files                               |
+| ------------------------------- | ------------------------------------------------------------ | ---------------------------------------- |
+| **Turing score (S2S, 18-dim)**  | `src/eval/turing_score.c`, `include/human/eval/turing_score.h` | `test_turing_score.c`, `test_sota_research.c` |
 
 ## Other Subsystems
 

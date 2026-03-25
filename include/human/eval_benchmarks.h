@@ -7,11 +7,13 @@
 typedef enum {
     HU_BENCHMARK_GAIA = 0,
     HU_BENCHMARK_SWE_BENCH,
-    HU_BENCHMARK_TOOL_USE
+    HU_BENCHMARK_TOOL_USE,
+    HU_BENCHMARK_LIVE_AGENT,
+    HU_BENCHMARK_APEX,
 } hu_benchmark_type_t;
 
-hu_error_t hu_benchmark_load(hu_allocator_t *alloc, hu_benchmark_type_t type,
-                             const char *json, size_t json_len, hu_eval_suite_t *out);
+hu_error_t hu_benchmark_load(hu_allocator_t *alloc, hu_benchmark_type_t type, const char *json,
+                             size_t json_len, hu_eval_suite_t *out);
 
 const char *hu_benchmark_type_name(hu_benchmark_type_t type);
 

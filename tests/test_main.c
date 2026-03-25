@@ -357,6 +357,7 @@ void run_skill_routing_tests(void);
 void run_dual_process_tests(void);
 void run_sota_research_tests(void);
 void run_sota_wiring_tests(void);
+void run_sota_live_wiring_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -738,6 +739,7 @@ int main(int argc, char **argv) {
     run_dual_process_tests();
     run_sota_research_tests();
     run_sota_wiring_tests();
+    run_sota_live_wiring_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

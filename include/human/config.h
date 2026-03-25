@@ -1,8 +1,8 @@
 #ifndef HU_CONFIG_H
 #define HU_CONFIG_H
 
-#include "human/config_types.h"
 #include "human/cognition/metacognition.h"
+#include "human/config_types.h"
 #include "human/core/allocator.h"
 #include "human/core/arena.h"
 #include "human/core/error.h"
@@ -107,23 +107,26 @@ typedef struct hu_agent_config {
     uint64_t message_timeout_secs;
     uint32_t pool_max_concurrent;
     /* Fleet: pooled sub-agents (spawn) limits — see docs/standards/ai/fleet.md */
-    uint32_t fleet_max_spawn_depth;   /* 0 = unlimited; default from merge */
-    uint32_t fleet_max_total_spawns;  /* 0 = unlimited lifetime spawns per pool */
-    double fleet_budget_usd;          /* 0 = unlimited; requires shared cost tracker */
+    uint32_t fleet_max_spawn_depth;  /* 0 = unlimited; default from merge */
+    uint32_t fleet_max_total_spawns; /* 0 = unlimited lifetime spawns per pool */
+    double fleet_budget_usd;         /* 0 = unlimited; requires shared cost tracker */
     char *default_profile;
     char *persona;
     hu_persona_channel_entry_t *persona_channels;
     size_t persona_channels_count;
     hu_persona_channel_entry_t *persona_contacts;
     size_t persona_contacts_count;
-    float context_pressure_warn;    /* warn at this ratio (default 0.85) */
-    float context_pressure_compact; /* auto-compact at this ratio (default 0.95) */
-    float context_compact_target;   /* compact until below this ratio (default 0.70) */
+    float context_pressure_warn;         /* warn at this ratio (default 0.85) */
+    float context_pressure_compact;      /* auto-compact at this ratio (default 0.95) */
+    float context_compact_target;        /* compact until below this ratio (default 0.70) */
     hu_metacog_settings_t metacognition; /* agent.metacognition in config.json */
-    char *mr_reflexive_model;       /* model router: fast backchannel model */
-    char *mr_conversational_model;  /* model router: standard chat model */
-    char *mr_analytical_model;      /* model router: capable reasoning model */
-    char *mr_deep_model;            /* model router: most capable model */
+    char *mr_reflexive_model;            /* model router: fast backchannel model */
+    char *mr_conversational_model;       /* model router: standard chat model */
+    char *mr_analytical_model;           /* model router: capable reasoning model */
+    char *mr_deep_model;                 /* model router: most capable model */
+    bool prompt_cache_enabled;           /* enable cross-turn system prompt dedup (default true) */
+    bool agent_comm_enabled;             /* enable ACP inter-agent messaging (default false) */
+    char *context_engine_type;           /* "legacy" (default) or "rag" */
 } hu_agent_config_t;
 
 typedef struct hu_policy_config {
@@ -414,7 +417,7 @@ typedef struct hu_channels_config {
     hu_qq_channel_config_t qq;
     hu_channel_daemon_config_t default_daemon;
     struct {
-        char **apps;         /* app names to monitor, NULL = all */
+        char **apps; /* app names to monitor, NULL = all */
         size_t apps_count;
         int poll_interval_sec;
     } pwa;
@@ -503,9 +506,9 @@ typedef struct hu_voice_settings {
     char *tts_voice;          /* voice name, NULL = default */
     char *tts_model;          /* model name, NULL = default */
     char *stt_model;          /* model name, NULL = default */
-    char *mode;               /* "sonata", "realtime", "webrtc" — NULL = sonata (default pipeline) */
-    char *realtime_model;     /* OpenAI Realtime model, e.g. "gpt-4o-realtime-preview" */
-    char *realtime_voice;     /* Voice for Realtime, e.g. "alloy" */
+    char *mode;           /* "sonata", "realtime", "webrtc" — NULL = sonata (default pipeline) */
+    char *realtime_model; /* OpenAI Realtime model, e.g. "gpt-4o-realtime-preview" */
+    char *realtime_voice; /* Voice for Realtime, e.g. "alloy" */
 } hu_voice_settings_t;
 
 typedef struct hu_identity_config {
@@ -542,8 +545,8 @@ typedef struct hu_config {
     char *workspace_dir_override;
     /** When set, DPO exports write to `<dpo_export_dir>/dpo_preferences.jsonl`. */
     char *dpo_export_dir;
-    char *data_dir;   /* overrides ~/.human/data/ for hu_data_load() */
-    char *temp_dir;   /* overrides platform temp dir */
+    char *data_dir; /* overrides ~/.human/data/ for hu_data_load() */
+    char *temp_dir; /* overrides platform temp dir */
     char *api_key;
     hu_provider_entry_t *providers;
     size_t providers_len;
