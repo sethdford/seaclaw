@@ -44,6 +44,9 @@ typedef struct hu_kv_cache_manager {
 hu_error_t hu_kv_cache_init(hu_kv_cache_manager_t *mgr, hu_allocator_t *alloc, uint32_t max_tokens);
 void hu_kv_cache_deinit(hu_kv_cache_manager_t *mgr);
 
+/** Remove all segments (frees labels); keeps alloc and max_tokens. */
+void hu_kv_cache_clear(hu_kv_cache_manager_t *mgr);
+
 /* Add a segment to track. */
 hu_error_t hu_kv_cache_add_segment(hu_kv_cache_manager_t *mgr, const char *label, size_t label_len,
                                    uint32_t token_count, bool pinned);

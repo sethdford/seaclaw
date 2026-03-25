@@ -22,14 +22,7 @@ const DEMO_CHANNELS = [
   { key: "slack", label: "Slack", configured: true, healthy: true, status: "Connected" },
   { key: "signal", label: "Signal", configured: false, status: "Not configured" },
   { key: "imessage", label: "iMessage", configured: true, healthy: true, status: "Connected" },
-  {
-    key: "email",
-    label: "Email",
-    configured: true,
-    healthy: false,
-    error: "SMTP timeout",
-    status: "Error",
-  },
+  { key: "email", label: "Email", configured: true, healthy: true, status: "Connected" },
   { key: "matrix", label: "Matrix", configured: false, status: "Not configured" },
   { key: "whatsapp", label: "WhatsApp", configured: true, healthy: true, status: "Connected" },
 ];
@@ -1113,7 +1106,7 @@ export class DemoGatewayClient extends EventTarget {
       { event: "health", payload: { status: "operational", uptime_secs: 172800 } },
       { event: "chat", payload: { channel: "Discord", user: "Bob", preview: "Deploy looks good" } },
       { event: "agent.tool", payload: { tool: "web_search", command: "Rust async patterns" } },
-      { event: "error", payload: { source: "email", message: "SMTP timeout" } },
+      { event: "chat", payload: { channel: "Email", user: "Team", preview: "Weekly sync notes" } },
     ];
     for (const s of seed) {
       this.dispatchEvent(new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, { detail: s }));
@@ -1968,6 +1961,74 @@ export class DemoGatewayClient extends EventTarget {
             conversational_repair: 7,
             paralinguistic_cues: 6,
           },
+        };
+
+      case "turing.contact":
+        return {
+          contact_id: "+18018285260",
+          dimensions: {
+            natural_language: 9,
+            emotional_intelligence: 8,
+            appropriate_length: 9,
+            personality_consistency: 8,
+            vulnerability_willingness: 7,
+            humor_naturalness: 8,
+            imperfection: 8,
+            opinion_having: 8,
+            energy_matching: 9,
+            context_awareness: 8,
+            non_robotic: 9,
+            genuine_warmth: 8,
+            prosody_naturalness: 7,
+            turn_timing: 7,
+            filler_usage: 7,
+            emotional_prosody: 7,
+            conversational_repair: 6,
+            paralinguistic_cues: 6,
+          },
+          hint: null,
+        };
+      case "turing.trajectory":
+        return {
+          directional_alignment: 0.72,
+          cumulative_impact: 0.81,
+          stability: 0.88,
+          overall: 0.80,
+        };
+      case "turing.ab_tests":
+        return {
+          tests: [
+            {
+              name: "disfluency_freq",
+              variant_a: 0.08,
+              variant_b: 0.15,
+              avg_a: 7.2,
+              avg_b: 7.8,
+              count_a: 34,
+              count_b: 31,
+              active: true,
+            },
+            {
+              name: "backchannel_prob",
+              variant_a: 0.25,
+              variant_b: 0.40,
+              avg_a: 7.5,
+              avg_b: 7.4,
+              count_a: 28,
+              count_b: 27,
+              active: true,
+            },
+            {
+              name: "double_text_prob",
+              variant_a: 0.05,
+              variant_b: 0.12,
+              avg_a: 7.1,
+              avg_b: 7.6,
+              count_a: 22,
+              count_b: 19,
+              active: true,
+            },
+          ],
         };
 
       // --- Security: CoT Audit ---

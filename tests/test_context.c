@@ -24,7 +24,7 @@ static void test_context_format_empty(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_chat_message_t *msgs = NULL;
     size_t count = 99;
-    hu_error_t err = hu_context_format_messages(&alloc, NULL, 0, 10, &msgs, &count);
+    hu_error_t err = hu_context_format_messages(&alloc, NULL, 0, 10, NULL, &msgs, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(count, 0u);
 }
@@ -53,7 +53,7 @@ static void test_context_format_with_history(void) {
     };
     hu_chat_message_t *msgs = NULL;
     size_t count = 0;
-    hu_error_t err = hu_context_format_messages(&alloc, history, 2, 10, &msgs, &count);
+    hu_error_t err = hu_context_format_messages(&alloc, history, 2, 10, NULL, &msgs, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(count, 2u);
     HU_ASSERT_NOT_NULL(msgs);
@@ -106,7 +106,7 @@ static void test_context_format_respects_max_messages(void) {
     };
     hu_chat_message_t *msgs = NULL;
     size_t count = 0;
-    hu_error_t err = hu_context_format_messages(&alloc, history, 4, 2, &msgs, &count);
+    hu_error_t err = hu_context_format_messages(&alloc, history, 4, 2, NULL, &msgs, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(count, 2u);
     HU_ASSERT_NOT_NULL(msgs);

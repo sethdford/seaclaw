@@ -2186,6 +2186,20 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 }
             }
 #endif
+            /* Scheduled message delivery: flush any due messages */
+            if (channels[c].channel->vtable->send) {
+                uint64_t sched_now = (uint64_t)time(NULL) * 1000ULL;
+                char sched_contact[128];
+                char sched_msg[512];
+                size_t sched_len = hu_conversation_flush_scheduled(
+                    sched_now, sched_contact, sizeof(sched_contact), sched_msg, sizeof(sched_msg));
+                if (sched_len > 0) {
+                    channels[c].channel->vtable->send(channels[c].channel->ctx, sched_contact,
+                                                      strlen(sched_contact), sched_msg, sched_len,
+                                                      NULL, 0);
+                    fprintf(stderr, "[human] scheduled message delivered to %s\n", sched_contact);
+                }
+            }
             if (event_ctx)
                 alloc->free(alloc->ctx, event_ctx, event_ctx_len + 1);
             if (silence_ctx)
@@ -7384,7 +7398,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* ── Situational context injections ─────────────────────────── */
 #ifndef HU_IS_TEST
                 {
-                    char inject_buf[2048];
+                    char inject_buf[3072];
                     size_t inject_pos = 0;
 
                     /* Cold restart: detect >4h conversation gap */
@@ -7464,22 +7478,58 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 
-                    /* Edit/unsend awareness: detect edited messages in batch */
+                    /* Edit/unsend awareness: detect edited or unsent messages */
                     {
                         bool any_edited = false;
+                        bool any_unsent = false;
                         for (size_t bi = batch_start; bi <= batch_end; bi++) {
-                            if (msgs[bi].was_edited) {
+                            if (msgs[bi].was_edited)
                                 any_edited = true;
-                                break;
-                            }
+                            if (msgs[bi].was_unsent)
+                                any_unsent = true;
                         }
-                        if (any_edited) {
+                        if (any_unsent) {
+                            size_t n = hu_conversation_build_edit_awareness_hint(
+                                false, true, inject_buf + inject_pos,
+                                sizeof(inject_buf) - inject_pos);
+                            if (n > 0) {
+                                inject_pos += n;
+                                inject_buf[inject_pos++] = '\n';
+                            }
+                        } else if (any_edited) {
                             size_t n = hu_conversation_build_edit_awareness_hint(
                                 true, false, inject_buf + inject_pos,
                                 sizeof(inject_buf) - inject_pos);
                             if (n > 0) {
                                 inject_pos += n;
                                 inject_buf[inject_pos++] = '\n';
+                            }
+                        }
+                    }
+
+                    /* Inline reply awareness: look up the original message they replied to */
+                    {
+                        const char *reply_guid = NULL;
+                        for (size_t bi = batch_start; bi <= batch_end; bi++) {
+                            if (msgs[bi].reply_to_guid[0]) {
+                                reply_guid = msgs[bi].reply_to_guid;
+                                break;
+                            }
+                        }
+                        if (reply_guid) {
+                            char orig_text[512];
+                            size_t orig_len = 0;
+                            hu_error_t lr_err = hu_imessage_lookup_message_by_guid(
+                                alloc, reply_guid, strlen(reply_guid), orig_text, sizeof(orig_text),
+                                &orig_len);
+                            if (lr_err == HU_OK && orig_len > 0) {
+                                size_t n = hu_conversation_build_inline_reply_hint(
+                                    orig_text, orig_len, inject_buf + inject_pos,
+                                    sizeof(inject_buf) - inject_pos);
+                                if (n > 0) {
+                                    inject_pos += n;
+                                    inject_buf[inject_pos++] = '\n';
+                                }
                             }
                         }
                     }
@@ -9403,6 +9453,21 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* GIF reaction: send a GIF when the moment calls for it */
+                bool gif_sent_this_turn = false;
+                {
+                    static bool gif_cal_loaded;
+                    if (!gif_cal_loaded) {
+                        gif_cal_loaded = true;
+                        const char *gh = getenv("HOME");
+                        if (gh) {
+                            char gcp[512];
+                            int gn =
+                                snprintf(gcp, sizeof(gcp), "%s/.human/gif_calibration.json", gh);
+                            if (gn > 0 && (size_t)gn < sizeof(gcp))
+                                hu_conversation_gif_cal_load(gcp, (size_t)gn);
+                        }
+                    }
+                }
                 if (combined_len > 0 && ch->channel->vtable->send) {
                     float gif_prob = 0.10f;
                     const char *contact_rel = NULL;
@@ -9484,6 +9549,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                                         gif_now_ms);
                                         hu_conversation_gif_cal_record_send(
                                             batch_key, key_len, gif_query, gif_query_len);
+                                        {
+                                            const char *cal_home = getenv("HOME");
+                                            if (cal_home) {
+                                                char cal_path[512];
+                                                int cp_n = snprintf(
+                                                    cal_path, sizeof(cal_path),
+                                                    "%s/.human/gif_calibration.json", cal_home);
+                                                if (cp_n > 0 && (size_t)cp_n < sizeof(cal_path))
+                                                    hu_conversation_gif_cal_save(cal_path,
+                                                                                 (size_t)cp_n);
+                                            }
+                                        }
+                                        gif_sent_this_turn = true;
                                         fprintf(stderr, "[human] sent GIF: query=\"%.*s\"\n",
                                                 (int)gif_query_len, gif_query);
                                         size_t gp_path_len = strlen(gif_path);
@@ -9492,6 +9570,43 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                                 if (gif_query)
                                     alloc->free(alloc->ctx, gif_query, gif_query_len + 1);
+                            }
+                        }
+                    }
+                }
+
+                /* Sticker-like reaction images: send expressive images for
+                 * emotionally resonant messages (only if GIF wasn't sent) */
+                if (combined_len > 0 && ch->channel->vtable->send && !gif_sent_this_turn) {
+                    float sticker_prob = 0.08f;
+#ifdef HU_HAS_PERSONA
+                    if (agent->persona && agent->persona->humanization.gif_probability > 0.0f)
+                        sticker_prob = agent->persona->humanization.gif_probability * 0.4f;
+#endif
+                    uint32_t stk_seed =
+                        (uint32_t)time(NULL) * 48271u + (uint32_t)(uintptr_t)combined;
+                    const char *last_resp = response;
+                    size_t last_resp_len = response ? response_len : 0;
+                    if (hu_conversation_should_send_sticker(combined, combined_len, last_resp,
+                                                            last_resp_len, stk_seed,
+                                                            sticker_prob)) {
+                        const char *home = getenv("HOME");
+                        if (home) {
+                            char stk_dir[512];
+                            int sd_n =
+                                snprintf(stk_dir, sizeof(stk_dir), "%s/.human/stickers", home);
+                            if (sd_n > 0 && (size_t)sd_n < sizeof(stk_dir)) {
+                                char stk_path[640];
+                                size_t sp_len = hu_conversation_select_sticker(
+                                    combined, combined_len, stk_seed, stk_dir, (size_t)sd_n,
+                                    stk_path, sizeof(stk_path));
+                                if (sp_len > 0 && access(stk_path, R_OK) == 0) {
+                                    usleep(1500000 + (stk_seed % 2000000));
+                                    const char *media[] = {stk_path};
+                                    ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                              "", 0, media, 1);
+                                    fprintf(stderr, "[human] sent sticker: %s\n", stk_path);
+                                }
                             }
                         }
                     }

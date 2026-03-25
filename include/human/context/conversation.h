@@ -761,4 +761,44 @@ size_t hu_conversation_build_emoji_mirror_hint(const hu_channel_history_entry_t 
 size_t hu_conversation_build_edit_awareness_hint(bool message_was_edited, bool message_was_unsent,
                                                  char *buf, size_t cap);
 
+/* Sticker-like reaction images: decide whether to send a sticker based on
+ * message content and probability. Returns true if a sticker should be sent. */
+bool hu_conversation_should_send_sticker(const char *msg, size_t msg_len, const char *last_response,
+                                         size_t resp_len, uint32_t seed, float probability);
+
+/* Select a sticker matching the message content from the sticker directory.
+ * Writes the full path to out_path. Returns path length or 0 if no match. */
+size_t hu_conversation_select_sticker(const char *msg, size_t msg_len, uint32_t seed,
+                                      const char *sticker_dir, size_t dir_len, char *out_path,
+                                      size_t out_cap);
+
+/* Build context hint for inline replies. original_text is the text of the message
+ * they are replying to. Tells the LLM to respond in context of that original. */
+size_t hu_conversation_build_inline_reply_hint(const char *original_text, size_t original_len,
+                                               char *buf, size_t cap);
+
+/* Persist GIF calibration data to a JSON file. Load restores it on startup.
+ * File format: [{"contact":"id","sent":N,"reacted":N}, ...] */
+hu_error_t hu_conversation_gif_cal_save(const char *path, size_t path_len);
+hu_error_t hu_conversation_gif_cal_load(const char *path, size_t path_len);
+
+/* Split a long response into multiple separate text messages at sentence boundaries.
+ * Each chunk fits in chunks[][512]. Returns the number of chunks written.
+ * Designed for the "double-text" pattern where humans send multiple short messages. */
+size_t hu_conversation_split_into_texts(const char *response, size_t resp_len, size_t max_chunk,
+                                        char chunks[][512], size_t max_chunks);
+
+/* Schedule a message for future delivery. deliver_at_ms is absolute epoch millis.
+ * Call hu_conversation_flush_scheduled periodically to get due messages. */
+hu_error_t hu_conversation_schedule_message(const char *contact_id, size_t cid_len,
+                                            const char *message, size_t msg_len,
+                                            uint64_t deliver_at_ms);
+size_t hu_conversation_flush_scheduled(uint64_t now_ms, char *out_contact, size_t contact_cap,
+                                       char *out_message, size_t message_cap);
+
+/* Resolve the macOS Contacts/AddressBook image directory path.
+ * Returns path length or 0 if not available. */
+size_t hu_conversation_contact_photo_path(const char *contact_id, size_t cid_len, char *out_path,
+                                          size_t out_cap);
+
 #endif /* HU_CONTEXT_CONVERSATION_H */

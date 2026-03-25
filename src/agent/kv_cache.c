@@ -17,6 +17,12 @@ hu_error_t hu_kv_cache_init(hu_kv_cache_manager_t *mgr, hu_allocator_t *alloc,
 void hu_kv_cache_deinit(hu_kv_cache_manager_t *mgr) {
     if (!mgr)
         return;
+    hu_kv_cache_clear(mgr);
+}
+
+void hu_kv_cache_clear(hu_kv_cache_manager_t *mgr) {
+    if (!mgr)
+        return;
     for (size_t i = 0; i < mgr->segment_count; i++) {
         if (mgr->segments[i].label && mgr->alloc)
             mgr->alloc->free(mgr->alloc->ctx, mgr->segments[i].label,

@@ -357,6 +357,8 @@ set(HU_CORE_SOURCES
     src/security/security.c
     src/security/mcp_audit.c
     src/security/policy.c
+    src/security/causal_armor.c
+    src/security/history_scorer.c
     src/security/arg_inspector.c
     src/security/pairing.c
     src/security/secrets.c

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 /* ── Helper to build history entries ─────────────────────────────────── */
 
@@ -2532,6 +2533,164 @@ static void edit_awareness_neither(void) {
     HU_ASSERT_EQ(0, (int)len);
 }
 
+/* ── Sticker decision engine tests ───────────────────────────────────── */
+
+static void sticker_should_send_on_trigger(void) {
+    const char *msg = "omg congrats!! that's amazing!";
+    bool result = hu_conversation_should_send_sticker(msg, strlen(msg), NULL, 0, 42, 1.0f);
+    HU_ASSERT_TRUE(result);
+}
+
+static void sticker_should_not_send_no_trigger(void) {
+    const char *msg = "what time is the meeting?";
+    bool result = false;
+    for (uint32_t seed = 0; seed < 20; seed++) {
+        if (hu_conversation_should_send_sticker(msg, strlen(msg), NULL, 0, seed, 1.0f))
+            result = true;
+    }
+    HU_ASSERT_TRUE(!result);
+}
+
+static void sticker_should_not_send_after_gif(void) {
+    const char *msg = "lol that's hilarious";
+    const char *last = "[GIF] sent a funny cat";
+    bool result =
+        hu_conversation_should_send_sticker(msg, strlen(msg), last, strlen(last), 42, 1.0f);
+    HU_ASSERT_TRUE(!result);
+}
+
+static void sticker_select_celebration(void) {
+    const char *msg = "I got the job!!";
+    char path[256];
+    size_t len = hu_conversation_select_sticker(msg, strlen(msg), 42, "/tmp/stickers", 13, path,
+                                                sizeof(path));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(path, "celebration.png") != NULL);
+}
+
+static void sticker_select_laughing(void) {
+    const char *msg = "lmao I can't even";
+    char path[256];
+    size_t len = hu_conversation_select_sticker(msg, strlen(msg), 99, "/tmp/stickers", 13, path,
+                                                sizeof(path));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(path, ".png") != NULL);
+}
+
+static void sticker_select_no_match(void) {
+    const char *msg = "what's the weather like?";
+    char path[256];
+    size_t len = hu_conversation_select_sticker(msg, strlen(msg), 42, "/tmp/stickers", 13, path,
+                                                sizeof(path));
+    HU_ASSERT_EQ(0, (int)len);
+}
+
+/* ── Inline reply context tests ──────────────────────────────────────── */
+
+static void inline_reply_hint_builds_context(void) {
+    const char *orig = "are we still on for dinner tonight?";
+    char buf[512];
+    size_t len = hu_conversation_build_inline_reply_hint(orig, strlen(orig), buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "INLINE REPLY") != NULL);
+    HU_ASSERT_TRUE(strstr(buf, "dinner tonight") != NULL);
+}
+
+static void inline_reply_hint_truncates_long(void) {
+    char orig[256];
+    memset(orig, 'a', sizeof(orig));
+    orig[sizeof(orig) - 1] = '\0';
+    char buf[512];
+    size_t len = hu_conversation_build_inline_reply_hint(orig, sizeof(orig) - 1, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "...") != NULL);
+}
+
+static void inline_reply_hint_null_returns_zero(void) {
+    char buf[256];
+    size_t len = hu_conversation_build_inline_reply_hint(NULL, 0, buf, sizeof(buf));
+    HU_ASSERT_EQ(0, (int)len);
+}
+
+/* ── GIF calibration persistence tests ───────────────────────────────── */
+
+static void gif_cal_save_and_load_roundtrip(void) {
+    hu_conversation_gif_cal_record_send("persist_test", 12, "funny dog", 9);
+    hu_conversation_gif_cal_record_send("persist_test", 12, "cats", 4);
+    hu_conversation_gif_cal_record_reaction("persist_test", 12);
+    float rate_before = hu_conversation_gif_cal_hit_rate("persist_test", 12);
+
+    const char *path = "/tmp/hu_test_gif_cal.json";
+    hu_error_t err = hu_conversation_gif_cal_save(path, strlen(path));
+    HU_ASSERT_EQ(err, HU_OK);
+
+    err = hu_conversation_gif_cal_load(path, strlen(path));
+    HU_ASSERT_EQ(err, HU_OK);
+    float rate_after = hu_conversation_gif_cal_hit_rate("persist_test", 12);
+    HU_ASSERT_TRUE(rate_before >= 0.0f && rate_after >= 0.0f);
+    (void)unlink(path);
+}
+
+/* ── Multi-message splitting tests ───────────────────────────────────── */
+
+static void split_into_texts_short_no_split(void) {
+    const char *msg = "hey what's up";
+    char chunks[4][512];
+    size_t n = hu_conversation_split_into_texts(msg, strlen(msg), 200, chunks, 4);
+    HU_ASSERT_EQ(1, (int)n);
+    HU_ASSERT_STR_EQ(chunks[0], msg);
+}
+
+static void split_into_texts_splits_at_sentence(void) {
+    const char *msg = "I went to the store. Then I came home. It was a good day.";
+    char chunks[4][512];
+    size_t n = hu_conversation_split_into_texts(msg, strlen(msg), 25, chunks, 4);
+    HU_ASSERT_TRUE(n >= 2);
+    HU_ASSERT_TRUE(strlen(chunks[0]) > 0);
+}
+
+static void split_into_texts_null_returns_zero(void) {
+    char chunks[4][512];
+    size_t n = hu_conversation_split_into_texts(NULL, 0, 100, chunks, 4);
+    HU_ASSERT_EQ(0, (int)n);
+}
+
+/* ── Scheduled message tests ─────────────────────────────────────────── */
+
+static void schedule_and_flush_delivers(void) {
+    uint64_t now = (uint64_t)time(NULL) * 1000ULL;
+    hu_error_t err =
+        hu_conversation_schedule_message("sched_contact", 13, "good morning!", 13, now - 1000);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    char contact[128], msg[512];
+    size_t len = hu_conversation_flush_scheduled(now, contact, sizeof(contact), msg, sizeof(msg));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_STR_EQ(contact, "sched_contact");
+    HU_ASSERT_STR_EQ(msg, "good morning!");
+}
+
+static void schedule_future_not_yet_delivered(void) {
+    uint64_t now = (uint64_t)time(NULL) * 1000ULL;
+    hu_conversation_schedule_message("future_contact", 14, "later!", 6, now + 3600000);
+    char contact[128], msg[512];
+    size_t len = hu_conversation_flush_scheduled(now, contact, sizeof(contact), msg, sizeof(msg));
+    HU_ASSERT_EQ(0, (int)len);
+}
+
+static void schedule_null_returns_error(void) {
+    hu_error_t err = hu_conversation_schedule_message(NULL, 0, "hi", 2, 12345);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+/* ── Contact photo path tests ────────────────────────────────────────── */
+
+static void contact_photo_null_returns_zero(void) {
+    char buf[256];
+    size_t len = hu_conversation_contact_photo_path(NULL, 0, buf, sizeof(buf));
+    HU_ASSERT_EQ(0, (int)len);
+}
+
 /* ── Banned AI phrases expansion tests ──────────────────────────────── */
 
 static void strip_feel_free_to(void) {
@@ -3687,4 +3846,33 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(edit_awareness_edited);
     HU_RUN_TEST(edit_awareness_unsent);
     HU_RUN_TEST(edit_awareness_neither);
+
+    /* Sticker decision engine */
+    HU_RUN_TEST(sticker_should_send_on_trigger);
+    HU_RUN_TEST(sticker_should_not_send_no_trigger);
+    HU_RUN_TEST(sticker_should_not_send_after_gif);
+    HU_RUN_TEST(sticker_select_celebration);
+    HU_RUN_TEST(sticker_select_laughing);
+    HU_RUN_TEST(sticker_select_no_match);
+
+    /* Inline reply context */
+    HU_RUN_TEST(inline_reply_hint_builds_context);
+    HU_RUN_TEST(inline_reply_hint_truncates_long);
+    HU_RUN_TEST(inline_reply_hint_null_returns_zero);
+
+    /* GIF calibration persistence */
+    HU_RUN_TEST(gif_cal_save_and_load_roundtrip);
+
+    /* Multi-message splitting */
+    HU_RUN_TEST(split_into_texts_short_no_split);
+    HU_RUN_TEST(split_into_texts_splits_at_sentence);
+    HU_RUN_TEST(split_into_texts_null_returns_zero);
+
+    /* Scheduled messages */
+    HU_RUN_TEST(schedule_and_flush_delivers);
+    HU_RUN_TEST(schedule_future_not_yet_delivered);
+    HU_RUN_TEST(schedule_null_returns_error);
+
+    /* Contact photo path */
+    HU_RUN_TEST(contact_photo_null_returns_zero);
 }

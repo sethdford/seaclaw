@@ -19,6 +19,13 @@
 
 #define HU_TOOL_CACHE_TTL_MAX_ENTRIES 64
 
+typedef enum hu_tool_cacheability {
+    HU_TOOL_CACHE_NEVER = 0,
+    HU_TOOL_CACHE_SHORT,
+    HU_TOOL_CACHE_MEDIUM,
+    HU_TOOL_CACHE_LONG,
+} hu_tool_cacheability_t;
+
 typedef struct hu_tool_cache_ttl_entry {
     uint64_t key_hash;
     char *result;
@@ -52,6 +59,10 @@ hu_error_t hu_tool_cache_ttl_put(hu_tool_cache_ttl_t *cache, uint64_t key, const
 
 /** Evict expired entries. Returns number of entries evicted. */
 size_t hu_tool_cache_ttl_evict_expired(hu_tool_cache_ttl_t *cache, int64_t now);
+
+/** Classify cache policy from tool name + args (side effects vs static reads). */
+hu_tool_cacheability_t hu_tool_cache_classify(const char *tool_name, size_t name_len,
+                                              const char *args_json, size_t args_len);
 
 /** Get default TTL for a tool by name (heuristic: side-effect-free tools get longer TTL). */
 int64_t hu_tool_cache_ttl_default_for(const char *tool_name, size_t name_len);

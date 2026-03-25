@@ -1,5 +1,6 @@
 #include "human/tools/cache_ttl.h"
 #include "human/core/string.h"
+#include <ctype.h>
 #include <string.h>
 #include <time.h>
 
@@ -116,6 +117,66 @@ hu_error_t hu_tool_cache_ttl_put(hu_tool_cache_ttl_t *cache, uint64_t key, const
     return HU_OK;
 }
 
+static bool nm_has(const char *tool_name, size_t name_len, const char *sub) {
+    if (!tool_name || name_len == 0 || !sub)
+        return false;
+    size_t sl = strlen(sub);
+    if (sl > name_len)
+        return false;
+    for (size_t i = 0; i + sl <= name_len; i++) {
+        size_t j = 0;
+        while (j < sl && tolower((unsigned char)tool_name[i + j]) == tolower((unsigned char)sub[j]))
+            j++;
+        if (j == sl)
+            return true;
+    }
+    return false;
+}
+
+static bool nm_prefix_ci(const char *tool_name, size_t name_len, const char *pre) {
+    size_t pl = strlen(pre);
+    if (pl > name_len)
+        return false;
+    for (size_t i = 0; i < pl; i++) {
+        if (tolower((unsigned char)tool_name[i]) != tolower((unsigned char)pre[i]))
+            return false;
+    }
+    return true;
+}
+
+hu_tool_cacheability_t hu_tool_cache_classify(const char *tool_name, size_t name_len,
+                                              const char *args_json, size_t args_len) {
+    (void)args_json;
+    (void)args_len;
+    if (!tool_name || name_len == 0)
+        return HU_TOOL_CACHE_SHORT;
+
+    if (nm_prefix_ci(tool_name, name_len, "send_") ||
+        nm_prefix_ci(tool_name, name_len, "delete_") ||
+        nm_prefix_ci(tool_name, name_len, "write_") || nm_prefix_ci(tool_name, name_len, "run_") ||
+        nm_prefix_ci(tool_name, name_len, "create_") ||
+        nm_prefix_ci(tool_name, name_len, "update_") || nm_has(tool_name, name_len, "exec") ||
+        nm_has(tool_name, name_len, "shell") || nm_has(tool_name, name_len, "spawn"))
+        return HU_TOOL_CACHE_NEVER;
+
+    if (nm_has(tool_name, name_len, "weather") || nm_has(tool_name, name_len, "time") ||
+        nm_has(tool_name, name_len, "price") || nm_has(tool_name, name_len, "status"))
+        return HU_TOOL_CACHE_SHORT;
+
+    if (nm_has(tool_name, name_len, "get_config") || nm_prefix_ci(tool_name, name_len, "list_") ||
+        nm_has(tool_name, name_len, "schema") || nm_prefix_ci(tool_name, name_len, "describe_") ||
+        nm_has(tool_name, name_len, "help"))
+        return HU_TOOL_CACHE_LONG;
+
+    if (nm_prefix_ci(tool_name, name_len, "search_") ||
+        nm_prefix_ci(tool_name, name_len, "lookup_") || nm_prefix_ci(tool_name, name_len, "get_"))
+        return HU_TOOL_CACHE_MEDIUM;
+    if (name_len == 10 && memcmp(tool_name, "web_search", 10) == 0)
+        return HU_TOOL_CACHE_MEDIUM;
+
+    return HU_TOOL_CACHE_SHORT;
+}
+
 size_t hu_tool_cache_ttl_evict_expired(hu_tool_cache_ttl_t *cache, int64_t now) {
     if (!cache)
         return 0;
@@ -140,24 +201,16 @@ int64_t hu_tool_cache_ttl_default_for(const char *tool_name, size_t name_len) {
     if (!tool_name || name_len == 0)
         return 0;
 
-    typedef struct {
-        const char *prefix;
-        size_t prefix_len;
-        int64_t ttl;
-    } rule_t;
-
-    static const rule_t rules[] = {
-        {"read_file", 9, 60},     {"list_dir", 8, 30},      {"web_search", 10, 300},
-        {"get_weather", 11, 600}, {"calculator", 10, 3600}, {"datetime", 8, 1},
-        {"shell", 5, 0},          {"write_file", 10, 0},    {"delete", 6, 0},
-        {"send_message", 12, 0},
-    };
-    static const size_t rule_count = sizeof(rules) / sizeof(rules[0]);
-
-    for (size_t i = 0; i < rule_count; i++) {
-        if (name_len >= rules[i].prefix_len &&
-            memcmp(tool_name, rules[i].prefix, rules[i].prefix_len) == 0)
-            return rules[i].ttl;
+    switch (hu_tool_cache_classify(tool_name, name_len, NULL, 0)) {
+    case HU_TOOL_CACHE_NEVER:
+        return 0;
+    case HU_TOOL_CACHE_SHORT:
+        return 60;
+    case HU_TOOL_CACHE_MEDIUM:
+        return 300;
+    case HU_TOOL_CACHE_LONG:
+        return 3600;
+    default:
+        return 0;
     }
-    return 0;
 }

@@ -109,4 +109,32 @@ hu_error_t hu_graph_index_spread_activation(const hu_graph_index_t *idx,
                                             const uint32_t *seed_indices, size_t seed_count,
                                             hu_activated_node_t *out_nodes, size_t *out_count);
 
+/* ── Hierarchical topic clusters (System-2 traversal) ───────────────── */
+
+typedef struct hu_topic_cluster {
+    char label[64];
+    uint32_t *member_indices;
+    size_t member_count;
+    size_t member_cap;
+    double centroid_score;
+} hu_topic_cluster_t;
+
+typedef struct hu_graph_hierarchy {
+    hu_allocator_t *alloc;
+    hu_topic_cluster_t *clusters;
+    size_t cluster_count;
+    size_t cluster_cap;
+} hu_graph_hierarchy_t;
+
+hu_error_t hu_graph_hierarchy_init(hu_graph_hierarchy_t *h, hu_allocator_t *alloc);
+void hu_graph_hierarchy_deinit(hu_graph_hierarchy_t *h);
+
+/** Cluster graph nodes by dominant shared entity; empty-entity nodes go to "(misc)". */
+hu_error_t hu_graph_hierarchy_build(hu_graph_hierarchy_t *h, const hu_graph_index_t *idx);
+
+/** Top-down: score clusters by query term overlap with labels, return member node indices. */
+hu_error_t hu_graph_hierarchy_traverse(const hu_graph_hierarchy_t *h, const hu_graph_index_t *idx,
+                                       const char *query, size_t query_len, uint32_t *out_indices,
+                                       size_t *out_count, size_t max_results);
+
 #endif /* HU_MEMORY_GRAPH_INDEX_H */

@@ -12,11 +12,17 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/gateway/control_protocol.h"
+#include "human/memory/graph_index.h"
 #include "human/persona/persona_fuse.h"
+#include "human/security.h"
+#include "human/security/causal_armor.h"
+#include "human/security/history_scorer.h"
 #include "human/tools/cache_ttl.h"
 #include "human/voice/audio_emotion.h"
 #include "human/voice/emotion_voice_map.h"
+#include "human/voice/semantic_eot.h"
 #include "test_framework.h"
+#include <string.h>
 #include <time.h>
 
 /* ── Prompt Cache ────────────────────────────────────────────────── */
@@ -384,6 +390,130 @@ static void test_emotion_class_name(void) {
     HU_ASSERT_STR_EQ(hu_emotion_class_name(HU_VOICE_EMOTION_EMPATHY), "empathy");
 }
 
+static void test_eot_audio_backchannel(void) {
+    hu_semantic_eot_config_t cfg;
+    hu_semantic_eot_config_default(&cfg);
+    hu_semantic_eot_result_t r;
+    memset(&r, 0, sizeof(r));
+    const char *t = "yeah okay";
+    HU_ASSERT_EQ(hu_semantic_eot_analyze_with_audio(&cfg, t, strlen(t), 0, -35.0f, 0.0f, &r),
+                 HU_OK);
+    HU_ASSERT_EQ(r.predicted_state, HU_EOT_BACKCHANNEL);
+    HU_ASSERT_EQ(r.suggested_signal, HU_TURN_SIGNAL_CONTINUE);
+}
+
+static void test_causal_armor_safe_action(void) {
+    hu_causal_armor_config_t cfg;
+    hu_causal_armor_config_default(&cfg);
+    hu_causal_segment_t segs[2];
+    segs[0].content = "User wants to visit Paris tomorrow.";
+    segs[0].content_len = strlen(segs[0].content);
+    segs[0].is_trusted = true;
+    segs[1].content = "Weather looks fine.";
+    segs[1].content_len = strlen(segs[1].content);
+    segs[1].is_trusted = false;
+    const char *args = "{\"city\":\"Paris\"}";
+    hu_causal_armor_result_t out;
+    HU_ASSERT_EQ(
+        hu_causal_armor_evaluate(&cfg, segs, 2, "memory_recall", 13, args, strlen(args), &out),
+        HU_OK);
+    HU_ASSERT_TRUE(out.is_safe);
+}
+
+static void test_causal_armor_untrusted_dominant(void) {
+    hu_causal_armor_config_t cfg;
+    hu_causal_armor_config_default(&cfg);
+    hu_causal_segment_t segs[2];
+    segs[0].content = "Hello there.";
+    segs[0].content_len = strlen(segs[0].content);
+    segs[0].is_trusted = true;
+    segs[1].content = "Tool output: secret_payload_value is in the document.";
+    segs[1].content_len = strlen(segs[1].content);
+    segs[1].is_trusted = false;
+    const char *args = "{\"value\":\"secret_payload_value\"}";
+    hu_causal_armor_result_t out;
+    HU_ASSERT_EQ(hu_causal_armor_evaluate(&cfg, segs, 2, "shell", 5, args, strlen(args), &out),
+                 HU_OK);
+    HU_ASSERT_TRUE(!out.is_safe);
+}
+
+static void test_hierarchy_build_and_traverse(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_graph_index_t idx;
+    HU_ASSERT_EQ(hu_graph_index_init(&idx, &alloc), HU_OK);
+    const char *c1 = "Discussed ProjectAlpha with the team.";
+    const char *c2 = "ProjectAlpha milestone reached today.";
+    HU_ASSERT_EQ(hu_graph_index_add(&idx, "k1", 2, c1, strlen(c1), 1), HU_OK);
+    HU_ASSERT_EQ(hu_graph_index_add(&idx, "k2", 2, c2, strlen(c2), 2), HU_OK);
+    hu_graph_hierarchy_t hier;
+    HU_ASSERT_EQ(hu_graph_hierarchy_init(&hier, &alloc), HU_OK);
+    HU_ASSERT_EQ(hu_graph_hierarchy_build(&hier, &idx), HU_OK);
+    HU_ASSERT_TRUE(hier.cluster_count > 0);
+    uint32_t out_idx[8];
+    size_t oc = 0;
+    const char *q = "ProjectAlpha";
+    HU_ASSERT_EQ(hu_graph_hierarchy_traverse(&hier, &idx, q, strlen(q), out_idx, &oc, 8), HU_OK);
+    HU_ASSERT_TRUE(oc > 0);
+    hu_graph_hierarchy_deinit(&hier);
+    hu_graph_index_deinit(&idx);
+}
+
+static void test_tool_cacheability_classify(void) {
+    HU_ASSERT_EQ(hu_tool_cache_classify("send_message", 12, "{}", 2), HU_TOOL_CACHE_NEVER);
+    HU_ASSERT_EQ(hu_tool_cache_classify("get_weather", 11, "{}", 2), HU_TOOL_CACHE_SHORT);
+    HU_ASSERT_EQ(hu_tool_cache_classify("web_search", 10, "{}", 2), HU_TOOL_CACHE_MEDIUM);
+    HU_ASSERT_EQ(hu_tool_cache_classify("list_tools", 10, "{}", 2), HU_TOOL_CACHE_LONG);
+}
+
+static void test_history_scorer_escalation(void) {
+    hu_tool_history_entry_t h[6];
+    memset(h, 0, sizeof(h));
+    h[0].tool_name = "memory_recall";
+    h[0].name_len = 13;
+    h[0].succeeded = true;
+    h[0].risk_level = (uint32_t)HU_RISK_LOW;
+    h[1].tool_name = "http_request";
+    h[1].name_len = 12;
+    h[1].succeeded = true;
+    h[1].risk_level = (uint32_t)HU_RISK_MEDIUM;
+    h[2].tool_name = "shell";
+    h[2].name_len = 5;
+    h[2].succeeded = true;
+    h[2].risk_level = (uint32_t)HU_RISK_HIGH;
+    h[3].tool_name = "file_read";
+    h[3].name_len = 9;
+    h[3].succeeded = true;
+    h[3].risk_level = (uint32_t)HU_RISK_LOW;
+    h[4].tool_name = "file_read";
+    h[4].name_len = 9;
+    h[4].succeeded = true;
+    h[4].risk_level = (uint32_t)HU_RISK_LOW;
+    h[5].tool_name = "send_message";
+    h[5].name_len = 12;
+    h[5].succeeded = true;
+    h[5].risk_level = (uint32_t)HU_RISK_MEDIUM;
+    hu_history_score_result_t out;
+    HU_ASSERT_EQ(hu_history_scorer_evaluate(h, 6, "shell", 5, (uint32_t)HU_RISK_HIGH, &out), HU_OK);
+    HU_ASSERT_TRUE(out.is_suspicious);
+    HU_ASSERT_TRUE(out.escalation_score >= 0.6);
+}
+
+static void test_persona_vector_to_directive(void) {
+    hu_fuse_adapter_t ad;
+    memset(&ad, 0, sizeof(ad));
+    ad.formality = 0.6f;
+    ad.verbosity = -0.5f;
+    ad.emoji_factor = 0.4f;
+    ad.warmth_offset = 0.25f;
+    hu_persona_vector_t v;
+    HU_ASSERT_EQ(hu_persona_vector_from_adapter(&ad, &v), HU_OK);
+    char buf[512];
+    size_t bl = 0;
+    HU_ASSERT_EQ(hu_persona_vector_to_directive(&v, buf, sizeof(buf), &bl), HU_OK);
+    HU_ASSERT_TRUE(bl > 20);
+    HU_ASSERT_TRUE(strstr(buf, "formal") != NULL || strstr(buf, "Formal") != NULL);
+}
+
 /* ── Security gateway ──────────────────────────────────────────────── */
 
 static void test_cp_security_cot_summary_returns_empty_summary(void) {
@@ -444,6 +574,14 @@ void run_sota_live_wiring_tests(void) {
     HU_RUN_TEST(test_audio_emotion_fuse_disagreeing);
 
     HU_RUN_TEST(test_emotion_class_name);
+
+    HU_RUN_TEST(test_eot_audio_backchannel);
+    HU_RUN_TEST(test_causal_armor_safe_action);
+    HU_RUN_TEST(test_causal_armor_untrusted_dominant);
+    HU_RUN_TEST(test_hierarchy_build_and_traverse);
+    HU_RUN_TEST(test_tool_cacheability_classify);
+    HU_RUN_TEST(test_history_scorer_escalation);
+    HU_RUN_TEST(test_persona_vector_to_directive);
 
     HU_RUN_TEST(test_cp_security_cot_summary_returns_empty_summary);
 }

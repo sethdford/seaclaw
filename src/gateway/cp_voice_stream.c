@@ -10,6 +10,7 @@
 #include "human/platform.h"
 #include "human/tts/cartesia_stream.h"
 #include "human/voice.h"
+#include "human/voice/audio_emotion.h"
 #include "human/voice/duplex.h"
 #include "human/voice/emotion_voice_map.h"
 #include "human/voice/semantic_eot.h"
@@ -472,20 +473,50 @@ hu_error_t cp_voice_audio_end(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     size_t text_len = 0;
     hu_error_t err = hu_voice_stt_file(alloc, &voice_cfg, tmpl, &text, &text_len);
     unlink(tmpl);
+
+    hu_audio_features_t feats;
+    memset(&feats, 0, sizeof(feats));
+    if (sl->pcm_len >= 320 && (sl->pcm_len % 2u) == 0u && sl->pcm_buf) {
+        (void)hu_audio_features_extract((const int16_t *)sl->pcm_buf, sl->pcm_len / 2u, 16000u,
+                                        &feats);
+    }
     sl->pcm_len = 0;
 
     if (err != HU_OK || !text)
         return err == HU_OK ? HU_ERR_IO : err;
 
-    /* Semantic EOT: analyze transcript to decide if user's turn is truly complete */
+    /* Fuse text + audio emotion for TTS voice selection */
+    {
+        hu_voice_emotion_t text_emo = HU_VOICE_EMOTION_NEUTRAL;
+        float text_conf = 0.0f;
+        (void)hu_emotion_detect_from_text(text, text_len, &text_emo, &text_conf);
+        hu_voice_emotion_t audio_emo = HU_VOICE_EMOTION_NEUTRAL;
+        float audio_conf = 0.0f;
+        if (feats.valid)
+            (void)hu_audio_emotion_classify(&feats, &audio_emo, &audio_conf);
+        hu_voice_emotion_t fused_emo = HU_VOICE_EMOTION_NEUTRAL;
+        float fused_conf = 0.0f;
+        (void)hu_emotion_fuse(text_emo, text_conf, audio_emo, audio_conf, &fused_emo, &fused_conf);
+        if (fused_conf > 0.25f) {
+            sl->current_emotion = fused_emo;
+            sl->emotion_voice_params = hu_emotion_voice_map(fused_emo);
+        }
+    }
+
+    /* Semantic EOT: transcript + acoustic features */
     hu_turn_signal_t eot_signal = HU_TURN_SIGNAL_YIELD;
     {
         hu_semantic_eot_config_t eot_cfg;
         hu_semantic_eot_config_default(&eot_cfg);
         hu_semantic_eot_result_t eot_result;
         memset(&eot_result, 0, sizeof(eot_result));
-        if (hu_semantic_eot_analyze(&eot_cfg, text, text_len, 0, &eot_result) == HU_OK &&
-            eot_result.is_endpoint)
+        float pitch_delta = feats.valid ? (feats.pitch_mean_hz - 120.0f) : 0.0f;
+        hu_error_t eot_err =
+            feats.valid
+                ? hu_semantic_eot_analyze_with_audio(&eot_cfg, text, text_len, 0, feats.energy_db,
+                                                     pitch_delta, &eot_result)
+                : hu_semantic_eot_analyze(&eot_cfg, text, text_len, 0, &eot_result);
+        if (eot_err == HU_OK && eot_result.is_endpoint)
             eot_signal = eot_result.suggested_signal;
     }
 

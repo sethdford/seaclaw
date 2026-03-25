@@ -215,6 +215,92 @@ static void turing_voice_turn_timing_short_casual(void) {
     HU_ASSERT(score.dimensions[HU_TURING_TURN_TIMING] >= 7);
 }
 
+static void turing_trajectory_single_score(void) {
+    hu_turing_score_t scores[1];
+    memset(scores, 0, sizeof(scores));
+    scores[0].overall = 8;
+    hu_turing_trajectory_t traj;
+    HU_ASSERT(hu_turing_score_trajectory(scores, 1, &traj) == HU_OK);
+    HU_ASSERT(traj.stability >= 0.99f);
+    HU_ASSERT(traj.overall > 0.0f && traj.overall <= 1.0f);
+}
+
+static void turing_trajectory_improving_trend(void) {
+    hu_turing_score_t scores[6];
+    memset(scores, 0, sizeof(scores));
+    scores[0].overall = 4;
+    scores[1].overall = 5;
+    scores[2].overall = 5;
+    scores[3].overall = 7;
+    scores[4].overall = 8;
+    scores[5].overall = 9;
+    hu_turing_trajectory_t traj;
+    HU_ASSERT(hu_turing_score_trajectory(scores, 6, &traj) == HU_OK);
+    HU_ASSERT(traj.directional_alignment > 0.5f);
+}
+
+static void turing_trajectory_declining_trend(void) {
+    hu_turing_score_t scores[4];
+    memset(scores, 0, sizeof(scores));
+    scores[0].overall = 9;
+    scores[1].overall = 8;
+    scores[2].overall = 5;
+    scores[3].overall = 3;
+    hu_turing_trajectory_t traj;
+    HU_ASSERT(hu_turing_score_trajectory(scores, 4, &traj) == HU_OK);
+    HU_ASSERT(traj.directional_alignment < 0.5f);
+}
+
+static void turing_trajectory_stable_high(void) {
+    hu_turing_score_t scores[5];
+    memset(scores, 0, sizeof(scores));
+    for (int i = 0; i < 5; i++)
+        scores[i].overall = 8;
+    hu_turing_trajectory_t traj;
+    HU_ASSERT(hu_turing_score_trajectory(scores, 5, &traj) == HU_OK);
+    HU_ASSERT(traj.stability >= 0.95f);
+    HU_ASSERT(traj.cumulative_impact >= 0.75f);
+}
+
+static void turing_trajectory_null_rejected(void) {
+    hu_turing_trajectory_t traj;
+    HU_ASSERT(hu_turing_score_trajectory(NULL, 0, &traj) == HU_ERR_INVALID_ARGUMENT);
+}
+
+static void turing_contact_hint_builds_for_weak_dims(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    int dims[HU_TURING_DIM_COUNT];
+    memset(dims, 0, sizeof(dims));
+    dims[HU_TURING_NATURAL_LANGUAGE] = 4;
+    dims[HU_TURING_GENUINE_WARMTH] = 5;
+    dims[HU_TURING_NON_ROBOTIC] = 3;
+    size_t len = 0;
+    char *hint = hu_turing_build_contact_hint(&alloc, dims, &len);
+    HU_ASSERT(hint != NULL);
+    HU_ASSERT(len > 0);
+    HU_ASSERT(strstr(hint, "contractions") != NULL || strstr(hint, "casual") != NULL);
+    alloc.free(alloc.ctx, hint, len + 1);
+}
+
+static void turing_contact_hint_null_for_good_dims(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    int dims[HU_TURING_DIM_COUNT];
+    for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
+        dims[i] = 8;
+    size_t len = 0;
+    char *hint = hu_turing_build_contact_hint(&alloc, dims, &len);
+    HU_ASSERT(hint == NULL);
+    HU_ASSERT(len == 0);
+}
+
+static void turing_ab_pick_variant_deterministic(void) {
+    bool v1 = hu_ab_test_pick_variant("alice", 5, "test_x");
+    bool v2 = hu_ab_test_pick_variant("alice", 5, "test_x");
+    HU_ASSERT(v1 == v2);
+    bool v3 = hu_ab_test_pick_variant("bob", 3, "test_x");
+    (void)v3;
+}
+
 void run_turing_score_tests(void) {
     HU_RUN_TEST(turing_heuristic_casual_message_scores_high);
     HU_RUN_TEST(turing_heuristic_ai_tells_score_low);
@@ -243,4 +329,12 @@ void run_turing_score_tests(void) {
     HU_RUN_TEST(turing_voice_emotional_prosody_with_emphasis);
     HU_RUN_TEST(turing_voice_prosody_varied_punctuation);
     HU_RUN_TEST(turing_voice_turn_timing_short_casual);
+    HU_RUN_TEST(turing_trajectory_single_score);
+    HU_RUN_TEST(turing_trajectory_improving_trend);
+    HU_RUN_TEST(turing_trajectory_declining_trend);
+    HU_RUN_TEST(turing_trajectory_stable_high);
+    HU_RUN_TEST(turing_trajectory_null_rejected);
+    HU_RUN_TEST(turing_contact_hint_builds_for_weak_dims);
+    HU_RUN_TEST(turing_contact_hint_null_for_good_dims);
+    HU_RUN_TEST(turing_ab_pick_variant_deterministic);
 }

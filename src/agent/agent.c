@@ -18,12 +18,14 @@
 #include "human/persona/circadian.h"
 #include "human/persona/relationship.h"
 #endif
+#include "human/agent/acp_bridge.h"
 #include "human/agent/agent_comm.h"
 #include "human/agent/commands.h"
 #include "human/agent/compaction.h"
 #include "human/agent/dispatcher.h"
 #include "human/agent/episodic.h"
 #include "human/agent/input_guard.h"
+#include "human/agent/kv_cache.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/memory_loader.h"
 #include "human/agent/outcomes.h"
@@ -582,6 +584,11 @@ void hu_agent_deinit(hu_agent_t *agent) {
         agent->alloc->free(agent->alloc->ctx, agent->tool_cache_ttl, sizeof(hu_tool_cache_ttl_t));
         agent->tool_cache_ttl = NULL;
     }
+    if (agent->kv_cache) {
+        hu_kv_cache_deinit(agent->kv_cache);
+        agent->alloc->free(agent->alloc->ctx, agent->kv_cache, sizeof(hu_kv_cache_manager_t));
+        agent->kv_cache = NULL;
+    }
     if (agent->context_engine) {
         hu_context_engine_t *ce = (hu_context_engine_t *)agent->context_engine;
         if (ce->vtable && ce->vtable->deinit)
@@ -1062,17 +1069,41 @@ void hu_agent_internal_process_mailbox_messages(hu_agent_t *agent) {
     uint64_t id = agent->agent_id ? agent->agent_id : (uint64_t)(uintptr_t)agent;
     hu_message_t msg;
     while (hu_mailbox_recv(agent->mailbox, id, &msg) == HU_OK) {
-        char buf[512];
-        size_t payload_len = msg.payload_len < 400 ? msg.payload_len : 400;
-        int n = snprintf(buf, sizeof(buf), "[Message from agent %llu]: %.*s",
-                         (unsigned long long)msg.from_agent, (int)payload_len,
-                         msg.payload ? msg.payload : "");
-        if (n > 0) {
-            hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_USER, buf,
-                                                                   (size_t)n, NULL, 0, NULL, 0);
-            if (hist_err != HU_OK)
-                fprintf(stderr, "[agent] mailbox message history append failed: %s\n",
-                        hu_error_string(hist_err));
+        bool acp_done = false;
+        if (msg.payload && msg.payload_len >= 4 && memcmp(msg.payload, "ACP|", 4) == 0) {
+            hu_acp_message_t acp;
+            memset(&acp, 0, sizeof(acp));
+            if (hu_acp_bridge_recv(agent->alloc, &msg, &acp) == HU_OK) {
+                char buf[640];
+                int n = snprintf(buf, sizeof(buf), "[ACP %s from %.*s]: %.*s",
+                                 hu_acp_msg_type_name(acp.type), (int)acp.sender_id_len,
+                                 acp.sender_id ? acp.sender_id : "",
+                                 acp.payload_len < 500 ? (int)acp.payload_len : 500,
+                                 acp.payload ? acp.payload : "");
+                hu_acp_message_free(agent->alloc, &acp);
+                acp_done = true;
+                if (n > 0) {
+                    hu_error_t hist_err = hu_agent_internal_append_history(
+                        agent, HU_ROLE_USER, buf, (size_t)n, NULL, 0, NULL, 0);
+                    if (hist_err != HU_OK)
+                        fprintf(stderr, "[agent] mailbox ACP history append failed: %s\n",
+                                hu_error_string(hist_err));
+                }
+            }
+        }
+        if (!acp_done) {
+            char buf[512];
+            size_t payload_len = msg.payload_len < 400 ? msg.payload_len : 400;
+            int n = snprintf(buf, sizeof(buf), "[Message from agent %llu]: %.*s",
+                             (unsigned long long)msg.from_agent, (int)payload_len,
+                             msg.payload ? msg.payload : "");
+            if (n > 0) {
+                hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_USER, buf,
+                                                                       (size_t)n, NULL, 0, NULL, 0);
+                if (hist_err != HU_OK)
+                    fprintf(stderr, "[agent] mailbox message append failed: %s\n",
+                            hu_error_string(hist_err));
+            }
         }
         hu_message_free(agent->alloc, &msg);
     }

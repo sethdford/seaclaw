@@ -1,5 +1,7 @@
 #include "human/persona/persona_fuse.h"
 #include "human/core/string.h"
+#include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 hu_error_t hu_persona_fuse_init(hu_persona_fuse_t *fuse, hu_allocator_t *alloc) {
@@ -134,5 +136,122 @@ hu_error_t hu_persona_fuse_add_builtin_adapters(hu_persona_fuse_t *fuse) {
     if (err != HU_OK)
         return err;
 
+    return HU_OK;
+}
+
+static float hu_clamp11(float x) {
+    if (x > 1.0f)
+        return 1.0f;
+    if (x < -1.0f)
+        return -1.0f;
+    return x;
+}
+
+hu_error_t hu_persona_vector_from_adapter(const hu_persona_fuse_adapter_t *adapter,
+                                          hu_persona_vector_t *out) {
+    if (!adapter || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    out->formality = hu_clamp11(adapter->formality);
+    out->warmth = hu_clamp11(adapter->warmth_offset * 2.0f);
+    out->verbosity = hu_clamp11(adapter->verbosity);
+    out->humor = 0.0f;
+    out->directness = 0.0f;
+    out->emoji_usage = hu_clamp11((adapter->emoji_factor - 1.0f) * 0.85f);
+    return HU_OK;
+}
+
+hu_error_t hu_persona_vector_compose(const hu_persona_vector_t *vectors, size_t count,
+                                     hu_persona_vector_t *out) {
+    if (!vectors || count == 0 || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    for (size_t i = 0; i < count; i++) {
+        out->formality += vectors[i].formality;
+        out->warmth += vectors[i].warmth;
+        out->verbosity += vectors[i].verbosity;
+        out->humor += vectors[i].humor;
+        out->directness += vectors[i].directness;
+        out->emoji_usage += vectors[i].emoji_usage;
+    }
+    float inv = 1.0f / (float)count;
+    out->formality = hu_clamp11(out->formality * inv);
+    out->warmth = hu_clamp11(out->warmth * inv);
+    out->verbosity = hu_clamp11(out->verbosity * inv);
+    out->humor = hu_clamp11(out->humor * inv);
+    out->directness = hu_clamp11(out->directness * inv);
+    out->emoji_usage = hu_clamp11(out->emoji_usage * inv);
+    return HU_OK;
+}
+
+static void append_dim(char *buf, size_t cap, size_t *pos, const char *sentence) {
+    if (!buf || !pos || !sentence || !sentence[0])
+        return;
+    size_t p = *pos;
+    if (p >= cap)
+        return;
+    int n = snprintf(buf + p, cap - p, "%s%s", p > 0 ? " " : "", sentence);
+    if (n > 0 && (size_t)n < cap - p)
+        *pos = p + (size_t)n;
+}
+
+static void dim_phrase(float v, const char *pos_very, const char *pos_mod, const char *pos_slight,
+                       const char *neg_avoid, const char *neg_min, char *out, size_t ocap) {
+    if (fabsf(v) <= 0.06f) {
+        out[0] = '\0';
+        return;
+    }
+    if (v > 0.55f)
+        snprintf(out, ocap, "%s", pos_very);
+    else if (v > 0.2f)
+        snprintf(out, ocap, "%s", pos_mod);
+    else if (v > 0.05f)
+        snprintf(out, ocap, "%s", pos_slight);
+    else if (v < -0.55f)
+        snprintf(out, ocap, "%s", neg_avoid);
+    else if (v < -0.15f)
+        snprintf(out, ocap, "%s", neg_min);
+    else
+        out[0] = '\0';
+}
+
+hu_error_t hu_persona_vector_to_directive(const hu_persona_vector_t *vec, char *buf,
+                                          size_t buf_size, size_t *out_len) {
+    if (!vec || !buf || buf_size == 0 || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    buf[0] = '\0';
+    *out_len = 0;
+    size_t pos = 0;
+    char tmp[96];
+
+    dim_phrase(vec->formality, "Be very formal and precise.", "Be moderately formal.",
+               "Be slightly formal.", "Avoid stiff formality.", "Minimize overly formal tone.", tmp,
+               sizeof(tmp));
+    append_dim(buf, buf_size, &pos, tmp);
+
+    dim_phrase(vec->warmth, "Use very warm, empathetic language.", "Use warm, empathetic language.",
+               "Lean slightly warm and supportive.", "Avoid excessive warmth.",
+               "Minimize sentimental warmth.", tmp, sizeof(tmp));
+    append_dim(buf, buf_size, &pos, tmp);
+
+    dim_phrase(vec->verbosity, "Be very detailed and expansive.", "Give moderately rich detail.",
+               "Add slight elaboration where helpful.", "Avoid long-winded replies.",
+               "Keep responses concise.", tmp, sizeof(tmp));
+    append_dim(buf, buf_size, &pos, tmp);
+
+    dim_phrase(vec->humor, "Lean into humor and playfulness.", "Light humor is welcome.",
+               "A touch of humor is fine.", "Avoid humor.", "Minimize jokes.", tmp, sizeof(tmp));
+    append_dim(buf, buf_size, &pos, tmp);
+
+    dim_phrase(vec->directness, "Be very direct and candid.", "Be direct in recommendations.",
+               "Be slightly more direct.", "Avoid bluntness.", "Soften direct recommendations.",
+               tmp, sizeof(tmp));
+    append_dim(buf, buf_size, &pos, tmp);
+
+    dim_phrase(vec->emoji_usage, "Emoji-rich expression is welcome.", "Moderate emoji is fine.",
+               "Use emoji sparingly.", "Avoid emoji.", "Minimal emoji usage.", tmp, sizeof(tmp));
+    append_dim(buf, buf_size, &pos, tmp);
+
+    *out_len = pos;
     return HU_OK;
 }

@@ -139,6 +139,31 @@ static void test_imessage_reaction_to_tapback_mapping(void) {
     HU_ASSERT_NULL(hu_imessage_reaction_to_tapback_name((hu_reaction_type_t)99));
 }
 
+static void test_imessage_loop_msg_reply_to_guid_field(void) {
+    hu_channel_loop_msg_t msg;
+    memset(&msg, 0, sizeof(msg));
+    HU_ASSERT_EQ(msg.reply_to_guid[0], '\0');
+    strncpy(msg.reply_to_guid, "p:0/ABCD-1234", sizeof(msg.reply_to_guid) - 1);
+    HU_ASSERT_STR_EQ(msg.reply_to_guid, "p:0/ABCD-1234");
+}
+
+static void test_imessage_guid_lookup_stub_returns_not_supported(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char out[128];
+    size_t out_len = 0;
+    hu_error_t err =
+        hu_imessage_lookup_message_by_guid(&alloc, "test-guid", 9, out, sizeof(out), &out_len);
+    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+    HU_ASSERT_EQ(out_len, 0u);
+}
+
+static void test_imessage_loop_msg_unsent_field(void) {
+    hu_channel_loop_msg_t msg = {0};
+    HU_ASSERT_EQ(msg.was_unsent, false);
+    msg.was_unsent = true;
+    HU_ASSERT_EQ(msg.was_unsent, true);
+}
+
 #if HU_IS_TEST
 static void test_imessage_react_test_records(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -147,8 +172,7 @@ static void test_imessage_react_test_records(void) {
     HU_ASSERT_NOT_NULL(ch.vtable->react);
 
     const char *target = "+15551234567";
-    hu_error_t err =
-        ch.vtable->react(ch.ctx, target, 11, 12345, HU_REACTION_HEART);
+    hu_error_t err = ch.vtable->react(ch.ctx, target, 11, 12345, HU_REACTION_HEART);
     HU_ASSERT_EQ(err, HU_OK);
 
     hu_reaction_type_t out_reaction = HU_REACTION_NONE;
@@ -187,6 +211,9 @@ void run_imessage_extended_tests(void) {
     HU_RUN_TEST(test_imessage_send_text_and_media_both_sent);
     HU_RUN_TEST(test_imessage_poll_test_mode);
 #endif
+    HU_RUN_TEST(test_imessage_loop_msg_reply_to_guid_field);
+    HU_RUN_TEST(test_imessage_guid_lookup_stub_returns_not_supported);
+    HU_RUN_TEST(test_imessage_loop_msg_unsent_field);
 #if HU_IS_TEST
     HU_RUN_TEST(test_imessage_react_test_records);
 #endif

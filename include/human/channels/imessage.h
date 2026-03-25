@@ -52,6 +52,13 @@ char *hu_imessage_get_latest_attachment_path(hu_allocator_t *alloc, const char *
                                              size_t contact_id_len);
 #endif
 
+/** Look up the text of a message by its GUID from chat.db.
+ * Used for inline reply context — when a message has thread_originator_guid,
+ * look up what they're replying to. Writes into out_text buffer. */
+hu_error_t hu_imessage_lookup_message_by_guid(hu_allocator_t *alloc, const char *guid,
+                                              size_t guid_len, char *out_text, size_t out_cap,
+                                              size_t *out_len);
+
 /** Search Tenor for a GIF matching the query and download to a temp file.
  * Returns the local path to the downloaded GIF (caller owns, free with alloc).
  * Returns NULL on failure (no API key, network error, no results).

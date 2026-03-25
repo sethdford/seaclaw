@@ -70,4 +70,25 @@ const hu_fuse_adapter_t *hu_persona_fuse_get(const hu_persona_fuse_t *fuse, cons
 /* Built-in adapter presets. */
 hu_error_t hu_persona_fuse_add_builtin_adapters(hu_persona_fuse_t *fuse);
 
+typedef hu_fuse_adapter_t hu_persona_fuse_adapter_t;
+
+/** Geometric style vector in [-1,1] per dimension (PersonaFuse + prompt calibration). */
+typedef struct hu_persona_vector {
+    float formality;
+    float warmth;
+    float verbosity;
+    float humor;
+    float directness;
+    float emoji_usage;
+} hu_persona_vector_t;
+
+hu_error_t hu_persona_vector_from_adapter(const hu_persona_fuse_adapter_t *adapter,
+                                          hu_persona_vector_t *out);
+
+hu_error_t hu_persona_vector_compose(const hu_persona_vector_t *vectors, size_t count,
+                                     hu_persona_vector_t *out);
+
+hu_error_t hu_persona_vector_to_directive(const hu_persona_vector_t *vec, char *buf,
+                                          size_t buf_size, size_t *out_len);
+
 #endif /* HU_PERSONA_FUSE_H */

@@ -23,23 +23,51 @@ char *hu_context_build_system_prompt(hu_allocator_t *alloc, const char *base, si
  * Caller must free each message's content and the array. */
 hu_error_t hu_context_format_messages(hu_allocator_t *alloc, const hu_owned_message_t *history,
                                       size_t history_count, size_t max_messages,
-                                      hu_chat_message_t **out_messages, size_t *out_count) {
+                                      const bool *include_mask, hu_chat_message_t **out_messages,
+                                      size_t *out_count) {
     if (!history || history_count == 0) {
         *out_messages = NULL;
         *out_count = 0;
         return HU_OK;
     }
-    size_t n = history_count;
-    if (max_messages > 0 && n > max_messages) {
-        n = max_messages;
-    }
-    hu_chat_message_t *msgs =
-        (hu_chat_message_t *)alloc->alloc(alloc->ctx, n * sizeof(hu_chat_message_t));
-    if (!msgs)
+
+    size_t *pick = (size_t *)alloc->alloc(alloc->ctx, history_count * sizeof(size_t));
+    if (!pick)
         return HU_ERR_OUT_OF_MEMORY;
-    size_t start = history_count - n;
-    for (size_t i = 0; i < n; i++) {
-        const hu_owned_message_t *src = &history[start + i];
+    size_t picked = 0;
+    for (size_t i = history_count; i > 0; i--) {
+        size_t idx = i - 1;
+        if (include_mask && !include_mask[idx])
+            continue;
+        pick[picked++] = idx;
+        if (max_messages > 0 && picked >= max_messages)
+            break;
+    }
+
+    /* restore chronological order */
+    if (picked > 1) {
+        for (size_t a = 0, b = picked - 1; a < b; a++, b--) {
+            size_t t = pick[a];
+            pick[a] = pick[b];
+            pick[b] = t;
+        }
+    }
+
+    if (picked == 0) {
+        alloc->free(alloc->ctx, pick, history_count * sizeof(size_t));
+        *out_messages = NULL;
+        *out_count = 0;
+        return HU_OK;
+    }
+
+    hu_chat_message_t *msgs =
+        (hu_chat_message_t *)alloc->alloc(alloc->ctx, picked * sizeof(hu_chat_message_t));
+    if (!msgs) {
+        alloc->free(alloc->ctx, pick, history_count * sizeof(size_t));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    for (size_t i = 0; i < picked; i++) {
+        const hu_owned_message_t *src = &history[pick[i]];
         msgs[i].role = src->role;
         msgs[i].content = src->content;
         msgs[i].content_len = src->content_len;
@@ -52,8 +80,9 @@ hu_error_t hu_context_format_messages(hu_allocator_t *alloc, const hu_owned_mess
         msgs[i].tool_calls = src->tool_calls;
         msgs[i].tool_calls_count = src->tool_calls_count;
     }
+    alloc->free(alloc->ctx, pick, history_count * sizeof(size_t));
     *out_messages = msgs;
-    *out_count = n;
+    *out_count = picked;
     return HU_OK;
 }
 

@@ -1,5 +1,6 @@
 #include "human/voice/semantic_eot.h"
 #include <ctype.h>
+#include <math.h>
 #include <string.h>
 
 void hu_semantic_eot_config_default(hu_semantic_eot_config_t *cfg) {
@@ -43,6 +44,39 @@ static size_t trimmed_len(const char *text, size_t len) {
     return len;
 }
 
+static size_t count_words(const char *text, size_t len) {
+    size_t n = 0;
+    size_t i = 0;
+    while (i < len) {
+        while (i < len && isspace((unsigned char)text[i]))
+            i++;
+        if (i >= len)
+            break;
+        n++;
+        while (i < len && !isspace((unsigned char)text[i]))
+            i++;
+    }
+    return n;
+}
+
+static bool syntax_complete_clause(const char *text, size_t text_len) {
+    return ends_with_char(text, text_len, '.') || ends_with_char(text, text_len, '!') ||
+           ends_with_char(text, text_len, '?');
+}
+
+static bool is_backchannel_phrase(const char *text, size_t tlen) {
+    return ci_contains(text, tlen, "uh huh") || ci_contains(text, tlen, "uh-huh") ||
+           ci_contains(text, tlen, "mhm") || ci_contains(text, tlen, "mm-hmm") ||
+           ci_contains(text, tlen, "yeah") || ci_contains(text, tlen, "okay") ||
+           ci_contains(text, tlen, "ok ") || ci_contains(text, tlen, "right") ||
+           ci_contains(text, tlen, "i see") || ci_contains(text, tlen, "got it");
+}
+
+static bool has_hold_fillers(const char *text, size_t tlen) {
+    return ci_contains(text, tlen, " um") || ci_contains(text, tlen, " uh") ||
+           ci_contains(text, tlen, " like ") || ci_contains(text, tlen, "you know");
+}
+
 hu_error_t hu_semantic_eot_analyze(const hu_semantic_eot_config_t *cfg, const char *text,
                                    size_t text_len, uint32_t silence_ms,
                                    hu_semantic_eot_result_t *out) {
@@ -51,6 +85,7 @@ hu_error_t hu_semantic_eot_analyze(const hu_semantic_eot_config_t *cfg, const ch
     out->is_endpoint = false;
     out->confidence = 0.0;
     out->suggested_signal = HU_TURN_SIGNAL_NONE;
+    out->predicted_state = HU_EOT_COMPLETE;
 
     if (!cfg || !text || text_len == 0)
         return HU_OK;
@@ -69,6 +104,7 @@ hu_error_t hu_semantic_eot_analyze(const hu_semantic_eot_config_t *cfg, const ch
 
     /* Trailing ellipsis = speaker holding */
     if (ends_with_str(text, text_len, "...")) {
+        out->predicted_state = HU_EOT_HOLD;
         out->confidence = 0.15;
         out->suggested_signal = HU_TURN_SIGNAL_HOLD;
         out->is_endpoint = false;
@@ -76,10 +112,8 @@ hu_error_t hu_semantic_eot_analyze(const hu_semantic_eot_config_t *cfg, const ch
     }
 
     /* Lexical yielding phrases */
-    if (ci_contains(text, tlen, "what do you think") ||
-        ci_contains(text, tlen, "your thoughts") ||
-        ci_contains(text, tlen, "can you help") ||
-        ci_contains(text, tlen, "do you know"))
+    if (ci_contains(text, tlen, "what do you think") || ci_contains(text, tlen, "your thoughts") ||
+        ci_contains(text, tlen, "can you help") || ci_contains(text, tlen, "do you know"))
         conf += 0.25;
 
     /* Short complete utterance (under ~40 chars with punctuation) */
@@ -100,10 +134,115 @@ hu_error_t hu_semantic_eot_analyze(const hu_semantic_eot_config_t *cfg, const ch
     out->is_endpoint = (conf >= cfg->confidence_threshold);
 
     if (out->is_endpoint) {
+        out->suggested_signal =
+            ends_with_char(text, text_len, '?') ? HU_TURN_SIGNAL_YIELD : HU_TURN_SIGNAL_CONTINUE;
+    }
+
+    return HU_OK;
+}
+
+hu_error_t hu_semantic_eot_analyze_with_audio(const hu_semantic_eot_config_t *cfg, const char *text,
+                                              size_t text_len, uint32_t silence_ms, float energy_db,
+                                              float pitch_delta, hu_semantic_eot_result_t *out) {
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    out->is_endpoint = false;
+    out->confidence = 0.0;
+    out->suggested_signal = HU_TURN_SIGNAL_NONE;
+    out->predicted_state = HU_EOT_COMPLETE;
+
+    if (!cfg || !text || text_len == 0)
+        return HU_OK;
+
+    size_t tlen = trimmed_len(text, text_len);
+    if (tlen < cfg->min_utterance_chars)
+        return HU_OK;
+
+    /* HOLD: ellipsis or strong filler presence */
+    if (ends_with_str(text, text_len, "...") ||
+        (has_hold_fillers(text, tlen) && !syntax_complete_clause(text, text_len))) {
+        out->predicted_state = HU_EOT_HOLD;
+        out->confidence = 0.15;
+        out->suggested_signal = HU_TURN_SIGNAL_HOLD;
+        return HU_OK;
+    }
+
+    /* BACKCHANNEL: very short + lexical cue */
+    if (count_words(text, tlen) < 5 && is_backchannel_phrase(text, tlen)) {
+        out->predicted_state = HU_EOT_BACKCHANNEL;
+        out->confidence = 0.55;
+        out->is_endpoint = false;
+        out->suggested_signal = HU_TURN_SIGNAL_CONTINUE;
+        return HU_OK;
+    }
+
+    bool syn_complete = syntax_complete_clause(text, text_len);
+    double conf = 0.0;
+
+    if (syn_complete) {
         if (ends_with_char(text, text_len, '?'))
-            out->suggested_signal = HU_TURN_SIGNAL_YIELD;
+            conf += 0.45;
         else
-            out->suggested_signal = HU_TURN_SIGNAL_YIELD;
+            conf += 0.35;
+    }
+
+    if (ci_contains(text, tlen, "what do you think") || ci_contains(text, tlen, "your thoughts") ||
+        ci_contains(text, tlen, "can you help") || ci_contains(text, tlen, "do you know"))
+        conf += 0.25;
+
+    if (tlen < 40 && conf >= 0.3)
+        conf += 0.10;
+
+    if (silence_ms >= cfg->pause_threshold_ms)
+        conf += 0.20;
+    else if (silence_ms >= cfg->pause_threshold_ms / 2)
+        conf += 0.10;
+
+    /* Acoustic fusion: energy and pitch each adjust confidence by up to 0.15 */
+    double econtrib = 0.0;
+    if (energy_db > -25.0f)
+        econtrib = 0.15 * fmin(1.0, (double)(energy_db + 25.0f) / 25.0);
+    else if (energy_db < -40.0f)
+        econtrib = -0.15 * fmin(1.0, (double)(-40.0f - energy_db) / 20.0);
+
+    double pcontrib = 0.15 * fmin(1.0, fabs((double)pitch_delta) / 80.0);
+    if (pitch_delta < 0)
+        pcontrib = -pcontrib;
+
+    conf += econtrib + pcontrib;
+
+    /* Multi-class state from text + acoustics */
+    bool high_energy = energy_db > -28.0f;
+    bool rising_pitch = pitch_delta > 8.0f;
+    bool low_energy = energy_db < -38.0f;
+    bool falling_pitch = pitch_delta < -8.0f;
+
+    if (high_energy && rising_pitch && !syn_complete) {
+        out->predicted_state = HU_EOT_INCOMPLETE;
+        conf = fmax(conf, 0.35);
+    } else if (low_energy && falling_pitch && syn_complete) {
+        out->predicted_state = HU_EOT_COMPLETE;
+        conf += 0.08;
+    }
+
+    if (conf > 1.0)
+        conf = 1.0;
+    if (conf < 0.0)
+        conf = 0.0;
+
+    out->confidence = conf;
+    out->is_endpoint =
+        (out->predicted_state == HU_EOT_COMPLETE && conf >= cfg->confidence_threshold);
+
+    if (out->predicted_state == HU_EOT_INCOMPLETE) {
+        out->is_endpoint = false;
+        out->suggested_signal = HU_TURN_SIGNAL_CONTINUE;
+        return HU_OK;
+    }
+
+    if (out->is_endpoint) {
+        out->suggested_signal =
+            ends_with_char(text, text_len, '?') ? HU_TURN_SIGNAL_YIELD : HU_TURN_SIGNAL_CONTINUE;
     }
 
     return HU_OK;

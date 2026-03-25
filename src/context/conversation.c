@@ -19,6 +19,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#if defined(__unix__) || defined(__APPLE__)
+#include <unistd.h>
+#endif
 
 #define CTX_BUF_CAP 16384
 
@@ -6995,10 +6998,16 @@ void hu_conversation_gif_cal_record_send(const char *contact_id, size_t cid_len,
         }
     }
     if (slot == SIZE_MAX) {
-        if (gif_cal_count >= HU_GIF_CAL_MAX_CONTACTS)
+        if (gif_cal_count >= HU_GIF_CAL_MAX_CONTACTS) {
+            /* Evict the contact with the fewest sends (least calibration data) */
             slot = 0;
-        else
+            for (size_t i = 1; i < HU_GIF_CAL_MAX_CONTACTS; i++) {
+                if (gif_cal_slots[i].sent_count < gif_cal_slots[slot].sent_count)
+                    slot = i;
+            }
+        } else {
             slot = gif_cal_count++;
+        }
         size_t n = cid_len < 127 ? cid_len : 127;
         memcpy(gif_cal_slots[slot].contact_id, contact_id, n);
         gif_cal_slots[slot].contact_id[n] = '\0';
@@ -7142,4 +7151,348 @@ size_t hu_conversation_build_edit_awareness_hint(bool message_was_edited, bool m
     }
 
     return 0;
+}
+
+/* ── Sticker-like reaction images ────────────────────────────────────── */
+
+typedef struct {
+    const char *category;
+    const char *filename;
+    const char *const *triggers;
+} hu_sticker_def_t;
+
+static const char *const sticker_celebration[] = {"congrats",    "amazing",  "proud",     "won",
+                                                  "got the job", "accepted", "graduated", NULL};
+static const char *const sticker_laughing[] = {
+    "lmao", "lol", "dying", "dead", "hilarious", "haha", "rofl", "crying laughing", NULL};
+static const char *const sticker_heart[] = {"love you",        "miss you",        "ily", "i love",
+                                            "thinking of you", "you're the best", NULL};
+static const char *const sticker_mind_blown[] = {
+    "no way", "what the", "mind blown", "insane", "unbelievable", "can't believe", "omg", NULL};
+static const char *const sticker_thumbs_up[] = {"sounds good", "perfect", "deal",  "got it",
+                                                "bet",         "will do", "on it", NULL};
+static const char *const sticker_sad[] = {"sorry to hear", "that sucks", "feel better", "rough day",
+                                          "ugh",           "worst",      NULL};
+static const char *const sticker_excited[] = {"can't wait", "so excited", "let's go", "pumped",
+                                              "yesss",      "finally",    NULL};
+
+static const hu_sticker_def_t sticker_defs[] = {
+    {"celebration", "celebration.png", sticker_celebration},
+    {"laughing", "laughing.png", sticker_laughing},
+    {"heart", "heart.png", sticker_heart},
+    {"mind-blown", "mind-blown.png", sticker_mind_blown},
+    {"thumbs-up", "thumbs-up.png", sticker_thumbs_up},
+    {"sad", "sad.png", sticker_sad},
+    {"excited", "excited.png", sticker_excited},
+};
+
+#define HU_STICKER_DEF_COUNT (sizeof(sticker_defs) / sizeof(sticker_defs[0]))
+
+bool hu_conversation_should_send_sticker(const char *msg, size_t msg_len, const char *last_response,
+                                         size_t resp_len, uint32_t seed, float probability) {
+    if (!msg || msg_len == 0 || probability <= 0.0f)
+        return false;
+
+    /* Only send stickers in response to emotionally expressive messages */
+    bool has_trigger = false;
+    for (size_t d = 0; d < HU_STICKER_DEF_COUNT && !has_trigger; d++) {
+        for (const char *const *t = sticker_defs[d].triggers; *t && !has_trigger; t++) {
+            if (str_contains_ci(msg, msg_len, *t))
+                has_trigger = true;
+        }
+    }
+    if (!has_trigger)
+        return false;
+
+    /* Don't double up: skip if we just sent a GIF or sticker */
+    if (last_response && resp_len > 0) {
+        if (str_contains_ci(last_response, resp_len, "[GIF]") ||
+            str_contains_ci(last_response, resp_len, "[Sticker]"))
+            return false;
+    }
+
+    uint32_t s = seed;
+    uint32_t roll = reaction_prng_next(&s) % 100u;
+    return roll < (uint32_t)(probability * 100.0f);
+}
+
+size_t hu_conversation_select_sticker(const char *msg, size_t msg_len, uint32_t seed,
+                                      const char *sticker_dir, size_t dir_len, char *out_path,
+                                      size_t out_cap) {
+    if (!msg || msg_len == 0 || !sticker_dir || dir_len == 0 || !out_path || out_cap < 32)
+        return 0;
+
+    /* Find all matching categories */
+    size_t matches[HU_STICKER_DEF_COUNT];
+    size_t match_count = 0;
+    for (size_t d = 0; d < HU_STICKER_DEF_COUNT; d++) {
+        for (const char *const *t = sticker_defs[d].triggers; *t; t++) {
+            if (str_contains_ci(msg, msg_len, *t)) {
+                matches[match_count++] = d;
+                break;
+            }
+        }
+    }
+    if (match_count == 0)
+        return 0;
+
+    /* Pick one at random */
+    uint32_t s = seed;
+    size_t idx = reaction_prng_next(&s) % match_count;
+    const hu_sticker_def_t *pick = &sticker_defs[matches[idx]];
+
+    int n = snprintf(out_path, out_cap, "%.*s/%s", (int)dir_len, sticker_dir, pick->filename);
+    if (n > 0 && (size_t)n < out_cap)
+        return (size_t)n;
+    return 0;
+}
+
+/* ── Inline reply context builder ────────────────────────────────────── */
+
+size_t hu_conversation_build_inline_reply_hint(const char *original_text, size_t original_len,
+                                               char *buf, size_t cap) {
+    if (!original_text || original_len == 0 || !buf || cap < 64)
+        return 0;
+
+    /* Truncate the original message if too long */
+    size_t show_len = original_len;
+    if (show_len > 120)
+        show_len = 120;
+
+    int n = snprintf(buf, cap,
+                     "[INLINE REPLY] Their message is a reply to: \"%.*s%s\"\n"
+                     "Respond in the context of that original message. "
+                     "You can reference it naturally but don't quote it back verbatim.",
+                     (int)show_len, original_text, (original_len > 120) ? "..." : "");
+    return (n > 0 && (size_t)n < cap) ? (size_t)n : 0;
+}
+
+/* ── GIF calibration persistence ─────────────────────────────────────── */
+
+hu_error_t hu_conversation_gif_cal_save(const char *path, size_t path_len) {
+    if (!path || path_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (gif_cal_count == 0)
+        return HU_OK;
+
+    char path_buf[512];
+    if (path_len >= sizeof(path_buf))
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(path_buf, path, path_len);
+    path_buf[path_len] = '\0';
+
+    FILE *f = fopen(path_buf, "w");
+    if (!f)
+        return HU_ERR_IO;
+
+    fprintf(f, "[\n");
+    for (size_t i = 0; i < gif_cal_count; i++) {
+        fprintf(f, "  {\"contact\":\"%s\",\"sent\":%u,\"reacted\":%u}%s\n",
+                gif_cal_slots[i].contact_id, (unsigned)gif_cal_slots[i].sent_count,
+                (unsigned)gif_cal_slots[i].reacted_count, (i + 1 < gif_cal_count) ? "," : "");
+    }
+    fprintf(f, "]\n");
+    fclose(f);
+    return HU_OK;
+}
+
+hu_error_t hu_conversation_gif_cal_load(const char *path, size_t path_len) {
+    if (!path || path_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char path_buf[512];
+    if (path_len >= sizeof(path_buf))
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(path_buf, path, path_len);
+    path_buf[path_len] = '\0';
+
+    FILE *f = fopen(path_buf, "r");
+    if (!f)
+        return HU_ERR_IO;
+
+    gif_cal_count = 0;
+    char line[256];
+    while (fgets(line, sizeof(line), f) && gif_cal_count < HU_GIF_CAL_MAX_CONTACTS) {
+        /* Parse: {"contact":"...","sent":N,"reacted":N} */
+        const char *cstart = strstr(line, "\"contact\":\"");
+        if (!cstart)
+            continue;
+        cstart += 11;
+        const char *cend = strchr(cstart, '"');
+        if (!cend || cend == cstart)
+            continue;
+        size_t clen = (size_t)(cend - cstart);
+        if (clen >= 127)
+            clen = 127;
+
+        const char *sstart = strstr(line, "\"sent\":");
+        const char *rstart = strstr(line, "\"reacted\":");
+        if (!sstart || !rstart)
+            continue;
+
+        unsigned sent = 0, reacted = 0;
+        sscanf(sstart + 7, "%u", &sent);
+        sscanf(rstart + 10, "%u", &reacted);
+        if (sent > 255)
+            sent = 255;
+        if (reacted > 255)
+            reacted = 255;
+
+        size_t idx = gif_cal_count++;
+        memcpy(gif_cal_slots[idx].contact_id, cstart, clen);
+        gif_cal_slots[idx].contact_id[clen] = '\0';
+        gif_cal_slots[idx].sent_count = (uint8_t)sent;
+        gif_cal_slots[idx].reacted_count = (uint8_t)reacted;
+        gif_cal_slots[idx].history_pos = 0;
+    }
+    fclose(f);
+    return HU_OK;
+}
+
+/* ── Multi-message splitting (simple chunk-based) ────────────────────── */
+
+size_t hu_conversation_split_into_texts(const char *response, size_t resp_len, size_t max_chunk,
+                                        char chunks[][512], size_t max_chunks) {
+    if (!response || resp_len == 0 || !chunks || max_chunks == 0 || max_chunk == 0)
+        return 0;
+    if (max_chunk > 511)
+        max_chunk = 511;
+
+    /* Short messages don't need splitting */
+    if (resp_len <= max_chunk) {
+        size_t n = resp_len > 511 ? 511 : resp_len;
+        memcpy(chunks[0], response, n);
+        chunks[0][n] = '\0';
+        return 1;
+    }
+
+    size_t count = 0;
+    size_t pos = 0;
+    while (pos < resp_len && count < max_chunks) {
+        size_t remaining = resp_len - pos;
+        if (remaining <= max_chunk) {
+            size_t n = remaining > 511 ? 511 : remaining;
+            memcpy(chunks[count], response + pos, n);
+            chunks[count][n] = '\0';
+            count++;
+            break;
+        }
+
+        /* Find sentence boundary near max_chunk */
+        size_t cut = max_chunk;
+        while (cut > max_chunk / 2) {
+            char c = response[pos + cut];
+            if (c == '.' || c == '!' || c == '?') {
+                cut++; /* include the punctuation */
+                break;
+            }
+            cut--;
+        }
+        /* Fallback: split at last space */
+        if (cut <= max_chunk / 2) {
+            cut = max_chunk;
+            while (cut > max_chunk / 2 && response[pos + cut] != ' ')
+                cut--;
+            if (cut <= max_chunk / 2)
+                cut = max_chunk;
+        }
+
+        size_t n = cut > 511 ? 511 : cut;
+        memcpy(chunks[count], response + pos, n);
+        chunks[count][n] = '\0';
+
+        /* Skip leading whitespace in next chunk */
+        pos += cut;
+        while (pos < resp_len && response[pos] == ' ')
+            pos++;
+        count++;
+    }
+    return count;
+}
+
+/* ── Scheduled message queue ─────────────────────────────────────────── */
+
+#define HU_SCHED_MAX 16
+
+static struct {
+    char contact_id[128];
+    char message[512];
+    size_t msg_len;
+    uint64_t deliver_at_ms;
+    bool active;
+} sched_queue[HU_SCHED_MAX];
+
+hu_error_t hu_conversation_schedule_message(const char *contact_id, size_t cid_len,
+                                            const char *message, size_t msg_len,
+                                            uint64_t deliver_at_ms) {
+    if (!contact_id || cid_len == 0 || !message || msg_len == 0 || deliver_at_ms == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    for (size_t i = 0; i < HU_SCHED_MAX; i++) {
+        if (!sched_queue[i].active) {
+            size_t cn = cid_len < 127 ? cid_len : 127;
+            memcpy(sched_queue[i].contact_id, contact_id, cn);
+            sched_queue[i].contact_id[cn] = '\0';
+            size_t mn = msg_len < 511 ? msg_len : 511;
+            memcpy(sched_queue[i].message, message, mn);
+            sched_queue[i].message[mn] = '\0';
+            sched_queue[i].msg_len = mn;
+            sched_queue[i].deliver_at_ms = deliver_at_ms;
+            sched_queue[i].active = true;
+            return HU_OK;
+        }
+    }
+    return HU_ERR_OUT_OF_MEMORY;
+}
+
+size_t hu_conversation_flush_scheduled(uint64_t now_ms, char *out_contact, size_t contact_cap,
+                                       char *out_message, size_t message_cap) {
+    if (!out_contact || !out_message || contact_cap == 0 || message_cap == 0)
+        return 0;
+
+    for (size_t i = 0; i < HU_SCHED_MAX; i++) {
+        if (sched_queue[i].active && now_ms >= sched_queue[i].deliver_at_ms) {
+            size_t cn = strlen(sched_queue[i].contact_id);
+            if (cn >= contact_cap)
+                cn = contact_cap - 1;
+            memcpy(out_contact, sched_queue[i].contact_id, cn);
+            out_contact[cn] = '\0';
+            size_t mn = sched_queue[i].msg_len;
+            if (mn >= message_cap)
+                mn = message_cap - 1;
+            memcpy(out_message, sched_queue[i].message, mn);
+            out_message[mn] = '\0';
+            sched_queue[i].active = false;
+            return mn;
+        }
+    }
+    return 0;
+}
+
+/* ── Contact photo path resolver (macOS Contacts) ────────────────────── */
+
+size_t hu_conversation_contact_photo_path(const char *contact_id, size_t cid_len, char *out_path,
+                                          size_t out_cap) {
+    if (!contact_id || cid_len == 0 || !out_path || out_cap < 64)
+        return 0;
+
+    const char *home = getenv("HOME");
+    if (!home)
+        return 0;
+
+    /* macOS Contacts stores images in AddressBook source directories.
+     * The most reliable path pattern for the current user:
+     * ~/Library/Application Support/AddressBook/Sources/<uuid>/Images/<hash>
+     * We search for any contact image matching the phone/email. */
+    int n = snprintf(out_path, out_cap, "%s/Library/Application Support/AddressBook/Images", home);
+    if (n < 0 || (size_t)n >= out_cap)
+        return 0;
+
+    /* Check if directory exists — if not, contact photos aren't available */
+    if (access(out_path, F_OK) != 0) {
+        out_path[0] = '\0';
+        return 0;
+    }
+
+    return (size_t)n;
 }

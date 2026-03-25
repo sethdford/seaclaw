@@ -22,7 +22,9 @@ typedef struct hu_sqlite_memory {
     sqlite3 *db;
     hu_allocator_t *alloc;
     hu_graph_index_t graph_index;
+    hu_graph_hierarchy_t graph_hierarchy;
     bool graph_initialized;
+    bool graph_hierarchy_ready;
 } hu_sqlite_memory_t;
 
 static const char *const schema_parts[] = {
@@ -592,9 +594,12 @@ static hu_error_t impl_store(void *ctx, const char *key, size_t key_len, const c
         return HU_ERR_MEMORY_STORE;
 
     /* Feed into MAGMA graph index for multi-dimensional reranking */
-    if (self->graph_initialized && content && content_len > 0)
+    if (self->graph_initialized && content && content_len > 0) {
         (void)hu_graph_index_add(&self->graph_index, key, key_len, content, content_len,
                                  (int64_t)time(NULL));
+        if (self->graph_hierarchy_ready)
+            (void)hu_graph_hierarchy_build(&self->graph_hierarchy, &self->graph_index);
+    }
 
     return HU_OK;
 }
@@ -642,6 +647,13 @@ static hu_error_t impl_store_ex(void *ctx, const char *key, size_t key_len, cons
     hu_str_free(self->alloc, id);
     if (rc != SQLITE_DONE)
         return HU_ERR_MEMORY_STORE;
+
+    if (self->graph_initialized && content && content_len > 0) {
+        (void)hu_graph_index_add(&self->graph_index, key, key_len, content, content_len,
+                                 (int64_t)time(NULL));
+        if (self->graph_hierarchy_ready)
+            (void)hu_graph_hierarchy_build(&self->graph_hierarchy, &self->graph_index);
+    }
     return HU_OK;
 }
 
@@ -844,6 +856,66 @@ static hu_error_t impl_recall(void *ctx, hu_allocator_t *alloc, const char *quer
                             }
                         }
                         alloc->free(alloc->ctx, seeds, seed_alloc_count * sizeof(uint32_t));
+                    }
+                }
+
+                /* System-2 hierarchy: add cluster members when recall is still sparse.
+                 * Require >=2 seed hits (same as spread activation) so single weak FTS rows
+                 * cannot pull unrelated cluster members (e.g. misc bucket). */
+                if (self->graph_initialized && self->graph_hierarchy_ready && count >= 2 &&
+                    count < limit) {
+                    uint32_t h_indices[64];
+                    size_t hcnt = 0;
+                    size_t want = limit - count;
+                    if (want > 64)
+                        want = 64;
+                    if (hu_graph_hierarchy_traverse(&self->graph_hierarchy, &self->graph_index,
+                                                    query, query_len, h_indices, &hcnt,
+                                                    want) == HU_OK &&
+                        hcnt > 0) {
+                        for (size_t hi = 0; hi < hcnt && count < limit; hi++) {
+                            uint32_t ni = h_indices[hi];
+                            if (ni >= self->graph_index.node_count)
+                                continue;
+                            const hu_graph_node_t *gn = &self->graph_index.nodes[ni];
+                            bool dup = false;
+                            for (size_t di = 0; di < count; di++) {
+                                if (entries[di].key_len == gn->memory_key_len &&
+                                    memcmp(entries[di].key, gn->memory_key, gn->memory_key_len) ==
+                                        0) {
+                                    dup = true;
+                                    break;
+                                }
+                            }
+                            if (dup)
+                                continue;
+                            sqlite3_stmt *hi_stmt = NULL;
+                            if (sqlite3_prepare_v2(self->db,
+                                                   "SELECT id, key, content, category, "
+                                                   "created_at, session_id, source "
+                                                   "FROM memories WHERE key = ?1 LIMIT 1",
+                                                   -1, &hi_stmt, NULL) == SQLITE_OK) {
+                                sqlite3_bind_text(hi_stmt, 1, gn->memory_key,
+                                                  (int)gn->memory_key_len, NULL);
+                                if (sqlite3_step(hi_stmt) == SQLITE_ROW) {
+                                    hu_memory_entry_t *e = &entries[count];
+                                    read_entry_from_row(hi_stmt, alloc, e);
+                                    bool session_ok = true;
+                                    if (session_id && session_id_len > 0 && e->session_id &&
+                                        (e->session_id_len != session_id_len ||
+                                         memcmp(e->session_id, session_id, session_id_len) != 0)) {
+                                        session_ok = false;
+                                    }
+                                    if (session_ok) {
+                                        e->score = 0.35;
+                                        count++;
+                                    } else {
+                                        free_entry(alloc, e);
+                                    }
+                                }
+                                sqlite3_finalize(hi_stmt);
+                            }
+                        }
                     }
                 }
 
@@ -1064,6 +1136,8 @@ static bool impl_health_check(void *ctx) {
 
 static void impl_deinit(void *ctx) {
     hu_sqlite_memory_t *self = (hu_sqlite_memory_t *)ctx;
+    if (self->graph_hierarchy_ready)
+        hu_graph_hierarchy_deinit(&self->graph_hierarchy);
     if (self->graph_initialized)
         hu_graph_index_deinit(&self->graph_index);
     if (self->db)
@@ -1234,6 +1308,10 @@ hu_memory_t hu_sqlite_memory_create(hu_allocator_t *alloc, const char *db_path) 
     self->db = db;
     self->alloc = alloc;
     self->graph_initialized = (hu_graph_index_init(&self->graph_index, alloc) == HU_OK);
+    self->graph_hierarchy_ready = false;
+    if (self->graph_initialized)
+        self->graph_hierarchy_ready =
+            (hu_graph_hierarchy_init(&self->graph_hierarchy, alloc) == HU_OK);
     return (hu_memory_t){
         .ctx = self,
         .vtable = &sqlite_vtable,

@@ -1,6 +1,7 @@
 #include "human/persona.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/persona/persona_fuse.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3640,6 +3641,48 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                     err = append_prompt(alloc, &buf, &len, &cap, header, (size_t)n);
                 if (err != HU_OK)
                     goto fail;
+            }
+
+            {
+                hu_fuse_adapter_t fuse_ad;
+                memset(&fuse_ad, 0, sizeof(fuse_ad));
+                if (ov->formality) {
+                    if (strstr(ov->formality, "high") || strstr(ov->formality, "High"))
+                        fuse_ad.formality = 0.55f;
+                    else if (strstr(ov->formality, "low") || strstr(ov->formality, "Low"))
+                        fuse_ad.formality = -0.55f;
+                }
+                if (ov->avg_length) {
+                    if (strstr(ov->avg_length, "short") || strstr(ov->avg_length, "brief"))
+                        fuse_ad.verbosity = -0.45f;
+                    else if (strstr(ov->avg_length, "long") || strstr(ov->avg_length, "Long"))
+                        fuse_ad.verbosity = 0.45f;
+                }
+                fuse_ad.emoji_factor = 1.0f;
+                if (ov->emoji_usage) {
+                    if (strstr(ov->emoji_usage, "minimal") || strstr(ov->emoji_usage, "none") ||
+                        strstr(ov->emoji_usage, "low"))
+                        fuse_ad.emoji_factor = 0.35f;
+                    else if (strstr(ov->emoji_usage, "heavy") || strstr(ov->emoji_usage, "high"))
+                        fuse_ad.emoji_factor = 1.75f;
+                }
+                hu_persona_vector_t pvec;
+                char dirbuf[512];
+                size_t dlen = 0;
+                if (hu_persona_vector_from_adapter(&fuse_ad, &pvec) == HU_OK &&
+                    hu_persona_vector_to_directive(&pvec, dirbuf, sizeof(dirbuf), &dlen) == HU_OK &&
+                    dlen > 0) {
+                    static const char ghdr[] = "\nGeometric style directive (calibrated):\n";
+                    err = append_prompt(alloc, &buf, &len, &cap, ghdr, sizeof(ghdr) - 1);
+                    if (err != HU_OK)
+                        goto fail;
+                    err = append_prompt(alloc, &buf, &len, &cap, dirbuf, dlen);
+                    if (err != HU_OK)
+                        goto fail;
+                    err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+                    if (err != HU_OK)
+                        goto fail;
+                }
             }
         }
     }

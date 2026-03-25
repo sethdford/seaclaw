@@ -1,6 +1,8 @@
 #include "human/memory/graph_index.h"
 #include "human/core/string.h"
 #include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 hu_error_t hu_graph_index_init(hu_graph_index_t *idx, hu_allocator_t *alloc) {
@@ -321,5 +323,223 @@ hu_error_t hu_graph_index_spread_activation(const hu_graph_index_t *idx,
     for (size_t i = 0; i < out_cap; i++)
         out_nodes[i] = candidates[i];
     *out_count = out_cap;
+    return HU_OK;
+}
+
+/* ── Hierarchical topic clusters ────────────────────────────────────── */
+
+hu_error_t hu_graph_hierarchy_init(hu_graph_hierarchy_t *h, hu_allocator_t *alloc) {
+    if (!h || !alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(h, 0, sizeof(*h));
+    h->alloc = alloc;
+    h->cluster_cap = 16;
+    h->clusters =
+        (hu_topic_cluster_t *)alloc->alloc(alloc->ctx, h->cluster_cap * sizeof(hu_topic_cluster_t));
+    if (!h->clusters)
+        return HU_ERR_OUT_OF_MEMORY;
+    memset(h->clusters, 0, h->cluster_cap * sizeof(hu_topic_cluster_t));
+    return HU_OK;
+}
+
+void hu_graph_hierarchy_deinit(hu_graph_hierarchy_t *h) {
+    if (!h || !h->alloc)
+        return;
+    for (size_t c = 0; c < h->cluster_count; c++) {
+        if (h->clusters[c].member_indices)
+            h->alloc->free(h->alloc->ctx, h->clusters[c].member_indices,
+                           h->clusters[c].member_cap * sizeof(uint32_t));
+    }
+    if (h->clusters)
+        h->alloc->free(h->alloc->ctx, h->clusters, h->cluster_cap * sizeof(hu_topic_cluster_t));
+    memset(h, 0, sizeof(*h));
+}
+
+static size_t entity_global_freq(const hu_graph_index_t *idx, const char *ent) {
+    size_t n = 0;
+    for (size_t i = 0; i < idx->node_count; i++) {
+        const hu_graph_node_t *node = &idx->nodes[i];
+        for (size_t e = 0; e < node->entity_count; e++) {
+            if (strcmp(node->entities[e], ent) == 0) {
+                n++;
+                break;
+            }
+        }
+    }
+    return n;
+}
+
+static hu_error_t cluster_add_member(hu_graph_hierarchy_t *h, size_t cluster_idx, uint32_t node_i) {
+    hu_topic_cluster_t *cl = &h->clusters[cluster_idx];
+    if (cl->member_count >= cl->member_cap) {
+        size_t ncap = cl->member_cap ? cl->member_cap * 2 : 8;
+        uint32_t *nm = (uint32_t *)h->alloc->realloc(h->alloc->ctx, cl->member_indices,
+                                                     cl->member_cap * sizeof(uint32_t),
+                                                     ncap * sizeof(uint32_t));
+        if (!nm)
+            return HU_ERR_OUT_OF_MEMORY;
+        cl->member_indices = nm;
+        cl->member_cap = ncap;
+    }
+    for (size_t j = 0; j < cl->member_count; j++) {
+        if (cl->member_indices[j] == node_i)
+            return HU_OK;
+    }
+    cl->member_indices[cl->member_count++] = node_i;
+    return HU_OK;
+}
+
+static size_t find_or_add_cluster(hu_graph_hierarchy_t *h, const char *label) {
+    for (size_t c = 0; c < h->cluster_count; c++) {
+        if (strcmp(h->clusters[c].label, label) == 0)
+            return c;
+    }
+    if (h->cluster_count >= h->cluster_cap) {
+        size_t ncap = h->cluster_cap * 2;
+        hu_topic_cluster_t *nc = (hu_topic_cluster_t *)h->alloc->realloc(
+            h->alloc->ctx, h->clusters, h->cluster_cap * sizeof(hu_topic_cluster_t),
+            ncap * sizeof(hu_topic_cluster_t));
+        if (!nc)
+            return (size_t)-1;
+        memset(nc + h->cluster_cap, 0, (ncap - h->cluster_cap) * sizeof(hu_topic_cluster_t));
+        h->clusters = nc;
+        h->cluster_cap = ncap;
+    }
+    size_t idx = h->cluster_count++;
+    memset(&h->clusters[idx], 0, sizeof(h->clusters[idx]));
+    (void)snprintf(h->clusters[idx].label, sizeof(h->clusters[idx].label), "%s", label);
+    h->clusters[idx].centroid_score = 1.0;
+    return idx;
+}
+
+hu_error_t hu_graph_hierarchy_build(hu_graph_hierarchy_t *h, const hu_graph_index_t *idx) {
+    if (!h || !h->alloc || !idx)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    size_t prev_clusters = h->cluster_count;
+    for (size_t c = 0; c < prev_clusters; c++) {
+        if (h->clusters[c].member_indices)
+            h->alloc->free(h->alloc->ctx, h->clusters[c].member_indices,
+                           h->clusters[c].member_cap * sizeof(uint32_t));
+        memset(&h->clusters[c], 0, sizeof(h->clusters[c]));
+    }
+    h->cluster_count = 0;
+
+    if (idx->node_count == 0)
+        return HU_OK;
+
+    for (size_t ni = 0; ni < idx->node_count; ni++) {
+        const hu_graph_node_t *node = &idx->nodes[ni];
+        const char *chosen = "(misc)";
+        size_t best_freq = 0;
+
+        if (node->entity_count > 0) {
+            for (size_t e = 0; e < node->entity_count; e++) {
+                size_t fq = entity_global_freq(idx, node->entities[e]);
+                if (fq > best_freq) {
+                    best_freq = fq;
+                    chosen = node->entities[e];
+                }
+            }
+        }
+
+        size_t ci = find_or_add_cluster(h, chosen);
+        if (ci == (size_t)-1)
+            return HU_ERR_OUT_OF_MEMORY;
+        hu_error_t err = cluster_add_member(h, ci, (uint32_t)ni);
+        if (err != HU_OK)
+            return err;
+    }
+
+    return HU_OK;
+}
+
+static size_t query_term_overlap(const char *qlabel, size_t qlen, const char *clabel) {
+    char qbuf[256];
+    char cbuf[256];
+    if (qlen >= sizeof(qbuf))
+        qlen = sizeof(qbuf) - 1;
+    memcpy(qbuf, qlabel, qlen);
+    qbuf[qlen] = '\0';
+    (void)snprintf(cbuf, sizeof(cbuf), "%s", clabel);
+
+    size_t score = 0;
+    char *saveq = NULL;
+    for (char *tok = strtok_r(qbuf, " \t\n\r", &saveq); tok;
+         tok = strtok_r(NULL, " \t\n\r", &saveq)) {
+        if (strlen(tok) < 2)
+            continue;
+        if (strstr(cbuf, tok) != NULL)
+            score++;
+    }
+    return score;
+}
+
+hu_error_t hu_graph_hierarchy_traverse(const hu_graph_hierarchy_t *h, const hu_graph_index_t *idx,
+                                       const char *query, size_t query_len, uint32_t *out_indices,
+                                       size_t *out_count, size_t max_results) {
+    if (!out_count)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_count = 0;
+    if (!h || !idx || !out_indices || max_results == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (h->cluster_count == 0 || !query || query_len == 0)
+        return HU_OK;
+
+    typedef struct {
+        size_t idx;
+        size_t score;
+    } ranked_t;
+
+    ranked_t ranked[128];
+    size_t rn = 0;
+    for (size_t c = 0; c < h->cluster_count && rn < 128; c++) {
+        size_t ov = query_term_overlap(query, query_len, h->clusters[c].label);
+        if (ov == 0 && strcmp(h->clusters[c].label, "(misc)") != 0)
+            continue;
+        ranked[rn].idx = c;
+        ranked[rn].score = ov > 0 ? ov : 1;
+        rn++;
+    }
+
+    for (size_t i = 1; i < rn; i++) {
+        ranked_t t = ranked[i];
+        size_t j = i;
+        while (j > 0 && ranked[j - 1].score < t.score) {
+            ranked[j] = ranked[j - 1];
+            j--;
+        }
+        ranked[j] = t;
+    }
+
+    if (rn == 0) {
+        for (size_t c = 0; c < h->cluster_count && rn < 128; c++) {
+            if (strcmp(h->clusters[c].label, "(misc)") == 0) {
+                ranked[0].idx = c;
+                ranked[0].score = 1;
+                rn = 1;
+                break;
+            }
+        }
+    }
+
+    for (size_t r = 0; r < rn && *out_count < max_results; r++) {
+        const hu_topic_cluster_t *cl = &h->clusters[ranked[r].idx];
+        for (size_t m = 0; m < cl->member_count && *out_count < max_results; m++) {
+            uint32_t ni = cl->member_indices[m];
+            if (ni >= idx->node_count)
+                continue;
+            bool dup = false;
+            for (size_t z = 0; z < *out_count; z++) {
+                if (out_indices[z] == ni) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (!dup)
+                out_indices[(*out_count)++] = ni;
+        }
+    }
+
     return HU_OK;
 }

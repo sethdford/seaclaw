@@ -7,6 +7,7 @@
 #include "human/agent/data_quality.h"
 #include "human/agent/degradation.h"
 #include "human/agent/gvr.h"
+#include "human/agent/kv_cache.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/mar.h"
 #include "human/agent/pattern_radar.h"
@@ -314,6 +315,9 @@ struct hu_agent {
 
     /* SOTA: cross-turn tool result cache with TTL */
     struct hu_tool_cache_ttl *tool_cache_ttl; /* owned; NULL until first turn */
+
+    /* SOTA: KV-cache-style context segment tracking for pruning */
+    hu_kv_cache_manager_t *kv_cache; /* owned; NULL until first turn */
 
     /* SOTA: pluggable context engine for RAG/graph/hybrid context assembly */
     struct hu_context_engine *context_engine; /* owned; NULL = use legacy behavior */

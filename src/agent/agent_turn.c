@@ -77,6 +77,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #endif
 #include "human/agent/acp_bridge.h"
 #include "human/agent/agent_comm.h"
+#include "human/agent/kv_cache.h"
 #include "human/agent/prompt_cache.h"
 #include "human/context.h"
 #include "human/context/conversation.h"
@@ -91,6 +92,9 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/memory/stm.h"
 #include "human/memory/superhuman.h"
 #include "human/memory/tiers.h"
+#include "human/security.h"
+#include "human/security/causal_armor.h"
+#include "human/security/history_scorer.h"
 #include "human/tools/cache_ttl.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
@@ -2447,10 +2451,77 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
         /* Format messages for this iteration using arena allocator */
         {
+            bool *kv_hist_mask = NULL;
+            if (agent->history_count > 0) {
+                if (!agent->kv_cache) {
+                    agent->kv_cache = (hu_kv_cache_manager_t *)agent->alloc->alloc(
+                        agent->alloc->ctx, sizeof(hu_kv_cache_manager_t));
+                    if (agent->kv_cache &&
+                        hu_kv_cache_init(agent->kv_cache, agent->alloc,
+                                         max_tokens > 0 ? (uint32_t)max_tokens : 128u * 1024u) !=
+                            HU_OK) {
+                        agent->alloc->free(agent->alloc->ctx, agent->kv_cache,
+                                           sizeof(hu_kv_cache_manager_t));
+                        agent->kv_cache = NULL;
+                    }
+                }
+                if (agent->kv_cache) {
+                    hu_kv_cache_manager_t *kvm = agent->kv_cache;
+                    kvm->eviction_threshold = 0.8f;
+                    hu_kv_cache_clear(kvm);
+                    (void)hu_kv_cache_add_segment(kvm, "system", 6,
+                                                  (uint32_t)((system_prompt_len + 3) / 4), true);
+                    for (size_t hi = 0; hi < agent->history_count; hi++) {
+                        char lbl[40];
+                        int ln = snprintf(lbl, sizeof(lbl), "h%zu", hi);
+                        if (ln <= 0)
+                            continue;
+                        const hu_owned_message_t *hm = &agent->history[hi];
+                        size_t tlen = hm->content_len;
+                        (void)hu_kv_cache_add_segment(kvm, lbl, (size_t)ln,
+                                                      (uint32_t)((tlen + 3) / 4) + 4u, false);
+                    }
+                    if (hu_kv_cache_utilization(kvm) > 0.8f) {
+                        const char *evicted[HU_KV_CACHE_MAX_SEGMENTS];
+                        size_t n_ev = hu_kv_cache_prune(kvm, evicted, HU_KV_CACHE_MAX_SEGMENTS);
+                        if (n_ev > 0) {
+                            kv_hist_mask = (bool *)agent->alloc->alloc(
+                                agent->alloc->ctx, agent->history_count * sizeof(bool));
+                            if (kv_hist_mask) {
+                                size_t keep = 0;
+                                for (size_t z = 0; z < agent->history_count; z++)
+                                    kv_hist_mask[z] = true;
+                                for (size_t e = 0; e < n_ev; e++) {
+                                    if (!evicted[e] || evicted[e][0] != 'h')
+                                        continue;
+                                    char *endp = NULL;
+                                    unsigned long idx = strtoul(evicted[e] + 1, &endp, 10);
+                                    if (endp != evicted[e] + 1 && idx < agent->history_count)
+                                        kv_hist_mask[idx] = false;
+                                }
+                                for (size_t z = 0; z < agent->history_count; z++) {
+                                    if (kv_hist_mask[z])
+                                        keep++;
+                                }
+                                if (keep == 0) {
+                                    agent->alloc->free(agent->alloc->ctx, kv_hist_mask,
+                                                       agent->history_count * sizeof(bool));
+                                    kv_hist_mask = NULL;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             hu_chat_message_t *hist_msgs = NULL;
             size_t hist_count = 0;
             err = hu_context_format_messages(&turn_alloc, agent->history, agent->history_count,
-                                             agent->max_history_messages, &hist_msgs, &hist_count);
+                                             agent->max_history_messages, kv_hist_mask, &hist_msgs,
+                                             &hist_count);
+            if (kv_hist_mask)
+                agent->alloc->free(agent->alloc->ctx, kv_hist_mask,
+                                   agent->history_count * sizeof(bool));
             if (err != HU_OK) {
                 hu_agent_clear_current_for_tools();
                 if (dpo_rejected_resp)
@@ -4431,6 +4502,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             memset(merged_results, 0, tc_count * sizeof(hu_tool_result_t));
                             for (size_t ci = 0; ci < tc_count; ci++) {
                                 const hu_tool_call_t *cc = &calls_to_dispatch[ci];
+                                if (hu_tool_cache_classify(cc->name, cc->name_len, cc->arguments,
+                                                           cc->arguments_len) ==
+                                    HU_TOOL_CACHE_NEVER)
+                                    continue;
                                 uint64_t ckey = hu_tool_cache_ttl_key(
                                     cc->name, cc->name_len, cc->arguments, cc->arguments_len);
                                 size_t clen = 0;
@@ -4566,6 +4641,74 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 result->needs_approval = true;
                             }
 
+                            /* CausalArmor: check causal attribution for high-risk tools */
+                            if (pa != HU_POLICY_DENY && result->success &&
+                                hu_tool_risk_level(tn_buf[0] ? tn_buf : "unknown") >=
+                                    HU_RISK_HIGH) {
+                                hu_causal_armor_config_t ca_cfg;
+                                hu_causal_armor_config_default(&ca_cfg);
+                                hu_causal_segment_t ca_segs[8];
+                                size_t ca_seg_count = 0;
+                                for (size_t hi = agent->history_count; hi > 0 && ca_seg_count < 8;
+                                     hi--) {
+                                    const hu_owned_message_t *he = &agent->history[hi - 1];
+                                    if (he->content && he->content_len > 0) {
+                                        ca_segs[ca_seg_count].content = he->content;
+                                        ca_segs[ca_seg_count].content_len = he->content_len;
+                                        ca_segs[ca_seg_count].is_trusted =
+                                            (he->role == HU_ROLE_USER);
+                                        ca_seg_count++;
+                                    }
+                                }
+                                if (ca_seg_count > 0) {
+                                    size_t argl =
+                                        call->arguments ? call->arguments_len : strlen(args_str);
+                                    hu_causal_armor_result_t ca_result;
+                                    if (hu_causal_armor_evaluate(&ca_cfg, ca_segs, ca_seg_count,
+                                                                 tn_buf, tn, args_str, argl,
+                                                                 &ca_result) == HU_OK &&
+                                        !ca_result.is_safe) {
+                                        static const char ca_msg[] =
+                                            "blocked: untrusted content dominates tool decision";
+                                        hu_tool_result_free(agent->alloc, result);
+                                        *result = hu_tool_result_fail(ca_msg, sizeof(ca_msg) - 1);
+                                    }
+                                }
+                            }
+
+                            /* Interaction-history safety scorer (post-CausalArmor) */
+                            if (pa != HU_POLICY_DENY && result->success &&
+                                hu_tool_risk_level(tn_buf[0] ? tn_buf : "unknown") >=
+                                    HU_RISK_MEDIUM) {
+                                hu_tool_history_entry_t thist[16];
+                                size_t thc = 0;
+                                for (size_t hi = 0; hi < agent->history_count && thc < 16; hi++) {
+                                    const hu_owned_message_t *m = &agent->history[hi];
+                                    if (m->role != HU_ROLE_TOOL || !m->name || m->name_len == 0)
+                                        continue;
+                                    thist[thc].tool_name = m->name;
+                                    thist[thc].name_len = m->name_len;
+                                    thist[thc].succeeded = !(m->content && m->content_len >= 6 &&
+                                                             memcmp(m->content, "denied", 6) == 0);
+                                    thist[thc].risk_level = (uint32_t)hu_tool_risk_level(m->name);
+                                    thc++;
+                                }
+                                if (thc > 0) {
+                                    hu_history_score_result_t hs;
+                                    if (hu_history_scorer_evaluate(
+                                            thist, thc, tn_buf, tn,
+                                            (uint32_t)hu_tool_risk_level(tn_buf[0] ? tn_buf
+                                                                                   : "unknown"),
+                                            &hs) == HU_OK &&
+                                        hs.is_suspicious) {
+                                        static const char hs_msg[] =
+                                            "blocked: suspicious tool-call history pattern";
+                                        hu_tool_result_free(agent->alloc, result);
+                                        *result = hu_tool_result_fail(hs_msg, sizeof(hs_msg) - 1);
+                                    }
+                                }
+                            }
+
                             /* Autonomy: SUPERVISED forces approval; ASSISTED for medium/high risk
                              */
                             if (agent->autonomy_level == HU_AUTONOMY_SUPERVISED) {
@@ -4697,7 +4840,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
                             /* TTL cache: store successful tool results */
                             if (ttl_cache && result->success && result->output &&
-                                result->output_len > 0 && !(ttl_hits && ttl_hits[tc])) {
+                                result->output_len > 0 && !(ttl_hits && ttl_hits[tc]) &&
+                                hu_tool_cache_classify(call->name, call->name_len, call->arguments,
+                                                       call->arguments_len) !=
+                                    HU_TOOL_CACHE_NEVER) {
                                 uint64_t ckey =
                                     hu_tool_cache_ttl_key(call->name, call->name_len,
                                                           call->arguments, call->arguments_len);

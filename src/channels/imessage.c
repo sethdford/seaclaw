@@ -492,22 +492,55 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
                          "  send \"%s\" to targetBuddy\n"
                          "end tell",
                          tgt_esc, msg_esc);
-        c->alloc->free(c->alloc->ctx, msg_esc, msg_esc_cap);
-        c->alloc->free(c->alloc->ctx, tgt_esc, tgt_esc_cap);
-        if (n < 0 || (size_t)n >= script_cap) {
-            c->alloc->free(c->alloc->ctx, script, script_cap);
-            send_err = HU_ERR_INTERNAL;
-            goto imsg_cleanup;
-        }
-
-        /* Human-like typing delay before sending */
+        /* Typing indicator: navigate to conversation + simulate keystrokes
+         * before we free tgt_esc (which we need for the contact search). */
+#ifndef HU_IS_TEST
         {
             unsigned int delay_ms = (unsigned int)(message_len * 25);
             if (delay_ms < 800)
                 delay_ms = 800;
             if (delay_ms > 4000)
                 delay_ms = 4000;
-            usleep(delay_ms * 1000);
+
+            if (delay_ms <= 3000) {
+                char typing_script[768];
+                int ts_n =
+                    snprintf(typing_script, sizeof(typing_script),
+                             "tell application \"Messages\" to activate\n"
+                             "delay 0.2\n"
+                             "tell application \"System Events\" to tell process \"Messages\"\n"
+                             "  keystroke \"n\" using command down\n"
+                             "  delay 0.2\n"
+                             "  keystroke \"%s\"\n"
+                             "  delay 0.4\n"
+                             "  key code 36\n"
+                             "  delay 0.2\n"
+                             "  keystroke \".\"\n"
+                             "  delay %.1f\n"
+                             "  keystroke \"a\" using command down\n"
+                             "  key code 51\n"
+                             "end tell",
+                             tgt_esc, (float)delay_ms / 1000.0f);
+                if (ts_n > 0 && (size_t)ts_n < sizeof(typing_script)) {
+                    const char *ts_argv[] = {"osascript", "-e", typing_script, NULL};
+                    hu_run_result_t ts_result = {0};
+                    hu_error_t ts_err = hu_process_run(c->alloc, ts_argv, NULL, 65536, &ts_result);
+                    hu_run_result_free(c->alloc, &ts_result);
+                    if (ts_err != HU_OK && getenv("HU_DEBUG"))
+                        fprintf(stderr, "[imessage] typing indicator failed (accessibility?)\n");
+                }
+            } else {
+                usleep(delay_ms * 1000);
+            }
+        }
+#endif
+
+        c->alloc->free(c->alloc->ctx, msg_esc, msg_esc_cap);
+        c->alloc->free(c->alloc->ctx, tgt_esc, tgt_esc_cap);
+        if (n < 0 || (size_t)n >= script_cap) {
+            c->alloc->free(c->alloc->ctx, script, script_cap);
+            send_err = HU_ERR_INTERNAL;
+            goto imsg_cleanup;
         }
 
         {
@@ -1694,7 +1727,9 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "   AND (LOWER(a3.filename) LIKE '%.caf' OR LOWER(a3.filename) LIKE '%.m4a' "
         "     OR LOWER(a3.filename) LIKE '%.mp3' OR LOWER(a3.filename) LIKE '%.aac' "
         "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio, "
-        "  CASE WHEN m.date_edited > 0 THEN 1 ELSE 0 END AS was_edited "
+        "  CASE WHEN m.date_edited > 0 THEN 1 ELSE 0 END AS was_edited, "
+        "  m.thread_originator_guid, "
+        "  CASE WHEN m.date_retracted > 0 THEN 1 ELSE 0 END AS was_unsent "
         "FROM message m "
         "JOIN handle h ON m.handle_id = h.ROWID "
         "WHERE m.is_from_me = 0 AND m.associated_message_type = 0 "
@@ -1736,6 +1771,8 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         int has_audio = sqlite3_column_int(stmt, 7);
         (void)has_audio;
         int was_edited = sqlite3_column_int(stmt, 8);
+        const char *reply_to = (const char *)sqlite3_column_text(stmt, 9);
+        int was_unsent = sqlite3_column_int(stmt, 10);
 
         if (!text || !handle)
             continue;
@@ -1790,6 +1827,16 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
             msgs[count].guid[0] = '\0';
         }
         msgs[count].was_edited = (was_edited != 0);
+        msgs[count].was_unsent = (was_unsent != 0);
+        if (reply_to && reply_to[0]) {
+            size_t rt_len = strlen(reply_to);
+            if (rt_len >= sizeof(msgs[count].reply_to_guid))
+                rt_len = sizeof(msgs[count].reply_to_guid) - 1;
+            memcpy(msgs[count].reply_to_guid, reply_to, rt_len);
+            msgs[count].reply_to_guid[rt_len] = '\0';
+        } else {
+            msgs[count].reply_to_guid[0] = '\0';
+        }
 
         c->last_rowid = rowid;
         count++;
@@ -1942,6 +1989,70 @@ char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t que
     (void)api_key;
     (void)api_key_len;
     return NULL;
+}
+#endif
+
+/* ── Inline reply context: look up original message text by GUID ────── */
+
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__) && defined(HU_ENABLE_SQLITE)
+hu_error_t hu_imessage_lookup_message_by_guid(hu_allocator_t *alloc, const char *guid,
+                                              size_t guid_len, char *out_text, size_t out_cap,
+                                              size_t *out_len) {
+    if (!alloc || !guid || guid_len == 0 || !out_text || out_cap == 0 || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out_len = 0;
+    out_text[0] = '\0';
+
+    const char *home = getenv("HOME");
+    if (!home)
+        return HU_ERR_NOT_SUPPORTED;
+    char db_path[512];
+    if (snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home) < 0)
+        return HU_ERR_INTERNAL;
+
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+        if (db)
+            sqlite3_close(db);
+        return HU_ERR_IO;
+    }
+
+    const char *sql = "SELECT m.text FROM message m WHERE m.guid = ? LIMIT 1";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return HU_ERR_INTERNAL;
+    }
+
+    sqlite3_bind_text(stmt, 1, guid, (int)guid_len, SQLITE_STATIC);
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *text = (const char *)sqlite3_column_text(stmt, 0);
+        if (text) {
+            size_t tlen = strlen(text);
+            if (tlen >= out_cap)
+                tlen = out_cap - 1;
+            memcpy(out_text, text, tlen);
+            out_text[tlen] = '\0';
+            *out_len = tlen;
+        }
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return HU_OK;
+}
+#else
+hu_error_t hu_imessage_lookup_message_by_guid(hu_allocator_t *alloc, const char *guid,
+                                              size_t guid_len, char *out_text, size_t out_cap,
+                                              size_t *out_len) {
+    (void)alloc;
+    (void)guid;
+    (void)guid_len;
+    if (out_text && out_cap > 0)
+        out_text[0] = '\0';
+    if (out_len)
+        *out_len = 0;
+    return HU_ERR_NOT_SUPPORTED;
 }
 #endif
 
