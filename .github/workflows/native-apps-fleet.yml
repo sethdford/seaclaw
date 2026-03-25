@@ -148,7 +148,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - name: Debug + release build (award-tier: ships clean on both configs)
+      - name: "Debug + release build (award-tier: ships clean on both configs)"
         run: |
           cd apps/macos && swift build
           cd apps/macos && swift build -c release

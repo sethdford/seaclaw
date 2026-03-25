@@ -452,8 +452,10 @@ jobs:
           lcov --remove coverage.info '/usr/*' '*/tests/*' '*/vendor/*' --output-file coverage.info --ignore-errors unused
           lcov --list coverage.info | tail -20
       - name: Upload to Codecov
-        if: ${{ secrets.CODECOV_TOKEN != '' }}
+        if: env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.info
