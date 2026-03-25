@@ -1691,6 +1691,7 @@ if(HU_ENABLE_PERSONA)
 endif()
 # Tests always have all module groups available
 target_compile_definitions(human_core_test PRIVATE HU_HAS_PERIPHERALS=1 HU_HAS_TUNNELS=1 HU_HAS_RUNTIME_EXOTIC=1 HU_HAS_TOOLS_BROWSER=1 HU_HAS_TOOLS_ADVANCED=1 HU_HAS_OTEL=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1 HU_ENABLE_ML=1)
+target_compile_options(human_core_test PRIVATE -UNDEBUG)
 if(Threads_FOUND)
     target_link_libraries(human_core_test PUBLIC Threads::Threads)
 endif()
@@ -2327,6 +2328,11 @@ if(HU_ENABLE_FIPS_CRYPTO)
     target_compile_definitions(human_tests PRIVATE HU_ENABLE_FIPS_CRYPTO=1)
 endif()
 target_compile_definitions(human_tests PRIVATE HU_ENABLE_ML=1)
+
+# Keep assert() active in tests even for Release/MinSizeRel builds (which define NDEBUG).
+# Five test files use libc assert() for guards; without this, those asserts become no-ops
+# and subsequent dereferences segfault.
+target_compile_options(human_tests PRIVATE -UNDEBUG)
 
 if(HU_ENABLE_ASAN)
     target_compile_options(human_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer)
