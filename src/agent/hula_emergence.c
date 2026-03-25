@@ -3,11 +3,11 @@
 #include "human/core/string.h"
 #include "human/platform.h"
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <stdint.h>
 #if defined(__unix__) || defined(__APPLE__)
 #include <dirent.h>
 #include <sys/stat.h>
@@ -15,7 +15,7 @@
 #endif
 
 #define HU_HULA_EMERGENCE_MAX_BUCKETS 128
-#define HU_HULA_EMERGENCE_MAX_TOOLS 256
+#define HU_HULA_EMERGENCE_MAX_TOOLS   256
 
 typedef struct {
     char *key;
@@ -40,7 +40,8 @@ static void default_trace_dir(char *buf, size_t cap) {
 #endif
 }
 
-/* Create ~/.human then ~/.human/hula_traces (or USERPROFILE equivalent). Single dir when explicit. */
+/* Create ~/.human then ~/.human/hula_traces (or USERPROFILE equivalent). Single dir when explicit.
+ */
 static hu_error_t hula_trace_prepare_dir(const char *dir_buf, bool is_default_path) {
     if (is_default_path) {
         const char *slash = strrchr(dir_buf, '/');
@@ -63,7 +64,8 @@ static hu_error_t hula_trace_prepare_dir(const char *dir_buf, bool is_default_pa
 hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
                                  const char *trace_json, size_t trace_json_len,
                                  const char *program_name, size_t program_name_len, bool success,
-                                 const char *program_json, size_t program_json_len) {
+                                 const char *program_json, size_t program_json_len,
+                                 const char *program_source, size_t program_source_len) {
 #if defined(HU_IS_TEST)
     if (!trace_dir)
         return HU_OK;
@@ -79,6 +81,8 @@ hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
     (void)success;
     (void)program_json;
     (void)program_json_len;
+    (void)program_source;
+    (void)program_source_len;
     return HU_ERR_NOT_SUPPORTED;
 #else
     char dir_buf[512];
@@ -101,7 +105,8 @@ hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
     unsigned long salt = (unsigned long)t ^ (unsigned long)(uintptr_t)trace_json;
     char path[640];
     const char *pn = program_name && program_name_len > 0 ? program_name : "trace";
-    int n = snprintf(path, sizeof(path), "%s/%lx_%.*s.json", dir_buf, salt, (int)program_name_len, pn);
+    int n =
+        snprintf(path, sizeof(path), "%s/%lx_%.*s.json", dir_buf, salt, (int)program_name_len, pn);
     if (n <= 0 || (size_t)n >= sizeof(path))
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -128,6 +133,10 @@ hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
         if (hu_json_parse(alloc, program_json, program_json_len, &prog_val) == HU_OK && prog_val)
             hu_json_object_set(alloc, root, "program", prog_val);
     }
+
+    if (program_source && program_source_len > 0)
+        hu_json_object_set(alloc, root, "program_source",
+                           hu_json_string_new(alloc, program_source, program_source_len));
 
     char *file_body = NULL;
     size_t file_len = 0;
@@ -195,8 +204,8 @@ static hu_error_t extract_tools_from_trace_array(hu_allocator_t *alloc, hu_json_
 }
 
 hu_error_t hu_hula_emergence_scan(hu_allocator_t *alloc, const char *trace_dir, size_t ngram_len,
-                                  size_t min_occurrences, char ***out_patterns, size_t *out_pattern_count,
-                                  size_t **out_freqs) {
+                                  size_t min_occurrences, char ***out_patterns,
+                                  size_t *out_pattern_count, size_t **out_freqs) {
     if (!alloc || !trace_dir || !out_patterns || !out_pattern_count || !out_freqs)
         return HU_ERR_INVALID_ARGUMENT;
     *out_patterns = NULL;
@@ -391,8 +400,7 @@ hu_error_t hu_hula_emergence_promote(hu_allocator_t *alloc, const char *skills_d
         hu_json_free(alloc, seq);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    hu_json_object_set(alloc, prog, "name",
-                       hu_json_string_new(alloc, skill_name, skill_name_len));
+    hu_json_object_set(alloc, prog, "name", hu_json_string_new(alloc, skill_name, skill_name_len));
     hu_json_object_set(alloc, prog, "version", hu_json_number_new(alloc, 1));
     hu_json_object_set(alloc, prog, "root", seq);
 
@@ -452,7 +460,8 @@ hu_error_t hu_hula_emergence_promote(hu_allocator_t *alloc, const char *skills_d
     }
     FILE *mf2 = fopen(md_path, "wb");
     if (mf2) {
-        fputs("# HuLa program (emerged)\n\nRun with: `human hula run '<json>'` or embed in agent.\n\n```json\n",
+        fputs("# HuLa program (emerged)\n\nRun with: `human hula run '<json>'` or embed in "
+              "agent.\n\n```json\n",
               mf2);
         fwrite(hula_json, 1, hula_len, mf2);
         fputs("\n```\n", mf2);

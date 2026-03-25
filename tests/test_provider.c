@@ -1,8 +1,8 @@
 #include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/arena.h"
-#include "human/core/json.h"
 #include "human/core/error.h"
+#include "human/core/json.h"
 #include "human/provider.h"
 #include "human/providers/anthropic.h"
 #include "human/providers/codex_cli.h"
@@ -570,16 +570,14 @@ static void test_factory_openai_codex(void) {
 static void test_from_config_null_alloc_returns_error(void) {
     hu_config_t cfg = {0};
     hu_provider_t out = {0};
-    hu_error_t err =
-        hu_provider_create_from_config(NULL, &cfg, "router", 6, &out);
+    hu_error_t err = hu_provider_create_from_config(NULL, &cfg, "router", 6, &out);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
 static void test_from_config_null_cfg_returns_error(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_provider_t out = {0};
-    hu_error_t err =
-        hu_provider_create_from_config(&alloc, NULL, "router", 6, &out);
+    hu_error_t err = hu_provider_create_from_config(&alloc, NULL, "router", 6, &out);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
@@ -587,8 +585,7 @@ static void test_from_config_null_name_returns_error(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_config_t cfg = {0};
     hu_provider_t out = {0};
-    hu_error_t err =
-        hu_provider_create_from_config(&alloc, &cfg, NULL, 6, &out);
+    hu_error_t err = hu_provider_create_from_config(&alloc, &cfg, NULL, 6, &out);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
@@ -596,16 +593,14 @@ static void test_from_config_zero_name_len_returns_error(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_config_t cfg = {0};
     hu_provider_t out = {0};
-    hu_error_t err =
-        hu_provider_create_from_config(&alloc, &cfg, "router", 0, &out);
+    hu_error_t err = hu_provider_create_from_config(&alloc, &cfg, "router", 0, &out);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
 static void test_from_config_null_out_returns_error(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_config_t cfg = {0};
-    hu_error_t err =
-        hu_provider_create_from_config(&alloc, &cfg, "router", 6, NULL);
+    hu_error_t err = hu_provider_create_from_config(&alloc, &cfg, "router", 6, NULL);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
 
@@ -613,8 +608,7 @@ static void test_from_config_unknown_provider_returns_not_supported(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_config_t cfg = {0};
     hu_provider_t out = {0};
-    hu_error_t err =
-        hu_provider_create_from_config(&alloc, &cfg, "unknown", 7, &out);
+    hu_error_t err = hu_provider_create_from_config(&alloc, &cfg, "unknown", 7, &out);
     HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
 }
 
@@ -622,18 +616,21 @@ static void test_from_config_router_creates_provider(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_arena_t *arena = hu_arena_create(backing);
     HU_ASSERT_NOT_NULL(arena);
-    hu_config_t cfg = {0};
-    cfg.arena = arena;
-    cfg.allocator = hu_arena_allocator(arena);
-    const char *json =
-        "{\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-test\"}],"
-        "\"router\":{\"standard\":\"openai\"}}";
-    hu_error_t perr = hu_config_parse_json(&cfg, json, strlen(json));
+    hu_config_t *cfg = (hu_config_t *)backing.alloc(backing.ctx, sizeof(hu_config_t));
+    HU_ASSERT_NOT_NULL(cfg);
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->arena = arena;
+    cfg->allocator = hu_arena_allocator(arena);
+    /* Verify the arena allocator works before config parsing */
+    void *test_ptr = cfg->allocator.alloc(cfg->allocator.ctx, 16);
+    HU_ASSERT_NOT_NULL(test_ptr);
+    const char *json = "{\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-test\"}],"
+                       "\"router\":{\"standard\":\"openai\"}}";
+    hu_error_t perr = hu_config_parse_json(cfg, json, strlen(json));
     HU_ASSERT_EQ(perr, HU_OK);
 
     hu_provider_t out = {0};
-    hu_error_t err =
-        hu_provider_create_from_config(&backing, &cfg, "router", 6, &out);
+    hu_error_t err = hu_provider_create_from_config(&backing, cfg, "router", 6, &out);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out.ctx);
     HU_ASSERT_NOT_NULL(out.vtable);
@@ -641,24 +638,25 @@ static void test_from_config_router_creates_provider(void) {
     if (out.vtable->deinit)
         out.vtable->deinit(out.ctx, &backing);
     hu_arena_destroy(arena);
+    backing.free(backing.ctx, cfg, sizeof(hu_config_t));
 }
 
 static void test_from_config_reliable_creates_provider(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_arena_t *arena = hu_arena_create(backing);
     HU_ASSERT_NOT_NULL(arena);
-    hu_config_t cfg = {0};
-    cfg.arena = arena;
-    cfg.allocator = hu_arena_allocator(arena);
-    const char *json =
-        "{\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-test\"}],"
-        "\"reliability\":{\"primary_provider\":\"openai\"}}";
-    hu_error_t perr = hu_config_parse_json(&cfg, json, strlen(json));
+    hu_config_t *cfg = (hu_config_t *)backing.alloc(backing.ctx, sizeof(hu_config_t));
+    HU_ASSERT_NOT_NULL(cfg);
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->arena = arena;
+    cfg->allocator = hu_arena_allocator(arena);
+    const char *json = "{\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-test\"}],"
+                       "\"reliability\":{\"primary_provider\":\"openai\"}}";
+    hu_error_t perr = hu_config_parse_json(cfg, json, strlen(json));
     HU_ASSERT_EQ(perr, HU_OK);
 
     hu_provider_t out = {0};
-    hu_error_t err =
-        hu_provider_create_from_config(&backing, &cfg, "reliable", 8, &out);
+    hu_error_t err = hu_provider_create_from_config(&backing, cfg, "reliable", 8, &out);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out.ctx);
     HU_ASSERT_NOT_NULL(out.vtable);
@@ -666,26 +664,28 @@ static void test_from_config_reliable_creates_provider(void) {
     if (out.vtable->deinit)
         out.vtable->deinit(out.ctx, &backing);
     hu_arena_destroy(arena);
+    backing.free(backing.ctx, cfg, sizeof(hu_config_t));
 }
 
 static void test_from_config_ensemble_creates_provider(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_arena_t *arena = hu_arena_create(backing);
     HU_ASSERT_NOT_NULL(arena);
-    hu_config_t cfg = {0};
-    cfg.arena = arena;
-    cfg.allocator = hu_arena_allocator(arena);
+    hu_config_t *cfg = (hu_config_t *)backing.alloc(backing.ctx, sizeof(hu_config_t));
+    HU_ASSERT_NOT_NULL(cfg);
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->arena = arena;
+    cfg->allocator = hu_arena_allocator(arena);
     const char *json =
         "{\"providers\":["
         "{\"name\":\"openai\",\"api_key\":\"sk-test\"},"
         "{\"name\":\"anthropic\",\"api_key\":\"sk-ant-test\"}],"
         "\"ensemble\":{\"providers\":[\"openai\",\"anthropic\"],\"strategy\":\"round_robin\"}}";
-    hu_error_t perr = hu_config_parse_json(&cfg, json, strlen(json));
+    hu_error_t perr = hu_config_parse_json(cfg, json, strlen(json));
     HU_ASSERT_EQ(perr, HU_OK);
 
     hu_provider_t out = {0};
-    hu_error_t err =
-        hu_provider_create_from_config(&backing, &cfg, "ensemble", 8, &out);
+    hu_error_t err = hu_provider_create_from_config(&backing, cfg, "ensemble", 8, &out);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out.ctx);
     HU_ASSERT_NOT_NULL(out.vtable);
@@ -693,6 +693,7 @@ static void test_from_config_ensemble_creates_provider(void) {
     if (out.vtable->deinit)
         out.vtable->deinit(out.ctx, &backing);
     hu_arena_destroy(arena);
+    backing.free(backing.ctx, cfg, sizeof(hu_config_t));
 }
 
 /* ─── helpers.c ───────────────────────────────────────────────────────────── */
@@ -730,8 +731,7 @@ static void test_helpers_is_reasoning_model_zero_len_returns_false(void) {
 
 static void test_helpers_extract_openai_content_succeeds(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *body =
-        "{\"choices\":[{\"message\":{\"content\":\"Hello world\"}}]}";
+    const char *body = "{\"choices\":[{\"message\":{\"content\":\"Hello world\"}}]}";
     char *out = hu_helpers_extract_openai_content(&alloc, body, strlen(body));
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_STR_EQ(out, "Hello world");
@@ -753,29 +753,23 @@ static void test_helpers_extract_openai_content_empty_choices_returns_null(void)
 
 static void test_helpers_extract_anthropic_content_succeeds(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *body =
-        "{\"content\":[{\"type\":\"text\",\"text\":\"Hi there\"}]}";
-    char *out =
-        hu_helpers_extract_anthropic_content(&alloc, body, strlen(body));
+    const char *body = "{\"content\":[{\"type\":\"text\",\"text\":\"Hi there\"}]}";
+    char *out = hu_helpers_extract_anthropic_content(&alloc, body, strlen(body));
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_STR_EQ(out, "Hi there");
     alloc.free(alloc.ctx, out, strlen(out) + 1);
 }
 
-static void test_helpers_extract_anthropic_content_invalid_json_returns_null(
-    void) {
+static void test_helpers_extract_anthropic_content_invalid_json_returns_null(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    char *out =
-        hu_helpers_extract_anthropic_content(&alloc, "{invalid", 8);
+    char *out = hu_helpers_extract_anthropic_content(&alloc, "{invalid", 8);
     HU_ASSERT_NULL(out);
 }
 
-static void test_helpers_extract_anthropic_content_empty_array_returns_null(
-    void) {
+static void test_helpers_extract_anthropic_content_empty_array_returns_null(void) {
     hu_allocator_t alloc = hu_system_allocator();
     const char *body = "{\"content\":[]}";
-    char *out =
-        hu_helpers_extract_anthropic_content(&alloc, body, strlen(body));
+    char *out = hu_helpers_extract_anthropic_content(&alloc, body, strlen(body));
     HU_ASSERT_NULL(out);
 }
 

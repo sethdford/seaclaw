@@ -24,12 +24,12 @@ typedef enum {
     HU_TURING_NON_ROBOTIC,
     HU_TURING_GENUINE_WARMTH,
     /* S2S voice dimensions (arXiv:2602.24080 taxonomy) */
-    HU_TURING_PROSODY_NATURALNESS,    /* intonation, rhythm, stress patterns */
-    HU_TURING_TURN_TIMING,            /* response latency, turn-taking fluency */
-    HU_TURING_FILLER_USAGE,           /* natural hesitations (um, uh, like) */
-    HU_TURING_EMOTIONAL_PROSODY,      /* vocal emotion expression (not just word choice) */
-    HU_TURING_CONVERSATIONAL_REPAIR,  /* self-correction, rephrasing mid-utterance */
-    HU_TURING_PARALINGUISTIC_CUES,    /* laughter, sighs, breath, vocal quality */
+    HU_TURING_PROSODY_NATURALNESS,   /* intonation, rhythm, stress patterns */
+    HU_TURING_TURN_TIMING,           /* response latency, turn-taking fluency */
+    HU_TURING_FILLER_USAGE,          /* natural hesitations (um, uh, like) */
+    HU_TURING_EMOTIONAL_PROSODY,     /* vocal emotion expression (not just word choice) */
+    HU_TURING_CONVERSATIONAL_REPAIR, /* self-correction, rephrasing mid-utterance */
+    HU_TURING_PARALINGUISTIC_CUES,   /* laughter, sighs, breath, vocal quality */
 } hu_turing_dimension_t;
 
 typedef enum {
@@ -57,9 +57,8 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
 /* Evaluate using an LLM judge for semantic scoring.
  * provider: the LLM to use as judge (should be cheap/fast model).
  * Returns HU_OK on success. Falls back to heuristic on LLM failure. */
-hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider,
-                               const char *model, size_t model_len,
-                               const char *response, size_t response_len,
+hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider, const char *model,
+                               size_t model_len, const char *response, size_t response_len,
                                const char *conversation_context, size_t context_len,
                                hu_turing_score_t *out);
 
@@ -84,12 +83,65 @@ hu_error_t hu_turing_store_score(sqlite3 *db, const char *contact_id, size_t con
 #define HU_TURING_CONTACT_ID_MAX 128
 
 hu_error_t hu_turing_get_trend(hu_allocator_t *alloc, sqlite3 *db, const char *contact_id,
-                               size_t contact_id_len, size_t max_entries,
-                               hu_turing_score_t *scores, int64_t *timestamps,
+                               size_t contact_id_len, size_t max_entries, hu_turing_score_t *scores,
+                               int64_t *timestamps,
                                char (*out_contact_ids)[HU_TURING_CONTACT_ID_MAX],
                                size_t *out_count);
 
 hu_error_t hu_turing_get_weakest_dimensions(sqlite3 *db, int *dimension_averages);
+
+/* Per-contact dimension averages (last 30 days). */
+hu_error_t hu_turing_get_contact_dimensions(sqlite3 *db, const char *contact_id,
+                                            size_t contact_id_len, int *dimension_averages);
+
+/* Build a contact-specific hint string from weak dimensions.
+ * Caller owns returned string (free with alloc). Returns NULL if no weak dims. */
+char *hu_turing_build_contact_hint(hu_allocator_t *alloc, const int *dimension_averages,
+                                   size_t *out_len);
+
+/* Per-channel dimension averages (last 30 days, derived from contact channel prefix). */
+hu_error_t hu_turing_get_channel_dimensions(sqlite3 *db, const char *channel_name,
+                                            size_t channel_name_len, int *dimension_averages);
+
+/* Trajectory scoring across a conversation (multi-turn). */
+typedef struct hu_turing_trajectory {
+    float directional_alignment; /* 0-1: emotional trajectory toward user needs */
+    float cumulative_impact;     /* 0-1: positive emotional impact over time */
+    float stability;             /* 0-1: empathic behavior stability (no regression) */
+    float overall;               /* weighted average */
+} hu_turing_trajectory_t;
+
+hu_error_t hu_turing_score_trajectory(const hu_turing_score_t *scores, size_t score_count,
+                                      hu_turing_trajectory_t *out);
+
+/* A/B test for humanization parameters.
+ * Tracks two parameter variants and their resulting Turing scores. */
+#define HU_AB_TEST_NAME_MAX 64
+
+typedef struct hu_ab_test {
+    char name[HU_AB_TEST_NAME_MAX]; /* test name (e.g., "disfluency_freq") */
+    float variant_a;                /* control value */
+    float variant_b;                /* treatment value */
+    int score_sum_a;                /* cumulative Turing score for variant A */
+    int score_count_a;              /* number of observations for A */
+    int score_sum_b;                /* cumulative Turing score for variant B */
+    int score_count_b;              /* number of observations for B */
+    bool active;                    /* test is still running */
+} hu_ab_test_t;
+
+hu_error_t hu_ab_test_init_table(sqlite3 *db);
+
+hu_error_t hu_ab_test_create(sqlite3 *db, const char *name, float variant_a, float variant_b);
+
+/* Pick variant for this turn (deterministic based on contact_id hash). */
+bool hu_ab_test_pick_variant(const char *contact_id, size_t contact_id_len, const char *test_name);
+
+hu_error_t hu_ab_test_record(sqlite3 *db, const char *name, bool is_variant_b, int turing_score);
+
+hu_error_t hu_ab_test_get_results(sqlite3 *db, const char *name, hu_ab_test_t *out);
+
+/* Auto-resolve: if one variant is significantly better after enough observations, promote it. */
+hu_error_t hu_ab_test_resolve(sqlite3 *db, const char *name, float *winning_value);
 #endif
 
 #endif

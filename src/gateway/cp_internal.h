@@ -246,6 +246,15 @@ hu_error_t cp_turing_trend(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
 hu_error_t cp_turing_dimensions(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                                 const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                 char **out, size_t *out_len);
+hu_error_t cp_turing_contact(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                             const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                             char **out, size_t *out_len);
+hu_error_t cp_turing_trajectory(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                char **out, size_t *out_len);
+hu_error_t cp_turing_ab_tests(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                              const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                              char **out, size_t *out_len);
 
 /* MCP Resources + Prompts RPC handlers */
 hu_error_t cp_mcp_resources_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,

@@ -13,17 +13,31 @@ struct hu_cartesia_stream {
     hu_ws_client_t *ws;
     char model_id[128];
     char voice_id[128];
+    hu_cartesia_voice_controls_t voice_controls;
+    bool has_voice_controls;
 #if HU_IS_TEST
     unsigned mock_send_count;
     unsigned mock_recv_phase;
 #endif
 };
 
+void hu_cartesia_stream_set_voice_controls(hu_cartesia_stream_t *s,
+                                           const hu_cartesia_voice_controls_t *controls) {
+    if (!s)
+        return;
+    if (controls) {
+        s->voice_controls = *controls;
+        s->has_voice_controls = true;
+    } else {
+        memset(&s->voice_controls, 0, sizeof(s->voice_controls));
+        s->has_voice_controls = false;
+    }
+}
+
 #if HU_IS_TEST
 
-hu_error_t hu_cartesia_stream_open(hu_allocator_t *alloc, const char *api_key,
-                                   const char *voice_id, const char *model_id,
-                                   hu_cartesia_stream_t **out) {
+hu_error_t hu_cartesia_stream_open(hu_allocator_t *alloc, const char *api_key, const char *voice_id,
+                                   const char *model_id, hu_cartesia_stream_t **out) {
     if (!alloc || !out)
         return HU_ERR_INVALID_ARGUMENT;
     (void)api_key;
@@ -121,7 +135,9 @@ static void json_set_str(hu_allocator_t *a, hu_json_value_t *obj, const char *ke
 static hu_error_t build_generation_json(hu_allocator_t *alloc, const char *model_id,
                                         const char *voice_id, const char *context_id,
                                         const char *transcript, bool is_continue, bool flush,
-                                        bool cancel, char **out_json, size_t *out_len) {
+                                        bool cancel,
+                                        const hu_cartesia_voice_controls_t *voice_controls,
+                                        char **out_json, size_t *out_len) {
     hu_json_value_t *o = hu_json_object_new(alloc);
     if (!o)
         return HU_ERR_OUT_OF_MEMORY;
@@ -136,6 +152,24 @@ static hu_error_t build_generation_json(hu_allocator_t *alloc, const char *model
         if (voice) {
             json_set_str(alloc, voice, "mode", "id");
             json_set_str(alloc, voice, "id", voice_id ? voice_id : "");
+            if (voice_controls) {
+                hu_json_value_t *ctrl = hu_json_object_new(alloc);
+                if (ctrl) {
+                    if (voice_controls->speed != 0.0f)
+                        hu_json_object_set(alloc, ctrl, "speed",
+                                           hu_json_number_new(alloc, voice_controls->speed));
+                    if (voice_controls->emotion && voice_controls->emotion[0]) {
+                        hu_json_value_t *emo_arr = hu_json_array_new(alloc);
+                        if (emo_arr) {
+                            hu_json_array_push(alloc, emo_arr,
+                                               hu_json_string_new(alloc, voice_controls->emotion,
+                                                                  strlen(voice_controls->emotion)));
+                            hu_json_object_set(alloc, ctrl, "emotion", emo_arr);
+                        }
+                    }
+                    hu_json_object_set(alloc, voice, "__experimental_controls", ctrl);
+                }
+            }
             hu_json_object_set(alloc, o, "voice", voice);
         }
         hu_json_value_t *fmt = hu_json_object_new(alloc);
@@ -156,9 +190,8 @@ static hu_error_t build_generation_json(hu_allocator_t *alloc, const char *model
     return err;
 }
 
-hu_error_t hu_cartesia_stream_open(hu_allocator_t *alloc, const char *api_key,
-                                   const char *voice_id, const char *model_id,
-                                   hu_cartesia_stream_t **out) {
+hu_error_t hu_cartesia_stream_open(hu_allocator_t *alloc, const char *api_key, const char *voice_id,
+                                   const char *model_id, hu_cartesia_stream_t **out) {
     if (!alloc || !api_key || !api_key[0] || !out)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -219,8 +252,9 @@ hu_error_t hu_cartesia_stream_send_generation(hu_cartesia_stream_t *s, hu_alloca
         return HU_ERR_INVALID_ARGUMENT;
     char *json = NULL;
     size_t jl = 0;
-    hu_error_t err = build_generation_json(alloc, s->model_id, s->voice_id, context_id, transcript,
-                                           is_continue, false, false, &json, &jl);
+    hu_error_t err = build_generation_json(
+        alloc, s->model_id, s->voice_id, context_id, transcript, is_continue, false, false,
+        s->has_voice_controls ? &s->voice_controls : NULL, &json, &jl);
     if (err != HU_OK)
         return err;
     err = send_json(s, json, jl);
@@ -234,9 +268,8 @@ hu_error_t hu_cartesia_stream_flush_context(hu_cartesia_stream_t *s, hu_allocato
         return HU_ERR_INVALID_ARGUMENT;
     char *json = NULL;
     size_t jl = 0;
-    hu_error_t err =
-        build_generation_json(alloc, s->model_id, s->voice_id, context_id, "", false, true,
-                              false, &json, &jl);
+    hu_error_t err = build_generation_json(alloc, s->model_id, s->voice_id, context_id, "", false,
+                                           true, false, NULL, &json, &jl);
     if (err != HU_OK)
         return err;
     err = send_json(s, json, jl);
@@ -251,7 +284,7 @@ hu_error_t hu_cartesia_stream_cancel_context(hu_cartesia_stream_t *s, hu_allocat
     char *json = NULL;
     size_t jl = 0;
     hu_error_t err = build_generation_json(alloc, s->model_id, s->voice_id, context_id, "", false,
-                                            false, true, &json, &jl);
+                                           false, true, NULL, &json, &jl);
     if (err != HU_OK)
         return err;
     err = send_json(s, json, jl);
@@ -280,8 +313,7 @@ hu_error_t hu_cartesia_stream_recv_next(hu_cartesia_stream_t *s, hu_allocator_t 
     }
 
     hu_json_value_t *root = NULL;
-    if (hu_json_parse(alloc, raw, rl, &root) != HU_OK || !root ||
-        root->type != HU_JSON_OBJECT) {
+    if (hu_json_parse(alloc, raw, rl, &root) != HU_OK || !root || root->type != HU_JSON_OBJECT) {
         if (root)
             hu_json_free(alloc, root);
         alloc->free(alloc->ctx, raw, rl);
@@ -325,9 +357,8 @@ hu_error_t hu_cartesia_stream_recv_next(hu_cartesia_stream_t *s, hu_allocator_t 
 
 #else /* no TLS */
 
-hu_error_t hu_cartesia_stream_open(hu_allocator_t *alloc, const char *api_key,
-                                   const char *voice_id, const char *model_id,
-                                   hu_cartesia_stream_t **out) {
+hu_error_t hu_cartesia_stream_open(hu_allocator_t *alloc, const char *api_key, const char *voice_id,
+                                   const char *model_id, hu_cartesia_stream_t **out) {
     (void)api_key;
     (void)voice_id;
     (void)model_id;

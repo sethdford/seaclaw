@@ -5,12 +5,12 @@
 #include "human/agent/hula_emergence.h"
 #include "human/agent/hula_lite.h"
 #include "human/bootstrap.h"
-#include "human/core/process_util.h"
 #include "human/calibration.h"
 #include "human/calibration/clone.h"
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/core/process_util.h"
 #include "human/core/string.h"
 #include "human/eval.h"
 #include "human/eval_benchmarks.h"
@@ -20,8 +20,8 @@
 #include "human/providers/factory.h"
 #include "human/security/sandbox.h"
 #ifdef HU_ENABLE_FEEDS
-#include "human/feeds/processor.h"
 #include "human/feeds/findings.h"
+#include "human/feeds/processor.h"
 #include "human/feeds/research.h"
 #include "human/feeds/trends.h"
 #include "human/intelligence/cycle.h"
@@ -151,15 +151,17 @@ hu_error_t hu_cli_setup_local_model_emit(FILE *out) {
 #ifdef HU_ENABLE_EMBEDDED_MODEL
     fprintf(out, "  Embedded GGUF (llama-cli): compiled in (HU_ENABLE_EMBEDDED_MODEL)\n");
 #else
-    fprintf(out,
-            "  Embedded GGUF (llama-cli): not in this build (cmake -DHU_ENABLE_EMBEDDED_MODEL=ON)\n");
+    fprintf(
+        out,
+        "  Embedded GGUF (llama-cli): not in this build (cmake -DHU_ENABLE_EMBEDDED_MODEL=ON)\n");
 #endif
     fprintf(out, "\n");
 #endif
     fprintf(out, "Suggested models:\n");
     fprintf(out, "  Ollama:  ollama pull llama3.2:3b\n");
     fprintf(out, "  GGUF:    https://huggingface.co/models?library=gguf\n");
-    fprintf(out, "           Run llama-cli with a local .gguf (see https://github.com/ggerganov/llama.cpp).\n");
+    fprintf(out, "           Run llama-cli with a local .gguf (see "
+                 "https://github.com/ggerganov/llama.cpp).\n");
     fprintf(out, "\n");
     fprintf(out, "Hybrid routing: use the ensemble provider with strategy \"best_for_task\" — see "
                  "include/human/providers/ensemble.h\n");
@@ -738,11 +740,16 @@ static int eval_json_basename_cmp(const void *a, const void *b) {
 /* ── eval (run/list/compare) ────────────────────────────────────────────── */
 hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human eval <run|baseline|validate|check-regression|list|compare|dashboard|history|trend|benchmark> [args]\n");
+        printf("Usage: human eval "
+               "<run|baseline|validate|check-regression|list|compare|dashboard|history|trend|"
+               "benchmark> [args]\n");
         printf("  run <suite.json>     Load and run an eval suite, print report JSON\n");
-        printf("  baseline [dir]       Run all *.json suites in dir (default: eval_suites/), print score table\n");
-        printf("  validate <dir>       Check all *.json suites parse; unique ids; required fields\n");
-        printf("  check-regression <dir>  Fresh baseline vs SQLite; fail if any suite drops >10%% from last persist\n");
+        printf("  baseline [dir]       Run all *.json suites in dir (default: eval_suites/), print "
+               "score table\n");
+        printf(
+            "  validate <dir>       Check all *.json suites parse; unique ids; required fields\n");
+        printf("  check-regression <dir>  Fresh baseline vs SQLite; fail if any suite drops >10%% "
+               "from last persist\n");
         printf("  list                 List eval_suites/*.json with task counts (POSIX)\n");
         printf("  compare <r1> <r2>    Compare two run report JSON files\n");
         printf("  dashboard [r1.json]  Render terminal dashboard from run report(s)\n");
@@ -765,7 +772,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         (void)path;
         static const char MOCK_SUITE[] =
             "{\"name\":\"mock-eval\",\"tasks\":["
-            "{\"id\":\"m1\",\"prompt\":\"2+2?\",\"expected\":\"4\",\"category\":\"math\",\"difficulty\":1,\"timeout_ms\":5000}"
+            "{\"id\":\"m1\",\"prompt\":\"2+2?\",\"expected\":\"4\",\"category\":\"math\","
+            "\"difficulty\":1,\"timeout_ms\":5000}"
             "]}\n";
         err = hu_eval_suite_load_json(alloc, MOCK_SUITE, sizeof(MOCK_SUITE) - 1, &suite);
 #else
@@ -804,8 +812,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 fprintf(stderr, "eval: provider error: %s\n", hu_error_string(err));
                 return err;
             }
-            err = hu_eval_run_suite(alloc, &provider, model, model_len, &suite,
-                                   HU_EVAL_CONTAINS, &run);
+            err = hu_eval_run_suite(alloc, &provider, model, model_len, &suite, HU_EVAL_CONTAINS,
+                                    &run);
             if (provider.vtable && provider.vtable->deinit)
                 provider.vtable->deinit(provider.ctx, alloc);
             hu_config_deinit(&cfg);
@@ -840,13 +848,14 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                         fprintf(stderr, "eval: stored run to history\n");
 
                     hu_eval_regression_t reg = {0};
-                    if (hu_eval_detect_regression(db, run.suite_name,
-                            run.pass_rate, 0.05, &reg) == HU_OK && reg.regressed) {
+                    if (hu_eval_detect_regression(db, run.suite_name, run.pass_rate, 0.05, &reg) ==
+                            HU_OK &&
+                        reg.regressed) {
                         fprintf(stderr,
-                            "WARNING: regression detected! pass_rate %.1f%% vs baseline %.1f%% (delta %.1f%%)\n",
-                            reg.current_pass_rate * 100.0,
-                            reg.baseline_pass_rate * 100.0,
-                            reg.delta * 100.0);
+                                "WARNING: regression detected! pass_rate %.1f%% vs baseline %.1f%% "
+                                "(delta %.1f%%)\n",
+                                reg.current_pass_rate * 100.0, reg.baseline_pass_rate * 100.0,
+                                reg.delta * 100.0);
                         /* --fail-on-regression: check if flag was passed */
                         bool fail_on_reg = false;
                         for (int fa = 0; fa < argc; fa++) {
@@ -946,7 +955,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                         hu_config_t cfg;
                         hu_error_t cfg_err = hu_config_load(alloc, &cfg);
                         if (cfg_err != HU_OK) {
-                            fprintf(stderr, "eval: baseline config error: %s\n", hu_error_string(cfg_err));
+                            fprintf(stderr, "eval: baseline config error: %s\n",
+                                    hu_error_string(cfg_err));
                             hu_eval_suite_free(alloc, &suite);
                             continue;
                         }
@@ -957,13 +967,14 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                         hu_provider_t provider = {0};
                         br = hu_provider_create_from_config(alloc, &cfg, prov, prov_len, &provider);
                         if (br != HU_OK) {
-                            fprintf(stderr, "eval: baseline provider error: %s\n", hu_error_string(br));
+                            fprintf(stderr, "eval: baseline provider error: %s\n",
+                                    hu_error_string(br));
                             hu_eval_suite_free(alloc, &suite);
                             hu_config_deinit(&cfg);
                             continue;
                         }
-                        br = hu_eval_run_suite(alloc, &provider, model, model_len, &suite, HU_EVAL_CONTAINS,
-                                               &run);
+                        br = hu_eval_run_suite(alloc, &provider, model, model_len, &suite,
+                                               HU_EVAL_CONTAINS, &run);
                         if (provider.vtable && provider.vtable->deinit)
                             provider.vtable->deinit(provider.ctx, alloc);
                         hu_config_deinit(&cfg);
@@ -1093,7 +1104,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 double score;
                 size_t tasks;
             } eval_chk_row_t;
-            eval_chk_row_t *rows = alloc->alloc(alloc->ctx, max_json_files * sizeof(eval_chk_row_t));
+            eval_chk_row_t *rows =
+                alloc->alloc(alloc->ctx, max_json_files * sizeof(eval_chk_row_t));
             if (!rows) {
                 for (size_t j = 0; j < n_names; j++)
                     alloc->free(alloc->ctx, names[j], strlen(names[j]) + 1);
@@ -1131,7 +1143,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                     hu_config_t cfg;
                     hu_error_t cfg_err = hu_config_load(alloc, &cfg);
                     if (cfg_err != HU_OK) {
-                        fprintf(stderr, "eval: check-regression config error: %s\n", hu_error_string(cfg_err));
+                        fprintf(stderr, "eval: check-regression config error: %s\n",
+                                hu_error_string(cfg_err));
                         hu_eval_suite_free(alloc, &suite);
                         continue;
                     }
@@ -1140,14 +1153,16 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                     hu_error_t br =
                         hu_provider_create_from_config(alloc, &cfg, prov, strlen(prov), &provider);
                     if (br != HU_OK) {
-                        fprintf(stderr, "eval: check-regression provider error: %s\n", hu_error_string(br));
+                        fprintf(stderr, "eval: check-regression provider error: %s\n",
+                                hu_error_string(br));
                         hu_eval_suite_free(alloc, &suite);
                         hu_config_deinit(&cfg);
                         continue;
                     }
                     const char *model = cfg.default_model ? cfg.default_model : "";
                     size_t model_len = model ? strlen(model) : 0;
-                    br = hu_eval_run_suite(alloc, &provider, model, model_len, &suite, HU_EVAL_CONTAINS, &run);
+                    br = hu_eval_run_suite(alloc, &provider, model, model_len, &suite,
+                                           HU_EVAL_CONTAINS, &run);
                     if (provider.vtable && provider.vtable->deinit)
                         provider.vtable->deinit(provider.ctx, alloc);
                     hu_config_deinit(&cfg);
@@ -1197,8 +1212,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             for (size_t si = 0; si < n_ok; si++) {
                 bool reg = false;
                 char msg[512];
-                hu_error_t re = hu_eval_regression_check_baseline_drop(db, rows[si].stem, rows[si].score, max_drop,
-                                                                       &reg, msg, sizeof(msg));
+                hu_error_t re = hu_eval_regression_check_baseline_drop(
+                    db, rows[si].stem, rows[si].score, max_drop, &reg, msg, sizeof(msg));
                 if (re != HU_OK) {
                     alloc->free(alloc->ctx, rows, max_json_files * sizeof(eval_chk_row_t));
                     if (mem.vtable && mem.vtable->deinit)
@@ -1376,8 +1391,10 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         }
 #else
         {
-            static const char MOCK_R1[] = "{\"suite\":\"s1\",\"passed\":8,\"failed\":2,\"pass_rate\":0.80,\"elapsed_ms\":1000}";
-            static const char MOCK_R2[] = "{\"suite\":\"s1\",\"passed\":9,\"failed\":1,\"pass_rate\":0.90,\"elapsed_ms\":900}";
+            static const char MOCK_R1[] = "{\"suite\":\"s1\",\"passed\":8,\"failed\":2,\"pass_"
+                                          "rate\":0.80,\"elapsed_ms\":1000}";
+            static const char MOCK_R2[] = "{\"suite\":\"s1\",\"passed\":9,\"failed\":1,\"pass_"
+                                          "rate\":0.90,\"elapsed_ms\":900}";
             (void)path1;
             (void)path2;
             len1 = sizeof(MOCK_R1) - 1;
@@ -1392,8 +1409,10 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 #endif
 
         if (!json1 || !json2) {
-            if (json1) alloc->free(alloc->ctx, json1, len1 + 1);
-            if (json2) alloc->free(alloc->ctx, json2, len2 + 1);
+            if (json1)
+                alloc->free(alloc->ctx, json1, len1 + 1);
+            if (json2)
+                alloc->free(alloc->ctx, json2, len2 + 1);
             return HU_ERR_OUT_OF_MEMORY;
         }
 
@@ -1429,14 +1448,16 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         if (argc >= 4) {
             runs_count = (size_t)(argc - 3);
             runs = alloc->alloc(alloc->ctx, runs_count * sizeof(hu_eval_run_t));
-            if (!runs) return HU_ERR_OUT_OF_MEMORY;
+            if (!runs)
+                return HU_ERR_OUT_OF_MEMORY;
             memset(runs, 0, runs_count * sizeof(hu_eval_run_t));
 
             for (size_t i = 0; i < runs_count; i++) {
                 const char *path = argv[3 + (int)i];
 #ifdef HU_IS_TEST
                 (void)path;
-                static const char MOCK[] = "{\"suite\":\"reasoning-basic\",\"passed\":8,\"failed\":2,\"pass_rate\":0.80,\"elapsed_ms\":120}";
+                static const char MOCK[] = "{\"suite\":\"reasoning-basic\",\"passed\":8,\"failed\":"
+                                           "2,\"pass_rate\":0.80,\"elapsed_ms\":120}";
                 size_t len = sizeof(MOCK) - 1;
                 err = hu_eval_run_load_json(alloc, MOCK, len, &runs[i]);
 #else
@@ -1472,7 +1493,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 err = hu_eval_run_load_json(alloc, json, len, &runs[i]);
                 alloc->free(alloc->ctx, json, len + 1);
 #endif
-                if (err != HU_OK) break;
+                if (err != HU_OK)
+                    break;
             }
 
             if (err == HU_OK)
@@ -1530,10 +1552,10 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         size_t count = 0;
         hu_error_t err = hu_eval_load_history(alloc, db, runs, max_runs, &count);
         if (err == HU_OK && count > 0) {
-            printf("%-20s %-12s %-10s %6s %6s %8s\n",
-                   "Suite", "Provider", "Model", "Pass", "Fail", "Rate");
-            printf("%-20s %-12s %-10s %6s %6s %8s\n",
-                   "----", "--------", "-----", "----", "----", "----");
+            printf("%-20s %-12s %-10s %6s %6s %8s\n", "Suite", "Provider", "Model", "Pass", "Fail",
+                   "Rate");
+            printf("%-20s %-12s %-10s %6s %6s %8s\n", "----", "--------", "-----", "----", "----",
+                   "----");
             for (size_t i = 0; i < count; i++) {
                 if (filter_suite && runs[i].suite_name &&
                     strcmp(runs[i].suite_name, filter_suite) != 0)
@@ -1541,8 +1563,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 printf("%-20s %-12s %-10s %6zu %6zu %7.1f%%\n",
                        runs[i].suite_name ? runs[i].suite_name : "-",
                        runs[i].provider ? runs[i].provider : "-",
-                       runs[i].model ? runs[i].model : "-",
-                       runs[i].passed, runs[i].failed,
+                       runs[i].model ? runs[i].model : "-", runs[i].passed, runs[i].failed,
                        runs[i].pass_rate * 100.0);
             }
         } else {
@@ -1602,7 +1623,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 
         if (err == HU_OK && count > 0) {
             for (size_t i = 0; i < count; i++) {
-                const char *sn = runs[i].suite_name && runs[i].suite_name[0] ? runs[i].suite_name : "-";
+                const char *sn =
+                    runs[i].suite_name && runs[i].suite_name[0] ? runs[i].suite_name : "-";
                 int slot = -1;
                 for (size_t s = 0; s < nslots; s++) {
                     if (strcmp(suite_names[s], sn) == 0) {
@@ -1631,8 +1653,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         size_t printed = 0;
         if (err == HU_OK && nslots > 0) {
             printf("%-28s %12s %12s %10s\n", "Suite", "Previous", "Current", "Delta");
-            printf("%-28s %12s %12s %10s\n", "----------------------------", "------------", "------------",
-                   "----------");
+            printf("%-28s %12s %12s %10s\n", "----------------------------", "------------",
+                   "------------", "----------");
             for (size_t s = 0; s < nslots; s++) {
                 if (!have_curr[s] || !have_prev[s])
                     continue;
@@ -1676,7 +1698,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         else if (strcmp(bench_name, "tooluse") == 0)
             bench_type = HU_BENCHMARK_TOOL_USE;
         else {
-            fprintf(stderr, "Unknown benchmark: %s (expected gaia, swebench, tooluse)\n", bench_name);
+            fprintf(stderr, "Unknown benchmark: %s (expected gaia, swebench, tooluse)\n",
+                    bench_name);
             return HU_ERR_INVALID_ARGUMENT;
         }
 
@@ -1686,11 +1709,13 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         (void)bench_path;
         static const char MOCK_BENCH[] =
             "{\"name\":\"mock-bench\",\"tasks\":["
-            "{\"id\":\"b1\",\"prompt\":\"test\",\"expected\":\"ok\",\"category\":\"basic\",\"difficulty\":1,\"timeout_ms\":5000}"
+            "{\"id\":\"b1\",\"prompt\":\"test\",\"expected\":\"ok\",\"category\":\"basic\","
+            "\"difficulty\":1,\"timeout_ms\":5000}"
             "]}\n";
         bench_json_len = sizeof(MOCK_BENCH) - 1;
         bench_json = alloc->alloc(alloc->ctx, bench_json_len + 1);
-        if (!bench_json) return HU_ERR_OUT_OF_MEMORY;
+        if (!bench_json)
+            return HU_ERR_OUT_OF_MEMORY;
         memcpy(bench_json, MOCK_BENCH, bench_json_len + 1);
 #else
         FILE *bf = fopen(bench_path, "r");
@@ -1701,10 +1726,16 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         fseek(bf, 0, SEEK_END);
         long bsz = ftell(bf);
         fseek(bf, 0, SEEK_SET);
-        if (bsz <= 0) { fclose(bf); return HU_ERR_INVALID_ARGUMENT; }
+        if (bsz <= 0) {
+            fclose(bf);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
         bench_json_len = (size_t)bsz;
         bench_json = alloc->alloc(alloc->ctx, bench_json_len + 1);
-        if (!bench_json) { fclose(bf); return HU_ERR_OUT_OF_MEMORY; }
+        if (!bench_json) {
+            fclose(bf);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
         size_t nread = fread(bench_json, 1, bench_json_len, bf);
         fclose(bf);
         if (nread != bench_json_len) {
@@ -1716,7 +1747,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 
         hu_eval_suite_t bench_suite;
         memset(&bench_suite, 0, sizeof(bench_suite));
-        hu_error_t berr = hu_benchmark_load(alloc, bench_type, bench_json, bench_json_len, &bench_suite);
+        hu_error_t berr =
+            hu_benchmark_load(alloc, bench_type, bench_json, bench_json_len, &bench_suite);
         alloc->free(alloc->ctx, bench_json, bench_json_len + 1);
         if (berr != HU_OK) {
             fprintf(stderr, "Failed to load benchmark: %s\n", hu_error_string(berr));
@@ -1724,8 +1756,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         }
 
         printf("{\"benchmark\":\"%s\",\"suite\":\"%s\",\"loaded\":true}\n",
-               hu_benchmark_type_name(bench_type),
-               bench_suite.name ? bench_suite.name : "");
+               hu_benchmark_type_name(bench_type), bench_suite.name ? bench_suite.name : "");
         hu_eval_suite_free(alloc, &bench_suite);
         return HU_OK;
     }
@@ -1782,7 +1813,8 @@ hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
         printf("Usage: human calibrate <run|clone> [args]\n");
         printf("  run [db_path] [contact] [channel]  - Analyze messaging patterns and produce "
                "recommendations (channel defaults to auto)\n");
-        printf("  clone [db_path] [contact] [persona_path] - Extract behavioral patterns and update persona\n");
+        printf("  clone [db_path] [contact] [persona_path] - Extract behavioral patterns and "
+               "update persona\n");
         return HU_OK;
     }
     const char *sub = argv[2];
@@ -1842,7 +1874,8 @@ hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
 #if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
 hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
-        printf("Usage: human feed <poll|status|list|health|findings|search|digest|correlate|cleanup|learn>\n");
+        printf("Usage: human feed "
+               "<poll|status|list|health|findings|search|digest|correlate|cleanup|learn>\n");
         return HU_OK;
     }
     hu_config_t cfg;
@@ -1861,7 +1894,8 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
     sqlite3 *db = hu_sqlite_memory_get_db(&mem);
     if (!db) {
         fprintf(stderr, "[feed] SQLite database not available\n");
-        if (mem.vtable->deinit) mem.vtable->deinit(mem.ctx);
+        if (mem.vtable->deinit)
+            mem.vtable->deinit(mem.ctx);
         hu_config_deinit(&cfg);
         return HU_ERR_NOT_FOUND;
     }
@@ -1887,16 +1921,16 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         }
         hu_feed_config_t fconf;
         memset(&fconf, 0, sizeof(fconf));
-        fconf.enabled[HU_FEED_NEWS_RSS]    = true;
+        fconf.enabled[HU_FEED_NEWS_RSS] = true;
         fconf.enabled[HU_FEED_FILE_INGEST] = true;
-        fconf.enabled[HU_FEED_GMAIL]       = true;
-        fconf.enabled[HU_FEED_IMESSAGE]    = true;
-        fconf.enabled[HU_FEED_TWITTER]     = true;
+        fconf.enabled[HU_FEED_GMAIL] = true;
+        fconf.enabled[HU_FEED_IMESSAGE] = true;
+        fconf.enabled[HU_FEED_TWITTER] = true;
         fconf.poll_interval_minutes[HU_FEED_FILE_INGEST] = 0;
-        fconf.poll_interval_minutes[HU_FEED_NEWS_RSS]    = 0;
-        fconf.poll_interval_minutes[HU_FEED_GMAIL]       = 0;
-        fconf.poll_interval_minutes[HU_FEED_IMESSAGE]    = 0;
-        fconf.poll_interval_minutes[HU_FEED_TWITTER]     = 0;
+        fconf.poll_interval_minutes[HU_FEED_NEWS_RSS] = 0;
+        fconf.poll_interval_minutes[HU_FEED_GMAIL] = 0;
+        fconf.poll_interval_minutes[HU_FEED_IMESSAGE] = 0;
+        fconf.poll_interval_minutes[HU_FEED_TWITTER] = 0;
         fconf.max_items_per_poll = 50;
         uint64_t last_poll[HU_FEED_COUNT] = {0};
         uint64_t now_ms = (uint64_t)time(NULL) * 1000ULL;
@@ -1908,9 +1942,9 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
             fprintf(stderr, "[feed] Poll error: %s\n", hu_error_string(err));
     } else if (strcmp(sub, "status") == 0) {
         sqlite3_stmt *stmt = NULL;
-        int rc = sqlite3_prepare_v2(db,
-            "SELECT source, COUNT(*), MAX(ingested_at) FROM feed_items GROUP BY source",
-            -1, &stmt, NULL);
+        int rc = sqlite3_prepare_v2(
+            db, "SELECT source, COUNT(*), MAX(ingested_at) FROM feed_items GROUP BY source", -1,
+            &stmt, NULL);
         if (rc != SQLITE_OK) {
             fprintf(stderr, "[feed] Query error: %s\n", sqlite3_errmsg(db));
         } else {
@@ -1937,36 +1971,44 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         /* Intelligence stats */
         printf("\nIntelligence:\n");
         sqlite3_stmt *istmt = NULL;
-        int irc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM research_findings WHERE status = 'actioned'", -1, &istmt, NULL);
+        int irc = sqlite3_prepare_v2(
+            db, "SELECT COUNT(*) FROM research_findings WHERE status = 'actioned'", -1, &istmt,
+            NULL);
         if (irc == SQLITE_OK && sqlite3_step(istmt) == SQLITE_ROW)
             printf("  Findings actioned: %d\n", sqlite3_column_int(istmt, 0));
-        if (istmt) sqlite3_finalize(istmt);
+        if (istmt)
+            sqlite3_finalize(istmt);
 
         irc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM general_lessons", -1, &istmt, NULL);
         if (irc == SQLITE_OK && sqlite3_step(istmt) == SQLITE_ROW)
             printf("  General lessons:   %d\n", sqlite3_column_int(istmt, 0));
-        if (istmt) sqlite3_finalize(istmt);
+        if (istmt)
+            sqlite3_finalize(istmt);
 
         irc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM current_events", -1, &istmt, NULL);
         if (irc == SQLITE_OK && sqlite3_step(istmt) == SQLITE_ROW)
             printf("  Current events:    %d\n", sqlite3_column_int(istmt, 0));
-        if (istmt) sqlite3_finalize(istmt);
+        if (istmt)
+            sqlite3_finalize(istmt);
 
         irc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM inferred_values", -1, &istmt, NULL);
         if (irc == SQLITE_OK && sqlite3_step(istmt) == SQLITE_ROW)
             printf("  Inferred values:   %d\n", sqlite3_column_int(istmt, 0));
-        if (istmt) sqlite3_finalize(istmt);
+        if (istmt)
+            sqlite3_finalize(istmt);
 
         irc = sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM growth_milestones", -1, &istmt, NULL);
         if (irc == SQLITE_OK && sqlite3_step(istmt) == SQLITE_ROW)
             printf("  Growth milestones: %d\n", sqlite3_column_int(istmt, 0));
-        if (istmt) sqlite3_finalize(istmt);
+        if (istmt)
+            sqlite3_finalize(istmt);
     } else if (strcmp(sub, "list") == 0) {
         sqlite3_stmt *stmt = NULL;
-        int rc = sqlite3_prepare_v2(db,
-            "SELECT source, content_type, substr(content, 1, 80), ingested_at "
-            "FROM feed_items ORDER BY ingested_at DESC LIMIT 10",
-            -1, &stmt, NULL);
+        int rc =
+            sqlite3_prepare_v2(db,
+                               "SELECT source, content_type, substr(content, 1, 80), ingested_at "
+                               "FROM feed_items ORDER BY ingested_at DESC LIMIT 10",
+                               -1, &stmt, NULL);
         if (rc != SQLITE_OK) {
             fprintf(stderr, "[feed] Query error: %s\n", sqlite3_errmsg(db));
         } else {
@@ -1984,8 +2026,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
                     if (lt)
                         strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M", lt);
                 }
-                printf("[%d] %s (%s) @ %s\n    %s\n\n",
-                       ++idx, src ? src : "?", ctype ? ctype : "?",
+                printf("[%d] %s (%s) @ %s\n    %s\n\n", ++idx, src ? src : "?", ctype ? ctype : "?",
                        timebuf, content ? content : "(empty)");
             }
             if (idx == 0)
@@ -1996,9 +2037,9 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         printf("Feed Health Report\n");
         printf("==================\n\n");
         sqlite3_stmt *stmt = NULL;
-        int rc = sqlite3_prepare_v2(db,
-            "SELECT source, COUNT(*), MAX(ingested_at) FROM feed_items GROUP BY source",
-            -1, &stmt, NULL);
+        int rc = sqlite3_prepare_v2(
+            db, "SELECT source, COUNT(*), MAX(ingested_at) FROM feed_items GROUP BY source", -1,
+            &stmt, NULL);
         if (rc == SQLITE_OK) {
             time_t now = time(NULL);
             while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -2007,9 +2048,10 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
                 int64_t last_ts = sqlite3_column_int64(stmt, 2);
                 double hours_ago = (last_ts > 0) ? difftime(now, (time_t)last_ts) / 3600.0 : -1;
                 const char *status_icon = (hours_ago >= 0 && hours_ago < 24) ? "OK" : "STALE";
-                if (hours_ago < 0) status_icon = "NEVER";
-                printf("  %-16s  %4d items  last=%.1fh ago  [%s]\n",
-                       src ? src : "?", cnt, hours_ago >= 0 ? hours_ago : 0.0, status_icon);
+                if (hours_ago < 0)
+                    status_icon = "NEVER";
+                printf("  %-16s  %4d items  last=%.1fh ago  [%s]\n", src ? src : "?", cnt,
+                       hours_ago >= 0 ? hours_ago : 0.0, status_icon);
             }
             sqlite3_finalize(stmt);
         }
@@ -2047,18 +2089,17 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
                 if (f->created_at > 0) {
                     time_t tt = (time_t)f->created_at;
                     struct tm *lt = localtime(&tt);
-                    if (lt) strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M", lt);
+                    if (lt)
+                        strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M", lt);
                 }
                 printf("[%lld] [%s] %s @ %s\n", (long long)f->id,
-                       f->priority[0] ? f->priority : "?",
-                       f->status[0] ? f->status : "?", timebuf);
-                printf("  Finding: %.120s%s\n",
-                       f->finding, strlen(f->finding) > 120 ? "..." : "");
+                       f->priority[0] ? f->priority : "?", f->status[0] ? f->status : "?", timebuf);
+                printf("  Finding: %.120s%s\n", f->finding, strlen(f->finding) > 120 ? "..." : "");
                 if (f->source[0])
                     printf("  Source: %s\n", f->source);
                 if (f->suggested_action[0])
-                    printf("  Action: %.100s%s\n",
-                           f->suggested_action, strlen(f->suggested_action) > 100 ? "..." : "");
+                    printf("  Action: %.100s%s\n", f->suggested_action,
+                           strlen(f->suggested_action) > 100 ? "..." : "");
                 printf("\n");
             }
             hu_findings_free(alloc, findings, fcount);
@@ -2070,8 +2111,8 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
             const char *query = argv[3];
             hu_feed_item_stored_t *results = NULL;
             size_t rcount = 0;
-            hu_error_t serr = hu_feed_search(alloc, db, query, strlen(query), 20,
-                                             &results, &rcount);
+            hu_error_t serr =
+                hu_feed_search(alloc, db, query, strlen(query), 20, &results, &rcount);
             if (serr != HU_OK) {
                 fprintf(stderr, "[feed] Search error: %s\n", hu_error_string(serr));
             } else if (rcount == 0) {
@@ -2084,12 +2125,13 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
                     if (r->ingested_at > 0) {
                         time_t tt = (time_t)r->ingested_at;
                         struct tm *lt = localtime(&tt);
-                        if (lt) strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M", lt);
+                        if (lt)
+                            strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M", lt);
                     }
-                    printf("[%zu] %s (%s) @ %s\n    %.100s%s\n",
-                           i + 1, r->source, r->content_type, timebuf,
-                           r->content, r->content_len > 100 ? "..." : "");
-                    if (r->url[0]) printf("    %s\n", r->url);
+                    printf("[%zu] %s (%s) @ %s\n    %.100s%s\n", i + 1, r->source, r->content_type,
+                           timebuf, r->content, r->content_len > 100 ? "..." : "");
+                    if (r->url[0])
+                        printf("    %s\n", r->url);
                     printf("\n");
                 }
                 hu_feed_items_free(alloc, results, rcount);
@@ -2099,8 +2141,8 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         char *digest_text = NULL;
         size_t digest_text_len = 0;
         int64_t since = (int64_t)time(NULL) - 86400;
-        hu_error_t derr = hu_feed_build_daily_digest(alloc, db, since, 8000,
-                                                     &digest_text, &digest_text_len);
+        hu_error_t derr =
+            hu_feed_build_daily_digest(alloc, db, since, 8000, &digest_text, &digest_text_len);
         if (derr != HU_OK) {
             fprintf(stderr, "[feed] Digest error: %s\n", hu_error_string(derr));
         } else {
@@ -2110,15 +2152,23 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
     } else if (strcmp(sub, "correlate") == 0) {
         int64_t since = (int64_t)time(NULL) - 86400;
         hu_error_t cerr = hu_feed_correlate_recent(alloc, db, since, 0.3);
-        if (cerr == HU_OK) printf("[feed] Correlation complete\n");
-        else fprintf(stderr, "[feed] Correlation error: %s\n", hu_error_string(cerr));
+        if (cerr == HU_OK)
+            printf("[feed] Correlation complete\n");
+        else
+            fprintf(stderr, "[feed] Correlation error: %s\n", hu_error_string(cerr));
     } else if (strcmp(sub, "cleanup") == 0) {
         uint32_t days = 30;
-        if (argc >= 4) { int d = atoi(argv[3]); if (d > 0 && d <= 365) days = (uint32_t)d; }
+        if (argc >= 4) {
+            int d = atoi(argv[3]);
+            if (d > 0 && d <= 365)
+                days = (uint32_t)d;
+        }
         hu_feed_processor_t fp = {.alloc = alloc, .db = db};
         hu_error_t cerr = hu_feed_processor_cleanup(&fp, days);
-        if (cerr == HU_OK) printf("[feed] Cleanup complete (removed items older than %u days)\n", days);
-        else fprintf(stderr, "[feed] Cleanup error: %s\n", hu_error_string(cerr));
+        if (cerr == HU_OK)
+            printf("[feed] Cleanup complete (removed items older than %u days)\n", days);
+        else
+            fprintf(stderr, "[feed] Cleanup error: %s\n", hu_error_string(cerr));
     } else if (strcmp(sub, "learn") == 0) {
 #if defined(HU_HAS_SKILLS)
         hu_intelligence_cycle_result_t learn_result;
@@ -2140,11 +2190,13 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
 #endif
     } else {
         fprintf(stderr, "Unknown feed subcommand: %s\n", sub);
-        printf("Usage: human feed <poll|status|list|health|findings|search|digest|correlate|cleanup|learn>\n");
+        printf("Usage: human feed "
+               "<poll|status|list|health|findings|search|digest|correlate|cleanup|learn>\n");
         err = HU_ERR_INVALID_ARGUMENT;
     }
 
-    if (mem.vtable->deinit) mem.vtable->deinit(mem.ctx);
+    if (mem.vtable->deinit)
+        mem.vtable->deinit(mem.ctx);
     hu_config_deinit(&cfg);
     return err;
 }
@@ -2152,16 +2204,23 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
 
 /* ── hula (run a HuLa program) ─────────────────────────────────────────── */
 
-static hu_error_t hula_read_file(hu_allocator_t *alloc, const char *path,
-                                  char **out, size_t *out_len) {
+static hu_error_t hula_read_file(hu_allocator_t *alloc, const char *path, char **out,
+                                 size_t *out_len) {
     FILE *f = fopen(path, "rb");
-    if (!f) return HU_ERR_NOT_FOUND;
+    if (!f)
+        return HU_ERR_NOT_FOUND;
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (sz <= 0) { fclose(f); return HU_ERR_NOT_FOUND; }
+    if (sz <= 0) {
+        fclose(f);
+        return HU_ERR_NOT_FOUND;
+    }
     char *buf = alloc->alloc(alloc->ctx, (size_t)sz + 1);
-    if (!buf) { fclose(f); return HU_ERR_OUT_OF_MEMORY; }
+    if (!buf) {
+        fclose(f);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
     size_t rd = fread(buf, 1, (size_t)sz, f);
     fclose(f);
     buf[rd] = '\0';
@@ -2171,17 +2230,19 @@ static hu_error_t hula_read_file(hu_allocator_t *alloc, const char *path,
 }
 
 /* Stub tools for local demo (no real providers needed) */
-typedef struct { const char *name; } hula_demo_tool_ctx_t;
+typedef struct {
+    const char *name;
+} hula_demo_tool_ctx_t;
 
-static hu_error_t hula_demo_execute(void *ctx, hu_allocator_t *alloc,
-                                     const hu_json_value_t *args,
-                                     hu_tool_result_t *out) {
+static hu_error_t hula_demo_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
+                                    hu_tool_result_t *out) {
     (void)alloc;
     hula_demo_tool_ctx_t *t = ctx;
     const char *text = "ok";
     if (args) {
         const char *s = hu_json_get_string(args, "text");
-        if (s) text = s;
+        if (s)
+            text = s;
     }
     char buf[256];
     int n = snprintf(buf, sizeof(buf), "[%s] %s", t->name, text);
@@ -2195,9 +2256,18 @@ static hu_error_t hula_demo_execute(void *ctx, hu_allocator_t *alloc,
 static const char *hula_demo_name(void *ctx) {
     return ((hula_demo_tool_ctx_t *)ctx)->name;
 }
-static const char *hula_demo_desc(void *ctx) { (void)ctx; return "demo tool"; }
-static const char *hula_demo_params(void *ctx) { (void)ctx; return "{}"; }
-static void hula_demo_deinit(void *ctx, hu_allocator_t *alloc) { (void)ctx; (void)alloc; }
+static const char *hula_demo_desc(void *ctx) {
+    (void)ctx;
+    return "demo tool";
+}
+static const char *hula_demo_params(void *ctx) {
+    (void)ctx;
+    return "{}";
+}
+static void hula_demo_deinit(void *ctx, hu_allocator_t *alloc) {
+    (void)ctx;
+    (void)alloc;
+}
 
 static const hu_tool_vtable_t hula_demo_vtable = {
     .execute = hula_demo_execute,
@@ -2238,8 +2308,9 @@ static hu_error_t hula_try_open_schema(FILE **out, char *path_buf, size_t path_c
 }
 
 /* Parse, validate, optionally execute; embed program_snapshot in persisted traces when set. */
-static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *json, size_t json_len,
-                                            bool json_owned, bool run_after_validate,
+static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *json,
+                                            size_t json_len, bool json_owned,
+                                            bool run_after_validate,
                                             const char *program_snapshot_json,
                                             size_t program_snapshot_len) {
     printf("── Parse ────────────────────────────────────────────\n");
@@ -2247,12 +2318,12 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     hu_error_t err = hu_hula_parse_json(alloc, json, json_len, &prog);
     if (err != HU_OK) {
         fprintf(stderr, "  FAIL: parse error: %s\n", hu_error_string(err));
-        if (json_owned) hu_str_free(alloc, (char *)json);
+        if (json_owned)
+            hu_str_free(alloc, (char *)json);
         return err;
     }
     printf("  OK: program \"%s\" v%u, %zu nodes, root=%s (%s)\n",
-           prog.name ? prog.name : "(unnamed)", prog.version,
-           prog.node_count,
+           prog.name ? prog.name : "(unnamed)", prog.version, prog.node_count,
            prog.root ? (prog.root->id ? prog.root->id : "?") : "(none)",
            prog.root ? hu_hula_op_name(prog.root->op) : "?");
 
@@ -2263,7 +2334,8 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     if (err != HU_OK) {
         fprintf(stderr, "  FAIL: validation error: %s\n", hu_error_string(err));
         hu_hula_program_deinit(&prog);
-        if (json_owned) hu_str_free(alloc, (char *)json);
+        if (json_owned)
+            hu_str_free(alloc, (char *)json);
         return err;
     }
     if (v.valid) {
@@ -2277,14 +2349,18 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
 
     if (!run_after_validate) {
         hu_hula_program_deinit(&prog);
-        if (json_owned) hu_str_free(alloc, (char *)json);
+        if (json_owned)
+            hu_str_free(alloc, (char *)json);
         return HU_OK;
     }
 
     printf("\n── Execute ──────────────────────────────────────────\n");
 
     hula_demo_tool_ctx_t demo_ctxs[] = {
-        {.name = "echo"}, {.name = "search"}, {.name = "write"}, {.name = "analyze"},
+        {.name = "echo"},
+        {.name = "search"},
+        {.name = "write"},
+        {.name = "analyze"},
     };
     hu_tool_t tools[4];
     for (size_t i = 0; i < 4; i++) {
@@ -2303,7 +2379,8 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     if (err != HU_OK) {
         fprintf(stderr, "  FAIL: exec init: %s\n", hu_error_string(err));
         hu_hula_program_deinit(&prog);
-        if (json_owned) hu_str_free(alloc, (char *)json);
+        if (json_owned)
+            hu_str_free(alloc, (char *)json);
         return err;
     }
 
@@ -2312,7 +2389,8 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
         fprintf(stderr, "  FAIL: exec run: %s\n", hu_error_string(err));
         hu_hula_exec_deinit(&exec);
         hu_hula_program_deinit(&prog);
-        if (json_owned) hu_str_free(alloc, (char *)json);
+        if (json_owned)
+            hu_str_free(alloc, (char *)json);
         return err;
     }
 
@@ -2322,9 +2400,10 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     for (size_t i = 0; i < prog.node_count; i++) {
         const hu_hula_node_t *n = &prog.nodes[i];
         const hu_hula_result_t *r = hu_hula_exec_result(&exec, n->id);
-        if (!r) continue;
-        printf("    %-10s %-8s %-7s", n->id ? n->id : "?",
-               hu_hula_op_name(n->op), hu_hula_status_name(r->status));
+        if (!r)
+            continue;
+        printf("    %-10s %-8s %-7s", n->id ? n->id : "?", hu_hula_op_name(n->op),
+               hu_hula_status_name(r->status));
         if (r->output && r->output_len > 0) {
             size_t show = r->output_len > 60 ? 60 : r->output_len;
             printf("  \"%.*s%s\"", (int)show, r->output, r->output_len > 60 ? "..." : "");
@@ -2351,9 +2430,10 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
         size_t pnl = pn ? strlen(pn) : 0;
         bool trace_ok = root_r && root_r->status == HU_HULA_DONE;
         hu_error_t tr_err = hu_hula_trace_persist(alloc, trace_dir_env, trace, trace_len, pn, pnl,
-                                                  trace_ok, snap, snap_len);
+                                                  trace_ok, snap, snap_len, NULL, 0);
         if (tr_err != HU_OK) {
-            fprintf(stderr, "hula: HU_HULA_TRACE_DIR persist failed: %s\n", hu_error_string(tr_err));
+            fprintf(stderr, "hula: HU_HULA_TRACE_DIR persist failed: %s\n",
+                    hu_error_string(tr_err));
         } else {
             printf("\n── Trace persist ─────────────────────────────────────\n");
             printf("  wrote JSON under %s\n", trace_dir_env);
@@ -2368,7 +2448,8 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
 
     hu_hula_exec_deinit(&exec);
     hu_hula_program_deinit(&prog);
-    if (json_owned) hu_str_free(alloc, (char *)json);
+    if (json_owned)
+        hu_str_free(alloc, (char *)json);
     return HU_OK;
 }
 
@@ -2377,7 +2458,8 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         printf("Usage: human hula <schema|expand|compile|replay|run|validate> ...\n\n");
         printf("  schema              Print JSON Schema path and contents (if found)\n");
         printf("  expand <tmpl> <vars.json>   Expand {{keys}} using JSON object vars\n");
-        printf("  compile [--lite] <file>     Print HuLa JSON (lite syntax or JSON file passthrough)\n");
+        printf("  compile [--lite] <file>     Print HuLa JSON (lite syntax or JSON file "
+               "passthrough)\n");
         printf("  replay <trace.json>         Re-run program embedded in a persisted trace file\n");
         printf("  run [--lite] <file|'{...}'>  Execute program\n");
         printf("  validate [--lite] <file|'{...}'>\n\n");
@@ -2392,7 +2474,8 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         FILE *f = NULL;
         hu_error_t er = hula_try_open_schema(&f, pbuf, sizeof(pbuf));
         if (er != HU_OK || !f) {
-            fprintf(stderr, "hula: schema file not found (try from repo root or set HUMAN_SOURCE_ROOT)\n");
+            fprintf(stderr,
+                    "hula: schema file not found (try from repo root or set HUMAN_SOURCE_ROOT)\n");
             return er != HU_OK ? er : HU_ERR_NOT_FOUND;
         }
         printf("(schema) %s\n\n", pbuf[0] ? pbuf : "hula-program.schema.json");
@@ -2500,9 +2583,10 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         }
         hu_json_value_t *prog_obj = hu_json_object_get(wrap, "program");
         if (!prog_obj || prog_obj->type != HU_JSON_OBJECT) {
-            fprintf(stderr,
-                    "hula: replay: missing \"program\" object (only traces written after this change "
-                    "embed it; use hula run on your source JSON).\n");
+            fprintf(
+                stderr,
+                "hula: replay: missing \"program\" object (only traces written after this change "
+                "embed it; use hula run on your source JSON).\n");
             hu_json_free(alloc, wrap);
             return HU_ERR_INVALID_ARGUMENT;
         }

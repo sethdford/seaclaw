@@ -845,6 +845,12 @@ if(HU_ENABLE_PERSONA AND NOT HU_ENABLE_AUTHENTIC)
     list(APPEND HU_CORE_SOURCES src/context/authentic.c)
 endif()
 
+# context/anticipatory.c is persona-gated above, but daemon.c calls it under
+# HU_ENABLE_SQLITE without persona — ensure it's linked when SQLite is on.
+if(HU_ENABLE_SQLITE AND NOT HU_ENABLE_PERSONA)
+    list(APPEND HU_CORE_SOURCES src/context/anticipatory.c)
+endif()
+
 # Browser automation tools
 if(HU_ENABLE_TOOLS_BROWSER)
     list(APPEND HU_CORE_SOURCES

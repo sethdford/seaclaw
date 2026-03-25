@@ -755,10 +755,14 @@ static hu_error_t impl_recall(void *ctx, hu_allocator_t *alloc, const char *quer
                         alloc->free(alloc->ctx, scores, count * sizeof(double));
                 }
 
-                /* Spreading activation: discover entity-connected memories beyond FTS */
-                if (self->graph_initialized && count >= 1 && count < limit) {
+                /* Spreading activation: discover entity-connected memories beyond FTS.
+                 * Requires >=2 seed results to avoid noise from single weak matches
+                 * (single FTS hits often come from cross-context content that will be
+                 * filtered by contact/session isolation). */
+                if (self->graph_initialized && count >= 2 && count < limit) {
+                    const size_t seed_alloc_count = count;
                     uint32_t *seeds =
-                        (uint32_t *)alloc->alloc(alloc->ctx, count * sizeof(uint32_t));
+                        (uint32_t *)alloc->alloc(alloc->ctx, seed_alloc_count * sizeof(uint32_t));
                     size_t seed_count = 0;
                     if (seeds) {
                         for (size_t si = 0; si < count && si < self->graph_index.node_count; si++) {
@@ -807,16 +811,29 @@ static hu_error_t impl_recall(void *ctx, hu_allocator_t *alloc, const char *quer
                                         sqlite3_stmt *sa_stmt = NULL;
                                         if (sqlite3_prepare_v2(
                                                 self->db,
-                                                "SELECT key, content, metadata, timestamp, "
-                                                "score FROM memories WHERE key = ?1 LIMIT 1",
+                                                "SELECT id, key, content, category, "
+                                                "created_at, session_id, source "
+                                                "FROM memories WHERE key = ?1 LIMIT 1",
                                                 -1, &sa_stmt, NULL) == SQLITE_OK) {
                                             sqlite3_bind_text(sa_stmt, 1, gn->memory_key,
                                                               (int)gn->memory_key_len, NULL);
                                             if (sqlite3_step(sa_stmt) == SQLITE_ROW) {
                                                 hu_memory_entry_t *e = &entries[count];
                                                 read_entry_from_row(sa_stmt, alloc, e);
-                                                e->score = activated[ai].energy * 0.5;
-                                                count++;
+                                                bool session_ok = true;
+                                                if (session_id && session_id_len > 0 &&
+                                                    e->session_id &&
+                                                    (e->session_id_len != session_id_len ||
+                                                     memcmp(e->session_id, session_id,
+                                                            session_id_len) != 0)) {
+                                                    session_ok = false;
+                                                }
+                                                if (session_ok) {
+                                                    e->score = activated[ai].energy * 0.5;
+                                                    count++;
+                                                } else {
+                                                    free_entry(alloc, e);
+                                                }
                                             }
                                             sqlite3_finalize(sa_stmt);
                                         }
@@ -826,7 +843,7 @@ static hu_error_t impl_recall(void *ctx, hu_allocator_t *alloc, const char *quer
                                             max_act * sizeof(hu_activated_node_t));
                             }
                         }
-                        alloc->free(alloc->ctx, seeds, count * sizeof(uint32_t));
+                        alloc->free(alloc->ctx, seeds, seed_alloc_count * sizeof(uint32_t));
                     }
                 }
 

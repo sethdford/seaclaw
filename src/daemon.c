@@ -2125,6 +2125,7 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 static uint64_t last_photo_scan_ms;
                 uint64_t pnow_ms = (uint64_t)time(NULL) * 1000ULL;
                 if (pnow_ms - last_photo_scan_ms > 3600000) { /* max once per hour */
+                    last_photo_scan_ms = pnow_ms;
                     char photos_db[512];
                     size_t pdb_len = hu_visual_apple_photos_db_path(photos_db, sizeof(photos_db));
                     if (pdb_len > 0) {
@@ -2133,27 +2134,51 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                         if (hu_visual_scan_apple_photos(alloc, photos_db, 3, &photos, &photo_count,
                                                         5) == HU_OK &&
                             photos && photo_count > 0) {
-                            bool shared = false;
-                            double best_conf = 0.0;
-                            size_t best_idx = 0;
-                            for (size_t pi = 0; pi < photo_count && !shared; pi++) {
+                            /* Collect top N shareable photos (album mode: up to 3) */
+                            typedef struct {
+                                size_t idx;
+                                double conf;
+                            } photo_candidate_t;
+                            photo_candidate_t candidates[3];
+                            size_t cand_count = 0;
+                            for (size_t pi = 0; pi < photo_count; pi++) {
                                 bool should_share = false;
                                 double conf = 0.0;
                                 hu_visual_should_share(&photos[pi], combined, combined_len,
                                                        &should_share, &conf);
-                                if (should_share && conf > best_conf) {
-                                    best_conf = conf;
-                                    best_idx = pi;
+                                if (!should_share || conf < 0.3)
+                                    continue;
+                                if (cand_count < 3) {
+                                    candidates[cand_count].idx = pi;
+                                    candidates[cand_count].conf = conf;
+                                    cand_count++;
+                                } else {
+                                    size_t worst = 0;
+                                    for (size_t ci = 1; ci < 3; ci++) {
+                                        if (candidates[ci].conf < candidates[worst].conf)
+                                            worst = ci;
+                                    }
+                                    if (conf > candidates[worst].conf) {
+                                        candidates[worst].idx = pi;
+                                        candidates[worst].conf = conf;
+                                    }
                                 }
                             }
-                            if (best_conf > 0.3 && photos[best_idx].path[0]) {
-                                const char *media[] = {photos[best_idx].path};
-                                channels[c].channel->vtable->send(channels[c].channel->ctx,
-                                                                  target_part, target_len, "", 0,
-                                                                  media, 1);
-                                fprintf(stderr, "[human] proactive photo shared: %s\n",
-                                        photos[best_idx].path);
-                                last_photo_scan_ms = pnow_ms;
+                            if (cand_count > 0) {
+                                const char *media[3];
+                                size_t media_count = 0;
+                                for (size_t ci = 0; ci < cand_count; ci++) {
+                                    if (photos[candidates[ci].idx].path[0])
+                                        media[media_count++] = photos[candidates[ci].idx].path;
+                                }
+                                if (media_count > 0) {
+                                    channels[c].channel->vtable->send(channels[c].channel->ctx,
+                                                                      target_part, target_len, "",
+                                                                      0, media, media_count);
+                                    fprintf(stderr,
+                                            "[human] proactive photo album: %zu photos shared\n",
+                                            media_count);
+                                }
                             }
                             hu_visual_entries_free(alloc, photos, photo_count);
                         }
@@ -2874,11 +2899,242 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         agent->persona->humanization.disfluency_frequency > 0.10f) {
                                         agent->persona->humanization.disfluency_frequency -= 0.02f;
                                     }
+
+                                    /* vulnerability_willingness low: boost personal sharing warmth
+                                     */
+                                    if (dim_avgs[HU_TURING_VULNERABILITY_WILLINGNESS] > 0 &&
+                                        dim_avgs[HU_TURING_VULNERABILITY_WILLINGNESS] < 6) {
+                                        float old_pw = agent->persona->context_modifiers
+                                                           .personal_sharing_warmth_boost;
+                                        agent->persona->context_modifiers
+                                            .personal_sharing_warmth_boost =
+                                            old_pw < 2.0f ? old_pw + 0.1f : 2.0f;
+                                        fprintf(stderr,
+                                                "[human] auto-tune: personal_sharing_warmth "
+                                                "%.2f -> %.2f\n",
+                                                (double)old_pw,
+                                                (double)agent->persona->context_modifiers
+                                                    .personal_sharing_warmth_boost);
+                                    }
+
+                                    /* genuine_warmth low: boost personal sharing + backchannel */
+                                    if (dim_avgs[HU_TURING_GENUINE_WARMTH] > 0 &&
+                                        dim_avgs[HU_TURING_GENUINE_WARMTH] < 6) {
+                                        float old_pw = agent->persona->context_modifiers
+                                                           .personal_sharing_warmth_boost;
+                                        agent->persona->context_modifiers
+                                            .personal_sharing_warmth_boost =
+                                            old_pw < 2.0f ? old_pw + 0.1f : 2.0f;
+                                        float old_bc =
+                                            agent->persona->humanization.backchannel_probability;
+                                        agent->persona->humanization.backchannel_probability =
+                                            old_bc < 0.45f ? old_bc + 0.03f : 0.45f;
+                                        fprintf(stderr,
+                                                "[human] auto-tune: warmth (sharing=%.2f, "
+                                                "backchannel=%.2f)\n",
+                                                (double)agent->persona->context_modifiers
+                                                    .personal_sharing_warmth_boost,
+                                                (double)agent->persona->humanization
+                                                    .backchannel_probability);
+                                    }
+
+                                    /* emotional_intelligence low: boost emotion breathing space */
+                                    if (dim_avgs[HU_TURING_EMOTIONAL_INTELLIGENCE] > 0 &&
+                                        dim_avgs[HU_TURING_EMOTIONAL_INTELLIGENCE] < 6) {
+                                        float old_em = agent->persona->context_modifiers
+                                                           .high_emotion_breathing_boost;
+                                        agent->persona->context_modifiers
+                                            .high_emotion_breathing_boost =
+                                            old_em < 2.0f ? old_em + 0.1f : 2.0f;
+                                        fprintf(stderr,
+                                                "[human] auto-tune: emotion_breathing "
+                                                "%.2f -> %.2f\n",
+                                                (double)old_em,
+                                                (double)agent->persona->context_modifiers
+                                                    .high_emotion_breathing_boost);
+                                    }
+
+                                    /* opinion_having low: reduce serious-topic dampening */
+                                    if (dim_avgs[HU_TURING_OPINION_HAVING] > 0 &&
+                                        dim_avgs[HU_TURING_OPINION_HAVING] < 6) {
+                                        float old_sr = agent->persona->context_modifiers
+                                                           .serious_topics_reduction;
+                                        agent->persona->context_modifiers.serious_topics_reduction =
+                                            old_sr > 0.15f ? old_sr - 0.05f : 0.15f;
+                                        fprintf(stderr,
+                                                "[human] auto-tune: serious_topics_reduction "
+                                                "%.2f -> %.2f\n",
+                                                (double)old_sr,
+                                                (double)agent->persona->context_modifiers
+                                                    .serious_topics_reduction);
+                                    }
+
+                                    /* context_awareness low: boost early-turn humanization */
+                                    if (dim_avgs[HU_TURING_CONTEXT_AWARENESS] > 0 &&
+                                        dim_avgs[HU_TURING_CONTEXT_AWARENESS] < 6) {
+                                        float old_et = agent->persona->context_modifiers
+                                                           .early_turn_humanization_boost;
+                                        agent->persona->context_modifiers
+                                            .early_turn_humanization_boost =
+                                            old_et < 2.0f ? old_et + 0.1f : 2.0f;
+                                        fprintf(stderr,
+                                                "[human] auto-tune: early_turn_humanization "
+                                                "%.2f -> %.2f\n",
+                                                (double)old_et,
+                                                (double)agent->persona->context_modifiers
+                                                    .early_turn_humanization_boost);
+                                    }
+
+                                    /* personality_consistency low: reduce disfluency (overdone
+                                     * randomness can sound inconsistent) */
+                                    if (dim_avgs[HU_TURING_PERSONALITY_CONSISTENCY] > 0 &&
+                                        dim_avgs[HU_TURING_PERSONALITY_CONSISTENCY] < 6 &&
+                                        agent->persona->humanization.disfluency_frequency > 0.08f) {
+                                        float old_df =
+                                            agent->persona->humanization.disfluency_frequency;
+                                        agent->persona->humanization.disfluency_frequency =
+                                            old_df - 0.03f;
+                                        fprintf(stderr,
+                                                "[human] auto-tune: disfluency (consistency) "
+                                                "%.2f -> %.2f\n",
+                                                (double)old_df,
+                                                (double)agent->persona->humanization
+                                                    .disfluency_frequency);
+                                    }
                                 }
 #endif
                             }
+
+                            /* Self-improvement: generate prompt patches from weak dimensions */
+                            {
+                                hu_self_improve_t si_engine = {0};
+                                if (hu_self_improve_create(alloc, tdb, &si_engine) == HU_OK) {
+                                    hu_self_improve_init_tables(&si_engine);
+                                    for (int d = 0; d < 12; d++) {
+                                        if (dim_avgs[d] <= 0 || dim_avgs[d] >= 6)
+                                            continue;
+                                        const char *dname =
+                                            hu_turing_dimension_name((hu_turing_dimension_t)d);
+                                        hu_structured_patch_t patch = {
+                                            .type = HU_PATCH_TEXT_HINT,
+                                            .parsed = true,
+                                        };
+                                        snprintf(patch.key, sizeof(patch.key), "turing_%s", dname);
+                                        switch (d) {
+                                        case HU_TURING_NATURAL_LANGUAGE:
+                                            snprintf(patch.value, sizeof(patch.value),
+                                                     "Use more contractions, varied sentence "
+                                                     "lengths, and casual register. Avoid "
+                                                     "formal language.");
+                                            break;
+                                        case HU_TURING_EMOTIONAL_INTELLIGENCE:
+                                            snprintf(patch.value, sizeof(patch.value),
+                                                     "Read emotional shifts carefully. Match "
+                                                     "empathy intensity to what they're feeling, "
+                                                     "don't over-empathize.");
+                                            break;
+                                        case HU_TURING_VULNERABILITY_WILLINGNESS:
+                                            snprintf(patch.value, sizeof(patch.value),
+                                                     "Share genuine doubts, admit when you're "
+                                                     "unsure, show real emotion. Don't always "
+                                                     "be confident.");
+                                            break;
+                                        case HU_TURING_HUMOR_NATURALNESS:
+                                            snprintf(patch.value, sizeof(patch.value),
+                                                     "Use humor that's contextual and brief. "
+                                                     "Laugh at their jokes naturally. Never "
+                                                     "explain the joke.");
+                                            break;
+                                        case HU_TURING_OPINION_HAVING:
+                                            snprintf(patch.value, sizeof(patch.value),
+                                                     "Have real opinions. Push back when you "
+                                                     "disagree. Say 'I think' and mean it. "
+                                                     "Avoid sycophancy.");
+                                            break;
+                                        case HU_TURING_ENERGY_MATCHING:
+                                            snprintf(patch.value, sizeof(patch.value),
+                                                     "Mirror their message energy. Short reply "
+                                                     "to short message, enthusiasm to enthusiasm.");
+                                            break;
+                                        case HU_TURING_CONTEXT_AWARENESS:
+                                            snprintf(patch.value, sizeof(patch.value),
+                                                     "Reference earlier conversation topics. "
+                                                     "Show you remember what they said.");
+                                            break;
+                                        case HU_TURING_GENUINE_WARMTH:
+                                            snprintf(patch.value, sizeof(patch.value),
+                                                     "Be warm in a way specific to them and "
+                                                     "your shared history. Generic warmth "
+                                                     "feels fake.");
+                                            break;
+                                        case HU_TURING_PERSONALITY_CONSISTENCY:
+                                            snprintf(patch.value, sizeof(patch.value),
+                                                     "Keep your voice consistent across turns. "
+                                                     "Same opinions, same style, same vibe.");
+                                            break;
+                                        default:
+                                            snprintf(patch.value, sizeof(patch.value),
+                                                     "Improve %s dimension in responses.", dname);
+                                            break;
+                                        }
+                                        hu_self_improve_apply_structured_patch(&si_engine, &patch);
+                                    }
+                                    hu_self_improve_deinit(&si_engine);
+                                }
+                            }
                         }
 #endif
+                        /* Channel-aware Turing analysis: per-channel weak dimensions */
+                        if (tdb && agent->persona) {
+                            static const char *channels[] = {"telegram", "discord",  "slack",
+                                                             "imessage", "whatsapp", "email",
+                                                             "signal",   "matrix"};
+                            for (size_t ch = 0; ch < sizeof(channels) / sizeof(channels[0]); ch++) {
+                                int ch_dims[HU_TURING_DIM_COUNT];
+                                size_t ch_len = strlen(channels[ch]);
+                                if (hu_turing_get_channel_dimensions(tdb, channels[ch], ch_len,
+                                                                     ch_dims) == HU_OK) {
+                                    int ch_sum = 0, ch_count = 0;
+                                    for (int d = 0; d < 12; d++) {
+                                        if (ch_dims[d] > 0) {
+                                            ch_sum += ch_dims[d];
+                                            ch_count++;
+                                        }
+                                    }
+                                    if (ch_count > 0) {
+                                        int ch_avg = ch_sum / ch_count;
+                                        if (ch_avg < 6)
+                                            fprintf(stderr,
+                                                    "[human] channel %s: avg turing %d/10 "
+                                                    "(below target)\n",
+                                                    channels[ch], ch_avg);
+                                    }
+                                }
+                            }
+                        }
+
+                        /* Trajectory scoring: check trend across recent global scores */
+                        if (tdb) {
+                            hu_turing_score_t traj_scores[20];
+                            int64_t traj_ts[20];
+                            char traj_cids[20][HU_TURING_CONTACT_ID_MAX];
+                            size_t traj_count = 0;
+                            if (hu_turing_get_trend(alloc, tdb, NULL, 0, 20, traj_scores, traj_ts,
+                                                    traj_cids, &traj_count) == HU_OK &&
+                                traj_count >= 3) {
+                                hu_turing_trajectory_t traj;
+                                if (hu_turing_score_trajectory(traj_scores, traj_count, &traj) ==
+                                    HU_OK) {
+                                    fprintf(stderr,
+                                            "[human] turing trajectory: direction=%.2f "
+                                            "impact=%.2f stability=%.2f overall=%.2f\n",
+                                            (double)traj.directional_alignment,
+                                            (double)traj.cumulative_impact, (double)traj.stability,
+                                            (double)traj.overall);
+                                }
+                            }
+                        }
+
                         turing_eval_today = true;
                         fprintf(stderr, "[human] daily turing evaluation completed\n");
                     }
@@ -7186,6 +7442,48 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 
+                    /* Emoji frequency matching: mirror their emoji usage level */
+                    if (history_entries && history_count >= 3) {
+                        size_t n = hu_conversation_build_emoji_mirror_hint(
+                            history_entries, history_count, inject_buf + inject_pos,
+                            sizeof(inject_buf) - inject_pos);
+                        if (n > 0) {
+                            inject_pos += n;
+                            inject_buf[inject_pos++] = '\n';
+                        }
+                    }
+
+                    /* Reaction-to-their-reaction: detect tapbacks on our messages */
+                    if (history_entries && history_count >= 2) {
+                        size_t n = hu_conversation_build_reaction_received_hint(
+                            history_entries, history_count, inject_buf + inject_pos,
+                            sizeof(inject_buf) - inject_pos);
+                        if (n > 0) {
+                            inject_pos += n;
+                            inject_buf[inject_pos++] = '\n';
+                        }
+                    }
+
+                    /* Edit/unsend awareness: detect edited messages in batch */
+                    {
+                        bool any_edited = false;
+                        for (size_t bi = batch_start; bi <= batch_end; bi++) {
+                            if (msgs[bi].was_edited) {
+                                any_edited = true;
+                                break;
+                            }
+                        }
+                        if (any_edited) {
+                            size_t n = hu_conversation_build_edit_awareness_hint(
+                                true, false, inject_buf + inject_pos,
+                                sizeof(inject_buf) - inject_pos);
+                            if (n > 0) {
+                                inject_pos += n;
+                                inject_buf[inject_pos++] = '\n';
+                            }
+                        }
+                    }
+
                     /* Append all injections to convo_ctx */
                     if (inject_pos > 0) {
                         size_t new_len = inject_pos + (convo_ctx ? convo_ctx_len : 0);
@@ -7636,6 +7934,127 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     qscore.naturalness, response_len > 40 ? response : response);
                         }
                     }
+
+                    /* Turing score gate: retry if heuristic score is too low.
+                     * Only fires once (shares retried flag with quality gate). */
+                    if (err == HU_OK && response && response_len > 0 && !retried) {
+                        hu_turing_score_t pre_tscore;
+                        if (hu_turing_score_heuristic(response, response_len, combined,
+                                                      combined_len, &pre_tscore) == HU_OK &&
+                            pre_tscore.overall < 6) {
+                            retried = true;
+                            fprintf(stderr, "[human] turing retry: %d/10 [%s] for %.40s...\n",
+                                    pre_tscore.overall, hu_turing_verdict_name(pre_tscore.verdict),
+                                    response_len > 40 ? response : response);
+                            /* Build targeted hint from weakest dimensions */
+                            const char *turing_hint =
+                                (pre_tscore.dimensions[HU_TURING_NON_ROBOTIC] < 5)
+                                    ? "Your response sounds like a chatbot. Drop formal "
+                                      "phrasing, use contractions, be casual."
+                                : (pre_tscore.dimensions[HU_TURING_ENERGY_MATCHING] < 5)
+                                    ? "Your response energy doesn't match theirs. Mirror "
+                                      "their vibe — if short, be short."
+                                : (pre_tscore.dimensions[HU_TURING_GENUINE_WARMTH] < 5)
+                                    ? "Your response feels cold. Show you actually care "
+                                      "about them specifically."
+                                : (pre_tscore.dimensions[HU_TURING_VULNERABILITY_WILLINGNESS] < 5)
+                                    ? "Your response feels guarded. Be more real — share "
+                                      "what you actually think or feel."
+                                    : "Your response feels unnatural. Text like a real "
+                                      "human friend would.";
+                            /* DPO: record low-scoring response as negative feedback */
+                            hu_dpo_record_from_feedback(&agent->dpo_collector, combined,
+                                                        combined_len, response, response_len,
+                                                        false);
+                            agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
+                            response = NULL;
+                            response_len = 0;
+                            if (convo_ctx) {
+                                size_t hint_len = strlen(turing_hint);
+                                size_t new_len = hint_len + 1 + convo_ctx_len + 1;
+                                char *new_convo = (char *)alloc->alloc(alloc->ctx, new_len);
+                                if (new_convo) {
+                                    memcpy(new_convo, turing_hint, hint_len);
+                                    new_convo[hint_len] = '\n';
+                                    memcpy(new_convo + hint_len + 1, convo_ctx, convo_ctx_len);
+                                    new_convo[new_len - 1] = '\0';
+                                    alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                    convo_ctx = new_convo;
+                                    convo_ctx_len = new_len - 1;
+                                    agent->conversation_context = convo_ctx;
+                                    agent->conversation_context_len = convo_ctx_len;
+                                }
+                            }
+                            if (ch->channel->vtable->start_typing)
+                                ch->channel->vtable->start_typing(ch->channel->ctx, batch_key,
+                                                                  key_len);
+                            continue;
+                        }
+                    }
+                    /* LLM judge gate for contacts with consistently low scores */
+#ifdef HU_ENABLE_SQLITE
+                    if (err == HU_OK && response && response_len > 0 && !retried && agent->memory) {
+                        sqlite3 *ljdb = hu_sqlite_memory_get_db(agent->memory);
+                        if (ljdb) {
+                            int contact_dims[HU_TURING_DIM_COUNT];
+                            if (hu_turing_get_contact_dimensions(ljdb, batch_key, key_len,
+                                                                 contact_dims) == HU_OK) {
+                                int csum = 0, ccnt = 0;
+                                for (int d = 0; d < 12; d++) {
+                                    if (contact_dims[d] > 0) {
+                                        csum += contact_dims[d];
+                                        ccnt++;
+                                    }
+                                }
+                                bool high_stakes = (ccnt > 0 && csum / ccnt < 7);
+                                if (high_stakes && agent->provider.vtable->chat) {
+                                    hu_turing_score_t llm_tscore;
+                                    hu_error_t llm_terr = hu_turing_score_llm(
+                                        alloc, &agent->provider, agent->model_name,
+                                        agent->model_name_len, response, response_len, combined,
+                                        combined_len, &llm_tscore);
+                                    if (llm_terr == HU_OK && llm_tscore.overall < 6) {
+                                        retried = true;
+                                        fprintf(stderr, "[human] llm judge retry: %d/10 for %.*s\n",
+                                                llm_tscore.overall,
+                                                (int)(key_len > 20 ? 20 : key_len), batch_key);
+                                        hu_dpo_record_from_feedback(&agent->dpo_collector, combined,
+                                                                    combined_len, response,
+                                                                    response_len, false);
+                                        agent->alloc->free(agent->alloc->ctx, response,
+                                                           response_len + 1);
+                                        response = NULL;
+                                        response_len = 0;
+                                        if (convo_ctx) {
+                                            static const char lj_hint[] =
+                                                "The LLM judge flagged your response as "
+                                                "sounding artificial. Be authentically human.";
+                                            size_t lj_len = sizeof(lj_hint) - 1;
+                                            size_t new_len = lj_len + 1 + convo_ctx_len + 1;
+                                            char *new_convo =
+                                                (char *)alloc->alloc(alloc->ctx, new_len);
+                                            if (new_convo) {
+                                                memcpy(new_convo, lj_hint, lj_len);
+                                                new_convo[lj_len] = '\n';
+                                                memcpy(new_convo + lj_len + 1, convo_ctx,
+                                                       convo_ctx_len);
+                                                new_convo[new_len - 1] = '\0';
+                                                alloc->free(alloc->ctx, convo_ctx,
+                                                            convo_ctx_len + 1);
+                                                convo_ctx = new_convo;
+                                                convo_ctx_len = new_len - 1;
+                                                agent->conversation_context = convo_ctx;
+                                                agent->conversation_context_len = convo_ctx_len;
+                                            }
+                                        }
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    }
+#endif
+
                     break;
                 } while (1);
 
@@ -8862,6 +9281,47 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                         if (agent->bth_metrics)
                             agent->bth_metrics->total_turns++;
+                        /* Voice-aware scoring: when voice pipeline is active, give
+                         * more weight to S2S voice dimensions (12-17) */
+#if defined(HU_ENABLE_CARTESIA) && defined(HU_HAS_PERSONA)
+                        if (agent->persona && agent->persona->voice.voice_id[0] &&
+                            agent->persona->voice_messages.enabled) {
+                            int voice_sum = 0;
+                            for (int vd = 12; vd < HU_TURING_DIM_COUNT; vd++)
+                                voice_sum += tscore.dimensions[vd];
+                            int voice_avg = voice_sum / 6;
+                            int text_sum = 0;
+                            for (int td = 0; td < 12; td++)
+                                text_sum += tscore.dimensions[td];
+                            int text_avg = text_sum / 12;
+                            /* Blend: 60% text, 40% voice when voice is active */
+                            int blended = (text_avg * 60 + voice_avg * 40 + 50) / 100;
+                            if (blended != tscore.overall) {
+                                fprintf(stderr,
+                                        "[human] voice-aware turing: %d/10 (text=%d, voice=%d)\n",
+                                        blended, text_avg, voice_avg);
+                                tscore.overall = blended;
+                            }
+                        }
+#endif
+
+                        /* A/B test recording: record score for active tests */
+                        if (ts_db && batch_key && key_len > 0) {
+                            (void)hu_ab_test_init_table(ts_db);
+                            static const char *ab_tests[] = {"disfluency_freq", "backchannel_prob",
+                                                             "double_text_prob"};
+                            for (size_t ab = 0; ab < 3; ab++) {
+                                bool is_b =
+                                    hu_ab_test_pick_variant(batch_key, key_len, ab_tests[ab]);
+                                (void)hu_ab_test_record(ts_db, ab_tests[ab], is_b, tscore.overall);
+                            }
+                        }
+
+                        /* DPO: record high-scoring responses as positive examples */
+                        if (tscore.overall >= 8) {
+                            hu_dpo_record_from_feedback(&agent->dpo_collector, combined,
+                                                        combined_len, response, response_len, true);
+                        }
                     }
                 }
 #endif
@@ -8927,6 +9387,21 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
+                /* GIF calibration: detect if they reacted to our GIF in recent history */
+                if (history_entries && history_count >= 2) {
+                    for (size_t hi = 1; hi < history_count; hi++) {
+                        if (history_entries[hi - 1].from_me && !history_entries[hi].from_me) {
+                            const char *prev = history_entries[hi - 1].text;
+                            const char *curr = history_entries[hi].text;
+                            bool was_gif = strstr(prev, "[GIF]") || strstr(prev, ".gif");
+                            bool is_reaction = strstr(curr, "Loved") ||
+                                               strstr(curr, "Laughed at") || strstr(curr, "Liked");
+                            if (was_gif && is_reaction)
+                                hu_conversation_gif_cal_record_reaction(batch_key, key_len);
+                        }
+                    }
+                }
+
                 /* GIF reaction: send a GIF when the moment calls for it */
                 if (combined_len > 0 && ch->channel->vtable->send) {
                     float gif_prob = 0.10f;
@@ -8937,20 +9412,25 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         gif_prob = agent->persona->humanization.gif_probability > 0.0f
                                        ? agent->persona->humanization.gif_probability
                                        : 0.10f;
-                        for (size_t ci = 0; ci < agent->persona->contacts_count; ci++) {
-                            const hu_contact_profile_t *cpr = &agent->persona->contacts[ci];
-                            if (cpr->contact_id && batch_key &&
-                                strstr(batch_key, cpr->contact_id)) {
-                                contact_rel = cpr->relationship_type ? cpr->relationship_type
-                                                                     : cpr->relationship;
-                                contact_rel_len = contact_rel ? strlen(contact_rel) : 0;
-                                break;
-                            }
+                        const hu_contact_profile_t *gif_cp =
+                            hu_persona_find_contact(agent->persona, batch_key, key_len);
+                        if (gif_cp) {
+                            contact_rel = gif_cp->relationship_type ? gif_cp->relationship_type
+                                                                    : gif_cp->relationship;
+                            contact_rel_len = contact_rel ? strlen(contact_rel) : 0;
                         }
                     }
 #endif
                     gif_prob = hu_conversation_adjust_gif_probability(gif_prob, contact_rel,
                                                                       contact_rel_len);
+                    /* Calibration: adjust based on historical hit rate for this contact */
+                    float cal_rate = hu_conversation_gif_cal_hit_rate(batch_key, key_len);
+                    if (cal_rate < 0.2f)
+                        gif_prob *= 0.5f; /* they rarely react to our GIFs — send fewer */
+                    else if (cal_rate > 0.7f)
+                        gif_prob *= 1.3f; /* they love our GIFs — send more */
+                    if (gif_prob > 1.0f)
+                        gif_prob = 1.0f;
                     uint32_t gif_seed =
                         (uint32_t)time(NULL) * 2654435761u + (uint32_t)(uintptr_t)combined;
                     uint64_t gif_now_ms = (uint64_t)time(NULL) * 1000ULL;
@@ -9002,6 +9482,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         (void)unlink(gif_path);
                                         hu_conversation_gif_rate_record(batch_key, key_len,
                                                                         gif_now_ms);
+                                        hu_conversation_gif_cal_record_send(
+                                            batch_key, key_len, gif_query, gif_query_len);
                                         fprintf(stderr, "[human] sent GIF: query=\"%.*s\"\n",
                                                 (int)gif_query_len, gif_query);
                                         size_t gp_path_len = strlen(gif_path);

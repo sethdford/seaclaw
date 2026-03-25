@@ -12,11 +12,23 @@ typedef struct hu_cartesia_stream hu_cartesia_stream_t;
  * Open a Cartesia TTS WebSocket (wss://api.cartesia.ai/tts/websocket).
  * Requires HU_HAS_TLS and HU_GATEWAY_POSIX when not in HU_IS_TEST.
  */
-hu_error_t hu_cartesia_stream_open(hu_allocator_t *alloc, const char *api_key,
-                                   const char *voice_id, const char *model_id,
-                                   hu_cartesia_stream_t **out);
+hu_error_t hu_cartesia_stream_open(hu_allocator_t *alloc, const char *api_key, const char *voice_id,
+                                   const char *model_id, hu_cartesia_stream_t **out);
 
 void hu_cartesia_stream_close(hu_cartesia_stream_t *s, hu_allocator_t *alloc);
+
+typedef struct hu_cartesia_voice_controls {
+    float speed; /* 0.0 = default; negative = slower, positive = faster; range ~ -1.0 to 1.0 */
+    float emotion_intensity; /* 0.0 to 1.0 */
+    const char *emotion;     /* Cartesia emotion tag, e.g. "positivity:high"; NULL = none */
+} hu_cartesia_voice_controls_t;
+
+/**
+ * Set voice controls that apply to subsequent send_generation calls.
+ * Pass NULL to reset to defaults.
+ */
+void hu_cartesia_stream_set_voice_controls(hu_cartesia_stream_t *s,
+                                           const hu_cartesia_voice_controls_t *controls);
 
 /**
  * Send a generation request. transcript may be empty when is_continue is false to flush.

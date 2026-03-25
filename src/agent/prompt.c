@@ -771,6 +771,35 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
             goto fail;
     }
 
+    /* Replay learning insights from prior conversations */
+    if (config->replay_context && config->replay_context_len > 0) {
+        static const char replay_hdr[] = "\n## Conversation Replay Insights\n";
+        err = append(alloc, &buf, &len, &cap, replay_hdr, sizeof(replay_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->replay_context, config->replay_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* Per-contact Turing hints from historical weak dimensions */
+    if (config->contact_turing_hint && config->contact_turing_hint_len > 0) {
+        static const char ct_hdr[] = "\n## Contact-Specific Guidance\n";
+        err = append(alloc, &buf, &len, &cap, ct_hdr, sizeof(ct_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->contact_turing_hint,
+                     config->contact_turing_hint_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
     /* Custom instructions */
     if (config->custom_instructions && config->custom_instructions_len > 0) {
         err = append(alloc, &buf, &len, &cap, config->custom_instructions,

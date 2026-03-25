@@ -2438,6 +2438,100 @@ static void cold_restart_one_hour_gap_no_hint(void) {
     HU_ASSERT_EQ(0, (int)len);
 }
 
+/* ── GIF humor calibration tests ─────────────────────────────────────── */
+
+static void gif_cal_hit_rate_default(void) {
+    float rate = hu_conversation_gif_cal_hit_rate("unknown_cal", 11);
+    HU_ASSERT_TRUE(rate >= 0.49f && rate <= 0.51f);
+}
+
+static void gif_cal_record_and_hit_rate(void) {
+    hu_conversation_gif_cal_record_send("cal_test_1", 10, "funny cat", 9);
+    hu_conversation_gif_cal_record_send("cal_test_1", 10, "dancing", 7);
+    hu_conversation_gif_cal_record_send("cal_test_1", 10, "oh no", 5);
+    hu_conversation_gif_cal_record_reaction("cal_test_1", 10);
+    float rate = hu_conversation_gif_cal_hit_rate("cal_test_1", 10);
+    HU_ASSERT_TRUE(rate > 0.0f && rate < 1.0f);
+}
+
+/* ── Reaction-received hint tests ────────────────────────────────────── */
+
+static void reaction_received_hint_no_reactions(void) {
+    hu_channel_history_entry_t entries[2];
+    memset(entries, 0, sizeof(entries));
+    entries[0].from_me = true;
+    strncpy(entries[0].text, "hey what's up", sizeof(entries[0].text) - 1);
+    entries[1].from_me = false;
+    strncpy(entries[1].text, "not much you?", sizeof(entries[1].text) - 1);
+    char buf[512];
+    size_t len = hu_conversation_build_reaction_received_hint(entries, 2, buf, sizeof(buf));
+    HU_ASSERT_EQ(0, (int)len);
+}
+
+static void reaction_received_hint_with_tapback(void) {
+    hu_channel_history_entry_t entries[3];
+    memset(entries, 0, sizeof(entries));
+    entries[0].from_me = true;
+    strncpy(entries[0].text, "that movie was great", sizeof(entries[0].text) - 1);
+    entries[1].from_me = false;
+    strncpy(entries[1].text, "Loved \"that movie was great\"", sizeof(entries[1].text) - 1);
+    entries[2].from_me = false;
+    strncpy(entries[2].text, "totally agree", sizeof(entries[2].text) - 1);
+    char buf[512];
+    size_t len = hu_conversation_build_reaction_received_hint(entries, 3, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "TAPBACK") != NULL);
+}
+
+/* ── Emoji mirror hint tests ─────────────────────────────────────────── */
+
+static void emoji_mirror_hint_no_emoji(void) {
+    hu_channel_history_entry_t entries[3];
+    memset(entries, 0, sizeof(entries));
+    entries[0].from_me = false;
+    strncpy(entries[0].text, "hey", sizeof(entries[0].text) - 1);
+    entries[1].from_me = false;
+    strncpy(entries[1].text, "what's up", sizeof(entries[1].text) - 1);
+    entries[2].from_me = false;
+    strncpy(entries[2].text, "nothing much", sizeof(entries[2].text) - 1);
+    char buf[512];
+    size_t len = hu_conversation_build_emoji_mirror_hint(entries, 3, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "rarely") != NULL);
+}
+
+static void emoji_mirror_hint_few_messages(void) {
+    hu_channel_history_entry_t entries[1];
+    memset(entries, 0, sizeof(entries));
+    entries[0].from_me = false;
+    strncpy(entries[0].text, "hi", sizeof(entries[0].text) - 1);
+    char buf[512];
+    size_t len = hu_conversation_build_emoji_mirror_hint(entries, 1, buf, sizeof(buf));
+    HU_ASSERT_EQ(0, (int)len);
+}
+
+/* ── Edit/unsend awareness tests ─────────────────────────────────────── */
+
+static void edit_awareness_edited(void) {
+    char buf[256];
+    size_t len = hu_conversation_build_edit_awareness_hint(true, false, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "EDITED") != NULL);
+}
+
+static void edit_awareness_unsent(void) {
+    char buf[256];
+    size_t len = hu_conversation_build_edit_awareness_hint(false, true, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "UNSENT") != NULL);
+}
+
+static void edit_awareness_neither(void) {
+    char buf[256];
+    size_t len = hu_conversation_build_edit_awareness_hint(false, false, buf, sizeof(buf));
+    HU_ASSERT_EQ(0, (int)len);
+}
+
 /* ── Banned AI phrases expansion tests ──────────────────────────────── */
 
 static void strip_feel_free_to(void) {
@@ -3576,4 +3670,21 @@ void run_conversation_tests(void) {
     /* Cold restart with real time gaps */
     HU_RUN_TEST(cold_restart_six_hour_gap);
     HU_RUN_TEST(cold_restart_one_hour_gap_no_hint);
+
+    /* GIF humor calibration */
+    HU_RUN_TEST(gif_cal_hit_rate_default);
+    HU_RUN_TEST(gif_cal_record_and_hit_rate);
+
+    /* Reaction-received hint */
+    HU_RUN_TEST(reaction_received_hint_no_reactions);
+    HU_RUN_TEST(reaction_received_hint_with_tapback);
+
+    /* Emoji mirror hint */
+    HU_RUN_TEST(emoji_mirror_hint_no_emoji);
+    HU_RUN_TEST(emoji_mirror_hint_few_messages);
+
+    /* Edit/unsend awareness */
+    HU_RUN_TEST(edit_awareness_edited);
+    HU_RUN_TEST(edit_awareness_unsent);
+    HU_RUN_TEST(edit_awareness_neither);
 }

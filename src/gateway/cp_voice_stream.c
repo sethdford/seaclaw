@@ -194,7 +194,7 @@ static bool vs_bus_cb(hu_bus_event_type_t type, const hu_bus_event_t *ev, void *
                 else
                     return true;
             }
-            /* Emotion-aware TTS: detect emotion from response text and update voice params */
+            /* Emotion-aware TTS: detect emotion and apply voice controls to Cartesia */
             {
                 hu_voice_emotion_t emo = HU_VOICE_EMOTION_NEUTRAL;
                 float emo_conf = 0.0f;
@@ -203,6 +203,22 @@ static bool vs_bus_cb(hu_bus_event_type_t type, const hu_bus_event_t *ev, void *
                     emo_conf > 0.3f && emo != sl->current_emotion) {
                     sl->current_emotion = emo;
                     sl->emotion_voice_params = hu_emotion_voice_map(emo);
+                    static const char *const cartesia_emotions[] = {
+                        [HU_VOICE_EMOTION_NEUTRAL] = NULL,
+                        [HU_VOICE_EMOTION_JOY] = "positivity:high",
+                        [HU_VOICE_EMOTION_SADNESS] = "sadness:high",
+                        [HU_VOICE_EMOTION_EMPATHY] = "sadness:low",
+                        [HU_VOICE_EMOTION_EXCITEMENT] = "surprise:high",
+                        [HU_VOICE_EMOTION_CONCERN] = "curiosity:high",
+                        [HU_VOICE_EMOTION_CALM] = "positivity:low",
+                        [HU_VOICE_EMOTION_URGENCY] = "anger:low",
+                    };
+                    hu_cartesia_voice_controls_t ctrl = {0};
+                    ctrl.speed = sl->emotion_voice_params.rate_factor - 1.0f;
+                    ctrl.emotion_intensity = sl->emotion_voice_params.emphasis;
+                    if ((size_t)emo < sizeof(cartesia_emotions) / sizeof(cartesia_emotions[0]))
+                        ctrl.emotion = cartesia_emotions[emo];
+                    hu_cartesia_stream_set_voice_controls(sl->tts, &ctrl);
                 }
             }
             if (hu_cartesia_stream_send_generation(sl->tts, a, sl->tts_context, tts_text, true) ==

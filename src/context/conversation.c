@@ -6785,33 +6785,38 @@ size_t hu_conversation_build_gif_search_prompt(const char *msg, size_t msg_len, 
 
 float hu_conversation_adjust_gif_probability(float base_probability, const char *relationship_type,
                                              size_t rel_len) {
+    if (base_probability < 0.0f)
+        base_probability = 0.0f;
+    if (base_probability > 1.0f)
+        base_probability = 1.0f;
     if (!relationship_type || rel_len == 0)
         return base_probability;
 
-    /* Close friends get more GIFs, formal relationships get fewer */
+    float result = base_probability;
+
     if (str_contains_ci(relationship_type, rel_len, "friend") ||
         str_contains_ci(relationship_type, rel_len, "bestie") ||
         str_contains_ci(relationship_type, rel_len, "sibling"))
-        return base_probability * 1.5f > 1.0f ? 1.0f : base_probability * 1.5f;
+        result = base_probability * 1.5f;
+    else if (str_contains_ci(relationship_type, rel_len, "partner") ||
+             str_contains_ci(relationship_type, rel_len, "spouse"))
+        result = base_probability * 1.3f;
+    else if (str_contains_ci(relationship_type, rel_len, "coworker") ||
+             str_contains_ci(relationship_type, rel_len, "colleague") ||
+             str_contains_ci(relationship_type, rel_len, "boss") ||
+             str_contains_ci(relationship_type, rel_len, "professional"))
+        result = base_probability * 0.3f;
+    else if (str_contains_ci(relationship_type, rel_len, "parent") ||
+             str_contains_ci(relationship_type, rel_len, "family"))
+        result = base_probability * 0.5f;
+    else if (str_contains_ci(relationship_type, rel_len, "acquaintance"))
+        result = base_probability * 0.2f;
 
-    if (str_contains_ci(relationship_type, rel_len, "partner") ||
-        str_contains_ci(relationship_type, rel_len, "spouse"))
-        return base_probability * 1.3f > 1.0f ? 1.0f : base_probability * 1.3f;
-
-    if (str_contains_ci(relationship_type, rel_len, "coworker") ||
-        str_contains_ci(relationship_type, rel_len, "colleague") ||
-        str_contains_ci(relationship_type, rel_len, "boss") ||
-        str_contains_ci(relationship_type, rel_len, "professional"))
-        return base_probability * 0.3f;
-
-    if (str_contains_ci(relationship_type, rel_len, "parent") ||
-        str_contains_ci(relationship_type, rel_len, "family"))
-        return base_probability * 0.5f;
-
-    if (str_contains_ci(relationship_type, rel_len, "acquaintance"))
-        return base_probability * 0.2f;
-
-    return base_probability;
+    if (result > 1.0f)
+        result = 1.0f;
+    if (result < 0.0f)
+        result = 0.0f;
+    return result;
 }
 
 size_t hu_conversation_build_gif_style_hint(const char *relationship_type, size_t rel_len,
@@ -6900,9 +6905,13 @@ void hu_conversation_gif_rate_record(const char *contact_id, size_t cid_len, uin
     }
 
     if (slot == SIZE_MAX) {
-        if (gif_rate_count >= HU_GIF_RATE_MAX_CONTACTS)
-            slot = 0; /* overwrite oldest */
-        else
+        if (gif_rate_count >= HU_GIF_RATE_MAX_CONTACTS) {
+            slot = 0;
+            for (size_t i = 1; i < gif_rate_count; i++) {
+                if (gif_rate_slots[i].last_gif_ms < gif_rate_slots[slot].last_gif_ms)
+                    slot = i;
+            }
+        } else
             slot = gif_rate_count++;
         size_t copy = cid_len < 127 ? cid_len : 127;
         memcpy(gif_rate_slots[slot].contact_id, contact_id, copy);
@@ -6954,4 +6963,183 @@ hu_seen_action_t hu_conversation_classify_seen_behavior(const char *msg, size_t 
     }
 
     return HU_SEEN_RESPOND_NOW;
+}
+
+/* ── GIF humor calibration (per-contact feedback loop) ───────────────── */
+
+#define HU_GIF_CAL_MAX_CONTACTS 32
+#define HU_GIF_CAL_HISTORY      8
+
+static struct {
+    char contact_id[128];
+    uint8_t sent_count;
+    uint8_t reacted_count;
+    char last_queries[HU_GIF_CAL_HISTORY][64];
+    bool last_got_reaction[HU_GIF_CAL_HISTORY];
+    uint8_t history_pos;
+} gif_cal_slots[HU_GIF_CAL_MAX_CONTACTS];
+static size_t gif_cal_count;
+
+void hu_conversation_gif_cal_record_send(const char *contact_id, size_t cid_len, const char *query,
+                                         size_t query_len) {
+    if (!contact_id || cid_len == 0)
+        return;
+
+    size_t slot = SIZE_MAX;
+    for (size_t i = 0; i < gif_cal_count; i++) {
+        size_t n = cid_len < 127 ? cid_len : 127;
+        if (strncmp(gif_cal_slots[i].contact_id, contact_id, n) == 0 &&
+            gif_cal_slots[i].contact_id[n] == '\0') {
+            slot = i;
+            break;
+        }
+    }
+    if (slot == SIZE_MAX) {
+        if (gif_cal_count >= HU_GIF_CAL_MAX_CONTACTS)
+            slot = 0;
+        else
+            slot = gif_cal_count++;
+        size_t n = cid_len < 127 ? cid_len : 127;
+        memcpy(gif_cal_slots[slot].contact_id, contact_id, n);
+        gif_cal_slots[slot].contact_id[n] = '\0';
+        gif_cal_slots[slot].sent_count = 0;
+        gif_cal_slots[slot].reacted_count = 0;
+        gif_cal_slots[slot].history_pos = 0;
+    }
+
+    uint8_t pos = gif_cal_slots[slot].history_pos % HU_GIF_CAL_HISTORY;
+    size_t qn = query_len < 63 ? query_len : 63;
+    if (query && qn > 0)
+        memcpy(gif_cal_slots[slot].last_queries[pos], query, qn);
+    gif_cal_slots[slot].last_queries[pos][qn] = '\0';
+    gif_cal_slots[slot].last_got_reaction[pos] = false;
+    gif_cal_slots[slot].history_pos++;
+    gif_cal_slots[slot].sent_count++;
+}
+
+void hu_conversation_gif_cal_record_reaction(const char *contact_id, size_t cid_len) {
+    if (!contact_id || cid_len == 0)
+        return;
+
+    for (size_t i = 0; i < gif_cal_count; i++) {
+        size_t n = cid_len < 127 ? cid_len : 127;
+        if (strncmp(gif_cal_slots[i].contact_id, contact_id, n) == 0 &&
+            gif_cal_slots[i].contact_id[n] == '\0') {
+            gif_cal_slots[i].reacted_count++;
+            if (gif_cal_slots[i].history_pos > 0) {
+                uint8_t prev = (gif_cal_slots[i].history_pos - 1) % HU_GIF_CAL_HISTORY;
+                gif_cal_slots[i].last_got_reaction[prev] = true;
+            }
+            return;
+        }
+    }
+}
+
+float hu_conversation_gif_cal_hit_rate(const char *contact_id, size_t cid_len) {
+    if (!contact_id || cid_len == 0)
+        return 0.5f;
+
+    for (size_t i = 0; i < gif_cal_count; i++) {
+        size_t n = cid_len < 127 ? cid_len : 127;
+        if (strncmp(gif_cal_slots[i].contact_id, contact_id, n) == 0 &&
+            gif_cal_slots[i].contact_id[n] == '\0') {
+            if (gif_cal_slots[i].sent_count < 3)
+                return 0.5f;
+            return (float)gif_cal_slots[i].reacted_count / (float)gif_cal_slots[i].sent_count;
+        }
+    }
+    return 0.5f;
+}
+
+/* ── Reaction-to-their-reaction awareness ────────────────────────────── */
+
+size_t hu_conversation_build_reaction_received_hint(const hu_channel_history_entry_t *entries,
+                                                    size_t count, char *buf, size_t cap) {
+    if (!entries || count < 2 || !buf || cap < 32)
+        return 0;
+
+    size_t reactions_on_ours = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (!entries[i].from_me &&
+            (str_contains_ci(entries[i].text, strlen(entries[i].text), "Loved") ||
+             str_contains_ci(entries[i].text, strlen(entries[i].text), "Liked") ||
+             str_contains_ci(entries[i].text, strlen(entries[i].text), "Laughed at") ||
+             str_contains_ci(entries[i].text, strlen(entries[i].text), "Emphasized") ||
+             str_contains_ci(entries[i].text, strlen(entries[i].text), "Questioned")))
+            reactions_on_ours++;
+    }
+
+    if (reactions_on_ours == 0)
+        return 0;
+
+    int n = snprintf(buf, cap,
+                     "[TAPBACK RECEIVED] They reacted to %zu of your recent messages. "
+                     "Don't explicitly acknowledge tapbacks — they're passive acknowledgment. "
+                     "But take it as a positive signal that the conversation is going well.",
+                     reactions_on_ours);
+    return (n > 0 && (size_t)n < cap) ? (size_t)n : 0;
+}
+
+/* ── Emoji frequency matching directive builder ──────────────────────── */
+
+size_t hu_conversation_build_emoji_mirror_hint(const hu_channel_history_entry_t *entries,
+                                               size_t count, char *buf, size_t cap) {
+    if (!entries || count == 0 || !buf || cap < 32)
+        return 0;
+
+    size_t their_msgs = 0;
+    size_t their_emoji_msgs = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (entries[i].from_me)
+            continue;
+        their_msgs++;
+        size_t tlen = strlen(entries[i].text);
+        for (size_t j = 0; j < tlen; j++) {
+            if ((unsigned char)entries[i].text[j] > 127) {
+                their_emoji_msgs++;
+                break;
+            }
+        }
+    }
+
+    if (their_msgs < 2)
+        return 0;
+
+    float emoji_rate = (float)their_emoji_msgs / (float)their_msgs;
+    const char *directive;
+    if (emoji_rate > 0.6f)
+        directive = "[EMOJI MATCH] They use emoji frequently — feel free to use emoji naturally. "
+                    "Match their energy level.";
+    else if (emoji_rate < 0.1f)
+        directive = "[EMOJI MATCH] They rarely use emoji — keep your responses mostly text-based. "
+                    "An occasional emoji is fine but don't overdo it.";
+    else
+        return 0; /* middle ground — no special directive needed */
+
+    int n = snprintf(buf, cap, "%s", directive);
+    return (n > 0 && (size_t)n < cap) ? (size_t)n : 0;
+}
+
+/* ── Message edit/unsend awareness ───────────────────────────────────── */
+
+size_t hu_conversation_build_edit_awareness_hint(bool message_was_edited, bool message_was_unsent,
+                                                 char *buf, size_t cap) {
+    if (!buf || cap < 32)
+        return 0;
+
+    if (message_was_unsent) {
+        int n = snprintf(buf, cap,
+                         "[MESSAGE UNSENT] They deleted a message. DO NOT mention it or ask what "
+                         "they said. Pretend you never saw it — this is crucial social etiquette.");
+        return (n > 0 && (size_t)n < cap) ? (size_t)n : 0;
+    }
+
+    if (message_was_edited) {
+        int n = snprintf(buf, cap,
+                         "[MESSAGE EDITED] They corrected a message. Respond to the corrected "
+                         "version only. Don't point out the edit.");
+        return (n > 0 && (size_t)n < cap) ? (size_t)n : 0;
+    }
+
+    return 0;
 }

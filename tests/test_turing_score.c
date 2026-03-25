@@ -172,6 +172,49 @@ static void turing_genuine_warmth_with_context(void) {
     HU_ASSERT(score.dimensions[HU_TURING_GENUINE_WARMTH] >= 7);
 }
 
+static void turing_voice_filler_usage_detected(void) {
+    hu_turing_score_t score;
+    const char *resp = "well, i guess like, i dunno, it's kinda weird ya know";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), NULL, 0, &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_FILLER_USAGE] >= 8);
+}
+
+static void turing_voice_conversational_repair_detected(void) {
+    hu_turing_score_t score;
+    const char *resp = "i think it's— wait, actually, i mean it's more like, no wait, scratch that";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), NULL, 0, &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_CONVERSATIONAL_REPAIR] >= 8);
+}
+
+static void turing_voice_paralinguistic_cues_detected(void) {
+    hu_turing_score_t score;
+    const char *resp = "haha aww that's so sweet, oof i felt that";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), NULL, 0, &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_PARALINGUISTIC_CUES] >= 8);
+}
+
+static void turing_voice_emotional_prosody_with_emphasis(void) {
+    hu_turing_score_t score;
+    const char *resp = "OMG that's AMAZING!! i'm so happy for you!! i love it so much";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), NULL, 0, &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_EMOTIONAL_PROSODY] >= 8);
+}
+
+static void turing_voice_prosody_varied_punctuation(void) {
+    hu_turing_score_t score;
+    const char *resp = "wait really? that's wild! i can't... like i'm still processing";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), NULL, 0, &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_PROSODY_NATURALNESS] >= 8);
+}
+
+static void turing_voice_turn_timing_short_casual(void) {
+    hu_turing_score_t score;
+    const char *ctx = "hey\n";
+    const char *resp = "lol yeah what's up";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), ctx, strlen(ctx), &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_TURN_TIMING] >= 7);
+}
+
 void run_turing_score_tests(void) {
     HU_RUN_TEST(turing_heuristic_casual_message_scores_high);
     HU_RUN_TEST(turing_heuristic_ai_tells_score_low);
@@ -194,4 +237,10 @@ void run_turing_score_tests(void) {
     HU_RUN_TEST(turing_opinion_strong_position);
     HU_RUN_TEST(turing_personality_consistent_voice);
     HU_RUN_TEST(turing_genuine_warmth_with_context);
+    HU_RUN_TEST(turing_voice_filler_usage_detected);
+    HU_RUN_TEST(turing_voice_conversational_repair_detected);
+    HU_RUN_TEST(turing_voice_paralinguistic_cues_detected);
+    HU_RUN_TEST(turing_voice_emotional_prosody_with_emphasis);
+    HU_RUN_TEST(turing_voice_prosody_varied_punctuation);
+    HU_RUN_TEST(turing_voice_turn_timing_short_casual);
 }

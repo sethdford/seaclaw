@@ -1,4 +1,3 @@
-#include "test_framework.h"
 #include "human/agent.h"
 #include "human/agent/constitutional.h"
 #include "human/agent/dispatcher.h"
@@ -11,11 +10,13 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/core/string.h"
 #include "human/memory/adaptive_rag.h"
 #include "human/memory/self_rag.h"
 #include "human/memory/tiers.h"
 #include "human/ml/dpo.h"
 #include "human/tools/delegate.h"
+#include "test_framework.h"
 #include <string.h>
 
 #ifdef HU_ENABLE_SQLITE
@@ -117,13 +118,13 @@ static void test_self_improve_prompt_patches_with_data(void) {
     hu_self_improve_init_tables(&engine);
 
     sqlite3_exec(db,
-        "CREATE TABLE IF NOT EXISTS self_evaluations("
-        "id INTEGER PRIMARY KEY, recommendations TEXT, created_at INTEGER)",
-        NULL, NULL, NULL);
+                 "CREATE TABLE IF NOT EXISTS self_evaluations("
+                 "id INTEGER PRIMARY KEY, recommendations TEXT, created_at INTEGER)",
+                 NULL, NULL, NULL);
     sqlite3_exec(db,
-        "INSERT INTO self_evaluations (recommendations, created_at) VALUES "
-        "('Be more concise', 100), ('Use bullet points', 200)",
-        NULL, NULL, NULL);
+                 "INSERT INTO self_evaluations (recommendations, created_at) VALUES "
+                 "('Be more concise', 100), ('Use bullet points', 200)",
+                 NULL, NULL, NULL);
 
     HU_ASSERT_EQ(hu_self_improve_apply_reflections(&engine, 300), HU_OK);
 
@@ -291,8 +292,9 @@ static void test_world_model_record_and_simulate(void) {
     hu_world_model_create(&alloc, db, &model);
     hu_world_model_init_tables(&model);
 
-    HU_ASSERT_EQ(hu_world_record_outcome(&model, "restart server", 14,
-                                         "server recovered", 16, 0.9, 1000), HU_OK);
+    HU_ASSERT_EQ(
+        hu_world_record_outcome(&model, "restart server", 14, "server recovered", 16, 0.9, 1000),
+        HU_OK);
 
     hu_wm_prediction_t pred;
     HU_ASSERT_EQ(hu_world_simulate(&model, "restart service", 15, "outage", 6, &pred), HU_OK);
@@ -313,8 +315,9 @@ static void test_world_model_counterfactual(void) {
     hu_world_record_outcome(&model, "deploy slow", 11, "success", 7, 0.8, 1001);
 
     hu_wm_prediction_t pred;
-    HU_ASSERT_EQ(hu_world_counterfactual(&model, "deploy fast", 11,
-                                         "deploy slow", 11, "prod", 4, &pred), HU_OK);
+    HU_ASSERT_EQ(
+        hu_world_counterfactual(&model, "deploy fast", 11, "deploy slow", 11, "prod", 4, &pred),
+        HU_OK);
 
     hu_world_model_deinit(&model);
     close_test_db(db);
@@ -350,8 +353,8 @@ static void test_world_evaluate_options(void) {
     size_t action_lens[] = {7, 6};
     hu_action_option_t opts[2];
     memset(opts, 0, sizeof(opts));
-    hu_error_t err = hu_world_evaluate_options(&model, actions, action_lens, 2,
-                                               "server down", 11, opts);
+    hu_error_t err =
+        hu_world_evaluate_options(&model, actions, action_lens, 2, "server down", 11, opts);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(opts[0].score >= 0.0);
     HU_ASSERT_TRUE(opts[1].score >= 0.0);
@@ -373,18 +376,15 @@ static void world_model_evaluate_options_scores_order(void) {
     (void)hu_world_model_init_tables(&model);
 
     /* Record some outcomes to bias scoring */
-    hu_world_record_outcome(&model, "high_confidence_action", 22,
-                            "good result", 11, 0.9, 1000);
-    hu_world_record_outcome(&model, "low_confidence_action", 21,
-                            "poor result", 11, 0.2, 1000);
+    hu_world_record_outcome(&model, "high_confidence_action", 22, "good result", 11, 0.9, 1000);
+    hu_world_record_outcome(&model, "low_confidence_action", 21, "poor result", 11, 0.2, 1000);
 
     const char *actions[] = {"low_confidence_action", "high_confidence_action", "unknown_action"};
     size_t action_lens[] = {21, 22, 14};
     hu_action_option_t opts[3];
     memset(opts, 0, sizeof(opts));
 
-    err = hu_world_evaluate_options(&model, actions, action_lens, 3,
-                                     "test context", 12, opts);
+    err = hu_world_evaluate_options(&model, actions, action_lens, 3, "test context", 12, opts);
     HU_ASSERT_EQ(err, HU_OK);
 
     /* All scores should be non-negative */
@@ -409,15 +409,13 @@ static void test_online_learning_record_and_count(void) {
     hu_online_learning_create(&alloc, db, 0.1, &engine);
     hu_online_learning_init_tables(&engine);
 
-    hu_learning_signal_t sig = {
-        .type = HU_SIGNAL_TOOL_SUCCESS,
-        .context = "test context",
-        .context_len = 12,
-        .tool_name = "shell",
-        .tool_name_len = 5,
-        .magnitude = 0.8,
-        .timestamp = 1000
-    };
+    hu_learning_signal_t sig = {.type = HU_SIGNAL_TOOL_SUCCESS,
+                                .context = "test context",
+                                .context_len = 12,
+                                .tool_name = "shell",
+                                .tool_name_len = 5,
+                                .magnitude = 0.8,
+                                .timestamp = 1000};
     HU_ASSERT_EQ(hu_online_learning_record(&engine, &sig), HU_OK);
 
     size_t count = 0;
@@ -524,8 +522,9 @@ static void test_value_learn_from_correction(void) {
     hu_value_engine_create(&alloc, db, &engine);
     hu_value_init_tables(&engine);
 
-    HU_ASSERT_EQ(hu_value_learn_from_correction(&engine, "brevity", 7,
-                                                "prefers short answers", 21, 0.8, 1000), HU_OK);
+    HU_ASSERT_EQ(hu_value_learn_from_correction(&engine, "brevity", 7, "prefers short answers", 21,
+                                                0.8, 1000),
+                 HU_OK);
 
     hu_value_t val;
     bool found = false;
@@ -665,8 +664,8 @@ static void test_orchestrator_register_agent(void) {
     hu_orchestrator_t orch;
     hu_orchestrator_create(&alloc, &orch);
 
-    HU_ASSERT_EQ(hu_orchestrator_register_agent(&orch, "agent-1", 7,
-                                                "coder", 5, "python,c", 8), HU_OK);
+    HU_ASSERT_EQ(hu_orchestrator_register_agent(&orch, "agent-1", 7, "coder", 5, "python,c", 8),
+                 HU_OK);
     HU_ASSERT_EQ(orch.agent_count, 1u);
 
     hu_orchestrator_deinit(&orch);
@@ -681,8 +680,7 @@ static void test_orchestrator_task_lifecycle(void) {
 
     const char *tasks[] = {"design API", "implement", "test"};
     size_t lens[] = {10, 9, 4};
-    HU_ASSERT_EQ(hu_orchestrator_propose_split(&orch, "build feature", 13,
-                                               tasks, lens, 3), HU_OK);
+    HU_ASSERT_EQ(hu_orchestrator_propose_split(&orch, "build feature", 13, tasks, lens, 3), HU_OK);
     HU_ASSERT_EQ(orch.task_count, 3u);
 
     HU_ASSERT_EQ(hu_orchestrator_assign_task(&orch, 1, "agent-1", 7), HU_OK);
@@ -812,8 +810,8 @@ static void test_speculative_predict_heuristic(void) {
     size_t actual = 0;
 
     hu_error_t err = hu_speculative_predict(&alloc, "how do I fix this?", 18,
-                                             "Here are the steps: 1. Check config 2. Restart",
-                                             47, preds, pred_lens, confs, 3, &actual);
+                                            "Here are the steps: 1. Check config 2. Restart", 47,
+                                            preds, pred_lens, confs, 3, &actual);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(actual >= 1);
     for (size_t i = 0; i < actual; i++) {
@@ -874,9 +872,8 @@ static void test_uncertainty_low_confidence(void) {
 static void test_uncertainty_extract_signals(void) {
     hu_uncertainty_signals_t signals;
     memset(&signals, 0, sizeof(signals));
-    hu_error_t err = hu_uncertainty_extract_signals(
-        "I think the answer might be 42", 30,
-        "what is the answer", 18, 1, 3, &signals);
+    hu_error_t err = hu_uncertainty_extract_signals("I think the answer might be 42", 30,
+                                                    "what is the answer", 18, 1, 3, &signals);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(signals.has_hedging_language);
     HU_ASSERT_TRUE(signals.is_factual_query);
@@ -927,8 +924,8 @@ static void test_orchestrator_decompose_goal_test_mode(void) {
     hu_decomposition_t result;
     memset(&result, 0, sizeof(result));
 
-    hu_error_t err = hu_orchestrator_decompose_goal(&alloc, NULL, "gpt-4", 5,
-                                                     "Build a web app", 15, NULL, 0, &result);
+    hu_error_t err = hu_orchestrator_decompose_goal(&alloc, NULL, "gpt-4", 5, "Build a web app", 15,
+                                                    NULL, 0, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(result.task_count >= 2);
     HU_ASSERT_NOT_NULL(result.reasoning);
@@ -980,14 +977,14 @@ static void test_integration_speculative_roundtrip(void) {
     size_t pred_lens[3] = {0};
     double confs[3] = {0};
     size_t count = 0;
-    hu_speculative_predict(&alloc, "explain X", 9, "X works by doing Y and Z", 24,
-                           preds, pred_lens, confs, 3, &count);
+    hu_speculative_predict(&alloc, "explain X", 9, "X works by doing Y and Z", 24, preds, pred_lens,
+                           confs, 3, &count);
 
     /* Store predictions */
     for (size_t i = 0; i < count; i++) {
         if (preds[i]) {
-            hu_speculative_cache_store(&cache, preds[i], pred_lens[i],
-                                       "pre-computed response", 21, confs[i], 1001);
+            hu_speculative_cache_store(&cache, preds[i], pred_lens[i], "pre-computed response", 21,
+                                       confs[i], 1001);
             alloc.free(alloc.ctx, preds[i], pred_lens[i] + 1);
         }
     }
@@ -998,15 +995,27 @@ static void test_integration_speculative_roundtrip(void) {
 
 /* -- Delegate E2E ---------------------------------------------------- */
 
-static void *agi_alloc_fn(void *ctx, size_t size) { (void)ctx; return malloc(size); }
-static void *agi_realloc_fn(void *ctx, void *ptr, size_t old_size, size_t new_size) {
-    (void)ctx; (void)old_size; return realloc(ptr, new_size);
+static void *agi_alloc_fn(void *ctx, size_t size) {
+    (void)ctx;
+    return malloc(size);
 }
-static void agi_free_fn(void *ctx, void *ptr, size_t size) { (void)ctx; (void)size; free(ptr); }
+static void *agi_realloc_fn(void *ctx, void *ptr, size_t old_size, size_t new_size) {
+    (void)ctx;
+    (void)old_size;
+    return realloc(ptr, new_size);
+}
+static void agi_free_fn(void *ctx, void *ptr, size_t size) {
+    (void)ctx;
+    (void)size;
+    free(ptr);
+}
 
 static void test_delegate_e2e_roundtrip(void) {
     hu_allocator_t alloc = {
-        .alloc = agi_alloc_fn, .realloc = agi_realloc_fn, .free = agi_free_fn, .ctx = NULL,
+        .alloc = agi_alloc_fn,
+        .realloc = agi_realloc_fn,
+        .free = agi_free_fn,
+        .ctx = NULL,
     };
     hu_tool_t delegate;
     HU_ASSERT_EQ(hu_delegate_create(&alloc, NULL, NULL, NULL, &delegate), HU_OK);
@@ -1032,7 +1041,10 @@ static void test_delegate_e2e_roundtrip(void) {
 
 static void test_delegate_missing_agent(void) {
     hu_allocator_t alloc = {
-        .alloc = agi_alloc_fn, .realloc = agi_realloc_fn, .free = agi_free_fn, .ctx = NULL,
+        .alloc = agi_alloc_fn,
+        .realloc = agi_realloc_fn,
+        .free = agi_free_fn,
+        .ctx = NULL,
     };
     hu_tool_t delegate;
     HU_ASSERT_EQ(hu_delegate_create(&alloc, NULL, NULL, NULL, &delegate), HU_OK);
@@ -1054,7 +1066,10 @@ static void test_delegate_missing_agent(void) {
 
 static void test_delegate_missing_prompt(void) {
     hu_allocator_t alloc = {
-        .alloc = agi_alloc_fn, .realloc = agi_realloc_fn, .free = agi_free_fn, .ctx = NULL,
+        .alloc = agi_alloc_fn,
+        .realloc = agi_realloc_fn,
+        .free = agi_free_fn,
+        .ctx = NULL,
     };
     hu_tool_t delegate;
     HU_ASSERT_EQ(hu_delegate_create(&alloc, NULL, NULL, NULL, &delegate), HU_OK);
@@ -1083,8 +1098,8 @@ static void test_srag_assess_and_verify_roundtrip(void) {
 
     hu_srag_assessment_t assess;
     memset(&assess, 0, sizeof(assess));
-    hu_error_t err = hu_srag_should_retrieve(&alloc, &cfg,
-        "What is the height of the Eiffel Tower?", 39, NULL, 0, &assess);
+    hu_error_t err = hu_srag_should_retrieve(
+        &alloc, &cfg, "What is the height of the Eiffel Tower?", 39, NULL, 0, &assess);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(assess.is_factual_query);
     HU_ASSERT_TRUE(assess.decision == HU_SRAG_RETRIEVE ||
@@ -1092,10 +1107,9 @@ static void test_srag_assess_and_verify_roundtrip(void) {
 
     double relevance = 0.0;
     bool should_use = false;
-    err = hu_srag_verify_relevance(&alloc, &cfg,
-        "What is the height of the Eiffel Tower?", 39,
-        "The Eiffel Tower is 330 meters tall, completed in 1889.", 55,
-        &relevance, &should_use);
+    err = hu_srag_verify_relevance(&alloc, &cfg, "What is the height of the Eiffel Tower?", 39,
+                                   "The Eiffel Tower is 330 meters tall, completed in 1889.", 55,
+                                   &relevance, &should_use);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(relevance > 0.0);
     HU_ASSERT_TRUE(should_use);
@@ -1108,8 +1122,7 @@ static void test_srag_creative_query_skips_retrieval(void) {
 
     hu_srag_assessment_t assess;
     memset(&assess, 0, sizeof(assess));
-    hu_srag_should_retrieve(&alloc, &cfg,
-        "Write me a poem about the ocean", 31, NULL, 0, &assess);
+    hu_srag_should_retrieve(&alloc, &cfg, "Write me a poem about the ocean", 31, NULL, 0, &assess);
     HU_ASSERT_TRUE(assess.is_creative_query);
 }
 
@@ -1121,9 +1134,9 @@ static void test_prm_score_step_standalone(void) {
     cfg.enabled = true;
 
     double score = 0.0;
-    hu_error_t err = hu_prm_score_step(&alloc, &cfg,
-        "First, let's identify the key variables: x=5, y=10", 51,
-        "Calculate x+y given x=5, y=10", 30, &score);
+    hu_error_t err =
+        hu_prm_score_step(&alloc, &cfg, "First, let's identify the key variables: x=5, y=10", 51,
+                          "Calculate x+y given x=5, y=10", 30, &score);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(score > 0.0);
 }
@@ -1135,11 +1148,10 @@ static void test_prm_chain_with_multi_step(void) {
 
     hu_prm_result_t result;
     memset(&result, 0, sizeof(result));
-    const char *chain =
-        "Step 1: Identify the problem.\n\n"
-        "Step 2: Break it down.\n\n"
-        "Step 3: Solve each part.\n\n"
-        "Step 4: Combine and verify.";
+    const char *chain = "Step 1: Identify the problem.\n\n"
+                        "Step 2: Break it down.\n\n"
+                        "Step 3: Solve each part.\n\n"
+                        "Step 4: Combine and verify.";
     hu_error_t err = hu_prm_score_chain(&alloc, &cfg, chain, strlen(chain), &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(result.step_count >= 2);
@@ -1156,13 +1168,11 @@ static void test_constitutional_critique_roundtrip(void) {
 
     hu_critique_result_t result;
     memset(&result, 0, sizeof(result));
-    hu_error_t err = hu_constitutional_critique(&alloc, NULL, NULL, 0,
-        "How do I fix my code?", 21,
-        "Here's a helpful explanation of the issue and how to fix it.", 60,
-        &cfg, &result);
+    hu_error_t err = hu_constitutional_critique(
+        &alloc, NULL, NULL, 0, "How do I fix my code?", 21,
+        "Here's a helpful explanation of the issue and how to fix it.", 60, &cfg, &result);
     HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_TRUE(result.verdict == HU_CRITIQUE_PASS ||
-                   result.verdict == HU_CRITIQUE_MINOR);
+    HU_ASSERT_TRUE(result.verdict == HU_CRITIQUE_PASS || result.verdict == HU_CRITIQUE_MINOR);
     hu_critique_result_free(&alloc, &result);
 }
 
@@ -1178,8 +1188,7 @@ static void test_adaptive_rag_select_and_learn(void) {
     HU_ASSERT_TRUE(s1 < HU_RAG_STRATEGY_COUNT);
     hu_adaptive_rag_record_outcome(&rag, s1, 0.9);
 
-    hu_rag_strategy_t s2 = hu_adaptive_rag_select(&rag,
-        "Tell me about person Y's preferences", 37);
+    hu_rag_strategy_t s2 = hu_adaptive_rag_select(&rag, "Tell me about person Y's preferences", 37);
     HU_ASSERT_TRUE(s2 < HU_RAG_STRATEGY_COUNT);
     hu_adaptive_rag_record_outcome(&rag, s2, 0.3);
 
@@ -1201,9 +1210,8 @@ static void test_dpo_record_from_retry_roundtrip(void) {
     HU_ASSERT_EQ(err, HU_OK);
     hu_dpo_init_tables(&collector);
 
-    err = hu_dpo_record_from_retry(&collector,
-        "Explain quantum computing", 25,
-        "Quantum computing is magic.", 27,
+    err = hu_dpo_record_from_retry(
+        &collector, "Explain quantum computing", 25, "Quantum computing is magic.", 27,
         "Quantum computing uses qubits which can exist in superposition states.", 70);
     HU_ASSERT_EQ(err, HU_OK);
 
@@ -1227,20 +1235,17 @@ static void test_tier_promote_demote_roundtrip(void) {
     HU_ASSERT_EQ(err, HU_OK);
     hu_tier_manager_init_tables(&mgr);
 
-    hu_tier_manager_store(&mgr, HU_TIER_ARCHIVAL, "fact:sky:blue", 13,
-                          "The sky is blue", 15);
+    hu_tier_manager_store(&mgr, HU_TIER_ARCHIVAL, "fact:sky:blue", 13, "The sky is blue", 15);
 
-    err = hu_tier_manager_promote(&mgr, "fact:sky:blue", 13,
-                                  HU_TIER_ARCHIVAL, HU_TIER_RECALL);
+    err = hu_tier_manager_promote(&mgr, "fact:sky:blue", 13, HU_TIER_ARCHIVAL, HU_TIER_RECALL);
     HU_ASSERT_EQ(err, HU_OK);
 
-    err = hu_tier_manager_demote(&mgr, "fact:sky:blue", 13,
-                                 HU_TIER_RECALL, HU_TIER_ARCHIVAL);
+    err = hu_tier_manager_demote(&mgr, "fact:sky:blue", 13, HU_TIER_RECALL, HU_TIER_ARCHIVAL);
     HU_ASSERT_EQ(err, HU_OK);
 
     hu_memory_tier_t assigned;
-    err = hu_tier_manager_auto_tier(&mgr, "important_key", 13,
-        "user's favorite color is green", 30, &assigned);
+    err = hu_tier_manager_auto_tier(&mgr, "important_key", 13, "user's favorite color is green", 30,
+                                    &assigned);
     HU_ASSERT_EQ(err, HU_OK);
 
     const char *tier_name = hu_memory_tier_str(assigned);
@@ -1255,15 +1260,18 @@ static void test_tier_promote_demote_roundtrip(void) {
 
 static size_t test_stream_chunks_received;
 static void test_stream_chunk_counter(void *ctx, const char *data, size_t len) {
-    (void)ctx; (void)data; (void)len;
+    (void)ctx;
+    (void)data;
+    (void)len;
     test_stream_chunks_received++;
 }
 
-static hu_error_t mock_streaming_execute(void *ctx, hu_allocator_t *alloc,
-    const hu_json_value_t *args,
-    void (*on_chunk)(void *cb_ctx, const char *data, size_t len),
-    void *cb_ctx, hu_tool_result_t *out) {
-    (void)ctx; (void)args;
+static hu_error_t
+mock_streaming_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
+                       void (*on_chunk)(void *cb_ctx, const char *data, size_t len), void *cb_ctx,
+                       hu_tool_result_t *out) {
+    (void)ctx;
+    (void)args;
     if (on_chunk) {
         on_chunk(cb_ctx, "chunk1", 6);
         on_chunk(cb_ctx, "chunk2", 6);
@@ -1274,9 +1282,18 @@ static hu_error_t mock_streaming_execute(void *ctx, hu_allocator_t *alloc,
     return HU_OK;
 }
 
-static const char *mock_stream_name(void *ctx) { (void)ctx; return "mock_stream"; }
-static const char *mock_stream_desc(void *ctx) { (void)ctx; return "mock streaming tool"; }
-static const char *mock_stream_params(void *ctx) { (void)ctx; return "{}"; }
+static const char *mock_stream_name(void *ctx) {
+    (void)ctx;
+    return "mock_stream";
+}
+static const char *mock_stream_desc(void *ctx) {
+    (void)ctx;
+    return "mock streaming tool";
+}
+static const char *mock_stream_params(void *ctx) {
+    (void)ctx;
+    return "{}";
+}
 
 static const hu_tool_vtable_t mock_stream_vtable = {
     .execute = NULL,
@@ -1292,9 +1309,12 @@ static void test_streaming_dispatcher_calls_execute_streaming(void) {
     hu_tool_t tool = {.ctx = NULL, .vtable = &mock_stream_vtable};
 
     hu_tool_call_t call = {
-        .id = "c1", .id_len = 2,
-        .name = "mock_stream", .name_len = 11,
-        .arguments = "{}", .arguments_len = 2,
+        .id = "c1",
+        .id_len = 2,
+        .name = "mock_stream",
+        .name_len = 11,
+        .arguments = "{}",
+        .arguments_len = 2,
     };
 
     hu_dispatcher_t disp;
@@ -1302,8 +1322,8 @@ static void test_streaming_dispatcher_calls_execute_streaming(void) {
     hu_dispatch_result_t dres;
     test_stream_chunks_received = 0;
 
-    hu_error_t err = hu_dispatcher_dispatch_streaming(&disp, &alloc, &tool, 1,
-        &call, 1, test_stream_chunk_counter, NULL, &dres);
+    hu_error_t err = hu_dispatcher_dispatch_streaming(&disp, &alloc, &tool, 1, &call, 1,
+                                                      test_stream_chunk_counter, NULL, &dres);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(dres.count, 1u);
     HU_ASSERT_TRUE(dres.results[0].success);
@@ -1318,17 +1338,20 @@ static void test_streaming_dispatcher_null_callback_falls_back(void) {
     hu_tool_t tool = {.ctx = NULL, .vtable = &mock_stream_vtable};
 
     hu_tool_call_t call = {
-        .id = "c1", .id_len = 2,
-        .name = "mock_stream", .name_len = 11,
-        .arguments = "{}", .arguments_len = 2,
+        .id = "c1",
+        .id_len = 2,
+        .name = "mock_stream",
+        .name_len = 11,
+        .arguments = "{}",
+        .arguments_len = 2,
     };
 
     hu_dispatcher_t disp;
     hu_dispatcher_default(&disp);
     hu_dispatch_result_t dres;
 
-    hu_error_t err = hu_dispatcher_dispatch_streaming(&disp, &alloc, &tool, 1,
-        &call, 1, NULL, NULL, &dres);
+    hu_error_t err =
+        hu_dispatcher_dispatch_streaming(&disp, &alloc, &tool, 1, &call, 1, NULL, NULL, &dres);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(dres.count, 1u);
 
@@ -1337,18 +1360,28 @@ static void test_streaming_dispatcher_null_callback_falls_back(void) {
 
 /* ─── Integration: Streaming dispatch with execute-only tool ──────── */
 
-static hu_error_t mock_execute_only(void *ctx, hu_allocator_t *alloc,
-    const hu_json_value_t *args, hu_tool_result_t *out) {
-    (void)ctx; (void)args;
+static hu_error_t mock_execute_only(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
+                                    hu_tool_result_t *out) {
+    (void)ctx;
+    (void)args;
     char *buf = (char *)alloc->alloc(alloc->ctx, 10);
     memcpy(buf, "exec_only", 10);
     *out = hu_tool_result_ok_owned(buf, 9);
     return HU_OK;
 }
 
-static const char *mock_exec_name(void *ctx) { (void)ctx; return "exec_only"; }
-static const char *mock_exec_desc(void *ctx) { (void)ctx; return "execute-only tool"; }
-static const char *mock_exec_params(void *ctx) { (void)ctx; return "{}"; }
+static const char *mock_exec_name(void *ctx) {
+    (void)ctx;
+    return "exec_only";
+}
+static const char *mock_exec_desc(void *ctx) {
+    (void)ctx;
+    return "execute-only tool";
+}
+static const char *mock_exec_params(void *ctx) {
+    (void)ctx;
+    return "{}";
+}
 
 static const hu_tool_vtable_t mock_exec_only_vtable = {
     .execute = mock_execute_only,
@@ -1364,9 +1397,12 @@ static void test_streaming_dispatch_execute_only_fallback(void) {
     hu_tool_t tool = {.ctx = NULL, .vtable = &mock_exec_only_vtable};
 
     hu_tool_call_t call = {
-        .id = "c1", .id_len = 2,
-        .name = "exec_only", .name_len = 9,
-        .arguments = "{}", .arguments_len = 2,
+        .id = "c1",
+        .id_len = 2,
+        .name = "exec_only",
+        .name_len = 9,
+        .arguments = "{}",
+        .arguments_len = 2,
     };
 
     hu_dispatcher_t disp;
@@ -1374,8 +1410,8 @@ static void test_streaming_dispatch_execute_only_fallback(void) {
     hu_dispatch_result_t dres;
     test_stream_chunks_received = 0;
 
-    hu_error_t err = hu_dispatcher_dispatch_streaming(&disp, &alloc, &tool, 1,
-        &call, 1, test_stream_chunk_counter, NULL, &dres);
+    hu_error_t err = hu_dispatcher_dispatch_streaming(&disp, &alloc, &tool, 1, &call, 1,
+                                                      test_stream_chunk_counter, NULL, &dres);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(dres.count, 1u);
     HU_ASSERT_TRUE(dres.results[0].success);
@@ -1387,10 +1423,14 @@ static void test_streaming_dispatch_execute_only_fallback(void) {
 
 /* ─── Integration: hu_agent_turn_stream E2E ───────────────────────── */
 
-static hu_error_t agi_mock_chat(void *ctx, hu_allocator_t *alloc,
-    const hu_chat_request_t *request, const char *model, size_t model_len,
-    double temperature, hu_chat_response_t *out) {
-    (void)ctx; (void)request; (void)model; (void)model_len; (void)temperature;
+static hu_error_t agi_mock_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_request_t *request,
+                                const char *model, size_t model_len, double temperature,
+                                hu_chat_response_t *out) {
+    (void)ctx;
+    (void)request;
+    (void)model;
+    (void)model_len;
+    (void)temperature;
     const char *resp = "streamed response";
     char *buf = (char *)alloc->alloc(alloc->ctx, 18);
     if (buf) {
@@ -1410,9 +1450,18 @@ static hu_error_t agi_mock_chat(void *ctx, hu_allocator_t *alloc,
     return out->content ? HU_OK : HU_ERR_OUT_OF_MEMORY;
 }
 
-static bool agi_mock_supports_tools(void *ctx) { (void)ctx; return false; }
-static const char *agi_mock_name(void *ctx) { (void)ctx; return "mock"; }
-static void agi_mock_deinit(void *ctx, hu_allocator_t *alloc) { (void)ctx; (void)alloc; }
+static bool agi_mock_supports_tools(void *ctx) {
+    (void)ctx;
+    return false;
+}
+static const char *agi_mock_name(void *ctx) {
+    (void)ctx;
+    return "mock";
+}
+static void agi_mock_deinit(void *ctx, hu_allocator_t *alloc) {
+    (void)ctx;
+    (void)alloc;
+}
 
 static const hu_provider_vtable_t agi_mock_vtable = {
     .chat = agi_mock_chat,
@@ -1430,28 +1479,30 @@ static void stream_token_counter(const char *delta, size_t len, void *ctx) {
 
 static void test_agent_turn_stream_e2e(void) {
     hu_allocator_t alloc = {
-        .alloc = agi_alloc_fn, .realloc = agi_realloc_fn, .free = agi_free_fn, .ctx = NULL,
+        .alloc = agi_alloc_fn,
+        .realloc = agi_realloc_fn,
+        .free = agi_free_fn,
+        .ctx = NULL,
     };
     hu_provider_t prov = {.ctx = NULL, .vtable = &agi_mock_vtable};
 
     hu_agent_t agent;
-    hu_error_t err = hu_agent_from_config(
-        &agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL,
-        "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0,
-        NULL, 0, NULL, 0, NULL);
+    hu_error_t err =
+        hu_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL, "gpt-4o", 6,
+                             "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
     HU_ASSERT_EQ(err, HU_OK);
 
     char *response = NULL;
     size_t response_len = 0;
     stream_token_total_len = 0;
 
-    err = hu_agent_turn_stream(&agent, "hello world", 11,
-        stream_token_counter, NULL, &response, &response_len);
+    err = hu_agent_turn_stream(&agent, "hello world", 11, stream_token_counter, NULL, &response,
+                               &response_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(response);
     HU_ASSERT_TRUE(response_len > 0);
     HU_ASSERT_TRUE(stream_token_total_len > 0);
-    HU_ASSERT_TRUE(strstr(response, "streamed") != NULL);
+    HU_ASSERT_TRUE(hu_strcasestr(response, "streamed") != NULL);
 
     if (response)
         alloc.free(alloc.ctx, response, response_len + 1);
@@ -1467,9 +1518,9 @@ static void test_tot_explore_generates_branches(void) {
 
     hu_tot_result_t result;
     memset(&result, 0, sizeof(result));
-    hu_error_t err = hu_tot_explore(&alloc, NULL, NULL, 0,
-        "How should we design a caching layer for this system?", 53,
-        &cfg, &result);
+    hu_error_t err =
+        hu_tot_explore(&alloc, NULL, NULL, 0,
+                       "How should we design a caching layer for this system?", 53, &cfg, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(result.branches_explored >= 1);
     HU_ASSERT_TRUE(result.best_thought != NULL);

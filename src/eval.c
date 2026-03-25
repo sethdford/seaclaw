@@ -626,7 +626,7 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
 
         const char *judge_expected = expected_str;
         size_t judge_expected_len = expected_str_len;
-        char *judge_owned = NULL;
+        char *judge_owned __attribute__((unused)) = NULL;
 #if !defined(HU_IS_TEST) || !HU_IS_TEST
         if (task_mode == HU_EVAL_LLM_JUDGE && task->rubric && task->rubric_len > 0) {
             if (expected_str_len > 0) {

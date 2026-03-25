@@ -3,6 +3,7 @@
  * TTL tool cache, emotion voice map, ACP bridge, KV cache, PersonaFuse,
  * audio emotion detection.
  */
+#include "cp_internal.h"
 #include "human/agent/acp_bridge.h"
 #include "human/agent/agent_comm.h"
 #include "human/agent/kv_cache.h"
@@ -10,6 +11,7 @@
 #include "human/agent/prompt_cache.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/gateway/control_protocol.h"
 #include "human/persona/persona_fuse.h"
 #include "human/tools/cache_ttl.h"
 #include "human/voice/audio_emotion.h"
@@ -382,6 +384,26 @@ static void test_emotion_class_name(void) {
     HU_ASSERT_STR_EQ(hu_emotion_class_name(HU_VOICE_EMOTION_EMPATHY), "empathy");
 }
 
+/* ── Security gateway ──────────────────────────────────────────────── */
+
+static void test_cp_security_cot_summary_returns_empty_summary(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(root);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_security_cot_summary(&alloc, NULL, NULL, NULL, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(out_len > 0);
+    HU_ASSERT(strstr(out, "total_audited") != NULL);
+    HU_ASSERT(strstr(out, "entries") != NULL);
+
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+}
+
 /* ── Suite registration ──────────────────────────────────────────── */
 
 void run_sota_live_wiring_tests(void) {
@@ -422,4 +444,6 @@ void run_sota_live_wiring_tests(void) {
     HU_RUN_TEST(test_audio_emotion_fuse_disagreeing);
 
     HU_RUN_TEST(test_emotion_class_name);
+
+    HU_RUN_TEST(test_cp_security_cot_summary_returns_empty_summary);
 }

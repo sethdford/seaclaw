@@ -7,6 +7,7 @@
 #define HU_IS_TEST 0
 #endif
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static const char *MAR_SYSTEM_PROMPTS[] = {
     [HU_MAR_ACTOR] = "You are the ACTOR. Generate a thorough response to the given task. "
                      "Be specific, cite evidence, and address all aspects of the task.",
@@ -20,6 +21,7 @@ static const char *MAR_SYSTEM_PROMPTS[] = {
                      "critiques, produce the definitive final answer. Synthesize the best elements "
                      "and correct any remaining errors.",
 };
+#endif
 
 const char *hu_mar_role_name(hu_mar_role_t role) {
     switch (role) {

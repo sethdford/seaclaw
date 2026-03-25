@@ -382,9 +382,9 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     if (vulnerability > 0)
         out->dimensions[HU_TURING_GENUINE_WARMTH] += 1;
 
-    /* S2S voice dimensions — text heuristic provides limited signal */
+    /* S2S voice dimensions — enhanced text heuristics */
 
-    /* prosody_naturalness: inferred from punctuation variety (excl/question/ellipsis) */
+    /* prosody_naturalness: punctuation variety, sentence length variation, emphasis markers */
     {
         int punct_variety = 0;
         if (memchr(response, '!', response_len))
@@ -393,16 +393,37 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
             punct_variety++;
         if (ci_has(response, response_len, "..."))
             punct_variety++;
-        out->dimensions[HU_TURING_PROSODY_NATURALNESS] = 6 + punct_variety;
+        if (ci_has(response, response_len, " — ") || ci_has(response, response_len, " - "))
+            punct_variety++;
+        int caps_emphasis = count_uppercase_words(response, response_len);
+        int score = 6 + punct_variety;
+        if (caps_emphasis > 0)
+            score += 1;
         if (casual > 0)
-            out->dimensions[HU_TURING_PROSODY_NATURALNESS] += 1;
+            score += 1;
+        if (contractions)
+            score += 1;
+        out->dimensions[HU_TURING_PROSODY_NATURALNESS] = score;
     }
 
-    /* turn_timing: can't measure from text alone, default neutral.
-     * Short/casual messages imply conversational flow, so bias toward human. */
-    out->dimensions[HU_TURING_TURN_TIMING] = (response_len < 100 && casual > 0) ? 7 : 6;
+    /* turn_timing: short/casual = conversational flow; long-form = monologue penalty */
+    {
+        int score = 6;
+        if (response_len < 100 && casual > 0)
+            score += 2;
+        else if (response_len < 50)
+            score += 1;
+        if (conversation_context && context_len > 0) {
+            size_t user_len = last_user_msg_len(conversation_context, context_len);
+            if (user_len > 0 && user_len < 30 && response_len < 80)
+                score += 1;
+        }
+        if (response_len > 400)
+            score -= 1;
+        out->dimensions[HU_TURING_TURN_TIMING] = score;
+    }
 
-    /* filler_usage: check for natural hesitation markers */
+    /* filler_usage: natural hesitation markers and verbal tics */
     {
         int fillers = 0;
         if (ci_has(response, response_len, " um ") || ci_has(response, response_len, " um,"))
@@ -413,17 +434,36 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
             fillers++;
         if (ci_has(response, response_len, "hmm") || ci_has(response, response_len, "well,"))
             fillers++;
-        out->dimensions[HU_TURING_FILLER_USAGE] = 6 + fillers * 2;
+        if (ci_has(response, response_len, "i guess") || ci_has(response, response_len, "ya know"))
+            fillers++;
+        if (ci_has(response, response_len, "you know") || ci_has(response, response_len, "i dunno"))
+            fillers++;
+        if (ci_has(response, response_len, "kinda") || ci_has(response, response_len, "sorta"))
+            fillers++;
+        out->dimensions[HU_TURING_FILLER_USAGE] = 5 + fillers * 2;
+        if (casual > 0)
+            out->dimensions[HU_TURING_FILLER_USAGE] += 1;
     }
 
-    /* emotional_prosody: proxy via emotional words + exclamation density */
-    out->dimensions[HU_TURING_EMOTIONAL_PROSODY] = 6 + emotional;
-    if (memchr(response, '!', response_len))
-        out->dimensions[HU_TURING_EMOTIONAL_PROSODY] += 1;
-    if (casual > 0 || contractions)
-        out->dimensions[HU_TURING_EMOTIONAL_PROSODY] += 1;
+    /* emotional_prosody: emotional words + exclamation density + caps emphasis + emoji */
+    {
+        int score = 5 + emotional;
+        int excl = count_exclamations(response, response_len);
+        if (excl > 0)
+            score += 1;
+        if (excl > 2)
+            score += 1;
+        if (casual > 0 || contractions)
+            score += 1;
+        int caps = count_uppercase_words(response, response_len);
+        if (caps > 0)
+            score += 1;
+        if (vulnerability > 0)
+            score += 1;
+        out->dimensions[HU_TURING_EMOTIONAL_PROSODY] = score;
+    }
 
-    /* conversational_repair: self-corrections ("I mean", "wait", "actually") */
+    /* conversational_repair: self-corrections, retractions, mid-thought pivots */
     {
         int repairs = 0;
         if (ci_has(response, response_len, "i mean"))
@@ -435,19 +475,39 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
             repairs++;
         if (ci_has(response, response_len, "no wait") || ci_has(response, response_len, "sorry,"))
             repairs++;
-        out->dimensions[HU_TURING_CONVERSATIONAL_REPAIR] = 6 + repairs * 2;
+        if (ci_has(response, response_len, "or rather") ||
+            ci_has(response, response_len, "well no"))
+            repairs++;
+        if (ci_has(response, response_len, "scratch that") || ci_has(response, response_len, "nvm"))
+            repairs++;
+        if (ci_has(response, response_len, "let me rephrase") ||
+            ci_has(response, response_len, "what i meant"))
+            repairs++;
+        out->dimensions[HU_TURING_CONVERSATIONAL_REPAIR] = 5 + repairs * 2;
+        if (casual > 0)
+            out->dimensions[HU_TURING_CONVERSATIONAL_REPAIR] += 1;
     }
 
-    /* paralinguistic_cues: laughter, sighs, breath markers */
+    /* paralinguistic_cues: laughter, sighs, breath, vocal sounds, expressive markers */
     {
         int para = 0;
         if (ci_has(response, response_len, "haha") || ci_has(response, response_len, "lol"))
             para++;
+        if (ci_has(response, response_len, "hehe") || ci_has(response, response_len, "lmao"))
+            para++;
         if (ci_has(response, response_len, "*sigh*") || ci_has(response, response_len, "sigh"))
             para++;
-        if (ci_has(response, response_len, "*laugh*"))
+        if (ci_has(response, response_len, "*laugh*") || ci_has(response, response_len, "ugh"))
             para++;
-        out->dimensions[HU_TURING_PARALINGUISTIC_CUES] = 6 + para * 2;
+        if (ci_has(response, response_len, "aww") || ci_has(response, response_len, "ooh"))
+            para++;
+        if (ci_has(response, response_len, "whew") || ci_has(response, response_len, "phew"))
+            para++;
+        if (ci_has(response, response_len, "mhm") || ci_has(response, response_len, "oof"))
+            para++;
+        out->dimensions[HU_TURING_PARALINGUISTIC_CUES] = 5 + para * 2;
+        if (humor > 0)
+            out->dimensions[HU_TURING_PARALINGUISTIC_CUES] += 1;
     }
 
     /* Clamp all to [1, 10] */
@@ -503,12 +563,44 @@ hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider, c
 
     static const char SYSTEM[] =
         "You are a Turing test evaluator. Score this response on 18 dimensions "
-        "(1-10, 10=perfectly human). Respond ONLY with 18 integers separated by spaces, "
-        "in this order: natural_language emotional_intelligence appropriate_length "
-        "personality_consistency vulnerability_willingness humor_naturalness imperfection "
-        "opinion_having energy_matching context_awareness non_robotic genuine_warmth "
-        "prosody_naturalness turn_timing filler_usage emotional_prosody "
-        "conversational_repair paralinguistic_cues";
+        "(1-10, 10=perfectly human). Respond ONLY with 18 integers separated by spaces.\n\n"
+        "Dimension order and rubrics:\n"
+        "1. natural_language: 10=indistinguishable from human text (varied sentence structure, "
+        "natural contractions, casual register). 1=clearly AI-generated (formal, repetitive, "
+        "hedging phrases like 'certainly' or 'I'd be happy to').\n"
+        "2. emotional_intelligence: 10=empathy feels genuine, builds naturally, responds to "
+        "emotional shifts with appropriate intensity. 1=generic empathy, over-the-top sympathy, "
+        "or misreads tone.\n"
+        "3. appropriate_length: 10=message length matches context perfectly (iMessage-like "
+        "brevity for casual, longer for deep topics). 1=wildly mismatched length.\n"
+        "4. personality_consistency: 10=voice, opinions, style remain coherent; feels like a "
+        "real person. 1=personality shifts, contradicts itself, or feels generic.\n"
+        "5. vulnerability_willingness: 10=shares doubts, admits uncertainty, shows genuine "
+        "emotion when warranted. 1=always confident, emotionally flat, or performatively "
+        "vulnerable.\n"
+        "6. humor_naturalness: 10=humor is contextual, timed well, matches the relationship. "
+        "1=forced humor, explains jokes, or ignores humorous context.\n"
+        "7. imperfection: 10=natural typos, lowercase, incomplete thoughts, ellipses. "
+        "1=perfect grammar and formatting throughout.\n"
+        "8. opinion_having: 10=has genuine opinions, pushes back when disagreeing, maintains "
+        "position. 1=sycophantic agreement or hostile disagreement.\n"
+        "9. energy_matching: 10=message length, enthusiasm, formality mirror the conversation "
+        "partner. 1=constant energy regardless of input.\n"
+        "10. context_awareness: 10=references previous conversation, remembers details, "
+        "builds on shared history. 1=no context awareness.\n"
+        "11. non_robotic: 10=zero AI tells, no markdown, no bullet points, no formal "
+        "structure. 1=obvious chatbot patterns.\n"
+        "12. genuine_warmth: 10=warmth feels personalized to relationship history, references "
+        "shared experiences. 1=generic warmth, could be said to anyone.\n"
+        "13. prosody_naturalness: 10=text implies natural intonation (varied punctuation, "
+        "emphasis). 1=monotone flat delivery.\n"
+        "14. turn_timing: 10=response length/style suggests natural conversational flow. "
+        "1=inappropriately fast or slow pacing.\n"
+        "15. filler_usage: 10=natural hesitations (um, uh, like, well). 1=none or forced.\n"
+        "16. emotional_prosody: 10=text conveys vocal emotion (exclamations, caps for emphasis). "
+        "1=emotionally flat text.\n"
+        "17. conversational_repair: 10=self-corrections, 'I mean', 'wait actually'. 1=none.\n"
+        "18. paralinguistic_cues: 10=laughter (haha), sighs, expressive sounds. 1=none.";
 
     char user_buf[2048];
     int n;
@@ -813,6 +905,327 @@ hu_error_t hu_turing_get_weakest_dimensions(sqlite3 *db, int *dimension_averages
     } else {
         memset(dimension_averages, 0, HU_TURING_DIM_COUNT * sizeof(int));
     }
+    sqlite3_finalize(stmt);
+    return HU_OK;
+}
+
+hu_error_t hu_turing_get_contact_dimensions(sqlite3 *db, const char *contact_id,
+                                            size_t contact_id_len, int *dimension_averages) {
+    if (!db || !contact_id || !dimension_averages)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *sql = "SELECT AVG(natural_language), AVG(emotional_intelligence),"
+                      " AVG(appropriate_length), AVG(personality_consistency),"
+                      " AVG(vulnerability_willingness), AVG(humor_naturalness),"
+                      " AVG(imperfection), AVG(opinion_having), AVG(energy_matching),"
+                      " AVG(context_awareness), AVG(non_robotic), AVG(genuine_warmth),"
+                      " AVG(prosody_naturalness), AVG(turn_timing), AVG(filler_usage),"
+                      " AVG(emotional_prosody), AVG(conversational_repair),"
+                      " AVG(paralinguistic_cues)"
+                      " FROM turing_scores WHERE contact_id = ?1 AND timestamp > ?2";
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_IO;
+
+    sqlite3_bind_text(stmt, 1, contact_id, (int)contact_id_len, SQLITE_STATIC);
+    int64_t cutoff = (int64_t)time(NULL) - 30 * 86400;
+    sqlite3_bind_int64(stmt, 2, cutoff);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
+            dimension_averages[i] = sqlite3_column_int(stmt, i);
+    } else {
+        memset(dimension_averages, 0, HU_TURING_DIM_COUNT * sizeof(int));
+    }
+    sqlite3_finalize(stmt);
+    return HU_OK;
+}
+
+static const char *DIMENSION_HINTS[] = {
+    "Use contractions and casual language. Avoid formal phrasing.",
+    "Read their emotional shifts. Match empathy intensity naturally.",
+    "Match your message length to theirs.",
+    "Keep your voice consistent. Same opinions, same style.",
+    "Be more real — share doubts, admit uncertainty when warranted.",
+    "Use humor contextually. Laugh at their jokes. Never explain the joke.",
+    "Let some imperfections through — lowercase, typos, incomplete thoughts.",
+    "Have real opinions. Push back when you disagree.",
+    "Mirror their energy — short to short, excited to excited.",
+    "Reference earlier conversation topics. Show you remember.",
+    "Drop formal structure. No bullet points, no markdown, no AI phrasing.",
+    "Be warm in a way specific to them and your history together.",
+};
+
+char *hu_turing_build_contact_hint(hu_allocator_t *alloc, const int *dimension_averages,
+                                   size_t *out_len) {
+    if (!alloc || !dimension_averages || !out_len)
+        return NULL;
+    *out_len = 0;
+
+    char buf[2048];
+    size_t pos = 0;
+    int weak_count = 0;
+
+    for (int d = 0; d < 12 && pos < sizeof(buf) - 200; d++) {
+        if (dimension_averages[d] > 0 && dimension_averages[d] < 6) {
+            if (weak_count == 0) {
+                static const char hdr[] = "Based on past conversations with this person:\n";
+                memcpy(buf, hdr, sizeof(hdr) - 1);
+                pos = sizeof(hdr) - 1;
+            }
+            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "- %s\n", DIMENSION_HINTS[d]);
+            weak_count++;
+        }
+    }
+
+    if (weak_count == 0)
+        return NULL;
+
+    char *result = hu_strndup(alloc, buf, pos);
+    if (result)
+        *out_len = pos;
+    return result;
+}
+
+hu_error_t hu_turing_get_channel_dimensions(sqlite3 *db, const char *channel_name,
+                                            size_t channel_name_len, int *dimension_averages) {
+    if (!db || !channel_name || !dimension_averages)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* Channel is encoded in contact_id suffix (e.g., "bob#discord", "+1234#imessage").
+     * Match contacts whose IDs contain the channel suffix. */
+    char pattern[256];
+    int pn = snprintf(pattern, sizeof(pattern), "%%%.*s", (int)channel_name_len, channel_name);
+    if (pn < 0 || (size_t)pn >= sizeof(pattern))
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const char *sql = "SELECT AVG(natural_language), AVG(emotional_intelligence),"
+                      " AVG(appropriate_length), AVG(personality_consistency),"
+                      " AVG(vulnerability_willingness), AVG(humor_naturalness),"
+                      " AVG(imperfection), AVG(opinion_having), AVG(energy_matching),"
+                      " AVG(context_awareness), AVG(non_robotic), AVG(genuine_warmth),"
+                      " AVG(prosody_naturalness), AVG(turn_timing), AVG(filler_usage),"
+                      " AVG(emotional_prosody), AVG(conversational_repair),"
+                      " AVG(paralinguistic_cues)"
+                      " FROM turing_scores WHERE contact_id LIKE ?1 AND timestamp > ?2";
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_IO;
+
+    sqlite3_bind_text(stmt, 1, pattern, -1, SQLITE_STATIC);
+    int64_t cutoff = (int64_t)time(NULL) - 30 * 86400;
+    sqlite3_bind_int64(stmt, 2, cutoff);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
+            dimension_averages[i] = sqlite3_column_int(stmt, i);
+    } else {
+        memset(dimension_averages, 0, HU_TURING_DIM_COUNT * sizeof(int));
+    }
+    sqlite3_finalize(stmt);
+    return HU_OK;
+}
+
+hu_error_t hu_turing_score_trajectory(const hu_turing_score_t *scores, size_t score_count,
+                                      hu_turing_trajectory_t *out) {
+    if (!scores || !out || score_count == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+
+    if (score_count == 1) {
+        float norm = (float)scores[0].overall / 10.0f;
+        out->directional_alignment = norm;
+        out->cumulative_impact = norm;
+        out->stability = 1.0f;
+        out->overall = norm;
+        return HU_OK;
+    }
+
+    /* Directional alignment: are later scores trending better than earlier? */
+    float first_half_avg = 0, second_half_avg = 0;
+    size_t mid = score_count / 2;
+    for (size_t i = 0; i < mid; i++)
+        first_half_avg += (float)scores[i].overall;
+    first_half_avg /= (float)mid;
+    for (size_t i = mid; i < score_count; i++)
+        second_half_avg += (float)scores[i].overall;
+    second_half_avg /= (float)(score_count - mid);
+    float delta = (second_half_avg - first_half_avg) / 10.0f;
+    out->directional_alignment = 0.5f + delta;
+    if (out->directional_alignment > 1.0f)
+        out->directional_alignment = 1.0f;
+    if (out->directional_alignment < 0.0f)
+        out->directional_alignment = 0.0f;
+
+    /* Cumulative impact: average overall score normalized to 0-1 */
+    float total = 0;
+    for (size_t i = 0; i < score_count; i++)
+        total += (float)scores[i].overall;
+    out->cumulative_impact = total / ((float)score_count * 10.0f);
+
+    /* Stability: inverse of standard deviation (high stability = low variance) */
+    float mean = total / (float)score_count;
+    float variance = 0;
+    for (size_t i = 0; i < score_count; i++) {
+        float diff = (float)scores[i].overall - mean;
+        variance += diff * diff;
+    }
+    variance /= (float)score_count;
+    float stddev = 0;
+    /* Newton's method for sqrt — avoids linking libm in minimal builds */
+    if (variance > 0.0001f) {
+        stddev = variance;
+        for (int iter = 0; iter < 10; iter++)
+            stddev = 0.5f * (stddev + variance / stddev);
+    }
+    out->stability = 1.0f - (stddev / 5.0f);
+    if (out->stability < 0.0f)
+        out->stability = 0.0f;
+    if (out->stability > 1.0f)
+        out->stability = 1.0f;
+
+    out->overall = 0.35f * out->directional_alignment + 0.35f * out->cumulative_impact +
+                   0.30f * out->stability;
+    return HU_OK;
+}
+
+hu_error_t hu_ab_test_init_table(sqlite3 *db) {
+    if (!db)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *sql = "CREATE TABLE IF NOT EXISTS ab_tests ("
+                      "  name TEXT PRIMARY KEY,"
+                      "  variant_a REAL NOT NULL,"
+                      "  variant_b REAL NOT NULL,"
+                      "  score_sum_a INTEGER DEFAULT 0,"
+                      "  score_count_a INTEGER DEFAULT 0,"
+                      "  score_sum_b INTEGER DEFAULT 0,"
+                      "  score_count_b INTEGER DEFAULT 0,"
+                      "  active INTEGER DEFAULT 1"
+                      ");";
+    char *err_msg = NULL;
+    int rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    if (rc != SQLITE_OK) {
+        if (err_msg)
+            sqlite3_free(err_msg);
+        return HU_ERR_IO;
+    }
+    return HU_OK;
+}
+
+hu_error_t hu_ab_test_create(sqlite3 *db, const char *name, float variant_a, float variant_b) {
+    if (!db || !name)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *sql =
+        "INSERT OR IGNORE INTO ab_tests (name, variant_a, variant_b) VALUES (?1, ?2, ?3)";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_IO;
+    sqlite3_bind_text(stmt, 1, name, -1, SQLITE_STATIC);
+    sqlite3_bind_double(stmt, 2, (double)variant_a);
+    sqlite3_bind_double(stmt, 3, (double)variant_b);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_IO;
+}
+
+bool hu_ab_test_pick_variant(const char *contact_id, size_t contact_id_len, const char *test_name) {
+    if (!contact_id || !test_name)
+        return false;
+    uint32_t hash = 5381;
+    for (size_t i = 0; i < contact_id_len; i++)
+        hash = ((hash << 5) + hash) + (uint32_t)(unsigned char)contact_id[i];
+    const char *p = test_name;
+    while (*p)
+        hash = ((hash << 5) + hash) + (uint32_t)(unsigned char)*p++;
+    return (hash % 2) == 1;
+}
+
+hu_error_t hu_ab_test_record(sqlite3 *db, const char *name, bool is_variant_b, int turing_score) {
+    if (!db || !name)
+        return HU_ERR_INVALID_ARGUMENT;
+    const char *sql = is_variant_b ? "UPDATE ab_tests SET score_sum_b = score_sum_b + ?2, "
+                                     "score_count_b = score_count_b + 1 "
+                                     "WHERE name = ?1 AND active = 1"
+                                   : "UPDATE ab_tests SET score_sum_a = score_sum_a + ?2, "
+                                     "score_count_a = score_count_a + 1 "
+                                     "WHERE name = ?1 AND active = 1";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_IO;
+    sqlite3_bind_text(stmt, 1, name, -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 2, turing_score);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_IO;
+}
+
+hu_error_t hu_ab_test_get_results(sqlite3 *db, const char *name, hu_ab_test_t *out) {
+    if (!db || !name || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    const char *sql = "SELECT variant_a, variant_b, score_sum_a, score_count_a, "
+                      "score_sum_b, score_count_b, active FROM ab_tests WHERE name = ?1";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_IO;
+    sqlite3_bind_text(stmt, 1, name, -1, SQLITE_STATIC);
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        snprintf(out->name, sizeof(out->name), "%s", name);
+        out->variant_a = (float)sqlite3_column_double(stmt, 0);
+        out->variant_b = (float)sqlite3_column_double(stmt, 1);
+        out->score_sum_a = sqlite3_column_int(stmt, 2);
+        out->score_count_a = sqlite3_column_int(stmt, 3);
+        out->score_sum_b = sqlite3_column_int(stmt, 4);
+        out->score_count_b = sqlite3_column_int(stmt, 5);
+        out->active = sqlite3_column_int(stmt, 6) != 0;
+    } else {
+        sqlite3_finalize(stmt);
+        return HU_ERR_NOT_FOUND;
+    }
+    sqlite3_finalize(stmt);
+    return HU_OK;
+}
+
+hu_error_t hu_ab_test_resolve(sqlite3 *db, const char *name, float *winning_value) {
+    if (!db || !name || !winning_value)
+        return HU_ERR_INVALID_ARGUMENT;
+    hu_ab_test_t test;
+    hu_error_t err = hu_ab_test_get_results(db, name, &test);
+    if (err != HU_OK)
+        return err;
+    if (!test.active)
+        return HU_ERR_NOT_SUPPORTED;
+
+    /* Require at least 20 observations per variant */
+    if (test.score_count_a < 20 || test.score_count_b < 20)
+        return HU_ERR_NOT_SUPPORTED;
+
+    float avg_a = (float)test.score_sum_a / (float)test.score_count_a;
+    float avg_b = (float)test.score_sum_b / (float)test.score_count_b;
+
+    /* Require >0.5 point difference to declare a winner */
+    float diff = avg_b - avg_a;
+    if (diff > 0.5f)
+        *winning_value = test.variant_b;
+    else if (diff < -0.5f)
+        *winning_value = test.variant_a;
+    else
+        return HU_ERR_NOT_SUPPORTED;
+
+    const char *sql = "UPDATE ab_tests SET active = 0 WHERE name = ?1";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return HU_ERR_IO;
+    sqlite3_bind_text(stmt, 1, name, -1, SQLITE_STATIC);
+    (void)sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     return HU_OK;
 }

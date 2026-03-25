@@ -3,13 +3,13 @@
 #include "human/agent/hula_compiler.h"
 #include "human/agent/hula_emergence.h"
 #include "human/agent/hula_lite.h"
-#include "human/security.h"
 #include "human/agent/spawn.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/provider.h"
+#include "human/security.h"
 #include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,8 +22,8 @@
 
 /* ── Stub tool for testing ──────────────────────────────────────────────── */
 
-static hu_error_t echo_execute(void *ctx, hu_allocator_t *alloc,
-                                const hu_json_value_t *args, hu_tool_result_t *out) {
+static hu_error_t echo_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
+                               hu_tool_result_t *out) {
     (void)ctx;
     const char *text = hu_json_get_string(args, "text");
     if (text) {
@@ -36,29 +36,53 @@ static hu_error_t echo_execute(void *ctx, hu_allocator_t *alloc,
     return HU_OK;
 }
 
-static const char *echo_name(void *ctx) { (void)ctx; return "echo"; }
-static const char *echo_desc(void *ctx) { (void)ctx; return "Echoes text"; }
-static const char *echo_params(void *ctx) { (void)ctx; return "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}}}"; }
+static const char *echo_name(void *ctx) {
+    (void)ctx;
+    return "echo";
+}
+static const char *echo_desc(void *ctx) {
+    (void)ctx;
+    return "Echoes text";
+}
+static const char *echo_params(void *ctx) {
+    (void)ctx;
+    return "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}}}";
+}
 
 static const hu_tool_vtable_t echo_vtable = {
-    .execute = echo_execute, .name = echo_name,
-    .description = echo_desc, .parameters_json = echo_params,
+    .execute = echo_execute,
+    .name = echo_name,
+    .description = echo_desc,
+    .parameters_json = echo_params,
 };
 
-static hu_error_t fail_execute(void *ctx, hu_allocator_t *alloc,
-                                const hu_json_value_t *args, hu_tool_result_t *out) {
-    (void)ctx; (void)alloc; (void)args;
+static hu_error_t fail_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
+                               hu_tool_result_t *out) {
+    (void)ctx;
+    (void)alloc;
+    (void)args;
     *out = hu_tool_result_fail("intentional failure", 19);
     return HU_OK;
 }
 
-static const char *fail_name(void *ctx) { (void)ctx; return "fail_tool"; }
-static const char *fail_desc(void *ctx) { (void)ctx; return "Always fails"; }
-static const char *fail_params(void *ctx) { (void)ctx; return "{}"; }
+static const char *fail_name(void *ctx) {
+    (void)ctx;
+    return "fail_tool";
+}
+static const char *fail_desc(void *ctx) {
+    (void)ctx;
+    return "Always fails";
+}
+static const char *fail_params(void *ctx) {
+    (void)ctx;
+    return "{}";
+}
 
 static const hu_tool_vtable_t fail_vtable = {
-    .execute = fail_execute, .name = fail_name,
-    .description = fail_desc, .parameters_json = fail_params,
+    .execute = fail_execute,
+    .name = fail_name,
+    .description = fail_desc,
+    .parameters_json = fail_params,
 };
 
 static int flaky_hits;
@@ -74,16 +98,24 @@ static hu_error_t flaky_execute(void *ctx, hu_allocator_t *alloc, const hu_json_
     return echo_execute(ctx, alloc, args, out);
 }
 
-static const char *flaky_name(void *ctx) { (void)ctx; return "flaky_tool"; }
-static const char *flaky_desc(void *ctx) { (void)ctx; return "Fails twice"; }
+static const char *flaky_name(void *ctx) {
+    (void)ctx;
+    return "flaky_tool";
+}
+static const char *flaky_desc(void *ctx) {
+    (void)ctx;
+    return "Fails twice";
+}
 static const char *flaky_params(void *ctx) {
     (void)ctx;
     return "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}}}";
 }
 
 static const hu_tool_vtable_t flaky_vtable = {
-    .execute = flaky_execute, .name = flaky_name,
-    .description = flaky_desc, .parameters_json = flaky_params,
+    .execute = flaky_execute,
+    .name = flaky_name,
+    .description = flaky_desc,
+    .parameters_json = flaky_params,
 };
 
 /* High-risk tool name for policy tests — must never execute if policy blocks first */
@@ -96,13 +128,24 @@ static hu_error_t shell_stub_execute(void *ctx, hu_allocator_t *alloc, const hu_
     return HU_OK;
 }
 
-static const char *shell_stub_name(void *ctx) { (void)ctx; return "shell"; }
-static const char *shell_stub_desc(void *ctx) { (void)ctx; return "Shell stub"; }
-static const char *shell_stub_params(void *ctx) { (void)ctx; return "{}"; }
+static const char *shell_stub_name(void *ctx) {
+    (void)ctx;
+    return "shell";
+}
+static const char *shell_stub_desc(void *ctx) {
+    (void)ctx;
+    return "Shell stub";
+}
+static const char *shell_stub_params(void *ctx) {
+    (void)ctx;
+    return "{}";
+}
 
 static const hu_tool_vtable_t shell_stub_vtable = {
-    .execute = shell_stub_execute, .name = shell_stub_name,
-    .description = shell_stub_desc, .parameters_json = shell_stub_params,
+    .execute = shell_stub_execute,
+    .name = shell_stub_name,
+    .description = shell_stub_desc,
+    .parameters_json = shell_stub_params,
 };
 
 static hu_tool_t make_tools(hu_tool_t *buf) {
@@ -186,10 +229,9 @@ static void hula_program_alloc_node_respects_max(void) {
 
 static void hula_parse_simple_call(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"greet\",\"version\":1,"
-        "\"root\":{\"op\":\"call\",\"id\":\"c1\",\"tool\":\"echo\","
-        "\"args\":{\"text\":\"hello\"}}}";
+    const char *json = "{\"name\":\"greet\",\"version\":1,"
+                       "\"root\":{\"op\":\"call\",\"id\":\"c1\",\"tool\":\"echo\","
+                       "\"args\":{\"text\":\"hello\"}}}";
     hu_hula_program_t prog;
     hu_error_t err = hu_hula_parse_json(&alloc, json, strlen(json), &prog);
     HU_ASSERT_EQ(err, HU_OK);
@@ -224,12 +266,11 @@ static void hula_parse_seq_with_children(void) {
 
 static void hula_parse_branch(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"cond\",\"root\":{\"op\":\"branch\",\"id\":\"b1\","
-        "\"pred\":\"success\","
-        "\"then\":{\"op\":\"call\",\"id\":\"t1\",\"tool\":\"echo\",\"args\":{}},"
-        "\"else\":{\"op\":\"call\",\"id\":\"e1\",\"tool\":\"echo\",\"args\":{}}"
-        "}}";
+    const char *json = "{\"name\":\"cond\",\"root\":{\"op\":\"branch\",\"id\":\"b1\","
+                       "\"pred\":\"success\","
+                       "\"then\":{\"op\":\"call\",\"id\":\"t1\",\"tool\":\"echo\",\"args\":{}},"
+                       "\"else\":{\"op\":\"call\",\"id\":\"e1\",\"tool\":\"echo\",\"args\":{}}"
+                       "}}";
     hu_hula_program_t prog;
     hu_error_t err = hu_hula_parse_json(&alloc, json, strlen(json), &prog);
     HU_ASSERT_EQ(err, HU_OK);
@@ -260,9 +301,8 @@ static void hula_parse_loop(void) {
 
 static void hula_parse_delegate(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"spawn\",\"root\":{\"op\":\"delegate\",\"id\":\"d1\","
-        "\"goal\":\"search the web\",\"model\":\"gpt-4\"}}";
+    const char *json = "{\"name\":\"spawn\",\"root\":{\"op\":\"delegate\",\"id\":\"d1\","
+                       "\"goal\":\"search the web\",\"model\":\"gpt-4\"}}";
     hu_hula_program_t prog;
     hu_error_t err = hu_hula_parse_json(&alloc, json, strlen(json), &prog);
     HU_ASSERT_EQ(err, HU_OK);
@@ -275,9 +315,8 @@ static void hula_parse_delegate(void) {
 
 static void hula_parse_emit(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"out\",\"root\":{\"op\":\"emit\",\"id\":\"e1\","
-        "\"emit_key\":\"response\",\"emit_value\":\"done\"}}";
+    const char *json = "{\"name\":\"out\",\"root\":{\"op\":\"emit\",\"id\":\"e1\","
+                       "\"emit_key\":\"response\",\"emit_value\":\"done\"}}";
     hu_hula_program_t prog;
     hu_error_t err = hu_hula_parse_json(&alloc, json, strlen(json), &prog);
     HU_ASSERT_EQ(err, HU_OK);
@@ -418,9 +457,8 @@ static void hula_validate_emit_missing_key(void) {
 
 static void hula_exec_simple_call(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"run\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
-        "\"tool\":\"echo\",\"args\":{\"text\":\"hi\"}}}";
+    const char *json = "{\"name\":\"run\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+                       "\"tool\":\"echo\",\"args\":{\"text\":\"hi\"}}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
 
@@ -472,7 +510,8 @@ static void hula_exec_call_substitutes_dollar_node_id_in_args(void) {
         "{\"name\":\"refs\",\"root\":{\"op\":\"seq\",\"id\":\"s1\","
         "\"children\":["
         "{\"op\":\"call\",\"id\":\"first\",\"tool\":\"echo\",\"args\":{\"text\":\"alpha\"}},"
-        "{\"op\":\"call\",\"id\":\"second\",\"tool\":\"echo\",\"args\":{\"text\":\"pre.$first.suf\"}}"
+        "{\"op\":\"call\",\"id\":\"second\",\"tool\":\"echo\",\"args\":{\"text\":\"pre.$first."
+        "suf\"}}"
         "]}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
@@ -494,9 +533,8 @@ static void hula_exec_call_substitutes_dollar_node_id_in_args(void) {
 
 static void hula_exec_call_dollar_ref_unknown_id_fails(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"badref\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
-        "\"tool\":\"echo\",\"args\":{\"text\":\"$noSuchId\"}}}";
+    const char *json = "{\"name\":\"badref\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+                       "\"tool\":\"echo\",\"args\":{\"text\":\"$noSuchId\"}}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
 
@@ -516,9 +554,8 @@ static void hula_exec_call_dollar_ref_unknown_id_fails(void) {
 
 static void hula_exec_call_args_double_dollar_is_literal_dollar(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"esc\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
-        "\"tool\":\"echo\",\"args\":{\"text\":\"$$5 and $$\"}}}";
+    const char *json = "{\"name\":\"esc\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+                       "\"tool\":\"echo\",\"args\":{\"text\":\"$$5 and $$\"}}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
 
@@ -627,7 +664,8 @@ static void hula_exec_branch_takes_else_on_failure(void) {
         "{\"op\":\"call\",\"id\":\"c1\",\"tool\":\"fail_tool\",\"args\":{}},"
         "{\"op\":\"branch\",\"id\":\"b1\",\"pred\":\"success\","
         "\"then\":{\"op\":\"call\",\"id\":\"t1\",\"tool\":\"echo\",\"args\":{\"text\":\"yes\"}},"
-        "\"else\":{\"op\":\"call\",\"id\":\"e1\",\"tool\":\"echo\",\"args\":{\"text\":\"fallback\"}}"
+        "\"else\":{\"op\":\"call\",\"id\":\"e1\",\"tool\":\"echo\",\"args\":{\"text\":\"fallback\"}"
+        "}"
         "}]}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
@@ -669,9 +707,8 @@ static void hula_exec_loop_bounded(void) {
 
 static void hula_exec_delegate_stub(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"spawn\",\"root\":{\"op\":\"delegate\",\"id\":\"d1\","
-        "\"goal\":\"find docs\"}}";
+    const char *json = "{\"name\":\"spawn\",\"root\":{\"op\":\"delegate\",\"id\":\"d1\","
+                       "\"goal\":\"find docs\"}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
 
@@ -690,9 +727,8 @@ static void hula_exec_delegate_stub(void) {
 
 static void hula_exec_emit_static_value(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"out\",\"root\":{\"op\":\"emit\",\"id\":\"e1\","
-        "\"emit_key\":\"result\",\"emit_value\":\"completed\"}}";
+    const char *json = "{\"name\":\"out\",\"root\":{\"op\":\"emit\",\"id\":\"e1\","
+                       "\"emit_key\":\"result\",\"emit_value\":\"completed\"}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
 
@@ -711,9 +747,8 @@ static void hula_exec_emit_static_value(void) {
 
 static void hula_exec_call_unknown_tool(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"bad\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
-        "\"tool\":\"nonexistent\",\"args\":{}}}";
+    const char *json = "{\"name\":\"bad\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+                       "\"tool\":\"nonexistent\",\"args\":{}}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
 
@@ -733,12 +768,11 @@ static void hula_exec_call_unknown_tool(void) {
 
 static void hula_roundtrip_preserves_structure(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"rt\",\"version\":1,"
-        "\"root\":{\"op\":\"seq\",\"id\":\"s1\","
-        "\"children\":["
-        "{\"op\":\"call\",\"id\":\"c1\",\"tool\":\"echo\",\"args\":{\"text\":\"x\"}}"
-        "]}}";
+    const char *json = "{\"name\":\"rt\",\"version\":1,"
+                       "\"root\":{\"op\":\"seq\",\"id\":\"s1\","
+                       "\"children\":["
+                       "{\"op\":\"call\",\"id\":\"c1\",\"tool\":\"echo\",\"args\":{\"text\":\"x\"}}"
+                       "]}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
 
@@ -850,8 +884,10 @@ static void hula_from_plan_with_deps(void) {
     hu_plan_step_t steps[3] = {
         {.tool_name = "echo", .args_json = "{\"text\":\"a\"}"},
         {.tool_name = "echo", .args_json = "{\"text\":\"b\"}"},
-        {.tool_name = "echo", .args_json = "{\"text\":\"c\"}",
-         .depends_count = 2, .depends_on = {0, 1}},
+        {.tool_name = "echo",
+         .args_json = "{\"text\":\"c\"}",
+         .depends_count = 2,
+         .depends_on = {0, 1}},
     };
     hu_plan_t plan = {.steps = steps, .steps_count = 3, .steps_cap = 3};
 
@@ -910,9 +946,8 @@ static void hula_from_dag_parallel_roots(void) {
 
 static void hula_policy_locked_blocks_call(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"blocked\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
-        "\"tool\":\"echo\",\"args\":{\"text\":\"nope\"}}}";
+    const char *json = "{\"name\":\"blocked\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+                       "\"tool\":\"echo\",\"args\":{\"text\":\"nope\"}}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
 
@@ -937,9 +972,8 @@ static void hula_policy_locked_blocks_call(void) {
 
 static void hula_policy_high_risk_blocked(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"risky\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
-        "\"tool\":\"shell\",\"args\":{}}}";
+    const char *json = "{\"name\":\"risky\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+                       "\"tool\":\"shell\",\"args\":{}}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
 
@@ -1007,7 +1041,8 @@ typedef struct {
 
 static void test_obs_record(void *ctx, const hu_observer_event_t *ev) {
     test_obs_ctx_t *t = (test_obs_ctx_t *)ctx;
-    if (ev->tag == HU_OBSERVER_EVENT_TOOL_CALL_START) t->start_count++;
+    if (ev->tag == HU_OBSERVER_EVENT_TOOL_CALL_START)
+        t->start_count++;
     if (ev->tag == HU_OBSERVER_EVENT_TOOL_CALL) {
         t->call_count++;
         t->last_success = ev->data.tool_call.success;
@@ -1015,14 +1050,16 @@ static void test_obs_record(void *ctx, const hu_observer_event_t *ev) {
 }
 
 static const hu_observer_vtable_t test_obs_vtable = {
-    .record_event = test_obs_record, .name = NULL, .flush = NULL, .deinit = NULL,
+    .record_event = test_obs_record,
+    .name = NULL,
+    .flush = NULL,
+    .deinit = NULL,
 };
 
 static void hula_observer_receives_events(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"obs\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
-        "\"tool\":\"echo\",\"args\":{\"text\":\"hey\"}}}";
+    const char *json = "{\"name\":\"obs\",\"root\":{\"op\":\"call\",\"id\":\"c1\","
+                       "\"tool\":\"echo\",\"args\":{\"text\":\"hey\"}}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
 
@@ -1058,8 +1095,10 @@ static void hula_e2e_full_pipeline(void) {
         "{\"op\":\"call\",\"id\":\"fetch2\",\"tool\":\"echo\",\"args\":{\"text\":\"data_b\"}}"
         "]},"
         "{\"op\":\"branch\",\"id\":\"check\",\"pred\":\"success\","
-        "\"then\":{\"op\":\"call\",\"id\":\"process\",\"tool\":\"echo\",\"args\":{\"text\":\"processed\"}},"
-        "\"else\":{\"op\":\"emit\",\"id\":\"err_out\",\"emit_key\":\"error\",\"emit_value\":\"failed\"}"
+        "\"then\":{\"op\":\"call\",\"id\":\"process\",\"tool\":\"echo\",\"args\":{\"text\":"
+        "\"processed\"}},"
+        "\"else\":{\"op\":\"emit\",\"id\":\"err_out\",\"emit_key\":\"error\",\"emit_value\":"
+        "\"failed\"}"
         "},"
         "{\"op\":\"emit\",\"id\":\"result\",\"emit_key\":\"output\",\"emit_value\":\"$process\"}"
         "]}}";
@@ -1109,7 +1148,7 @@ static void hula_e2e_full_pipeline(void) {
     HU_ASSERT_EQ(hu_hula_exec_result(&exec, "main")->status, HU_HULA_DONE);
 
     /* 6. Verify observer captured all tool calls */
-    HU_ASSERT_EQ(obs_ctx.start_count, 3);  /* fetch1, fetch2, process */
+    HU_ASSERT_EQ(obs_ctx.start_count, 3); /* fetch1, fetch2, process */
     HU_ASSERT_EQ(obs_ctx.call_count, 3);
 
     /* 7. Verify trace log is valid JSON with all nodes */
@@ -1163,8 +1202,8 @@ static void hula_extract_and_strip_program_tags(void) {
         "{\"name\":\"t\",\"version\":1,\"root\":{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\","
         "\"args\":{\"text\":\"z\"}}}";
     char wrapped[512];
-    int wn = snprintf(wrapped, sizeof(wrapped), "Preamble <hula_program>%s</hula_program> tail",
-                      inner);
+    int wn =
+        snprintf(wrapped, sizeof(wrapped), "Preamble <hula_program>%s</hula_program> tail", inner);
     HU_ASSERT_TRUE(wn > 0 && (size_t)wn < sizeof(wrapped));
 
     hu_hula_program_t prog;
@@ -1184,10 +1223,9 @@ static void hula_extract_and_strip_program_tags(void) {
 
 static void hula_cost_estimate_bounds(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *par_json =
-        "{\"name\":\"p\",\"root\":{\"op\":\"par\",\"id\":\"r\",\"children\":["
-        "{\"op\":\"call\",\"id\":\"a\",\"tool\":\"echo\",\"args\":{}},"
-        "{\"op\":\"call\",\"id\":\"b\",\"tool\":\"echo\",\"args\":{}}]}}";
+    const char *par_json = "{\"name\":\"p\",\"root\":{\"op\":\"par\",\"id\":\"r\",\"children\":["
+                           "{\"op\":\"call\",\"id\":\"a\",\"tool\":\"echo\",\"args\":{}},"
+                           "{\"op\":\"call\",\"id\":\"b\",\"tool\":\"echo\",\"args\":{}}]}}";
     hu_hula_program_t parp;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, par_json, strlen(par_json), &parp), HU_OK);
     hu_hula_cost_estimate_t est;
@@ -1206,10 +1244,9 @@ static void hula_cost_estimate_bounds(void) {
     HU_ASSERT_EQ(est.estimated_tool_calls, 2u);
     hu_hula_program_deinit(&loopp);
 
-    const char *del_json =
-        "{\"name\":\"d\",\"root\":{\"op\":\"seq\",\"id\":\"s\",\"children\":["
-        "{\"op\":\"delegate\",\"id\":\"d1\",\"goal\":\"sub\"},"
-        "{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\",\"args\":{}}]}}";
+    const char *del_json = "{\"name\":\"d\",\"root\":{\"op\":\"seq\",\"id\":\"s\",\"children\":["
+                           "{\"op\":\"delegate\",\"id\":\"d1\",\"goal\":\"sub\"},"
+                           "{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\",\"args\":{}}]}}";
     hu_hula_program_t delp;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, del_json, strlen(del_json), &delp), HU_OK);
     hu_hula_estimate_cost(&delp, &est);
@@ -1288,7 +1325,7 @@ static void hula_emergence_persist_scan_promote(void) {
 
     const char *tr_json = "[{\"op\":\"call\",\"tool\":\"z\"}]";
     HU_ASSERT_EQ(hu_hula_trace_persist(&alloc, tr, tr_json, strlen(tr_json), "unitprog", 8, true,
-                                       NULL, 0),
+                                       NULL, 0, NULL, 0),
                  HU_OK);
 
     char **patterns = NULL;
@@ -1346,7 +1383,7 @@ static void hula_trace_persist_embeds_program_field(void) {
         "{\"name\":\"emb\",\"version\":1,\"root\":{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\","
         "\"args\":{\"text\":\"x\"}}}";
     HU_ASSERT_EQ(hu_hula_trace_persist(&alloc, td, trace_a, strlen(trace_a), "emb", 3, true, prog,
-                                       strlen(prog)),
+                                       strlen(prog), NULL, 0),
                  HU_OK);
     DIR *d = opendir(td);
     HU_ASSERT_NOT_NULL(d);
@@ -1393,7 +1430,8 @@ static void hula_trace_persist_embeds_program_from_to_json(void) {
     HU_ASSERT_NOT_NULL(pj);
     char td[] = "/tmp/hu_hula_tjsnap_XXXXXX";
     HU_ASSERT_NOT_NULL(mkdtemp(td));
-    HU_ASSERT_EQ(hu_hula_trace_persist(&alloc, td, "[]", 2, "tj", 2, true, pj, pjl), HU_OK);
+    HU_ASSERT_EQ(hu_hula_trace_persist(&alloc, td, "[]", 2, "tj", 2, true, pj, pjl, NULL, 0),
+                 HU_OK);
     hu_str_free(&alloc, pj);
     hu_hula_program_deinit(&prog);
 
@@ -1462,20 +1500,20 @@ static void hula_compiler_chat_compile_execute_mock(void) {
         "{\"op\":\"call\",\"id\":\"b\",\"tool\":\"echo\",\"args\":{\"text\":\"y\"}}]}}";
     hula_compiler_mock_chat_ctx_t mctx = {.json = json};
     bool ok = false;
-    HU_ASSERT_EQ(hu_hula_compiler_chat_compile_execute(
-                     &alloc, "goal", 4, tools, 2, NULL, NULL, NULL, NULL, hula_compiler_mock_chat,
-                     &mctx, "gpt-4", 5, 0.7, NULL, 0, NULL, NULL, &ok),
+    HU_ASSERT_EQ(hu_hula_compiler_chat_compile_execute(&alloc, "goal", 4, tools, 2, NULL, NULL,
+                                                       NULL, NULL, hula_compiler_mock_chat, &mctx,
+                                                       "gpt-4", 5, 0.7, NULL, 0, NULL, NULL, &ok),
                  HU_OK);
     HU_ASSERT_TRUE(ok);
 }
 
 static void hula_exec_try_catch_invokes_catch(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"t\",\"version\":1,\"root\":{\"op\":\"try\",\"id\":\"tr\","
-        "\"body\":{\"op\":\"call\",\"id\":\"b\",\"tool\":\"fail_tool\",\"args\":{}},"
-        "\"catch\":{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\",\"args\":{\"text\":\"recovered\"}}"
-        "}}";
+    const char *json = "{\"name\":\"t\",\"version\":1,\"root\":{\"op\":\"try\",\"id\":\"tr\","
+                       "\"body\":{\"op\":\"call\",\"id\":\"b\",\"tool\":\"fail_tool\",\"args\":{}},"
+                       "\"catch\":{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\",\"args\":{"
+                       "\"text\":\"recovered\"}}"
+                       "}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
     hu_tool_t tools[2];
@@ -1563,7 +1601,10 @@ static void hula_cancel_obs_record(void *ctx, const hu_observer_event_t *ev) {
 }
 
 static const hu_observer_vtable_t hula_cancel_obs_vtable = {
-    .record_event = hula_cancel_obs_record, .name = NULL, .flush = NULL, .deinit = NULL,
+    .record_event = hula_cancel_obs_record,
+    .name = NULL,
+    .flush = NULL,
+    .deinit = NULL,
 };
 
 static void hula_exec_cancel_marks_following_node(void) {
@@ -1604,15 +1645,17 @@ static void hula_lifecycle_obs_record(void *ctx, const hu_observer_event_t *ev) 
 }
 
 static const hu_observer_vtable_t hula_lifecycle_obs_vtable = {
-    .record_event = hula_lifecycle_obs_record, .name = NULL, .flush = NULL, .deinit = NULL,
+    .record_event = hula_lifecycle_obs_record,
+    .name = NULL,
+    .flush = NULL,
+    .deinit = NULL,
 };
 
 static void hula_observer_emits_hula_lifecycle(void) {
     hula_lifecycle_ns = hula_lifecycle_ne = hula_lifecycle_pe = 0;
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"o\",\"root\":{\"op\":\"call\",\"id\":\"c1\",\"tool\":\"echo\","
-        "\"args\":{\"text\":\"z\"}}}";
+    const char *json = "{\"name\":\"o\",\"root\":{\"op\":\"call\",\"id\":\"c1\",\"tool\":\"echo\","
+                       "\"args\":{\"text\":\"z\"}}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
     hu_tool_t tools[2];
@@ -1631,9 +1674,9 @@ static void hula_observer_emits_hula_lifecycle(void) {
 static void hula_retry_flaky_eventually_succeeds(void) {
     flaky_hits = 0;
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{\"name\":\"f\",\"version\":1,\"root\":{\"op\":\"call\",\"id\":\"f1\",\"tool\":\"flaky_tool\","
-        "\"args\":{\"text\":\"done\"},\"retry_count\":2}}";
+    const char *json = "{\"name\":\"f\",\"version\":1,\"root\":{\"op\":\"call\",\"id\":\"f1\","
+                       "\"tool\":\"flaky_tool\","
+                       "\"args\":{\"text\":\"done\"},\"retry_count\":2}}";
     hu_hula_program_t prog;
     HU_ASSERT_EQ(hu_hula_parse_json(&alloc, json, strlen(json), &prog), HU_OK);
     hu_tool_t tools[3];
@@ -1695,8 +1738,9 @@ static void hula_compiler_prompt_includes_finance_domain_example(void) {
 
 static int hula_repair_chat_i;
 
-static hu_error_t hula_repair_mock_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_request_t *req,
-                                        const char *model, size_t model_len, double temperature,
+static hu_error_t hula_repair_mock_chat(void *ctx, hu_allocator_t *alloc,
+                                        const hu_chat_request_t *req, const char *model,
+                                        size_t model_len, double temperature,
                                         hu_chat_response_t *out) {
     (void)ctx;
     (void)model;
@@ -1726,9 +1770,9 @@ static void hula_compiler_repair_validates_on_second_attempt(void) {
     hu_tool_t tools[2];
     (void)make_tools(tools);
     bool ok = false;
-    HU_ASSERT_EQ(hu_hula_compiler_chat_compile_execute(
-                     &alloc, "g", 1, tools, 2, NULL, NULL, NULL, NULL, hula_repair_mock_chat, NULL,
-                     "m", 1, 0.0, NULL, 0, NULL, NULL, &ok),
+    HU_ASSERT_EQ(hu_hula_compiler_chat_compile_execute(&alloc, "g", 1, tools, 2, NULL, NULL, NULL,
+                                                       NULL, hula_repair_mock_chat, NULL, "m", 1,
+                                                       0.0, NULL, 0, NULL, NULL, &ok),
                  HU_OK);
     HU_ASSERT_TRUE(ok);
     HU_ASSERT_EQ(hula_repair_chat_i, 2);

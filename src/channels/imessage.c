@@ -1693,7 +1693,8 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "   WHERE maj3.message_id = m.ROWID AND a3.filename IS NOT NULL "
         "   AND (LOWER(a3.filename) LIKE '%.caf' OR LOWER(a3.filename) LIKE '%.m4a' "
         "     OR LOWER(a3.filename) LIKE '%.mp3' OR LOWER(a3.filename) LIKE '%.aac' "
-        "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio "
+        "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio, "
+        "  CASE WHEN m.date_edited > 0 THEN 1 ELSE 0 END AS was_edited "
         "FROM message m "
         "JOIN handle h ON m.handle_id = h.ROWID "
         "WHERE m.is_from_me = 0 AND m.associated_message_type = 0 "
@@ -1734,6 +1735,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         int has_video = sqlite3_column_int(stmt, 6);
         int has_audio = sqlite3_column_int(stmt, 7);
         (void)has_audio;
+        int was_edited = sqlite3_column_int(stmt, 8);
 
         if (!text || !handle)
             continue;
@@ -1787,6 +1789,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         } else {
             msgs[count].guid[0] = '\0';
         }
+        msgs[count].was_edited = (was_edited != 0);
 
         c->last_rowid = rowid;
         count++;

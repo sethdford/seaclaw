@@ -1,11 +1,12 @@
 #include "human/agent/gvr.h"
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 #ifndef HU_IS_TEST
 #define HU_IS_TEST 0
 #endif
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static const char GVR_VERIFY_SYS[] =
     "You are a verification assistant. Given the original prompt and a response, "
     "check for factual errors, hallucinations, tool-output misuse, or incomplete answers. "
@@ -16,14 +17,20 @@ static const char GVR_REVISE_SYS[] =
     "You are a revision assistant. Given the original prompt, a previous response, "
     "and a critique identifying errors, produce a corrected response that addresses "
     "all issues raised in the critique.";
+#endif
 
 static char *gvr_dup(hu_allocator_t *alloc, const char *s, size_t len) {
-    if (!s || len == 0) return NULL;
+    if (!s || len == 0)
+        return NULL;
     char *d = (char *)alloc->alloc(alloc->ctx, len + 1);
-    if (d) { memcpy(d, s, len); d[len] = '\0'; }
+    if (d) {
+        memcpy(d, s, len);
+        d[len] = '\0';
+    }
     return d;
 }
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
 static hu_gvr_verdict_t parse_verdict(const char *text, size_t text_len,
                                       const char **critique_start, size_t *critique_out_len) {
     *critique_start = NULL;
@@ -40,7 +47,8 @@ static hu_gvr_verdict_t parse_verdict(const char *text, size_t text_len,
     if (text_len - i >= 4 && (memcmp(text + i, "PASS", 4) == 0)) {
         if (i + 4 < text_len && text[i + 4] == ':') {
             size_t cs = i + 5;
-            while (cs < text_len && text[cs] == ' ') cs++;
+            while (cs < text_len && text[cs] == ' ')
+                cs++;
             *critique_start = text + cs;
             *critique_out_len = text_len - cs;
         }
@@ -50,7 +58,8 @@ static hu_gvr_verdict_t parse_verdict(const char *text, size_t text_len,
     if (text_len - i >= 4 && (memcmp(text + i, "FAIL", 4) == 0)) {
         if (i + 4 < text_len && text[i + 4] == ':') {
             size_t cs = i + 5;
-            while (cs < text_len && text[cs] == ' ') cs++;
+            while (cs < text_len && text[cs] == ' ')
+                cs++;
             *critique_start = text + cs;
             *critique_out_len = text_len - cs;
         } else {
@@ -65,12 +74,11 @@ static hu_gvr_verdict_t parse_verdict(const char *text, size_t text_len,
     *critique_out_len = text_len - i;
     return HU_GVR_FAIL;
 }
+#endif
 
-hu_error_t hu_gvr_check(hu_allocator_t *alloc, hu_provider_t *provider,
-                        const char *model, size_t model_len,
-                        const char *original_prompt, size_t original_prompt_len,
-                        const char *response, size_t response_len,
-                        hu_gvr_check_result_t *out) {
+hu_error_t hu_gvr_check(hu_allocator_t *alloc, hu_provider_t *provider, const char *model,
+                        size_t model_len, const char *original_prompt, size_t original_prompt_len,
+                        const char *response, size_t response_len, hu_gvr_check_result_t *out) {
     if (!alloc || !provider || !out)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -95,7 +103,9 @@ hu_error_t hu_gvr_check(hu_allocator_t *alloc, hu_provider_t *provider,
     } else {
         out->verdict = HU_GVR_PASS;
     }
-    (void)provider; (void)model; (void)model_len;
+    (void)provider;
+    (void)model;
+    (void)model_len;
     (void)original_prompt_len;
     return HU_OK;
 #else
@@ -105,18 +115,16 @@ hu_error_t hu_gvr_check(hu_allocator_t *alloc, hu_provider_t *provider,
     char user_msg[8192];
     int n = snprintf(user_msg, sizeof(user_msg),
                      "Original prompt:\n\"%.*s\"\n\nResponse to verify:\n\"%.*s\"",
-                     (int)(original_prompt_len < 3000 ? original_prompt_len : 3000), original_prompt,
-                     (int)(response_len < 4000 ? response_len : 4000), response);
-    if (n < 0) n = 0;
+                     (int)(original_prompt_len < 3000 ? original_prompt_len : 3000),
+                     original_prompt, (int)(response_len < 4000 ? response_len : 4000), response);
+    if (n < 0)
+        n = 0;
 
     char *verify_out = NULL;
     size_t verify_out_len = 0;
     hu_error_t err = provider->vtable->chat_with_system(
-        provider->ctx, alloc,
-        GVR_VERIFY_SYS, sizeof(GVR_VERIFY_SYS) - 1,
-        user_msg, (size_t)n,
-        model ? model : "", model_len,
-        0.0, &verify_out, &verify_out_len);
+        provider->ctx, alloc, GVR_VERIFY_SYS, sizeof(GVR_VERIFY_SYS) - 1, user_msg, (size_t)n,
+        model ? model : "", model_len, 0.0, &verify_out, &verify_out_len);
 
     if (err != HU_OK)
         return err;
@@ -135,12 +143,10 @@ hu_error_t hu_gvr_check(hu_allocator_t *alloc, hu_provider_t *provider,
 #endif
 }
 
-hu_error_t hu_gvr_revise(hu_allocator_t *alloc, hu_provider_t *provider,
-                         const char *model, size_t model_len,
-                         const char *original_prompt, size_t original_prompt_len,
-                         const char *response, size_t response_len,
-                         const char *critique, size_t critique_len,
-                         char **revised_out, size_t *revised_out_len) {
+hu_error_t hu_gvr_revise(hu_allocator_t *alloc, hu_provider_t *provider, const char *model,
+                         size_t model_len, const char *original_prompt, size_t original_prompt_len,
+                         const char *response, size_t response_len, const char *critique,
+                         size_t critique_len, char **revised_out, size_t *revised_out_len) {
     if (!alloc || !provider || !revised_out || !revised_out_len)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -153,10 +159,15 @@ hu_error_t hu_gvr_revise(hu_allocator_t *alloc, hu_provider_t *provider,
     size_t fixed_len = strlen(fixed);
     *revised_out = gvr_dup(alloc, fixed, fixed_len);
     *revised_out_len = fixed_len;
-    (void)provider; (void)model; (void)model_len;
-    (void)original_prompt; (void)original_prompt_len;
-    (void)response; (void)response_len;
-    (void)critique; (void)critique_len;
+    (void)provider;
+    (void)model;
+    (void)model_len;
+    (void)original_prompt;
+    (void)original_prompt_len;
+    (void)response;
+    (void)response_len;
+    (void)critique;
+    (void)critique_len;
     return *revised_out ? HU_OK : HU_ERR_OUT_OF_MEMORY;
 #else
     if (!provider->vtable || !provider->vtable->chat_with_system)
@@ -168,26 +179,23 @@ hu_error_t hu_gvr_revise(hu_allocator_t *alloc, hu_provider_t *provider,
                      "Previous response:\n\"%.*s\"\n\n"
                      "Critique (issues to fix):\n\"%.*s\"\n\n"
                      "Produce a corrected response:",
-                     (int)(original_prompt_len < 2000 ? original_prompt_len : 2000), original_prompt,
-                     (int)(response_len < 4000 ? response_len : 4000), response,
+                     (int)(original_prompt_len < 2000 ? original_prompt_len : 2000),
+                     original_prompt, (int)(response_len < 4000 ? response_len : 4000), response,
                      (int)(critique_len < 2000 ? critique_len : 2000), critique);
-    if (n < 0) n = 0;
+    if (n < 0)
+        n = 0;
 
     return provider->vtable->chat_with_system(
-        provider->ctx, alloc,
-        GVR_REVISE_SYS, sizeof(GVR_REVISE_SYS) - 1,
-        user_msg, (size_t)n,
-        model ? model : "", model_len,
-        0.0, revised_out, revised_out_len);
+        provider->ctx, alloc, GVR_REVISE_SYS, sizeof(GVR_REVISE_SYS) - 1, user_msg, (size_t)n,
+        model ? model : "", model_len, 0.0, revised_out, revised_out_len);
 #endif
 }
 
 hu_error_t hu_gvr_pipeline(hu_allocator_t *alloc, hu_provider_t *provider,
-                           const hu_gvr_config_t *config,
-                           const char *generator_model, size_t generator_model_len,
-                           const char *original_prompt, size_t original_prompt_len,
-                           const char *initial_response, size_t initial_response_len,
-                           hu_gvr_pipeline_result_t *out) {
+                           const hu_gvr_config_t *config, const char *generator_model,
+                           size_t generator_model_len, const char *original_prompt,
+                           size_t original_prompt_len, const char *initial_response,
+                           size_t initial_response_len, hu_gvr_pipeline_result_t *out) {
     if (!alloc || !provider || !out)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -203,7 +211,8 @@ hu_error_t hu_gvr_pipeline(hu_allocator_t *alloc, hu_provider_t *provider,
 
     uint32_t max_rev = config->max_revisions > 0 ? config->max_revisions : 2;
     const char *verify_model = config->verifier_model ? config->verifier_model : generator_model;
-    size_t verify_model_len = config->verifier_model ? config->verifier_model_len : generator_model_len;
+    size_t verify_model_len =
+        config->verifier_model ? config->verifier_model_len : generator_model_len;
 
     const char *current = initial_response;
     size_t current_len = initial_response_len;
@@ -211,10 +220,9 @@ hu_error_t hu_gvr_pipeline(hu_allocator_t *alloc, hu_provider_t *provider,
 
     for (uint32_t rev = 0; rev <= max_rev; rev++) {
         hu_gvr_check_result_t check = {0};
-        hu_error_t err = hu_gvr_check(alloc, provider,
-                                      verify_model, verify_model_len,
-                                      original_prompt, original_prompt_len,
-                                      current, current_len, &check);
+        hu_error_t err =
+            hu_gvr_check(alloc, provider, verify_model, verify_model_len, original_prompt,
+                         original_prompt_len, current, current_len, &check);
         if (err != HU_OK) {
             if (owned_current)
                 alloc->free(alloc->ctx, owned_current, current_len + 1);
@@ -239,12 +247,9 @@ hu_error_t hu_gvr_pipeline(hu_allocator_t *alloc, hu_provider_t *provider,
         if (rev < max_rev) {
             char *revised = NULL;
             size_t revised_len = 0;
-            err = hu_gvr_revise(alloc, provider,
-                                generator_model, generator_model_len,
-                                original_prompt, original_prompt_len,
-                                current, current_len,
-                                check.critique, check.critique_len,
-                                &revised, &revised_len);
+            err = hu_gvr_revise(alloc, provider, generator_model, generator_model_len,
+                                original_prompt, original_prompt_len, current, current_len,
+                                check.critique, check.critique_len, &revised, &revised_len);
             hu_gvr_check_result_free(alloc, &check);
             if (err != HU_OK) {
                 if (owned_current)
@@ -283,7 +288,8 @@ hu_error_t hu_gvr_pipeline(hu_allocator_t *alloc, hu_provider_t *provider,
 }
 
 void hu_gvr_check_result_free(hu_allocator_t *alloc, hu_gvr_check_result_t *result) {
-    if (!alloc || !result) return;
+    if (!alloc || !result)
+        return;
     if (result->critique) {
         alloc->free(alloc->ctx, result->critique, result->critique_len + 1);
         result->critique = NULL;
@@ -292,7 +298,8 @@ void hu_gvr_check_result_free(hu_allocator_t *alloc, hu_gvr_check_result_t *resu
 }
 
 void hu_gvr_pipeline_result_free(hu_allocator_t *alloc, hu_gvr_pipeline_result_t *result) {
-    if (!alloc || !result) return;
+    if (!alloc || !result)
+        return;
     if (result->final_content) {
         alloc->free(alloc->ctx, result->final_content, result->final_content_len + 1);
         result->final_content = NULL;

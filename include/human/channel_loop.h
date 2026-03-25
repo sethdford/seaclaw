@@ -47,6 +47,7 @@ typedef struct hu_channel_loop_msg {
     bool has_attachment; /* true if message has image attachment (for vision pipeline) */
     bool has_video;      /* true if message has video attachment (.mov, .mp4, .m4v) */
     char guid[96];       /* iMessage message GUID for inline reply tracking */
+    bool was_edited;     /* message was edited after initial send (iMessage) */
 } hu_channel_loop_msg_t;
 
 typedef hu_error_t (*hu_channel_loop_poll_fn)(void *channel_ctx, hu_allocator_t *alloc,

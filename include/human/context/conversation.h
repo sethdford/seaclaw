@@ -738,4 +738,27 @@ hu_seen_action_t hu_conversation_classify_seen_behavior(const char *msg, size_t 
                                                         uint8_t hour_local, uint32_t seed,
                                                         uint32_t *out_delay_ms);
 
+/* GIF humor calibration: track sends and reactions per contact.
+ * Record a GIF send (with search query), then record if the contact reacted.
+ * hit_rate returns reaction/send ratio (0.5 default for <3 samples). */
+void hu_conversation_gif_cal_record_send(const char *contact_id, size_t cid_len, const char *query,
+                                         size_t query_len);
+void hu_conversation_gif_cal_record_reaction(const char *contact_id, size_t cid_len);
+float hu_conversation_gif_cal_hit_rate(const char *contact_id, size_t cid_len);
+
+/* Build a hint about tapback reactions they sent on our messages.
+ * Tells the LLM not to explicitly acknowledge tapbacks. */
+size_t hu_conversation_build_reaction_received_hint(const hu_channel_history_entry_t *entries,
+                                                    size_t count, char *buf, size_t cap);
+
+/* Build an emoji frequency matching directive based on their message patterns.
+ * If they use lots of emoji, encourage it; if they rarely do, suggest restraint. */
+size_t hu_conversation_build_emoji_mirror_hint(const hu_channel_history_entry_t *entries,
+                                               size_t count, char *buf, size_t cap);
+
+/* Build awareness hint for edited or unsent messages.
+ * Tells the LLM to respond to the corrected version or pretend unsent was never seen. */
+size_t hu_conversation_build_edit_awareness_hint(bool message_was_edited, bool message_was_unsent,
+                                                 char *buf, size_t cap);
+
 #endif /* HU_CONTEXT_CONVERSATION_H */
