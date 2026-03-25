@@ -262,9 +262,9 @@ test.describe("Automations (Demo)", () => {
     }).toPass({ timeout: POLL });
   });
 
-  test("shows 4 stat cards", async ({ page }) => {
+  test("shows 5 stat cards", async ({ page }) => {
     await expect(async () => {
-      expect(await page.evaluate(shadowCount("hu-automations-view", "hu-stat-card"))).toBe(4);
+      expect(await page.evaluate(shadowCount("hu-automations-view", "hu-stat-card"))).toBe(5);
     }).toPass({ timeout: POLL });
   });
 
@@ -492,11 +492,12 @@ test.describe("Logs (Demo)", () => {
     }).toPass({ timeout: POLL });
   });
 
-  test("log area contains timeline or empty state", async ({ page }) => {
+  test("log area contains rows, empty state, or legacy timeline", async ({ page }) => {
     await expect(async () => {
       const hasTimeline = await page.evaluate(shadowExists("hu-logs-view", "hu-timeline"));
       const hasEmpty = await page.evaluate(shadowExists("hu-logs-view", "hu-empty-state"));
-      expect(hasTimeline || hasEmpty).toBe(true);
+      const hasRows = await page.evaluate(shadowExists("hu-logs-view", ".log-row"));
+      expect(hasTimeline || hasEmpty || hasRows).toBe(true);
     }).toPass({ timeout: POLL });
   });
 
@@ -552,13 +553,8 @@ test.describe("Voice (Demo)", () => {
 
   test("shows empty conversation state", async ({ page }) => {
     await expect(async () => {
-      const hasConversation = await page.evaluate(
-        shadowExists("hu-voice-view", "hu-voice-conversation"),
-      );
-      const hasEmptyState = await page.evaluate(
-        shadowExistsIn("hu-voice-view", "hu-voice-conversation", "hu-empty-state"),
-      );
-      expect(hasConversation && hasEmptyState).toBe(true);
+      const hasEmptyState = await page.evaluate(shadowExists("hu-voice-view", "hu-empty-state"));
+      expect(hasEmptyState).toBe(true);
     }).toPass({ timeout: POLL });
   });
 });

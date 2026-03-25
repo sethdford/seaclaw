@@ -46,8 +46,8 @@ test.describe("Chat View", () => {
   test("chat view has proper ARIA structure", async ({ page }) => {
     const chatView = page.locator("hu-app >> hu-chat-view");
     await expect(chatView).toBeAttached({ timeout: 5000 });
-    // Chat messages area should be present
-    const messagesArea = chatView.locator(".messages, [role='log'], .chat-messages").first();
+    // Message log lives inside hu-message-thread shadow (role="log")
+    const messagesArea = page.locator("hu-app >> hu-chat-view >> hu-message-thread >> [role='log']");
     await expect(messagesArea).toBeAttached({ timeout: 5000 });
   });
 

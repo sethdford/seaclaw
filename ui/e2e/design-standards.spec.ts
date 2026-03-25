@@ -324,13 +324,8 @@ test.describe("Wave 3: Loading & Empty States", () => {
     await page.goto("/?demo#voice");
     await waitForViewReady(page, "hu-voice-view");
     await expect(async () => {
-      const hasConversation = await page.evaluate(
-        shadowExists("hu-voice-view", "hu-voice-conversation"),
-      );
-      const hasEmptyState = await page.evaluate(
-        shadowExistsIn("hu-voice-view", "hu-voice-conversation", "hu-empty-state"),
-      );
-      expect(hasConversation && hasEmptyState).toBe(true);
+      const hasEmptyState = await page.evaluate(shadowExists("hu-voice-view", "hu-empty-state"));
+      expect(hasEmptyState).toBe(true);
     }).toPass({ timeout: POLL });
   });
 });

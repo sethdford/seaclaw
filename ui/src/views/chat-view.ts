@@ -19,8 +19,6 @@ import "../components/hu-chat-sessions-panel.js";
 import "../components/hu-context-menu.js";
 import "../components/hu-status-dot.js";
 import "../components/hu-skeleton.js";
-import "../components/hu-empty-state.js";
-
 @customElement("hu-chat-view")
 export class ScChatView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
@@ -168,46 +166,6 @@ export class ScChatView extends GatewayAwareLitElement {
       }
       .skeleton-composer {
         width: 100%;
-      }
-      .empty-state-wrap {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 0;
-      }
-      .suggestion-chip {
-        display: inline-flex;
-        align-items: center;
-        padding: var(--hu-space-sm) var(--hu-space-lg);
-        background: color-mix(in srgb, var(--hu-surface-container) 50%, transparent);
-        border: 1px solid var(--hu-border-subtle);
-        border-radius: var(--hu-radius-full);
-        font-family: var(--hu-font);
-        font-size: var(--hu-text-sm);
-        color: var(--hu-text);
-        cursor: pointer;
-        transition:
-          border-color var(--hu-duration-fast),
-          background var(--hu-duration-fast),
-          transform var(--hu-duration-fast);
-      }
-      .suggestion-chip:hover {
-        border-color: var(--hu-accent);
-        background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
-        transform: translateY(calc(-1 * var(--hu-focus-ring-width, 2px)));
-      }
-      .suggestion-chip:focus-visible {
-        outline: 2px solid var(--hu-accent);
-        outline-offset: 2px;
-      }
-      .suggestion-chips {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: var(--hu-space-sm);
-        margin-top: var(--hu-space-md);
       }
       @container (max-width: 600px) /* --hu-breakpoint-md */ {
         .container {
@@ -597,9 +555,7 @@ export class ScChatView extends GatewayAwareLitElement {
           ${this._renderHistoryErrorBanner()} ${this._renderSearch()}
           ${this.chat.historyLoading
             ? this._renderSkeleton()
-            : this.chat.items.length === 0
-              ? this._renderEmptyState()
-              : html`
+            : html`
                   <div
                     class="hu-stagger-motion9"
                     style="flex: 1; display: flex; flex-direction: column; min-height: 0;"
@@ -703,6 +659,8 @@ export class ScChatView extends GatewayAwareLitElement {
                       }}
                       @hu-suggestion-click=${(e: CustomEvent<{ text: string }>) =>
                         this._handleSend(e.detail.text)}
+                      @hu-hero-suggestion=${(e: CustomEvent<{ text: string }>) =>
+                        this._handleSend(e.detail.text)}
                       @open-artifact=${async (e: CustomEvent<{ id: string }>) => {
                         await import("../components/hu-artifact-panel.js");
                         this.chat.openArtifact(e.detail.id);
@@ -710,7 +668,7 @@ export class ScChatView extends GatewayAwareLitElement {
                       .artifacts=${Array.from(this.chat.artifacts.values())}
                     ></hu-message-thread>
                   </div>
-                `}
+              `}
           ${this._renderRetryButton()}
           <hu-chat-composer
             .value=${this.inputValue}
@@ -934,31 +892,4 @@ export class ScChatView extends GatewayAwareLitElement {
     `;
   }
 
-  private _renderEmptyState() {
-    const suggestions = ["What can you help me with?", "Summarize a document", "Draft an email"];
-    return html`
-      <div class="empty-state-wrap hu-stagger-motion9">
-        <hu-empty-state
-          .icon=${icons["message-square"]}
-          heading="Start a conversation"
-          description="Ask anything — your AI assistant is ready to help."
-        >
-          <div class="suggestion-chips">
-            ${suggestions.map(
-              (text) => html`
-                <button
-                  type="button"
-                  class="suggestion-chip"
-                  @click=${() => this._handleSend(text)}
-                  aria-label=${`Suggest: ${text}`}
-                >
-                  ${text}
-                </button>
-              `,
-            )}
-          </div>
-        </hu-empty-state>
-      </div>
-    `;
-  }
 }
