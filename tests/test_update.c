@@ -73,6 +73,7 @@ static void update_check_zero_size_returns_error(void) {
 static void maybe_check_null_args_returns_error(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
     HU_ASSERT_EQ(hu_update_maybe_check(NULL, &cfg), HU_ERR_INVALID_ARGUMENT);
     HU_ASSERT_EQ(hu_update_maybe_check(&alloc, NULL), HU_ERR_INVALID_ARGUMENT);
 }

@@ -9,7 +9,7 @@ Scope: entire repository.
 
 human is a C11 autonomous AI assistant runtime optimized for:
 
-- minimal binary size (~1620 KB release with LTO)
+- minimal binary size (~1750 KB release with LTO)
 - minimal memory footprint (5–6 MB peak RSS measured)
 - zero dependencies beyond libc, optional SQLite and libcurl
 - Zig reference implementation archived in `archive/zig-reference/`
@@ -29,13 +29,13 @@ Key extension points:
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 - `src/ml/` — on-device ML training (BPE, GPT, DPO, LoRA, feed predictor) — `HU_ENABLE_ML`
 
-Current scale: **1233 source + header files, ~290K lines of C, ~120K lines of tests, 7076 tests, 38 channels**.
+Current scale: **1233 source + header files, ~290K lines of C, ~120K lines of tests, 7104 tests, 38 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
 | Metric                   | Measured       |
 | ------------------------ | -------------- |
-| Binary size              | ~1620 KB       |
+| Binary size              | ~1750 KB       |
 | Text section             | 480 KB         |
 | Cold-start (`--version`) | 4–27 ms avg    |
 | Peak RSS (`--version`)   | ~5.7 MB        |
@@ -64,7 +64,7 @@ These codebase realities should drive every design decision:
 2. **Binary size and memory are hard product constraints**
    - `cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON` is the release target. Every dependency and abstraction has a size cost.
    - Avoid adding unnecessary runtime allocations or large data tables without justification.
-   - Current release binary: ~1620 KB (all features with LTO).
+   - Current release binary: ~1750 KB (all features with LTO).
 
 3. **Security-critical surfaces are first-class**
    - `src/gateway/gateway.c`, `src/security/`, `src/tools/`, `src/runtime/` carry high blast radius.
@@ -77,7 +77,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `HU_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 7076+ tests must pass at zero ASan errors**
+5. **All 7104+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `HU_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -119,7 +119,7 @@ src/
 
 include/human/       public C headers
 
-tests/                 336 test files, 7076+ tests
+tests/                 336 test files, 7104+ tests
 
 apps/                  iOS, macOS, Android, shared (4 app directories)
 
