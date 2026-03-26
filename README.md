@@ -22,7 +22,7 @@
 The smallest fully autonomous AI assistant infrastructure — a static C binary that fits on any $5 board, boots in milliseconds, and requires nothing but libc.
 
 ```
-~1620 KB binary · <30 ms startup · 6962+ tests · 97 providers · 38 channels (37 production + 1 experimental) · 85 tools · Pluggable everything
+~1620 KB binary · <30 ms startup · 7076+ tests · 97 providers · 38 channels (37 production + 1 experimental) · 85 tools · Pluggable everything
 ```
 
 ### Features
@@ -622,7 +622,7 @@ Build and tests require a C11 compiler and CMake 3.20+. One-time setup:
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DHU_ENABLE_ALL_CHANNELS=ON
 cmake --build .                            # Dev build
-./human_tests                             # 6962+ tests
+./human_tests                             # 7076+ tests
 cd ..
 ```
 
@@ -701,7 +701,7 @@ config.c Config loading/merging (~/.human/config.json)
 ...
 
 include/human/ Public C headers
-tests/ 335 test files, 6962 tests
+tests/ 336 test files, 7076 tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
 ui/ Web UI (LitElement + Vite)

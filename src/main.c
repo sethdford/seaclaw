@@ -5,8 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 #if defined(__unix__) || defined(__APPLE__)
+#include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
+#include <sys/file.h>
 #include <time.h>
 #include <unistd.h>
 #endif
@@ -287,35 +289,49 @@ static hu_error_t cmd_schedule(hu_allocator_t *alloc, int argc, char **argv) {
     if (sn < 0 || (size_t)sn >= sizeof(sched_path))
         return HU_ERR_INTERNAL;
 
+    /* Lock the schedule file for the duration of this command */
+    char lock_path[520];
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", sched_path);
+    int lock_fd = open(lock_path, O_CREAT | O_RDWR, 0600);
+    if (lock_fd >= 0)
+        flock(lock_fd, LOCK_EX);
+
     if (argc >= 3 && strcmp(argv[2], "list") == 0) {
-        hu_conversation_sched_load(sched_path, (size_t)sn);
+        hu_error_t lerr = hu_conversation_sched_load(sched_path, (size_t)sn);
+        if (lerr != HU_OK && lerr != HU_ERR_IO) {
+            fprintf(stderr, "Failed to load schedule: error %d\n", (int)lerr);
+            if (lock_fd >= 0) {
+                flock(lock_fd, LOCK_UN);
+                close(lock_fd);
+            }
+            return lerr;
+        }
         size_t count = 0;
-        hu_sched_slot_t slots[HU_SCHED_MAX];
+        /* Print real queue indices so cancel works correctly */
+        printf("Scheduled messages:\n");
         for (size_t i = 0; i < HU_SCHED_MAX; i++) {
             hu_sched_slot_t *s = hu_conversation_sched_slot(i);
-            if (s && s->active) {
-                slots[count++] = *s;
-            }
+            if (!s || !s->active)
+                continue;
+            count++;
+            time_t t = (time_t)(s->deliver_at_ms / 1000ULL);
+            struct tm tm_buf;
+            struct tm *tp = localtime_r(&t, &tm_buf);
+            char time_str[64];
+            if (tp)
+                strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tp);
+            else
+                snprintf(time_str, sizeof(time_str), "%" PRIu64, s->deliver_at_ms);
+            printf("  [%zu] to: %s | channel: %s | at: %s\n"
+                   "       msg: %s\n",
+                   i, s->contact_id, s->channel_name[0] ? s->channel_name : "(any)", time_str,
+                   s->message);
         }
-        if (count == 0) {
-            printf("No scheduled messages.\n");
-        } else {
-            printf("Scheduled messages (%zu):\n", count);
-            for (size_t i = 0; i < count; i++) {
-                time_t t = (time_t)(slots[i].deliver_at_ms / 1000ULL);
-                struct tm tm_buf;
-                struct tm *tp = localtime_r(&t, &tm_buf);
-                char time_str[64];
-                if (tp)
-                    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tp);
-                else
-                    snprintf(time_str, sizeof(time_str), "%" PRIu64, slots[i].deliver_at_ms);
-                printf("  [%zu] to: %s | channel: %s | at: %s\n"
-                       "       msg: %s\n",
-                       i, slots[i].contact_id,
-                       slots[i].channel_name[0] ? slots[i].channel_name : "(any)", time_str,
-                       slots[i].message);
-            }
+        if (count == 0)
+            printf("  (none)\n");
+        if (lock_fd >= 0) {
+            flock(lock_fd, LOCK_UN);
+            close(lock_fd);
         }
         return HU_OK;
     }
@@ -325,55 +341,95 @@ static hu_error_t cmd_schedule(hu_allocator_t *alloc, int argc, char **argv) {
         const char *msg = argv[4];
         const char *when_str = argv[5];
         const char *channel = (argc >= 7) ? argv[6] : "";
-        /* Parse 'when' as epoch seconds or "+Nm" (minutes from now) */
         uint64_t deliver_ms = 0;
         if (when_str[0] == '+') {
-            int minutes = atoi(when_str + 1);
-            if (minutes <= 0) {
-                fprintf(stderr, "Invalid delay: %s (use +Nm for N minutes)\n", when_str);
+            char *end = NULL;
+            long minutes = strtol(when_str + 1, &end, 10);
+            if (!end || *end != '\0' || minutes <= 0 || minutes > 525600) {
+                fprintf(stderr, "Invalid delay: %s (use +Nm, 1-525600 minutes)\n", when_str);
+                if (lock_fd >= 0) {
+                    flock(lock_fd, LOCK_UN);
+                    close(lock_fd);
+                }
                 return HU_ERR_INVALID_ARGUMENT;
             }
             deliver_ms = (uint64_t)time(NULL) * 1000ULL + (uint64_t)minutes * 60000ULL;
         } else {
-            long long epoch = atoll(when_str);
-            if (epoch <= 0) {
+            char *end = NULL;
+            long long epoch = strtoll(when_str, &end, 10);
+            if (!end || *end != '\0' || epoch <= 0) {
                 fprintf(stderr, "Invalid time: %s (use epoch seconds or +Nm)\n", when_str);
+                if (lock_fd >= 0) {
+                    flock(lock_fd, LOCK_UN);
+                    close(lock_fd);
+                }
                 return HU_ERR_INVALID_ARGUMENT;
             }
             deliver_ms = (uint64_t)epoch * 1000ULL;
         }
-        hu_conversation_sched_load(sched_path, (size_t)sn);
+        hu_error_t lerr = hu_conversation_sched_load(sched_path, (size_t)sn);
+        (void)lerr;
         hu_error_t err = hu_conversation_schedule_message_on(
             contact, strlen(contact), channel, strlen(channel), msg, strlen(msg), deliver_ms);
         if (err != HU_OK) {
             fprintf(stderr, "Failed to schedule message: error %d\n", (int)err);
+            if (lock_fd >= 0) {
+                flock(lock_fd, LOCK_UN);
+                close(lock_fd);
+            }
             return err;
         }
         hu_conversation_sched_save(sched_path, (size_t)sn);
         printf("Scheduled message for %s at %" PRIu64 "ms\n", contact, deliver_ms);
+        if (lock_fd >= 0) {
+            flock(lock_fd, LOCK_UN);
+            close(lock_fd);
+        }
         return HU_OK;
     }
 
     if (argc >= 4 && strcmp(argv[2], "cancel") == 0) {
-        int idx = atoi(argv[3]);
-        hu_conversation_sched_load(sched_path, (size_t)sn);
+        char *end = NULL;
+        long idx = strtol(argv[3], &end, 10);
+        if (!end || *end != '\0' || idx < 0 || idx >= HU_SCHED_MAX) {
+            fprintf(stderr, "Invalid index: %s (0-%d)\n", argv[3], HU_SCHED_MAX - 1);
+            if (lock_fd >= 0) {
+                flock(lock_fd, LOCK_UN);
+                close(lock_fd);
+            }
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        hu_error_t lerr = hu_conversation_sched_load(sched_path, (size_t)sn);
+        (void)lerr;
         hu_sched_slot_t *slot = hu_conversation_sched_slot((size_t)idx);
         if (!slot || !slot->active) {
-            fprintf(stderr, "No active scheduled message at index %d\n", idx);
+            fprintf(stderr, "No active scheduled message at index %ld\n", idx);
+            if (lock_fd >= 0) {
+                flock(lock_fd, LOCK_UN);
+                close(lock_fd);
+            }
             return HU_ERR_INVALID_ARGUMENT;
         }
         printf("Cancelled: \"%s\" to %s\n", slot->message, slot->contact_id);
         slot->active = false;
         hu_conversation_sched_save(sched_path, (size_t)sn);
+        if (lock_fd >= 0) {
+            flock(lock_fd, LOCK_UN);
+            close(lock_fd);
+        }
         return HU_OK;
     }
 
+    if (lock_fd >= 0) {
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+    }
     fprintf(stderr, "Usage: human schedule <subcommand>\n\n"
                     "Subcommands:\n"
                     "  list                           List pending scheduled messages\n"
                     "  add <contact> <msg> <when> [channel]  Schedule a message\n"
                     "    <when>: epoch seconds or +Nm (minutes from now)\n"
-                    "  cancel <index>                 Cancel a scheduled message\n");
+                    "  cancel <index>                 Cancel by slot index (shown in list)\n");
     return HU_ERR_INVALID_ARGUMENT;
 }
 

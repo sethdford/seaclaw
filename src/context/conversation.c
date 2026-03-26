@@ -7329,19 +7329,19 @@ hu_error_t hu_conversation_gif_cal_load(const char *path, size_t path_len) {
         return HU_ERR_IO;
 
     gif_cal_count = 0;
-    char line[256];
+    char line[1024];
     while (fgets(line, sizeof(line), f) && gif_cal_count < HU_GIF_CAL_MAX_CONTACTS) {
-        /* Parse: {"contact":"...","sent":N,"reacted":N} */
         const char *cstart = strstr(line, "\"contact\":\"");
         if (!cstart)
             continue;
         cstart += 11;
-        const char *cend = strchr(cstart, '"');
-        if (!cend || cend == cstart)
+        /* Find the unescaped closing quote */
+        const char *cend = cstart;
+        while (*cend && !(*cend == '"' && (cend == cstart || *(cend - 1) != '\\')))
+            cend++;
+        if (!*cend || cend == cstart)
             continue;
-        size_t clen = (size_t)(cend - cstart);
-        if (clen >= 127)
-            clen = 127;
+        size_t raw_clen = (size_t)(cend - cstart);
 
         const char *sstart = strstr(line, "\"sent\":");
         const char *rstart = strstr(line, "\"reacted\":");
@@ -7349,16 +7349,28 @@ hu_error_t hu_conversation_gif_cal_load(const char *path, size_t path_len) {
             continue;
 
         unsigned sent = 0, reacted = 0;
-        sscanf(sstart + 7, "%u", &sent);
-        sscanf(rstart + 10, "%u", &reacted);
+        if (sscanf(sstart + 7, "%u", &sent) != 1)
+            continue;
+        if (sscanf(rstart + 10, "%u", &reacted) != 1)
+            continue;
         if (sent > 255)
             sent = 255;
         if (reacted > 255)
             reacted = 255;
 
+        /* Unescape contact_id: \" -> ", \\ -> \ */
         size_t idx = gif_cal_count++;
-        memcpy(gif_cal_slots[idx].contact_id, cstart, clen);
-        gif_cal_slots[idx].contact_id[clen] = '\0';
+        size_t di = 0;
+        for (size_t si = 0; si < raw_clen && di < 126; si++) {
+            if (cstart[si] == '\\' && si + 1 < raw_clen &&
+                (cstart[si + 1] == '"' || cstart[si + 1] == '\\')) {
+                gif_cal_slots[idx].contact_id[di++] = cstart[si + 1];
+                si++;
+            } else {
+                gif_cal_slots[idx].contact_id[di++] = cstart[si];
+            }
+        }
+        gif_cal_slots[idx].contact_id[di] = '\0';
         gif_cal_slots[idx].sent_count = (uint8_t)sent;
         gif_cal_slots[idx].reacted_count = (uint8_t)reacted;
         gif_cal_slots[idx].history_pos = 0;
@@ -7662,7 +7674,7 @@ hu_error_t hu_conversation_sched_load(const char *path, size_t path_len) {
                     dst[di++] = '\r';
                     si++;
                 } else if (next == 'u' && si + 5 < raw_len) {
-                    /* \uXXXX: decode BMP codepoint to UTF-8 */
+                    /* \uXXXX with UTF-16 surrogate pair support */
                     unsigned cp = 0;
                     bool valid = true;
                     for (int d = 0; d < 4 && valid; d++) {
@@ -7676,20 +7688,58 @@ hu_error_t hu_conversation_sched_load(const char *path, size_t path_len) {
                         else
                             valid = false;
                     }
-                    if (valid) {
-                        si += 5;
-                        if (cp < 0x80 && di < 511) {
-                            dst[di++] = (char)cp;
-                        } else if (cp < 0x800 && di + 1 < 511) {
-                            dst[di++] = (char)(0xC0 | (cp >> 6));
-                            dst[di++] = (char)(0x80 | (cp & 0x3F));
-                        } else if (di + 2 < 511) {
-                            dst[di++] = (char)(0xE0 | (cp >> 12));
-                            dst[di++] = (char)(0x80 | ((cp >> 6) & 0x3F));
-                            dst[di++] = (char)(0x80 | (cp & 0x3F));
-                        }
-                    } else {
+                    if (!valid) {
                         dst[di++] = mstart[si];
+                        continue;
+                    }
+                    size_t consumed = 5;
+                    /* Handle UTF-16 surrogate pairs: \uD800-\uDBFF + \uDC00-\uDFFF */
+                    if (cp >= 0xD800 && cp <= 0xDBFF && si + 11 < raw_len &&
+                        mstart[si + 6] == '\\' && mstart[si + 7] == 'u') {
+                        unsigned low = 0;
+                        bool low_valid = true;
+                        for (int d = 0; d < 4 && low_valid; d++) {
+                            char h = mstart[si + 8 + d];
+                            if (h >= '0' && h <= '9')
+                                low = low * 16 + (unsigned)(h - '0');
+                            else if (h >= 'a' && h <= 'f')
+                                low = low * 16 + (unsigned)(h - 'a' + 10);
+                            else if (h >= 'A' && h <= 'F')
+                                low = low * 16 + (unsigned)(h - 'A' + 10);
+                            else
+                                low_valid = false;
+                        }
+                        if (low_valid && low >= 0xDC00 && low <= 0xDFFF) {
+                            cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
+                            consumed = 11;
+                        }
+                    }
+                    /* Skip lone surrogates (invalid Unicode) */
+                    if (cp >= 0xD800 && cp <= 0xDFFF) {
+                        si += consumed;
+                        continue;
+                    }
+                    /* Encode to UTF-8, only advance si if write succeeds */
+                    if (cp < 0x80 && di < 511) {
+                        dst[di++] = (char)cp;
+                        si += consumed;
+                    } else if (cp < 0x800 && di + 1 <= 510) {
+                        dst[di++] = (char)(0xC0 | (cp >> 6));
+                        dst[di++] = (char)(0x80 | (cp & 0x3F));
+                        si += consumed;
+                    } else if (cp < 0x10000 && di + 2 <= 510) {
+                        dst[di++] = (char)(0xE0 | (cp >> 12));
+                        dst[di++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+                        dst[di++] = (char)(0x80 | (cp & 0x3F));
+                        si += consumed;
+                    } else if (cp >= 0x10000 && di + 3 <= 510) {
+                        dst[di++] = (char)(0xF0 | (cp >> 18));
+                        dst[di++] = (char)(0x80 | ((cp >> 12) & 0x3F));
+                        dst[di++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+                        dst[di++] = (char)(0x80 | (cp & 0x3F));
+                        si += consumed;
+                    } else {
+                        break;
                     }
                 } else {
                     dst[di++] = mstart[si];

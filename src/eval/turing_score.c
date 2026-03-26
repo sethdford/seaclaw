@@ -340,6 +340,92 @@ static int has_context_references(const char *response, size_t resp_len, const c
     return count;
 }
 
+/* Vocabulary diversity penalty: detect when assistant reuses distinctive words
+ * verbatim across turns. Returns 0 (good diversity) to -2 (heavy repetition).
+ * Only flags non-stopword tokens >=5 chars repeated in prior assistant turns. */
+static int vocab_diversity_penalty(const char *response, size_t response_len, const char *ctx,
+                                   size_t ctx_len) {
+    if (!ctx || ctx_len < 20 || !response || response_len < 10)
+        return 0;
+
+    static const char *stopwords[] = {
+        "about", "after", "again",  "because", "before", "being",  "could", "doing", "every",
+        "going", "great", "having", "never",   "other",  "really", "right", "since", "still",
+        "their", "there", "these",  "think",   "thing",  "those",  "today", "until", "where",
+        "which", "while", "would",  "should",  "might",  "maybe",  "could", "would", "sorry"};
+    static const size_t n_stop = sizeof(stopwords) / sizeof(stopwords[0]);
+
+    /* Collect distinctive words from the response (5+ chars, not stopwords) */
+    const char *rw[32];
+    size_t rwl[32];
+    int n_rw = 0;
+    for (size_t i = 0; i < response_len && n_rw < 32;) {
+        while (i < response_len && (response[i] == ' ' || response[i] == '\n'))
+            i++;
+        size_t ws = i;
+        while (i < response_len && response[i] != ' ' && response[i] != '\n')
+            i++;
+        size_t wl = i - ws;
+        if (wl < 5 || wl > 20)
+            continue;
+        bool stop = false;
+        for (size_t s = 0; s < n_stop; s++) {
+            if (wl == strlen(stopwords[s]) && strncasecmp(response + ws, stopwords[s], wl) == 0) {
+                stop = true;
+                break;
+            }
+        }
+        if (!stop) {
+            rw[n_rw] = response + ws;
+            rwl[n_rw] = wl;
+            n_rw++;
+        }
+    }
+
+    /* Scan prior assistant turns for these distinctive words */
+    int repeated = 0;
+    const char *p = ctx;
+    const char *end = ctx + ctx_len;
+    while (p < end) {
+        const char *le = p;
+        while (le < end && *le != '\n')
+            le++;
+        size_t ll = (size_t)(le - p);
+        bool is_asst = false;
+        const char *ms = p;
+        size_t ml = ll;
+        if (ll > 11 && (memcmp(p, "assistant: ", 11) == 0 || memcmp(p, "Assistant: ", 11) == 0)) {
+            is_asst = true;
+            ms = p + 11;
+            ml = ll - 11;
+        } else if (ll > 3 && memcmp(p, "A: ", 3) == 0) {
+            is_asst = true;
+            ms = p + 3;
+            ml = ll - 3;
+        }
+        if (is_asst && ml > 5) {
+            for (int w = 0; w < n_rw; w++) {
+                for (size_t j = 0; j + rwl[w] <= ml; j++) {
+                    if (strncasecmp(ms + j, rw[w], rwl[w]) == 0) {
+                        bool boundary_l = (j == 0 || ms[j - 1] == ' ');
+                        bool boundary_r = (j + rwl[w] >= ml || ms[j + rwl[w]] == ' ' ||
+                                           ms[j + rwl[w]] == ',' || ms[j + rwl[w]] == '.');
+                        if (boundary_l && boundary_r)
+                            repeated++;
+                        break;
+                    }
+                }
+            }
+        }
+        p = le < end ? le + 1 : le;
+    }
+    if (repeated >= 5)
+        return -2;
+    if (repeated >= 3)
+        return -1;
+    return 0;
+}
+
 /* Cross-turn style consistency: extract prior assistant messages from context
  * and compare register (casual, lowercase, length) with the current response.
  * Returns 0-3 bonus points for consistency. */
@@ -353,9 +439,21 @@ static int cross_turn_consistency(const char *response, size_t response_len, con
     bool resp_has_casual = has_casual_markers(response, response_len) > 0;
     bool resp_has_contractions = has_contractions(response, response_len) > 0;
 
+    /* Detect laugh style in response */
+    const char *laugh_types[] = {"haha", "lol", "lmao", "hehe"};
+    int resp_laugh = -1;
+    for (int i = 0; i < 4; i++) {
+        if (ci_has(response, response_len, laugh_types[i])) {
+            resp_laugh = i;
+            break;
+        }
+    }
+
     /* Scan context for "assistant:" or "\nA:" prefixed segments (common conversation formats) */
     int matching_turns = 0;
     int total_turns = 0;
+    int laugh_consistent = 0;
+    int laugh_checked = 0;
     const char *p = ctx;
     const char *end = ctx + ctx_len;
     while (p < end) {
@@ -392,6 +490,18 @@ static int cross_turn_consistency(const char *response, size_t response_len, con
                 matches++;
             if (matches >= 2)
                 matching_turns++;
+
+            /* Laugh style consistency check */
+            if (resp_laugh >= 0) {
+                for (int i = 0; i < 4; i++) {
+                    if (ci_has(msg_start, msg_len, laugh_types[i])) {
+                        laugh_checked++;
+                        if (i == resp_laugh)
+                            laugh_consistent++;
+                        break;
+                    }
+                }
+            }
         }
 
         p = (line_end < end) ? line_end + 1 : end;
@@ -400,13 +510,19 @@ static int cross_turn_consistency(const char *response, size_t response_len, con
     if (total_turns == 0)
         return 0;
     int ratio_pct = (matching_turns * 100) / total_turns;
+    int bonus = 0;
     if (ratio_pct >= 80)
-        return 3;
-    if (ratio_pct >= 50)
-        return 2;
-    if (ratio_pct >= 30)
-        return 1;
-    return 0;
+        bonus = 3;
+    else if (ratio_pct >= 50)
+        bonus = 2;
+    else if (ratio_pct >= 30)
+        bonus = 1;
+
+    /* Laugh style mismatch penalty: switching laugh styles is a strong AI tell */
+    if (laugh_checked > 0 && laugh_consistent == 0)
+        bonus -= 1;
+
+    return bonus;
 }
 
 hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
@@ -426,6 +542,13 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     int opinions = has_opinion_markers(response, response_len);
     int ctx_refs =
         has_context_references(response, response_len, conversation_context, context_len);
+
+    /* Count question marks — humans ask questions frequently */
+    int questions = 0;
+    for (size_t i = 0; i < response_len; i++) {
+        if (response[i] == '?')
+            questions++;
+    }
 
     /* natural_language: penalize AI tells and structural markers */
     out->dimensions[HU_TURING_NATURAL_LANGUAGE] = 10 - ai_tells * 2 - structural;
@@ -586,29 +709,37 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
         out->dimensions[HU_TURING_ENERGY_MATCHING] = score;
     }
 
-    /* context_awareness: references to conversation context, temporal markers */
+    /* context_awareness: references to conversation context, temporal markers, engagement */
     {
         int score = 6;
         if (conversation_context && context_len > 0) {
             score += ctx_refs;
-            if (ci_has(response, response_len, "you") && ci_has(response, response_len, "your"))
+            /* Reward 2nd-person references (either "you" or "your"), not requiring both */
+            if (ci_has(response, response_len, "you") || ci_has(response, response_len, "your"))
                 score += 1;
         }
         if (emotional > 0 && contractions)
             score += 1;
+        /* Asking questions shows active engagement with context */
+        if (questions > 0)
+            score += 1;
         out->dimensions[HU_TURING_CONTEXT_AWARENESS] = score;
     }
 
-    /* non_robotic: inverse of AI tells + structural */
-    out->dimensions[HU_TURING_NON_ROBOTIC] = 10 - ai_tells * 3 - structural * 2;
+    /* non_robotic: inverse of AI tells + structural + vocab repetition penalty */
+    int vocab_penalty =
+        vocab_diversity_penalty(response, response_len, conversation_context, context_len);
+    out->dimensions[HU_TURING_NON_ROBOTIC] = 10 - ai_tells * 3 - structural * 2 + vocab_penalty;
 
-    /* genuine_warmth: emotional + personalized + not formulaic */
+    /* genuine_warmth: emotional + personalized + not formulaic + curious */
     out->dimensions[HU_TURING_GENUINE_WARMTH] = 5 + emotional;
     if (ai_tells > 0)
         out->dimensions[HU_TURING_GENUINE_WARMTH] -= ai_tells;
     if (ctx_refs > 0)
         out->dimensions[HU_TURING_GENUINE_WARMTH] += 1;
     if (vulnerability > 0)
+        out->dimensions[HU_TURING_GENUINE_WARMTH] += 1;
+    if (questions > 0)
         out->dimensions[HU_TURING_GENUINE_WARMTH] += 1;
 
     /* S2S voice dimensions — enhanced text heuristics */

@@ -1682,6 +1682,45 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
             }
 #endif
 
+            /* Scheduled message delivery: runs regardless of should_checkin
+             * so that due messages are never blocked by per-contact silence. */
+            if (channels[c].channel->vtable->send) {
+                static bool sched_loaded_once;
+                if (!sched_loaded_once) {
+                    const char *sh = getenv("HOME");
+                    if (sh) {
+                        char sp[512];
+                        int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
+                        if (sn > 0 && (size_t)sn < sizeof(sp))
+                            hu_conversation_sched_load(sp, (size_t)sn);
+                    }
+                    sched_loaded_once = true;
+                }
+                uint64_t sched_now = (uint64_t)time(NULL) * 1000ULL;
+                const char *sched_ch =
+                    channels[c].channel->vtable->name
+                        ? channels[c].channel->vtable->name(channels[c].channel->ctx)
+                        : "";
+                char sched_contact[128], sched_channel[32], sched_msg[512];
+                size_t sched_len = hu_conversation_flush_scheduled_for(
+                    sched_now, sched_ch, strlen(sched_ch), sched_contact, sizeof(sched_contact),
+                    sched_channel, sizeof(sched_channel), sched_msg, sizeof(sched_msg));
+                if (sched_len > 0) {
+                    channels[c].channel->vtable->send(channels[c].channel->ctx, sched_contact,
+                                                      strlen(sched_contact), sched_msg, sched_len,
+                                                      NULL, 0);
+                    fprintf(stderr, "[human] scheduled message delivered to %s via %s\n",
+                            sched_contact, sched_ch);
+                    const char *sh = getenv("HOME");
+                    if (sh) {
+                        char sp[512];
+                        int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
+                        if (sn > 0 && (size_t)sn < sizeof(sp))
+                            hu_conversation_sched_save(sp, (size_t)sn);
+                    }
+                }
+            }
+
             if (!should_checkin)
                 break;
 
@@ -2133,23 +2172,29 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
 
             /* Proactive "good morning" scheduler: per-contact, once per day
              * during the 6-9am window. Uses LLM to generate personalized
-             * greetings when the agent is available. */
+             * greetings when the agent is available. Ring buffer with day
+             * rollover to avoid stale entries blocking new contacts. */
             {
                 static struct {
                     char contact_id[64];
                     uint32_t day;
                 } gm_sent[8];
                 static size_t gm_sent_count;
+                static uint32_t gm_last_day;
                 time_t gm_now = time(NULL);
                 struct tm gm_tm;
                 struct tm *gm_p = localtime_r(&gm_now, &gm_tm);
                 uint32_t gm_day = gm_p ? (uint32_t)(gm_p->tm_yday + gm_p->tm_year * 366) : 0;
                 int gm_hour = gm_p ? gm_p->tm_hour : 12;
+                /* Day rollover: clear tracker when calendar day changes */
+                if (gm_day != gm_last_day) {
+                    gm_sent_count = 0;
+                    gm_last_day = gm_day;
+                }
                 if (gm_hour >= 6 && gm_hour < 9 && cp && cp->relationship_type) {
                     bool is_close = (strcmp(cp->relationship_type, "partner") == 0 ||
                                      strcmp(cp->relationship_type, "close_friend") == 0 ||
                                      strcmp(cp->relationship_type, "family") == 0);
-                    /* Check per-contact daily gate */
                     bool already_sent = false;
                     size_t cid_len = strlen(cp->contact_id);
                     for (size_t gi = 0; gi < gm_sent_count && !already_sent; gi++) {
@@ -2157,20 +2202,17 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                             strcmp(gm_sent[gi].contact_id, cp->contact_id) == 0)
                             already_sent = true;
                     }
-                    if (is_close && !already_sent) {
-                        /* Record this contact as scheduled today */
-                        if (gm_sent_count < 8) {
-                            size_t cn = cid_len < 63 ? cid_len : 63;
-                            memcpy(gm_sent[gm_sent_count].contact_id, cp->contact_id, cn);
-                            gm_sent[gm_sent_count].contact_id[cn] = '\0';
-                            gm_sent[gm_sent_count].day = gm_day;
-                            gm_sent_count++;
-                        }
-                        /* LLM-personalized greeting when agent is available */
+                    if (is_close && !already_sent && gm_sent_count < 8) {
+                        size_t cn = cid_len < 63 ? cid_len : 63;
+                        memcpy(gm_sent[gm_sent_count].contact_id, cp->contact_id, cn);
+                        gm_sent[gm_sent_count].contact_id[cn] = '\0';
+                        gm_sent[gm_sent_count].day = gm_day;
+                        gm_sent_count++;
+
                         const char *greeting = "good morning :)";
                         size_t greeting_len = 15;
                         char gm_resp[256];
-                        if (agent) {
+                        if (agent && agent->provider.vtable && agent->provider.vtable->chat) {
                             const char *gm_prompt =
                                 "Generate a very brief, warm morning greeting for a "
                                 "close friend/family member. One short sentence max. "
@@ -2193,7 +2235,6 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                                 agent->alloc->free(agent->alloc->ctx, gm_out, gm_out_len + 1);
                             hu_agent_clear_history(agent);
                         }
-                        /* Schedule for tomorrow 7:30-9:00am local time */
                         uint32_t gm_seed = (uint32_t)(gm_now * 48271u) + (uint32_t)(uintptr_t)cp;
                         uint32_t offset_min = 450 + (gm_seed % 90);
                         struct tm tomorrow_tm = gm_tm;
@@ -2291,46 +2332,6 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 }
             }
 #endif
-            /* Scheduled message delivery: flush any due messages.
-             * Loads queue from disk once, saves after each delivery. */
-            {
-                static bool sched_loaded;
-                if (!sched_loaded) {
-                    sched_loaded = true;
-                    const char *sh = getenv("HOME");
-                    if (sh) {
-                        char sp[512];
-                        int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
-                        if (sn > 0 && (size_t)sn < sizeof(sp))
-                            hu_conversation_sched_load(sp, (size_t)sn);
-                    }
-                }
-            }
-            if (channels[c].channel->vtable->send) {
-                uint64_t sched_now = (uint64_t)time(NULL) * 1000ULL;
-                const char *sched_ch =
-                    channels[c].channel->vtable->name
-                        ? channels[c].channel->vtable->name(channels[c].channel->ctx)
-                        : "";
-                char sched_contact[128], sched_channel[32], sched_msg[512];
-                size_t sched_len = hu_conversation_flush_scheduled_for(
-                    sched_now, sched_ch, strlen(sched_ch), sched_contact, sizeof(sched_contact),
-                    sched_channel, sizeof(sched_channel), sched_msg, sizeof(sched_msg));
-                if (sched_len > 0) {
-                    channels[c].channel->vtable->send(channels[c].channel->ctx, sched_contact,
-                                                      strlen(sched_contact), sched_msg, sched_len,
-                                                      NULL, 0);
-                    fprintf(stderr, "[human] scheduled message delivered to %s via %s\n",
-                            sched_contact, sched_ch);
-                    const char *sh = getenv("HOME");
-                    if (sh) {
-                        char sp[512];
-                        int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
-                        if (sn > 0 && (size_t)sn < sizeof(sp))
-                            hu_conversation_sched_save(sp, (size_t)sn);
-                    }
-                }
-            }
             if (event_ctx)
                 alloc->free(alloc->ctx, event_ctx, event_ctx_len + 1);
             if (silence_ctx)
@@ -9972,13 +9973,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                strstr(curr, "Laughed at") || strstr(curr, "Liked");
                             if (was_gif && is_reaction) {
                                 hu_conversation_gif_cal_record_reaction(batch_key, key_len);
-                                const char *rh = getenv("HOME");
-                                if (rh) {
-                                    char rcp[512];
-                                    int rn = snprintf(rcp, sizeof(rcp),
-                                                      "%s/.human/gif_calibration.json", rh);
-                                    if (rn > 0 && (size_t)rn < sizeof(rcp))
-                                        hu_conversation_gif_cal_save(rcp, (size_t)rn);
+                                static uint64_t last_gif_cal_save_ms;
+                                uint64_t gcnow = (uint64_t)time(NULL) * 1000ULL;
+                                if (gcnow - last_gif_cal_save_ms > 30000) {
+                                    last_gif_cal_save_ms = gcnow;
+                                    const char *rh = getenv("HOME");
+                                    if (rh) {
+                                        char rcp[512];
+                                        int rn = snprintf(rcp, sizeof(rcp),
+                                                          "%s/.human/gif_calibration.json", rh);
+                                        if (rn > 0 && (size_t)rn < sizeof(rcp))
+                                            hu_conversation_gif_cal_save(rcp, (size_t)rn);
+                                    }
                                 }
                             }
                         }

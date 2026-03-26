@@ -330,11 +330,15 @@ static const char *imessage_reaction_to_ax_menu_name(hu_reaction_type_t reaction
 }
 #endif
 
-/* Escape " and \ for AppleScript string literal */
+/* Escape for AppleScript string literal: quotes, backslash, and control chars.
+ * Control characters (0x00-0x1F, 0x7F) are stripped to prevent script injection. */
 size_t escape_for_applescript(char *out, size_t out_cap, const char *in, size_t in_len) {
     size_t j = 0;
     for (size_t i = 0; i < in_len && j + 2 < out_cap; i++) {
-        if (in[i] == '\\' || in[i] == '"') {
+        unsigned char ch = (unsigned char)in[i];
+        if (ch < 0x20 || ch == 0x7F) {
+            continue;
+        } else if (in[i] == '\\' || in[i] == '"') {
             out[j++] = '\\';
             out[j++] = in[i];
         } else {
@@ -1806,6 +1810,15 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
     sqlite3_bind_int64(stmt, 1, c->last_rowid);
     sqlite3_bind_int(stmt, 2, (int)max_msgs);
 
+    /* Pre-prepare retraction query once (avoids N+1 prepare/finalize) */
+    sqlite3_stmt *retract_stmt = NULL;
+    if (has_date_retracted) {
+        sqlite3_prepare_v2(db,
+                           "SELECT CASE WHEN date_retracted > 0 THEN 1 ELSE 0 END "
+                           "FROM message WHERE ROWID = ?",
+                           -1, &retract_stmt, NULL);
+    }
+
     size_t count = 0;
     while (sqlite3_step(stmt) == SQLITE_ROW && count < max_msgs) {
         int64_t rowid = sqlite3_column_int64(stmt, 0);
@@ -1874,17 +1887,11 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         }
         msgs[count].was_edited = (was_edited != 0);
         msgs[count].was_unsent = false;
-        if (has_date_retracted) {
-            sqlite3_stmt *retract_stmt = NULL;
-            if (sqlite3_prepare_v2(db,
-                                   "SELECT CASE WHEN date_retracted > 0 THEN 1 ELSE 0 END FROM "
-                                   "message WHERE ROWID = ?",
-                                   -1, &retract_stmt, NULL) == SQLITE_OK) {
-                sqlite3_bind_int64(retract_stmt, 1, rowid);
-                if (sqlite3_step(retract_stmt) == SQLITE_ROW)
-                    msgs[count].was_unsent = (sqlite3_column_int(retract_stmt, 0) != 0);
-                sqlite3_finalize(retract_stmt);
-            }
+        if (retract_stmt) {
+            sqlite3_reset(retract_stmt);
+            sqlite3_bind_int64(retract_stmt, 1, rowid);
+            if (sqlite3_step(retract_stmt) == SQLITE_ROW)
+                msgs[count].was_unsent = (sqlite3_column_int(retract_stmt, 0) != 0);
         }
         if (reply_to && reply_to[0]) {
             size_t rt_len = strlen(reply_to);
@@ -1904,6 +1911,8 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
     }
 
     sqlite3_finalize(stmt);
+    if (retract_stmt)
+        sqlite3_finalize(retract_stmt);
     sqlite3_close(db);
 
     if (count > 0)

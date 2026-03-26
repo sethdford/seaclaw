@@ -207,7 +207,7 @@ hu_channel_policy_t  — combines DM + group policies per channel
 
 1. Create `src/channels/<name>.c` implementing `hu_channel_vtable_t`
 2. Create `include/human/channels/<name>.h` if needed
-3. Register in `src/channels/factory.c`
+3. Register via `hu_channel_manager_register()` in `src/channel_manager.c`
 4. Add `HU_ENABLE_CHANNEL_<NAME>` feature flag in CMakeLists.txt if optional
 5. Add tests for vtable wiring, auth/config, health check, send/receive
 6. Use `HU_IS_TEST` guards for any network connections

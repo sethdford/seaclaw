@@ -1,3 +1,4 @@
+#include "human/context/conversation.h"
 #include "human/eval/turing_score.h"
 #include "test_framework.h"
 #include <time.h>
@@ -642,6 +643,88 @@ static void turing_channel_dims_sqlite_like_pattern(void) {
 }
 #endif
 
+/* ── Q1: Question-asking ratio boosts warmth + context awareness ── */
+static void turing_question_boosts_warmth(void) {
+    hu_turing_score_t with_q, without_q;
+    const char *ctx = "user: hey what's up\nassistant: not much\nuser: cool";
+    const char *resp_q = "sounds good, what are you up to tonight?";
+    const char *resp_nq = "sounds good, enjoy your evening";
+    hu_turing_score_heuristic(resp_q, strlen(resp_q), ctx, strlen(ctx), &with_q);
+    hu_turing_score_heuristic(resp_nq, strlen(resp_nq), ctx, strlen(ctx), &without_q);
+    HU_ASSERT(with_q.dimensions[HU_TURING_GENUINE_WARMTH] >=
+              without_q.dimensions[HU_TURING_GENUINE_WARMTH]);
+    HU_ASSERT(with_q.dimensions[HU_TURING_CONTEXT_AWARENESS] >=
+              without_q.dimensions[HU_TURING_CONTEXT_AWARENESS]);
+}
+
+/* ── Q2: Context awareness accepts "you" OR "your", not requiring both ── */
+static void turing_context_awareness_you_or_your(void) {
+    hu_turing_score_t score;
+    const char *ctx = "user: i had a rough day";
+    const char *resp = "i'm sorry you went through that";
+    hu_turing_score_heuristic(resp, strlen(resp), ctx, strlen(ctx), &score);
+    HU_ASSERT(score.dimensions[HU_TURING_CONTEXT_AWARENESS] >= 7);
+}
+
+/* ── Q3: Vocabulary diversity penalty for repeated distinctive words ── */
+static void turing_vocab_repetition_penalized(void) {
+    hu_turing_score_t diverse, repetitive;
+    const char *ctx_repeat =
+        "assistant: absolutely fascinating perspective on the concept\n"
+        "user: tell me more\n"
+        "assistant: the fascinating interplay between systems is remarkable\nuser: ok";
+    const char *resp_repeat = "this is absolutely fascinating, a remarkable insight indeed";
+    hu_turing_score_heuristic(resp_repeat, strlen(resp_repeat), ctx_repeat, strlen(ctx_repeat),
+                              &repetitive);
+
+    const char *ctx_diverse = "assistant: that's a cool take\nuser: tell me more\n"
+                              "assistant: yeah the interplay is interesting\nuser: ok";
+    const char *resp_diverse = "hmm i think there's something deeper going on here";
+    hu_turing_score_heuristic(resp_diverse, strlen(resp_diverse), ctx_diverse, strlen(ctx_diverse),
+                              &diverse);
+    HU_ASSERT(diverse.dimensions[HU_TURING_NON_ROBOTIC] >=
+              repetitive.dimensions[HU_TURING_NON_ROBOTIC]);
+}
+
+/* ── Q4: Laugh style consistency affects personality_consistency ── */
+static void turing_laugh_style_consistency(void) {
+    hu_turing_score_t consistent, inconsistent;
+    const char *ctx_haha = "assistant: haha that's so true\nuser: right?\nassistant: haha yeah";
+    const char *resp_haha = "haha omg same";
+    hu_turing_score_heuristic(resp_haha, strlen(resp_haha), ctx_haha, strlen(ctx_haha),
+                              &consistent);
+
+    const char *ctx_lol = "assistant: haha that's so true\nuser: right?\nassistant: haha yeah";
+    const char *resp_lol = "lol omg same";
+    hu_turing_score_heuristic(resp_lol, strlen(resp_lol), ctx_lol, strlen(ctx_lol), &inconsistent);
+    HU_ASSERT(consistent.dimensions[HU_TURING_PERSONALITY_CONSISTENCY] >=
+              inconsistent.dimensions[HU_TURING_PERSONALITY_CONSISTENCY]);
+}
+
+/* ── Q5: hu_conversation_vary_complexity applies contractions ── */
+static void vary_complexity_applies_contractions(void) {
+    char buf[256];
+    snprintf(buf, sizeof(buf), "I am going to do not worry about it");
+    size_t len = strlen(buf);
+    size_t new_len = hu_conversation_vary_complexity(buf, len, 0);
+    HU_ASSERT(new_len <= len);
+    HU_ASSERT(new_len > 0);
+}
+
+static void vary_complexity_null_safe(void) {
+    HU_ASSERT(hu_conversation_vary_complexity(NULL, 0, 42) == 0);
+    char buf[4] = "";
+    HU_ASSERT(hu_conversation_vary_complexity(buf, 0, 42) == 0);
+}
+
+static void vary_complexity_preserves_short_input(void) {
+    char buf[8] = "ok";
+    size_t len = 2;
+    size_t new_len = hu_conversation_vary_complexity(buf, len, 99);
+    HU_ASSERT(new_len == 2);
+    HU_ASSERT(memcmp(buf, "ok", 2) == 0);
+}
+
 void run_turing_score_tests(void) {
     HU_RUN_TEST(turing_heuristic_casual_message_scores_high);
     HU_RUN_TEST(turing_heuristic_ai_tells_score_low);
@@ -704,4 +787,14 @@ void run_turing_score_tests(void) {
     HU_RUN_TEST(turing_ab_resolve_too_close);
     HU_RUN_TEST(turing_channel_dims_hash_delimiter);
 #endif
+
+    /* Q1-Q5: question ratio, context awareness, vocab diversity, style fingerprint, vary_complexity
+     */
+    HU_RUN_TEST(turing_question_boosts_warmth);
+    HU_RUN_TEST(turing_context_awareness_you_or_your);
+    HU_RUN_TEST(turing_vocab_repetition_penalized);
+    HU_RUN_TEST(turing_laugh_style_consistency);
+    HU_RUN_TEST(vary_complexity_applies_contractions);
+    HU_RUN_TEST(vary_complexity_null_safe);
+    HU_RUN_TEST(vary_complexity_preserves_short_input);
 }
