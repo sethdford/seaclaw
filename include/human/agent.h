@@ -92,6 +92,7 @@ typedef struct hu_agent_context_config {
     float pressure_warn;    /* warn at this ratio (default 0.85) */
     float pressure_compact; /* auto-compact at this ratio (default 0.95) */
     float compact_target;   /* compact until below this ratio (default 0.70) */
+    bool compact_context;
     bool llm_compiler_enabled;
     bool mcts_planner_enabled;
     bool tree_of_thought;
@@ -168,6 +169,7 @@ struct hu_agent {
     float context_pressure_warn;
     float context_pressure_compact;
     float context_compact_target;
+    bool compact_context_enabled;
     bool context_pressure_warning_85_emitted;
     bool context_pressure_warning_95_emitted;
 
@@ -386,6 +388,35 @@ typedef void (*hu_agent_stream_token_cb)(const char *delta, size_t len, void *ct
 hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_len,
                                 hu_agent_stream_token_cb on_token, void *token_ctx,
                                 char **response_out, size_t *response_len_out);
+
+/* Rich streaming callback: emits typed events including text, thinking, tool calls,
+ * and tool results. Used by the gateway and channels for Claude Desktop-style streaming. */
+typedef enum hu_agent_stream_event_type {
+    HU_AGENT_STREAM_TEXT,        /* assistant text delta */
+    HU_AGENT_STREAM_THINKING,    /* reasoning content delta */
+    HU_AGENT_STREAM_TOOL_START,  /* tool call beginning (name + id) */
+    HU_AGENT_STREAM_TOOL_ARGS,   /* tool arguments delta */
+    HU_AGENT_STREAM_TOOL_RESULT, /* tool execution complete (result in data) */
+} hu_agent_stream_event_type_t;
+
+typedef struct hu_agent_stream_event {
+    hu_agent_stream_event_type_t type;
+    const char *data;
+    size_t data_len;
+    const char *tool_name;
+    size_t tool_name_len;
+    const char *tool_call_id;
+    size_t tool_call_id_len;
+    bool is_error; /* for TOOL_RESULT: was the tool execution an error? */
+} hu_agent_stream_event_t;
+
+typedef void (*hu_agent_stream_event_cb)(const hu_agent_stream_event_t *event, void *ctx);
+
+/* Streaming turn with rich event callback: streams text between tool calls,
+ * executes tools inline, and resumes streaming (Claude Desktop-style). */
+hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t msg_len,
+                                   hu_agent_stream_event_cb on_event, void *event_ctx,
+                                   char **response_out, size_t *response_len_out);
 
 /* Run a single message without history (no tool loop for simplicity in Phase 4). */
 hu_error_t hu_agent_run_single(hu_agent_t *agent, const char *system_prompt,

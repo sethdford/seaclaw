@@ -77,6 +77,71 @@ static void test_semantic_eot_holds_on_ellipsis(void) {
     HU_ASSERT_FALSE(res.is_endpoint);
 }
 
+static void test_semantic_eot_classifier_default_weights(void) {
+    hu_semantic_eot_classifier_t cls;
+    hu_semantic_eot_classifier_default(&cls);
+    HU_ASSERT_TRUE(cls.weights[1] > cls.weights[0]);
+    HU_ASSERT_TRUE(cls.weights[2] < 0.0f);
+    HU_ASSERT_TRUE(cls.threshold > 0.0f && cls.threshold < 1.0f);
+}
+
+static void test_semantic_eot_extract_features_complete_sentence(void) {
+    float feats[HU_EOT_FEATURE_DIM];
+    const char *text = "I think we should go with plan A.";
+    HU_ASSERT_EQ(hu_semantic_eot_extract_features(text, strlen(text), 500, -30.0f, -10.0f, feats),
+                 HU_OK);
+    HU_ASSERT_FLOAT_EQ(feats[0], 1.0f, 0.01);
+    HU_ASSERT_FLOAT_EQ(feats[1], 0.0f, 0.01);
+    HU_ASSERT_FLOAT_EQ(feats[2], 0.0f, 0.01);
+    HU_ASSERT_TRUE(feats[7] > 0.3f);
+}
+
+static void test_semantic_eot_classify_question_is_endpoint(void) {
+    hu_semantic_eot_classifier_t cls;
+    hu_semantic_eot_classifier_default(&cls);
+    hu_semantic_eot_config_t cfg;
+    hu_semantic_eot_config_default(&cfg);
+    hu_semantic_eot_result_t res;
+    const char *text = "What do you think about this?";
+    HU_ASSERT_EQ(hu_semantic_eot_classify(&cls, &cfg, text, strlen(text), 600, -35.0f, -5.0f, &res),
+                 HU_OK);
+    HU_ASSERT_TRUE(res.is_endpoint);
+    HU_ASSERT_TRUE(res.confidence > 0.5);
+    HU_ASSERT_EQ(res.suggested_signal, HU_TURN_SIGNAL_YIELD);
+}
+
+static void test_semantic_eot_classify_ellipsis_is_hold(void) {
+    hu_semantic_eot_classifier_t cls;
+    hu_semantic_eot_classifier_default(&cls);
+    hu_semantic_eot_config_t cfg;
+    hu_semantic_eot_config_default(&cfg);
+    hu_semantic_eot_result_t res;
+    const char *text = "I was thinking maybe...";
+    HU_ASSERT_EQ(hu_semantic_eot_classify(&cls, &cfg, text, strlen(text), 200, -35.0f, 0.0f, &res),
+                 HU_OK);
+    HU_ASSERT_FALSE(res.is_endpoint);
+    HU_ASSERT_EQ(res.predicted_state, HU_EOT_HOLD);
+}
+
+static void test_semantic_eot_classify_null_cls_falls_back(void) {
+    hu_semantic_eot_config_t cfg;
+    hu_semantic_eot_config_default(&cfg);
+    hu_semantic_eot_result_t res;
+    const char *text = "Hello there!";
+    HU_ASSERT_EQ(hu_semantic_eot_classify(NULL, &cfg, text, strlen(text), 500, -30.0f, 0.0f, &res),
+                 HU_OK);
+}
+
+static void test_semantic_eot_set_weights_validates_dim(void) {
+    hu_semantic_eot_classifier_t cls;
+    float w[5] = {0};
+    HU_ASSERT_EQ(hu_semantic_eot_set_weights(&cls, w, 5, 0.0f, 0.5f), HU_ERR_INVALID_ARGUMENT);
+    float w10[10] = {0.1f};
+    HU_ASSERT_EQ(hu_semantic_eot_set_weights(&cls, w10, 10, -0.5f, 0.6f), HU_OK);
+    HU_ASSERT_FLOAT_EQ(cls.bias, -0.5f, 0.01);
+    HU_ASSERT_FLOAT_EQ(cls.threshold, 0.6f, 0.01);
+}
+
 /* ═══ C: Graph index rerank ═══════════════════════════════════════════ */
 
 static void test_graph_rerank_boosts_entity_connected(void) {
@@ -504,6 +569,12 @@ void run_sota_wiring_tests(void) {
     HU_RUN_TEST(test_arg_inspector_allows_safe_args);
     HU_RUN_TEST(test_semantic_eot_yields_on_question);
     HU_RUN_TEST(test_semantic_eot_holds_on_ellipsis);
+    HU_RUN_TEST(test_semantic_eot_classifier_default_weights);
+    HU_RUN_TEST(test_semantic_eot_extract_features_complete_sentence);
+    HU_RUN_TEST(test_semantic_eot_classify_question_is_endpoint);
+    HU_RUN_TEST(test_semantic_eot_classify_ellipsis_is_hold);
+    HU_RUN_TEST(test_semantic_eot_classify_null_cls_falls_back);
+    HU_RUN_TEST(test_semantic_eot_set_weights_validates_dim);
     HU_RUN_TEST(test_graph_rerank_boosts_entity_connected);
     HU_RUN_TEST(test_mcp_timeout_budget_adaptive);
     HU_RUN_TEST(test_mcp_serf_classifies_timeout);

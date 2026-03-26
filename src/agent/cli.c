@@ -483,6 +483,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         .pressure_warn = cfg.agent.context_pressure_warn,
         .pressure_compact = cfg.agent.context_pressure_compact,
         .compact_target = cfg.agent.context_compact_target,
+        .compact_context = cfg.agent.compact_context,
         .llm_compiler_enabled = cfg.agent.llm_compiler_enabled,
         .hula_enabled = cfg.agent.hula_enabled,
         .mcts_planner_enabled = cfg.agent.mcts_planner_enabled,
@@ -1096,7 +1097,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_awareness_deinit(&cli_awareness);
     hu_bus_deinit(&cli_bus);
 #ifdef HU_HAS_VOICE_CHANNEL
-        hu_channel_voice_destroy(&cli_voice_ch);
+    hu_channel_voice_destroy(&cli_voice_ch);
 #endif
     hu_config_deinit(&cfg);
     if (single_message_mode && single_message_exit != HU_OK)

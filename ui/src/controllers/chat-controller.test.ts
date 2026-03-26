@@ -179,6 +179,37 @@ describe("ChatController", () => {
       });
     });
 
+    it("processes agent.tool start/result with gateway state field", () => {
+      const host = createMockHost();
+      const getGateway = vi.fn().mockReturnValue(null);
+      const ctrl = new ChatController(host as unknown as ReactiveControllerHost, getGateway);
+
+      ctrl.handleEvent("agent.tool", {
+        state: "start",
+        id: "gw-tool-1",
+        message: "web_search",
+      });
+      expect(ctrl.items).toHaveLength(1);
+      expect(ctrl.items[0]).toMatchObject({
+        type: "tool_call",
+        id: "gw-tool-1",
+        name: "web_search",
+        status: "running",
+      });
+
+      ctrl.handleEvent("agent.tool", {
+        state: "result",
+        id: "gw-tool-1",
+        message: "3 results for query",
+      });
+      expect(ctrl.items).toHaveLength(1);
+      expect(ctrl.items[0]).toMatchObject({
+        type: "tool_call",
+        status: "completed",
+        result: "3 results for query",
+      });
+    });
+
     it("processes thinking events", () => {
       const host = createMockHost();
       const getGateway = vi.fn().mockReturnValue(null);
@@ -197,6 +228,21 @@ describe("ChatController", () => {
       expect(ctrl.items[0]).toMatchObject({
         type: "thinking",
         content: "Let me think about this...",
+        streaming: true,
+      });
+    });
+
+    it("processes chat events with state thinking (gateway shape)", () => {
+      const host = createMockHost();
+      const getGateway = vi.fn().mockReturnValue(null);
+      const ctrl = new ChatController(host as unknown as ReactiveControllerHost, getGateway);
+
+      ctrl.handleEvent("chat", { state: "thinking", message: "Step 1: " });
+      ctrl.handleEvent("chat", { state: "thinking", message: "parse intent." });
+      expect(ctrl.items).toHaveLength(1);
+      expect(ctrl.items[0]).toMatchObject({
+        type: "thinking",
+        content: "Step 1: parse intent.",
         streaming: true,
       });
     });

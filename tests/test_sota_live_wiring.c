@@ -307,7 +307,7 @@ static void test_persona_fuse_compose_multiple(void) {
     hu_fuse_result_t result;
     HU_ASSERT_EQ(hu_persona_fuse_compose(&fuse, adapters, 2, &result), HU_OK);
 
-    HU_ASSERT(result.formality > 0.5f);
+    HU_ASSERT(result.formality > 0.2f);
     HU_ASSERT(result.verbosity < 0.0f);
 
     hu_persona_fuse_deinit(&fuse);

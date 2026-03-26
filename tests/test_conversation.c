@@ -2691,6 +2691,171 @@ static void contact_photo_null_returns_zero(void) {
     HU_ASSERT_EQ(0, (int)len);
 }
 
+static void contact_photo_small_buf_returns_zero(void) {
+    char buf[16];
+    size_t len = hu_conversation_contact_photo_path("test@test.com", 13, buf, sizeof(buf));
+    HU_ASSERT_EQ(0, (int)len);
+}
+
+/* ── Schedule with channel routing tests ─────────────────────────────── */
+
+static void schedule_on_channel_routes(void) {
+    uint64_t now = (uint64_t)time(NULL) * 1000ULL;
+    hu_error_t err = hu_conversation_schedule_message_on("routed_contact", 14, "imessage", 8,
+                                                         "hello via imsg", 14, now - 500);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    char contact[128], channel[32], msg[512];
+    size_t len = hu_conversation_flush_scheduled_on(now, contact, sizeof(contact), channel,
+                                                    sizeof(channel), msg, sizeof(msg));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_STR_EQ(contact, "routed_contact");
+    HU_ASSERT_STR_EQ(channel, "imessage");
+    HU_ASSERT_STR_EQ(msg, "hello via imsg");
+}
+
+static void schedule_on_empty_channel_matches_any(void) {
+    uint64_t now = (uint64_t)time(NULL) * 1000ULL;
+    hu_conversation_schedule_message_on("any_contact", 11, NULL, 0, "hey", 3, now - 100);
+    char contact[128], channel[32], msg[512];
+    channel[0] = 'X';
+    size_t len = hu_conversation_flush_scheduled_on(now, contact, sizeof(contact), channel,
+                                                    sizeof(channel), msg, sizeof(msg));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_EQ(channel[0], '\0');
+}
+
+/* ── Schedule persistence tests ──────────────────────────────────────── */
+
+static void sched_save_and_load_roundtrip(void) {
+    uint64_t now = (uint64_t)time(NULL) * 1000ULL;
+    hu_conversation_schedule_message_on("persist_user", 12, "telegram", 8, "hi from persist", 15,
+                                        now + 60000);
+    const char *path = "/tmp/hu_test_sched.json";
+    hu_error_t err = hu_conversation_sched_save(path, strlen(path));
+    HU_ASSERT_EQ(err, HU_OK);
+
+    err = hu_conversation_sched_load(path, strlen(path));
+    HU_ASSERT_EQ(err, HU_OK);
+
+    char contact[128], channel[32], msg[512];
+    size_t len = hu_conversation_flush_scheduled_on(now + 60000, contact, sizeof(contact), channel,
+                                                    sizeof(channel), msg, sizeof(msg));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_STR_EQ(contact, "persist_user");
+    HU_ASSERT_STR_EQ(channel, "telegram");
+    (void)unlink(path);
+}
+
+/* ── Split boundary edge case tests ──────────────────────────────────── */
+
+static void split_into_texts_exact_boundary(void) {
+    const char *msg = "Hello world.";
+    char chunks[4][512];
+    size_t n = hu_conversation_split_into_texts(msg, strlen(msg), 12, chunks, 4);
+    HU_ASSERT_EQ(1, (int)n);
+    HU_ASSERT_STR_EQ(chunks[0], "Hello world.");
+}
+
+static void split_into_texts_respects_max_chunks(void) {
+    const char *msg = "A. B. C. D. E. F. G. H.";
+    char chunks[2][512];
+    size_t n = hu_conversation_split_into_texts(msg, strlen(msg), 5, chunks, 2);
+    HU_ASSERT_EQ(2, (int)n);
+}
+
+/* ── GIF cal JSON escaping test ──────────────────────────────────────── */
+
+static void gif_cal_save_escapes_quotes(void) {
+    hu_conversation_gif_cal_record_send("test\"quoted", 11, "query", 5);
+    const char *path = "/tmp/hu_test_gif_cal_esc.json";
+    hu_error_t err = hu_conversation_gif_cal_save(path, strlen(path));
+    HU_ASSERT_EQ(err, HU_OK);
+
+    FILE *f = fopen(path, "r");
+    HU_ASSERT_TRUE(f != NULL);
+    char buf[512];
+    bool found_escaped = false;
+    while (fgets(buf, sizeof(buf), f)) {
+        if (strstr(buf, "test\\\"quoted"))
+            found_escaped = true;
+    }
+    fclose(f);
+    HU_ASSERT_TRUE(found_escaped);
+    (void)unlink(path);
+}
+
+/* ── sched_load \uXXXX unescaping ───────────────────────────────────── */
+
+static void sched_load_unescapes_unicode(void) {
+    const char *path = "/tmp/hu_test_sched_unicode.json";
+    FILE *f = fopen(path, "w");
+    HU_ASSERT_TRUE(f != NULL);
+    fprintf(f, "{\"contact\":\"alice\",\"channel\":\"imessage\","
+               "\"message\":\"caf\\u00e9 time!\","
+               "\"deliver_at\":99999999}\n");
+    fclose(f);
+    hu_error_t err = hu_conversation_sched_load(path, strlen(path));
+    HU_ASSERT_EQ(err, HU_OK);
+
+    char out_contact[128], out_channel[32], out_msg[512];
+    size_t n = hu_conversation_flush_scheduled_for(100000000000ULL, "imessage", 8, out_contact,
+                                                   sizeof(out_contact), out_channel,
+                                                   sizeof(out_channel), out_msg, sizeof(out_msg));
+    HU_ASSERT_EQ(1, (int)n);
+    /* \u00e9 = é encoded as UTF-8 (0xC3 0xA9) */
+    HU_ASSERT_TRUE(strstr(out_msg, "caf") != NULL);
+    HU_ASSERT_TRUE(strlen(out_msg) > 4);
+    (void)unlink(path);
+}
+
+static void sched_load_unescapes_tab_and_cr(void) {
+    const char *path = "/tmp/hu_test_sched_tab.json";
+    FILE *f = fopen(path, "w");
+    HU_ASSERT_TRUE(f != NULL);
+    fprintf(f, "{\"contact\":\"bob\",\"channel\":\"\","
+               "\"message\":\"line1\\tline2\\rline3\","
+               "\"deliver_at\":99999999}\n");
+    fclose(f);
+    hu_conversation_sched_load(path, strlen(path));
+
+    char out_contact[128], out_channel[32], out_msg[512];
+    size_t n = hu_conversation_flush_scheduled_for(100000000000ULL, NULL, 0, out_contact,
+                                                   sizeof(out_contact), out_channel,
+                                                   sizeof(out_channel), out_msg, sizeof(out_msg));
+    HU_ASSERT_EQ(1, (int)n);
+    HU_ASSERT_TRUE(strchr(out_msg, '\t') != NULL);
+    HU_ASSERT_TRUE(strchr(out_msg, '\r') != NULL);
+    (void)unlink(path);
+}
+
+/* ── sched_slot accessor ────────────────────────────────────────────── */
+
+static void sched_slot_returns_null_for_invalid_index(void) {
+    hu_sched_slot_t *s = hu_conversation_sched_slot(HU_SCHED_MAX);
+    HU_ASSERT_TRUE(s == NULL);
+    s = hu_conversation_sched_slot(HU_SCHED_MAX + 100);
+    HU_ASSERT_TRUE(s == NULL);
+}
+
+static void sched_slot_returns_valid_after_schedule(void) {
+    hu_error_t err = hu_conversation_schedule_message_on("test_slot_user", 14, "cli_test", 8,
+                                                         "hello from cli", 14, 12345678ULL);
+    HU_ASSERT_EQ(err, HU_OK);
+    bool found = false;
+    for (size_t i = 0; i < HU_SCHED_MAX; i++) {
+        hu_sched_slot_t *s = hu_conversation_sched_slot(i);
+        if (s && s->active && strcmp(s->contact_id, "test_slot_user") == 0) {
+            found = true;
+            HU_ASSERT_TRUE(strcmp(s->message, "hello from cli") == 0);
+            HU_ASSERT_EQ(12345678ULL, s->deliver_at_ms);
+            s->active = false;
+            break;
+        }
+    }
+    HU_ASSERT_TRUE(found);
+}
+
 /* ── Banned AI phrases expansion tests ──────────────────────────────── */
 
 static void strip_feel_free_to(void) {
@@ -3875,4 +4040,27 @@ void run_conversation_tests(void) {
 
     /* Contact photo path */
     HU_RUN_TEST(contact_photo_null_returns_zero);
+    HU_RUN_TEST(contact_photo_small_buf_returns_zero);
+
+    /* Scheduled message channel routing */
+    HU_RUN_TEST(schedule_on_channel_routes);
+    HU_RUN_TEST(schedule_on_empty_channel_matches_any);
+
+    /* Schedule persistence */
+    HU_RUN_TEST(sched_save_and_load_roundtrip);
+
+    /* Split edge cases */
+    HU_RUN_TEST(split_into_texts_exact_boundary);
+    HU_RUN_TEST(split_into_texts_respects_max_chunks);
+
+    /* GIF cal JSON escaping */
+    HU_RUN_TEST(gif_cal_save_escapes_quotes);
+
+    /* sched_load \uXXXX + escape completeness */
+    HU_RUN_TEST(sched_load_unescapes_unicode);
+    HU_RUN_TEST(sched_load_unescapes_tab_and_cr);
+
+    /* sched_slot accessor */
+    HU_RUN_TEST(sched_slot_returns_null_for_invalid_index);
+    HU_RUN_TEST(sched_slot_returns_valid_after_schedule);
 }

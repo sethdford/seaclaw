@@ -148,6 +148,34 @@ static hu_error_t append_sse_chunk(hu_json_buf_t *buf, hu_allocator_t *alloc, co
     return HU_OK;
 }
 
+#ifndef HU_IS_TEST
+/* Context for mapping hu_agent_turn_stream_v2 events to OpenAI-style SSE chunks */
+typedef struct {
+    hu_json_buf_t *buf;
+    hu_allocator_t *alloc;
+    const char *id;
+    const char *model;
+    size_t model_len;
+    long created;
+    hu_error_t append_err;
+    bool emitted_text;
+} openai_compat_stream_ctx_t;
+
+static void openai_compat_agent_stream_cb(const hu_agent_stream_event_t *event, void *ctx) {
+    openai_compat_stream_ctx_t *s = (openai_compat_stream_ctx_t *)ctx;
+    if (!s || s->append_err != HU_OK)
+        return;
+    if (event->type != HU_AGENT_STREAM_TEXT)
+        return;
+    if (!event->data || event->data_len == 0)
+        return;
+    s->emitted_text = true;
+    if (append_sse_chunk(s->buf, s->alloc, s->id, s->model, s->model_len, s->created, event->data,
+                         event->data_len, false) != HU_OK)
+        s->append_err = HU_ERR_OUT_OF_MEMORY;
+}
+#endif /* !HU_IS_TEST */
+
 void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                                               hu_allocator_t *alloc,
                                               const hu_app_context_t *app_ctx, int *out_status,
@@ -299,6 +327,117 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
             return;
         }
 #else
+        if (app_ctx && app_ctx->agent) {
+            const char *last_user_msg = NULL;
+            size_t last_user_msg_len = 0;
+
+            hu_agent_clear_history(app_ctx->agent);
+            for (size_t i = 0; i < msg_count; i++) {
+                if (msgs[i].role == HU_ROLE_USER) {
+                    last_user_msg = msgs[i].content;
+                    last_user_msg_len = msgs[i].content_len;
+                }
+                if (i < msg_count - 1 || msgs[i].role != HU_ROLE_USER) {
+                    hu_error_t herr = hu_agent_internal_append_history(
+                        app_ctx->agent, msgs[i].role, msgs[i].content, msgs[i].content_len, NULL, 0,
+                        NULL, 0);
+                    if (herr != HU_OK) {
+                        alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+                        hu_json_free(alloc, root);
+                        hu_json_buf_free(&buf);
+                        error_response(alloc, 502, "Agent error", out_status, out_body,
+                                       out_body_len);
+                        return;
+                    }
+                }
+            }
+
+            if (!last_user_msg) {
+                alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+                hu_json_free(alloc, root);
+                hu_json_buf_free(&buf);
+                error_response(alloc, 400, "No user message in messages", out_status, out_body,
+                               out_body_len);
+                return;
+            }
+
+            openai_compat_stream_ctx_t stream_ctx = {.buf = &buf,
+                                                     .alloc = alloc,
+                                                     .id = id_buf,
+                                                     .model = model,
+                                                     .model_len = model_len_out,
+                                                     .created = created_ts,
+                                                     .append_err = HU_OK,
+                                                     .emitted_text = false};
+
+            char *agent_resp = NULL;
+            size_t agent_resp_len = 0;
+            err = hu_agent_turn_stream_v2(app_ctx->agent, last_user_msg, last_user_msg_len,
+                                          openai_compat_agent_stream_cb, &stream_ctx, &agent_resp,
+                                          &agent_resp_len);
+
+            alloc->free(alloc->ctx, msgs, msg_count * sizeof(hu_chat_message_t));
+            hu_json_free(alloc, root);
+
+            if (stream_ctx.append_err != HU_OK)
+                err = stream_ctx.append_err;
+
+            if (err != HU_OK) {
+                if (agent_resp)
+                    app_ctx->agent->alloc->free(app_ctx->agent->alloc->ctx, agent_resp,
+                                                agent_resp_len + 1);
+                hu_json_buf_free(&buf);
+                if (err == HU_ERR_OUT_OF_MEMORY)
+                    error_response(alloc, 500, "Out of memory", out_status, out_body, out_body_len);
+                else
+                    error_response(alloc, 502, "Agent error", out_status, out_body, out_body_len);
+                return;
+            }
+
+            /* Slash commands return a full response without invoking the stream callback */
+            if (!stream_ctx.emitted_text && agent_resp && agent_resp_len > 0) {
+                if (append_sse_chunk(&buf, alloc, id_buf, model, model_len_out, created_ts,
+                                     agent_resp, agent_resp_len, false) != HU_OK) {
+                    app_ctx->agent->alloc->free(app_ctx->agent->alloc->ctx, agent_resp,
+                                                agent_resp_len + 1);
+                    hu_json_buf_free(&buf);
+                    error_response(alloc, 500, "Out of memory", out_status, out_body, out_body_len);
+                    return;
+                }
+            }
+
+            if (agent_resp)
+                app_ctx->agent->alloc->free(app_ctx->agent->alloc->ctx, agent_resp,
+                                            agent_resp_len + 1);
+
+            if (append_sse_chunk(&buf, alloc, id_buf, model, model_len_out, created_ts, NULL, 0,
+                                 true) != HU_OK ||
+                hu_json_buf_append_raw(&buf, "data: [DONE]\n\n", 14) != HU_OK) {
+                hu_json_buf_free(&buf);
+                error_response(alloc, 500, "Out of memory", out_status, out_body, out_body_len);
+                return;
+            }
+
+            size_t resp_len = buf.len;
+            size_t n = resp_len + 1;
+            char *resp_body = (char *)alloc->alloc(alloc->ctx, n);
+            if (!resp_body) {
+                hu_json_buf_free(&buf);
+                *out_body = NULL;
+                *out_body_len = 0;
+                return;
+            }
+            memcpy(resp_body, buf.ptr, resp_len);
+            resp_body[resp_len] = '\0';
+            hu_json_buf_free(&buf);
+            *out_status = 200;
+            *out_body = resp_body;
+            *out_body_len = resp_len;
+            if (out_content_type)
+                *out_content_type = "text/event-stream";
+            return;
+        }
+
         hu_provider_t provider = {0};
         err = hu_provider_create_from_config(alloc, cfg, provider_name, strlen(provider_name),
                                              &provider);
@@ -342,7 +481,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                 hu_chat_response_free(alloc, &resp);
             return;
         }
-        /* Split content into word/whitespace chunks and emit SSE events */
+        /* No agent: batch completion, then split into word/whitespace chunks for SSE */
         const char *content = resp.content ? resp.content : "";
         size_t content_len = resp.content ? resp.content_len : 0;
         const char *p = content;

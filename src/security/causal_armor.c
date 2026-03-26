@@ -131,6 +131,20 @@ hu_error_t hu_causal_armor_evaluate(const hu_causal_armor_config_t *cfg,
         out->reason_len = n > 0 ? (size_t)n : 0;
     }
 
+    double grounding = 1.0;
+    hu_causal_armor_check_grounding(segments, cap, proposed_tool, tool_len, proposed_args, args_len,
+                                    &grounding);
+    out->grounding_score = grounding;
+
+    if (out->is_safe && grounding < cfg->user_intent_floor) {
+        out->is_safe = false;
+        int n =
+            snprintf(out->reason, sizeof(out->reason),
+                     "grounding score %.2f below threshold — args reference untrusted-only terms",
+                     grounding);
+        out->reason_len = n > 0 ? (size_t)n : 0;
+    }
+
     return HU_OK;
 }
 

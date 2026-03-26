@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -61,6 +62,9 @@
 #endif
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
+#endif
+#ifdef HU_ENABLE_CARTESIA
+#include "human/tts/voice_clone.h"
 #endif
 #ifdef HU_ENABLE_FEEDS
 #include "human/feeds/processor.h"
@@ -186,6 +190,9 @@ static hu_error_t cmd_migrate(hu_allocator_t *alloc, int argc, char **argv);
 #ifdef HU_HAS_PERSONA
 static hu_error_t cmd_persona(hu_allocator_t *alloc, int argc, char **argv);
 #endif
+#ifdef HU_ENABLE_CARTESIA
+static hu_error_t cmd_voice(hu_allocator_t *alloc, int argc, char **argv);
+#endif
 #ifdef HU_ENABLE_ML
 static hu_error_t cmd_ml(hu_allocator_t *alloc, int argc, char **argv);
 #endif
@@ -268,6 +275,108 @@ static hu_error_t cmd_paperclip(hu_allocator_t *alloc, int argc, char **argv) {
 }
 #endif
 
+static hu_error_t cmd_schedule(hu_allocator_t *alloc, int argc, char **argv) {
+    (void)alloc;
+    const char *home = getenv("HOME");
+    if (!home) {
+        fprintf(stderr, "HOME not set\n");
+        return HU_ERR_INTERNAL;
+    }
+    char sched_path[512];
+    int sn = snprintf(sched_path, sizeof(sched_path), "%s/.human/scheduled.json", home);
+    if (sn < 0 || (size_t)sn >= sizeof(sched_path))
+        return HU_ERR_INTERNAL;
+
+    if (argc >= 3 && strcmp(argv[2], "list") == 0) {
+        hu_conversation_sched_load(sched_path, (size_t)sn);
+        size_t count = 0;
+        hu_sched_slot_t slots[HU_SCHED_MAX];
+        for (size_t i = 0; i < HU_SCHED_MAX; i++) {
+            hu_sched_slot_t *s = hu_conversation_sched_slot(i);
+            if (s && s->active) {
+                slots[count++] = *s;
+            }
+        }
+        if (count == 0) {
+            printf("No scheduled messages.\n");
+        } else {
+            printf("Scheduled messages (%zu):\n", count);
+            for (size_t i = 0; i < count; i++) {
+                time_t t = (time_t)(slots[i].deliver_at_ms / 1000ULL);
+                struct tm tm_buf;
+                struct tm *tp = localtime_r(&t, &tm_buf);
+                char time_str[64];
+                if (tp)
+                    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tp);
+                else
+                    snprintf(time_str, sizeof(time_str), "%" PRIu64, slots[i].deliver_at_ms);
+                printf("  [%zu] to: %s | channel: %s | at: %s\n"
+                       "       msg: %s\n",
+                       i, slots[i].contact_id,
+                       slots[i].channel_name[0] ? slots[i].channel_name : "(any)", time_str,
+                       slots[i].message);
+            }
+        }
+        return HU_OK;
+    }
+
+    if (argc >= 6 && strcmp(argv[2], "add") == 0) {
+        const char *contact = argv[3];
+        const char *msg = argv[4];
+        const char *when_str = argv[5];
+        const char *channel = (argc >= 7) ? argv[6] : "";
+        /* Parse 'when' as epoch seconds or "+Nm" (minutes from now) */
+        uint64_t deliver_ms = 0;
+        if (when_str[0] == '+') {
+            int minutes = atoi(when_str + 1);
+            if (minutes <= 0) {
+                fprintf(stderr, "Invalid delay: %s (use +Nm for N minutes)\n", when_str);
+                return HU_ERR_INVALID_ARGUMENT;
+            }
+            deliver_ms = (uint64_t)time(NULL) * 1000ULL + (uint64_t)minutes * 60000ULL;
+        } else {
+            long long epoch = atoll(when_str);
+            if (epoch <= 0) {
+                fprintf(stderr, "Invalid time: %s (use epoch seconds or +Nm)\n", when_str);
+                return HU_ERR_INVALID_ARGUMENT;
+            }
+            deliver_ms = (uint64_t)epoch * 1000ULL;
+        }
+        hu_conversation_sched_load(sched_path, (size_t)sn);
+        hu_error_t err = hu_conversation_schedule_message_on(
+            contact, strlen(contact), channel, strlen(channel), msg, strlen(msg), deliver_ms);
+        if (err != HU_OK) {
+            fprintf(stderr, "Failed to schedule message: error %d\n", (int)err);
+            return err;
+        }
+        hu_conversation_sched_save(sched_path, (size_t)sn);
+        printf("Scheduled message for %s at %" PRIu64 "ms\n", contact, deliver_ms);
+        return HU_OK;
+    }
+
+    if (argc >= 4 && strcmp(argv[2], "cancel") == 0) {
+        int idx = atoi(argv[3]);
+        hu_conversation_sched_load(sched_path, (size_t)sn);
+        hu_sched_slot_t *slot = hu_conversation_sched_slot((size_t)idx);
+        if (!slot || !slot->active) {
+            fprintf(stderr, "No active scheduled message at index %d\n", idx);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        printf("Cancelled: \"%s\" to %s\n", slot->message, slot->contact_id);
+        slot->active = false;
+        hu_conversation_sched_save(sched_path, (size_t)sn);
+        return HU_OK;
+    }
+
+    fprintf(stderr, "Usage: human schedule <subcommand>\n\n"
+                    "Subcommands:\n"
+                    "  list                           List pending scheduled messages\n"
+                    "  add <contact> <msg> <when> [channel]  Schedule a message\n"
+                    "    <when>: epoch seconds or +Nm (minutes from now)\n"
+                    "  cancel <index>                 Cancel a scheduled message\n");
+    return HU_ERR_INVALID_ARGUMENT;
+}
+
 static const hu_command_t commands[] = {
     {"agent", "Start interactive agent (--demo: use local Ollama)", cmd_agent},
     {"init", "Initialize config file", cmd_init},
@@ -294,6 +403,9 @@ static const hu_command_t commands[] = {
 #ifdef HU_HAS_PERSONA
     {"persona", "Create and manage persona profiles", cmd_persona},
 #endif
+#ifdef HU_ENABLE_CARTESIA
+    {"voice", "Voice cloning and TTS management", cmd_voice},
+#endif
 #if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
     {"feed", "Feed monitoring and ingestion", cmd_feed},
 #endif
@@ -301,6 +413,7 @@ static const hu_command_t commands[] = {
     {"calibrate", "Analyze messaging patterns and calibrate persona", cmd_calibrate},
     {"workspace", "Workspace management", cmd_workspace},
     {"config", "Configuration reference (schema)", cmd_config},
+    {"schedule", "Manage scheduled messages (list, add, cancel)", cmd_schedule},
     {"capabilities", "Show available capabilities", cmd_capabilities},
     {"models", "List available models", cmd_models},
     {"auth", "Authentication management", cmd_auth},
@@ -1912,6 +2025,96 @@ static hu_error_t cmd_persona(hu_allocator_t *alloc, int argc, char **argv) {
 }
 #endif
 
+#ifdef HU_ENABLE_CARTESIA
+static hu_error_t cmd_voice(hu_allocator_t *alloc, int argc, char **argv) {
+    if (argc < 3 || !argv[2]) {
+        fprintf(stderr,
+                "Usage: human voice <subcommand>\n\n"
+                "Subcommands:\n"
+                "  clone --file <path> [--name <name>] [--lang <code>] [--persona <name>]\n");
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    if (strcmp(argv[2], "clone") != 0) {
+        fprintf(stderr, "Unknown voice subcommand: %s\n", argv[2]);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    const char *file_path = NULL;
+    const char *name = NULL;
+    const char *lang = NULL;
+    const char *persona = NULL;
+
+    for (int i = 3; i < argc; i++) {
+        if (!argv[i])
+            continue;
+        if (strcmp(argv[i], "--file") == 0 && i + 1 < argc)
+            file_path = argv[++i];
+        else if (strcmp(argv[i], "--name") == 0 && i + 1 < argc)
+            name = argv[++i];
+        else if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc)
+            lang = argv[++i];
+        else if (strcmp(argv[i], "--persona") == 0 && i + 1 < argc)
+            persona = argv[++i];
+    }
+
+    if (!file_path) {
+        fprintf(stderr, "Error: --file <path> is required\n");
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    /* Get Cartesia API key from env or config */
+    const char *api_key = getenv("CARTESIA_API_KEY");
+    if (!api_key || api_key[0] == '\0') {
+        fprintf(stderr, "Error: CARTESIA_API_KEY environment variable not set\n");
+        return HU_ERR_PROVIDER_AUTH;
+    }
+
+    hu_voice_clone_config_t cfg;
+    hu_voice_clone_config_default(&cfg);
+    if (name) {
+        cfg.name = name;
+        cfg.name_len = strlen(name);
+    }
+    if (lang) {
+        cfg.language = lang;
+        cfg.language_len = strlen(lang);
+    }
+
+    hu_voice_clone_result_t result;
+    hu_error_t err =
+        hu_voice_clone_from_file(alloc, api_key, strlen(api_key), file_path, &cfg, &result);
+    if (err != HU_OK) {
+        if (result.error_len > 0)
+            fprintf(stderr, "Clone failed: %s\n", result.error);
+        else
+            fprintf(stderr, "Clone failed: %s\n", hu_error_string(err));
+        return err;
+    }
+
+    printf("Voice cloned successfully!\n");
+    printf("  Voice ID: %s\n", result.voice_id);
+    printf("  Name:     %s\n", result.name);
+    printf("  Language:  %s\n", result.language);
+
+    if (persona && persona[0]) {
+        err = hu_persona_set_voice_id(alloc, persona, strlen(persona), result.voice_id,
+                                      strlen(result.voice_id));
+        if (err == HU_OK)
+            printf("\nPersona '%s' updated with new voice_id.\n", persona);
+        else
+            fprintf(stderr, "\nWarning: failed to update persona '%s': %s\n", persona,
+                    hu_error_string(err));
+    } else {
+        printf("\nTo use this voice, add it to your persona:\n");
+        printf("  human voice clone --file %s --persona <name>\n", file_path);
+        printf("Or manually set voice_id in ~/.human/personas/<name>.json\n");
+    }
+
+    return HU_OK;
+}
+#endif
+
 static hu_error_t cmd_migrate(hu_allocator_t *alloc, int argc, char **argv) {
     hu_migration_config_t mc = {
         .source = HU_MIGRATION_SOURCE_NONE,
@@ -2042,7 +2245,20 @@ static size_t utf8_safe_truncate(const char *buf, size_t len) {
     return pos;
 }
 
-static void gw_stream_token_cb(const char *delta, size_t len, void *ctx) {
+/* Copy data into bus event message with UTF-8 safe truncation */
+static void gw_bus_set_message(hu_bus_event_t *bev, const char *data, size_t len) {
+    if (!data || len == 0) {
+        bev->message[0] = '\0';
+        return;
+    }
+    size_t copy_len = len < HU_BUS_MSG_LEN - 1 ? len : HU_BUS_MSG_LEN - 1;
+    if (copy_len < len)
+        copy_len = utf8_safe_truncate(data, copy_len);
+    memcpy(bev->message, data, copy_len);
+    bev->message[copy_len] = '\0';
+}
+
+__attribute__((unused)) static void gw_stream_token_cb(const char *delta, size_t len, void *ctx) {
     gw_stream_ctx_t *sc = (gw_stream_ctx_t *)ctx;
     if (!sc || !delta || !len)
         return;
@@ -2051,11 +2267,46 @@ static void gw_stream_token_cb(const char *delta, size_t len, void *ctx) {
     ev.type = HU_BUS_MESSAGE_CHUNK;
     memcpy(ev.channel, sc->channel, HU_BUS_CHANNEL_LEN);
     memcpy(ev.id, sc->id, HU_BUS_ID_LEN);
-    size_t copy_len = len < HU_BUS_MSG_LEN - 1 ? len : HU_BUS_MSG_LEN - 1;
-    if (copy_len < len)
-        copy_len = utf8_safe_truncate(delta, copy_len);
-    memcpy(ev.message, delta, copy_len);
-    ev.message[copy_len] = '\0';
+    gw_bus_set_message(&ev, delta, len);
+    hu_bus_publish(sc->bus, &ev);
+}
+
+/* Rich stream event callback for v2: maps agent events to typed bus events */
+static void gw_stream_event_cb(const hu_agent_stream_event_t *event, void *ctx) {
+    gw_stream_ctx_t *sc = (gw_stream_ctx_t *)ctx;
+    if (!sc)
+        return;
+    hu_bus_event_t ev;
+    memset(&ev, 0, sizeof(ev));
+    memcpy(ev.channel, sc->channel, HU_BUS_CHANNEL_LEN);
+    memcpy(ev.id, sc->id, HU_BUS_ID_LEN);
+
+    switch (event->type) {
+    case HU_AGENT_STREAM_TEXT:
+        if (!event->data || event->data_len == 0)
+            return;
+        ev.type = HU_BUS_MESSAGE_CHUNK;
+        gw_bus_set_message(&ev, event->data, event->data_len);
+        break;
+    case HU_AGENT_STREAM_THINKING:
+        if (!event->data || event->data_len == 0)
+            return;
+        ev.type = HU_BUS_THINKING_CHUNK;
+        gw_bus_set_message(&ev, event->data, event->data_len);
+        break;
+    case HU_AGENT_STREAM_TOOL_START:
+        ev.type = HU_BUS_TOOL_CALL;
+        gw_bus_set_message(&ev, event->tool_name, event->tool_name_len);
+        break;
+    case HU_AGENT_STREAM_TOOL_ARGS:
+        ev.type = HU_BUS_TOOL_CALL;
+        gw_bus_set_message(&ev, event->data, event->data_len);
+        break;
+    case HU_AGENT_STREAM_TOOL_RESULT:
+        ev.type = HU_BUS_TOOL_CALL_RESULT;
+        gw_bus_set_message(&ev, event->data, event->data_len);
+        break;
+    }
     hu_bus_publish(sc->bus, &ev);
 }
 
@@ -2079,8 +2330,8 @@ static bool gw_agent_on_message(hu_bus_event_type_t type, const hu_bus_event_t *
     snprintf(stream_ctx.channel, HU_BUS_CHANNEL_LEN, "%s",
              ev->channel[0] ? ev->channel : "gateway");
     snprintf(stream_ctx.id, HU_BUS_ID_LEN, "%s", ev->id);
-    hu_error_t err = hu_agent_turn_stream(b->agent, msg, strlen(msg), gw_stream_token_cb,
-                                          &stream_ctx, &reply, &reply_len);
+    hu_error_t err = hu_agent_turn_stream_v2(b->agent, msg, strlen(msg), gw_stream_event_cb,
+                                             &stream_ctx, &reply, &reply_len);
     if (err == HU_OK && reply && reply_len > 0) {
         hu_bus_event_t rev;
         memset(&rev, 0, sizeof(rev));

@@ -2437,7 +2437,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 .warning_85_emitted = agent->context_pressure_warning_85_emitted,
                 .warning_95_emitted = agent->context_pressure_warning_95_emitted,
             };
-            if (hu_context_check_pressure(&pr, agent->context_pressure_warn,
+            if (agent->compact_context_enabled &&
+                hu_context_check_pressure(&pr, agent->context_pressure_warn,
                                           agent->context_pressure_compact)) {
                 hu_context_compact_for_pressure(agent->alloc, agent->history, &agent->history_count,
                                                 &agent->history_cap, (size_t)max_tokens,
@@ -2482,7 +2483,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         (void)hu_kv_cache_add_segment(kvm, lbl, (size_t)ln,
                                                       (uint32_t)((tlen + 3) / 4) + 4u, false);
                     }
-                    if (hu_kv_cache_utilization(kvm) > 0.8f) {
+                    if (hu_kv_cache_needs_eviction(kvm)) {
                         const char *evicted[HU_KV_CACHE_MAX_SEGMENTS];
                         size_t n_ev = hu_kv_cache_prune(kvm, evicted, HU_KV_CACHE_MAX_SEGMENTS);
                         if (n_ev > 0) {

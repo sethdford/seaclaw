@@ -391,6 +391,7 @@ set(HU_CORE_SOURCES
     src/gateway/cp_memory.c
     src/gateway/cp_hula.c
     src/gateway/cp_voice.c
+    src/gateway/cp_voice_clone.c
     src/gateway/cp_voice_stream.c
     src/gateway/cp_turing.c
     src/gateway/cp_mcp.c
@@ -885,6 +886,7 @@ endif()
 # cartesia.c is always compiled (stubs return HU_ERR_NOT_SUPPORTED when disabled)
 list(APPEND HU_CORE_SOURCES src/tts/cartesia.c)
 list(APPEND HU_CORE_SOURCES src/tts/cartesia_stream.c)
+list(APPEND HU_CORE_SOURCES src/tts/voice_clone.c)
 
 # Cartesia full pipeline (requires libcurl for API calls)
 if(HU_ENABLE_CARTESIA)
@@ -2111,6 +2113,7 @@ if(HU_ENABLE_PERSONA)
 endif()
 list(APPEND HU_TEST_SOURCES tests/test_cartesia.c)
 list(APPEND HU_TEST_SOURCES tests/test_cartesia_stream.c)
+list(APPEND HU_TEST_SOURCES tests/test_voice_clone.c)
 if(HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_SOURCES tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)
 endif()

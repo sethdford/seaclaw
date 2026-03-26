@@ -47,15 +47,20 @@ typedef struct hu_constitutional_config {
 /* Critique a response against principles. Uses LLM for evaluation.
  * Caller must free result with hu_critique_result_free. */
 hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *provider,
-                                    const char *model, size_t model_len,
-                                    const char *user_msg, size_t user_msg_len,
-                                    const char *response, size_t response_len,
-                                    const hu_constitutional_config_t *config,
-                                    hu_critique_result_t *result);
+                                      const char *model, size_t model_len, const char *user_msg,
+                                      size_t user_msg_len, const char *response,
+                                      size_t response_len, const hu_constitutional_config_t *config,
+                                      hu_critique_result_t *result);
 
 void hu_critique_result_free(hu_allocator_t *alloc, hu_critique_result_t *result);
 
 /* Default principles: helpful, harmless, honest */
 hu_constitutional_config_t hu_constitutional_config_default(void);
+
+#ifdef HU_IS_TEST
+hu_critique_verdict_t hu_constitutional_test_parse_verdict(const char *resp, size_t resp_len,
+                                                           int *principle_idx);
+int hu_constitutional_test_parse_principle_index(const char *resp, size_t resp_len);
+#endif
 
 #endif

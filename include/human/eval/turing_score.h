@@ -62,6 +62,12 @@ hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider, c
                                const char *conversation_context, size_t context_len,
                                hu_turing_score_t *out);
 
+/* Apply channel-specific weight adjustments to a scored result.
+ * Casual channels (discord, telegram, imessage, whatsapp) emphasize casual markers;
+ * formal channels (email, slack) emphasize structure and length. */
+void hu_turing_apply_channel_weights(hu_turing_score_t *score, const char *channel,
+                                     size_t channel_len);
+
 /* Dimension name for display/logging. */
 const char *hu_turing_dimension_name(hu_turing_dimension_t dim);
 
@@ -71,6 +77,17 @@ const char *hu_turing_verdict_name(hu_turing_verdict_t verdict);
 /* Format a score as a summary string. Caller owns result. */
 char *hu_turing_score_summary(hu_allocator_t *alloc, const hu_turing_score_t *score,
                               size_t *out_len);
+
+/* Trajectory scoring across a conversation (multi-turn). No SQLite required. */
+typedef struct hu_turing_trajectory {
+    float directional_alignment; /* 0-1: emotional trajectory toward user needs */
+    float cumulative_impact;     /* 0-1: positive emotional impact over time */
+    float stability;             /* 0-1: empathic behavior stability (no regression) */
+    float overall;               /* weighted average */
+} hu_turing_trajectory_t;
+
+hu_error_t hu_turing_score_trajectory(const hu_turing_score_t *scores, size_t score_count,
+                                      hu_turing_trajectory_t *out);
 
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
@@ -102,17 +119,6 @@ char *hu_turing_build_contact_hint(hu_allocator_t *alloc, const int *dimension_a
 /* Per-channel dimension averages (last 30 days, derived from contact channel prefix). */
 hu_error_t hu_turing_get_channel_dimensions(sqlite3 *db, const char *channel_name,
                                             size_t channel_name_len, int *dimension_averages);
-
-/* Trajectory scoring across a conversation (multi-turn). */
-typedef struct hu_turing_trajectory {
-    float directional_alignment; /* 0-1: emotional trajectory toward user needs */
-    float cumulative_impact;     /* 0-1: positive emotional impact over time */
-    float stability;             /* 0-1: empathic behavior stability (no regression) */
-    float overall;               /* weighted average */
-} hu_turing_trajectory_t;
-
-hu_error_t hu_turing_score_trajectory(const hu_turing_score_t *scores, size_t score_count,
-                                      hu_turing_trajectory_t *out);
 
 /* A/B test for humanization parameters.
  * Tracks two parameter variants and their resulting Turing scores. */

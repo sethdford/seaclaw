@@ -3,6 +3,7 @@
 #include "human/agent/action_preview.h"
 #include "human/agent/awareness.h"
 #include "human/agent/compaction.h"
+#include "human/agent/constitutional.h"
 #include "human/agent/dispatcher.h"
 #include "human/agent/episodic.h"
 #include "human/agent/mailbox.h"
@@ -11,7 +12,6 @@
 #include "human/agent/planner.h"
 #include "human/agent/reflection.h"
 #include "human/agent/tree_of_thought.h"
-#include "human/agent/constitutional.h"
 #include "human/bus.h"
 #include "human/config_types.h"
 #include "human/context_tokens.h"
@@ -430,8 +430,8 @@ static void test_constitutional_critique_disabled_returns_pass(void) {
     hu_critique_result_t result;
     memset(&result, 0, sizeof(result));
 
-    hu_error_t err = hu_constitutional_critique(&alloc, NULL, "gpt-4", 4, "Hello", 5, "Hi", 2,
-                                                &cfg, &result);
+    hu_error_t err =
+        hu_constitutional_critique(&alloc, NULL, "gpt-4", 4, "Hello", 5, "Hi", 2, &cfg, &result);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(result.verdict, HU_CRITIQUE_PASS);
 
@@ -445,6 +445,75 @@ static void test_critique_result_free_handles_null(void) {
     hu_critique_result_free(&alloc, &result);
     hu_critique_result_free(NULL, &result);
     hu_critique_result_free(&alloc, NULL);
+}
+
+static void test_parse_verdict_pass(void) {
+    int idx = -1;
+    HU_ASSERT_EQ(hu_constitutional_test_parse_verdict("PASS - looks good", 18, &idx),
+                 HU_CRITIQUE_PASS);
+    HU_ASSERT_EQ(idx, -1);
+}
+
+static void test_parse_verdict_minor(void) {
+    int idx = -1;
+    HU_ASSERT_EQ(hu_constitutional_test_parse_verdict("MINOR issue with tone", 21, &idx),
+                 HU_CRITIQUE_MINOR);
+}
+
+static void test_parse_verdict_rewrite(void) {
+    int idx = -1;
+    HU_ASSERT_EQ(hu_constitutional_test_parse_verdict("REWRITE: violates principle 2", 29, &idx),
+                 HU_CRITIQUE_REWRITE);
+}
+
+static void test_parse_verdict_case_insensitive(void) {
+    int idx = -1;
+    HU_ASSERT_EQ(hu_constitutional_test_parse_verdict("pass", 4, &idx), HU_CRITIQUE_PASS);
+    HU_ASSERT_EQ(hu_constitutional_test_parse_verdict("minor", 5, &idx), HU_CRITIQUE_MINOR);
+    HU_ASSERT_EQ(hu_constitutional_test_parse_verdict("rewrite", 7, &idx), HU_CRITIQUE_REWRITE);
+}
+
+static void test_parse_verdict_empty_returns_pass(void) {
+    int idx = 5;
+    HU_ASSERT_EQ(hu_constitutional_test_parse_verdict("", 0, &idx), HU_CRITIQUE_PASS);
+    HU_ASSERT_EQ(idx, -1);
+    HU_ASSERT_EQ(hu_constitutional_test_parse_verdict(NULL, 0, &idx), HU_CRITIQUE_PASS);
+}
+
+static void test_parse_verdict_with_leading_whitespace(void) {
+    int idx = -1;
+    HU_ASSERT_EQ(hu_constitutional_test_parse_verdict("  \n  REWRITE principle 1", 23, &idx),
+                 HU_CRITIQUE_REWRITE);
+}
+
+static void test_parse_principle_index_finds_number(void) {
+    HU_ASSERT_EQ(hu_constitutional_test_parse_principle_index("principle 2", 11), 2);
+    HU_ASSERT_EQ(hu_constitutional_test_parse_principle_index("PRINCIPLE 10", 12), 10);
+    HU_ASSERT_EQ(hu_constitutional_test_parse_principle_index("violates principle 3 because", 28),
+                 3);
+}
+
+static void test_parse_principle_index_returns_neg1_when_missing(void) {
+    HU_ASSERT_EQ(hu_constitutional_test_parse_principle_index("no number here", 14), -1);
+    HU_ASSERT_EQ(hu_constitutional_test_parse_principle_index("", 0), -1);
+    HU_ASSERT_EQ(hu_constitutional_test_parse_principle_index(NULL, 0), -1);
+}
+
+static void test_parse_principle_index_skips_hash(void) {
+    HU_ASSERT_EQ(hu_constitutional_test_parse_principle_index("principle #3 violated", 21), 3);
+}
+
+static void test_constitutional_principle_idx_preserved(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_constitutional_config_t cfg = hu_constitutional_config_default();
+    hu_critique_result_t result;
+    memset(&result, 0, sizeof(result));
+    hu_error_t err = hu_constitutional_critique(&alloc, NULL, "test", 4, "Hello", 5, "Response", 8,
+                                                &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.verdict, HU_CRITIQUE_PASS);
+    HU_ASSERT_EQ(result.principle_index, -1);
+    hu_critique_result_free(&alloc, &result);
 }
 
 void run_agent_modules_tests(void) {
@@ -475,4 +544,14 @@ void run_agent_modules_tests(void) {
     HU_RUN_TEST(test_constitutional_critique_in_test_mode_returns_pass);
     HU_RUN_TEST(test_constitutional_critique_disabled_returns_pass);
     HU_RUN_TEST(test_critique_result_free_handles_null);
+    HU_RUN_TEST(test_parse_verdict_pass);
+    HU_RUN_TEST(test_parse_verdict_minor);
+    HU_RUN_TEST(test_parse_verdict_rewrite);
+    HU_RUN_TEST(test_parse_verdict_case_insensitive);
+    HU_RUN_TEST(test_parse_verdict_empty_returns_pass);
+    HU_RUN_TEST(test_parse_verdict_with_leading_whitespace);
+    HU_RUN_TEST(test_parse_principle_index_finds_number);
+    HU_RUN_TEST(test_parse_principle_index_returns_neg1_when_missing);
+    HU_RUN_TEST(test_parse_principle_index_skips_hash);
+    HU_RUN_TEST(test_constitutional_principle_idx_preserved);
 }

@@ -75,6 +75,7 @@
 #define HU_COGNITIVE_SKIP_LIFE_CHAPTER 1
 #include "human/memory/cognitive.h"
 #undef HU_COGNITIVE_SKIP_LIFE_CHAPTER
+#include "human/bus.h"
 #include "human/channel_monitor.h"
 #include "human/context/context_ext.h"
 #include "human/humanness.h"
@@ -2086,6 +2087,17 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                         skip = true;
 #endif
                     if (!skip && channels[c].channel->vtable->send) {
+                        response_len = hu_conversation_strip_ai_phrases(response, response_len);
+                        response_len =
+                            hu_conversation_vary_complexity(response, response_len, (uint32_t)now);
+                        if (response_len > 1 && response[0] >= 'A' && response[0] <= 'Z' &&
+                            response[1] >= 'a' && response[1] <= 'z' && response[0] != 'I') {
+                            response[0] = (char)(response[0] + 32);
+                        }
+                        if (response_len > 1 && response[response_len - 1] == '.') {
+                            response[response_len - 1] = '\0';
+                            response_len--;
+                        }
                         channels[c].channel->vtable->send(channels[c].channel->ctx, target_part,
                                                           target_len, response, response_len, NULL,
                                                           0);
@@ -2117,6 +2129,99 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
                 alloc->free(alloc->ctx, prompt, prompt_len + 1);
                 hu_agent_clear_history(agent);
+            }
+
+            /* Proactive "good morning" scheduler: per-contact, once per day
+             * during the 6-9am window. Uses LLM to generate personalized
+             * greetings when the agent is available. */
+            {
+                static struct {
+                    char contact_id[64];
+                    uint32_t day;
+                } gm_sent[8];
+                static size_t gm_sent_count;
+                time_t gm_now = time(NULL);
+                struct tm gm_tm;
+                struct tm *gm_p = localtime_r(&gm_now, &gm_tm);
+                uint32_t gm_day = gm_p ? (uint32_t)(gm_p->tm_yday + gm_p->tm_year * 366) : 0;
+                int gm_hour = gm_p ? gm_p->tm_hour : 12;
+                if (gm_hour >= 6 && gm_hour < 9 && cp && cp->relationship_type) {
+                    bool is_close = (strcmp(cp->relationship_type, "partner") == 0 ||
+                                     strcmp(cp->relationship_type, "close_friend") == 0 ||
+                                     strcmp(cp->relationship_type, "family") == 0);
+                    /* Check per-contact daily gate */
+                    bool already_sent = false;
+                    size_t cid_len = strlen(cp->contact_id);
+                    for (size_t gi = 0; gi < gm_sent_count && !already_sent; gi++) {
+                        if (gm_sent[gi].day == gm_day &&
+                            strcmp(gm_sent[gi].contact_id, cp->contact_id) == 0)
+                            already_sent = true;
+                    }
+                    if (is_close && !already_sent) {
+                        /* Record this contact as scheduled today */
+                        if (gm_sent_count < 8) {
+                            size_t cn = cid_len < 63 ? cid_len : 63;
+                            memcpy(gm_sent[gm_sent_count].contact_id, cp->contact_id, cn);
+                            gm_sent[gm_sent_count].contact_id[cn] = '\0';
+                            gm_sent[gm_sent_count].day = gm_day;
+                            gm_sent_count++;
+                        }
+                        /* LLM-personalized greeting when agent is available */
+                        const char *greeting = "good morning :)";
+                        size_t greeting_len = 15;
+                        char gm_resp[256];
+                        if (agent) {
+                            const char *gm_prompt =
+                                "Generate a very brief, warm morning greeting for a "
+                                "close friend/family member. One short sentence max. "
+                                "Natural and casual, like a real text. No emojis unless "
+                                "it fits your personality. Examples: 'morning!', "
+                                "'hey good morning', 'rise and shine :)'";
+                            hu_agent_clear_history(agent);
+                            char *gm_out = NULL;
+                            size_t gm_out_len = 0;
+                            hu_error_t gm_err = hu_agent_turn(agent, gm_prompt, strlen(gm_prompt),
+                                                              &gm_out, &gm_out_len);
+                            if (gm_err == HU_OK && gm_out && gm_out_len > 0 &&
+                                gm_out_len < sizeof(gm_resp)) {
+                                memcpy(gm_resp, gm_out, gm_out_len);
+                                gm_resp[gm_out_len] = '\0';
+                                greeting = gm_resp;
+                                greeting_len = gm_out_len;
+                            }
+                            if (gm_out)
+                                agent->alloc->free(agent->alloc->ctx, gm_out, gm_out_len + 1);
+                            hu_agent_clear_history(agent);
+                        }
+                        /* Schedule for tomorrow 7:30-9:00am local time */
+                        uint32_t gm_seed = (uint32_t)(gm_now * 48271u) + (uint32_t)(uintptr_t)cp;
+                        uint32_t offset_min = 450 + (gm_seed % 90);
+                        struct tm tomorrow_tm = gm_tm;
+                        tomorrow_tm.tm_mday += 1;
+                        tomorrow_tm.tm_hour = (int)(offset_min / 60);
+                        tomorrow_tm.tm_min = (int)(offset_min % 60);
+                        tomorrow_tm.tm_sec = 0;
+                        tomorrow_tm.tm_isdst = -1;
+                        time_t deliver_t = mktime(&tomorrow_tm);
+                        uint64_t deliver_ms = (uint64_t)deliver_t * 1000ULL;
+                        const char *gm_ch =
+                            channels[c].channel->vtable->name
+                                ? channels[c].channel->vtable->name(channels[c].channel->ctx)
+                                : "";
+                        hu_conversation_schedule_message_on(cp->contact_id, cid_len, gm_ch,
+                                                            strlen(gm_ch), greeting, greeting_len,
+                                                            deliver_ms);
+                        fprintf(stderr, "[human] scheduled morning message for %s: %.*s\n",
+                                cp->name ? cp->name : cp->contact_id, (int)greeting_len, greeting);
+                        const char *sh = getenv("HOME");
+                        if (sh) {
+                            char sp[512];
+                            int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
+                            if (sn > 0 && (size_t)sn < sizeof(sp))
+                                hu_conversation_sched_save(sp, (size_t)sn);
+                        }
+                    }
+                }
             }
 
 #ifdef HU_ENABLE_SQLITE
@@ -2186,18 +2291,44 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 }
             }
 #endif
-            /* Scheduled message delivery: flush any due messages */
+            /* Scheduled message delivery: flush any due messages.
+             * Loads queue from disk once, saves after each delivery. */
+            {
+                static bool sched_loaded;
+                if (!sched_loaded) {
+                    sched_loaded = true;
+                    const char *sh = getenv("HOME");
+                    if (sh) {
+                        char sp[512];
+                        int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
+                        if (sn > 0 && (size_t)sn < sizeof(sp))
+                            hu_conversation_sched_load(sp, (size_t)sn);
+                    }
+                }
+            }
             if (channels[c].channel->vtable->send) {
                 uint64_t sched_now = (uint64_t)time(NULL) * 1000ULL;
-                char sched_contact[128];
-                char sched_msg[512];
-                size_t sched_len = hu_conversation_flush_scheduled(
-                    sched_now, sched_contact, sizeof(sched_contact), sched_msg, sizeof(sched_msg));
+                const char *sched_ch =
+                    channels[c].channel->vtable->name
+                        ? channels[c].channel->vtable->name(channels[c].channel->ctx)
+                        : "";
+                char sched_contact[128], sched_channel[32], sched_msg[512];
+                size_t sched_len = hu_conversation_flush_scheduled_for(
+                    sched_now, sched_ch, strlen(sched_ch), sched_contact, sizeof(sched_contact),
+                    sched_channel, sizeof(sched_channel), sched_msg, sizeof(sched_msg));
                 if (sched_len > 0) {
                     channels[c].channel->vtable->send(channels[c].channel->ctx, sched_contact,
                                                       strlen(sched_contact), sched_msg, sched_len,
                                                       NULL, 0);
-                    fprintf(stderr, "[human] scheduled message delivered to %s\n", sched_contact);
+                    fprintf(stderr, "[human] scheduled message delivered to %s via %s\n",
+                            sched_contact, sched_ch);
+                    const char *sh = getenv("HOME");
+                    if (sh) {
+                        char sp[512];
+                        int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
+                        if (sn > 0 && (size_t)sn < sizeof(sp))
+                            hu_conversation_sched_save(sp, (size_t)sn);
+                    }
                 }
             }
             if (event_ctx)
@@ -2323,6 +2454,169 @@ const char *hu_missed_message_acknowledgment(int64_t delay_secs, int receive_hou
     return missed[seed % 3];
 }
 
+/* ── Outbound bus: streaming chunks + final channel delivery ─────────────── */
+
+typedef struct hu_daemon_out_turn_state {
+    bool typing_started;
+    bool text_delivered_via_bus;
+} hu_daemon_out_turn_state_t;
+
+typedef struct hu_daemon_out_bus_bridge {
+    hu_service_channel_t *channels;
+    size_t channel_count;
+    hu_daemon_out_turn_state_t *active_turn;   /* non-NULL during streaming (chunk typing) */
+    hu_daemon_out_turn_state_t *delivery_turn; /* non-NULL around MESSAGE_SENT publish */
+    hu_bus_t *bus;
+} hu_daemon_out_bus_bridge_t;
+
+typedef struct hu_daemon_stream_ctx {
+    hu_bus_t *bus;
+    char channel[HU_BUS_CHANNEL_LEN];
+    char id[HU_BUS_ID_LEN];
+} hu_daemon_stream_ctx_t;
+
+/* Back up to last valid UTF-8 boundary at or before pos in buf of length len. */
+static size_t daemon_utf8_safe_truncate(const char *buf, size_t len) {
+    if (len == 0)
+        return 0;
+    size_t pos = len;
+    while (pos > 0 && ((unsigned char)buf[pos - 1] & 0xC0) == 0x80)
+        --pos;
+    if (pos > 0) {
+        unsigned char lead = (unsigned char)buf[pos - 1];
+        size_t seq_len = 1;
+        if ((lead & 0xE0) == 0xC0)
+            seq_len = 2;
+        else if ((lead & 0xF0) == 0xE0)
+            seq_len = 3;
+        else if ((lead & 0xF8) == 0xF0)
+            seq_len = 4;
+        if (pos - 1 + seq_len > len)
+            pos = pos - 1;
+    }
+    return pos;
+}
+
+static void daemon_bus_set_message(hu_bus_event_t *bev, const char *data, size_t len) {
+    if (!data || len == 0) {
+        bev->message[0] = '\0';
+        return;
+    }
+    size_t copy_len = len < HU_BUS_MSG_LEN - 1 ? len : HU_BUS_MSG_LEN - 1;
+    if (copy_len < len)
+        copy_len = daemon_utf8_safe_truncate(data, copy_len);
+    memcpy(bev->message, data, copy_len);
+    bev->message[copy_len] = '\0';
+}
+
+static hu_service_channel_t *daemon_out_find_channel(hu_service_channel_t *channels, size_t count,
+                                                     const char *name) {
+    if (!channels || count == 0 || !name || !name[0])
+        return NULL;
+    for (size_t i = 0; i < count; i++) {
+        if (!channels[i].channel || !channels[i].channel->vtable ||
+            !channels[i].channel->vtable->name)
+            continue;
+        const char *n = channels[i].channel->vtable->name(channels[i].channel->ctx);
+        if (n && strcmp(n, name) == 0)
+            return &channels[i];
+    }
+    return NULL;
+}
+
+#ifndef HU_IS_TEST
+/* Rich stream event callback: maps agent stream events to bus (matches gateway pattern). */
+static void daemon_stream_event_cb(const hu_agent_stream_event_t *event, void *ctx) {
+    hu_daemon_stream_ctx_t *sc = (hu_daemon_stream_ctx_t *)ctx;
+    if (!sc || !sc->bus)
+        return;
+    hu_bus_event_t ev;
+    memset(&ev, 0, sizeof(ev));
+    memcpy(ev.channel, sc->channel, HU_BUS_CHANNEL_LEN);
+    memcpy(ev.id, sc->id, HU_BUS_ID_LEN);
+
+    switch (event->type) {
+    case HU_AGENT_STREAM_TEXT:
+        if (!event->data || event->data_len == 0)
+            return;
+        ev.type = HU_BUS_MESSAGE_CHUNK;
+        daemon_bus_set_message(&ev, event->data, event->data_len);
+        break;
+    case HU_AGENT_STREAM_THINKING:
+        if (!event->data || event->data_len == 0)
+            return;
+        ev.type = HU_BUS_THINKING_CHUNK;
+        daemon_bus_set_message(&ev, event->data, event->data_len);
+        break;
+    case HU_AGENT_STREAM_TOOL_START:
+        ev.type = HU_BUS_TOOL_CALL;
+        daemon_bus_set_message(&ev, event->tool_name, event->tool_name_len);
+        break;
+    case HU_AGENT_STREAM_TOOL_ARGS:
+        ev.type = HU_BUS_TOOL_CALL;
+        daemon_bus_set_message(&ev, event->data, event->data_len);
+        break;
+    case HU_AGENT_STREAM_TOOL_RESULT:
+        ev.type = HU_BUS_TOOL_CALL_RESULT;
+        daemon_bus_set_message(&ev, event->data, event->data_len);
+        break;
+    }
+    hu_bus_publish(sc->bus, &ev);
+}
+
+static bool daemon_outbound_bus_cb(hu_bus_event_type_t type, const hu_bus_event_t *ev,
+                                   void *user_ctx) {
+    hu_daemon_out_bus_bridge_t *br = (hu_daemon_out_bus_bridge_t *)user_ctx;
+    if (!br || !ev)
+        return true;
+    if (type != HU_BUS_MESSAGE_CHUNK && type != HU_BUS_MESSAGE_SENT)
+        return true;
+
+    hu_service_channel_t *sch =
+        daemon_out_find_channel(br->channels, br->channel_count, ev->channel);
+    if (!sch || !sch->channel || !sch->channel->vtable)
+        return true;
+
+    const char *target = ev->id;
+    size_t target_len = strnlen(ev->id, HU_BUS_ID_LEN);
+
+    if (type == HU_BUS_MESSAGE_CHUNK) {
+        if (!sch->channel->vtable->send_event)
+            return true;
+        hu_daemon_out_turn_state_t *ts = br->active_turn;
+        if (ts && !ts->typing_started && sch->channel->vtable->start_typing) {
+            (void)sch->channel->vtable->start_typing(sch->channel->ctx, target, target_len);
+            ts->typing_started = true;
+        }
+        const char *msg = ev->message;
+        size_t msg_len = strnlen(msg, HU_BUS_MSG_LEN);
+        (void)sch->channel->vtable->send_event(sch->channel->ctx, target, target_len, msg, msg_len,
+                                               NULL, 0, HU_OUTBOUND_STAGE_CHUNK);
+        return true;
+    }
+
+    /* HU_BUS_MESSAGE_SENT */
+    const char *msg = ev->payload ? (const char *)ev->payload : ev->message;
+    size_t msg_len = msg ? strlen(msg) : 0;
+    if (!msg || msg_len == 0)
+        return true;
+
+    hu_error_t se = HU_OK;
+    if (sch->channel->vtable->send_event) {
+        se = sch->channel->vtable->send_event(sch->channel->ctx, target, target_len, msg, msg_len,
+                                              NULL, 0, HU_OUTBOUND_STAGE_FINAL);
+    } else if (sch->channel->vtable->send) {
+        se = sch->channel->vtable->send(sch->channel->ctx, target, target_len, msg, msg_len, NULL,
+                                        0);
+    }
+    if (sch->channel->vtable->stop_typing)
+        sch->channel->vtable->stop_typing(sch->channel->ctx, target, target_len);
+    if (br->delivery_turn && se == HU_OK)
+        br->delivery_turn->text_delivered_via_bus = true;
+    return true;
+}
+#endif /* !HU_IS_TEST */
+
 /* ── Service loop ──────────────────────────────────────────────────────── */
 
 hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
@@ -2379,6 +2673,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
         }
     }
     int64_t chan_monitor_last_ts = 0;
+
+    hu_bus_t daemon_outbound_bus;
+    hu_bus_init(&daemon_outbound_bus);
+    hu_daemon_out_bus_bridge_t daemon_out_bus_bridge = {.channels = channels,
+                                                        .channel_count = channel_count,
+                                                        .active_turn = NULL,
+                                                        .delivery_turn = NULL,
+                                                        .bus = &daemon_outbound_bus};
+    (void)hu_bus_subscribe(&daemon_outbound_bus, daemon_outbound_bus_cb, &daemon_out_bus_bridge,
+                           HU_BUS_EVENT_COUNT);
 
     hu_graph_t *graph = NULL;
 #ifdef HU_ENABLE_SQLITE
@@ -4241,6 +4545,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
 #ifndef HU_IS_TEST
+                hu_daemon_out_turn_state_t turn_out_state;
+                memset(&turn_out_state, 0, sizeof(turn_out_state));
                 /* 1. Per-contact profile via persona struct */
 #ifdef HU_HAS_PERSONA
                 if (agent->persona) {
@@ -6681,30 +6987,53 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
 #ifdef HU_HAS_PERSONA
 #ifndef HU_IS_TEST
-                /* Replay insights: inject stored insights from previous conversation */
-                if (replay_insights_len > 0) {
-                    if (convo_ctx) {
-                        size_t merged_len = convo_ctx_len + replay_insights_len + 2;
-                        char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
-                        if (merged) {
-                            memcpy(merged, convo_ctx, convo_ctx_len);
-                            merged[convo_ctx_len] = '\n';
-                            memcpy(merged + convo_ctx_len + 1, replay_insights,
-                                   replay_insights_len);
-                            merged[merged_len - 1] = '\n';
-                            merged[merged_len] = '\0';
-                            alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
-                            convo_ctx = merged;
-                            convo_ctx_len = merged_len;
-                        }
-                    } else {
-                        convo_ctx = (char *)alloc->alloc(alloc->ctx, replay_insights_len + 1);
-                        if (convo_ctx) {
-                            memcpy(convo_ctx, replay_insights, replay_insights_len);
-                            convo_ctx[replay_insights_len] = '\0';
-                            convo_ctx_len = replay_insights_len;
+                /* Replay insights: per-contact lookup from memory store */
+                {
+                    const char *ri_src = NULL;
+                    size_t ri_len = 0;
+                    char *ri_heap = NULL;
+                    if (agent->memory && agent->memory->vtable && agent->memory->vtable->get &&
+                        batch_key && key_len > 0) {
+                        hu_memory_entry_t ri_entry;
+                        memset(&ri_entry, 0, sizeof(ri_entry));
+                        bool ri_found = false;
+                        if (agent->memory->vtable->get(agent->memory->ctx, alloc, "replay:latest",
+                                                       13, &ri_entry, &ri_found) == HU_OK &&
+                            ri_found && ri_entry.content && ri_entry.content_len > 0) {
+                            ri_src = ri_entry.content;
+                            ri_len = ri_entry.content_len;
+                            ri_heap = (char *)ri_entry.content;
                         }
                     }
+                    if (!ri_src && replay_insights_len > 0) {
+                        ri_src = replay_insights;
+                        ri_len = replay_insights_len;
+                    }
+                    if (ri_src && ri_len > 0) {
+                        if (convo_ctx) {
+                            size_t merged_len = convo_ctx_len + ri_len + 2;
+                            char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
+                            if (merged) {
+                                memcpy(merged, convo_ctx, convo_ctx_len);
+                                merged[convo_ctx_len] = '\n';
+                                memcpy(merged + convo_ctx_len + 1, ri_src, ri_len);
+                                merged[merged_len - 1] = '\n';
+                                merged[merged_len] = '\0';
+                                alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                convo_ctx = merged;
+                                convo_ctx_len = merged_len;
+                            }
+                        } else {
+                            convo_ctx = (char *)alloc->alloc(alloc->ctx, ri_len + 1);
+                            if (convo_ctx) {
+                                memcpy(convo_ctx, ri_src, ri_len);
+                                convo_ctx[ri_len] = '\0';
+                                convo_ctx_len = ri_len;
+                            }
+                        }
+                    }
+                    if (ri_heap)
+                        alloc->free(alloc->ctx, ri_heap, ri_len + 1);
                 }
                 /* GraphRAG community insights: inject topic clusters from weekly detection */
                 if (community_insights_len > 0) {
@@ -7543,6 +7872,24 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 
+                    /* Contact photo context: if available, note it for richer understanding.
+                     * The path is stored for potential vision-model multimodal prompting. */
+                    if (sizeof(inject_buf) - inject_pos > 200) {
+                        char photo_path[512];
+                        size_t pp_len = hu_conversation_contact_photo_path(
+                            batch_key, key_len, photo_path, sizeof(photo_path));
+                        if (pp_len > 0) {
+                            int n =
+                                snprintf(inject_buf + inject_pos, sizeof(inject_buf) - inject_pos,
+                                         "[CONTACT PHOTO] Profile photo on file at: %s\n"
+                                         "You know what they look like. Reference appearance "
+                                         "naturally if relevant (e.g. haircut, glasses).\n",
+                                         photo_path);
+                            if (n > 0 && (size_t)n < sizeof(inject_buf) - inject_pos)
+                                inject_pos += (size_t)n;
+                        }
+                    }
+
                     /* Append all injections to convo_ctx */
                     if (inject_pos > 0) {
                         size_t new_len = inject_pos + (convo_ctx ? convo_ctx_len : 0);
@@ -7639,6 +7986,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (ch->channel->vtable->start_typing) {
                     ch->channel->vtable->start_typing(ch->channel->ctx, batch_key, key_len);
                 }
+                turn_out_state.typing_started = (ch->channel->vtable->start_typing != NULL);
 
                 /* Thinking response: send filler first if message warrants it */
                 {
@@ -7789,9 +8137,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 burst_response, burst_response_len, burst_msgs, 4);
                             for (int bi = 0; bi < n; bi++) {
                                 if (burst_msgs[bi][0]) {
+                                    size_t bm_len = strlen(burst_msgs[bi]);
+                                    bm_len =
+                                        hu_conversation_strip_ai_phrases(burst_msgs[bi], bm_len);
+                                    bm_len = hu_conversation_vary_complexity(
+                                        burst_msgs[bi], bm_len, burst_seed + (uint32_t)bi);
+                                    if (bm_len > 1 && burst_msgs[bi][0] >= 'A' &&
+                                        burst_msgs[bi][0] <= 'Z' && burst_msgs[bi][1] >= 'a' &&
+                                        burst_msgs[bi][1] <= 'z' && burst_msgs[bi][0] != 'I') {
+                                        burst_msgs[bi][0] = (char)(burst_msgs[bi][0] + 32);
+                                    }
+                                    if (bm_len > 1 && burst_msgs[bi][bm_len - 1] == '.') {
+                                        burst_msgs[bi][bm_len - 1] = '\0';
+                                        bm_len--;
+                                    }
                                     ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
-                                                              burst_msgs[bi],
-                                                              strlen(burst_msgs[bi]), NULL, 0);
+                                                              burst_msgs[bi], bm_len, NULL, 0);
                                     if (bi < n - 1) {
                                         unsigned int delay_ms =
                                             1000u + (burst_seed + (uint32_t)bi) % 2000u;
@@ -7863,7 +8224,40 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         response = NULL;
                         response_len = 0;
                     }
-                    err = hu_agent_turn(agent, combined, combined_len, &response, &response_len);
+                    daemon_out_bus_bridge.active_turn = &turn_out_state;
+                    {
+                        hu_daemon_stream_ctx_t stream_ctx;
+                        memset(&stream_ctx, 0, sizeof(stream_ctx));
+                        stream_ctx.bus = &daemon_outbound_bus;
+                        if (agent->active_channel && agent->active_channel_len > 0) {
+                            size_t nc = agent->active_channel_len < HU_BUS_CHANNEL_LEN - 1
+                                            ? agent->active_channel_len
+                                            : HU_BUS_CHANNEL_LEN - 1;
+                            memcpy(stream_ctx.channel, agent->active_channel, nc);
+                            stream_ctx.channel[nc] = '\0';
+                        } else if (ch->channel->vtable->name) {
+                            const char *cn = ch->channel->vtable->name(ch->channel->ctx);
+                            if (cn) {
+                                int scn =
+                                    snprintf(stream_ctx.channel, HU_BUS_CHANNEL_LEN, "%s", cn);
+                                (void)scn;
+                            }
+                        }
+                        {
+                            size_t ik = key_len < HU_BUS_ID_LEN - 1 ? key_len : HU_BUS_ID_LEN - 1;
+                            memcpy(stream_ctx.id, batch_key, ik);
+                            stream_ctx.id[ik] = '\0';
+                        }
+                        if (!retried) {
+                            err = hu_agent_turn_stream_v2(agent, combined, combined_len,
+                                                          daemon_stream_event_cb, &stream_ctx,
+                                                          &response, &response_len);
+                        } else {
+                            err = hu_agent_turn(agent, combined, combined_len, &response,
+                                                &response_len);
+                        }
+                    }
+                    daemon_out_bus_bridge.active_turn = NULL;
                     fprintf(stderr, "[human] agent turn result: err=%s response_len=%zu for %.*s\n",
                             hu_error_string(err), response_len, (int)(key_len > 20 ? 20 : key_len),
                             batch_key);
@@ -7872,9 +8266,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 batch_key, hu_error_string(err));
 
 #ifndef HU_IS_TEST
-                    /* Stop typing indicator after LLM call */
-                    if (ch->channel->vtable->stop_typing) {
-                        ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key, key_len);
+                    if (err != HU_OK) {
+                        if (ch->channel->vtable->stop_typing) {
+                            ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key, key_len);
+                        }
+                    }
+                    if (err == HU_OK && (!response || response_len == 0)) {
+                        if (ch->channel->vtable->stop_typing) {
+                            ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key, key_len);
+                        }
                     }
 
                     /* AI-tell filter: catch known robotic phrases and force retry */
@@ -7937,6 +8337,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (ch->channel->vtable->start_typing)
                                 ch->channel->vtable->start_typing(ch->channel->ctx, batch_key,
                                                                   key_len);
+                            if (ch->channel->vtable->stop_typing) {
+                                ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key,
+                                                                 key_len);
+                            }
                             continue;
                         }
                     }
@@ -7986,6 +8390,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (ch->channel->vtable->start_typing)
                                 ch->channel->vtable->start_typing(ch->channel->ctx, batch_key,
                                                                   key_len);
+                            if (ch->channel->vtable->stop_typing) {
+                                ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key,
+                                                                 key_len);
+                            }
                             continue;
                         } else if (qscore.needs_revision) {
                             fprintf(stderr,
@@ -8109,6 +8517,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                 agent->conversation_context = convo_ctx;
                                                 agent->conversation_context_len = convo_ctx_len;
                                             }
+                                        }
+                                        if (ch->channel->vtable->stop_typing) {
+                                            ch->channel->vtable->stop_typing(ch->channel->ctx,
+                                                                             batch_key, key_len);
                                         }
                                         continue;
                                     }
@@ -8938,6 +9350,32 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 #endif
+                    /* Bus final delivery: post-processed text (send_event FINAL or send). */
+                    turn_out_state.text_delivered_via_bus = false;
+                    if (err == HU_OK && response && response_len > 0) {
+                        hu_bus_event_t rev;
+                        memset(&rev, 0, sizeof(rev));
+                        rev.type = HU_BUS_MESSAGE_SENT;
+                        if (agent->active_channel && agent->active_channel[0]) {
+                            int nc4 = snprintf(rev.channel, HU_BUS_CHANNEL_LEN, "%s",
+                                               agent->active_channel);
+                            (void)nc4;
+                        } else if (ch->channel->vtable->name) {
+                            const char *cn4 = ch->channel->vtable->name(ch->channel->ctx);
+                            if (cn4)
+                                (void)snprintf(rev.channel, HU_BUS_CHANNEL_LEN, "%s", cn4);
+                        }
+                        {
+                            size_t idk = key_len < HU_BUS_ID_LEN - 1 ? key_len : HU_BUS_ID_LEN - 1;
+                            memcpy(rev.id, batch_key, idk);
+                            rev.id[idk] = '\0';
+                        }
+                        rev.payload = response;
+                        daemon_bus_set_message(&rev, response, response_len);
+                        daemon_out_bus_bridge.delivery_turn = &turn_out_state;
+                        hu_bus_publish(&daemon_outbound_bus, &rev);
+                        daemon_out_bus_bridge.delivery_turn = NULL;
+                    }
                     /* ── Voice decision: TTS when channel has voice_enabled ───── */
                     bool sent_voice = false;
                     {
@@ -9135,7 +9573,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             (void)hu_voice_session_stop(&unified_voice);
                         }
                     }
-                    if (!sent_voice) {
+                    if (!sent_voice && !turn_out_state.text_delivered_via_bus) {
                         const char *eff_ch = ch->channel->vtable->name
                                                  ? ch->channel->vtable->name(ch->channel->ctx)
                                                  : "unknown";
@@ -9219,9 +9657,40 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     (f == 0 && proactive_vis_n > 0) ? proactive_vis_m : NULL;
                                 size_t pv_cnt =
                                     (f == 0 && proactive_vis_n > 0) ? proactive_vis_n : 0;
-                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
-                                                          fragments[f].text, fragments[f].text_len,
-                                                          pv_ptr, pv_cnt);
+
+                                /* Double-text: split long fragments into
+                                 * sentence-level messages for a more human
+                                 * texting cadence (>120 chars, no newlines). */
+                                bool did_double_text = false;
+#ifndef HU_IS_TEST
+                                if (fragments[f].text_len > 120 &&
+                                    !memchr(fragments[f].text, '\n', fragments[f].text_len)) {
+                                    char dt_chunks[4][512];
+                                    size_t dt_n = hu_conversation_split_into_texts(
+                                        fragments[f].text, fragments[f].text_len, 100, dt_chunks,
+                                        4);
+                                    if (dt_n >= 2) {
+                                        did_double_text = true;
+                                        for (size_t dt = 0; dt < dt_n; dt++) {
+                                            if (dt > 0) {
+                                                uint32_t dt_ms =
+                                                    300 + (uint32_t)(strlen(dt_chunks[dt]) * 50);
+                                                if (dt_ms > 2000)
+                                                    dt_ms = 2000;
+                                                usleep((useconds_t)(dt_ms * 1000));
+                                            }
+                                            ch->channel->vtable->send(
+                                                ch->channel->ctx, batch_key, key_len, dt_chunks[dt],
+                                                strlen(dt_chunks[dt]), (dt == 0) ? pv_ptr : NULL,
+                                                (dt == 0) ? pv_cnt : 0);
+                                        }
+                                    }
+                                }
+#endif
+                                if (!did_double_text)
+                                    ch->channel->vtable->send(
+                                        ch->channel->ctx, batch_key, key_len, fragments[f].text,
+                                        fragments[f].text_len, pv_ptr, pv_cnt);
                                 if (pv_cnt > 0) {
                                     uint64_t pv_rec = (uint64_t)time(NULL) * 1000ULL;
                                     hu_visual_proactive_media_governor_record(pv_rec);
@@ -9355,6 +9824,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     hu_turing_score_t tscore;
                     hu_error_t ts_err = hu_turing_score_heuristic(response, response_len, combined,
                                                                   combined_len, &tscore);
+                    if (ts_err == HU_OK && agent->active_channel) {
+                        hu_turing_apply_channel_weights(&tscore, agent->active_channel,
+                                                        agent->active_channel_len);
+                    }
                     if (ts_err == HU_OK) {
                         fprintf(stderr, "[human] turing: %d/10 [%s] for %.*s\n", tscore.overall,
                                 hu_turing_verdict_name(tscore.verdict),
@@ -9495,8 +9968,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             bool was_gif = strstr(prev, "[GIF]") || strstr(prev, ".gif");
                             bool is_reaction = strstr(curr, "Loved") ||
                                                strstr(curr, "Laughed at") || strstr(curr, "Liked");
-                            if (was_gif && is_reaction)
+                            if (was_gif && is_reaction) {
                                 hu_conversation_gif_cal_record_reaction(batch_key, key_len);
+                                const char *rh = getenv("HOME");
+                                if (rh) {
+                                    char rcp[512];
+                                    int rn = snprintf(rcp, sizeof(rcp),
+                                                      "%s/.human/gif_calibration.json", rh);
+                                    if (rn > 0 && (size_t)rn < sizeof(rcp))
+                                        hu_conversation_gif_cal_save(rcp, (size_t)rn);
+                                }
+                            }
                         }
                     }
                 }
@@ -9585,6 +10067,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         &gif_query, &gif_query_len);
                                 }
                                 if (gif_query && gif_query_len > 0 && gif_query_len < 100) {
+#ifdef HU_HAS_IMESSAGE
                                     char *gif_path =
                                         hu_imessage_fetch_gif(alloc, gif_query, gif_query_len,
                                                               tenor_key, strlen(tenor_key));
@@ -9616,6 +10099,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         size_t gp_path_len = strlen(gif_path);
                                         alloc->free(alloc->ctx, gif_path, gp_path_len + 1);
                                     }
+#endif /* HU_HAS_IMESSAGE */
                                 }
                                 if (gif_query)
                                     alloc->free(alloc->ctx, gif_query, gif_query_len + 1);
@@ -9664,6 +10148,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
 #ifndef HU_IS_TEST
             skip_send:
+                if (ch && ch->channel && ch->channel->vtable && ch->channel->vtable->stop_typing) {
+                    ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key, key_len);
+                }
 #endif
                 if (response) {
                     /* Bump consecutive response counter for this contact */
@@ -9723,6 +10210,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     }
 
 #undef HU_STOP_FLAG
+    hu_bus_unsubscribe(&daemon_outbound_bus, daemon_outbound_bus_cb, &daemon_out_bus_bridge);
+    hu_bus_deinit(&daemon_outbound_bus);
     hu_inbox_deinit(&inbox_watcher);
     if (chan_monitor)
         hu_channel_monitor_destroy(chan_monitor);

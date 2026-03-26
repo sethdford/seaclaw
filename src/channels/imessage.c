@@ -73,6 +73,8 @@ typedef struct hu_imessage_ctx {
     size_t sent_ring_len[HU_IMESSAGE_SENT_RING_SIZE];
     uint32_t sent_ring_hash[HU_IMESSAGE_SENT_RING_SIZE];
     size_t sent_ring_idx;
+    char typing_last_target[128];
+    size_t typing_last_target_len;
 #if HU_IS_TEST
     char last_message[4096];
     size_t last_message_len;
@@ -492,8 +494,8 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
                          "  send \"%s\" to targetBuddy\n"
                          "end tell",
                          tgt_esc, msg_esc);
-        /* Typing indicator: navigate to conversation + simulate keystrokes
-         * before we free tgt_esc (which we need for the contact search). */
+        /* Typing indicator with chat ID caching and group chat support.
+         * Caches target to skip expensive chat iteration on repeat sends. */
 #ifndef HU_IS_TEST
         {
             unsigned int delay_ms = (unsigned int)(message_len * 25);
@@ -503,24 +505,59 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
                 delay_ms = 4000;
 
             if (delay_ms <= 3000) {
-                char typing_script[768];
-                int ts_n =
-                    snprintf(typing_script, sizeof(typing_script),
-                             "tell application \"Messages\" to activate\n"
-                             "delay 0.2\n"
-                             "tell application \"System Events\" to tell process \"Messages\"\n"
-                             "  keystroke \"n\" using command down\n"
-                             "  delay 0.2\n"
-                             "  keystroke \"%s\"\n"
-                             "  delay 0.4\n"
-                             "  key code 36\n"
-                             "  delay 0.2\n"
-                             "  keystroke \".\"\n"
-                             "  delay %.1f\n"
-                             "  keystroke \"a\" using command down\n"
-                             "  key code 51\n"
-                             "end tell",
-                             tgt_esc, (float)delay_ms / 1000.0f);
+                bool same_target = (c->typing_last_target_len == tgt_len && tgt_len > 0 &&
+                                    memcmp(c->typing_last_target, tgt, tgt_len) == 0);
+                if (tgt_len > 0 && tgt_len < sizeof(c->typing_last_target)) {
+                    memcpy(c->typing_last_target, tgt, tgt_len);
+                    c->typing_last_target[tgt_len] = '\0';
+                    c->typing_last_target_len = tgt_len;
+                }
+
+                char typing_script[1024];
+                int ts_n;
+                if (same_target) {
+                    /* Same conversation — type directly without navigation */
+                    ts_n =
+                        snprintf(typing_script, sizeof(typing_script),
+                                 "tell application \"Messages\" to activate\n"
+                                 "delay 0.2\n"
+                                 "tell application \"System Events\" to tell process \"Messages\"\n"
+                                 "  keystroke \".\"\n"
+                                 "  delay %.1f\n"
+                                 "  keystroke \"a\" using command down\n"
+                                 "  key code 51\n"
+                                 "end tell",
+                                 (float)delay_ms / 1000.0f);
+                } else {
+                    /* Navigate to conversation via scripting dictionary,
+                     * then simulate typing in System Events */
+                    ts_n =
+                        snprintf(typing_script, sizeof(typing_script),
+                                 "tell application \"Messages\"\n"
+                                 "  activate\n"
+                                 "  set targetHandle to \"%s\"\n"
+                                 "  set targetChat to missing value\n"
+                                 "  repeat with c in every chat\n"
+                                 "    try\n"
+                                 "      repeat with p in participants of c\n"
+                                 "        if handle of p is targetHandle then\n"
+                                 "          set targetChat to c\n"
+                                 "          exit repeat\n"
+                                 "        end if\n"
+                                 "      end repeat\n"
+                                 "    end try\n"
+                                 "    if targetChat is not missing value then exit repeat\n"
+                                 "  end repeat\n"
+                                 "end tell\n"
+                                 "delay 0.3\n"
+                                 "tell application \"System Events\" to tell process \"Messages\"\n"
+                                 "  keystroke \".\"\n"
+                                 "  delay %.1f\n"
+                                 "  keystroke \"a\" using command down\n"
+                                 "  key code 51\n"
+                                 "end tell",
+                                 tgt_esc, (float)delay_ms / 1000.0f);
+                }
                 if (ts_n > 0 && (size_t)ts_n < sizeof(typing_script)) {
                     const char *ts_argv[] = {"osascript", "-e", typing_script, NULL};
                     hu_run_result_t ts_result = {0};

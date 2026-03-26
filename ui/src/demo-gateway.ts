@@ -6,8 +6,12 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
     const sv = source[key];
     const tv = target[key];
     if (
-      sv && typeof sv === "object" && !Array.isArray(sv) &&
-      tv && typeof tv === "object" && !Array.isArray(tv)
+      sv &&
+      typeof sv === "object" &&
+      !Array.isArray(sv) &&
+      tv &&
+      typeof tv === "object" &&
+      !Array.isArray(tv)
     ) {
       deepMerge(tv as Record<string, unknown>, sv as Record<string, unknown>);
     } else {
@@ -1202,7 +1206,6 @@ export class DemoGatewayClient extends EventTarget {
     const PUNCTUATION = /[.!?:]$/;
 
     const words = fullResponse.match(/\S+\s*/g) ?? [fullResponse];
-    let delay = 0;
 
     const emit = (event: string, payload: Record<string, unknown>): void => {
       this.dispatchEvent(
@@ -1210,10 +1213,6 @@ export class DemoGatewayClient extends EventTarget {
           detail: { event, payload: { ...payload, session_key: sk } },
         }),
       );
-    };
-
-    const emitThinking = (): void => {
-      emit("thinking", { message: "Let me think about this..." });
     };
 
     const emitChunk = (content: string): void => {
@@ -1243,34 +1242,59 @@ export class DemoGatewayClient extends EventTarget {
       return 25 + Math.random() * 20;
     };
 
-    const doToolCall = Math.random() < 0.3;
-    if (doToolCall) {
-      const toolId = "demo-tool-" + Date.now();
-      const toolName = Math.random() < 0.5 ? "web_search" : "code_interpreter";
-      emit("agent.tool", { id: toolId, message: toolName });
-      delay += 400;
-      setTimeout(() => {
-        emit("agent.tool", {
-          id: toolId,
-          message: toolName,
-          result: "Found relevant information",
-        });
-      }, delay);
+    const thinkingParts = ["Reviewing ", "your ", "question… ", "Planning ", "the ", "response."];
+    let delay = 0;
+    for (const part of thinkingParts) {
+      const at = delay;
+      setTimeout(() => emit("chat", { state: "thinking", message: part, id }), at);
+      delay += 90 + Math.random() * 50;
     }
 
-    const thinkingDuration = 600 + Math.random() * 400;
-    delay += thinkingDuration;
-    setTimeout(emitThinking, doToolCall ? 400 : 0);
-    setTimeout(() => {
-      let totalDelay = 0;
-      for (const word of words) {
-        const ms = wordDelay(word);
-        totalDelay += ms;
-        if (PUNCTUATION.test(word.trim())) totalDelay += 80 + Math.random() * 70;
-        setTimeout(() => emitChunk(word), delay + totalDelay);
-      }
-      setTimeout(emitSent, delay + totalDelay + 100);
-    }, delay);
+    const toolId = `demo-tool-${Date.now()}`;
+    const toolName = Math.random() < 0.5 ? "web_search" : "file_read";
+    const mid = Math.max(1, Math.floor(words.length / 2));
+    const firstWords = words.slice(0, mid);
+    const secondWords = words.slice(mid);
+
+    let chunkTotal = 0;
+    for (const word of firstWords) {
+      let ms = wordDelay(word);
+      if (PUNCTUATION.test(word.trim())) ms += 80 + Math.random() * 70;
+      chunkTotal += ms;
+      const at = delay + chunkTotal;
+      setTimeout(() => emitChunk(word), at);
+    }
+
+    const afterFirstChunks = delay + chunkTotal;
+    setTimeout(
+      () =>
+        emit("agent.tool", {
+          state: "start",
+          id: toolId,
+          message: toolName,
+        }),
+      afterFirstChunks + 40,
+    );
+    setTimeout(
+      () =>
+        emit("agent.tool", {
+          state: "result",
+          id: toolId,
+          message: toolName,
+          result: "Demo tool output: operation completed successfully.",
+        }),
+      afterFirstChunks + 520,
+    );
+
+    const secondStart = afterFirstChunks + 620;
+    let secondTotal = 0;
+    for (const word of secondWords) {
+      let ms = wordDelay(word);
+      if (PUNCTUATION.test(word.trim())) ms += 80 + Math.random() * 70;
+      secondTotal += ms;
+      setTimeout(() => emitChunk(word), secondStart + secondTotal);
+    }
+    setTimeout(emitSent, secondStart + secondTotal + 120);
   }
 
   #handleRequest(method: string, params?: Record<string, unknown>): unknown {
@@ -1993,7 +2017,7 @@ export class DemoGatewayClient extends EventTarget {
           directional_alignment: 0.72,
           cumulative_impact: 0.81,
           stability: 0.88,
-          overall: 0.80,
+          overall: 0.8,
         };
       case "turing.ab_tests":
         return {
@@ -2011,7 +2035,7 @@ export class DemoGatewayClient extends EventTarget {
             {
               name: "backchannel_prob",
               variant_a: 0.25,
-              variant_b: 0.40,
+              variant_b: 0.4,
               avg_a: 7.5,
               avg_b: 7.4,
               count_a: 28,

@@ -7269,6 +7269,23 @@ size_t hu_conversation_build_inline_reply_hint(const char *original_text, size_t
 
 /* ── GIF calibration persistence ─────────────────────────────────────── */
 
+static void fprint_json_escaped(FILE *f, const char *s) {
+    if (!f || !s)
+        return;
+    for (; *s; s++) {
+        if (*s == '"')
+            fputs("\\\"", f);
+        else if (*s == '\\')
+            fputs("\\\\", f);
+        else if ((unsigned char)*s < 0x20) {
+            /* Escape control characters as \uXXXX for valid JSON */
+            fprintf(f, "\\u%04x", (unsigned)*s);
+        } else {
+            fputc(*s, f);
+        }
+    }
+}
+
 hu_error_t hu_conversation_gif_cal_save(const char *path, size_t path_len) {
     if (!path || path_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
@@ -7287,8 +7304,9 @@ hu_error_t hu_conversation_gif_cal_save(const char *path, size_t path_len) {
 
     fprintf(f, "[\n");
     for (size_t i = 0; i < gif_cal_count; i++) {
-        fprintf(f, "  {\"contact\":\"%s\",\"sent\":%u,\"reacted\":%u}%s\n",
-                gif_cal_slots[i].contact_id, (unsigned)gif_cal_slots[i].sent_count,
+        fprintf(f, "  {\"contact\":\"");
+        fprint_json_escaped(f, gif_cal_slots[i].contact_id);
+        fprintf(f, "\",\"sent\":%u,\"reacted\":%u}%s\n", (unsigned)gif_cal_slots[i].sent_count,
                 (unsigned)gif_cal_slots[i].reacted_count, (i + 1 < gif_cal_count) ? "," : "");
     }
     fprintf(f, "]\n");
@@ -7417,19 +7435,25 @@ size_t hu_conversation_split_into_texts(const char *response, size_t resp_len, s
 
 /* ── Scheduled message queue ─────────────────────────────────────────── */
 
-#define HU_SCHED_MAX 16
+static hu_sched_slot_t sched_queue[HU_SCHED_MAX];
 
-static struct {
-    char contact_id[128];
-    char message[512];
-    size_t msg_len;
-    uint64_t deliver_at_ms;
-    bool active;
-} sched_queue[HU_SCHED_MAX];
+hu_sched_slot_t *hu_conversation_sched_slot(size_t index) {
+    if (index >= HU_SCHED_MAX)
+        return NULL;
+    return &sched_queue[index];
+}
 
 hu_error_t hu_conversation_schedule_message(const char *contact_id, size_t cid_len,
                                             const char *message, size_t msg_len,
                                             uint64_t deliver_at_ms) {
+    return hu_conversation_schedule_message_on(contact_id, cid_len, NULL, 0, message, msg_len,
+                                               deliver_at_ms);
+}
+
+hu_error_t hu_conversation_schedule_message_on(const char *contact_id, size_t cid_len,
+                                               const char *channel_name, size_t ch_len,
+                                               const char *message, size_t msg_len,
+                                               uint64_t deliver_at_ms) {
     if (!contact_id || cid_len == 0 || !message || msg_len == 0 || deliver_at_ms == 0)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -7438,6 +7462,13 @@ hu_error_t hu_conversation_schedule_message(const char *contact_id, size_t cid_l
             size_t cn = cid_len < 127 ? cid_len : 127;
             memcpy(sched_queue[i].contact_id, contact_id, cn);
             sched_queue[i].contact_id[cn] = '\0';
+            if (channel_name && ch_len > 0) {
+                size_t chn = ch_len < 31 ? ch_len : 31;
+                memcpy(sched_queue[i].channel_name, channel_name, chn);
+                sched_queue[i].channel_name[chn] = '\0';
+            } else {
+                sched_queue[i].channel_name[0] = '\0';
+            }
             size_t mn = msg_len < 511 ? msg_len : 511;
             memcpy(sched_queue[i].message, message, mn);
             sched_queue[i].message[mn] = '\0';
@@ -7452,52 +7483,341 @@ hu_error_t hu_conversation_schedule_message(const char *contact_id, size_t cid_l
 
 size_t hu_conversation_flush_scheduled(uint64_t now_ms, char *out_contact, size_t contact_cap,
                                        char *out_message, size_t message_cap) {
+    return hu_conversation_flush_scheduled_on(now_ms, out_contact, contact_cap, NULL, 0,
+                                              out_message, message_cap);
+}
+
+size_t hu_conversation_flush_scheduled_on(uint64_t now_ms, char *out_contact, size_t contact_cap,
+                                          char *out_channel, size_t channel_cap, char *out_message,
+                                          size_t message_cap) {
+    return hu_conversation_flush_scheduled_for(now_ms, NULL, 0, out_contact, contact_cap,
+                                               out_channel, channel_cap, out_message, message_cap);
+}
+
+size_t hu_conversation_flush_scheduled_for(uint64_t now_ms, const char *channel_filter,
+                                           size_t filter_len, char *out_contact, size_t contact_cap,
+                                           char *out_channel, size_t channel_cap, char *out_message,
+                                           size_t message_cap) {
     if (!out_contact || !out_message || contact_cap == 0 || message_cap == 0)
         return 0;
 
     for (size_t i = 0; i < HU_SCHED_MAX; i++) {
-        if (sched_queue[i].active && now_ms >= sched_queue[i].deliver_at_ms) {
-            size_t cn = strlen(sched_queue[i].contact_id);
-            if (cn >= contact_cap)
-                cn = contact_cap - 1;
-            memcpy(out_contact, sched_queue[i].contact_id, cn);
-            out_contact[cn] = '\0';
-            size_t mn = sched_queue[i].msg_len;
-            if (mn >= message_cap)
-                mn = message_cap - 1;
-            memcpy(out_message, sched_queue[i].message, mn);
-            out_message[mn] = '\0';
-            sched_queue[i].active = false;
-            return mn;
+        if (!sched_queue[i].active || now_ms < sched_queue[i].deliver_at_ms)
+            continue;
+
+        /* Channel routing: skip if filter specified and doesn't match */
+        if (channel_filter && filter_len > 0 && sched_queue[i].channel_name[0]) {
+            size_t stored_len = strlen(sched_queue[i].channel_name);
+            if (stored_len != filter_len ||
+                memcmp(sched_queue[i].channel_name, channel_filter, filter_len) != 0)
+                continue;
         }
+
+        size_t cn = strlen(sched_queue[i].contact_id);
+        if (cn >= contact_cap)
+            cn = contact_cap - 1;
+        memcpy(out_contact, sched_queue[i].contact_id, cn);
+        out_contact[cn] = '\0';
+        if (out_channel && channel_cap > 0) {
+            size_t chn = strlen(sched_queue[i].channel_name);
+            if (chn >= channel_cap)
+                chn = channel_cap - 1;
+            memcpy(out_channel, sched_queue[i].channel_name, chn);
+            out_channel[chn] = '\0';
+        }
+        size_t mn = sched_queue[i].msg_len;
+        if (mn >= message_cap)
+            mn = message_cap - 1;
+        memcpy(out_message, sched_queue[i].message, mn);
+        out_message[mn] = '\0';
+        sched_queue[i].active = false;
+        return mn;
     }
     return 0;
 }
 
-/* ── Contact photo path resolver (macOS Contacts) ────────────────────── */
+/* ── Scheduled message persistence ───────────────────────────────────── */
+
+hu_error_t hu_conversation_sched_save(const char *path, size_t path_len) {
+    if (!path || path_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char path_buf[512];
+    if (path_len >= sizeof(path_buf))
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(path_buf, path, path_len);
+    path_buf[path_len] = '\0';
+
+    size_t active_count = 0;
+    for (size_t i = 0; i < HU_SCHED_MAX; i++)
+        if (sched_queue[i].active)
+            active_count++;
+
+    if (active_count == 0) {
+        (void)remove(path_buf);
+        return HU_OK;
+    }
+
+    FILE *f = fopen(path_buf, "w");
+    if (!f)
+        return HU_ERR_IO;
+
+    fprintf(f, "[\n");
+    size_t written = 0;
+    for (size_t i = 0; i < HU_SCHED_MAX; i++) {
+        if (!sched_queue[i].active)
+            continue;
+        fprintf(f, "  {\"contact\":\"");
+        fprint_json_escaped(f, sched_queue[i].contact_id);
+        fprintf(f, "\",\"channel\":\"");
+        fprint_json_escaped(f, sched_queue[i].channel_name);
+        fprintf(f, "\",\"message\":\"");
+        fprint_json_escaped(f, sched_queue[i].message);
+        fprintf(f, "\",\"deliver_at\":%llu}%s\n", (unsigned long long)sched_queue[i].deliver_at_ms,
+                (written + 1 < active_count) ? "," : "");
+        written++;
+    }
+    fprintf(f, "]\n");
+    fclose(f);
+    return HU_OK;
+}
+
+hu_error_t hu_conversation_sched_load(const char *path, size_t path_len) {
+    if (!path || path_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char path_buf[512];
+    if (path_len >= sizeof(path_buf))
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(path_buf, path, path_len);
+    path_buf[path_len] = '\0';
+
+    FILE *f = fopen(path_buf, "r");
+    if (!f)
+        return HU_ERR_IO;
+
+    for (size_t i = 0; i < HU_SCHED_MAX; i++)
+        sched_queue[i].active = false;
+
+    char line[768];
+    size_t slot = 0;
+    while (fgets(line, sizeof(line), f) && slot < HU_SCHED_MAX) {
+        const char *cstart = strstr(line, "\"contact\":\"");
+        if (!cstart)
+            continue;
+        cstart += 11;
+        const char *cend = strchr(cstart, '"');
+        if (!cend)
+            continue;
+
+        const char *chstart = strstr(line, "\"channel\":\"");
+        const char *mstart = strstr(line, "\"message\":\"");
+        const char *dstart = strstr(line, "\"deliver_at\":");
+        if (!mstart || !dstart)
+            continue;
+
+        size_t cn = (size_t)(cend - cstart);
+        if (cn >= 127)
+            cn = 127;
+        memcpy(sched_queue[slot].contact_id, cstart, cn);
+        sched_queue[slot].contact_id[cn] = '\0';
+
+        sched_queue[slot].channel_name[0] = '\0';
+        if (chstart) {
+            chstart += 11;
+            const char *chend = strchr(chstart, '"');
+            if (chend) {
+                size_t chn = (size_t)(chend - chstart);
+                if (chn >= 31)
+                    chn = 31;
+                memcpy(sched_queue[slot].channel_name, chstart, chn);
+                sched_queue[slot].channel_name[chn] = '\0';
+            }
+        }
+
+        mstart += 11;
+        const char *mend = strstr(mstart, "\",\"deliver_at\"");
+        if (!mend)
+            mend = strchr(mstart, '"');
+        if (!mend || mend == mstart)
+            continue;
+
+        /* Unescape JSON sequences: \" -> ", \\ -> \, \n -> newline, \uXXXX -> char */
+        size_t raw_len = (size_t)(mend - mstart);
+        char *dst = sched_queue[slot].message;
+        size_t di = 0;
+        for (size_t si = 0; si < raw_len && di < 511; si++) {
+            if (mstart[si] == '\\' && si + 1 < raw_len) {
+                char next = mstart[si + 1];
+                if (next == '"' || next == '\\' || next == '/') {
+                    dst[di++] = next;
+                    si++;
+                } else if (next == 'n') {
+                    dst[di++] = '\n';
+                    si++;
+                } else if (next == 't') {
+                    dst[di++] = '\t';
+                    si++;
+                } else if (next == 'r') {
+                    dst[di++] = '\r';
+                    si++;
+                } else if (next == 'u' && si + 5 < raw_len) {
+                    /* \uXXXX: decode BMP codepoint to UTF-8 */
+                    unsigned cp = 0;
+                    bool valid = true;
+                    for (int d = 0; d < 4 && valid; d++) {
+                        char h = mstart[si + 2 + d];
+                        if (h >= '0' && h <= '9')
+                            cp = cp * 16 + (unsigned)(h - '0');
+                        else if (h >= 'a' && h <= 'f')
+                            cp = cp * 16 + (unsigned)(h - 'a' + 10);
+                        else if (h >= 'A' && h <= 'F')
+                            cp = cp * 16 + (unsigned)(h - 'A' + 10);
+                        else
+                            valid = false;
+                    }
+                    if (valid) {
+                        si += 5;
+                        if (cp < 0x80 && di < 511) {
+                            dst[di++] = (char)cp;
+                        } else if (cp < 0x800 && di + 1 < 511) {
+                            dst[di++] = (char)(0xC0 | (cp >> 6));
+                            dst[di++] = (char)(0x80 | (cp & 0x3F));
+                        } else if (di + 2 < 511) {
+                            dst[di++] = (char)(0xE0 | (cp >> 12));
+                            dst[di++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+                            dst[di++] = (char)(0x80 | (cp & 0x3F));
+                        }
+                    } else {
+                        dst[di++] = mstart[si];
+                    }
+                } else {
+                    dst[di++] = mstart[si];
+                }
+            } else {
+                dst[di++] = mstart[si];
+            }
+        }
+        dst[di] = '\0';
+        sched_queue[slot].msg_len = di;
+
+        unsigned long long deliver = 0;
+        if (sscanf(dstart + 13, "%llu", &deliver) != 1 || deliver == 0)
+            continue;
+        sched_queue[slot].deliver_at_ms = (uint64_t)deliver;
+        sched_queue[slot].active = true;
+        slot++;
+    }
+    fclose(f);
+    return HU_OK;
+}
+
+/* ── Contact photo resolver (macOS AddressBook SQLite) ────────────────── */
 
 size_t hu_conversation_contact_photo_path(const char *contact_id, size_t cid_len, char *out_path,
                                           size_t out_cap) {
     if (!contact_id || cid_len == 0 || !out_path || out_cap < 64)
         return 0;
 
+#ifdef HU_IS_TEST
+    (void)cid_len;
+    out_path[0] = '\0';
+    return 0;
+#elif !defined(HU_ENABLE_SQLITE)
+    (void)cid_len;
+    out_path[0] = '\0';
+    return 0;
+#else
     const char *home = getenv("HOME");
     if (!home)
         return 0;
 
-    /* macOS Contacts stores images in AddressBook source directories.
-     * The most reliable path pattern for the current user:
-     * ~/Library/Application Support/AddressBook/Sources/<uuid>/Images/<hash>
-     * We search for any contact image matching the phone/email. */
-    int n = snprintf(out_path, out_cap, "%s/Library/Application Support/AddressBook/Images", home);
-    if (n < 0 || (size_t)n >= out_cap)
+    char db_path[512];
+    int dp = snprintf(db_path, sizeof(db_path),
+                      "%s/Library/Application Support/AddressBook/AddressBook-v22.abcddb", home);
+    if (dp < 0 || (size_t)dp >= sizeof(db_path))
         return 0;
 
-    /* Check if directory exists — if not, contact photos aren't available */
-    if (access(out_path, F_OK) != 0) {
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+        if (db)
+            sqlite3_close(db);
+        out_path[0] = '\0';
+        return 0;
+    }
+
+    /* Join: phone/email -> ZABCDRECORD -> ZABCDLIKENESS to find the image.
+     * Contact photos are stored as blobs in ZABCDLIKENESS.ZDATA, but we want the
+     * tiff/jpeg file path. macOS also writes contact images to:
+     * ~/Library/Application Support/AddressBook/Sources/<uuid>/Images/<ZOWNER hash>
+     * We query for the ZOWNER (record ROWID) then construct the path. */
+    const char *sql = "SELECT r.Z_PK FROM ZABCDRECORD r "
+                      "LEFT JOIN ZABCDPHONENUMBER p ON p.ZOWNER = r.Z_PK "
+                      "LEFT JOIN ZABCDEMAILADDRESS e ON e.ZOWNER = r.Z_PK "
+                      "WHERE p.ZFULLNUMBER LIKE ? OR e.ZADDRESS LIKE ? "
+                      "LIMIT 1";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        out_path[0] = '\0';
+        return 0;
+    }
+
+    char like_pat[140];
+    size_t safe_len = cid_len > 128 ? 128 : cid_len;
+    int lp = snprintf(like_pat, sizeof(like_pat), "%%%.*s%%", (int)safe_len, contact_id);
+    if (lp < 0 || (size_t)lp >= sizeof(like_pat)) {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        out_path[0] = '\0';
+        return 0;
+    }
+    sqlite3_bind_text(stmt, 1, like_pat, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, like_pat, -1, SQLITE_STATIC);
+
+    int64_t record_pk = -1;
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+        record_pk = sqlite3_column_int64(stmt, 0);
+    sqlite3_finalize(stmt);
+
+    if (record_pk < 0) {
+        sqlite3_close(db);
+        out_path[0] = '\0';
+        return 0;
+    }
+
+    /* Check ZABCDLIKENESS for this record */
+    const char *img_sql = "SELECT Z_PK FROM ZABCDLIKENESS WHERE ZOWNER = ? LIMIT 1";
+    sqlite3_stmt *img_stmt = NULL;
+    bool has_image = false;
+    if (sqlite3_prepare_v2(db, img_sql, -1, &img_stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int64(img_stmt, 1, record_pk);
+        if (sqlite3_step(img_stmt) == SQLITE_ROW)
+            has_image = true;
+        sqlite3_finalize(img_stmt);
+    }
+
+    sqlite3_close(db);
+
+    if (!has_image) {
+        out_path[0] = '\0';
+        return 0;
+    }
+
+    /* macOS stores contact images at a known path pattern */
+    int n = snprintf(out_path, out_cap,
+                     "%s/Library/Application Support/AddressBook/Images/ABImage-%lld", home,
+                     (long long)record_pk);
+    if (n < 0 || (size_t)n >= out_cap) {
+        out_path[0] = '\0';
+        return 0;
+    }
+
+    if (access(out_path, R_OK) != 0) {
         out_path[0] = '\0';
         return 0;
     }
 
     return (size_t)n;
+#endif
 }

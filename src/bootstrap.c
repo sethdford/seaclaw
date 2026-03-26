@@ -687,6 +687,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             .pressure_warn = bi->cfg.agent.context_pressure_warn,
             .pressure_compact = bi->cfg.agent.context_pressure_compact,
             .compact_target = bi->cfg.agent.context_compact_target,
+            .compact_context = bi->cfg.agent.compact_context,
             .llm_compiler_enabled = bi->cfg.agent.llm_compiler_enabled,
             .hula_enabled = bi->cfg.agent.hula_enabled,
             .mcts_planner_enabled = bi->cfg.agent.mcts_planner_enabled,

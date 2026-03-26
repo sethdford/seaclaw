@@ -11,11 +11,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CONST_DEFAULT_HELPFUL "helpful"
+#define CONST_DEFAULT_HELPFUL      "helpful"
 #define CONST_DEFAULT_HELPFUL_DESC "Responses should directly address what the user needs."
-#define CONST_DEFAULT_HARMLESS "harmless"
-#define CONST_DEFAULT_HARMLESS_DESC "Responses must not cause harm, promote violence, or assist in dangerous activities."
-#define CONST_DEFAULT_HONEST "honest"
+#define CONST_DEFAULT_HARMLESS     "harmless"
+#define CONST_DEFAULT_HARMLESS_DESC \
+    "Responses must not cause harm, promote violence, or assist in dangerous activities."
+#define CONST_DEFAULT_HONEST      "honest"
 #define CONST_DEFAULT_HONEST_DESC "Responses must be truthful and not fabricate information."
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -93,16 +94,17 @@ static CONST_UNUSED hu_critique_verdict_t parse_verdict(const char *resp, size_t
 
 /* Extract principle index from response (e.g. "principle 2" or "principle 2") */
 static CONST_UNUSED int parse_principle_index(const char *resp, size_t resp_len) {
-    if (!resp || resp_len < 8)
+    if (!resp || resp_len < 9)
         return -1;
     const char *p = resp;
     const char *end = resp + resp_len;
-    while (p < end) {
+    while (p + 9 <= end) {
         if ((p[0] == 'p' || p[0] == 'P') && (p[1] == 'r' || p[1] == 'R') &&
             (p[2] == 'i' || p[2] == 'I') && (p[3] == 'n' || p[3] == 'N') &&
             (p[4] == 'c' || p[4] == 'C') && (p[5] == 'i' || p[5] == 'I') &&
-            (p[6] == 'p' || p[6] == 'P') && (p[7] == 'l' || p[7] == 'L')) {
-            p += 8;
+            (p[6] == 'p' || p[6] == 'P') && (p[7] == 'l' || p[7] == 'L') &&
+            (p[8] == 'e' || p[8] == 'E')) {
+            p += 9;
             while (p < end && (isspace((unsigned char)*p) || *p == '#'))
                 p++;
             if (p < end && *p >= '0' && *p <= '9') {
@@ -121,10 +123,9 @@ static CONST_UNUSED int parse_principle_index(const char *resp, size_t resp_len)
 }
 
 hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *provider,
-                                      const char *model, size_t model_len,
-                                      const char *user_msg, size_t user_msg_len,
-                                      const char *response, size_t response_len,
-                                      const hu_constitutional_config_t *config,
+                                      const char *model, size_t model_len, const char *user_msg,
+                                      size_t user_msg_len, const char *response,
+                                      size_t response_len, const hu_constitutional_config_t *config,
                                       hu_critique_result_t *result) {
     if (!alloc || !result)
         return HU_ERR_INVALID_ARGUMENT;
@@ -170,13 +171,11 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-    pos += (size_t)snprintf(critique_prompt + pos, prompt_cap - pos,
-                            "Given these principles:\n");
+    pos += (size_t)snprintf(critique_prompt + pos, prompt_cap - pos, "Given these principles:\n");
     for (size_t i = 0; i < config->principle_count && pos < prompt_cap - 1; i++) {
         const hu_principle_t *pr = &config->principles[i];
-        int n = snprintf(critique_prompt + pos, prompt_cap - pos, "%zu. %.*s: %.*s\n",
-                         i + 1, (int)pr->name_len, pr->name, (int)pr->description_len,
-                         pr->description);
+        int n = snprintf(critique_prompt + pos, prompt_cap - pos, "%zu. %.*s: %.*s\n", i + 1,
+                         (int)pr->name_len, pr->name, (int)pr->description_len, pr->description);
         if (n > 0 && (size_t)n < prompt_cap - pos)
             pos += (size_t)n;
     }
@@ -224,9 +223,9 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
 
     if (resp.content && resp.content_len > 0) {
         verdict = parse_verdict(resp.content, resp.content_len, &principle_idx);
-        principle_idx = parse_principle_index(resp.content, resp.content_len);
-        if (principle_idx < 0)
-            principle_idx = -1;
+        int explicit_idx = parse_principle_index(resp.content, resp.content_len);
+        if (explicit_idx >= 0)
+            principle_idx = explicit_idx;
         reasoning = hu_strndup(alloc, resp.content, resp.content_len);
         if (reasoning)
             reasoning_len = strlen(reasoning);
@@ -249,15 +248,17 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
         char *rewrite_prompt = (char *)alloc->alloc(alloc->ctx, rewrite_cap);
         if (rewrite_prompt) {
             int n = snprintf(rewrite_prompt, rewrite_cap,
-                            "Revise this response to satisfy the principle: %s\n\n"
-                            "Original: %.*s\n\nRewrite:",
-                            principle_desc, (int)response_len, response);
-            size_t rewrite_len = (n > 0 && (size_t)n < rewrite_cap) ? (size_t)n : strlen(rewrite_prompt);
+                             "Revise this response to satisfy the principle: %s\n\n"
+                             "Original: %.*s\n\nRewrite:",
+                             principle_desc, (int)response_len, response);
+            size_t rewrite_len =
+                (n > 0 && (size_t)n < rewrite_cap) ? (size_t)n : strlen(rewrite_prompt);
 
             hu_chat_message_t rw_msgs[2];
             memset(rw_msgs, 0, sizeof(rw_msgs));
             rw_msgs[0].role = HU_ROLE_SYSTEM;
-            rw_msgs[0].content = "Revise the response to comply with the principle. Output only the revised text.";
+            rw_msgs[0].content =
+                "Revise the response to comply with the principle. Output only the revised text.";
             rw_msgs[0].content_len = strlen(rw_msgs[0].content);
             rw_msgs[1].role = HU_ROLE_USER;
             rw_msgs[1].content = rewrite_prompt;
@@ -274,7 +275,7 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
             hu_chat_response_t rw_resp;
             memset(&rw_resp, 0, sizeof(rw_resp));
             err = provider->vtable->chat(provider->ctx, alloc, &rw_req, model, model_len, 0.3,
-                                        &rw_resp);
+                                         &rw_resp);
             alloc->free(alloc->ctx, rewrite_prompt, rewrite_cap);
 
             if (err == HU_OK && rw_resp.content && rw_resp.content_len > 0) {
@@ -289,3 +290,14 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
     return HU_OK;
 #endif
 }
+
+#ifdef HU_IS_TEST
+hu_critique_verdict_t hu_constitutional_test_parse_verdict(const char *resp, size_t resp_len,
+                                                           int *principle_idx) {
+    return parse_verdict(resp, resp_len, principle_idx);
+}
+
+int hu_constitutional_test_parse_principle_index(const char *resp, size_t resp_len) {
+    return parse_principle_index(resp, resp_len);
+}
+#endif

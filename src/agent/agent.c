@@ -187,6 +187,7 @@ hu_error_t hu_agent_from_config(
     out->context_pressure_warn = 0.85f;
     out->context_pressure_compact = 0.95f;
     out->context_compact_target = 0.70f;
+    out->compact_context_enabled = true;
     out->context_pressure_warning_85_emitted = false;
     out->context_pressure_warning_95_emitted = false;
     if (ctx_cfg) {
@@ -197,6 +198,7 @@ hu_error_t hu_agent_from_config(
             out->context_pressure_compact = ctx_cfg->pressure_compact;
         if (ctx_cfg->compact_target > 0.0f)
             out->context_compact_target = ctx_cfg->compact_target;
+        out->compact_context_enabled = ctx_cfg->compact_context;
         out->llm_compiler_enabled = ctx_cfg->llm_compiler_enabled;
         out->mcts_planner_enabled = ctx_cfg->mcts_planner_enabled;
         out->tool_routing_enabled = ctx_cfg->tool_routing_enabled;

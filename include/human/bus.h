@@ -20,6 +20,8 @@ typedef enum hu_bus_event_type {
     HU_BUS_MESSAGE_SENT,
     HU_BUS_MESSAGE_CHUNK,
     HU_BUS_TOOL_CALL,
+    HU_BUS_TOOL_CALL_RESULT, /* tool execution completed (result in message/payload) */
+    HU_BUS_THINKING_CHUNK,   /* reasoning/thinking content delta */
     HU_BUS_ERROR,
     HU_BUS_HEALTH_CHANGE,
     HU_BUS_CRON_STARTED,

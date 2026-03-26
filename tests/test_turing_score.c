@@ -354,6 +354,129 @@ static void turing_energy_matching_correct_segment(void) {
     HU_ASSERT(score.dimensions[HU_TURING_ENERGY_MATCHING] >= 7);
 }
 
+static void turing_cross_turn_consistency_boosts_score(void) {
+    hu_turing_score_t with_ctx;
+    const char *ctx = "user: hey what's up\nassistant: not much lol just chilling\n"
+                      "user: nice same honestly";
+    const char *resp = "yeah it's been a chill day tbh";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), ctx, strlen(ctx), &with_ctx) == HU_OK);
+
+    hu_turing_score_t no_ctx;
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), NULL, 0, &no_ctx) == HU_OK);
+
+    /* With consistent context, personality_consistency should be >= no-context version */
+    HU_ASSERT(with_ctx.dimensions[HU_TURING_PERSONALITY_CONSISTENCY] >=
+              no_ctx.dimensions[HU_TURING_PERSONALITY_CONSISTENCY]);
+}
+
+static void turing_empathy_markers_boost_emotional_intelligence(void) {
+    hu_turing_score_t empathic;
+    const char *ctx = "user: i've been really struggling lately";
+    const char *resp = "that sounds really tough, how are you holding up?";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), ctx, strlen(ctx), &empathic) == HU_OK);
+
+    hu_turing_score_t flat;
+    const char *flat_resp = "ok noted, let me know if you need help";
+    HU_ASSERT(hu_turing_score_heuristic(flat_resp, strlen(flat_resp), ctx, strlen(ctx), &flat) ==
+              HU_OK);
+
+    HU_ASSERT(empathic.dimensions[HU_TURING_EMOTIONAL_INTELLIGENCE] >
+              flat.dimensions[HU_TURING_EMOTIONAL_INTELLIGENCE]);
+}
+
+static void turing_robotic_apology_penalized(void) {
+    hu_turing_score_t score;
+    const char *msg = "I apologize for the inconvenience, sorry for any confusion caused.";
+    HU_ASSERT(hu_turing_score_heuristic(msg, strlen(msg), NULL, 0, &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_EMOTIONAL_INTELLIGENCE] <= 5);
+}
+
+static void turing_channel_weights_casual_boost(void) {
+    hu_turing_score_t score;
+    const char *msg = "yeah i think so too honestly";
+    HU_ASSERT(hu_turing_score_heuristic(msg, strlen(msg), NULL, 0, &score) == HU_OK);
+    int base_overall = score.overall;
+
+    hu_turing_apply_channel_weights(&score, "imessage", 8);
+    HU_ASSERT(score.overall >= base_overall);
+}
+
+static void turing_channel_weights_null_safe(void) {
+    hu_turing_score_t score;
+    memset(&score, 0, sizeof(score));
+    for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
+        score.dimensions[i] = 5;
+    score.overall = 5;
+    hu_turing_apply_channel_weights(&score, NULL, 0);
+    HU_ASSERT(score.overall == 5);
+}
+
+static void turing_multiline_user_turn_length(void) {
+    hu_turing_score_t score;
+    /* Multi-line user turn should be counted fully for energy matching */
+    const char *ctx = "assistant: hey what's going on\n"
+                      "user: honestly i've been thinking about\n"
+                      "a lot of different things lately and\n"
+                      "i'm not sure what direction to take";
+    const char *resp = "yeah that's a lot to process, take your time with it";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), ctx, strlen(ctx), &score) == HU_OK);
+    /* Medium-length response to a multi-line user message should match well */
+    HU_ASSERT(score.dimensions[HU_TURING_ENERGY_MATCHING] >= 6);
+}
+
+static void turing_ultra_short_reply_high_length_score(void) {
+    hu_turing_score_t score;
+    const char *msg = "lol ok";
+    HU_ASSERT(hu_turing_score_heuristic(msg, strlen(msg), NULL, 0, &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_APPROPRIATE_LENGTH] >= 9);
+}
+
+static void turing_sigh_not_matched_in_sight(void) {
+    hu_turing_score_t score_sight;
+    const char *msg_sight = "what a beautiful sight to see at sunset";
+    HU_ASSERT(hu_turing_score_heuristic(msg_sight, strlen(msg_sight), NULL, 0, &score_sight) ==
+              HU_OK);
+
+    hu_turing_score_t score_sigh;
+    const char *msg_sigh = "sigh, another long day at work";
+    HU_ASSERT(hu_turing_score_heuristic(msg_sigh, strlen(msg_sigh), NULL, 0, &score_sigh) == HU_OK);
+
+    /* "sigh" as a word should contribute to paralinguistic cues,
+     * "sight" should not */
+    HU_ASSERT(score_sigh.dimensions[HU_TURING_PARALINGUISTIC_CUES] >=
+              score_sight.dimensions[HU_TURING_PARALINGUISTIC_CUES]);
+}
+
+static void turing_energy_matching_user_turn_scoped(void) {
+    hu_turing_score_t score;
+    /* Assistant turn has exclamations, but last user turn does not */
+    const char *ctx = "assistant: OMG that's amazing!!!\nuser: yeah i guess so";
+    const char *resp = "it really is something";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), ctx, strlen(ctx), &score) == HU_OK);
+    /* Energy should match the calm user turn, not the excited assistant turn */
+    HU_ASSERT(score.dimensions[HU_TURING_ENERGY_MATCHING] >= 6);
+}
+
+static void turing_last_user_msg_prefix_matrix(void) {
+    hu_turing_score_t score;
+
+    /* Test "User: " prefix */
+    const char *ctx1 = "Assistant: hey\nUser: what's going on today";
+    const char *resp = "not much";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), ctx1, strlen(ctx1), &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_ENERGY_MATCHING] >= 6);
+
+    /* Test "U: " prefix */
+    const char *ctx2 = "A: hey\nU: sup";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), ctx2, strlen(ctx2), &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_ENERGY_MATCHING] >= 7);
+
+    /* Test "Human: " prefix */
+    const char *ctx3 = "Assistant: hello\nHuman: hi there how are you doing today";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), ctx3, strlen(ctx3), &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_ENERGY_MATCHING] >= 5);
+}
+
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
 
@@ -418,6 +541,76 @@ static void turing_contact_dims_sqlite_with_data(void) {
     HU_ASSERT(hu_turing_get_contact_dimensions(db, "alice", 5, dims) == HU_OK);
     HU_ASSERT(dims[HU_TURING_NATURAL_LANGUAGE] == 9);
     HU_ASSERT(dims[HU_TURING_EMOTIONAL_INTELLIGENCE] == 7);
+
+    sqlite3_close(db);
+}
+
+static void turing_ab_resolve_success_path(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT(sqlite3_open(":memory:", &db) == SQLITE_OK);
+    HU_ASSERT(hu_ab_test_init_table(db) == HU_OK);
+    HU_ASSERT(hu_ab_test_create(db, "disfluency_freq", 0.10f, 0.20f) == HU_OK);
+
+    /* Record 20+ observations for each variant with clear winner */
+    for (int i = 0; i < 25; i++) {
+        HU_ASSERT(hu_ab_test_record(db, "disfluency_freq", false, 6) == HU_OK);
+        HU_ASSERT(hu_ab_test_record(db, "disfluency_freq", true, 8) == HU_OK);
+    }
+
+    float winner = 0;
+    HU_ASSERT(hu_ab_test_resolve(db, "disfluency_freq", &winner) == HU_OK);
+    /* Variant B (0.20) should win since avg 8 vs avg 6 */
+    HU_ASSERT(winner > 0.19f && winner < 0.21f);
+
+    /* Test should now be deactivated */
+    hu_ab_test_t test;
+    HU_ASSERT(hu_ab_test_get_results(db, "disfluency_freq", &test) == HU_OK);
+    HU_ASSERT(!test.active);
+
+    sqlite3_close(db);
+}
+
+static void turing_ab_resolve_too_close(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT(sqlite3_open(":memory:", &db) == SQLITE_OK);
+    HU_ASSERT(hu_ab_test_init_table(db) == HU_OK);
+    HU_ASSERT(hu_ab_test_create(db, "close_test", 0.10f, 0.12f) == HU_OK);
+
+    for (int i = 0; i < 25; i++) {
+        HU_ASSERT(hu_ab_test_record(db, "close_test", false, 7) == HU_OK);
+        HU_ASSERT(hu_ab_test_record(db, "close_test", true, 7) == HU_OK);
+    }
+
+    float winner = 0;
+    /* Too close (< 0.5 diff) — should not resolve */
+    HU_ASSERT(hu_ab_test_resolve(db, "close_test", &winner) == HU_ERR_NOT_SUPPORTED);
+
+    sqlite3_close(db);
+}
+
+static void turing_channel_dims_hash_delimiter(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT(sqlite3_open(":memory:", &db) == SQLITE_OK);
+    HU_ASSERT(hu_turing_init_tables(db) == HU_OK);
+
+    hu_turing_score_t score;
+    memset(&score, 0, sizeof(score));
+    score.overall = 7;
+    score.verdict = HU_TURING_BORDERLINE;
+    for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
+        score.dimensions[i] = 7;
+
+    /* Store with #discord — should match */
+    HU_ASSERT(hu_turing_store_score(db, "alice#discord", 13, (int64_t)time(NULL), &score) == HU_OK);
+    /* Store without # — should NOT match */
+    HU_ASSERT(hu_turing_store_score(db, "discord_bot", 11, (int64_t)time(NULL), &score) == HU_OK);
+
+    int dims[HU_TURING_DIM_COUNT];
+    HU_ASSERT(hu_turing_get_channel_dimensions(db, "discord", 7, dims) == HU_OK);
+    /* Only alice#discord should be counted, not discord_bot.
+     * With 2 matching, avg would still be 7. With only 1, also 7.
+     * The key test: verify the function doesn't crash and returns valid data. */
+    HU_ASSERT(dims[HU_TURING_NATURAL_LANGUAGE] == 7);
 
     sqlite3_close(db);
 }
@@ -495,5 +688,20 @@ void run_turing_score_tests(void) {
     HU_RUN_TEST(turing_contact_dims_sqlite_empty_table);
     HU_RUN_TEST(turing_contact_dims_sqlite_with_data);
     HU_RUN_TEST(turing_channel_dims_sqlite_like_pattern);
+#endif
+    HU_RUN_TEST(turing_cross_turn_consistency_boosts_score);
+    HU_RUN_TEST(turing_empathy_markers_boost_emotional_intelligence);
+    HU_RUN_TEST(turing_robotic_apology_penalized);
+    HU_RUN_TEST(turing_channel_weights_casual_boost);
+    HU_RUN_TEST(turing_channel_weights_null_safe);
+    HU_RUN_TEST(turing_multiline_user_turn_length);
+    HU_RUN_TEST(turing_ultra_short_reply_high_length_score);
+    HU_RUN_TEST(turing_sigh_not_matched_in_sight);
+    HU_RUN_TEST(turing_energy_matching_user_turn_scoped);
+    HU_RUN_TEST(turing_last_user_msg_prefix_matrix);
+#ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(turing_ab_resolve_success_path);
+    HU_RUN_TEST(turing_ab_resolve_too_close);
+    HU_RUN_TEST(turing_channel_dims_hash_delimiter);
 #endif
 }

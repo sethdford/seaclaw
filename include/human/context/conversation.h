@@ -789,14 +789,46 @@ size_t hu_conversation_split_into_texts(const char *response, size_t resp_len, s
                                         char chunks[][512], size_t max_chunks);
 
 /* Schedule a message for future delivery. deliver_at_ms is absolute epoch millis.
- * Call hu_conversation_flush_scheduled periodically to get due messages. */
+ * Call hu_conversation_flush_scheduled periodically to get due messages.
+ * _on variants include channel_name for routing to the correct channel. */
 hu_error_t hu_conversation_schedule_message(const char *contact_id, size_t cid_len,
                                             const char *message, size_t msg_len,
                                             uint64_t deliver_at_ms);
+hu_error_t hu_conversation_schedule_message_on(const char *contact_id, size_t cid_len,
+                                               const char *channel_name, size_t ch_len,
+                                               const char *message, size_t msg_len,
+                                               uint64_t deliver_at_ms);
 size_t hu_conversation_flush_scheduled(uint64_t now_ms, char *out_contact, size_t contact_cap,
                                        char *out_message, size_t message_cap);
+size_t hu_conversation_flush_scheduled_on(uint64_t now_ms, char *out_contact, size_t contact_cap,
+                                          char *out_channel, size_t channel_cap, char *out_message,
+                                          size_t message_cap);
+/* Channel-filtered flush: only returns messages matching channel_filter (or any if NULL/empty). */
+size_t hu_conversation_flush_scheduled_for(uint64_t now_ms, const char *channel_filter,
+                                           size_t filter_len, char *out_contact, size_t contact_cap,
+                                           char *out_channel, size_t channel_cap, char *out_message,
+                                           size_t message_cap);
 
-/* Resolve the macOS Contacts/AddressBook image directory path.
+/* Persist scheduled messages to a JSON file. Load restores on startup. */
+hu_error_t hu_conversation_sched_save(const char *path, size_t path_len);
+hu_error_t hu_conversation_sched_load(const char *path, size_t path_len);
+
+#define HU_SCHED_MAX 16
+
+typedef struct hu_sched_slot {
+    char contact_id[128];
+    char channel_name[32];
+    char message[512];
+    size_t msg_len;
+    uint64_t deliver_at_ms;
+    bool active;
+} hu_sched_slot_t;
+
+/* Access a scheduled slot by index (0..HU_SCHED_MAX-1). Returns NULL if out of range. */
+hu_sched_slot_t *hu_conversation_sched_slot(size_t index);
+
+/* Resolve the macOS Contacts/AddressBook contact photo path.
+ * Queries AddressBook-v22.abcddb for phone/email → record → image.
  * Returns path length or 0 if not available. */
 size_t hu_conversation_contact_photo_path(const char *contact_id, size_t cid_len, char *out_path,
                                           size_t out_cap);

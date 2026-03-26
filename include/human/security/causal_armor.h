@@ -37,6 +37,7 @@ typedef struct hu_causal_armor_result {
     bool is_safe;
     double user_intent_attribution;   /* [0.0, 1.0] */
     double max_untrusted_attribution; /* [0.0, 1.0] */
+    double grounding_score;           /* [0.0, 1.0] — 1.0 = all args grounded in trusted segments */
     size_t dominant_segment_idx;      /* index of most influential untrusted segment, or SIZE_MAX */
     char reason[256];
     size_t reason_len;

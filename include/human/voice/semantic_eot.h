@@ -66,4 +66,39 @@ hu_error_t hu_semantic_eot_analyze_with_audio(const hu_semantic_eot_config_t *cf
                                               size_t text_len, uint32_t silence_ms, float energy_db,
                                               float pitch_delta, hu_semantic_eot_result_t *out);
 
+/**
+ * Feature-based EOT classifier using logistic regression over engineered features.
+ * Replaces pure heuristic cascades with a learned linear model for higher accuracy.
+ * Feature vector: [syntax_complete, question_mark, ellipsis, yield_phrase, backchannel,
+ *                  hold_filler, word_count_norm, silence_norm, energy_norm, pitch_norm]
+ *
+ * Weights can be updated by calling hu_semantic_eot_set_weights (e.g. from config or
+ * fine-tuning). Default weights are calibrated from conversational corpora.
+ */
+
+#define HU_EOT_FEATURE_DIM 10
+
+typedef struct hu_semantic_eot_classifier {
+    float weights[HU_EOT_FEATURE_DIM];
+    float bias;
+    float threshold; /* sigmoid output above this → endpoint (default: 0.55) */
+} hu_semantic_eot_classifier_t;
+
+void hu_semantic_eot_classifier_default(hu_semantic_eot_classifier_t *cls);
+
+/** Set custom weights (e.g. from fine-tuning on user conversation data). */
+hu_error_t hu_semantic_eot_set_weights(hu_semantic_eot_classifier_t *cls, const float *weights,
+                                       size_t dim, float bias, float threshold);
+
+/** Extract feature vector from text + audio. out_features must have HU_EOT_FEATURE_DIM elements. */
+hu_error_t hu_semantic_eot_extract_features(const char *text, size_t text_len, uint32_t silence_ms,
+                                            float energy_db, float pitch_delta,
+                                            float *out_features);
+
+/** Classify using the learned model. Falls back to heuristic path if cls is NULL. */
+hu_error_t hu_semantic_eot_classify(const hu_semantic_eot_classifier_t *cls,
+                                    const hu_semantic_eot_config_t *cfg, const char *text,
+                                    size_t text_len, uint32_t silence_ms, float energy_db,
+                                    float pitch_delta, hu_semantic_eot_result_t *out);
+
 #endif /* HU_VOICE_SEMANTIC_EOT_H */

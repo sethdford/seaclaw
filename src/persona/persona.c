@@ -3644,32 +3644,62 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
             }
 
             {
-                hu_fuse_adapter_t fuse_ad;
-                memset(&fuse_ad, 0, sizeof(fuse_ad));
-                if (ov->formality) {
-                    if (strstr(ov->formality, "high") || strstr(ov->formality, "High"))
-                        fuse_ad.formality = 0.55f;
-                    else if (strstr(ov->formality, "low") || strstr(ov->formality, "Low"))
-                        fuse_ad.formality = -0.55f;
-                }
-                if (ov->avg_length) {
-                    if (strstr(ov->avg_length, "short") || strstr(ov->avg_length, "brief"))
-                        fuse_ad.verbosity = -0.45f;
-                    else if (strstr(ov->avg_length, "long") || strstr(ov->avg_length, "Long"))
-                        fuse_ad.verbosity = 0.45f;
-                }
-                fuse_ad.emoji_factor = 1.0f;
-                if (ov->emoji_usage) {
-                    if (strstr(ov->emoji_usage, "minimal") || strstr(ov->emoji_usage, "none") ||
-                        strstr(ov->emoji_usage, "low"))
-                        fuse_ad.emoji_factor = 0.35f;
-                    else if (strstr(ov->emoji_usage, "heavy") || strstr(ov->emoji_usage, "high"))
-                        fuse_ad.emoji_factor = 1.75f;
-                }
                 hu_persona_vector_t pvec;
+                bool have_vec = false;
+
+                if (ov->style_notes_count > 0) {
+                    hu_persona_fuse_t fuse;
+                    if (hu_persona_fuse_init(&fuse, alloc) == HU_OK) {
+                        hu_persona_fuse_add_builtin_adapters(&fuse);
+                        hu_fuse_result_t fused;
+                        if (hu_persona_fuse_compose(&fuse, (const char *const *)ov->style_notes,
+                                                    ov->style_notes_count, &fused) == HU_OK) {
+                            memset(&pvec, 0, sizeof(pvec));
+                            pvec.formality = fused.formality;
+                            pvec.verbosity = fused.verbosity;
+                            pvec.warmth = fused.warmth_offset * 2.0f;
+                            pvec.emoji_usage = (fused.emoji_factor - 1.0f) * 0.85f;
+                            if (pvec.emoji_usage > 1.0f)
+                                pvec.emoji_usage = 1.0f;
+                            if (pvec.emoji_usage < -1.0f)
+                                pvec.emoji_usage = -1.0f;
+                            have_vec = true;
+                        }
+                        hu_persona_fuse_deinit(&fuse);
+                    }
+                }
+
+                if (!have_vec) {
+                    hu_fuse_adapter_t fuse_ad;
+                    memset(&fuse_ad, 0, sizeof(fuse_ad));
+                    if (ov->formality) {
+                        if (strstr(ov->formality, "high") || strstr(ov->formality, "High"))
+                            fuse_ad.formality = 0.55f;
+                        else if (strstr(ov->formality, "low") || strstr(ov->formality, "Low"))
+                            fuse_ad.formality = -0.55f;
+                    }
+                    if (ov->avg_length) {
+                        if (strstr(ov->avg_length, "short") || strstr(ov->avg_length, "brief"))
+                            fuse_ad.verbosity = -0.45f;
+                        else if (strstr(ov->avg_length, "long") || strstr(ov->avg_length, "Long"))
+                            fuse_ad.verbosity = 0.45f;
+                    }
+                    fuse_ad.emoji_factor = 1.0f;
+                    if (ov->emoji_usage) {
+                        if (strstr(ov->emoji_usage, "minimal") || strstr(ov->emoji_usage, "none") ||
+                            strstr(ov->emoji_usage, "low"))
+                            fuse_ad.emoji_factor = 0.35f;
+                        else if (strstr(ov->emoji_usage, "heavy") ||
+                                 strstr(ov->emoji_usage, "high"))
+                            fuse_ad.emoji_factor = 1.75f;
+                    }
+                    hu_persona_vector_from_adapter(&fuse_ad, &pvec);
+                    have_vec = true;
+                }
+
                 char dirbuf[512];
                 size_t dlen = 0;
-                if (hu_persona_vector_from_adapter(&fuse_ad, &pvec) == HU_OK &&
+                if (have_vec &&
                     hu_persona_vector_to_directive(&pvec, dirbuf, sizeof(dirbuf), &dlen) == HU_OK &&
                     dlen > 0) {
                     static const char ghdr[] = "\nGeometric style directive (calibrated):\n";

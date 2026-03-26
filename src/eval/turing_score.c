@@ -202,20 +202,82 @@ static int has_opinion_markers(const char *s, size_t len) {
     return count;
 }
 
+/* Find the last user turn in conversation context. Looks for role prefixes
+ * (user:, U:, Human:) scanning backward, or falls back to last line. */
 static size_t last_user_msg_len(const char *ctx, size_t ctx_len) {
     if (!ctx || ctx_len == 0)
         return 0;
-    /* Skip trailing whitespace/newlines to find end of last real content */
+
     size_t end = ctx_len;
-    while (end > 0 && (ctx[end - 1] == '\n' || ctx[end - 1] == '\r'))
+    while (end > 0 && (ctx[end - 1] == '\n' || ctx[end - 1] == '\r' || ctx[end - 1] == ' '))
         end--;
     if (end == 0)
         return 0;
-    /* Find the newline before the last line */
-    size_t start = end;
-    while (start > 0 && ctx[start - 1] != '\n')
-        start--;
-    return end - start;
+
+    /* Scan backward for the last user-role prefix to find full turn */
+    static const char *user_prefixes[] = {"user: ", "User: ", "U: ", "Human: ", "human: "};
+    static const size_t prefix_lens[] = {6, 6, 3, 7, 7};
+    size_t best_start = 0;
+    bool found_prefix = false;
+
+    for (size_t i = 0; i < sizeof(user_prefixes) / sizeof(user_prefixes[0]); i++) {
+        size_t plen = prefix_lens[i];
+        if (plen > end)
+            continue;
+        /* Scan backward from end for this prefix at start of a line */
+        for (size_t pos = end; pos >= plen; pos--) {
+            size_t check = pos - plen;
+            if ((check == 0 || ctx[check - 1] == '\n') &&
+                memcmp(ctx + check, user_prefixes[i], plen) == 0) {
+                size_t msg_start = check + plen;
+                /* The turn extends until the next role prefix or end */
+                size_t msg_end = end;
+                for (size_t scan = msg_start; scan < end; scan++) {
+                    if (ctx[scan] != '\n')
+                        continue;
+                    size_t next = scan + 1;
+                    if (next >= end)
+                        break;
+                    bool next_is_role = false;
+                    for (size_t j = 0; j < sizeof(user_prefixes) / sizeof(user_prefixes[0]); j++) {
+                        if (next + prefix_lens[j] <= end &&
+                            memcmp(ctx + next, user_prefixes[j], prefix_lens[j]) == 0)
+                            next_is_role = true;
+                    }
+                    static const char *asst_prefixes[] = {"assistant: ", "Assistant: ", "A: "};
+                    static const size_t asst_lens[] = {11, 11, 3};
+                    for (size_t j = 0; j < sizeof(asst_prefixes) / sizeof(asst_prefixes[0]); j++) {
+                        if (next + asst_lens[j] <= end &&
+                            memcmp(ctx + next, asst_prefixes[j], asst_lens[j]) == 0)
+                            next_is_role = true;
+                    }
+                    if (next_is_role) {
+                        msg_end = scan;
+                        break;
+                    }
+                }
+                while (msg_end > msg_start &&
+                       (ctx[msg_end - 1] == '\n' || ctx[msg_end - 1] == '\r'))
+                    msg_end--;
+                if (msg_end > msg_start && msg_start > best_start) {
+                    best_start = msg_start;
+                    found_prefix = true;
+                    return msg_end - msg_start;
+                }
+            }
+            if (check == 0)
+                break;
+        }
+    }
+
+    /* Fallback: return last line */
+    if (!found_prefix) {
+        size_t start = end;
+        while (start > 0 && ctx[start - 1] != '\n')
+            start--;
+        return end - start;
+    }
+    return 0;
 }
 
 static int count_exclamations(const char *s, size_t len) {
@@ -278,6 +340,75 @@ static int has_context_references(const char *response, size_t resp_len, const c
     return count;
 }
 
+/* Cross-turn style consistency: extract prior assistant messages from context
+ * and compare register (casual, lowercase, length) with the current response.
+ * Returns 0-3 bonus points for consistency. */
+static int cross_turn_consistency(const char *response, size_t response_len, const char *ctx,
+                                  size_t ctx_len) {
+    if (!ctx || ctx_len < 10 || !response || response_len == 0)
+        return 0;
+
+    /* Analyze current response style */
+    bool resp_has_lower_start = (response[0] >= 'a' && response[0] <= 'z');
+    bool resp_has_casual = has_casual_markers(response, response_len) > 0;
+    bool resp_has_contractions = has_contractions(response, response_len) > 0;
+
+    /* Scan context for "assistant:" or "\nA:" prefixed segments (common conversation formats) */
+    int matching_turns = 0;
+    int total_turns = 0;
+    const char *p = ctx;
+    const char *end = ctx + ctx_len;
+    while (p < end) {
+        const char *line_end = p;
+        while (line_end < end && *line_end != '\n')
+            line_end++;
+        size_t line_len = (size_t)(line_end - p);
+
+        bool is_assistant = false;
+        const char *msg_start = p;
+        size_t msg_len = line_len;
+        if (line_len > 11 &&
+            (memcmp(p, "assistant: ", 11) == 0 || memcmp(p, "Assistant: ", 11) == 0)) {
+            is_assistant = true;
+            msg_start = p + 11;
+            msg_len = line_len - 11;
+        } else if (line_len > 3 && (memcmp(p, "A: ", 3) == 0)) {
+            is_assistant = true;
+            msg_start = p + 3;
+            msg_len = line_len - 3;
+        }
+
+        if (is_assistant && msg_len > 2) {
+            total_turns++;
+            int matches = 0;
+            bool prev_lower = (msg_start[0] >= 'a' && msg_start[0] <= 'z');
+            if (prev_lower == resp_has_lower_start)
+                matches++;
+            bool prev_casual = has_casual_markers(msg_start, msg_len) > 0;
+            if (prev_casual == resp_has_casual)
+                matches++;
+            bool prev_contractions = has_contractions(msg_start, msg_len) > 0;
+            if (prev_contractions == resp_has_contractions)
+                matches++;
+            if (matches >= 2)
+                matching_turns++;
+        }
+
+        p = (line_end < end) ? line_end + 1 : end;
+    }
+
+    if (total_turns == 0)
+        return 0;
+    int ratio_pct = (matching_turns * 100) / total_turns;
+    if (ratio_pct >= 80)
+        return 3;
+    if (ratio_pct >= 50)
+        return 2;
+    if (ratio_pct >= 30)
+        return 1;
+    return 0;
+}
+
 hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
                                      const char *conversation_context, size_t context_len,
                                      hu_turing_score_t *out) {
@@ -303,16 +434,57 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     if (casual > 0)
         out->dimensions[HU_TURING_NATURAL_LANGUAGE] += 1;
 
-    /* emotional_intelligence: presence of emotional vocabulary */
-    out->dimensions[HU_TURING_EMOTIONAL_INTELLIGENCE] = 5 + emotional;
-    if (emotional > 2)
-        out->dimensions[HU_TURING_EMOTIONAL_INTELLIGENCE] = 9;
-    if (vulnerability > 0)
-        out->dimensions[HU_TURING_EMOTIONAL_INTELLIGENCE] += 1;
+    /* emotional_intelligence: emotional vocabulary + empathy signals + context appropriateness */
+    {
+        int ei = 5;
+        if (emotional > 0)
+            ei += (emotional > 2) ? 3 : emotional;
 
-    /* appropriate_length: iMessage-appropriate = under 300 chars */
-    if (response_len < 50)
-        out->dimensions[HU_TURING_APPROPRIATE_LENGTH] = 8;
+        /* Empathy markers: asking about feelings, validating, reflecting back */
+        static const char *empathy_phrases[] = {
+            "how are you",   "how do you feel", "that must",     "that sounds",
+            "i can imagine", "i hear you",      "makes sense",   "i get that",
+            "are you okay",  "you doing ok",    "what happened", "tell me more",
+        };
+        int empathy = 0;
+        for (size_t i = 0; i < sizeof(empathy_phrases) / sizeof(empathy_phrases[0]); i++) {
+            if (ci_has(response, response_len, empathy_phrases[i]))
+                empathy++;
+        }
+        if (empathy > 0)
+            ei += (empathy > 2) ? 2 : 1;
+
+        /* Context-responsive: if user message has emotional tone, emotional response is appropriate
+         */
+        if (conversation_context && context_len > 0) {
+            size_t user_len = last_user_msg_len(conversation_context, context_len);
+            if (user_len > 0) {
+                const char *user_start = conversation_context + context_len - user_len;
+                int user_emotional = has_emotional_words(user_start, user_len);
+                int user_vuln = has_vulnerability_markers(user_start, user_len);
+                if ((user_emotional > 0 || user_vuln > 0) && emotional > 0)
+                    ei += 1;
+                if ((user_emotional > 0 || user_vuln > 0) && emotional == 0 && empathy == 0)
+                    ei -= 2;
+            }
+        }
+
+        /* Penalize robotic apology patterns */
+        if (ci_has(response, response_len, "sorry for any") ||
+            ci_has(response, response_len, "apologize for the") ||
+            ci_has(response, response_len, "sorry for the inconvenience"))
+            ei -= 2;
+
+        if (vulnerability > 0)
+            ei += 1;
+        out->dimensions[HU_TURING_EMOTIONAL_INTELLIGENCE] = ei;
+    }
+
+    /* appropriate_length: iMessage-appropriate. Ultra-short is peak human texting. */
+    if (response_len < 10)
+        out->dimensions[HU_TURING_APPROPRIATE_LENGTH] = 10;
+    else if (response_len < 50)
+        out->dimensions[HU_TURING_APPROPRIATE_LENGTH] = 9;
     else if (response_len < 150)
         out->dimensions[HU_TURING_APPROPRIATE_LENGTH] = 9;
     else if (response_len < 300)
@@ -320,14 +492,18 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     else
         out->dimensions[HU_TURING_APPROPRIATE_LENGTH] = 4 - (int)(response_len / 200);
 
-    /* personality_consistency: opinions + consistent register + no hedging */
-    out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] = 6;
-    if (opinions > 0)
-        out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] += 1;
-    if (casual > 1)
-        out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] += 1;
-    if (vulnerability > 0 && emotional > 0)
-        out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] += 1;
+    /* personality_consistency: opinions + consistent register + cross-turn style match */
+    {
+        int pc = 5;
+        if (opinions > 0)
+            pc += 1;
+        if (casual > 1)
+            pc += 1;
+        if (vulnerability > 0 && emotional > 0)
+            pc += 1;
+        pc += cross_turn_consistency(response, response_len, conversation_context, context_len);
+        out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] = pc;
+    }
 
     /* vulnerability_willingness: authentic self-disclosure, not just emotional words */
     out->dimensions[HU_TURING_VULNERABILITY_WILLINGNESS] = 5;
@@ -372,22 +548,27 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
         ci_has(response, response_len, "that's a good point"))
         out->dimensions[HU_TURING_OPINION_HAVING] -= 1;
 
-    /* energy_matching: compare response energy to context energy */
+    /* energy_matching: compare response energy to last user turn energy */
     {
         int score = 6;
         if (conversation_context && context_len > 0) {
             size_t user_len = last_user_msg_len(conversation_context, context_len);
-            int ctx_excl = count_exclamations(conversation_context, context_len);
+            const char *user_start = (user_len > 0 && user_len <= context_len)
+                                         ? conversation_context + context_len - user_len
+                                         : conversation_context;
+            size_t user_scan_len = (user_len > 0) ? user_len : context_len;
+
+            int ctx_excl = count_exclamations(user_start, user_scan_len);
             int resp_excl = count_exclamations(response, response_len);
-            int ctx_upper = count_uppercase_words(conversation_context, context_len);
+            int ctx_upper = count_uppercase_words(user_start, user_scan_len);
 
             /* Length ratio matching */
             if (user_len > 0 && user_len < 20 && response_len < 60)
-                score += 2; /* short-to-short is natural */
+                score += 2;
             else if (user_len > 0 && user_len < 20 && response_len > 200)
-                score -= 2; /* essay response to a brief message */
+                score -= 2;
             else if (user_len > 100 && response_len < 30)
-                score += 1; /* brief acknowledgment to a long message is okay */
+                score += 1;
 
             /* Exclamation energy matching */
             if (ctx_excl > 0 && resp_excl > 0)
@@ -543,8 +724,21 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
             para++;
         if (ci_has(response, response_len, "hehe") || ci_has(response, response_len, "lmao"))
             para++;
-        if (ci_has(response, response_len, "*sigh*") || ci_has(response, response_len, "sigh"))
+        if (ci_has(response, response_len, "*sigh*"))
             para++;
+        else {
+            size_t slen = 4;
+            for (size_t sp = 0; sp + slen <= response_len; sp++) {
+                size_t j = 0;
+                while (j < slen &&
+                       tolower((unsigned char)response[sp + j]) == (unsigned char)"sigh"[j])
+                    j++;
+                if (j == slen && word_boundary(response, response_len, sp, slen)) {
+                    para++;
+                    break;
+                }
+            }
+        }
         if (ci_has(response, response_len, "*laugh*") || ci_has(response, response_len, "ugh"))
             para++;
         if (ci_has(response, response_len, "aww") || ci_has(response, response_len, "ooh"))
@@ -717,10 +911,20 @@ hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider, c
         return hu_turing_score_heuristic(response, response_len, conversation_context, context_len,
                                          out);
 
-    int sum = 0;
-    for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
-        sum += out->dimensions[i];
-    out->overall = (sum + HU_TURING_DIM_COUNT / 2) / HU_TURING_DIM_COUNT;
+    /* Weighted average matching heuristic path: text dims (0-11) weight 3, voice dims weight 1 */
+    {
+        int weighted_sum = 0;
+        int total_weight = 0;
+        for (int i = 0; i < 12; i++) {
+            weighted_sum += out->dimensions[i] * 3;
+            total_weight += 3;
+        }
+        for (int i = 12; i < HU_TURING_DIM_COUNT; i++) {
+            weighted_sum += out->dimensions[i];
+            total_weight += 1;
+        }
+        out->overall = (weighted_sum + total_weight / 2) / total_weight;
+    }
 
     if (out->overall >= 8)
         out->verdict = HU_TURING_HUMAN;
@@ -730,6 +934,65 @@ hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider, c
         out->verdict = HU_TURING_AI_DETECTED;
 
     return HU_OK;
+}
+
+void hu_turing_apply_channel_weights(hu_turing_score_t *score, const char *channel,
+                                     size_t channel_len) {
+    if (!score || !channel || channel_len == 0)
+        return;
+
+    typedef enum { CH_CASUAL, CH_FORMAL, CH_BALANCED } ch_class_t;
+    ch_class_t cls = CH_BALANCED;
+
+    if ((channel_len == 8 && memcmp(channel, "imessage", 8) == 0) ||
+        (channel_len == 8 && memcmp(channel, "whatsapp", 8) == 0) ||
+        (channel_len == 7 && memcmp(channel, "discord", 7) == 0) ||
+        (channel_len == 8 && memcmp(channel, "telegram", 8) == 0) ||
+        (channel_len == 6 && memcmp(channel, "signal", 6) == 0) ||
+        (channel_len == 3 && memcmp(channel, "sms", 3) == 0)) {
+        cls = CH_CASUAL;
+    } else if ((channel_len == 5 && memcmp(channel, "email", 5) == 0) ||
+               (channel_len == 5 && memcmp(channel, "slack", 5) == 0) ||
+               (channel_len == 8 && memcmp(channel, "linkedin", 8) == 0)) {
+        cls = CH_FORMAL;
+    }
+
+    if (cls == CH_CASUAL) {
+        /* Casual channels: boost casual dims, relax length */
+        if (score->dimensions[HU_TURING_NATURAL_LANGUAGE] < 10)
+            score->dimensions[HU_TURING_NATURAL_LANGUAGE] += 1;
+        if (score->dimensions[HU_TURING_IMPERFECTION] < 10)
+            score->dimensions[HU_TURING_IMPERFECTION] += 1;
+        if (score->dimensions[HU_TURING_APPROPRIATE_LENGTH] < 10)
+            score->dimensions[HU_TURING_APPROPRIATE_LENGTH] += 1;
+    } else if (cls == CH_FORMAL) {
+        /* Formal channels: boost structure, don't penalize length as hard */
+        if (score->dimensions[HU_TURING_CONTEXT_AWARENESS] < 10)
+            score->dimensions[HU_TURING_CONTEXT_AWARENESS] += 1;
+        if (score->dimensions[HU_TURING_OPINION_HAVING] < 10)
+            score->dimensions[HU_TURING_OPINION_HAVING] += 1;
+    }
+
+    /* Recalculate overall with same weighted formula */
+    int weighted_sum = 0;
+    int total_weight = 0;
+    for (int i = 0; i < 12; i++) {
+        if (score->dimensions[i] > 10)
+            score->dimensions[i] = 10;
+        weighted_sum += score->dimensions[i] * 3;
+        total_weight += 3;
+    }
+    for (int i = 12; i < HU_TURING_DIM_COUNT; i++) {
+        weighted_sum += score->dimensions[i];
+        total_weight += 1;
+    }
+    score->overall = (weighted_sum + total_weight / 2) / total_weight;
+    if (score->overall >= 8)
+        score->verdict = HU_TURING_HUMAN;
+    else if (score->overall >= 6)
+        score->verdict = HU_TURING_BORDERLINE;
+    else
+        score->verdict = HU_TURING_AI_DETECTED;
 }
 
 const char *hu_turing_dimension_name(hu_turing_dimension_t dim) {
@@ -1057,10 +1320,10 @@ hu_error_t hu_turing_get_channel_dimensions(sqlite3 *db, const char *channel_nam
     if (!db || !channel_name || !dimension_averages)
         return HU_ERR_INVALID_ARGUMENT;
 
-    /* Channel is encoded in contact_id suffix (e.g., "bob#discord", "+1234#imessage").
-     * Match contacts whose IDs contain the channel suffix. */
+    /* Channel is encoded in contact_id suffix after '#' (e.g., "bob#discord", "+1234#imessage").
+     * Use '%#channel' LIKE pattern to require the '#' delimiter, avoiding false matches. */
     char pattern[256];
-    int pn = snprintf(pattern, sizeof(pattern), "%%%.*s", (int)channel_name_len, channel_name);
+    int pn = snprintf(pattern, sizeof(pattern), "%%#%.*s", (int)channel_name_len, channel_name);
     if (pn < 0 || (size_t)pn >= sizeof(pattern))
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -1094,6 +1357,7 @@ hu_error_t hu_turing_get_channel_dimensions(sqlite3 *db, const char *channel_nam
     sqlite3_finalize(stmt);
     return HU_OK;
 }
+#endif /* HU_ENABLE_SQLITE — trajectory scoring is SQLite-independent, below */
 
 hu_error_t hu_turing_score_trajectory(const hu_turing_score_t *scores, size_t score_count,
                                       hu_turing_trajectory_t *out) {
@@ -1158,6 +1422,7 @@ hu_error_t hu_turing_score_trajectory(const hu_turing_score_t *scores, size_t sc
     return HU_OK;
 }
 
+#ifdef HU_ENABLE_SQLITE
 hu_error_t hu_ab_test_init_table(sqlite3 *db) {
     if (!db)
         return HU_ERR_INVALID_ARGUMENT;

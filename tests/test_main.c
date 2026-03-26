@@ -284,6 +284,7 @@ void run_paperclip_tests(void);
 #endif
 void run_cartesia_tests(void);
 void run_cartesia_stream_tests(void);
+void register_voice_clone_tests(void);
 #ifdef HU_ENABLE_CARTESIA
 void run_audio_pipeline_tests(void);
 void run_voice_decision_tests(void);
@@ -667,6 +668,7 @@ int main(int argc, char **argv) {
 #endif
     run_cartesia_tests();
     run_cartesia_stream_tests();
+    register_voice_clone_tests();
 #ifdef HU_ENABLE_CARTESIA
     run_audio_pipeline_tests();
     run_voice_decision_tests();

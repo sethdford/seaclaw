@@ -172,7 +172,20 @@ static bool vs_bus_cb(hu_bus_event_type_t type, const hu_bus_event_t *ev, void *
     vs_slot_t *sl = s_active_tts_slot;
     int64_t now = vs_now_ms();
 
-    if (type == HU_BUS_MESSAGE_CHUNK) {
+    switch (type) {
+    case HU_BUS_THINKING_CHUNK:
+        /* Model reasoning; never feed to Cartesia or advance duplex from this stream. */
+        return true;
+
+    case HU_BUS_TOOL_CALL:
+        /* Tool invocation metadata only; do not speak or disturb TTS context. */
+        return true;
+
+    case HU_BUS_TOOL_CALL_RESULT:
+        /* Raw tool output; spoken text arrives in subsequent HU_BUS_MESSAGE_CHUNK. */
+        return true;
+
+    case HU_BUS_MESSAGE_CHUNK: {
         const char *tok = ev->message[0] ? ev->message : NULL;
         if (!tok || !tok[0])
             return true;
@@ -228,12 +241,20 @@ static bool vs_bus_cb(hu_bus_event_type_t type, const hu_bus_event_t *ev, void *
         } else if (action == HU_TURN_ACTION_YIELD_FLOOR) {
             vs_finish_agent_turn(sl, a);
         }
-    } else if (type == HU_BUS_MESSAGE_SENT) {
+        return true;
+    }
+
+    case HU_BUS_MESSAGE_SENT: {
         hu_turn_action_t action;
         hu_duplex_agent_chunk(&sl->duplex, now, HU_TURN_SIGNAL_YIELD, &action);
         vs_finish_agent_turn(sl, a);
+        return true;
     }
-    return true;
+
+    default:
+        /* Other bus events (e.g. MESSAGE_RECEIVED, ERROR): no voice/TTS side effects. */
+        return true;
+    }
 }
 
 void hu_voice_stream_attach_bus(hu_bus_t *bus, hu_control_protocol_t *proto) {
@@ -516,11 +537,11 @@ hu_error_t cp_voice_audio_end(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
         hu_semantic_eot_result_t eot_result;
         memset(&eot_result, 0, sizeof(eot_result));
         float pitch_delta = feats.valid ? (feats.pitch_mean_hz - 120.0f) : 0.0f;
-        hu_error_t eot_err =
-            feats.valid
-                ? hu_semantic_eot_analyze_with_audio(&eot_cfg, text, text_len, 0, feats.energy_db,
-                                                     pitch_delta, &eot_result)
-                : hu_semantic_eot_analyze(&eot_cfg, text, text_len, 0, &eot_result);
+        hu_semantic_eot_classifier_t eot_cls;
+        hu_semantic_eot_classifier_default(&eot_cls);
+        float eot_energy = feats.valid ? feats.energy_db : -40.0f;
+        hu_error_t eot_err = hu_semantic_eot_classify(&eot_cls, &eot_cfg, text, text_len, 0,
+                                                      eot_energy, pitch_delta, &eot_result);
         if (eot_err == HU_OK && eot_result.is_endpoint)
             eot_signal = eot_result.suggested_signal;
     }

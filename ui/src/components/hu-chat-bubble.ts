@@ -24,6 +24,8 @@ export class ScChatBubble extends LitElement {
   private _wordQueue: string[] = [];
   private _releaseTimer = 0;
   private _lastContentLength = 0;
+  /** Sliding window of word counts keyed by arrival time (for adaptive streaming pace). */
+  private _arrivalSamples: Array<{ at: number; count: number }> = [];
 
   static override styles = css`
     @keyframes hu-bubble-send {
@@ -515,6 +517,7 @@ export class ScChatBubble extends LitElement {
     if (!this.streaming || this.role === "user" || reducedMotion) {
       this._visibleContent = this.content;
       this._wordQueue = [];
+      this._arrivalSamples = [];
       this._clearReleaseTimer();
       this._lastContentLength = this.content.length;
       return;
@@ -526,32 +529,71 @@ export class ScChatBubble extends LitElement {
 
     const newWords = newChars.match(/\S+\s*/g) ?? [newChars];
     this._wordQueue.push(...newWords);
+    const now = performance.now();
+    this._arrivalSamples.push({ at: now, count: newWords.length });
+    this._pruneArrivalSamples(now);
 
     if (!this._releaseTimer) {
       this._releaseNextWord();
     }
   }
 
-  /** Batch size for word release — re-render markdown every ~100ms instead of per-word. */
+  /** Slow path: batch size / interval when arrivals are sparse (typing feel). */
   private static readonly _STREAM_BATCH_SIZE = 5;
   private static readonly _STREAM_BATCH_MS = 100;
+  /** Words summed over this window set the adaptive mode. */
+  private static readonly _ARRIVAL_WINDOW_MS = 200;
+  /** Above this many words in the window → drain the whole pending queue (fast model). */
+  private static readonly _HIGH_THROUGHPUT_WORDS = 10;
+  /** Below this many words in the window → word-by-word batching. */
+  private static readonly _LOW_THROUGHPUT_WORDS = 5;
+  /** Between low and high: still drain queue, but pace slightly vs instant re-entry. */
+  private static readonly _MEDIUM_DRAIN_DELAY_MS = 16;
+
+  private _pruneArrivalSamples(now: number): void {
+    const cutoff = now - ScChatBubble._ARRIVAL_WINDOW_MS;
+    while (this._arrivalSamples.length > 0 && this._arrivalSamples[0].at < cutoff) {
+      this._arrivalSamples.shift();
+    }
+  }
+
+  private _recentArrivalWordCount(now: number): number {
+    this._pruneArrivalSamples(now);
+    let sum = 0;
+    for (const s of this._arrivalSamples) {
+      sum += s.count;
+    }
+    return sum;
+  }
 
   private _releaseNextWord(): void {
     if (this._wordQueue.length === 0) {
       this._releaseTimer = 0;
       return;
     }
-    const batchSize = Math.min(ScChatBubble._STREAM_BATCH_SIZE, this._wordQueue.length);
+    const now = performance.now();
+    const recent = this._recentArrivalWordCount(now);
+
+    let batchSize: number;
+    let delayMs: number;
+    if (recent > ScChatBubble._HIGH_THROUGHPUT_WORDS) {
+      batchSize = this._wordQueue.length;
+      delayMs = 0;
+    } else if (recent < ScChatBubble._LOW_THROUGHPUT_WORDS) {
+      batchSize = Math.min(ScChatBubble._STREAM_BATCH_SIZE, this._wordQueue.length);
+      delayMs = ScChatBubble._STREAM_BATCH_MS;
+    } else {
+      batchSize = this._wordQueue.length;
+      delayMs = ScChatBubble._MEDIUM_DRAIN_DELAY_MS;
+    }
+
     for (let i = 0; i < batchSize; i++) {
       const word = this._wordQueue.shift()!;
       this._visibleContent += word;
     }
     this.requestUpdate();
 
-    this._releaseTimer = window.setTimeout(
-      () => this._releaseNextWord(),
-      ScChatBubble._STREAM_BATCH_MS,
-    );
+    this._releaseTimer = window.setTimeout(() => this._releaseNextWord(), delayMs);
   }
 
   private _clearReleaseTimer(): void {

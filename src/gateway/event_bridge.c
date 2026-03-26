@@ -39,6 +39,18 @@ static bool bus_callback(hu_bus_event_type_t type, const hu_bus_event_t *ev, voi
         break;
     case HU_BUS_TOOL_CALL:
         event_name = "agent.tool";
+        hu_json_object_set(bridge->proto->alloc, payload_obj, "state",
+                           hu_json_string_new(bridge->proto->alloc, "start", 5));
+        break;
+    case HU_BUS_TOOL_CALL_RESULT:
+        event_name = "agent.tool";
+        hu_json_object_set(bridge->proto->alloc, payload_obj, "state",
+                           hu_json_string_new(bridge->proto->alloc, "result", 6));
+        break;
+    case HU_BUS_THINKING_CHUNK:
+        event_name = "chat";
+        hu_json_object_set(bridge->proto->alloc, payload_obj, "state",
+                           hu_json_string_new(bridge->proto->alloc, "thinking", 8));
         break;
     case HU_BUS_ERROR:
         event_name = "error";

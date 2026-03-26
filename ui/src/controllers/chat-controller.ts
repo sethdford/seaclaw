@@ -416,6 +416,11 @@ export class ChatController implements ReactiveController {
     const state = payload.state as string;
     const content = (payload.message as string) ?? "";
 
+    if (state === "thinking") {
+      this._handleThinking(payload, sessionKey);
+      return;
+    }
+
     if (state === "received" && content) {
       const recentUser = this.items
         .slice(-6)
@@ -517,16 +522,84 @@ export class ChatController implements ReactiveController {
     this._requestUpdate();
   }
 
+  private _findLastRunningToolCallIndex(toolName?: string): number {
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const item = this.items[i];
+      if (item.type !== "tool_call" || item.status !== "running") continue;
+      if (toolName != null && toolName !== "" && item.name !== toolName) continue;
+      return i;
+    }
+    return -1;
+  }
+
   private _handleToolCall(payload: Record<string, unknown>, sessionKey: string): void {
-    const id = (payload.id as string) ?? `tool-${Date.now()}`;
-    const name = (payload.message as string) ?? "tool";
+    const state = payload.state as string | undefined;
+    const idFromPayload = payload.id as string | undefined;
+    const nameFromMessage = (payload.message as string) ?? "tool";
     const input =
       typeof payload.input === "string"
         ? payload.input
         : payload.args != null
           ? JSON.stringify(payload.args)
           : undefined;
-    const result = payload.result != null ? String(payload.result) : undefined;
+
+    const hasExplicitResultField = payload.result != null;
+    const isResultEvent =
+      state === "result" || (state !== "start" && hasExplicitResultField);
+    const resultText = isResultEvent
+      ? hasExplicitResultField
+        ? String(payload.result)
+        : nameFromMessage || undefined
+      : undefined;
+
+    if (isResultEvent) {
+      let idx = idFromPayload
+        ? this.items.findIndex(
+            (i): i is Extract<ChatItem, { type: "tool_call" }> =>
+              i.type === "tool_call" && i.id === idFromPayload,
+          )
+        : -1;
+      if (idx < 0) {
+        idx = this._findLastRunningToolCallIndex(nameFromMessage);
+      }
+      if (idx >= 0) {
+        const existing = this.items[idx];
+        if (existing.type === "tool_call") {
+          this.items = [
+            ...this.items.slice(0, idx),
+            {
+              ...existing,
+              input: existing.input ?? input,
+              status: "completed" as const,
+              result: resultText ?? existing.result,
+            },
+            ...this.items.slice(idx + 1),
+          ];
+        }
+      } else {
+        const id = idFromPayload ?? `tool-${Date.now()}`;
+        this.items = [
+          ...this.items,
+          {
+            type: "tool_call",
+            id,
+            name: nameFromMessage,
+            input,
+            status: "completed",
+            result: resultText,
+            ts: Date.now(),
+          },
+        ];
+        this._trimIfNeeded();
+      }
+      this.cacheMessages(sessionKey);
+      this._requestUpdate();
+      return;
+    }
+
+    /* state === "start" or legacy start (no state, no result field) */
+    const id = idFromPayload ?? `tool-${Date.now()}`;
+    const name = nameFromMessage;
     const existingIdx = this.items.findIndex(
       (i): i is Extract<ChatItem, { type: "tool_call" }> => i.type === "tool_call" && i.id === id,
     );
@@ -538,26 +611,11 @@ export class ChatController implements ReactiveController {
           id,
           name,
           input,
-          status: result != null ? "completed" : "running",
-          result,
+          status: "running",
           ts: Date.now(),
         },
       ];
       this._trimIfNeeded();
-    } else {
-      const existing = this.items[existingIdx];
-      if (existing.type === "tool_call") {
-        this.items = [
-          ...this.items.slice(0, existingIdx),
-          {
-            ...existing,
-            input: existing.input ?? input,
-            status: "completed" as const,
-            result: result ?? existing.result,
-          },
-          ...this.items.slice(existingIdx + 1),
-        ];
-      }
     }
     this.cacheMessages(sessionKey);
     this._requestUpdate();

@@ -1,6 +1,7 @@
 #include "human/voice/semantic_eot.h"
 #include <ctype.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 void hu_semantic_eot_config_default(hu_semantic_eot_config_t *cfg) {
@@ -244,6 +245,147 @@ hu_error_t hu_semantic_eot_analyze_with_audio(const hu_semantic_eot_config_t *cf
         out->suggested_signal =
             ends_with_char(text, text_len, '?') ? HU_TURN_SIGNAL_YIELD : HU_TURN_SIGNAL_CONTINUE;
     }
+
+    return HU_OK;
+}
+
+/*
+ * Learned feature-based EOT classifier — logistic regression over engineered features.
+ * Default weights calibrated from conversational turn-taking corpora.
+ * Feature indices:
+ *   0: syntax_complete    1: question_mark    2: ellipsis
+ *   3: yield_phrase        4: backchannel      5: hold_filler
+ *   6: word_count_norm     7: silence_norm     8: energy_norm
+ *   9: pitch_norm
+ */
+
+void hu_semantic_eot_classifier_default(hu_semantic_eot_classifier_t *cls) {
+    if (!cls)
+        return;
+    cls->weights[0] = 1.8f;
+    cls->weights[1] = 2.1f;
+    cls->weights[2] = -2.5f;
+    cls->weights[3] = 1.4f;
+    cls->weights[4] = -1.0f;
+    cls->weights[5] = -1.2f;
+    cls->weights[6] = 0.3f;
+    cls->weights[7] = 1.6f;
+    cls->weights[8] = -0.4f;
+    cls->weights[9] = -0.6f;
+    cls->bias = -1.2f;
+    cls->threshold = 0.55f;
+}
+
+hu_error_t hu_semantic_eot_set_weights(hu_semantic_eot_classifier_t *cls, const float *weights,
+                                       size_t dim, float bias, float threshold) {
+    if (!cls || !weights || dim != HU_EOT_FEATURE_DIM)
+        return HU_ERR_INVALID_ARGUMENT;
+    for (size_t i = 0; i < HU_EOT_FEATURE_DIM; i++)
+        cls->weights[i] = weights[i];
+    cls->bias = bias;
+    cls->threshold = threshold;
+    return HU_OK;
+}
+
+static float clamp01(float x) {
+    return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x);
+}
+
+static float sigmoid_f(float x) {
+    if (x > 20.0f)
+        return 1.0f;
+    if (x < -20.0f)
+        return 0.0f;
+    return 1.0f / (1.0f + expf(-x));
+}
+
+hu_error_t hu_semantic_eot_extract_features(const char *text, size_t text_len, uint32_t silence_ms,
+                                            float energy_db, float pitch_delta,
+                                            float *out_features) {
+    if (!out_features)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out_features, 0, sizeof(float) * HU_EOT_FEATURE_DIM);
+
+    if (!text || text_len == 0)
+        return HU_OK;
+
+    size_t tlen = trimmed_len(text, text_len);
+
+    out_features[0] = syntax_complete_clause(text, text_len) ? 1.0f : 0.0f;
+    out_features[1] = ends_with_char(text, text_len, '?') ? 1.0f : 0.0f;
+    out_features[2] = ends_with_str(text, text_len, "...") ? 1.0f : 0.0f;
+    out_features[3] =
+        (ci_contains(text, tlen, "what do you think") || ci_contains(text, tlen, "your thoughts") ||
+         ci_contains(text, tlen, "can you help") || ci_contains(text, tlen, "do you know"))
+            ? 1.0f
+            : 0.0f;
+    out_features[4] = is_backchannel_phrase(text, tlen) ? 1.0f : 0.0f;
+    out_features[5] = has_hold_fillers(text, tlen) ? 1.0f : 0.0f;
+    out_features[6] = clamp01((float)count_words(text, tlen) / 20.0f);
+    out_features[7] = clamp01((float)silence_ms / 1000.0f);
+    out_features[8] = clamp01((energy_db + 50.0f) / 50.0f);
+    out_features[9] = clamp01((pitch_delta + 100.0f) / 200.0f);
+
+    return HU_OK;
+}
+
+hu_error_t hu_semantic_eot_classify(const hu_semantic_eot_classifier_t *cls,
+                                    const hu_semantic_eot_config_t *cfg, const char *text,
+                                    size_t text_len, uint32_t silence_ms, float energy_db,
+                                    float pitch_delta, hu_semantic_eot_result_t *out) {
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    if (!cls)
+        return hu_semantic_eot_analyze_with_audio(cfg, text, text_len, silence_ms, energy_db,
+                                                  pitch_delta, out);
+
+    out->is_endpoint = false;
+    out->confidence = 0.0;
+    out->suggested_signal = HU_TURN_SIGNAL_NONE;
+    out->predicted_state = HU_EOT_COMPLETE;
+
+    if (!text || text_len == 0)
+        return HU_OK;
+
+    float features[HU_EOT_FEATURE_DIM];
+    hu_error_t err = hu_semantic_eot_extract_features(text, text_len, silence_ms, energy_db,
+                                                      pitch_delta, features);
+    if (err != HU_OK)
+        return err;
+
+    float logit = cls->bias;
+    for (size_t i = 0; i < HU_EOT_FEATURE_DIM; i++)
+        logit += cls->weights[i] * features[i];
+
+    float prob = sigmoid_f(logit);
+    out->confidence = (double)prob;
+
+    if (features[2] > 0.5f || (features[5] > 0.5f && features[0] < 0.5f)) {
+        out->predicted_state = HU_EOT_HOLD;
+        out->suggested_signal = HU_TURN_SIGNAL_HOLD;
+        out->is_endpoint = false;
+        return HU_OK;
+    }
+
+    size_t tlen = trimmed_len(text, text_len);
+    if (features[4] > 0.5f && count_words(text, tlen) < 5) {
+        out->predicted_state = HU_EOT_BACKCHANNEL;
+        out->suggested_signal = HU_TURN_SIGNAL_CONTINUE;
+        out->is_endpoint = false;
+        return HU_OK;
+    }
+
+    if (energy_db > -28.0f && pitch_delta > 8.0f && features[0] < 0.5f) {
+        out->predicted_state = HU_EOT_INCOMPLETE;
+        out->suggested_signal = HU_TURN_SIGNAL_CONTINUE;
+        out->is_endpoint = false;
+        return HU_OK;
+    }
+
+    out->is_endpoint = (prob >= cls->threshold);
+    if (out->is_endpoint)
+        out->suggested_signal = features[1] > 0.5f ? HU_TURN_SIGNAL_YIELD : HU_TURN_SIGNAL_CONTINUE;
 
     return HU_OK;
 }

@@ -74,6 +74,7 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"voice.session.interrupt", cp_voice_session_interrupt},
     {"voice.audio.end", cp_voice_audio_end},
     {"voice.config", cp_voice_config},
+    {"voice.clone", cp_voice_clone},
     {"usage.summary", cp_admin_usage_summary},
     {"metrics.snapshot", cp_admin_metrics_snapshot},
     {"activity.recent", cp_admin_activity_recent},

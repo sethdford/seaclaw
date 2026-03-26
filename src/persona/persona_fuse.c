@@ -73,6 +73,9 @@ hu_error_t hu_persona_fuse_compose(const hu_persona_fuse_t *fuse, const char *co
     memset(out, 0, sizeof(*out));
     out->emoji_factor = 1.0f;
 
+    hu_persona_vector_t vectors[HU_PERSONA_FUSE_MAX_ADAPTERS];
+    size_t vec_count = 0;
+
     for (size_t i = 0; i < adapter_count; i++) {
         if (!adapter_names[i])
             continue;
@@ -81,10 +84,10 @@ hu_error_t hu_persona_fuse_compose(const hu_persona_fuse_t *fuse, const char *co
         if (!a)
             continue;
 
-        out->formality += a->formality;
-        out->verbosity += a->verbosity;
+        if (vec_count < HU_PERSONA_FUSE_MAX_ADAPTERS)
+            hu_persona_vector_from_adapter(a, &vectors[vec_count++]);
+
         out->emoji_factor *= a->emoji_factor;
-        out->warmth_offset += a->warmth_offset;
 
         if (a->preferred_vocab_count > 0 && out->preferred_vocab_count == 0) {
             out->preferred_vocab = (const char *const *)a->preferred_vocab;
@@ -96,19 +99,13 @@ hu_error_t hu_persona_fuse_compose(const hu_persona_fuse_t *fuse, const char *co
         }
     }
 
-    /* Clamp values */
-    if (out->formality > 1.0f)
-        out->formality = 1.0f;
-    if (out->formality < -1.0f)
-        out->formality = -1.0f;
-    if (out->verbosity > 1.0f)
-        out->verbosity = 1.0f;
-    if (out->verbosity < -1.0f)
-        out->verbosity = -1.0f;
-    if (out->warmth_offset > 0.5f)
-        out->warmth_offset = 0.5f;
-    if (out->warmth_offset < -0.5f)
-        out->warmth_offset = -0.5f;
+    if (vec_count > 0) {
+        hu_persona_vector_t composed;
+        hu_persona_vector_compose(vectors, vec_count, &composed);
+        out->formality = composed.formality;
+        out->verbosity = composed.verbosity;
+        out->warmth_offset = composed.warmth * 0.5f;
+    }
 
     return HU_OK;
 }
