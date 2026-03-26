@@ -13,6 +13,7 @@
 #endif
 #include "human/observability/log_observer.h"
 #include "human/provider.h"
+#include "human/providers/openai.h"
 #include "human/tool.h"
 #include "test_framework.h"
 #include <stdio.h>
@@ -199,6 +200,218 @@ static const hu_tool_vtable_t mock_tool_vtable = {
     .deinit = mock_tool_deinit,
 };
 
+/* First stream_chat yields a tool call; second yields plain text so hu_agent_turn_stream_v2 can
+ * finish (core OpenAI/Anthropic test mocks always return tools whenever tools are configured). */
+static int stream_v2_cycle_phase;
+
+static hu_error_t stream_v2_cycle_chat_with_system(void *ctx, hu_allocator_t *alloc,
+                                                   const char *system_prompt,
+                                                   size_t system_prompt_len, const char *message,
+                                                   size_t message_len, const char *model,
+                                                   size_t model_len, double temperature, char **out,
+                                                   size_t *out_len) {
+    (void)ctx;
+    (void)system_prompt;
+    (void)system_prompt_len;
+    (void)message;
+    (void)message_len;
+    (void)model;
+    (void)model_len;
+    (void)temperature;
+    const char *resp = "mock response";
+    *out = hu_strndup(alloc, resp, strlen(resp));
+    *out_len = *out ? strlen(resp) : 0;
+    return *out ? HU_OK : HU_ERR_OUT_OF_MEMORY;
+}
+
+static hu_error_t stream_v2_cycle_chat(void *ctx, hu_allocator_t *alloc,
+                                       const hu_chat_request_t *request, const char *model,
+                                       size_t model_len, double temperature,
+                                       hu_chat_response_t *out) {
+    (void)ctx;
+    (void)request;
+    (void)model;
+    (void)model_len;
+    (void)temperature;
+    const char *resp = "mock response";
+    out->content = hu_strndup(alloc, resp, strlen(resp));
+    out->content_len = out->content ? strlen(resp) : 0;
+    out->tool_calls = NULL;
+    out->tool_calls_count = 0;
+    out->usage.prompt_tokens = 1;
+    out->usage.completion_tokens = 2;
+    out->usage.total_tokens = 3;
+    out->model = NULL;
+    out->model_len = 0;
+    out->reasoning_content = NULL;
+    out->reasoning_content_len = 0;
+    return out->content ? HU_OK : HU_ERR_OUT_OF_MEMORY;
+}
+
+static bool stream_v2_cycle_supports_native_tools(void *ctx) {
+    (void)ctx;
+    return true;
+}
+
+static bool stream_v2_cycle_supports_streaming(void *ctx) {
+    (void)ctx;
+    return true;
+}
+
+static void stream_v2_cycle_deinit(void *ctx, hu_allocator_t *alloc) {
+    (void)ctx;
+    (void)alloc;
+}
+
+static hu_error_t stream_v2_cycle_stream_chat(void *ctx, hu_allocator_t *alloc,
+                                              const hu_chat_request_t *request, const char *model,
+                                              size_t model_len, double temperature,
+                                              hu_stream_callback_t callback, void *callback_ctx,
+                                              hu_stream_chat_result_t *out) {
+    (void)ctx;
+    (void)model;
+    (void)model_len;
+    (void)temperature;
+    if (!alloc || !request || !callback || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+
+    if (stream_v2_cycle_phase == 0 && request->tools && request->tools_count > 0) {
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.delta = "Let me ";
+            c.delta_len = 7;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.delta = "check. ";
+            c.delta_len = 7;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_START;
+            c.tool_name = request->tools[0].name;
+            c.tool_name_len = request->tools[0].name_len;
+            c.tool_call_id = "call_cycle_1";
+            c.tool_call_id_len = 12;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_DELTA;
+            c.delta = "{}";
+            c.delta_len = 2;
+            c.tool_call_id = "call_cycle_1";
+            c.tool_call_id_len = 12;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_DONE;
+            c.tool_call_id = "call_cycle_1";
+            c.tool_call_id_len = 12;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.is_final = true;
+            callback(callback_ctx, &c);
+        }
+        out->content = hu_strndup(alloc, "Let me check. ", 14);
+        if (!out->content)
+            return HU_ERR_OUT_OF_MEMORY;
+        out->content_len = 14;
+        hu_tool_call_t *tcs = (hu_tool_call_t *)alloc->alloc(alloc->ctx, sizeof(hu_tool_call_t));
+        if (!tcs)
+            return HU_ERR_OUT_OF_MEMORY;
+        memset(tcs, 0, sizeof(*tcs));
+        tcs[0].id = hu_strndup(alloc, "call_cycle_1", 12);
+        tcs[0].id_len = 12;
+        tcs[0].name = hu_strndup(alloc, request->tools[0].name, request->tools[0].name_len);
+        tcs[0].name_len = request->tools[0].name_len;
+        tcs[0].arguments = hu_strndup(alloc, "{}", 2);
+        tcs[0].arguments_len = 2;
+        out->tool_calls = tcs;
+        out->tool_calls_count = 1;
+        out->usage.completion_tokens = 5;
+        stream_v2_cycle_phase = 1;
+        return HU_OK;
+    }
+
+    const char *chunks[] = {"All ", "done"};
+    for (size_t i = 0; i < 2; i++) {
+        hu_stream_chunk_t c;
+        memset(&c, 0, sizeof(c));
+        c.type = HU_STREAM_CONTENT;
+        c.delta = chunks[i];
+        c.delta_len = strlen(chunks[i]);
+        callback(callback_ctx, &c);
+    }
+    {
+        hu_stream_chunk_t c;
+        memset(&c, 0, sizeof(c));
+        c.type = HU_STREAM_CONTENT;
+        c.is_final = true;
+        callback(callback_ctx, &c);
+    }
+    out->content = hu_strndup(alloc, "All done", 8);
+    if (!out->content)
+        return HU_ERR_OUT_OF_MEMORY;
+    out->content_len = 8;
+    out->usage.completion_tokens = 2;
+    return HU_OK;
+}
+
+typedef struct stream_v2_cycle_provider {
+    const char *name;
+} stream_v2_cycle_provider_t;
+
+static const char *stream_v2_cycle_get_name(void *ctx) {
+    return ((stream_v2_cycle_provider_t *)ctx)->name;
+}
+
+static const hu_provider_vtable_t stream_v2_cycle_vtable = {
+    .chat_with_system = stream_v2_cycle_chat_with_system,
+    .chat = stream_v2_cycle_chat,
+    .supports_native_tools = stream_v2_cycle_supports_native_tools,
+    .get_name = stream_v2_cycle_get_name,
+    .deinit = stream_v2_cycle_deinit,
+    .supports_streaming = stream_v2_cycle_supports_streaming,
+    .stream_chat = stream_v2_cycle_stream_chat,
+};
+
+static hu_provider_t stream_v2_cycle_provider_create(hu_allocator_t *alloc,
+                                                     stream_v2_cycle_provider_t *ctx) {
+    (void)alloc;
+    ctx->name = "stream_cycle_mock";
+    return (hu_provider_t){.ctx = ctx, .vtable = &stream_v2_cycle_vtable};
+}
+
+typedef struct {
+    hu_agent_stream_event_type_t types[32];
+    size_t count;
+} stream_v2_event_collector_t;
+
+static void stream_v2_collect_events(const hu_agent_stream_event_t *event, void *ctx) {
+    stream_v2_event_collector_t *c = (stream_v2_event_collector_t *)ctx;
+    if (c->count < 32)
+        c->types[c->count++] = event->type;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
  * Tests
  * ───────────────────────────────────────────────────────────────────────── */
@@ -268,6 +481,126 @@ static void test_agent_turn_simple(void) {
 
     if (response)
         alloc.free(alloc.ctx, response, response_len + 1);
+    hu_agent_deinit(&agent);
+}
+
+static void test_agent_turn_stream_v2_basic(void) {
+#if HU_IS_TEST
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_provider_t prov;
+    hu_error_t err = hu_openai_create(&alloc, "test-key", 8, NULL, 0, &prov);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    err = hu_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL, "gpt-4", 5,
+                               "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    stream_v2_event_collector_t coll;
+    memset(&coll, 0, sizeof(coll));
+    char *response = NULL;
+    size_t response_len = 0;
+    err = hu_agent_turn_stream_v2(&agent, "hello", 5, stream_v2_collect_events, &coll, &response,
+                                  &response_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(response);
+    HU_ASSERT_TRUE(response_len > 0);
+    HU_ASSERT_TRUE(hu_strcasestr(response, "mock") != NULL);
+    HU_ASSERT_TRUE(coll.count > 0);
+    for (size_t i = 0; i < coll.count; i++)
+        HU_ASSERT_EQ((int)coll.types[i], (int)HU_AGENT_STREAM_TEXT);
+
+    alloc.free(alloc.ctx, response, response_len + 1);
+    hu_agent_deinit(&agent);
+#endif
+}
+
+static void test_agent_turn_stream_v2_with_tools(void) {
+#if HU_IS_TEST
+    stream_v2_cycle_phase = 0;
+    hu_allocator_t alloc = hu_system_allocator();
+    stream_v2_cycle_provider_t pctx;
+    hu_provider_t prov = stream_v2_cycle_provider_create(&alloc, &pctx);
+
+    mock_tool_t tool_ctx = {.name = "shell"};
+    hu_tool_t tool = {.ctx = &tool_ctx, .vtable = &mock_tool_vtable};
+
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    hu_error_t err =
+        hu_agent_from_config(&agent, &alloc, prov, &tool, 1, NULL, NULL, NULL, NULL, "gpt-4", 5,
+                             "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    stream_v2_event_collector_t coll;
+    memset(&coll, 0, sizeof(coll));
+    char *response = NULL;
+    size_t response_len = 0;
+    err = hu_agent_turn_stream_v2(&agent, "hi", 2, stream_v2_collect_events, &coll, &response,
+                                  &response_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(response);
+    HU_ASSERT_EQ(response_len, 8u);
+    HU_ASSERT_STR_EQ(response, "All done");
+
+    size_t first_text = coll.count;
+    size_t tool_start_at = coll.count;
+    size_t tool_result_at = coll.count;
+    for (size_t i = 0; i < coll.count; i++) {
+        if (coll.types[i] == HU_AGENT_STREAM_TEXT && first_text == coll.count)
+            first_text = i;
+        if (coll.types[i] == HU_AGENT_STREAM_TOOL_START)
+            tool_start_at = i;
+        if (coll.types[i] == HU_AGENT_STREAM_TOOL_RESULT)
+            tool_result_at = i;
+    }
+    HU_ASSERT_TRUE(first_text < coll.count);
+    HU_ASSERT_TRUE(tool_start_at < coll.count);
+    HU_ASSERT_TRUE(tool_result_at < coll.count);
+    HU_ASSERT_TRUE(first_text < tool_start_at);
+    HU_ASSERT_TRUE(tool_start_at < tool_result_at);
+
+    bool text_after_tool_result = false;
+    for (size_t j = tool_result_at + 1; j < coll.count; j++) {
+        if (coll.types[j] == HU_AGENT_STREAM_TEXT) {
+            text_after_tool_result = true;
+            break;
+        }
+    }
+    HU_ASSERT_TRUE(text_after_tool_result);
+    HU_ASSERT_TRUE(stream_v2_cycle_phase == 1);
+
+    alloc.free(alloc.ctx, response, response_len + 1);
+    hu_agent_deinit(&agent);
+#endif
+}
+
+static void test_agent_turn_stream_v2_fallback_no_streaming(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    mock_provider_t mock_ctx;
+    hu_provider_t prov = mock_provider_create(&alloc, &mock_ctx);
+
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    hu_error_t err =
+        hu_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL, "gpt-4o", 6,
+                             "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    stream_v2_event_collector_t coll;
+    memset(&coll, 0, sizeof(coll));
+    char *response = NULL;
+    size_t response_len = 0;
+    err = hu_agent_turn_stream_v2(&agent, "hello", 5, stream_v2_collect_events, &coll, &response,
+                                  &response_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(response);
+    HU_ASSERT_TRUE(coll.count >= 2);
+    for (size_t i = 0; i < coll.count; i++)
+        HU_ASSERT_EQ((int)coll.types[i], (int)HU_AGENT_STREAM_TEXT);
+
+    alloc.free(alloc.ctx, response, response_len + 1);
     hu_agent_deinit(&agent);
 }
 
@@ -1226,6 +1559,9 @@ void run_e2e_tests(void) {
     HU_RUN_TEST(test_agent_from_config_null_alloc);
     HU_RUN_TEST(test_agent_from_config_null_provider);
     HU_RUN_TEST(test_agent_turn_simple);
+    HU_RUN_TEST(test_agent_turn_stream_v2_basic);
+    HU_RUN_TEST(test_agent_turn_stream_v2_with_tools);
+    HU_RUN_TEST(test_agent_turn_stream_v2_fallback_no_streaming);
     HU_RUN_TEST(test_agent_slash_help);
     HU_RUN_TEST(test_agent_slash_clear);
     HU_RUN_TEST(test_agent_sessions_command);

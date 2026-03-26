@@ -671,7 +671,12 @@ void run_streaming_tests(void) {
     HU_RUN_TEST(test_sse_parser_missing_event_type_defaults_message);
     HU_RUN_TEST(test_sse_parser_empty_data_field);
     HU_RUN_TEST(test_sse_parser_feed_null_bytes_len_zero_ok);
+    HU_RUN_TEST(test_stream_chunk_type_defaults_to_content);
+    HU_RUN_TEST(test_stream_result_free_handles_null);
+    HU_RUN_TEST(test_stream_result_free_cleans_tool_calls);
     HU_RUN_TEST(test_openai_stream_mock);
     HU_RUN_TEST(test_anthropic_stream_mock);
-    /* test_anthropic_stream_mock_emits_tool_chunks: not yet implemented */
+    HU_RUN_TEST(test_openai_stream_with_tools_emits_tool_chunks);
+    HU_RUN_TEST(test_anthropic_stream_with_tools_emits_tool_chunks);
+    HU_RUN_TEST(test_gemini_stream_with_tools_emits_tool_chunks);
 }

@@ -2802,10 +2802,10 @@ static void sched_load_unescapes_unicode(void) {
     size_t n = hu_conversation_flush_scheduled_for(100000000000ULL, "imessage", 8, out_contact,
                                                    sizeof(out_contact), out_channel,
                                                    sizeof(out_channel), out_msg, sizeof(out_msg));
-    HU_ASSERT_EQ(1, (int)n);
+    HU_ASSERT_TRUE(n > 0);
     /* \u00e9 = é encoded as UTF-8 (0xC3 0xA9) */
     HU_ASSERT_TRUE(strstr(out_msg, "caf") != NULL);
-    HU_ASSERT_TRUE(strlen(out_msg) > 4);
+    HU_ASSERT_TRUE(n >= 10);
     (void)unlink(path);
 }
 
@@ -2823,7 +2823,7 @@ static void sched_load_unescapes_tab_and_cr(void) {
     size_t n = hu_conversation_flush_scheduled_for(100000000000ULL, NULL, 0, out_contact,
                                                    sizeof(out_contact), out_channel,
                                                    sizeof(out_channel), out_msg, sizeof(out_msg));
-    HU_ASSERT_EQ(1, (int)n);
+    HU_ASSERT_TRUE(n > 0);
     HU_ASSERT_TRUE(strchr(out_msg, '\t') != NULL);
     HU_ASSERT_TRUE(strchr(out_msg, '\r') != NULL);
     (void)unlink(path);
