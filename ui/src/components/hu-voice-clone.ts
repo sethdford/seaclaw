@@ -189,8 +189,8 @@ export class HuVoiceClone extends LitElement {
           <span class="badge">Cartesia</span>
         </div>
         <p class="clone-description">
-          Record 5\u201310 seconds of clear speech to create a voice clone.
-          The cloned voice will be used for text-to-speech in your conversations.
+          Record 5–10 seconds of clear speech to create a voice clone. The cloned voice will be used
+          for text-to-speech in your conversations.
         </p>
 
         ${this._phase !== "done"
@@ -233,11 +233,9 @@ export class HuVoiceClone extends LitElement {
         ${this._phase === "done"
           ? html`
               <div class="result-card">
-                <span class="result-check">\u2713</span>
+                <span class="result-check">✓</span>
                 <div class="result-details">
-                  <span class="result-title"
-                    >Voice cloned: ${this._voiceName || "My Voice"}</span
-                  >
+                  <span class="result-title">Voice cloned: ${this._voiceName || "My Voice"}</span>
                   <span class="result-id">${this._voiceId}</span>
                 </div>
               </div>
@@ -272,12 +270,10 @@ export class HuVoiceClone extends LitElement {
               `
             : nothing}
           ${this._phase === "uploading"
-            ? html` <hu-button variant="primary" disabled>Cloning\u2026</hu-button> `
+            ? html` <hu-button variant="primary" disabled>Cloning…</hu-button> `
             : nothing}
           ${this._phase === "done"
-            ? html`
-                <hu-button variant="ghost" @click=${this._reset}>Clone Another</hu-button>
-              `
+            ? html` <hu-button variant="ghost" @click=${this._reset}>Clone Another</hu-button> `
             : nothing}
         </div>
       </div>

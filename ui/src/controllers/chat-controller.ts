@@ -544,8 +544,7 @@ export class ChatController implements ReactiveController {
           : undefined;
 
     const hasExplicitResultField = payload.result != null;
-    const isResultEvent =
-      state === "result" || (state !== "start" && hasExplicitResultField);
+    const isResultEvent = state === "result" || (state !== "start" && hasExplicitResultField);
     const resultText = isResultEvent
       ? hasExplicitResultField
         ? String(payload.result)
