@@ -34,6 +34,36 @@ interface TuringDimensionsRes {
   dimensions?: Record<string, number>;
 }
 
+interface TuringTrajectoryRes {
+  directional_alignment?: number;
+  cumulative_impact?: number;
+  stability?: number;
+  overall?: number;
+}
+
+interface TuringContactRes {
+  contact_id?: string;
+  dimensions?: Record<string, number>;
+  hint?: string | null;
+}
+
+interface TuringAbTest {
+  name?: string;
+  variant_a?: number;
+  variant_b?: number;
+  avg_a?: number;
+  avg_b?: number;
+  count_a?: number;
+  count_b?: number;
+  active?: boolean;
+}
+
+interface TuringAbTestsRes {
+  tests?: TuringAbTest[];
+}
+
+const HU_TURING_DIM_COUNT = 18;
+
 const DIMENSION_ORDER = [
   "natural_language",
   "emotional_intelligence",
@@ -47,7 +77,12 @@ const DIMENSION_ORDER = [
   "context_awareness",
   "non_robotic",
   "genuine_warmth",
-  "orchestration_quality",
+  "prosody_naturalness",
+  "turn_timing",
+  "filler_usage",
+  "emotional_prosody",
+  "conversational_repair",
+  "paralinguistic_cues",
 ];
 
 function formatDimensionName(key: string): string {
@@ -206,6 +241,96 @@ export class ScTuringView extends GatewayAwareLitElement {
         border-bottom: none;
       }
 
+      .trajectory-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+        gap: var(--hu-space-lg);
+        margin-bottom: var(--hu-space-2xl);
+      }
+
+      .trajectory-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--hu-space-xs);
+        text-align: center;
+      }
+
+      .trajectory-label {
+        font-size: var(--hu-text-xs);
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-text-muted);
+        text-transform: uppercase;
+        letter-spacing: var(--hu-tracking-xs);
+      }
+
+      .trajectory-value {
+        font-size: var(--hu-text-2xl);
+        font-weight: var(--hu-weight-bold);
+        color: var(--hu-text);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .contact-link {
+        background: none;
+        border: none;
+        color: var(--hu-accent);
+        cursor: pointer;
+        font: inherit;
+        padding: 0;
+        text-decoration: underline;
+        text-decoration-color: color-mix(in srgb, var(--hu-accent) 40%, transparent);
+        transition: text-decoration-color var(--hu-duration-fast) var(--hu-ease-out);
+      }
+
+      .contact-link:hover {
+        text-decoration-color: var(--hu-accent);
+      }
+
+      .contact-hint {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--hu-space-sm);
+        padding: var(--hu-space-md);
+        margin-bottom: var(--hu-space-md);
+        background: color-mix(in srgb, var(--hu-accent-secondary) 10%, transparent);
+        border-radius: var(--hu-radius-md);
+        font-size: var(--hu-text-sm);
+        color: var(--hu-text);
+        line-height: var(--hu-leading-relaxed);
+      }
+
+      .contact-hint svg {
+        flex-shrink: 0;
+        width: 1.25rem;
+        height: 1.25rem;
+        color: var(--hu-accent-secondary);
+      }
+
+      .contact-dims {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-xs);
+        margin-bottom: var(--hu-space-md);
+      }
+
+      .contact-dim-row {
+        display: flex;
+        justify-content: space-between;
+        padding: var(--hu-space-xs) 0;
+        border-bottom: 1px solid var(--hu-border-subtle);
+        font-size: var(--hu-text-sm);
+      }
+
+      .contact-dim-name {
+        color: var(--hu-text);
+      }
+
+      .contact-dim-score {
+        font-weight: var(--hu-weight-semibold);
+        font-variant-numeric: tabular-nums;
+      }
+
       @media (prefers-reduced-motion: reduce) {
         .dimension-bar-fill {
           transition: none;
@@ -278,6 +403,10 @@ export class ScTuringView extends GatewayAwareLitElement {
     this.connectionStatus = current.status;
   }
 
+  @state() private trajectory: TuringTrajectoryRes | null = null;
+  @state() private abTests: TuringAbTest[] = [];
+  @state() private selectedContact: TuringContactRes | null = null;
+
   protected override async load(): Promise<void> {
     const gw = this.gateway;
     if (!gw) {
@@ -288,10 +417,14 @@ export class ScTuringView extends GatewayAwareLitElement {
     this.loading = true;
     this.error = "";
     try {
-      const [scoresRes, trendRes, dimRes] = await Promise.all([
+      const [scoresRes, trendRes, dimRes, trajRes, abRes] = await Promise.all([
         gw.request<TuringScoresRes>("turing.scores", {}).catch(() => ({ scores: [] })),
         gw.request<TuringTrendRes>("turing.trend", {}).catch(() => ({ trend: [] })),
         gw.request<TuringDimensionsRes>("turing.dimensions", {}).catch(() => ({ dimensions: {} })),
+        gw
+          .request<TuringTrajectoryRes>("turing.trajectory", {})
+          .catch(() => null as TuringTrajectoryRes | null),
+        gw.request<TuringAbTestsRes>("turing.ab_tests", {}).catch(() => ({ tests: [] })),
       ]);
 
       const scoresPayload = scoresRes as TuringScoresRes;
@@ -302,6 +435,11 @@ export class ScTuringView extends GatewayAwareLitElement {
         dimPayload?.dimensions && typeof dimPayload.dimensions === "object"
           ? dimPayload.dimensions
           : {};
+
+      this.trajectory = trajRes as TuringTrajectoryRes | null;
+
+      const abPayload = abRes as TuringAbTestsRes;
+      this.abTests = Array.isArray(abPayload?.tests) ? abPayload.tests : [];
 
       if (this.scores.length === 0 && Array.isArray((trendRes as TuringTrendRes)?.trend)) {
         const trend = (trendRes as TuringTrendRes).trend ?? [];
@@ -318,6 +456,19 @@ export class ScTuringView extends GatewayAwareLitElement {
       this.dimensions = {};
     } finally {
       this.loading = false;
+    }
+  }
+
+  private async _loadContact(contactId: string): Promise<void> {
+    const gw = this.gateway;
+    if (!gw) return;
+    try {
+      const res = await gw.request<TuringContactRes>("turing.contact", {
+        contact_id: contactId,
+      });
+      this.selectedContact = res as TuringContactRes;
+    } catch {
+      this.selectedContact = null;
     }
   }
 
@@ -394,7 +545,8 @@ export class ScTuringView extends GatewayAwareLitElement {
 
     return html`
       <div class="hu-scroll-reveal-stagger">
-        ${this._renderHero()} ${this._renderDimensions()} ${this._renderRecentScores()}
+        ${this._renderHero()} ${this._renderTrajectory()} ${this._renderDimensions()}
+        ${this._renderRecentScores()} ${this._renderContactDetail()} ${this._renderAbTests()}
       </div>
     `;
   }
@@ -424,7 +576,8 @@ export class ScTuringView extends GatewayAwareLitElement {
           <hu-badge variant=${verdictBadgeVariant(verdict)}>${verdict}</hu-badge>
         </div>
         <p class="hero-subtitle">
-          Based on 12 humanness dimensions across ${n} conversation${n === 1 ? "" : "s"}
+          Based on ${HU_TURING_DIM_COUNT} humanness dimensions across ${n}
+          conversation${n === 1 ? "" : "s"}
         </p>
       </hu-page-hero>
     `;
@@ -475,12 +628,118 @@ export class ScTuringView extends GatewayAwareLitElement {
             ${recent.map(
               (s) => html`
                 <tr>
-                  <td>${s.contact_id ?? "—"}</td>
+                  <td>
+                    <button
+                      class="contact-link"
+                      @click=${() => s.contact_id && this._loadContact(s.contact_id)}
+                    >
+                      ${s.contact_id ?? "—"}
+                    </button>
+                  </td>
                   <td>${formatTimestamp(s.timestamp ?? 0)}</td>
                   <td>${s.overall ?? "—"}/10</td>
                   <td>
                     <hu-badge variant=${verdictBadgeVariant(s.verdict ?? "")}>
                       ${s.verdict ?? "—"}
+                    </hu-badge>
+                  </td>
+                </tr>
+              `,
+            )}
+          </tbody>
+        </table>
+      </hu-card>
+    `;
+  }
+
+  private _renderTrajectory() {
+    const t = this.trajectory;
+    if (!t || t.overall == null) return nothing;
+    const pct = (v: number | undefined) => (v != null ? `${Math.round(v * 100)}%` : "—");
+    return html`
+      <div class="section-label">Trajectory</div>
+      <div class="trajectory-grid">
+        <hu-card glass surface="high" class="trajectory-card">
+          <span class="trajectory-label">Direction</span>
+          <span class="trajectory-value">${pct(t.directional_alignment)}</span>
+        </hu-card>
+        <hu-card glass surface="high" class="trajectory-card">
+          <span class="trajectory-label">Impact</span>
+          <span class="trajectory-value">${pct(t.cumulative_impact)}</span>
+        </hu-card>
+        <hu-card glass surface="high" class="trajectory-card">
+          <span class="trajectory-label">Stability</span>
+          <span class="trajectory-value">${pct(t.stability)}</span>
+        </hu-card>
+        <hu-card glass surface="high" class="trajectory-card">
+          <span class="trajectory-label">Overall</span>
+          <span class="trajectory-value">${pct(t.overall)}</span>
+        </hu-card>
+      </div>
+    `;
+  }
+
+  private _renderContactDetail() {
+    const c = this.selectedContact;
+    if (!c) return nothing;
+    const dims = c.dimensions ?? {};
+    const entries = Object.entries(dims).sort(([, a], [, b]) => a - b);
+    return html`
+      <div class="section-label">Contact: ${c.contact_id ?? "—"}</div>
+      <hu-card glass surface="high">
+        ${c.hint
+          ? html`<div class="contact-hint">
+              ${icons.lightbulb}
+              <span>${c.hint}</span>
+            </div>`
+          : nothing}
+        <div class="contact-dims">
+          ${entries.map(
+            ([key, score]) => html`
+              <div class="contact-dim-row">
+                <span class="contact-dim-name">${formatDimensionName(key)}</span>
+                <span class="contact-dim-score" style="color: ${scoreColor(score)}"
+                  >${score}/10</span
+                >
+              </div>
+            `,
+          )}
+        </div>
+        <hu-button variant="secondary" @click=${() => (this.selectedContact = null)}
+          >Close</hu-button
+        >
+      </hu-card>
+    `;
+  }
+
+  private _renderAbTests() {
+    if (this.abTests.length === 0) return nothing;
+    return html`
+      <div class="section-label">A/B Experiments</div>
+      <hu-card glass surface="high">
+        <table class="scores-table" role="grid" aria-label="A/B test results">
+          <thead>
+            <tr>
+              <th>Experiment</th>
+              <th>Variant A</th>
+              <th>Variant B</th>
+              <th>Avg A</th>
+              <th>Avg B</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${this.abTests.map(
+              (t) => html`
+                <tr>
+                  <td>${formatDimensionName(t.name ?? "")}</td>
+                  <td>${t.variant_a?.toFixed(2) ?? "—"}</td>
+                  <td>${t.variant_b?.toFixed(2) ?? "—"}</td>
+                  <td style="color: ${scoreColor(t.avg_a ?? 0)}">${t.avg_a?.toFixed(1) ?? "—"}</td>
+                  <td style="color: ${scoreColor(t.avg_b ?? 0)}">${t.avg_b?.toFixed(1) ?? "—"}</td>
+                  <td>
+                    <hu-badge variant=${t.active ? "success" : "neutral"}>
+                      ${t.active ? "Active" : "Resolved"}
                     </hu-badge>
                   </td>
                 </tr>
@@ -504,7 +763,7 @@ export class ScTuringView extends GatewayAwareLitElement {
       <div class="section-label">Dimension Scores</div>
       <div class="dimensions-grid">
         ${Array.from(
-          { length: 12 },
+          { length: HU_TURING_DIM_COUNT },
           () => html` <hu-skeleton variant="card" height="6rem"></hu-skeleton> `,
         )}
       </div>

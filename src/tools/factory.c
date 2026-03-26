@@ -94,6 +94,7 @@
 #ifdef HU_HAS_SKILLS
 #include "human/tools/skill_run.h"
 #endif
+#include "human/tools/lsp.h"
 #include "human/tools/skill_write.h"
 #include "human/tools/spawn.h"
 #include "human/tools/voice_clone.h"
@@ -114,9 +115,14 @@
 #else
 #define HU_TOOLS_PERSONA_COUNT 0
 #endif
-#define HU_TOOLS_COUNT_BASE         \
-    (55 + HU_TOOLS_CRON_COUNT - 1 + \
-     HU_TOOLS_PERSONA_COUNT) /* +bff_memory +doc_ingest +meeting_transcribe +voice_clone */
+#ifdef HU_ENABLE_CARTESIA
+#define HU_TOOLS_CARTESIA_COUNT 1
+#else
+#define HU_TOOLS_CARTESIA_COUNT 0
+#endif
+/* Base: 55 (core tools incl. lsp) + cron - 1 (skill_run conditional) + persona + cartesia */
+#define HU_TOOLS_COUNT_BASE \
+    (55 + HU_TOOLS_CRON_COUNT - 1 + HU_TOOLS_PERSONA_COUNT + HU_TOOLS_CARTESIA_COUNT)
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -570,10 +576,15 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
         goto fail;
     idx++;
 
+#ifdef HU_ENABLE_CARTESIA
     err = add_tool_ws(alloc, tools, &idx, workspace_dir, workspace_dir_len, policy,
                       hu_voice_clone_tool_create);
     if (err != HU_OK)
         goto fail;
+#endif
+
+    tools[idx] = hu_lsp_tool_create(alloc);
+    idx++;
 
 #ifdef HU_ENABLE_CURL
     err = hu_paperclip_tool_create(alloc, &tools[idx]);

@@ -1242,7 +1242,17 @@ export class DemoGatewayClient extends EventTarget {
       return 25 + Math.random() * 20;
     };
 
-    const thinkingParts = ["Reviewing ", "your ", "question… ", "Planning ", "the ", "response."];
+    const thinkingParts = [
+      "Reviewing ",
+      "your ",
+      "question… ",
+      "Planning ",
+      "the ",
+      "response. ",
+      // Long tail so hu-reasoning-block auto-collapse runs after streaming (>200 chars total).
+      "Cross-checking gateway event ordering, chat controller item sequencing, and shadow-DOM " +
+        "streaming surfaces so the dashboard reflects thinking, tools, and assistant text incrementally.",
+    ];
     let delay = 0;
     for (const part of thinkingParts) {
       const at = delay;
@@ -1272,9 +1282,11 @@ export class DemoGatewayClient extends EventTarget {
           state: "start",
           id: toolId,
           message: toolName,
+          args: { demo: true, session: sk, phase: "streaming-e2e" },
         }),
       afterFirstChunks + 40,
     );
+    /* Leave tool in "running" long enough for E2E to observe subtitle (Playwright + CI variance). */
     setTimeout(
       () =>
         emit("agent.tool", {
@@ -1283,10 +1295,10 @@ export class DemoGatewayClient extends EventTarget {
           message: toolName,
           result: "Demo tool output: operation completed successfully.",
         }),
-      afterFirstChunks + 520,
+      afterFirstChunks + 2000,
     );
 
-    const secondStart = afterFirstChunks + 620;
+    const secondStart = afterFirstChunks + 2100;
     let secondTotal = 0;
     for (const word of secondWords) {
       let ms = wordDelay(word);
@@ -2061,6 +2073,31 @@ export class DemoGatewayClient extends EventTarget {
               active: true,
             },
           ],
+        };
+
+      case "turing.channel":
+        return {
+          channel: (params as Record<string, string>)?.channel ?? "imessage",
+          dimensions: {
+            natural_language: 8,
+            emotional_intelligence: 7,
+            appropriate_length: 9,
+            personality_consistency: 8,
+            vulnerability_willingness: 6,
+            humor_naturalness: 7,
+            imperfection: 8,
+            opinion_having: 7,
+            energy_matching: 8,
+            context_awareness: 7,
+            non_robotic: 8,
+            genuine_warmth: 7,
+            prosody_naturalness: 6,
+            turn_timing: 7,
+            filler_usage: 6,
+            emotional_prosody: 5,
+            conversational_repair: 6,
+            paralinguistic_cues: 7,
+          },
         };
 
       // --- Security: CoT Audit ---

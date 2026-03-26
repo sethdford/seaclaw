@@ -31,14 +31,15 @@ final class HumaniOSFleetUITests: XCTestCase {
     /// Resolves a tab bar button: exact title, compound VoiceOver-style label, or first tab for Overview (SwiftUI / OS differences on CI simulators).
     private func tabBarButton(for title: String) -> XCUIElement {
         let bar = app.tabBars.firstMatch
+        _ = bar.buttons.firstMatch.waitForExistence(timeout: Timeout.tabItem)
         let exact = bar.buttons[title]
-        if exact.waitForExistence(timeout: 2) {
+        if exact.waitForExistence(timeout: Timeout.tabItem) {
             return exact
         }
         let fuzzy = bar.buttons
             .matching(NSPredicate(format: "label CONTAINS[c] %@", title))
             .firstMatch
-        if fuzzy.waitForExistence(timeout: 2) {
+        if fuzzy.waitForExistence(timeout: 8) {
             return fuzzy
         }
         if title == "Overview" {

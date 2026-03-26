@@ -34,25 +34,22 @@ static void test_gateway_voice_transcribe_cartesia_provider(void) {
     HU_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = hu_arena_allocator(arena);
-    const char *json =
-        "{\"voice\":{\"stt_provider\":\"cartesia\"},"
-        "\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}]}";
+    const char *json = "{\"voice\":{\"stt_provider\":\"cartesia\"},"
+                       "\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}]}";
     HU_ASSERT_EQ(hu_config_parse_json(&cfg, json, strlen(json)), HU_OK);
 
     hu_app_context_t app = {.config = &cfg, .alloc = &backing};
     hu_control_protocol_t proto = {0};
     hu_ws_conn_t conn = {0};
-    const char *req =
-        "{\"method\":\"voice.transcribe\",\"params\":{\"audio\":\"ZGVzdA==\","
-        "\"mimeType\":\"audio/webm\"}}";
+    const char *req = "{\"method\":\"voice.transcribe\",\"params\":{\"audio\":\"ZGVzdA==\","
+                      "\"mimeType\":\"audio/webm\"}}";
     hu_json_value_t *root = NULL;
     HU_ASSERT_EQ(hu_json_parse(&backing, req, strlen(req), &root), HU_OK);
     HU_ASSERT_NOT_NULL(root);
 
     char *out = NULL;
     size_t out_len = 0;
-    hu_error_t err =
-        cp_voice_transcribe(&backing, &app, &conn, &proto, root, &out, &out_len);
+    hu_error_t err = cp_voice_transcribe(&backing, &app, &conn, &proto, root, &out, &out_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out);
     assert_transcribe_json_text(&backing, out, out_len, "Cartesia mock transcription");
@@ -75,17 +72,15 @@ static void test_gateway_voice_transcribe_default_gemini(void) {
     hu_app_context_t app = {.config = &cfg, .alloc = &backing};
     hu_control_protocol_t proto = {0};
     hu_ws_conn_t conn = {0};
-    const char *req =
-        "{\"method\":\"voice.transcribe\",\"params\":{\"audio\":\"ZGVzdA==\","
-        "\"mimeType\":\"audio/webm\"}}";
+    const char *req = "{\"method\":\"voice.transcribe\",\"params\":{\"audio\":\"ZGVzdA==\","
+                      "\"mimeType\":\"audio/webm\"}}";
     hu_json_value_t *root = NULL;
     HU_ASSERT_EQ(hu_json_parse(&backing, req, strlen(req), &root), HU_OK);
     HU_ASSERT_NOT_NULL(root);
 
     char *out = NULL;
     size_t out_len = 0;
-    hu_error_t err =
-        cp_voice_transcribe(&backing, &app, &conn, &proto, root, &out, &out_len);
+    hu_error_t err = cp_voice_transcribe(&backing, &app, &conn, &proto, root, &out, &out_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out);
     assert_transcribe_json_text(&backing, out, out_len, "Mock Gemini transcription");
@@ -102,9 +97,8 @@ static void test_gateway_voice_session_start_returns_pcm_meta(void) {
     HU_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = hu_arena_allocator(arena);
-    const char *json =
-        "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
-        "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
+    const char *json = "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
+                       "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
     HU_ASSERT_EQ(hu_config_parse_json(&cfg, json, strlen(json)), HU_OK);
 
     hu_app_context_t app = {.config = &cfg, .alloc = &backing};
@@ -113,15 +107,14 @@ static void test_gateway_voice_session_start_returns_pcm_meta(void) {
     conn.id = 42;
     conn.active = true;
     const char *req = "{\"type\":\"req\",\"id\":\"1\",\"method\":\"voice.session.start\","
-                       "\"params\":{\"voiceId\":\"vid\",\"modelId\":\"mid\"}}";
+                      "\"params\":{\"voiceId\":\"vid\",\"modelId\":\"mid\"}}";
     hu_json_value_t *root = NULL;
     HU_ASSERT_EQ(hu_json_parse(&backing, req, strlen(req), &root), HU_OK);
     HU_ASSERT_NOT_NULL(root);
 
     char *out = NULL;
     size_t out_len = 0;
-    hu_error_t err =
-        cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len);
+    hu_error_t err = cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(strstr(out, "pcm_f32le") != NULL);
@@ -130,12 +123,12 @@ static void test_gateway_voice_session_start_returns_pcm_meta(void) {
     backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
 
-    const char *req2 = "{\"type\":\"req\",\"id\":\"2\",\"method\":\"voice.session.stop\",\"params\":{}}";
+    const char *req2 =
+        "{\"type\":\"req\",\"id\":\"2\",\"method\":\"voice.session.stop\",\"params\":{}}";
     HU_ASSERT_EQ(hu_json_parse(&backing, req2, strlen(req2), &root), HU_OK);
     out = NULL;
     out_len = 0;
-    HU_ASSERT_EQ(cp_voice_session_stop(&backing, &app, &conn, &proto, root, &out, &out_len),
-                 HU_OK);
+    HU_ASSERT_EQ(cp_voice_session_stop(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
     if (out)
         backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
@@ -164,8 +157,7 @@ static void test_gateway_voice_transcribe_missing_audio_returns_error(void) {
 
     char *out = NULL;
     size_t out_len = 0;
-    hu_error_t err =
-        cp_voice_transcribe(&backing, &app, &conn, &proto, root, &out, &out_len);
+    hu_error_t err = cp_voice_transcribe(&backing, &app, &conn, &proto, root, &out, &out_len);
     HU_ASSERT_NEQ(err, HU_OK);
     HU_ASSERT_NULL(out);
     HU_ASSERT_EQ(out_len, 0u);
@@ -180,9 +172,8 @@ static void test_gateway_voice_session_interrupt_clears_pcm(void) {
     HU_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = hu_arena_allocator(arena);
-    const char *json =
-        "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
-        "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
+    const char *json = "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
+                       "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
     HU_ASSERT_EQ(hu_config_parse_json(&cfg, json, strlen(json)), HU_OK);
 
     hu_app_context_t app = {.config = &cfg, .alloc = &backing};
@@ -193,13 +184,15 @@ static void test_gateway_voice_session_interrupt_clears_pcm(void) {
 
     /* Start session */
     const char *start_req = "{\"type\":\"req\",\"id\":\"1\",\"method\":\"voice.session.start\","
-                             "\"params\":{}}";
+                            "\"params\":{}}";
     hu_json_value_t *root = NULL;
     HU_ASSERT_EQ(hu_json_parse(&backing, start_req, strlen(start_req), &root), HU_OK);
     char *out = NULL;
     size_t out_len = 0;
-    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
-    if (out) backing.free(backing.ctx, out, out_len);
+    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len),
+                 HU_OK);
+    if (out)
+        backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
 
     /* Feed binary data */
@@ -208,12 +201,12 @@ static void test_gateway_voice_session_interrupt_clears_pcm(void) {
 
     /* Interrupt */
     const char *int_req = "{\"type\":\"req\",\"id\":\"2\",\"method\":\"voice.session.interrupt\","
-                           "\"params\":{}}";
+                          "\"params\":{}}";
     HU_ASSERT_EQ(hu_json_parse(&backing, int_req, strlen(int_req), &root), HU_OK);
     out = NULL;
     out_len = 0;
-    HU_ASSERT_EQ(
-        cp_voice_session_interrupt(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_EQ(cp_voice_session_interrupt(&backing, &app, &conn, &proto, root, &out, &out_len),
+                 HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(strstr(out, "true") != NULL);
     backing.free(backing.ctx, out, out_len);
@@ -221,12 +214,13 @@ static void test_gateway_voice_session_interrupt_clears_pcm(void) {
 
     /* Stop to clean up slot */
     const char *stop_req = "{\"type\":\"req\",\"id\":\"3\",\"method\":\"voice.session.stop\","
-                            "\"params\":{}}";
+                           "\"params\":{}}";
     HU_ASSERT_EQ(hu_json_parse(&backing, stop_req, strlen(stop_req), &root), HU_OK);
     out = NULL;
     out_len = 0;
     HU_ASSERT_EQ(cp_voice_session_stop(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
-    if (out) backing.free(backing.ctx, out, out_len);
+    if (out)
+        backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
     hu_arena_destroy(arena);
 }
@@ -239,9 +233,8 @@ static void test_gateway_voice_on_binary_accumulates(void) {
     HU_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = hu_arena_allocator(arena);
-    const char *json =
-        "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
-        "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
+    const char *json = "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
+                       "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
     HU_ASSERT_EQ(hu_config_parse_json(&cfg, json, strlen(json)), HU_OK);
 
     hu_app_context_t app = {.config = &cfg, .alloc = &backing};
@@ -253,13 +246,15 @@ static void test_gateway_voice_on_binary_accumulates(void) {
 
     /* Start session to allocate a slot */
     const char *start_req = "{\"type\":\"req\",\"id\":\"1\",\"method\":\"voice.session.start\","
-                             "\"params\":{}}";
+                            "\"params\":{}}";
     hu_json_value_t *root = NULL;
     HU_ASSERT_EQ(hu_json_parse(&backing, start_req, strlen(start_req), &root), HU_OK);
     char *out = NULL;
     size_t out_len = 0;
-    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
-    if (out) backing.free(backing.ctx, out, out_len);
+    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len),
+                 HU_OK);
+    if (out)
+        backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
 
     /* Send two binary chunks */
@@ -279,12 +274,13 @@ static void test_gateway_voice_on_binary_accumulates(void) {
 
     /* Stop to clean up */
     const char *stop_req = "{\"type\":\"req\",\"id\":\"2\",\"method\":\"voice.session.stop\","
-                            "\"params\":{}}";
+                           "\"params\":{}}";
     HU_ASSERT_EQ(hu_json_parse(&backing, stop_req, strlen(stop_req), &root), HU_OK);
     out = NULL;
     out_len = 0;
     HU_ASSERT_EQ(cp_voice_session_stop(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
-    if (out) backing.free(backing.ctx, out, out_len);
+    if (out)
+        backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
     hu_arena_destroy(arena);
 }
@@ -297,9 +293,8 @@ static void test_gateway_voice_on_conn_close_frees_slot(void) {
     HU_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = hu_arena_allocator(arena);
-    const char *json =
-        "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
-        "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
+    const char *json = "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
+                       "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
     HU_ASSERT_EQ(hu_config_parse_json(&cfg, json, strlen(json)), HU_OK);
 
     hu_app_context_t app = {.config = &cfg, .alloc = &backing};
@@ -311,13 +306,15 @@ static void test_gateway_voice_on_conn_close_frees_slot(void) {
 
     /* Start session */
     const char *start_req = "{\"type\":\"req\",\"id\":\"1\",\"method\":\"voice.session.start\","
-                             "\"params\":{}}";
+                            "\"params\":{}}";
     hu_json_value_t *root = NULL;
     HU_ASSERT_EQ(hu_json_parse(&backing, start_req, strlen(start_req), &root), HU_OK);
     char *out = NULL;
     size_t out_len = 0;
-    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
-    if (out) backing.free(backing.ctx, out, out_len);
+    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len),
+                 HU_OK);
+    if (out)
+        backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
 
     /* Simulate disconnect — should free the slot without crash */
@@ -340,9 +337,8 @@ static void test_gateway_voice_audio_end_no_data_returns_error(void) {
     HU_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = hu_arena_allocator(arena);
-    const char *json =
-        "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
-        "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
+    const char *json = "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
+                       "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
     HU_ASSERT_EQ(hu_config_parse_json(&cfg, json, strlen(json)), HU_OK);
 
     hu_bus_t bus;
@@ -356,18 +352,20 @@ static void test_gateway_voice_audio_end_no_data_returns_error(void) {
 
     /* Start session */
     const char *start_req = "{\"type\":\"req\",\"id\":\"1\",\"method\":\"voice.session.start\","
-                             "\"params\":{}}";
+                            "\"params\":{}}";
     hu_json_value_t *root = NULL;
     HU_ASSERT_EQ(hu_json_parse(&backing, start_req, strlen(start_req), &root), HU_OK);
     char *out = NULL;
     size_t out_len = 0;
-    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
-    if (out) backing.free(backing.ctx, out, out_len);
+    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len),
+                 HU_OK);
+    if (out)
+        backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
 
     /* audio.end without any binary data should fail */
     const char *end_req = "{\"type\":\"req\",\"id\":\"2\",\"method\":\"voice.audio.end\","
-                           "\"params\":{\"mimeType\":\"audio/webm\"}}";
+                          "\"params\":{\"mimeType\":\"audio/webm\"}}";
     HU_ASSERT_EQ(hu_json_parse(&backing, end_req, strlen(end_req), &root), HU_OK);
     out = NULL;
     out_len = 0;
@@ -390,9 +388,8 @@ static void test_gateway_voice_double_start_reuses_slot(void) {
     HU_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = hu_arena_allocator(arena);
-    const char *json =
-        "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
-        "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
+    const char *json = "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}],"
+                       "\"voice\":{\"tts_voice\":\"v1\",\"tts_model\":\"m1\"}}";
     HU_ASSERT_EQ(hu_config_parse_json(&cfg, json, strlen(json)), HU_OK);
 
     hu_app_context_t app = {.config = &cfg, .alloc = &backing};
@@ -402,14 +399,15 @@ static void test_gateway_voice_double_start_reuses_slot(void) {
     conn.active = true;
 
     const char *start_req = "{\"type\":\"req\",\"id\":\"1\",\"method\":\"voice.session.start\","
-                             "\"params\":{}}";
+                            "\"params\":{}}";
     hu_json_value_t *root = NULL;
     char *out = NULL;
     size_t out_len = 0;
 
     /* First start */
     HU_ASSERT_EQ(hu_json_parse(&backing, start_req, strlen(start_req), &root), HU_OK);
-    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len),
+                 HU_OK);
     HU_ASSERT_NOT_NULL(out);
     backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
@@ -418,19 +416,21 @@ static void test_gateway_voice_double_start_reuses_slot(void) {
     HU_ASSERT_EQ(hu_json_parse(&backing, start_req, strlen(start_req), &root), HU_OK);
     out = NULL;
     out_len = 0;
-    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_EQ(cp_voice_session_start(&backing, &app, &conn, &proto, root, &out, &out_len),
+                 HU_OK);
     HU_ASSERT_NOT_NULL(out);
     backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
 
     /* Clean up */
     const char *stop_req = "{\"type\":\"req\",\"id\":\"2\",\"method\":\"voice.session.stop\","
-                            "\"params\":{}}";
+                           "\"params\":{}}";
     HU_ASSERT_EQ(hu_json_parse(&backing, stop_req, strlen(stop_req), &root), HU_OK);
     out = NULL;
     out_len = 0;
     HU_ASSERT_EQ(cp_voice_session_stop(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
-    if (out) backing.free(backing.ctx, out, out_len);
+    if (out)
+        backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
     hu_arena_destroy(arena);
 }
@@ -454,19 +454,107 @@ static void test_gateway_voice_interrupt_without_session_returns_ok(void) {
 
     /* Interrupt without a session — should return ok (no slot to interrupt) */
     const char *int_req = "{\"type\":\"req\",\"id\":\"1\",\"method\":\"voice.session.interrupt\","
-                           "\"params\":{}}";
+                          "\"params\":{}}";
     hu_json_value_t *root = NULL;
     HU_ASSERT_EQ(hu_json_parse(&backing, int_req, strlen(int_req), &root), HU_OK);
     char *out = NULL;
     size_t out_len = 0;
-    HU_ASSERT_EQ(
-        cp_voice_session_interrupt(&backing, &app, &conn, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_EQ(cp_voice_session_interrupt(&backing, &app, &conn, &proto, root, &out, &out_len),
+                 HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(strstr(out, "true") != NULL);
     backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
     hu_arena_destroy(arena);
 }
+static void test_gateway_voice_clone_returns_voice_id(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}]}";
+    HU_ASSERT_EQ(hu_config_parse_json(&cfg, json, strlen(json)), HU_OK);
+
+    hu_app_context_t app = {.config = &cfg, .alloc = &backing};
+    hu_control_protocol_t proto = {0};
+    hu_ws_conn_t conn = {0};
+    const char *req = "{\"method\":\"voice.clone\",\"params\":{\"audio\":\"ZGVzdA==\","
+                      "\"mimeType\":\"audio/wav\",\"name\":\"Test Voice\",\"language\":\"en\"}}";
+    hu_json_value_t *root = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&backing, req, strlen(req), &root), HU_OK);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_voice_clone(&backing, &app, &conn, &proto, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "voice_id") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "Test Voice") != NULL);
+    backing.free(backing.ctx, out, out_len);
+    hu_json_free(&backing, root);
+    hu_arena_destroy(arena);
+}
+
+static void test_gateway_voice_clone_missing_audio_returns_error(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}]}";
+    HU_ASSERT_EQ(hu_config_parse_json(&cfg, json, strlen(json)), HU_OK);
+
+    hu_app_context_t app = {.config = &cfg, .alloc = &backing};
+    hu_control_protocol_t proto = {0};
+    hu_ws_conn_t conn = {0};
+    const char *req = "{\"method\":\"voice.clone\",\"params\":{\"name\":\"Test\"}}";
+    hu_json_value_t *root = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&backing, req, strlen(req), &root), HU_OK);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_voice_clone(&backing, &app, &conn, &proto, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    hu_json_free(&backing, root);
+    hu_arena_destroy(arena);
+}
+
+static void test_gateway_voice_clone_missing_params_returns_error(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"providers\":[{\"name\":\"cartesia\",\"api_key\":\"ck-test\"}]}";
+    HU_ASSERT_EQ(hu_config_parse_json(&cfg, json, strlen(json)), HU_OK);
+
+    hu_app_context_t app = {.config = &cfg, .alloc = &backing};
+    hu_control_protocol_t proto = {0};
+    hu_ws_conn_t conn = {0};
+    const char *req = "{\"method\":\"voice.clone\"}";
+    hu_json_value_t *root = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&backing, req, strlen(req), &root), HU_OK);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_voice_clone(&backing, &app, &conn, &proto, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    hu_json_free(&backing, root);
+    hu_arena_destroy(arena);
+}
+
+static void test_gateway_voice_clone_null_alloc_returns_error(void) {
+    hu_error_t err = cp_voice_clone(NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
 #endif /* HU_GATEWAY_POSIX */
 
 void run_gateway_voice_tests(void) {
@@ -482,5 +570,9 @@ void run_gateway_voice_tests(void) {
     HU_RUN_TEST(test_gateway_voice_audio_end_no_data_returns_error);
     HU_RUN_TEST(test_gateway_voice_double_start_reuses_slot);
     HU_RUN_TEST(test_gateway_voice_interrupt_without_session_returns_ok);
+    HU_RUN_TEST(test_gateway_voice_clone_returns_voice_id);
+    HU_RUN_TEST(test_gateway_voice_clone_missing_audio_returns_error);
+    HU_RUN_TEST(test_gateway_voice_clone_missing_params_returns_error);
+    HU_RUN_TEST(test_gateway_voice_clone_null_alloc_returns_error);
 #endif
 }

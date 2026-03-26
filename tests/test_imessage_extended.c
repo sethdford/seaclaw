@@ -40,6 +40,22 @@ static void test_imessage_escape_empty(void) {
     HU_ASSERT_STR_EQ(out, "");
 }
 
+static void test_imessage_escape_strips_control_chars(void) {
+    char out[256];
+    char input[] = "hello\x01\x1F\x7Fworld";
+    size_t len = escape_for_applescript(out, sizeof(out), input, strlen(input));
+    HU_ASSERT_STR_EQ(out, "helloworld");
+    HU_ASSERT_EQ(len, (size_t)10);
+}
+
+static void test_imessage_escape_tabs_and_newlines_stripped(void) {
+    char out[256];
+    char input[] = "a\tb\nc\rd";
+    size_t len = escape_for_applescript(out, sizeof(out), input, strlen(input));
+    HU_ASSERT_STR_EQ(out, "abcd");
+    HU_ASSERT_EQ(len, (size_t)4);
+}
+
 static void test_imessage_escape_truncation(void) {
     char out[8]; /* small buffer */
     size_t len = escape_for_applescript(out, sizeof(out), "hello world this is a long string", 33);
@@ -205,6 +221,20 @@ static void test_imessage_react_test_records(void) {
 }
 #endif
 
+static void test_imessage_gif_tapback_stub_returns_zero(void) {
+    int count = hu_imessage_count_recent_gif_tapbacks("alice@example.com", 17);
+    HU_ASSERT_EQ(count, 0);
+}
+
+static void test_imessage_allow_from_filter_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    const char *allowed[] = {"+15559999999"};
+    hu_error_t err = hu_imessage_create(&alloc, "+15551234567", 12, allowed, 1, &ch);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_imessage_destroy(&ch);
+}
+
 void run_imessage_extended_tests(void) {
     HU_TEST_SUITE("iMessage Extended");
 
@@ -214,11 +244,15 @@ void run_imessage_extended_tests(void) {
     HU_RUN_TEST(test_imessage_escape_backslash);
     HU_RUN_TEST(test_imessage_escape_empty);
     HU_RUN_TEST(test_imessage_escape_truncation);
+    HU_RUN_TEST(test_imessage_escape_strips_control_chars);
+    HU_RUN_TEST(test_imessage_escape_tabs_and_newlines_stripped);
 #endif
     HU_RUN_TEST(test_imessage_reaction_to_tapback_mapping);
     HU_RUN_TEST(test_imessage_create_with_allow_from);
     HU_RUN_TEST(test_imessage_create_null_alloc);
     HU_RUN_TEST(test_imessage_health_check);
+    HU_RUN_TEST(test_imessage_gif_tapback_stub_returns_zero);
+    HU_RUN_TEST(test_imessage_allow_from_filter_no_crash);
 #if defined(__APPLE__) && defined(__MACH__)
     HU_RUN_TEST(test_imessage_send_test_mode);
     HU_RUN_TEST(test_imessage_send_media_only_no_crash);

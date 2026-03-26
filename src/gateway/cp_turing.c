@@ -316,6 +316,56 @@ hu_error_t cp_turing_ab_tests(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     return err;
 }
 
+hu_error_t cp_turing_channel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                             const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                             char **out, size_t *out_len) {
+    (void)conn;
+    (void)proto;
+    if (!app || !app->agent || !app->agent->memory)
+        return HU_ERR_NOT_SUPPORTED;
+    sqlite3 *db = hu_sqlite_memory_get_db(app->agent->memory);
+    if (!db)
+        return HU_ERR_NOT_SUPPORTED;
+    if (hu_turing_init_tables(db) != HU_OK)
+        return HU_ERR_IO;
+
+    const char *channel = NULL;
+    size_t channel_len = 0;
+    if (root) {
+        hu_json_value_t *params = hu_json_object_get(root, "params");
+        if (params) {
+            channel = hu_json_get_string(params, "channel");
+            if (channel)
+                channel_len = strlen(channel);
+        }
+    }
+    if (!channel || channel_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    int ch_dims[HU_TURING_DIM_COUNT];
+    if (hu_turing_get_channel_dimensions(db, channel, channel_len, ch_dims) != HU_OK)
+        return HU_ERR_IO;
+
+    hu_json_value_t *obj = hu_json_object_new(alloc);
+    if (!obj)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_json_value_t *dims = hu_json_object_new(alloc);
+    if (!dims) {
+        hu_json_free(alloc, obj);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    for (int d = 0; d < HU_TURING_DIM_COUNT; d++) {
+        const char *dn = hu_turing_dimension_name((hu_turing_dimension_t)d);
+        hu_json_object_set(alloc, dims, dn, hu_json_number_new(alloc, (double)ch_dims[d]));
+    }
+    hu_json_object_set(alloc, obj, "channel", hu_json_string_new(alloc, channel, channel_len));
+    hu_json_object_set(alloc, obj, "dimensions", dims);
+
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
+}
+
 #else /* !HU_ENABLE_SQLITE */
 
 hu_error_t cp_turing_scores(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -386,6 +436,19 @@ hu_error_t cp_turing_trajectory(hu_allocator_t *alloc, hu_app_context_t *app, hu
 hu_error_t cp_turing_ab_tests(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                               const hu_control_protocol_t *proto, const hu_json_value_t *root,
                               char **out, size_t *out_len) {
+    (void)alloc;
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    (void)out;
+    (void)out_len;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
+hu_error_t cp_turing_channel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                             const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                             char **out, size_t *out_len) {
     (void)alloc;
     (void)app;
     (void)conn;

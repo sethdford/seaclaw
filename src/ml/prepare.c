@@ -252,11 +252,6 @@ hu_error_t hu_ml_prepare_conversations(hu_allocator_t *alloc, hu_bpe_tokenizer_t
         return HU_ERR_INVALID_ARGUMENT;
     *messages_processed = 0;
 
-#ifdef HU_IS_TEST
-    (void)chat_db_path;
-    (void)memory_db_path;
-    return HU_OK;
-#else
 #ifdef HU_ENABLE_SQLITE
     char *buf = NULL;
     size_t buf_len = 0;
@@ -318,7 +313,6 @@ hu_error_t hu_ml_prepare_conversations(hu_allocator_t *alloc, hu_bpe_tokenizer_t
     (void)chat_db_path;
     (void)memory_db_path;
     return HU_ERR_NOT_SUPPORTED;
-#endif
 #endif
 }
 

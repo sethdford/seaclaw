@@ -992,11 +992,18 @@
       <section class="component-section" id="hu-tool-result">
         <h2>hu-tool-result</h2>
         <div class="playground">
-          <div class="preview" style="width: 100%; max-width: 480px;">
+          <div class="preview" style="width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: var(--hu-space-md);">
             <hu-tool-result tool="shell" status="success" content="File created successfully"></hu-tool-result>
+            <hu-tool-result
+              tool="search"
+              status="success"
+              input='{"query": "design tokens", "limit": 10, "strict": true}'
+              content="Found 10 results."
+            ></hu-tool-result>
           </div>
         </div>
-        <div class="code-snippet"><pre><code>&lt;hu-tool-result tool=&quot;shell&quot; status=&quot;success&quot;&gt;&lt;/hu-tool-result&gt;</code></pre></div>
+        <div class="code-snippet"><pre><code>&lt;hu-tool-result tool=&quot;shell&quot; status=&quot;success&quot; content=&quot;...&quot;&gt;&lt;/hu-tool-result&gt;
+&lt;hu-tool-result tool=&quot;search&quot; status=&quot;success&quot; input='{...}' content=&quot;...&quot;&gt;&lt;/hu-tool-result&gt;</code></pre></div>
       </section>
 
       <section class="component-section" id="hu-artifact-panel">

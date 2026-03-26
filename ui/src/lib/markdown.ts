@@ -43,11 +43,135 @@ function renderTextWithLatex(text: string): TemplateResult {
   )}`;
 }
 
+/** Apply `fn` only to regions outside ``` fenced code (even indices after split). */
+function transformOutsideCodeFences(text: string, fn: (segment: string) => string): string {
+  const parts = text.split("```");
+  for (let i = 0; i < parts.length; i += 2) {
+    parts[i] = fn(parts[i]);
+  }
+  return parts.join("```");
+}
+
+/** GFM table heuristics: lone header row, missing separator, or column mismatch. */
+function normalizeStreamingTables(markdown: string): string {
+  const lines = markdown.split("\n");
+  if (lines.length === 0) return markdown;
+
+  const end = lines.length;
+  let start = end;
+  while (start > 0 && /^\s*\|/.test(lines[start - 1])) {
+    start -= 1;
+  }
+  if (end - start < 1) return markdown;
+
+  const block = lines.slice(start, end);
+
+  const isSeparatorRow = (row: string): boolean => {
+    const t = row.trim();
+    if (!t.startsWith("|") || !t.endsWith("|")) return false;
+    const interior = t.slice(1, -1);
+    return /^[\s\-:|]+$/.test(interior) && interior.includes("-");
+  };
+
+  const countCells = (row: string): number => {
+    const t = row.trim();
+    if (!t.startsWith("|") || !t.endsWith("|")) return 0;
+    return t.slice(1, -1).split("|").length;
+  };
+
+  const header = block[0];
+  if (isSeparatorRow(header)) return markdown;
+
+  const headerCells = countCells(header);
+  if (headerCells < 1) return markdown;
+
+  const makeSeparator = (cells: number): string =>
+    `|${Array.from({ length: cells }, () => "---").join("|")}|`;
+
+  if (block.length === 1) {
+    lines.splice(start + 1, 0, makeSeparator(headerCells));
+    return lines.join("\n");
+  }
+
+  if (isSeparatorRow(block[1])) {
+    if (countCells(block[1]) !== headerCells) {
+      block[1] = makeSeparator(headerCells);
+      lines.splice(start, end - start, ...block);
+      return lines.join("\n");
+    }
+    return markdown;
+  }
+
+  block.splice(1, 0, makeSeparator(headerCells));
+  lines.splice(start, end - start, ...block);
+  return lines.join("\n");
+}
+
+/**
+ * If the stream ends on an empty list marker line (`- `, `* `, `1. `), append ZWSP so
+ * marked emits a list (not a paragraph showing the marker).
+ */
+function normalizeStreamingListMarkers(markdown: string): string {
+  if (!/(?:^|\n)([-*+]|\d{1,9}\.)\s*$/.test(markdown)) return markdown;
+  return `${markdown}\u200b`;
+}
+
+/** `[label](url` or `![alt](url` without closing `)` — close for parsing. */
+function closeIncompleteLinks(markdown: string): string {
+  if (!/(\[[^\]]*\]|\!\[[^\]]*\])\([^)\r\n]*$/.test(markdown)) return markdown;
+  return `${markdown})`;
+}
+
+/** Close `~~`, `__`, `**`, and lone `*` outside inline `...` spans (streaming). */
+function closeUnclosedEmphasisOutsideCodespans(markdown: string): string {
+  let result = "";
+  let pos = 0;
+  while (pos < markdown.length) {
+    const tick = markdown.indexOf("`", pos);
+    if (tick === -1) {
+      result += closeEmphasisPlain(markdown.slice(pos));
+      break;
+    }
+    result += closeEmphasisPlain(markdown.slice(pos, tick));
+    const tick2 = markdown.indexOf("`", tick + 1);
+    if (tick2 === -1) {
+      result += markdown.slice(tick);
+      break;
+    }
+    result += markdown.slice(tick, tick2 + 1);
+    pos = tick2 + 1;
+  }
+  return result;
+}
+
+function closeEmphasisPlain(fragment: string): string {
+  if (fragment.length === 0) return fragment;
+  let t = fragment;
+  if ((t.match(/~~/g) || []).length % 2 === 1) t += "~~";
+  if ((t.match(/__/g) || []).length % 2 === 1) t += "__";
+  if ((t.match(/\*\*/g) || []).length % 2 === 1) t += "**";
+  const withoutDouble = t.replace(/\*\*/g, "");
+  if ((withoutDouble.match(/\*/g) || []).length % 2 === 1) t += "*";
+  return t;
+}
+
+function normalizeStreamingMarkdownSegment(segment: string): string {
+  let s = normalizeStreamingTables(segment);
+  s = normalizeStreamingListMarkers(s);
+  s = closeIncompleteLinks(s);
+  s = closeUnclosedEmphasisOutsideCodespans(s);
+  return s;
+}
+
+/**
+ * When `streaming` is true, normalize incomplete markdown so marked sees well-formed
+ * structure at every chunk (unclosed fences, tables, lists, links, emphasis).
+ */
 function normalizeForParsing(text: string, streaming: boolean): string {
   if (!streaming) return text;
   const fenceCount = (text.match(/```/g) || []).length;
-  if (fenceCount % 2 !== 0) return text + "\n```";
-  return text;
+  const withFences = fenceCount % 2 !== 0 ? `${text}\n\`\`\`` : text;
+  return transformOutsideCodeFences(withFences, normalizeStreamingMarkdownSegment);
 }
 
 export function renderInlineTokens(

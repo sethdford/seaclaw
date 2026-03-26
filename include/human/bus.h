@@ -1,8 +1,8 @@
 #ifndef HU_BUS_H
 #define HU_BUS_H
 
-#include "core/allocator.h"
-#include "core/error.h"
+#include "human/core/allocator.h"
+#include "human/core/error.h"
 #include <stdbool.h>
 #include <stddef.h>
 #if defined(_WIN32) || defined(_WIN64)

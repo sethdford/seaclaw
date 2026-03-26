@@ -927,6 +927,64 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *
     return HU_OK;
 }
 
+int hu_imessage_count_recent_gif_tapbacks(const char *contact_id, size_t contact_id_len) {
+    if (!contact_id || contact_id_len == 0)
+        return 0;
+
+    const char *home = getenv("HOME");
+    if (!home)
+        return 0;
+
+    char db_path[512];
+    int dp = snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home);
+    if (dp < 0 || (size_t)dp >= sizeof(db_path))
+        return 0;
+
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+        if (db)
+            sqlite3_close(db);
+        return 0;
+    }
+
+    /* Find positive tapbacks (love/like/laugh/emphasis = 2000-2004) on our messages
+     * that have GIF attachments, from this contact, in the last 24 hours. */
+    const char *sql =
+        "SELECT COUNT(*) FROM message m "
+        "WHERE m.is_from_me = 0 "
+        "  AND m.associated_message_type BETWEEN 2000 AND 2004 "
+        "  AND m.handle_id = (SELECT ROWID FROM handle WHERE id = ?1) "
+        "  AND m.date > (strftime('%s', 'now') - 86400) * 1000000000 - 978307200000000000 "
+        "  AND m.associated_message_guid IN ("
+        "    SELECT m2.guid FROM message m2 "
+        "    JOIN message_attachment_join maj ON maj.message_id = m2.ROWID "
+        "    JOIN attachment a ON maj.attachment_id = a.ROWID "
+        "    WHERE m2.is_from_me = 1 "
+        "      AND LOWER(a.filename) LIKE '%.gif' "
+        "      AND m2.date > (strftime('%s', 'now') - 86400) * 1000000000 - 978307200000000000"
+        "  )";
+
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return 0;
+    }
+
+    char contact_buf[128];
+    size_t clen =
+        contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
+    memcpy(contact_buf, contact_id, clen);
+    contact_buf[clen] = '\0';
+    sqlite3_bind_text(stmt, 1, contact_buf, (int)clen, SQLITE_STATIC);
+
+    int result = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+        result = sqlite3_column_int(stmt, 0);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return result;
+}
+
 hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const char *contact_id,
                                                   size_t contact_id_len, char **out,
                                                   size_t *out_len) {
@@ -1046,6 +1104,12 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *
     if (out_len)
         *out_len = 0;
     return HU_OK;
+}
+
+int hu_imessage_count_recent_gif_tapbacks(const char *contact_id, size_t contact_id_len) {
+    (void)contact_id;
+    (void)contact_id_len;
+    return 0;
 }
 
 hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const char *contact_id,
@@ -1833,8 +1897,10 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         int was_edited = sqlite3_column_int(stmt, 8);
         const char *reply_to = (const char *)sqlite3_column_text(stmt, 9);
 
-        if (!text || !handle)
+        if (!text || !handle) {
+            c->last_rowid = rowid;
             continue;
+        }
 
         /* Skip messages that match content we recently sent (echo prevention) */
         if (imessage_was_sent_by_us(c, text, strlen(text))) {
@@ -1859,8 +1925,10 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
                     break;
                 }
             }
-            if (!allowed)
+            if (!allowed) {
+                c->last_rowid = rowid;
                 continue;
+            }
         }
         size_t text_len = strlen(text);
         if (handle_len >= sizeof(msgs[count].session_key))

@@ -3,6 +3,7 @@ import { customElement, state } from "lit/decorators.js";
 import { ScToast } from "./hu-toast.js";
 import { AudioRecorder, blobToBase64 } from "../audio-recorder.js";
 import type { GatewayClient } from "../gateway.js";
+import { icons } from "../icons.js";
 import "./hu-button.js";
 
 type ClonePhase = "idle" | "recording" | "uploading" | "done" | "error";
@@ -146,7 +147,9 @@ export class HuVoiceClone extends LitElement {
 
     .result-check {
       color: var(--hu-accent);
-      font-size: 1.25rem;
+      width: 1.25rem;
+      height: 1.25rem;
+      flex-shrink: 0;
     }
 
     .result-details {
@@ -233,7 +236,7 @@ export class HuVoiceClone extends LitElement {
         ${this._phase === "done"
           ? html`
               <div class="result-card">
-                <span class="result-check">✓</span>
+                <span class="result-check">${icons.check}</span>
                 <div class="result-details">
                   <span class="result-title">Voice cloned: ${this._voiceName || "My Voice"}</span>
                   <span class="result-id">${this._voiceId}</span>

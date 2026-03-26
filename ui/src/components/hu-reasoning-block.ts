@@ -1,10 +1,13 @@
 import { LitElement, html, css, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
 import { icons } from "../icons.js";
 import { renderMarkdown } from "../lib/markdown.js";
 import "./hu-code-block.js";
 
 const PREVIEW_LENGTH = 100;
+const LONG_CONTENT_THRESHOLD = 200;
+const AUTO_COLLAPSE_DELAY_MS = 1000;
 
 @customElement("hu-reasoning-block")
 export class ScReasoningBlock extends LitElement {
@@ -12,6 +15,12 @@ export class ScReasoningBlock extends LitElement {
   @property({ type: Boolean }) streaming = false;
   @property({ type: String }) duration = "";
   @property({ type: Boolean }) collapsed = true;
+
+  @state() private _elapsedDisplay = "";
+
+  private _streamingStartedAt = 0;
+  private _rafId = 0;
+  private _collapseTimer: number | null = null;
 
   static override styles = css`
     @keyframes hu-pulse {
@@ -24,14 +33,35 @@ export class ScReasoningBlock extends LitElement {
       }
     }
 
+    @keyframes hu-thinking-shimmer {
+      from {
+        background-position: -200% center;
+      }
+      to {
+        background-position: 200% center;
+      }
+    }
+
+    @keyframes hu-reasoning-enter {
+      from {
+        opacity: 0;
+        transform: translateY(-0.5rem);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     :host {
       display: block;
       contain: layout style;
+      animation: hu-reasoning-enter var(--hu-duration-normal) var(--hu-ease-out);
     }
 
     .reasoning-block {
       background: color-mix(in srgb, var(--hu-accent) 4%, transparent);
-      border-left: 2px solid color-mix(in srgb, var(--hu-accent) 30%, transparent);
+      border-left: 0.125rem solid color-mix(in srgb, var(--hu-accent) 30%, transparent);
       border-radius: var(--hu-radius-md);
       overflow: hidden;
     }
@@ -53,8 +83,36 @@ export class ScReasoningBlock extends LitElement {
       transition: background-color var(--hu-duration-fast) var(--hu-ease-out);
     }
 
+    .header.streaming {
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--hu-accent) 6%, transparent) 50%,
+        transparent 100%
+      );
+      background-size: 200% 100%;
+      animation: hu-thinking-shimmer calc(var(--hu-duration-slowest) * 3) var(--hu-ease-in-out)
+        infinite;
+    }
+
     .header:hover {
       background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
+    }
+
+    .header.streaming:hover {
+      background:
+        linear-gradient(
+          90deg,
+          transparent 0%,
+          color-mix(in srgb, var(--hu-accent) 6%, transparent) 50%,
+          transparent 100%
+        ),
+        color-mix(in srgb, var(--hu-accent) 8%, transparent);
+      background-size:
+        200% 100%,
+        auto;
+      animation: hu-thinking-shimmer calc(var(--hu-duration-slowest) * 3) var(--hu-ease-in-out)
+        infinite;
     }
 
     .header:focus-visible {
@@ -74,8 +132,12 @@ export class ScReasoningBlock extends LitElement {
       transform: rotate(90deg);
     }
 
-    .label.streaming {
-      animation: hu-pulse var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
+    .brain-icon {
+      display: inline-flex;
+      width: 1em;
+      height: 1em;
+      flex-shrink: 0;
+      color: var(--hu-accent);
     }
 
     .pulse-dot {
@@ -86,21 +148,38 @@ export class ScReasoningBlock extends LitElement {
       animation: hu-pulse var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
     }
 
+    .preview-row {
+      padding: 0 var(--hu-space-md) var(--hu-space-sm);
+      font-family: var(--hu-font);
+      font-size: var(--hu-text-sm);
+    }
+
     .content {
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
       color: var(--hu-text);
-      padding: 0 var(--hu-space-md) var(--hu-space-md);
-      max-height: 125rem;
       overflow: hidden;
-      transition: max-height var(--hu-duration-normal) var(--hu-ease-out);
+      opacity: 1;
+      transform: translateY(0);
+      transition:
+        max-height var(--hu-duration-normal) var(--hu-ease-out),
+        opacity var(--hu-duration-normal) var(--hu-ease-out),
+        transform var(--hu-duration-normal) var(--hu-ease-out),
+        padding var(--hu-duration-normal) var(--hu-ease-out);
+    }
+
+    .content.expanded {
+      max-height: 125rem;
+      padding: 0 var(--hu-space-md) var(--hu-space-md);
+      opacity: 1;
+      transform: translateY(0);
     }
 
     .content.collapsed {
       max-height: 0;
-      padding-top: 0;
-      padding-bottom: 0;
-      overflow: hidden;
+      padding: 0;
+      opacity: 0;
+      transform: translateY(-0.25rem);
     }
 
     .preview {
@@ -177,15 +256,33 @@ export class ScReasoningBlock extends LitElement {
     }
 
     @media (prefers-reduced-motion: reduce) {
+      :host {
+        animation: none;
+        opacity: 1;
+      }
+
       .caret {
         transition: none;
       }
 
       .content {
         transition: none;
+        opacity: 1;
+        transform: none;
       }
 
-      .label.streaming,
+      .content.collapsed {
+        opacity: 1;
+        transform: none;
+      }
+
+      .header.streaming,
+      .header.streaming:hover {
+        animation: none;
+        background: color-mix(in srgb, var(--hu-accent) 6%, transparent);
+        background-size: auto;
+      }
+
       .pulse-dot {
         animation: none;
         opacity: 1;
@@ -199,7 +296,85 @@ export class ScReasoningBlock extends LitElement {
     return text.slice(0, PREVIEW_LENGTH) + "...";
   }
 
+  private _clearCollapseTimer() {
+    if (this._collapseTimer !== null) {
+      clearTimeout(this._collapseTimer);
+      this._collapseTimer = null;
+    }
+  }
+
+  private _stopElapsedTicker() {
+    if (this._rafId !== 0) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = 0;
+    }
+  }
+
+  private _tickElapsed = () => {
+    if (!this.streaming) {
+      return;
+    }
+    const secs = (performance.now() - this._streamingStartedAt) / 1000;
+    const next = `${secs.toFixed(1)}s`;
+    if (next !== this._elapsedDisplay) {
+      this._elapsedDisplay = next;
+    }
+    this._rafId = requestAnimationFrame(this._tickElapsed);
+  };
+
+  private _startElapsedTicker() {
+    this._stopElapsedTicker();
+    this._streamingStartedAt = performance.now();
+    this._rafId = requestAnimationFrame(this._tickElapsed);
+  }
+
+  private _scheduleAutoCollapse() {
+    this._clearCollapseTimer();
+    if (this.content.length <= LONG_CONTENT_THRESHOLD) {
+      return;
+    }
+    this._collapseTimer = window.setTimeout(() => {
+      this._collapseTimer = null;
+      this.collapsed = true;
+    }, AUTO_COLLAPSE_DELAY_MS);
+  }
+
+  override disconnectedCallback() {
+    this._stopElapsedTicker();
+    this._clearCollapseTimer();
+    super.disconnectedCallback();
+  }
+
+  override willUpdate(changed: PropertyValues<this>) {
+    super.willUpdate(changed);
+    if (!changed.has("streaming")) {
+      return;
+    }
+    const prev = changed.get("streaming") as boolean | undefined;
+    if (!prev && this.streaming) {
+      this._clearCollapseTimer();
+      this.collapsed = false;
+    } else if (prev && !this.streaming) {
+      this._elapsedDisplay = "";
+    }
+  }
+
+  override updated(changed: PropertyValues<this>) {
+    super.updated(changed);
+    if (!changed.has("streaming")) {
+      return;
+    }
+    const prev = changed.get("streaming") as boolean | undefined;
+    if (!prev && this.streaming) {
+      this._startElapsedTicker();
+    } else if (prev && !this.streaming) {
+      this._stopElapsedTicker();
+      this._scheduleAutoCollapse();
+    }
+  }
+
   private _toggle() {
+    this._clearCollapseTimer();
     this.collapsed = !this.collapsed;
   }
 
@@ -211,11 +386,13 @@ export class ScReasoningBlock extends LitElement {
   }
 
   override render() {
-    const label = this.duration || "Thinking";
+    const label = this.streaming
+      ? `Thinking · ${this._elapsedDisplay || "0.0s"}`
+      : this.duration || "Thinking";
     return html`
       <div class="reasoning-block" role="region" aria-label="AI reasoning">
         <button
-          class="header"
+          class="header ${this.streaming ? "streaming" : ""}"
           @click=${this._toggle}
           @keydown=${this._onKeyDown}
           aria-expanded=${!this.collapsed}
@@ -223,18 +400,20 @@ export class ScReasoningBlock extends LitElement {
           aria-label="Toggle reasoning content"
         >
           <span class="caret ${this.collapsed ? "" : "expanded"}">${icons["caret-right"]}</span>
-          <span class="label ${this.streaming ? "streaming" : ""}">${label}</span>
+          <span class="brain-icon" aria-hidden="true">${icons.brain}</span>
+          <span class="label">${label}</span>
           ${this.streaming ? html`<span class="pulse-dot" aria-hidden="true"></span>` : nothing}
         </button>
+        ${this.collapsed
+          ? html`<div class="preview-row"><span class="preview">${this._preview}</span></div>`
+          : nothing}
         <div
           id="reasoning-content"
           class="content ${this.collapsed ? "collapsed" : "expanded"}"
           role=${this.streaming ? "status" : nothing}
           aria-live=${this.streaming ? "polite" : nothing}
         >
-          ${this.collapsed
-            ? html`<span class="preview">${this._preview}</span>`
-            : renderMarkdown(this.content, { streaming: this.streaming })}
+          ${this.collapsed ? nothing : renderMarkdown(this.content, { streaming: this.streaming })}
         </div>
       </div>
     `;

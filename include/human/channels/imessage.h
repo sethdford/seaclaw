@@ -35,6 +35,11 @@ hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const c
                                                   size_t contact_id_len, char **out,
                                                   size_t *out_len);
 
+/** Count positive tapbacks (love/like/laugh/emphasis) on our GIF messages from this
+ * contact in the last 24 hours. Uses direct SQL on chat.db associated_message_type.
+ * Returns 0 on non-macOS or when SQLite unavailable. */
+int hu_imessage_count_recent_gif_tapbacks(const char *contact_id, size_t contact_id_len);
+
 #ifndef HU_IS_TEST
 /** Check if the real user sent a message to `handle` within the last
  * `within_seconds` seconds.  Queries chat.db for is_from_me=1 rows.

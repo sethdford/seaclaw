@@ -34,6 +34,7 @@ option(HU_ENABLE_AUTHENTIC "Build authentic existence features" OFF)
 option(HU_ENABLE_CARTESIA "Enable Cartesia TTS for voice messages" OFF)
 option(HU_ENABLE_ML "Build ML training subsystem (BPE tokenizer, dataloader, experiment loop)" OFF)
 option(HU_ENABLE_FEEDS "Build feed ingestion and research agent" OFF)
+option(HU_ENABLE_SOCIAL "Build social feed ingestion (Facebook, Instagram)" OFF)
 option(HU_ENABLE_EMBEDDED_MODEL "Enable embedded model provider (llama.cpp/llama-cli)" OFF)
 option(HU_ENABLE_COREML "Enable CoreML/MLX provider (macOS only)" OFF)
 
@@ -671,13 +672,9 @@ set(HU_CORE_SOURCES
     src/plugins/registry.c
     src/plugin_loader.c
     src/plugin_discovery.c
-    src/channels/channel_monitor.c
-    src/doctor_fix.c
     src/skills/skill_scaffold.c
     src/context/context_engine.c
     src/context/context_engine_rag.c
-    src/humanness.c
-    src/memory/evolved_opinions.c
     src/mcp_registry.c
     src/onboard.c
     src/interactions/choices.c

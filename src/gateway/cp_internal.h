@@ -16,10 +16,6 @@ static inline void cp_json_set_str(hu_allocator_t *a, hu_json_value_t *obj, cons
     hu_json_object_set(a, obj, key, hu_json_string_new(a, val, strlen(val)));
 }
 
-typedef hu_error_t (*hu_cp_handler_fn)(hu_allocator_t *alloc, hu_app_context_t *app,
-                                       hu_ws_conn_t *conn, const hu_control_protocol_t *proto,
-                                       const hu_json_value_t *root, char **out, size_t *out_len);
-
 /* Chat handlers */
 hu_error_t cp_chat_send(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                         const hu_control_protocol_t *proto, const hu_json_value_t *root, char **out,
@@ -258,6 +254,9 @@ hu_error_t cp_turing_trajectory(hu_allocator_t *alloc, hu_app_context_t *app, hu
 hu_error_t cp_turing_ab_tests(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                               const hu_control_protocol_t *proto, const hu_json_value_t *root,
                               char **out, size_t *out_len);
+hu_error_t cp_turing_channel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                             const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                             char **out, size_t *out_len);
 
 /* MCP Resources + Prompts RPC handlers */
 hu_error_t cp_mcp_resources_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,

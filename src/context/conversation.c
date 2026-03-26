@@ -20,6 +20,8 @@
 #include <string.h>
 #include <time.h>
 #if defined(__unix__) || defined(__APPLE__)
+#include <dirent.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #endif
 
@@ -7836,38 +7838,77 @@ size_t hu_conversation_contact_photo_path(const char *contact_id, size_t cid_len
         return 0;
     }
 
-    /* Check ZABCDLIKENESS for this record */
-    const char *img_sql = "SELECT Z_PK FROM ZABCDLIKENESS WHERE ZOWNER = ? LIMIT 1";
-    sqlite3_stmt *img_stmt = NULL;
-    bool has_image = false;
-    if (sqlite3_prepare_v2(db, img_sql, -1, &img_stmt, NULL) == SQLITE_OK) {
-        sqlite3_bind_int64(img_stmt, 1, record_pk);
-        if (sqlite3_step(img_stmt) == SQLITE_ROW)
-            has_image = true;
-        sqlite3_finalize(img_stmt);
-    }
-
-    sqlite3_close(db);
-
-    if (!has_image) {
-        out_path[0] = '\0';
-        return 0;
-    }
-
-    /* macOS stores contact images at a known path pattern */
+    /* Try legacy path first: ~/Library/Application Support/AddressBook/Images/ABImage-<PK> */
     int n = snprintf(out_path, out_cap,
                      "%s/Library/Application Support/AddressBook/Images/ABImage-%lld", home,
                      (long long)record_pk);
-    if (n < 0 || (size_t)n >= out_cap) {
-        out_path[0] = '\0';
-        return 0;
+    if (n > 0 && (size_t)n < out_cap && access(out_path, R_OK) == 0) {
+        sqlite3_close(db);
+        return (size_t)n;
     }
 
-    if (access(out_path, R_OK) != 0) {
-        out_path[0] = '\0';
-        return 0;
+    /* Modern macOS: try Sources/<uuid>/Images/<PK> for each source directory */
+    {
+        char sources_dir[512];
+        int sd = snprintf(sources_dir, sizeof(sources_dir),
+                          "%s/Library/Application Support/AddressBook/Sources", home);
+        if (sd > 0 && (size_t)sd < sizeof(sources_dir)) {
+            DIR *dir = opendir(sources_dir);
+            if (dir) {
+                struct dirent *ent;
+                while ((ent = readdir(dir)) != NULL) {
+                    if (ent->d_name[0] == '.')
+                        continue;
+                    n = snprintf(out_path, out_cap, "%s/%s/Images/%lld", sources_dir, ent->d_name,
+                                 (long long)record_pk);
+                    if (n > 0 && (size_t)n < out_cap && access(out_path, R_OK) == 0) {
+                        closedir(dir);
+                        sqlite3_close(db);
+                        return (size_t)n;
+                    }
+                }
+                closedir(dir);
+            }
+        }
     }
 
-    return (size_t)n;
+    /* Fallback: extract ZDATA blob from ZABCDLIKENESS to a cache file */
+    {
+        const char *blob_sql = "SELECT ZDATA FROM ZABCDLIKENESS WHERE ZOWNER = ? "
+                               "AND ZDATA IS NOT NULL LIMIT 1";
+        sqlite3_stmt *blob_stmt = NULL;
+        if (sqlite3_prepare_v2(db, blob_sql, -1, &blob_stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_int64(blob_stmt, 1, record_pk);
+            if (sqlite3_step(blob_stmt) == SQLITE_ROW) {
+                const void *blob = sqlite3_column_blob(blob_stmt, 0);
+                int blob_len = sqlite3_column_bytes(blob_stmt, 0);
+                if (blob && blob_len > 0) {
+                    char cache_dir[512];
+                    int cd = snprintf(cache_dir, sizeof(cache_dir),
+                                      "%s/.human/cache/contact-photos", home);
+                    if (cd > 0 && (size_t)cd < sizeof(cache_dir)) {
+                        (void)mkdir(cache_dir, 0700);
+                        n = snprintf(out_path, out_cap, "%s/%lld.jpg", cache_dir,
+                                     (long long)record_pk);
+                        if (n > 0 && (size_t)n < out_cap) {
+                            FILE *cf = fopen(out_path, "wb");
+                            if (cf) {
+                                fwrite(blob, 1, (size_t)blob_len, cf);
+                                fclose(cf);
+                                sqlite3_finalize(blob_stmt);
+                                sqlite3_close(db);
+                                return (size_t)n;
+                            }
+                        }
+                    }
+                }
+            }
+            sqlite3_finalize(blob_stmt);
+        }
+    }
+
+    sqlite3_close(db);
+    out_path[0] = '\0';
+    return 0;
 #endif
 }

@@ -38,7 +38,7 @@ void hu_cartesia_stream_set_voice_controls(hu_cartesia_stream_t *s,
 
 hu_error_t hu_cartesia_stream_open(hu_allocator_t *alloc, const char *api_key, const char *voice_id,
                                    const char *model_id, hu_cartesia_stream_t **out) {
-    if (!alloc || !out)
+    if (!alloc || !api_key || !out)
         return HU_ERR_INVALID_ARGUMENT;
     (void)api_key;
     hu_cartesia_stream_t *s =

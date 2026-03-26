@@ -53,6 +53,12 @@ public enum Methods {
 
     // Voice & persona
     public static let voiceTranscribe = "voice.transcribe"
+    public static let voiceClone = "voice.clone"
+    public static let voiceSessionStart = "voice.session.start"
+    public static let voiceSessionStop = "voice.session.stop"
+    public static let voiceSessionInterrupt = "voice.session.interrupt"
+    public static let voiceAudioEnd = "voice.audio.end"
+    public static let voiceConfig = "voice.config"
     public static let personaSet = "persona.set"
 
     // Auth (OAuth)
@@ -91,7 +97,7 @@ public enum Methods {
         execApprovalResolve, usageSummary,
         activityRecent, agentsList, modelsList,
         metricsSnapshot, sotaMetrics, securityCotSummary, nodesList, nodesAction,
-        voiceTranscribe, personaSet,
+        voiceTranscribe, voiceClone, voiceSessionStart, voiceSessionStop, voiceSessionInterrupt, voiceAudioEnd, voiceConfig, personaSet,
         authToken, authOauthStart, authOauthCallback, authOauthRefresh,
         memoryStatus, memoryList, memoryRecall, memoryStore, memoryForget, memoryIngest, memoryConsolidate,
         hulaTracesAnalytics, hulaTracesList, hulaTracesGet,

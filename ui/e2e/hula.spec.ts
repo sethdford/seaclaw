@@ -48,14 +48,17 @@ test.describe("HuLa (Demo)", () => {
     }).toPass({ timeout: POLL });
   });
 
-  test("trace detail requests trace_limit (truncation banner when applicable)", async ({ page }) => {
+  test("trace detail requests trace_limit (truncation banner when applicable)", async ({
+    page,
+  }) => {
     await page.goto("/?demo#hula");
     await waitForViewReady(page, "hu-hula-view");
     await waitForShadowSelector(page, "hu-hula-view", ".trace-row");
     await page.evaluate(`(() => {
       const app = document.querySelector("hu-app");
       const view = app?.shadowRoot?.querySelector("hu-hula-view");
-      (view?.shadowRoot?.querySelector(".trace-row") as HTMLElement)?.click();
+      const row = view?.shadowRoot?.querySelector(".trace-row");
+      if (row) row.click();
     })()`);
     await expect(async () => {
       const text = await page.evaluate(deepText("hu-hula-view"));
@@ -79,7 +82,8 @@ test.describe("HuLa from Observability (Demo)", () => {
       const host = view?.shadowRoot?.querySelector(
         "hu-button[data-testid='metrics-open-hula-traces']",
       );
-      (host?.shadowRoot?.querySelector("button") as HTMLElement | null)?.click();
+      const btn = host?.shadowRoot?.querySelector("button");
+      if (btn) btn.click();
     })()`);
     await expect(page).toHaveURL(/#hula/);
     await waitForViewReady(page, "hu-hula-view");

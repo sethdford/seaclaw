@@ -10,27 +10,51 @@
 
 /* Top-level keys read by hu_config_parse_json (derive from config.c) */
 static const char *const hu_config_top_keys[] = {
-    "workspace",     "dpo_export_dir",
+    "workspace",
+    "dpo_export_dir",
     "default_provider",
-    "default_model", "default_temperature",
-    "max_tokens",    "api_key",
-    "providers",     "autonomy",
-    "gateway",       "memory",
-    "tools",         "cron",
-    "scheduler",     "runtime",
-    "tunnel",        "channels",
-    "agent",         "heartbeat",
-    "reliability",   "router",
-    "ensemble",      "diagnostics",
-    "session",       "peripherals",
-    "hardware",      "browser",
-    "cost",          "mcp_servers",
-    "nodes",         "policy",
-    "plugins",       "security",
-    "secrets",       "identity",
+    "default_model",
+    "default_temperature",
+    "max_tokens",
+    "api_key",
+    "providers",
+    "autonomy",
+    "gateway",
+    "memory",
+    "tools",
+    "cron",
+    "scheduler",
+    "runtime",
+    "tunnel",
+    "channels",
+    "agent",
+    "heartbeat",
+    "reliability",
+    "router",
+    "ensemble",
+    "diagnostics",
+    "session",
+    "peripherals",
+    "hardware",
+    "browser",
+    "cost",
+    "mcp_servers",
+    "nodes",
+    "policy",
+    "plugins",
+    "security",
+    "secrets",
+    "identity",
     "feeds",
     "voice",
-    "provider",      "model",
+    "provider",
+    "model",
+    "auto_update",
+    "update_check_interval_hours",
+    "config_version",
+    "data_dir",
+    "temp_dir",
+    "behavior",
 };
 static const size_t hu_config_top_keys_len =
     sizeof(hu_config_top_keys) / sizeof(hu_config_top_keys[0]);
@@ -69,16 +93,8 @@ static const char *const hu_ensemble_keys[] = {
 static const size_t hu_ensemble_keys_len = sizeof(hu_ensemble_keys) / sizeof(hu_ensemble_keys[0]);
 
 static const char *const hu_voice_keys[] = {
-    "local_stt_endpoint",
-    "local_tts_endpoint",
-    "stt_provider",
-    "tts_provider",
-    "tts_voice",
-    "tts_model",
-    "stt_model",
-    "mode",
-    "realtime_model",
-    "realtime_voice",
+    "local_stt_endpoint", "local_tts_endpoint", "stt_provider", "tts_provider",   "tts_voice",
+    "tts_model",          "stt_model",          "mode",         "realtime_model", "realtime_voice",
 };
 static const size_t hu_voice_keys_len = sizeof(hu_voice_keys) / sizeof(hu_voice_keys[0]);
 
@@ -91,8 +107,7 @@ static const size_t hu_security_keys_len = sizeof(hu_security_keys) / sizeof(hu_
 static const char *const hu_known_providers[] = {
     "openai",       "anthropic",  "gemini",     "google",     "google-gemini",
     "ollama",       "openrouter", "compatible", "claude_cli", "codex_cli",
-    "openai-codex", "router",     "reliable",
-    "ensemble",
+    "openai-codex", "router",     "reliable",   "ensemble",
 };
 static const size_t hu_known_providers_len =
     sizeof(hu_known_providers) / sizeof(hu_known_providers[0]);

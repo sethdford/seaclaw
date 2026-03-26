@@ -113,11 +113,13 @@ hu_error_t hu_voice_clone_from_file(hu_allocator_t *alloc, const char *api_key, 
     const char *name = (cfg->name && cfg->name_len > 0) ? cfg->name : "Human Voice Clone";
     const char *lang = (cfg->language && cfg->language_len > 0) ? cfg->language : "en";
 
-    char hdr_buf[512];
-    int n = snprintf(hdr_buf, sizeof(hdr_buf), "X-API-Key: %.*s\nCartesia-Version: %s",
-                     (int)api_key_len, api_key, CARTESIA_VERSION);
-    if (n < 0 || (size_t)n >= sizeof(hdr_buf))
+    char hdr_api[256];
+    int n = snprintf(hdr_api, sizeof(hdr_api), "X-API-Key: %.*s", (int)api_key_len, api_key);
+    if (n < 0 || (size_t)n >= sizeof(hdr_api))
         return HU_ERR_INVALID_ARGUMENT;
+
+    char hdr_ver[64];
+    snprintf(hdr_ver, sizeof(hdr_ver), "Cartesia-Version: %s", CARTESIA_VERSION);
 
     /* Build curl multipart form args */
     size_t clip_cap = 64 + strlen(file_path);
@@ -136,14 +138,16 @@ hu_error_t hu_voice_clone_from_file(hu_allocator_t *alloc, const char *api_key, 
     char lang_arg[32];
     snprintf(lang_arg, sizeof(lang_arg), "language=%s", lang);
 
-    const char *argv[22];
+    const char *argv[24];
     size_t argc = 0;
     argv[argc++] = "curl";
     argv[argc++] = "-s";
     argv[argc++] = "-X";
     argv[argc++] = "POST";
     argv[argc++] = "-H";
-    argv[argc++] = hdr_buf;
+    argv[argc++] = hdr_api;
+    argv[argc++] = "-H";
+    argv[argc++] = hdr_ver;
     argv[argc++] = "-F";
     argv[argc++] = clip_arg;
     argv[argc++] = "-F";
@@ -211,9 +215,11 @@ hu_error_t hu_voice_clone_from_bytes(hu_allocator_t *alloc, const char *api_key,
     (void)audio;
     (void)audio_len;
     (void)mime_type;
-    (void)cfg;
     snprintf(out->voice_id, sizeof(out->voice_id), "test-clone-%08x", 0xCAFEBABEu);
-    snprintf(out->name, sizeof(out->name), "test-voice-bytes");
+    if (cfg && cfg->name && cfg->name_len > 0)
+        snprintf(out->name, sizeof(out->name), "%.*s", (int)cfg->name_len, cfg->name);
+    else
+        snprintf(out->name, sizeof(out->name), "test-voice-bytes");
     snprintf(out->language, sizeof(out->language), "en");
     out->success = true;
     return HU_OK;
@@ -292,16 +298,30 @@ hu_error_t hu_voice_clone_from_bytes(hu_allocator_t *alloc, const char *api_key,
                                      const uint8_t *audio, size_t audio_len, const char *mime_type,
                                      const hu_voice_clone_config_t *cfg,
                                      hu_voice_clone_result_t *out) {
-    (void)alloc;
+    if (!alloc || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    if (!api_key || api_key_len == 0 || !audio || audio_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
+    (void)mime_type;
+    snprintf(out->voice_id, sizeof(out->voice_id), "test-clone-%08x", 0xCAFEBABEu);
+    if (cfg && cfg->name && cfg->name_len > 0)
+        snprintf(out->name, sizeof(out->name), "%.*s", (int)cfg->name_len, cfg->name);
+    else
+        snprintf(out->name, sizeof(out->name), "test-voice-bytes");
+    snprintf(out->language, sizeof(out->language), "en");
+    out->success = true;
+    return HU_OK;
+#else
     (void)api_key;
     (void)api_key_len;
     (void)audio;
     (void)audio_len;
     (void)mime_type;
     (void)cfg;
-    if (out)
-        memset(out, 0, sizeof(*out));
     return HU_ERR_NOT_SUPPORTED;
+#endif
 }
 
 #endif /* HU_ENABLE_CARTESIA */
@@ -371,6 +391,16 @@ hu_error_t hu_persona_set_voice_id(hu_allocator_t *alloc, const char *persona_na
 
     hu_json_object_set(alloc, voice, "voice_id", hu_json_string_new(alloc, voice_id, voice_id_len));
     hu_json_object_set(alloc, voice, "provider", hu_json_string_new(alloc, "cartesia", 8));
+
+    /* Ensure voice_messages.enabled = true so the daemon actually uses this voice */
+    hu_json_value_t *vm = hu_json_object_get(root, "voice_messages");
+    if (!vm || vm->type != HU_JSON_OBJECT) {
+        vm = hu_json_object_new(alloc);
+        if (vm)
+            hu_json_object_set(alloc, root, "voice_messages", vm);
+    }
+    if (vm && vm->type == HU_JSON_OBJECT)
+        hu_json_object_set(alloc, vm, "enabled", hu_json_bool_new(alloc, true));
 
     /* Serialize and write back */
     char *json_out = NULL;

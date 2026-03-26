@@ -100,7 +100,9 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"turing.contact", cp_turing_contact},
     {"turing.trajectory", cp_turing_trajectory},
     {"turing.ab_tests", cp_turing_ab_tests},
+    {"turing.channel", cp_turing_channel},
     {"security.cot.summary", cp_security_cot_summary},
+    {"sota.metrics", cp_admin_metrics_snapshot},
     {"mcp.resources.list", cp_mcp_resources_list},
     {"mcp.prompts.list", cp_mcp_prompts_list},
     {NULL, NULL},
@@ -109,8 +111,7 @@ static const hu_rpc_entry_t s_rpc_table[] = {
 /* ── Auth helpers ───────────────────────────────────────────────────── */
 
 static bool is_public_method(const char *method) {
-    return strcmp(method, "health") == 0 || strcmp(method, "status") == 0 ||
-           strcmp(method, "version") == 0 || strcmp(method, "connect") == 0 ||
+    return strcmp(method, "health") == 0 || strcmp(method, "connect") == 0 ||
            strcmp(method, "capabilities") == 0 || strcmp(method, "auth.oauth.start") == 0 ||
            strcmp(method, "auth.oauth.callback") == 0 || strcmp(method, "auth.oauth.refresh") == 0;
 }

@@ -1022,11 +1022,11 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
 
             char *trend_section = NULL;
             size_t trend_len = 0;
-            if (config && config->feeds.interests) {
+            if (app_ctx.cfg && app_ctx.cfg->feeds.interests) {
                 hu_feed_trend_t *trends = NULL;
                 size_t trend_count = 0;
-                if (hu_feed_detect_trends(alloc, feed_db, config->feeds.interests,
-                                          strlen(config->feeds.interests), &trends,
+                if (hu_feed_detect_trends(alloc, feed_db, app_ctx.cfg->feeds.interests,
+                                          strlen(app_ctx.cfg->feeds.interests), &trends,
                                           &trend_count) == HU_OK) {
                     hu_feed_trends_build_section(alloc, trends, trend_count, &trend_section,
                                                  &trend_len);
@@ -1061,9 +1061,9 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
             if (trend_section)
                 alloc->free(alloc->ctx, trend_section, trend_len + 1);
 
-            if (config->feeds.retention_days > 0) {
+            if (app_ctx.cfg->feeds.retention_days > 0) {
                 hu_feed_processor_t cleanup_proc = {.alloc = alloc, .db = feed_db};
-                hu_feed_processor_cleanup(&cleanup_proc, config->feeds.retention_days);
+                hu_feed_processor_cleanup(&cleanup_proc, app_ctx.cfg->feeds.retention_days);
             }
         }
 #endif
@@ -2119,10 +2119,18 @@ static hu_error_t cmd_voice(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_ERR_INVALID_ARGUMENT;
     }
 
-    /* Get Cartesia API key from env or config */
+    /* Get Cartesia API key from env, then config fallback */
     const char *api_key = getenv("CARTESIA_API_KEY");
     if (!api_key || api_key[0] == '\0') {
-        fprintf(stderr, "Error: CARTESIA_API_KEY environment variable not set\n");
+        hu_config_t tmp_cfg;
+        if (hu_config_load(alloc, &tmp_cfg) == HU_OK) {
+            const char *cfg_key = hu_config_get_provider_key(&tmp_cfg, "cartesia");
+            if (cfg_key && cfg_key[0] != '\0')
+                api_key = cfg_key;
+        }
+    }
+    if (!api_key || api_key[0] == '\0') {
+        fprintf(stderr, "Error: set CARTESIA_API_KEY or configure providers.cartesia.api_key\n");
         return HU_ERR_PROVIDER_AUTH;
     }
 
@@ -2312,19 +2320,6 @@ static void gw_bus_set_message(hu_bus_event_t *bev, const char *data, size_t len
         copy_len = utf8_safe_truncate(data, copy_len);
     memcpy(bev->message, data, copy_len);
     bev->message[copy_len] = '\0';
-}
-
-__attribute__((unused)) static void gw_stream_token_cb(const char *delta, size_t len, void *ctx) {
-    gw_stream_ctx_t *sc = (gw_stream_ctx_t *)ctx;
-    if (!sc || !delta || !len)
-        return;
-    hu_bus_event_t ev;
-    memset(&ev, 0, sizeof(ev));
-    ev.type = HU_BUS_MESSAGE_CHUNK;
-    memcpy(ev.channel, sc->channel, HU_BUS_CHANNEL_LEN);
-    memcpy(ev.id, sc->id, HU_BUS_ID_LEN);
-    gw_bus_set_message(&ev, delta, len);
-    hu_bus_publish(sc->bus, &ev);
 }
 
 /* Rich stream event callback for v2: maps agent events to typed bus events */

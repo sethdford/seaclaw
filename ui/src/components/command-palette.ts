@@ -51,6 +51,7 @@ const NAV_ITEMS: { id: string; label: string }[] = [
   { id: "logs", label: "Logs" },
   { id: "turing", label: "Turing" },
   { id: "hula", label: "HuLa" },
+  { id: "design-system", label: "Design System" },
 ];
 
 const COMMANDS: Command[] = [

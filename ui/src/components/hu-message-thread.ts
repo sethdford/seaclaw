@@ -6,7 +6,6 @@ import "./hu-typing-indicator.js";
 import "./hu-delivery-status.js";
 import "./hu-tool-result.js";
 import "./hu-reasoning-block.js";
-import "./hu-thinking.js";
 import "./hu-skeleton.js";
 import "./hu-message-actions.js";
 import type { ChatItem, ArtifactData } from "../controllers/chat-controller.js";
@@ -1247,7 +1246,8 @@ export class ScMessageThread extends LitElement {
                           ? "error"
                           : "success"
                         : "running"}
-                      .content=${block.item.result ?? block.item.input ?? ""}
+                      .input=${block.item.input ?? ""}
+                      .content=${block.item.result ?? ""}
                     ></hu-tool-result>`;
                   if (block.type === "thinking")
                     return html`<hu-reasoning-block

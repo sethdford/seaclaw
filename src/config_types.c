@@ -1,3 +1,3 @@
 #include "human/config_types.h"
 
-/* Config type definitions */
+typedef int hu_config_types_unused_;

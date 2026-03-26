@@ -969,6 +969,17 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
                         channels[c].channel->vtable->name(channels[c].channel->ctx);
                     if (ch_name && strcmp(ch_name, ch_part) == 0) {
                         if (channels[c].channel->vtable->send) {
+                            response_len = hu_conversation_strip_ai_phrases(response, response_len);
+                            response_len = hu_conversation_vary_complexity(response, response_len,
+                                                                           (uint32_t)time(NULL));
+                            if (response_len > 1 && response[0] >= 'A' && response[0] <= 'Z' &&
+                                response[1] >= 'a' && response[1] <= 'z' && response[0] != 'I') {
+                                response[0] = (char)(response[0] + 32);
+                            }
+                            if (response_len > 1 && response[response_len - 1] == '.') {
+                                response[response_len - 1] = '\0';
+                                response_len--;
+                            }
                             (void)channels[c].channel->vtable->send(
                                 channels[c].channel->ctx, target_part, target_part_len, response,
                                 response_len, NULL, 0);
@@ -1530,6 +1541,59 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
     }
 #endif
 
+    /* Scheduled message delivery: once per channel, independent of contacts */
+    {
+        static bool sched_loaded_once;
+        if (!sched_loaded_once) {
+            const char *sh = getenv("HOME");
+            if (sh) {
+                char sp[512];
+                int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
+                if (sn > 0 && (size_t)sn < sizeof(sp))
+                    hu_conversation_sched_load(sp, (size_t)sn);
+            }
+            sched_loaded_once = true;
+        }
+        uint64_t sched_now = (uint64_t)time(NULL) * 1000ULL;
+        for (size_t sc = 0; sc < channel_count; sc++) {
+            if (!channels[sc].channel || !channels[sc].channel->vtable ||
+                !channels[sc].channel->vtable->send || !channels[sc].channel->vtable->name)
+                continue;
+            const char *sched_ch = channels[sc].channel->vtable->name(channels[sc].channel->ctx);
+            if (!sched_ch)
+                continue;
+            char sched_contact[128], sched_channel[32], sched_msg[512];
+            size_t sched_len = hu_conversation_flush_scheduled_for(
+                sched_now, sched_ch, strlen(sched_ch), sched_contact, sizeof(sched_contact),
+                sched_channel, sizeof(sched_channel), sched_msg, sizeof(sched_msg));
+            if (sched_len > 0) {
+                sched_len = hu_conversation_strip_ai_phrases(sched_msg, sched_len);
+                sched_len =
+                    hu_conversation_vary_complexity(sched_msg, sched_len, (uint32_t)time(NULL));
+                if (sched_len > 1 && sched_msg[0] >= 'A' && sched_msg[0] <= 'Z' &&
+                    sched_msg[1] >= 'a' && sched_msg[1] <= 'z' && sched_msg[0] != 'I') {
+                    sched_msg[0] = (char)(sched_msg[0] + 32);
+                }
+                if (sched_len > 1 && sched_msg[sched_len - 1] == '.') {
+                    sched_msg[sched_len - 1] = '\0';
+                    sched_len--;
+                }
+                channels[sc].channel->vtable->send(channels[sc].channel->ctx, sched_contact,
+                                                   strlen(sched_contact), sched_msg, sched_len,
+                                                   NULL, 0);
+                fprintf(stderr, "[human] scheduled message delivered to %s via %s\n", sched_contact,
+                        sched_ch);
+                const char *sh = getenv("HOME");
+                if (sh) {
+                    char sp[512];
+                    int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
+                    if (sn > 0 && (size_t)sn < sizeof(sp))
+                        hu_conversation_sched_save(sp, (size_t)sn);
+                }
+            }
+        }
+    }
+
     for (size_t i = 0; i < agent->persona->contacts_count; i++) {
         const hu_contact_profile_t *cp = &agent->persona->contacts[i];
         if (!cp->proactive_checkin || !cp->proactive_channel || !cp->contact_id)
@@ -1681,45 +1745,6 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 }
             }
 #endif
-
-            /* Scheduled message delivery: runs regardless of should_checkin
-             * so that due messages are never blocked by per-contact silence. */
-            if (channels[c].channel->vtable->send) {
-                static bool sched_loaded_once;
-                if (!sched_loaded_once) {
-                    const char *sh = getenv("HOME");
-                    if (sh) {
-                        char sp[512];
-                        int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
-                        if (sn > 0 && (size_t)sn < sizeof(sp))
-                            hu_conversation_sched_load(sp, (size_t)sn);
-                    }
-                    sched_loaded_once = true;
-                }
-                uint64_t sched_now = (uint64_t)time(NULL) * 1000ULL;
-                const char *sched_ch =
-                    channels[c].channel->vtable->name
-                        ? channels[c].channel->vtable->name(channels[c].channel->ctx)
-                        : "";
-                char sched_contact[128], sched_channel[32], sched_msg[512];
-                size_t sched_len = hu_conversation_flush_scheduled_for(
-                    sched_now, sched_ch, strlen(sched_ch), sched_contact, sizeof(sched_contact),
-                    sched_channel, sizeof(sched_channel), sched_msg, sizeof(sched_msg));
-                if (sched_len > 0) {
-                    channels[c].channel->vtable->send(channels[c].channel->ctx, sched_contact,
-                                                      strlen(sched_contact), sched_msg, sched_len,
-                                                      NULL, 0);
-                    fprintf(stderr, "[human] scheduled message delivered to %s via %s\n",
-                            sched_contact, sched_ch);
-                    const char *sh = getenv("HOME");
-                    if (sh) {
-                        char sp[512];
-                        int sn = snprintf(sp, sizeof(sp), "%s/.human/scheduled.json", sh);
-                        if (sn > 0 && (size_t)sn < sizeof(sp))
-                            hu_conversation_sched_save(sp, (size_t)sn);
-                    }
-                }
-            }
 
             if (!should_checkin)
                 break;
@@ -2476,7 +2501,8 @@ typedef struct hu_daemon_stream_ctx {
     char id[HU_BUS_ID_LEN];
 } hu_daemon_stream_ctx_t;
 
-/* Back up to last valid UTF-8 boundary at or before pos in buf of length len. */
+#ifndef HU_IS_TEST
+
 static size_t daemon_utf8_safe_truncate(const char *buf, size_t len) {
     if (len == 0)
         return 0;
@@ -2524,8 +2550,6 @@ static hu_service_channel_t *daemon_out_find_channel(hu_service_channel_t *chann
     }
     return NULL;
 }
-
-#ifndef HU_IS_TEST
 /* Rich stream event callback: maps agent stream events to bus (matches gateway pattern). */
 static void daemon_stream_event_cb(const hu_agent_stream_event_t *event, void *ctx) {
     hu_daemon_stream_ctx_t *sc = (hu_daemon_stream_ctx_t *)ctx;
@@ -3414,14 +3438,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
                         /* Channel-aware Turing analysis: per-channel weak dimensions */
                         if (tdb && agent->persona) {
-                            static const char *channels[] = {"telegram", "discord",  "slack",
-                                                             "imessage", "whatsapp", "email",
-                                                             "signal",   "matrix"};
-                            for (size_t ch = 0; ch < sizeof(channels) / sizeof(channels[0]); ch++) {
+                            static const char *turing_channels[] = {"telegram", "discord",  "slack",
+                                                                    "imessage", "whatsapp", "email",
+                                                                    "signal",   "matrix"};
+                            for (size_t ch = 0;
+                                 ch < sizeof(turing_channels) / sizeof(turing_channels[0]); ch++) {
                                 int ch_dims[HU_TURING_DIM_COUNT];
-                                size_t ch_len = strlen(channels[ch]);
-                                if (hu_turing_get_channel_dimensions(tdb, channels[ch], ch_len,
-                                                                     ch_dims) == HU_OK) {
+                                size_t ch_len = strlen(turing_channels[ch]);
+                                if (hu_turing_get_channel_dimensions(tdb, turing_channels[ch],
+                                                                     ch_len, ch_dims) == HU_OK) {
                                     int ch_sum = 0, ch_count = 0;
                                     for (int d = 0; d < 12; d++) {
                                         if (ch_dims[d] > 0) {
@@ -3435,7 +3460,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             fprintf(stderr,
                                                     "[human] channel %s: avg turing %d/10 "
                                                     "(below target)\n",
-                                                    channels[ch], ch_avg);
+                                                    turing_channels[ch], ch_avg);
                                     }
                                 }
                             }
@@ -3459,6 +3484,40 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             (double)traj.directional_alignment,
                                             (double)traj.cumulative_impact, (double)traj.stability,
                                             (double)traj.overall);
+                                }
+                            }
+                        }
+
+                        /* B1: Seed A/B experiments if they don't exist yet */
+                        if (tdb) {
+                            (void)hu_ab_test_init_table(tdb);
+                            static const struct {
+                                const char *name;
+                                float a;
+                                float b;
+                            } ab_seed[] = {
+                                {"disfluency_freq", 0.10f, 0.20f},
+                                {"backchannel_prob", 0.25f, 0.40f},
+                                {"double_text_prob", 0.05f, 0.12f},
+                            };
+                            for (size_t ab_i = 0; ab_i < 3; ab_i++) {
+                                hu_ab_test_t existing;
+                                if (hu_ab_test_get_results(tdb, ab_seed[ab_i].name, &existing) !=
+                                    HU_OK) {
+                                    (void)hu_ab_test_create(tdb, ab_seed[ab_i].name,
+                                                            ab_seed[ab_i].a, ab_seed[ab_i].b);
+                                    fprintf(stderr, "[human] ab: seeded test '%s' (%.2f vs %.2f)\n",
+                                            ab_seed[ab_i].name, (double)ab_seed[ab_i].a,
+                                            (double)ab_seed[ab_i].b);
+                                }
+                            }
+
+                            /* W1: Auto-resolve A/B tests with enough data */
+                            for (size_t ab_i = 0; ab_i < 3; ab_i++) {
+                                float winner = 0.0f;
+                                if (hu_ab_test_resolve(tdb, ab_seed[ab_i].name, &winner) == HU_OK) {
+                                    fprintf(stderr, "[human] ab: resolved '%s' -> winner=%.2f\n",
+                                            ab_seed[ab_i].name, (double)winner);
                                 }
                             }
                         }
@@ -8411,9 +8470,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                      * Only fires once (shares retried flag with quality gate). */
                     if (err == HU_OK && response && response_len > 0 && !retried) {
                         hu_turing_score_t pre_tscore;
-                        if (hu_turing_score_heuristic(response, response_len, combined,
-                                                      combined_len, &pre_tscore) == HU_OK &&
-                            pre_tscore.overall < 6) {
+                        hu_error_t pre_ts_err = hu_turing_score_heuristic(
+                            response, response_len, combined, combined_len, &pre_tscore);
+                        if (pre_ts_err == HU_OK && agent->active_channel)
+                            hu_turing_apply_channel_weights(&pre_tscore, agent->active_channel,
+                                                            agent->active_channel_len);
+                        if (pre_ts_err == HU_OK && pre_tscore.overall < 6) {
                             retried = true;
                             fprintf(stderr, "[human] turing retry: %d/10 [%s] for %.40s...\n",
                                     pre_tscore.overall, hu_turing_verdict_name(pre_tscore.verdict),
@@ -9832,15 +9894,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                         agent->active_channel_len);
                     }
                     if (ts_err == HU_OK) {
-                        fprintf(stderr, "[human] turing: %d/10 [%s] for %.*s\n", tscore.overall,
-                                hu_turing_verdict_name(tscore.verdict),
-                                (int)(key_len > 20 ? 20 : key_len), batch_key);
-                        sqlite3 *ts_db = hu_sqlite_memory_get_db(agent->memory);
-                        if (ts_db) {
-                            (void)hu_turing_init_tables(ts_db);
-                            (void)hu_turing_store_score(ts_db, batch_key, key_len,
-                                                        (int64_t)time(NULL), &tscore);
-                        }
                         if (agent->bth_metrics)
                             agent->bth_metrics->total_turns++;
                         /* Voice-aware scoring: when voice pipeline is active, give
@@ -9856,7 +9909,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             for (int td = 0; td < 12; td++)
                                 text_sum += tscore.dimensions[td];
                             int text_avg = text_sum / 12;
-                            /* Blend: 60% text, 40% voice when voice is active */
                             int blended = (text_avg * 60 + voice_avg * 40 + 50) / 100;
                             if (blended != tscore.overall) {
                                 fprintf(stderr,
@@ -9866,6 +9918,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             }
                         }
 #endif
+                        fprintf(stderr, "[human] turing: %d/10 [%s] for %.*s\n", tscore.overall,
+                                hu_turing_verdict_name(tscore.verdict),
+                                (int)(key_len > 20 ? 20 : key_len), batch_key);
+                        sqlite3 *ts_db = hu_sqlite_memory_get_db(agent->memory);
+                        if (ts_db) {
+                            (void)hu_turing_init_tables(ts_db);
+                            (void)hu_turing_store_score(ts_db, batch_key, key_len,
+                                                        (int64_t)time(NULL), &tscore);
+                        }
 
                         /* A/B test recording: record score for active tests */
                         if (ts_db && batch_key && key_len > 0) {
@@ -9962,30 +10023,23 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* GIF calibration: detect if they reacted to our GIF in recent history */
-                if (history_entries && history_count >= 2) {
-                    for (size_t hi = 1; hi < history_count; hi++) {
-                        if (history_entries[hi - 1].from_me && !history_entries[hi].from_me) {
-                            const char *prev = history_entries[hi - 1].text;
-                            const char *curr = history_entries[hi].text;
-                            bool was_gif = strstr(prev, "[GIF]") || strstr(prev, ".gif");
-                            bool is_reaction = strstr(curr, "Loved") ||
-                                               strstr(curr, "Laughed at") || strstr(curr, "Liked");
-                            if (was_gif && is_reaction) {
-                                hu_conversation_gif_cal_record_reaction(batch_key, key_len);
-                                static uint64_t last_gif_cal_save_ms;
-                                uint64_t gcnow = (uint64_t)time(NULL) * 1000ULL;
-                                if (gcnow - last_gif_cal_save_ms > 30000) {
-                                    last_gif_cal_save_ms = gcnow;
-                                    const char *rh = getenv("HOME");
-                                    if (rh) {
-                                        char rcp[512];
-                                        int rn = snprintf(rcp, sizeof(rcp),
-                                                          "%s/.human/gif_calibration.json", rh);
-                                        if (rn > 0 && (size_t)rn < sizeof(rcp))
-                                            hu_conversation_gif_cal_save(rcp, (size_t)rn);
-                                    }
-                                }
+                /* GIF calibration: detect positive tapbacks on our GIF messages via SQL */
+                {
+                    int gif_taps = hu_imessage_count_recent_gif_tapbacks(batch_key, key_len);
+                    if (gif_taps > 0) {
+                        for (int gt = 0; gt < gif_taps; gt++)
+                            hu_conversation_gif_cal_record_reaction(batch_key, key_len);
+                        static uint64_t last_gif_cal_save_ms;
+                        uint64_t gcnow = (uint64_t)time(NULL) * 1000ULL;
+                        if (gcnow - last_gif_cal_save_ms > 30000) {
+                            last_gif_cal_save_ms = gcnow;
+                            const char *rh = getenv("HOME");
+                            if (rh) {
+                                char rcp[512];
+                                int rn = snprintf(rcp, sizeof(rcp),
+                                                  "%s/.human/gif_calibration.json", rh);
+                                if (rn > 0 && (size_t)rn < sizeof(rcp))
+                                    hu_conversation_gif_cal_save(rcp, (size_t)rn);
                             }
                         }
                     }

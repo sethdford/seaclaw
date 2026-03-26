@@ -600,11 +600,13 @@ describe("hu-tool-result", () => {
       tool: string;
       status: string;
       content: string;
+      input: string;
       collapsed: boolean;
     };
     expect(el.tool).toBe("");
     expect(el.status).toBe("running");
     expect(el.content).toBe("");
+    expect(el.input).toBe("");
     expect(el.collapsed).toBe(false);
   });
 
@@ -622,6 +624,7 @@ describe("hu-tool-result", () => {
     await el.updateComplete;
     const header = el.shadowRoot?.querySelector(".header");
     expect(header?.textContent).toContain("shell");
+    expect(header?.textContent).toContain("Completed");
     el.remove();
   });
 
@@ -651,6 +654,27 @@ describe("hu-tool-result", () => {
     header?.click();
     await el.updateComplete;
     expect(el.collapsed).toBe(true);
+    el.remove();
+  });
+
+  it("renders input and output sections when input is set", async () => {
+    const el = document.createElement("hu-tool-result") as HTMLElement & {
+      tool: string;
+      status: string;
+      content: string;
+      input: string;
+      updateComplete: Promise<boolean>;
+    };
+    el.tool = "grep";
+    el.status = "success";
+    el.input = '{"pattern":"foo"}';
+    el.content = "matches: 2";
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const toggles = el.shadowRoot?.querySelectorAll(".section-toggle");
+    expect(toggles?.length).toBe(2);
+    expect(el.shadowRoot?.textContent).toContain("Input");
+    expect(el.shadowRoot?.textContent).toContain("Output");
     el.remove();
   });
 });
@@ -1274,6 +1298,69 @@ describe("hu-reasoning-block", () => {
     expect(preview?.textContent?.endsWith("...")).toBe(true);
     expect(preview?.textContent?.length).toBeLessThanOrEqual(103);
     el.remove();
+  });
+
+  it("expands when streaming starts", async () => {
+    const el = document.createElement("hu-reasoning-block") as HTMLElement & {
+      content: string;
+      collapsed: boolean;
+      streaming: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.content = "Short.";
+    el.collapsed = true;
+    el.streaming = false;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    el.streaming = true;
+    await el.updateComplete;
+    expect(el.collapsed).toBe(false);
+    el.remove();
+  });
+
+  it("auto-collapses long content after streaming stops", async () => {
+    vi.useFakeTimers();
+    const el = document.createElement("hu-reasoning-block") as HTMLElement & {
+      content: string;
+      collapsed: boolean;
+      streaming: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    const longText = "x".repeat(201);
+    el.content = longText;
+    el.streaming = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.collapsed).toBe(false);
+    el.streaming = false;
+    await el.updateComplete;
+    expect(el.collapsed).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    await el.updateComplete;
+    expect(el.collapsed).toBe(true);
+    el.remove();
+    vi.useRealTimers();
+  });
+
+  it("stays expanded after streaming stops when content is short", async () => {
+    vi.useFakeTimers();
+    const el = document.createElement("hu-reasoning-block") as HTMLElement & {
+      content: string;
+      collapsed: boolean;
+      streaming: boolean;
+      updateComplete: Promise<boolean>;
+    };
+    el.content = "Short thought.";
+    el.streaming = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    el.streaming = false;
+    await el.updateComplete;
+    await vi.advanceTimersByTimeAsync(2000);
+    await el.updateComplete;
+    expect(el.collapsed).toBe(false);
+    el.remove();
+    vi.useRealTimers();
   });
 });
 
