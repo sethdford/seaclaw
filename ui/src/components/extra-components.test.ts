@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { HU_CHART_CATEGORICAL_SERIES_COUNT, type ScChart } from "./hu-chart.js";
 import type { ScJsonViewer } from "./hu-json-viewer.js";
+import "./hu-voice-clone.js";
 import type { ScPagination } from "./hu-pagination.js";
 import type { ScDataTableV2 } from "./hu-data-table-v2.js";
 import type { ScCheckbox } from "./hu-checkbox.js";
@@ -3666,5 +3667,27 @@ describe("spring animation library", () => {
     } finally {
       matchMediaSpy.mockRestore();
     }
+  });
+});
+
+describe("hu-voice-clone", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("hu-voice-clone")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("hu-voice-clone");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+
+  it("should render clone card", async () => {
+    const el = document.createElement("hu-voice-clone") as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const shadow = el.shadowRoot!;
+    expect(shadow.querySelector(".clone-card")).toBeTruthy();
+    el.remove();
   });
 });

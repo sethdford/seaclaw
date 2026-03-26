@@ -47,6 +47,8 @@ _human() {
                 paperclip:Paperclip agent integration
                 persona:Persona management
                 research:Run research agent
+                schedule:Manage scheduled messages
+                voice:Voice cloning and TTS
                 plugins:Plugin management
                 pwa:PWA browser automation
                 sandbox:Sandbox management

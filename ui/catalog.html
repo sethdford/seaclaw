@@ -112,6 +112,7 @@
       <a href="#hu-automation-card">hu-automation-card</a>
       <a href="#hu-automation-form">hu-automation-form</a>
       <a href="#hu-voice-orb">hu-voice-orb</a>
+      <a href="#hu-voice-clone">hu-voice-clone</a>
       <a href="#hu-voice-conversation">hu-voice-conversation</a>
       <a href="#hu-chat-sessions-panel">hu-chat-sessions-panel</a>
       <a href="#hu-file-preview">hu-file-preview</a>
@@ -1301,6 +1302,17 @@
         <div class="code-snippet"><code>&lt;hu-voice-orb .state=${"idle"} .audioLevel=${0} ?disabled=${false} @hu-voice-mic-toggle=${"..."}&gt;&lt;/hu-voice-orb&gt;</code></div>
       </section>
 
+      <section class="component-section" id="hu-voice-clone">
+        <h2>hu-voice-clone</h2>
+        <p>Voice cloning interface: upload audio sample, clone voice via Cartesia, and assign to persona.</p>
+        <div class="playground">
+          <div class="preview" style="width:100%;min-height:200px">
+            <hu-voice-clone></hu-voice-clone>
+          </div>
+        </div>
+        <div class="code-snippet"><code>&lt;hu-voice-clone persona="default"&gt;&lt;/hu-voice-clone&gt;</code></div>
+      </section>
+
       <section class="component-section" id="hu-voice-conversation">
         <h2>hu-voice-conversation</h2>
         <p>Conversation display for voice view: empty state or message thread with scroll-to-bottom.</p>
@@ -1746,6 +1758,7 @@
       import "/src/components/hu-automation-card.js";
       import "/src/components/hu-automation-form.js";
       import "/src/components/hu-voice-orb.js";
+      import "/src/components/hu-voice-clone.js";
       import "/src/components/hu-voice-conversation.js";
       import "/src/components/hu-chat-sessions-panel.js";
       import "/src/components/hu-file-preview.js";
