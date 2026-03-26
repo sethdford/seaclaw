@@ -7846,6 +7846,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 
                     /* Inline reply awareness: look up the original message they replied to */
+#ifdef HU_HAS_IMESSAGE
                     {
                         const char *reply_guid = NULL;
                         for (size_t bi = batch_start; bi <= batch_end; bi++) {
@@ -7871,6 +7872,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             }
                         }
                     }
+#endif
 
                     /* Contact photo context: if available, note it for richer understanding.
                      * The path is stored for potential vision-model multimodal prompting. */

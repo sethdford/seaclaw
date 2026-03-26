@@ -1,73 +1,155 @@
----
-title: Cartesia Voice Clone Setup
-date: 2026-03-11
----
+# Voice Cloning Setup
 
-# Cartesia Voice Clone Setup
-
-This guide explains how to create and configure a cloned voice for use with Human's Cartesia TTS integration.
+Clone your voice for use with Cartesia TTS. Once cloned, Human uses your voice for all text-to-speech output — including voice messages sent via iMessage, Telegram, Discord, and other channels.
 
 ## Prerequisites
 
-- Cartesia API key ([cartesia.ai](https://cartesia.ai))
-- `HU_ENABLE_CARTESIA=ON` and `HU_ENABLE_CURL=ON` in your build
+- **Cartesia API key**: Set `CARTESIA_API_KEY` environment variable, or add it to `~/.human/config.json` under `providers.cartesia.api_key`.
+- **Build with Cartesia**: `cmake --preset dev -DHU_ENABLE_CARTESIA=ON` (or any preset with Cartesia enabled).
+- **Audio sample**: 5–10 seconds of clear speech in a quiet environment. Supported formats: WAV, MP3, M4A, CAF, OGG.
 
-## Step 1: Record a Voice Sample
+## Quick Start (CLI)
 
-1. Record 30–60 seconds of clear speech in a quiet environment.
-2. Use a good microphone; avoid background noise and reverb.
-3. Speak naturally at a consistent pace. Include varied intonation.
-4. Save as WAV or MP3 (mono, 16 kHz or 44.1 kHz recommended).
+```bash
+# Record a 10-second sample (use any recording tool)
+# Then clone it and assign to your persona:
+human voice clone --file ~/my-voice-sample.wav --name "My Voice" --persona seth
 
-## Step 2: Upload to Cartesia
+# Verify the persona was updated:
+human persona show seth | grep voice_id
+```
 
-1. Log in to the [Cartesia dashboard](https://play.cartesia.ai).
-2. Go to **Voices** → **Create Voice** → **Instant Voice Clone**.
-3. Upload your audio file.
-4. Wait for processing (usually under a minute).
-5. Copy the **Voice ID** (UUID format, e.g. `a0e99841-438c-4a64-b679-ae501e7d6091`).
+## CLI Reference
 
-## Step 3: Add to Persona Config
+```
+human voice clone --file <path> [--name <name>] [--lang <code>] [--persona <name>]
+```
 
-Add a `voice` block to your persona JSON (`~/.human/personas/<name>.json`):
+| Flag | Description | Default |
+| ------------ | ---------------------------------------- | ------------ |
+| `--file` | Path to audio file (required) | — |
+| `--name` | Name for the cloned voice | "My Voice" |
+| `--lang` | ISO 639-1 language code | "en" |
+| `--persona` | Auto-update this persona's voice config | (none) |
+
+## Gateway API
+
+The `voice.clone` JSON-RPC method accepts base64-encoded audio:
 
 ```json
 {
-  "version": 1,
-  "name": "my-persona",
-  "core": { "identity": "...", "traits": [...] },
-  "voice": {
-    "provider": "cartesia",
-    "voice_id": "a0e99841-438c-4a64-b679-ae501e7d6091",
-    "model": "sonic-3-2026-01-12",
-    "default_emotion": "content",
-    "default_speed": 0.95,
-    "nonverbals": true
+  "method": "voice.clone",
+  "params": {
+    "audio": "<base64-encoded-audio>",
+    "mimeType": "audio/wav",
+    "name": "My Voice",
+    "language": "en",
+    "persona": "seth"
   }
 }
 ```
 
-| Field             | Description                    | Default                |
-| ----------------- | ------------------------------ | ---------------------- |
-| `provider`        | TTS provider (`"cartesia"`)    | `"cartesia"`           |
-| `voice_id`        | Cartesia voice UUID from clone | (required for TTS)     |
-| `model`           | Cartesia model ID              | `"sonic-3-2026-01-12"` |
-| `default_emotion` | Base emotion tag               | `"content"`            |
-| `default_speed`   | Playback speed (0.5–2.0)       | `0.95`                 |
-| `nonverbals`      | Enable `[laughter]` etc.       | `true`                 |
+Response:
 
-## Step 4: Set API Key
+```json
+{
+  "voice_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "name": "My Voice",
+  "language": "en"
+}
+```
 
-Configure your Cartesia API key in `~/.human/config.json` or via the `CARTESIA_API_KEY` environment variable.
+## Web Dashboard
 
-## Automated STT / gateway E2E (no microphone)
+1. Navigate to the **Voice** view.
+2. Click **Clone Voice** in the status bar.
+3. Enter a voice name and optionally a persona name.
+4. Click **Start Recording** and speak for 5–10 seconds.
+5. Click **Stop & Clone** to upload and create the voice.
 
-- **Direct Cartesia API** (TTS → WAV → STT): `bash scripts/e2e-voice-stt.sh` with `CARTESIA_API_KEY` and `CARTESIA_VOICE_ID` (or `FERNI_VOICE_ID`) set. See script header for multi-turn mode, keyword N-of-M, and model matrix env vars.
-- **Gateway `voice.transcribe`**: set `E2E_VOICE_STT_GATEWAY=1` (requires a built `human` binary and Node 22+). Uses `scripts/e2e-voice-stt-gateway.mjs` over `ws://…/ws`.
-- **CI**: `.github/workflows/e2e-cartesia-voice-stt.yml` runs on `workflow_dispatch` and weekly schedule; configure repository secrets `CARTESIA_API_KEY` and `CARTESIA_VOICE_ID`. Scheduled runs skip quietly if secrets are absent.
+## Agent Tool
+
+The agent has access to a `voice_clone` tool. It can be invoked by the LLM:
+
+```json
+{
+  "tool": "voice_clone",
+  "args": {
+    "file_path": "/path/to/audio.wav",
+    "name": "User Voice",
+    "language": "en",
+    "persona": "seth"
+  }
+}
+```
+
+## How It Works
+
+1. **Upload**: Audio is sent to Cartesia's `POST /voices/clone` endpoint.
+2. **Clone**: Cartesia processes the audio and returns a voice UUID.
+3. **Persona Update**: If a persona name is provided, the voice UUID is written into `~/.human/personas/<name>.json` under `voice.voice_id` with `voice.provider = "cartesia"`.
+4. **TTS Usage**: All subsequent TTS synthesis uses the cloned voice ID. The daemon's outbound voice pipeline reads `voice_id` from the active persona and passes it to `hu_cartesia_tts_synthesize()`.
+
+## Persona JSON Structure
+
+After cloning, the persona file includes:
+
+```json
+{
+  "identity": { ... },
+  "voice": {
+    "voice_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "provider": "cartesia"
+  }
+}
+```
 
 ## Troubleshooting
 
-- **No voice output**: Ensure `voice_id` is set and `HU_ENABLE_CARTESIA=ON`.
-- **Auth errors**: Verify API key and that the voice belongs to your account.
-- **Poor quality**: Re-record with less noise; use a higher sample rate.
+- **"voice cloning not available in this build"**: Rebuild with `-DHU_ENABLE_CARTESIA=ON -DHU_ENABLE_CURL=ON`.
+- **"CARTESIA_API_KEY environment variable not set"**: Export the key or add it to config.
+- **Clone fails with error**: Ensure the audio is 5–10 seconds of clear speech. Very short clips (<3s) or noisy recordings may fail.
+- **Voice sounds wrong**: Re-record in a quiet environment. Speak naturally at your normal pace and volume.
+
+## Architecture
+
+```
+CLI (human voice clone)
+        │
+        ▼
+hu_voice_clone_from_file()  ─── src/tts/voice_clone.c
+        │
+        ├─ curl POST /voices/clone (Cartesia API)
+        │
+        ▼
+hu_persona_set_voice_id()   ─── src/tts/voice_clone.c
+        │
+        ▼
+~/.human/personas/<name>.json updated
+
+Gateway (voice.clone RPC)
+        │
+        ▼
+cp_voice_clone()            ─── src/gateway/cp_voice_clone.c
+        │
+        ├─ base64 decode → hu_voice_clone_from_bytes()
+        │
+        ▼
+Same flow as CLI
+
+Agent Tool (voice_clone)
+        │
+        ▼
+src/tools/voice_clone.c     ─── delegates to hu_voice_clone_from_file()
+```
+
+## Related Files
+
+| File | Purpose |
+| ------------------------------------ | ------------------------------- |
+| `include/human/tts/voice_clone.h` | Public API |
+| `src/tts/voice_clone.c` | Core implementation |
+| `src/gateway/cp_voice_clone.c` | Gateway RPC handler |
+| `src/tools/voice_clone.c` | Agent tool |
+| `tests/test_voice_clone.c` | Unit tests |
+| `ui/src/components/hu-voice-clone.ts` | Web dashboard component |

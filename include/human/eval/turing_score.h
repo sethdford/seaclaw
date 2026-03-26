@@ -111,11 +111,6 @@ hu_error_t hu_turing_get_weakest_dimensions(sqlite3 *db, int *dimension_averages
 hu_error_t hu_turing_get_contact_dimensions(sqlite3 *db, const char *contact_id,
                                             size_t contact_id_len, int *dimension_averages);
 
-/* Build a contact-specific hint string from weak dimensions.
- * Caller owns returned string (free with alloc). Returns NULL if no weak dims. */
-char *hu_turing_build_contact_hint(hu_allocator_t *alloc, const int *dimension_averages,
-                                   size_t *out_len);
-
 /* Per-channel dimension averages (last 30 days, derived from contact channel prefix). */
 hu_error_t hu_turing_get_channel_dimensions(sqlite3 *db, const char *channel_name,
                                             size_t channel_name_len, int *dimension_averages);
@@ -139,9 +134,6 @@ hu_error_t hu_ab_test_init_table(sqlite3 *db);
 
 hu_error_t hu_ab_test_create(sqlite3 *db, const char *name, float variant_a, float variant_b);
 
-/* Pick variant for this turn (deterministic based on contact_id hash). */
-bool hu_ab_test_pick_variant(const char *contact_id, size_t contact_id_len, const char *test_name);
-
 hu_error_t hu_ab_test_record(sqlite3 *db, const char *name, bool is_variant_b, int turing_score);
 
 hu_error_t hu_ab_test_get_results(sqlite3 *db, const char *name, hu_ab_test_t *out);
@@ -149,5 +141,15 @@ hu_error_t hu_ab_test_get_results(sqlite3 *db, const char *name, hu_ab_test_t *o
 /* Auto-resolve: if one variant is significantly better after enough observations, promote it. */
 hu_error_t hu_ab_test_resolve(sqlite3 *db, const char *name, float *winning_value);
 #endif
+
+/* SQLite-independent Turing utilities (pure computation, no db needed). */
+
+/* Build a contact-specific hint string from weak dimensions.
+ * Caller owns returned string (free with alloc). Returns NULL if no weak dims. */
+char *hu_turing_build_contact_hint(hu_allocator_t *alloc, const int *dimension_averages,
+                                   size_t *out_len);
+
+/* Pick A/B test variant (deterministic based on contact_id hash). */
+bool hu_ab_test_pick_variant(const char *contact_id, size_t contact_id_len, const char *test_name);
 
 #endif

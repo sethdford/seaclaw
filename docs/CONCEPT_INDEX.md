@@ -81,6 +81,10 @@ Use this to find the right files for a given task without searching the full cod
 | **Emotion–voice map**                | `src/voice/emotion_voice_map.c`, `include/human/voice/emotion_voice_map.h`   | `test_sota_wiring.c`                                 |
 | **Audio emotion (STT features)**   | `src/voice/audio_emotion.c`, `include/human/voice/audio_emotion.h`           | `—`                                                  |
 | **Turn signal (LLM turn-taking)**  | `src/voice/turn_signal.c`, `include/human/voice/turn_signal.h`               | `test_turn_signal.c`                                 |
+| **Voice cloning (Cartesia)**       | `src/tts/voice_clone.c`, `include/human/tts/voice_clone.h`                  | `test_voice_clone.c`                                 |
+| **Voice clone gateway**            | `src/gateway/cp_voice_clone.c`                                               | `test_voice_clone.c`                                 |
+| **Voice clone tool**               | `src/tools/voice_clone.c`, `include/human/tools/voice_clone.h`              | `test_voice_clone.c`                                 |
+| **Voice clone UI**                 | `ui/src/components/hu-voice-clone.ts`                                        | `—`                                                  |
 
 ## Tools
 

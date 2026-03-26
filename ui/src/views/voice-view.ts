@@ -19,6 +19,7 @@ import "../components/hu-empty-state.js";
 import "../components/hu-status-dot.js";
 import "../components/hu-voice-orb.js";
 import "../components/hu-voice-conversation.js";
+import "../components/hu-voice-clone.js";
 import "../components/hu-empty-state.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
@@ -218,6 +219,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private _sessionDurationSec = 0;
   @state() private _speaking = false;
   @state() private _audioLevel = 0;
+  @state() private _showClonePanel = false;
   private _durationTimer: ReturnType<typeof setInterval> | null = null;
   private _recorder = new AudioRecorder();
   readonly #playback = new AudioPlaybackEngine(24000);
@@ -762,6 +764,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
     return html`
       <div class="container hu-mesh-gradient">
         ${this._renderStatusBar()} ${this._renderErrorBanner()}
+        ${this._showClonePanel
+          ? html`<hu-voice-clone .gateway=${this.gateway ?? this._boundGateway}></hu-voice-clone>`
+          : nothing}
         <hu-voice-conversation
           .items=${this._chatItems}
           .isWaiting=${this.voiceStatus === "processing"}
@@ -819,6 +824,16 @@ export class ScVoiceView extends GatewayAwareLitElement {
             aria-label="Export conversation"
           >
             Export
+          </hu-button>
+          <hu-button
+            variant="ghost"
+            size="sm"
+            @click=${() => {
+              this._showClonePanel = !this._showClonePanel;
+            }}
+            aria-label="Clone voice"
+          >
+            Clone Voice
           </hu-button>
           <hu-button
             variant="ghost"

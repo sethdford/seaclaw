@@ -1268,6 +1268,7 @@ hu_error_t hu_turing_get_contact_dimensions(sqlite3 *db, const char *contact_id,
     sqlite3_finalize(stmt);
     return HU_OK;
 }
+#endif /* HU_ENABLE_SQLITE — hint builder + pick_variant are SQLite-independent, below */
 
 static const char *DIMENSION_HINTS[] = {
     "Use contractions and casual language. Avoid formal phrasing.",
@@ -1315,6 +1316,7 @@ char *hu_turing_build_contact_hint(hu_allocator_t *alloc, const int *dimension_a
     return result;
 }
 
+#ifdef HU_ENABLE_SQLITE
 hu_error_t hu_turing_get_channel_dimensions(sqlite3 *db, const char *channel_name,
                                             size_t channel_name_len, int *dimension_averages) {
     if (!db || !channel_name || !dimension_averages)
@@ -1463,18 +1465,6 @@ hu_error_t hu_ab_test_create(sqlite3 *db, const char *name, float variant_a, flo
     return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_IO;
 }
 
-bool hu_ab_test_pick_variant(const char *contact_id, size_t contact_id_len, const char *test_name) {
-    if (!contact_id || !test_name)
-        return false;
-    uint32_t hash = 5381;
-    for (size_t i = 0; i < contact_id_len; i++)
-        hash = ((hash << 5) + hash) + (uint32_t)(unsigned char)contact_id[i];
-    const char *p = test_name;
-    while (*p)
-        hash = ((hash << 5) + hash) + (uint32_t)(unsigned char)*p++;
-    return (hash % 2) == 1;
-}
-
 hu_error_t hu_ab_test_record(sqlite3 *db, const char *name, bool is_variant_b, int turing_score) {
     if (!db || !name)
         return HU_ERR_INVALID_ARGUMENT;
@@ -1559,4 +1549,16 @@ hu_error_t hu_ab_test_resolve(sqlite3 *db, const char *name, float *winning_valu
     sqlite3_finalize(stmt);
     return HU_OK;
 }
-#endif
+#endif /* HU_ENABLE_SQLITE */
+
+bool hu_ab_test_pick_variant(const char *contact_id, size_t contact_id_len, const char *test_name) {
+    if (!contact_id || !test_name)
+        return false;
+    uint32_t hash = 5381;
+    for (size_t i = 0; i < contact_id_len; i++)
+        hash = ((hash << 5) + hash) + (uint32_t)(unsigned char)contact_id[i];
+    const char *p = test_name;
+    while (*p)
+        hash = ((hash << 5) + hash) + (uint32_t)(unsigned char)*p++;
+    return (hash % 2) == 1;
+}
