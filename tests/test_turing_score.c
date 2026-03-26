@@ -1,5 +1,6 @@
 #include "human/eval/turing_score.h"
 #include "test_framework.h"
+#include <time.h>
 
 static void turing_heuristic_casual_message_scores_high(void) {
     hu_turing_score_t score;
@@ -301,6 +302,153 @@ static void turing_ab_pick_variant_deterministic(void) {
     (void)v3;
 }
 
+static void turing_rn_not_matched_inside_words(void) {
+    hu_turing_score_t score_word;
+    const char *msg_word = "i'm learning new patterns for this";
+    HU_ASSERT(hu_turing_score_heuristic(msg_word, strlen(msg_word), NULL, 0, &score_word) == HU_OK);
+
+    hu_turing_score_t score_rn;
+    const char *msg_rn = "doing homework rn lol";
+    HU_ASSERT(hu_turing_score_heuristic(msg_rn, strlen(msg_rn), NULL, 0, &score_rn) == HU_OK);
+
+    /* "rn" as a standalone word should score higher on casual markers than "rn" inside words */
+    HU_ASSERT(score_rn.dimensions[HU_TURING_NATURAL_LANGUAGE] >=
+              score_word.dimensions[HU_TURING_NATURAL_LANGUAGE]);
+}
+
+static void turing_weighted_scoring_text_dominant(void) {
+    hu_turing_score_t score;
+    const char *msg = "yeah that's so true, i've been thinking the same thing honestly";
+    HU_ASSERT(hu_turing_score_heuristic(msg, strlen(msg), NULL, 0, &score) == HU_OK);
+    /* Text dims should dominate: even if voice-proxy dims are lower,
+     * a casual human message should score well overall */
+    HU_ASSERT(score.overall >= 7);
+}
+
+static void turing_expanded_ai_tells_detected(void) {
+    hu_turing_score_t score;
+    const char *msg = "Let me know if you need anything else! Hope this helps. "
+                      "In summary, it's important to note that I apologize for any confusion.";
+    HU_ASSERT(hu_turing_score_heuristic(msg, strlen(msg), NULL, 0, &score) == HU_OK);
+    HU_ASSERT(score.dimensions[HU_TURING_NATURAL_LANGUAGE] <= 5);
+    HU_ASSERT(score.dimensions[HU_TURING_NON_ROBOTIC] <= 3);
+}
+
+static void turing_markdown_bold_penalized(void) {
+    hu_turing_score_t score;
+    const char *msg = "Here are the **key points** you should consider:\n"
+                      "The **most important** thing is to stay focused.";
+    HU_ASSERT(hu_turing_score_heuristic(msg, strlen(msg), NULL, 0, &score) == HU_OK);
+    /* Markdown bold (**) is detected as an AI tell */
+    HU_ASSERT(score.dimensions[HU_TURING_NON_ROBOTIC] <= 7);
+}
+
+static void turing_energy_matching_correct_segment(void) {
+    hu_turing_score_t score;
+    /* Context has two lines: a long first message and a short last message */
+    const char *ctx = "hey i was thinking about what you said yesterday about the whole "
+                      "situation with work and everything\nyo";
+    const char *resp = "what's up";
+    HU_ASSERT(hu_turing_score_heuristic(resp, strlen(resp), ctx, strlen(ctx), &score) == HU_OK);
+    /* Short response to short last message should score well on energy matching */
+    HU_ASSERT(score.dimensions[HU_TURING_ENERGY_MATCHING] >= 7);
+}
+
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+
+static void turing_ab_test_sqlite_roundtrip(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT(sqlite3_open(":memory:", &db) == SQLITE_OK);
+    HU_ASSERT(hu_ab_test_init_table(db) == HU_OK);
+    HU_ASSERT(hu_ab_test_create(db, "test_param", 0.10f, 0.20f) == HU_OK);
+
+    hu_ab_test_t test;
+    HU_ASSERT(hu_ab_test_get_results(db, "test_param", &test) == HU_OK);
+    HU_ASSERT(test.active);
+    HU_ASSERT(test.score_count_a == 0);
+    HU_ASSERT(test.score_count_b == 0);
+
+    HU_ASSERT(hu_ab_test_record(db, "test_param", false, 8) == HU_OK);
+    HU_ASSERT(hu_ab_test_record(db, "test_param", true, 7) == HU_OK);
+    HU_ASSERT(hu_ab_test_get_results(db, "test_param", &test) == HU_OK);
+    HU_ASSERT(test.score_count_a == 1);
+    HU_ASSERT(test.score_count_b == 1);
+    HU_ASSERT(test.score_sum_a == 8);
+    HU_ASSERT(test.score_sum_b == 7);
+
+    /* Not enough observations to resolve */
+    float winner = 0;
+    HU_ASSERT(hu_ab_test_resolve(db, "test_param", &winner) == HU_ERR_NOT_SUPPORTED);
+
+    sqlite3_close(db);
+}
+
+static void turing_contact_dims_sqlite_empty_table(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT(sqlite3_open(":memory:", &db) == SQLITE_OK);
+    HU_ASSERT(hu_turing_init_tables(db) == HU_OK);
+
+    int dims[HU_TURING_DIM_COUNT];
+    memset(dims, 99, sizeof(dims));
+    HU_ASSERT(hu_turing_get_contact_dimensions(db, "nobody", 6, dims) == HU_OK);
+    /* All zeros when no data */
+    for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
+        HU_ASSERT(dims[i] == 0);
+
+    sqlite3_close(db);
+}
+
+static void turing_contact_dims_sqlite_with_data(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT(sqlite3_open(":memory:", &db) == SQLITE_OK);
+    HU_ASSERT(hu_turing_init_tables(db) == HU_OK);
+
+    hu_turing_score_t score;
+    memset(&score, 0, sizeof(score));
+    score.overall = 8;
+    score.verdict = HU_TURING_HUMAN;
+    for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
+        score.dimensions[i] = 7;
+    score.dimensions[HU_TURING_NATURAL_LANGUAGE] = 9;
+
+    HU_ASSERT(hu_turing_store_score(db, "alice", 5, (int64_t)time(NULL), &score) == HU_OK);
+
+    int dims[HU_TURING_DIM_COUNT];
+    HU_ASSERT(hu_turing_get_contact_dimensions(db, "alice", 5, dims) == HU_OK);
+    HU_ASSERT(dims[HU_TURING_NATURAL_LANGUAGE] == 9);
+    HU_ASSERT(dims[HU_TURING_EMOTIONAL_INTELLIGENCE] == 7);
+
+    sqlite3_close(db);
+}
+
+static void turing_channel_dims_sqlite_like_pattern(void) {
+    sqlite3 *db = NULL;
+    HU_ASSERT(sqlite3_open(":memory:", &db) == SQLITE_OK);
+    HU_ASSERT(hu_turing_init_tables(db) == HU_OK);
+
+    hu_turing_score_t score;
+    memset(&score, 0, sizeof(score));
+    score.overall = 7;
+    score.verdict = HU_TURING_BORDERLINE;
+    for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
+        score.dimensions[i] = 7;
+
+    HU_ASSERT(hu_turing_store_score(db, "bob#discord", 11, (int64_t)time(NULL), &score) == HU_OK);
+
+    int dims[HU_TURING_DIM_COUNT];
+    HU_ASSERT(hu_turing_get_channel_dimensions(db, "discord", 7, dims) == HU_OK);
+    HU_ASSERT(dims[HU_TURING_NATURAL_LANGUAGE] == 7);
+
+    /* Non-matching channel should return zeros */
+    int no_dims[HU_TURING_DIM_COUNT];
+    HU_ASSERT(hu_turing_get_channel_dimensions(db, "slack", 5, no_dims) == HU_OK);
+    HU_ASSERT(no_dims[HU_TURING_NATURAL_LANGUAGE] == 0);
+
+    sqlite3_close(db);
+}
+#endif
+
 void run_turing_score_tests(void) {
     HU_RUN_TEST(turing_heuristic_casual_message_scores_high);
     HU_RUN_TEST(turing_heuristic_ai_tells_score_low);
@@ -337,4 +485,15 @@ void run_turing_score_tests(void) {
     HU_RUN_TEST(turing_contact_hint_builds_for_weak_dims);
     HU_RUN_TEST(turing_contact_hint_null_for_good_dims);
     HU_RUN_TEST(turing_ab_pick_variant_deterministic);
+    HU_RUN_TEST(turing_rn_not_matched_inside_words);
+    HU_RUN_TEST(turing_weighted_scoring_text_dominant);
+    HU_RUN_TEST(turing_expanded_ai_tells_detected);
+    HU_RUN_TEST(turing_markdown_bold_penalized);
+    HU_RUN_TEST(turing_energy_matching_correct_segment);
+#ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(turing_ab_test_sqlite_roundtrip);
+    HU_RUN_TEST(turing_contact_dims_sqlite_empty_table);
+    HU_RUN_TEST(turing_contact_dims_sqlite_with_data);
+    HU_RUN_TEST(turing_channel_dims_sqlite_like_pattern);
+#endif
 }

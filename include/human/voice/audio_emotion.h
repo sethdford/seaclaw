@@ -8,12 +8,14 @@
 #include <stdint.h>
 
 /*
- * Audio emotion detection from STT features.
+ * Audio emotion detection from basic acoustic features.
  *
  * Extends the text-based emotion detection (emotion_voice_map.h) with
  * acoustic features: energy level, pitch variance, speaking rate.
- * These are computed from PCM audio and fused with text-based emotion
- * to produce a more accurate emotion classification.
+ * These are computed from raw PCM audio (NOT encoded formats like WebM/Opus).
+ * Classification uses hand-tuned thresholds on crude aggregate features,
+ * not a trained model. Useful as a coarse signal; fused with text-based
+ * emotion for improved accuracy over text-only classification.
  */
 
 typedef struct hu_audio_features {

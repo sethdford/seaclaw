@@ -6,9 +6,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Multi-step attack chain detection via interaction history analysis.
- * Detects privilege escalation patterns across tool call sequences.
- * Reference: arXiv:2601.10156 (ToolSafe) */
+/* Heuristic multi-step tool-call pattern detector.
+ * Flags sequences where risk levels increase monotonically, suggesting
+ * privilege escalation probing. Uses simple risk-level comparison and
+ * data-flow keyword matching, not true attack-graph reasoning.
+ * Effective as a lightweight anomaly signal; should be combined with
+ * policy enforcement for defense-in-depth.
+ * Inspired by: arXiv:2601.10156 (ToolSafe) */
 
 typedef struct hu_tool_history_entry {
     const char *tool_name;

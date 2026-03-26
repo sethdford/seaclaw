@@ -53,7 +53,8 @@ static hu_error_t gemini_load_adc(hu_gemini_ctx_t *gc, hu_allocator_t *alloc) {
     if (cred_env && strlen(cred_env) > 0) {
         snprintf(path, sizeof(path), "%s", cred_env);
     } else {
-        snprintf(path, sizeof(path), "%s/.config/gcloud/application_default_credentials.json", home);
+        snprintf(path, sizeof(path), "%s/.config/gcloud/application_default_credentials.json",
+                 home);
     }
 
     FILE *f = fopen(path, "r");
@@ -111,8 +112,8 @@ static hu_error_t gemini_refresh_token(hu_gemini_ctx_t *gc, hu_allocator_t *allo
 
     hu_http_response_t resp = {0};
     hu_error_t err = hu_http_request(alloc, HU_GOOGLE_TOKEN_URL, "POST",
-                                     "Content-Type: application/x-www-form-urlencoded",
-                                     body, (size_t)blen, &resp);
+                                     "Content-Type: application/x-www-form-urlencoded", body,
+                                     (size_t)blen, &resp);
     if (err != HU_OK)
         return err;
 
@@ -155,45 +156,6 @@ static hu_error_t gemini_ensure_token(hu_gemini_ctx_t *gc, hu_allocator_t *alloc
     return gemini_refresh_token(gc, alloc);
 }
 
-/* Extract text from Gemini SSE JSON: candidates[0].content.parts[0].text */
-static char *gemini_extract_sse_delta(hu_allocator_t *alloc, const char *json_str,
-                                      size_t json_len) {
-    hu_json_value_t *parsed = NULL;
-    if (hu_json_parse(alloc, json_str, json_len, &parsed) != HU_OK)
-        return NULL;
-
-    hu_json_value_t *candidates = hu_json_object_get(parsed, "candidates");
-    if (!candidates || candidates->type != HU_JSON_ARRAY || candidates->data.array.len == 0) {
-        hu_json_free(alloc, parsed);
-        return NULL;
-    }
-
-    hu_json_value_t *first = candidates->data.array.items[0];
-    if (first->type != HU_JSON_OBJECT) {
-        hu_json_free(alloc, parsed);
-        return NULL;
-    }
-
-    hu_json_value_t *content = hu_json_object_get(first, "content");
-    if (!content || content->type != HU_JSON_OBJECT) {
-        hu_json_free(alloc, parsed);
-        return NULL;
-    }
-
-    hu_json_value_t *parts = hu_json_object_get(content, "parts");
-    if (!parts || parts->type != HU_JSON_ARRAY || parts->data.array.len == 0) {
-        hu_json_free(alloc, parsed);
-        return NULL;
-    }
-
-    hu_json_value_t *part0 = parts->data.array.items[0];
-    const char *text = hu_json_get_string(part0, "text");
-    char *out = NULL;
-    if (text && strlen(text) > 0)
-        out = hu_strndup(alloc, text, strlen(text));
-    hu_json_free(alloc, parsed);
-    return out;
-}
 #endif
 
 typedef struct gemini_stream_ctx {
@@ -204,10 +166,219 @@ typedef struct gemini_stream_ctx {
     char *content_buf;
     size_t content_len;
     size_t content_cap;
+    hu_tool_call_t *tool_calls;
+    size_t tool_calls_count;
+    size_t tool_calls_cap;
     hu_error_t last_error;
 } gemini_stream_ctx_t;
 
 #if !HU_IS_TEST
+static void gemini_stream_free_accumulated_tools(hu_allocator_t *alloc, gemini_stream_ctx_t *s) {
+    if (!alloc || !s || !s->tool_calls || s->tool_calls_count == 0)
+        return;
+    for (size_t i = 0; i < s->tool_calls_count; i++) {
+        hu_tool_call_t *tc = &s->tool_calls[i];
+        if (tc->id)
+            alloc->free(alloc->ctx, (void *)tc->id, tc->id_len + 1);
+        if (tc->name)
+            alloc->free(alloc->ctx, (void *)tc->name, tc->name_len + 1);
+        if (tc->arguments)
+            alloc->free(alloc->ctx, (void *)tc->arguments, tc->arguments_len + 1);
+    }
+    alloc->free(alloc->ctx, s->tool_calls, s->tool_calls_cap * sizeof(hu_tool_call_t));
+    s->tool_calls = NULL;
+    s->tool_calls_count = 0;
+    s->tool_calls_cap = 0;
+}
+
+/* Parse one streamGenerateContent SSE JSON payload: all content.parts (text + functionCall). */
+static void gemini_process_sse_json(gemini_stream_ctx_t *s, const char *json_str, size_t json_len) {
+    hu_json_value_t *parsed = NULL;
+    if (hu_json_parse(s->alloc, json_str, json_len, &parsed) != HU_OK)
+        return;
+
+    hu_json_value_t *candidates = hu_json_object_get(parsed, "candidates");
+    if (!candidates || candidates->type != HU_JSON_ARRAY || candidates->data.array.len == 0) {
+        hu_json_free(s->alloc, parsed);
+        return;
+    }
+
+    hu_json_value_t *first = candidates->data.array.items[0];
+    if (first->type != HU_JSON_OBJECT) {
+        hu_json_free(s->alloc, parsed);
+        return;
+    }
+
+    hu_json_value_t *content = hu_json_object_get(first, "content");
+    if (!content || content->type != HU_JSON_OBJECT) {
+        hu_json_free(s->alloc, parsed);
+        return;
+    }
+
+    hu_json_value_t *parts = hu_json_object_get(content, "parts");
+    if (!parts || parts->type != HU_JSON_ARRAY || parts->data.array.len == 0) {
+        hu_json_free(s->alloc, parsed);
+        return;
+    }
+
+    for (size_t pi = 0; pi < parts->data.array.len; pi++) {
+        hu_json_value_t *part = parts->data.array.items[pi];
+        if (!part || part->type != HU_JSON_OBJECT)
+            continue;
+
+        const char *text = hu_json_get_string(part, "text");
+        if (text) {
+            size_t dlen = strlen(text);
+            if (dlen > 0) {
+                if (s->content_len + dlen + 1 > s->content_cap) {
+                    size_t new_cap = s->content_cap ? s->content_cap * 2 : 4096;
+                    while (new_cap < s->content_len + dlen + 1)
+                        new_cap *= 2;
+                    char *nbuf =
+                        (char *)s->alloc->realloc(s->alloc->ctx, s->content_buf,
+                                                  s->content_cap ? s->content_cap : 0, new_cap);
+                    if (!nbuf) {
+                        s->last_error = HU_ERR_OUT_OF_MEMORY;
+                        hu_json_free(s->alloc, parsed);
+                        return;
+                    }
+                    s->content_buf = nbuf;
+                    s->content_cap = new_cap;
+                }
+                memcpy(s->content_buf + s->content_len, text, dlen + 1);
+                s->content_len += dlen;
+
+                hu_stream_chunk_t c;
+                memset(&c, 0, sizeof(c));
+                c.type = HU_STREAM_CONTENT;
+                c.delta = text;
+                c.delta_len = dlen;
+                c.is_final = false;
+                c.token_count = 1;
+                s->callback(s->callback_ctx, &c);
+            }
+        }
+
+        hu_json_value_t *fc = hu_json_object_get(part, "functionCall");
+        if (!fc || fc->type != HU_JSON_OBJECT)
+            continue;
+
+        const char *fname = hu_json_get_string(fc, "name");
+        if (!fname || strlen(fname) == 0)
+            continue;
+
+        int tool_index = (int)s->tool_calls_count;
+        char idbuf[64];
+        int id_n = snprintf(idbuf, sizeof(idbuf), "gemini_tc_%d", tool_index);
+        if (id_n <= 0 || (size_t)id_n >= sizeof(idbuf)) {
+            s->last_error = HU_ERR_INVALID_ARGUMENT;
+            hu_json_free(s->alloc, parsed);
+            return;
+        }
+        size_t id_len = (size_t)id_n;
+        size_t name_len = strlen(fname);
+
+        hu_json_value_t *args = hu_json_object_get(fc, "args");
+        char *args_str = NULL;
+        size_t args_len = 0;
+        if (args && args->type == HU_JSON_OBJECT) {
+            if (hu_json_stringify(s->alloc, args, &args_str, &args_len) != HU_OK) {
+                s->last_error = HU_ERR_OUT_OF_MEMORY;
+                hu_json_free(s->alloc, parsed);
+                return;
+            }
+        } else {
+            args_str = hu_strndup(s->alloc, "{}", 2);
+            args_len = 2;
+        }
+
+        char *id_dup = hu_strndup(s->alloc, idbuf, id_len);
+        char *name_dup = hu_strndup(s->alloc, fname, name_len);
+        if (!args_str || !id_dup || !name_dup) {
+            if (args_str)
+                s->alloc->free(s->alloc->ctx, args_str, args_len + 1);
+            if (id_dup)
+                s->alloc->free(s->alloc->ctx, id_dup, id_len + 1);
+            if (name_dup)
+                s->alloc->free(s->alloc->ctx, name_dup, name_len + 1);
+            s->last_error = HU_ERR_OUT_OF_MEMORY;
+            hu_json_free(s->alloc, parsed);
+            return;
+        }
+
+        size_t new_count = s->tool_calls_count + 1;
+        size_t need_cap = s->tool_calls_cap;
+        while (need_cap < new_count)
+            need_cap = need_cap ? need_cap * 2 : 4;
+        if (need_cap > s->tool_calls_cap) {
+            hu_tool_call_t *n = (hu_tool_call_t *)s->alloc->realloc(
+                s->alloc->ctx, s->tool_calls, s->tool_calls_cap * sizeof(hu_tool_call_t),
+                need_cap * sizeof(hu_tool_call_t));
+            if (!n) {
+                s->alloc->free(s->alloc->ctx, args_str, args_len + 1);
+                s->alloc->free(s->alloc->ctx, id_dup, id_len + 1);
+                s->alloc->free(s->alloc->ctx, name_dup, name_len + 1);
+                s->last_error = HU_ERR_OUT_OF_MEMORY;
+                hu_json_free(s->alloc, parsed);
+                return;
+            }
+            s->tool_calls = n;
+            s->tool_calls_cap = need_cap;
+        }
+
+        hu_tool_call_t *tc = &s->tool_calls[s->tool_calls_count];
+        memset(tc, 0, sizeof(*tc));
+        tc->id = id_dup;
+        tc->id_len = id_len;
+        tc->name = name_dup;
+        tc->name_len = name_len;
+        tc->arguments = args_str;
+        tc->arguments_len = args_len;
+        s->tool_calls_count = new_count;
+
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_START;
+            c.tool_name = name_dup;
+            c.tool_name_len = name_len;
+            c.tool_call_id = id_dup;
+            c.tool_call_id_len = id_len;
+            c.tool_index = tool_index;
+            c.is_final = false;
+            s->callback(s->callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_DELTA;
+            c.delta = args_str;
+            c.delta_len = args_len;
+            c.tool_name = name_dup;
+            c.tool_name_len = name_len;
+            c.tool_call_id = id_dup;
+            c.tool_call_id_len = id_len;
+            c.tool_index = tool_index;
+            c.is_final = false;
+            s->callback(s->callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_DONE;
+            c.tool_name = name_dup;
+            c.tool_name_len = name_len;
+            c.tool_call_id = id_dup;
+            c.tool_call_id_len = id_len;
+            c.tool_index = tool_index;
+            c.is_final = false;
+            s->callback(s->callback_ctx, &c);
+        }
+    }
+
+    hu_json_free(s->alloc, parsed);
+}
+
 static void gemini_sse_event_cb(const char *event_type, size_t event_type_len, const char *data,
                                 size_t data_len, void *userdata) {
     (void)event_type;
@@ -217,42 +388,15 @@ static void gemini_sse_event_cb(const char *event_type, size_t event_type_len, c
         return;
 
     if (data_len == 6 && memcmp(data, "[DONE]", 6) == 0) {
-        hu_stream_chunk_t c = {.delta = NULL, .delta_len = 0, .is_final = true, .token_count = 0};
+        hu_stream_chunk_t c;
+        memset(&c, 0, sizeof(c));
+        c.type = HU_STREAM_CONTENT;
+        c.is_final = true;
         s->callback(s->callback_ctx, &c);
         return;
     }
 
-    char *delta = gemini_extract_sse_delta(s->alloc, data, data_len);
-    if (!delta)
-        return;
-
-    size_t dlen = strlen(delta);
-
-    if (s->content_len + dlen + 1 > s->content_cap) {
-        size_t new_cap = s->content_cap ? s->content_cap * 2 : 4096;
-        while (new_cap < s->content_len + dlen + 1)
-            new_cap *= 2;
-        char *nbuf = (char *)s->alloc->realloc(s->alloc->ctx, s->content_buf,
-                                               s->content_cap ? s->content_cap : 0, new_cap);
-        if (!nbuf) {
-            s->alloc->free(s->alloc->ctx, delta, dlen + 1);
-            s->last_error = HU_ERR_OUT_OF_MEMORY;
-            return;
-        }
-        s->content_buf = nbuf;
-        s->content_cap = new_cap;
-    }
-    memcpy(s->content_buf + s->content_len, delta, dlen + 1);
-    s->content_len += dlen;
-
-    hu_stream_chunk_t c = {
-        .delta = delta,
-        .delta_len = dlen,
-        .is_final = false,
-        .token_count = 1,
-    };
-    s->callback(s->callback_ctx, &c);
-    s->alloc->free(s->alloc->ctx, delta, dlen + 1);
+    gemini_process_sse_json(s, data, data_len);
 }
 
 static size_t gemini_stream_write_cb(const char *chunk, size_t chunk_len, void *userdata) {
@@ -658,8 +802,8 @@ static hu_error_t gemini_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
                           gc->oauth_token);
         if (na > 0 && (size_t)na < sizeof(auth_buf))
             auth_header = auth_buf;
-        int n = snprintf(url_buf, sizeof(url_buf), "%.*s/%.*s:generateContent",
-                         (int)eff_base_len, eff_base, (int)model_len, model);
+        int n = snprintf(url_buf, sizeof(url_buf), "%.*s/%.*s:generateContent", (int)eff_base_len,
+                         eff_base, (int)model_len, model);
         if (n <= 0 || (size_t)n >= sizeof(url_buf)) {
             alloc->free(alloc->ctx, body, body_len);
             return HU_ERR_INVALID_ARGUMENT;
@@ -670,8 +814,8 @@ static hu_error_t gemini_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
             return HU_ERR_PROVIDER_AUTH;
         }
         int n = snprintf(url_buf, sizeof(url_buf), "%.*s/%.*s:generateContent?key=%.*s",
-                         (int)eff_base_len, eff_base, (int)model_len, model,
-                         (int)gc->api_key_len, gc->api_key);
+                         (int)eff_base_len, eff_base, (int)model_len, model, (int)gc->api_key_len,
+                         gc->api_key);
         if (n <= 0 || (size_t)n >= sizeof(url_buf)) {
             alloc->free(alloc->ctx, body, body_len);
             return HU_ERR_INVALID_ARGUMENT;
@@ -801,19 +945,104 @@ static hu_error_t gemini_stream_chat(void *ctx, hu_allocator_t *alloc,
     (void)model;
     (void)model_len;
     (void)temperature;
+    if (request->tools && request->tools_count > 0) {
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.delta = "Let me ";
+            c.delta_len = 7;
+            c.token_count = 1;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.delta = "check. ";
+            c.delta_len = 7;
+            c.token_count = 1;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_START;
+            c.tool_name = request->tools[0].name;
+            c.tool_name_len = request->tools[0].name_len;
+            c.tool_call_id = "gemini_tc_0";
+            c.tool_call_id_len = 11;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_DELTA;
+            c.delta = "{\"command\":\"ls\"}";
+            c.delta_len = 16;
+            c.tool_call_id = "gemini_tc_0";
+            c.tool_call_id_len = 11;
+            c.tool_name = request->tools[0].name;
+            c.tool_name_len = request->tools[0].name_len;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_DONE;
+            c.tool_name = request->tools[0].name;
+            c.tool_name_len = request->tools[0].name_len;
+            c.tool_call_id = "gemini_tc_0";
+            c.tool_call_id_len = 11;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.is_final = true;
+            callback(callback_ctx, &c);
+        }
+        out->content = hu_strndup(alloc, "Let me check. ", 14);
+        out->content_len = 14;
+        hu_tool_call_t *tcs = (hu_tool_call_t *)alloc->alloc(alloc->ctx, sizeof(hu_tool_call_t));
+        if (tcs) {
+            memset(tcs, 0, sizeof(hu_tool_call_t));
+            tcs[0].id = hu_strndup(alloc, "gemini_tc_0", 11);
+            tcs[0].id_len = 11;
+            tcs[0].name = hu_strndup(alloc, request->tools[0].name, request->tools[0].name_len);
+            tcs[0].name_len = request->tools[0].name_len;
+            tcs[0].arguments = hu_strndup(alloc, "{\"command\":\"ls\"}", 16);
+            tcs[0].arguments_len = 16;
+            out->tool_calls = tcs;
+            out->tool_calls_count = 1;
+        }
+        out->usage.completion_tokens = 5;
+        return HU_OK;
+    }
     {
         const char *chunks[] = {"Hello ", "from ", "Gemini ", "stream"};
         for (int i = 0; i < 4; i++) {
-            hu_stream_chunk_t c = {
-                .delta = chunks[i],
-                .delta_len = strlen(chunks[i]),
-                .is_final = false,
-                .token_count = 1,
-            };
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.delta = chunks[i];
+            c.delta_len = strlen(chunks[i]);
+            c.is_final = false;
+            c.token_count = 1;
             callback(callback_ctx, &c);
         }
-        hu_stream_chunk_t c = {.delta = NULL, .delta_len = 0, .is_final = true, .token_count = 4};
-        callback(callback_ctx, &c);
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.is_final = true;
+            c.token_count = 4;
+            callback(callback_ctx, &c);
+        }
         out->content = hu_strndup(alloc, "Hello from Gemini stream", 25);
         out->content_len = 25;
         out->usage.completion_tokens = 4;
@@ -973,6 +1202,45 @@ static hu_error_t gemini_stream_chat(void *ctx, hu_allocator_t *alloc,
         hu_json_array_push(alloc, contents, part);
     }
 
+    if (request->tools && request->tools_count > 0) {
+        hu_json_value_t *func_decls = hu_json_array_new(alloc);
+        if (func_decls) {
+            for (size_t ti = 0; ti < request->tools_count; ti++) {
+                hu_json_value_t *decl = hu_json_object_new(alloc);
+                if (!decl) {
+                    hu_json_free(alloc, func_decls);
+                    hu_json_free(alloc, root);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                hu_json_object_set(alloc, decl, "name",
+                                   hu_json_string_new(alloc, request->tools[ti].name,
+                                                      request->tools[ti].name_len));
+                hu_json_object_set(
+                    alloc, decl, "description",
+                    hu_json_string_new(
+                        alloc, request->tools[ti].description ? request->tools[ti].description : "",
+                        request->tools[ti].description_len));
+                if (request->tools[ti].parameters_json &&
+                    request->tools[ti].parameters_json_len > 0) {
+                    hu_json_value_t *params = NULL;
+                    if (hu_json_parse(alloc, request->tools[ti].parameters_json,
+                                      request->tools[ti].parameters_json_len, &params) == HU_OK)
+                        hu_json_object_set(alloc, decl, "parameters", params);
+                }
+                hu_json_array_push(alloc, func_decls, decl);
+            }
+            hu_json_value_t *tools_wrapper = hu_json_object_new(alloc);
+            if (tools_wrapper) {
+                hu_json_object_set(alloc, tools_wrapper, "functionDeclarations", func_decls);
+                hu_json_value_t *tools_arr = hu_json_array_new(alloc);
+                if (tools_arr) {
+                    hu_json_array_push(alloc, tools_arr, tools_wrapper);
+                    hu_json_object_set(alloc, root, "tools", tools_arr);
+                }
+            }
+        }
+    }
+
     hu_json_object_set(alloc, root, "generationConfig", hu_json_object_new(alloc));
     hu_json_value_t *gen_cfg = hu_json_object_get(root, "generationConfig");
     if (gen_cfg) {
@@ -1013,8 +1281,8 @@ static hu_error_t gemini_stream_chat(void *ctx, hu_allocator_t *alloc,
                  (int)s_eff_base_len, s_eff_base, (int)model_len, model);
     } else {
         snprintf(url_buf, sizeof(url_buf), "%.*s/%.*s:streamGenerateContent?key=%.*s&alt=sse",
-                 (int)s_eff_base_len, s_eff_base, (int)model_len, model,
-                 (int)gc->api_key_len, gc->api_key);
+                 (int)s_eff_base_len, s_eff_base, (int)model_len, model, (int)gc->api_key_len,
+                 gc->api_key);
     }
 
     gemini_stream_ctx_t sctx = {
@@ -1024,6 +1292,9 @@ static hu_error_t gemini_stream_chat(void *ctx, hu_allocator_t *alloc,
         .content_buf = NULL,
         .content_len = 0,
         .content_cap = 0,
+        .tool_calls = NULL,
+        .tool_calls_count = 0,
+        .tool_calls_cap = 0,
         .last_error = HU_OK,
     };
     err = hu_sse_parser_init(&sctx.parser, alloc);
@@ -1035,16 +1306,22 @@ static hu_error_t gemini_stream_chat(void *ctx, hu_allocator_t *alloc,
                                    gemini_stream_write_cb, &sctx);
     hu_sse_parser_deinit(&sctx.parser);
     alloc->free(alloc->ctx, body, body_len);
-    if (err != HU_OK)
+    if (err != HU_OK) {
+        gemini_stream_free_accumulated_tools(alloc, &sctx);
         return err;
+    }
     if (sctx.last_error != HU_OK) {
         if (sctx.content_buf)
             alloc->free(alloc->ctx, sctx.content_buf, sctx.content_cap);
+        gemini_stream_free_accumulated_tools(alloc, &sctx);
         return sctx.last_error;
     }
 
     {
-        hu_stream_chunk_t c = {.delta = NULL, .delta_len = 0, .is_final = true, .token_count = 0};
+        hu_stream_chunk_t c;
+        memset(&c, 0, sizeof(c));
+        c.type = HU_STREAM_CONTENT;
+        c.is_final = true;
         callback(callback_ctx, &c);
     }
 
@@ -1053,7 +1330,15 @@ static hu_error_t gemini_stream_chat(void *ctx, hu_allocator_t *alloc,
         out->content_len = sctx.content_len;
         alloc->free(alloc->ctx, sctx.content_buf, sctx.content_cap);
     }
-    out->usage.completion_tokens = (uint32_t)((sctx.content_len + 3) / 4);
+    if (sctx.tool_calls && sctx.tool_calls_count > 0) {
+        out->tool_calls = sctx.tool_calls;
+        out->tool_calls_count = sctx.tool_calls_count;
+        sctx.tool_calls = NULL;
+        sctx.tool_calls_count = 0;
+        sctx.tool_calls_cap = 0;
+    }
+    out->usage.completion_tokens =
+        (uint32_t)((sctx.content_len + 3) / 4 + out->tool_calls_count * 4u);
     return HU_OK;
 #endif
 }

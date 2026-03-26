@@ -2913,6 +2913,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     if (dim_avgs[HU_TURING_HUMOR_NATURALNESS] > 8 &&
                                         agent->persona->humanization.disfluency_frequency > 0.10f) {
                                         agent->persona->humanization.disfluency_frequency -= 0.02f;
+                                        if (agent->persona->humanization.disfluency_frequency <
+                                            0.0f)
+                                            agent->persona->humanization.disfluency_frequency =
+                                                0.0f;
                                     }
 
                                     /* vulnerability_willingness low: boost personal sharing warmth
@@ -3009,6 +3013,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             agent->persona->humanization.disfluency_frequency;
                                         agent->persona->humanization.disfluency_frequency =
                                             old_df - 0.03f;
+                                        if (agent->persona->humanization.disfluency_frequency <
+                                            0.0f)
+                                            agent->persona->humanization.disfluency_frequency =
+                                                0.0f;
                                         fprintf(stderr,
                                                 "[human] auto-tune: disfluency (consistency) "
                                                 "%.2f -> %.2f\n",
@@ -7845,6 +7853,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 bool retried = false;
+                char *turing_rejected_resp = NULL;
+                size_t turing_rejected_len = 0;
                 fprintf(stderr, "[human] calling agent turn for %.*s...\n",
                         (int)(key_len > 20 ? 20 : key_len), batch_key);
                 do {
@@ -8013,10 +8023,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                       "what you actually think or feel."
                                     : "Your response feels unnatural. Text like a real "
                                       "human friend would.";
-                            /* DPO: record low-scoring response as negative feedback */
-                            hu_dpo_record_from_feedback(&agent->dpo_collector, combined,
-                                                        combined_len, response, response_len,
-                                                        false);
+                            /* DPO: save rejected response for pairing after retry */
+                            if (turing_rejected_resp)
+                                alloc->free(alloc->ctx, turing_rejected_resp,
+                                            turing_rejected_len + 1);
+                            turing_rejected_resp = hu_strndup(alloc, response, response_len);
+                            turing_rejected_len = turing_rejected_resp ? response_len : 0;
                             agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
                             response = NULL;
                             response_len = 0;
@@ -8108,6 +8120,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                     break;
                 } while (1);
+
+                /* DPO: pair rejected response from Turing retry with chosen retry result */
+                if (turing_rejected_resp && turing_rejected_len > 0 && response &&
+                    response_len > 0) {
+                    hu_dpo_record_from_retry(&agent->dpo_collector, combined, combined_len,
+                                             turing_rejected_resp, turing_rejected_len, response,
+                                             response_len);
+                }
+                if (turing_rejected_resp) {
+                    alloc->free(alloc->ctx, turing_rejected_resp, turing_rejected_len + 1);
+                    turing_rejected_resp = NULL;
+                }
 
                 /* Text naturalizer: lowercase first char, strip trailing period */
                 if (err == HU_OK && response && response_len > 0) {
@@ -8688,6 +8712,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                         err =
                             hu_agent_turn(agent, combined, combined_len, &response, &response_len);
+                        /* Apply text naturalizer to disclosure retry response */
+                        if (err == HU_OK && response && response_len > 0) {
+                            if (response_len > 1 && response[0] >= 'A' && response[0] <= 'Z' &&
+                                response[1] >= 'a' && response[1] <= 'z' && response[0] != 'I') {
+                                response[0] = (char)(response[0] + 32);
+                            }
+                            if (response_len > 1 && response[response_len - 1] == '.') {
+                                response[response_len - 1] = '\0';
+                                response_len--;
+                            }
+                        }
                     }
                 }
 #endif
@@ -9409,6 +9444,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 &dt_resp_len);
                             if (dt_err == HU_OK && dt_resp && dt_resp_len > 0 &&
                                 dt_resp_len < 200) {
+                                /* Post-process double-text through the same BTH pipeline */
+                                dt_resp_len =
+                                    hu_conversation_strip_ai_phrases(dt_resp, dt_resp_len);
+                                dt_resp_len =
+                                    hu_conversation_vary_complexity(dt_resp, dt_resp_len, dt_seed);
+                                if (dt_resp_len > 1 && dt_resp[0] >= 'A' && dt_resp[0] <= 'Z' &&
+                                    dt_resp[1] >= 'a' && dt_resp[1] <= 'z' && dt_resp[0] != 'I') {
+                                    dt_resp[0] = (char)(dt_resp[0] + 32);
+                                }
+                                if (dt_resp_len > 1 && dt_resp[dt_resp_len - 1] == '.') {
+                                    dt_resp[dt_resp_len - 1] = '\0';
+                                    dt_resp_len--;
+                                }
                                 unsigned int dt_delay = 10000u + (dt_seed % 35000u);
                                 usleep((useconds_t)(dt_delay * 1000u));
                                 ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,

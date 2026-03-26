@@ -109,7 +109,11 @@ hu_error_t hu_graph_index_spread_activation(const hu_graph_index_t *idx,
                                             const uint32_t *seed_indices, size_t seed_count,
                                             hu_activated_node_t *out_nodes, size_t *out_count);
 
-/* ── Hierarchical topic clusters (System-2 traversal) ───────────────── */
+/* ── Hierarchical topic clusters (entity-frequency bucketing) ────────── */
+/* Clusters graph nodes by their most-frequent shared entity. This is a
+ * simple frequency-based grouping, not a learned or semantic clustering
+ * algorithm. Effective for entity-centric recall but does not capture
+ * conceptual similarity beyond exact entity name matches. */
 
 typedef struct hu_topic_cluster {
     char label[64];

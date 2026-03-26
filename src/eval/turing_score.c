@@ -43,9 +43,32 @@ static int ci_has(const char *haystack, size_t len, const char *needle) {
 
 static int count_ai_tells(const char *s, size_t len) {
     static const char *tells[] = {
-        "I'd be happy to", "certainly",      "feel free",    "as an AI",
-        "I understand",    "absolutely",     "I appreciate", "definitely",
-        "I can help",      "great question", "I'm here to",
+        "I'd be happy to",
+        "certainly",
+        "feel free",
+        "as an AI",
+        "I understand your",
+        "absolutely",
+        "I appreciate",
+        "definitely",
+        "I can help",
+        "great question",
+        "I'm here to",
+        "let me know if you need anything",
+        "hope this helps",
+        "does that make sense",
+        "in summary",
+        "to summarize",
+        "it's important to note",
+        "worth noting",
+        "generally speaking",
+        "I apologize for",
+        "sorry for any confusion",
+        "don't hesitate to",
+        "I'd love to help",
+        "I want to be",
+        "here are some",
+        "**",
     };
     int count = 0;
     for (size_t i = 0; i < sizeof(tells) / sizeof(tells[0]); i++) {
@@ -91,13 +114,37 @@ static int has_contractions(const char *s, size_t len) {
     return 0;
 }
 
+static int word_boundary(const char *s, size_t len, size_t pos, size_t nlen) {
+    bool left_ok = (pos == 0 || s[pos - 1] == ' ' || s[pos - 1] == '\n' || s[pos - 1] == ',');
+    bool right_ok = (pos + nlen >= len || s[pos + nlen] == ' ' || s[pos + nlen] == '\n' ||
+                     s[pos + nlen] == ',' || s[pos + nlen] == '.' || s[pos + nlen] == '!' ||
+                     s[pos + nlen] == '?');
+    return left_ok && right_ok;
+}
+
 static int has_casual_markers(const char *s, size_t len) {
     static const char *markers[] = {"haha", "lol", "omg", "nah", "yeah",
-                                    "tbh",  "rn",  "ngl", "imo", "lmao"};
+                                    "tbh",  "ngl", "imo", "lmao"};
+    static const char *boundary_markers[] = {"rn"};
     int count = 0;
     for (size_t i = 0; i < sizeof(markers) / sizeof(markers[0]); i++) {
         if (ci_has(s, len, markers[i]))
             count++;
+    }
+    for (size_t i = 0; i < sizeof(boundary_markers) / sizeof(boundary_markers[0]); i++) {
+        size_t nlen = strlen(boundary_markers[i]);
+        if (nlen > len)
+            continue;
+        for (size_t p = 0; p + nlen <= len; p++) {
+            size_t j = 0;
+            while (j < nlen && tolower((unsigned char)s[p + j]) ==
+                                   tolower((unsigned char)boundary_markers[i][j]))
+                j++;
+            if (j == nlen && word_boundary(s, len, p, nlen)) {
+                count++;
+                break;
+            }
+        }
     }
     return count;
 }
@@ -512,15 +559,26 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     }
 
     /* Clamp all to [1, 10] */
-    int sum = 0;
     for (int i = 0; i < HU_TURING_DIM_COUNT; i++) {
         if (out->dimensions[i] < 1)
             out->dimensions[i] = 1;
         if (out->dimensions[i] > 10)
             out->dimensions[i] = 10;
-        sum += out->dimensions[i];
     }
-    out->overall = (sum + HU_TURING_DIM_COUNT / 2) / HU_TURING_DIM_COUNT;
+
+    /* Weighted average: text dims (0-11) get weight 3, voice-proxy dims (12-17) get weight 1.
+     * Voice proxies from text heuristics are inherently noisy; avoid dragging down the score. */
+    int weighted_sum = 0;
+    int total_weight = 0;
+    for (int i = 0; i < 12; i++) {
+        weighted_sum += out->dimensions[i] * 3;
+        total_weight += 3;
+    }
+    for (int i = 12; i < HU_TURING_DIM_COUNT; i++) {
+        weighted_sum += out->dimensions[i];
+        total_weight += 1;
+    }
+    out->overall = (weighted_sum + total_weight / 2) / total_weight;
 
     if (out->overall >= 8)
         out->verdict = HU_TURING_HUMAN;

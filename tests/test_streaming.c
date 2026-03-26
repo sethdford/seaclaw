@@ -399,6 +399,70 @@ static void test_anthropic_stream_mock(void) {
 #endif
 }
 
+static void test_anthropic_stream_mock_emits_tool_chunks(void) {
+#if HU_IS_TEST
+    anthropic_stream_chunk_count = 0;
+    anthropic_stream_got_final = false;
+
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_provider_t prov;
+    hu_error_t err = hu_anthropic_create(&alloc, "test-key", 8, NULL, 0, &prov);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_tool_spec_t tools[1];
+    tools[0].name = "shell";
+    tools[0].name_len = 5;
+    tools[0].description = NULL;
+    tools[0].description_len = 0;
+    tools[0].parameters_json = NULL;
+    tools[0].parameters_json_len = 0;
+
+    hu_chat_message_t msgs[1];
+    msgs[0].role = HU_ROLE_USER;
+    msgs[0].content = "run ls";
+    msgs[0].content_len = 6;
+    msgs[0].name = NULL;
+    msgs[0].name_len = 0;
+    msgs[0].tool_call_id = NULL;
+    msgs[0].tool_call_id_len = 0;
+    msgs[0].content_parts = NULL;
+    msgs[0].content_parts_count = 0;
+    msgs[0].tool_calls = NULL;
+    msgs[0].tool_calls_count = 0;
+
+    hu_chat_request_t req = {
+        .messages = msgs,
+        .messages_count = 1,
+        .model = "claude-3",
+        .model_len = 8,
+        .temperature = 0.7,
+        .max_tokens = 0,
+        .tools = tools,
+        .tools_count = 1,
+        .timeout_secs = 0,
+        .reasoning_effort = NULL,
+        .reasoning_effort_len = 0,
+    };
+
+    hu_stream_chat_result_t result;
+    memset(&result, 0, sizeof(result));
+    err = prov.vtable->stream_chat(prov.ctx, &alloc, &req, "claude-3", 8, 0.7, anthropic_stream_cb,
+                                   NULL, &result);
+
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(anthropic_stream_chunk_count, 6);
+    HU_ASSERT_TRUE(anthropic_stream_got_final);
+    HU_ASSERT_NOT_NULL(result.content);
+    HU_ASSERT_EQ(result.tool_calls_count, 1U);
+    HU_ASSERT_NOT_NULL(result.tool_calls);
+    HU_ASSERT_TRUE(result.tool_calls[0].arguments_len > 0);
+
+    hu_stream_chat_result_free(&alloc, &result);
+    if (prov.vtable->deinit)
+        prov.vtable->deinit(prov.ctx, &alloc);
+#endif
+}
+
 void run_streaming_tests(void) {
     HU_TEST_SUITE("Streaming");
     HU_RUN_TEST(test_sse_parser_single_event);
@@ -420,4 +484,5 @@ void run_streaming_tests(void) {
     HU_RUN_TEST(test_sse_parser_feed_null_bytes_len_zero_ok);
     HU_RUN_TEST(test_openai_stream_mock);
     HU_RUN_TEST(test_anthropic_stream_mock);
+    HU_RUN_TEST(test_anthropic_stream_mock_emits_tool_chunks);
 }

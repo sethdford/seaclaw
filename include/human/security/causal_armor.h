@@ -7,10 +7,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* CausalArmor: leave-one-out causal attribution for indirect prompt injection defense.
- * At privileged decision points, computes attribution margins to detect when untrusted
- * content (tool outputs, retrieved docs) has disproportionate influence over tool calls.
- * Reference: arXiv:2602.07918 (CausalArmor) */
+/* CausalArmor: heuristic content-influence detector for indirect prompt injection defense.
+ * Approximates leave-one-out attribution by measuring word overlap between untrusted
+ * context segments and proposed tool call arguments. Does NOT perform true causal
+ * attribution (which requires model re-inference per segment). Effective as a lightweight
+ * first-pass filter; not a substitute for real attribution analysis.
+ * Inspired by: arXiv:2602.07918 (CausalArmor) */
 
 typedef struct hu_causal_segment {
     const char *content;

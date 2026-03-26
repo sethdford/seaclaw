@@ -10,6 +10,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if !HU_IS_TEST
+#include "human/core/http.h"
+#include "human/providers/sse.h"
+#endif
+
 typedef struct hu_compatible_ctx {
     char *api_key;
     size_t api_key_len;
@@ -82,49 +87,15 @@ static hu_error_t compatible_chat_with_system(void *ctx, hu_allocator_t *alloc,
     return HU_OK;
 }
 
-static hu_error_t compatible_chat(void *ctx, hu_allocator_t *alloc,
-                                  const hu_chat_request_t *request, const char *model,
-                                  size_t model_len, double temperature, hu_chat_response_t *out) {
-    hu_compatible_ctx_t *cc = (hu_compatible_ctx_t *)ctx;
-    if (!cc || !request || !out)
+#if !HU_IS_TEST
+/* Build JSON body for POST /chat/completions (shared by non-streaming and streaming). */
+static hu_error_t compatible_build_chat_json(hu_allocator_t *alloc,
+                                             const hu_chat_request_t *request, const char *model,
+                                             size_t model_len, double temperature,
+                                             hu_json_value_t **root_out) {
+    if (!alloc || !request || !root_out)
         return HU_ERR_INVALID_ARGUMENT;
-    (void)model;
-    (void)model_len;
-    (void)temperature;
-
-#if HU_IS_TEST
-    memset(out, 0, sizeof(*out));
-    if (request->tools && request->tools_count > 0) {
-        out->content = NULL;
-        out->content_len = 0;
-        hu_tool_call_t *tcs = (hu_tool_call_t *)alloc->alloc(alloc->ctx, sizeof(hu_tool_call_t));
-        if (tcs) {
-            memset(tcs, 0, sizeof(hu_tool_call_t));
-            tcs[0].id = hu_strndup(alloc, "call_mock_comp", 14);
-            tcs[0].id_len = 14;
-            tcs[0].name = hu_strndup(alloc, "shell", 5);
-            tcs[0].name_len = 5;
-            tcs[0].arguments = hu_strndup(alloc, "{\"command\":\"ls\"}", 16);
-            tcs[0].arguments_len = 16;
-            out->tool_calls = tcs;
-            out->tool_calls_count = 1;
-        }
-        out->usage.prompt_tokens = 10;
-        out->usage.completion_tokens = 8;
-        out->usage.total_tokens = 18;
-    } else {
-        const char *content = "Hello from mock OpenAI-compatible";
-        size_t len = strlen(content);
-        out->content = hu_strndup(alloc, content, len);
-        out->content_len = len;
-        out->usage.prompt_tokens = 10;
-        out->usage.completion_tokens = 5;
-        out->usage.total_tokens = 15;
-    }
-    return HU_OK;
-#else
-    if (!cc->base_url || cc->base_url_len == 0)
-        return HU_ERR_CONFIG_INVALID;
+    *root_out = NULL;
 
     hu_json_value_t *root = hu_json_object_new(alloc);
     if (!root)
@@ -252,10 +223,7 @@ static hu_error_t compatible_chat(void *ctx, hu_allocator_t *alloc,
     }
 
     /* HuLa compiler (`hu_hula_compiler_chat_compile_execute`) sets response_format to
-     * `json_object` for OpenAI-style APIs. Most OpenAI-compatible endpoints honor
-     * `response_format.type`; some third-party proxies strip or ignore it (models may return
-     * markdown fences). See `docs/providers/hula-json-mode-matrix.md` for a coarse
-     * compatibility matrix. */
+     * `json_object` for OpenAI-style APIs. See `docs/providers/hula-json-mode-matrix.md`. */
     if (request->response_format && request->response_format_len > 0) {
         hu_json_value_t *rf_obj = hu_json_object_new(alloc);
         if (rf_obj) {
@@ -275,9 +243,64 @@ static hu_error_t compatible_chat(void *ctx, hu_allocator_t *alloc,
             hu_json_object_set(alloc, root, "top_logprobs", topn);
     }
 
+    *root_out = root;
+    return HU_OK;
+}
+#endif /* !HU_IS_TEST */
+
+static hu_error_t compatible_chat(void *ctx, hu_allocator_t *alloc,
+                                  const hu_chat_request_t *request, const char *model,
+                                  size_t model_len, double temperature, hu_chat_response_t *out) {
+    hu_compatible_ctx_t *cc = (hu_compatible_ctx_t *)ctx;
+    if (!cc || !request || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if HU_IS_TEST
+    (void)model;
+    (void)model_len;
+    (void)temperature;
+    memset(out, 0, sizeof(*out));
+    if (request->tools && request->tools_count > 0) {
+        out->content = NULL;
+        out->content_len = 0;
+        hu_tool_call_t *tcs = (hu_tool_call_t *)alloc->alloc(alloc->ctx, sizeof(hu_tool_call_t));
+        if (tcs) {
+            memset(tcs, 0, sizeof(hu_tool_call_t));
+            tcs[0].id = hu_strndup(alloc, "call_mock_comp", 14);
+            tcs[0].id_len = 14;
+            tcs[0].name = hu_strndup(alloc, "shell", 5);
+            tcs[0].name_len = 5;
+            tcs[0].arguments = hu_strndup(alloc, "{\"command\":\"ls\"}", 16);
+            tcs[0].arguments_len = 16;
+            out->tool_calls = tcs;
+            out->tool_calls_count = 1;
+        }
+        out->usage.prompt_tokens = 10;
+        out->usage.completion_tokens = 8;
+        out->usage.total_tokens = 18;
+    } else {
+        const char *content = "Hello from mock OpenAI-compatible";
+        size_t len = strlen(content);
+        out->content = hu_strndup(alloc, content, len);
+        out->content_len = len;
+        out->usage.prompt_tokens = 10;
+        out->usage.completion_tokens = 5;
+        out->usage.total_tokens = 15;
+    }
+    return HU_OK;
+#else
+    if (!cc->base_url || cc->base_url_len == 0)
+        return HU_ERR_CONFIG_INVALID;
+
+    hu_json_value_t *root = NULL;
+    hu_error_t err =
+        compatible_build_chat_json(alloc, request, model, model_len, temperature, &root);
+    if (err != HU_OK)
+        return err;
+
     char *body = NULL;
     size_t body_len = 0;
-    hu_error_t err = hu_json_stringify(alloc, root, &body, &body_len);
+    err = hu_json_stringify(alloc, root, &body, &body_len);
     hu_json_free(alloc, root);
     if (err != HU_OK)
         return err;
@@ -392,7 +415,228 @@ static void compatible_deinit(void *ctx, hu_allocator_t *alloc) {
     alloc->free(alloc->ctx, cc, sizeof(*cc));
 }
 
-static const hu_provider_vtable_t compatible_vtable;
+#if !HU_IS_TEST
+
+#define COMPATIBLE_STREAM_MAX_TOOLS 16
+
+typedef struct compatible_stream_tool {
+    char *id;
+    size_t id_len;
+    char *name;
+    size_t name_len;
+    char *args;
+    size_t args_len;
+    size_t args_cap;
+    bool started;
+} compatible_stream_tool_t;
+
+typedef struct compatible_stream_ctx {
+    hu_allocator_t *alloc;
+    hu_stream_callback_t callback;
+    void *callback_ctx;
+    hu_sse_parser_t parser;
+    hu_error_t last_error;
+    char *content_buf;
+    size_t content_len;
+    size_t content_cap;
+    compatible_stream_tool_t tools[COMPATIBLE_STREAM_MAX_TOOLS];
+    size_t tools_count;
+} compatible_stream_ctx_t;
+
+static void compatible_append_content(compatible_stream_ctx_t *s, const char *delta,
+                                      size_t delta_len);
+static void compatible_append_tool_args(compatible_stream_ctx_t *s, size_t idx, const char *delta,
+                                        size_t delta_len);
+
+static bool compatible_is_done_signal(const char *data, size_t data_len) {
+    if (!data)
+        return false;
+    while (data_len > 0 && (*data == ' ' || *data == '\t')) {
+        data++;
+        data_len--;
+    }
+    if (data_len == 6 && memcmp(data, "[DONE]", 6) == 0)
+        return true;
+    return false;
+}
+
+static void compatible_extract_stream_delta(compatible_stream_ctx_t *s, const char *json_str,
+                                            size_t json_len) {
+    hu_json_value_t *parsed = NULL;
+    if (hu_json_parse(s->alloc, json_str, json_len, &parsed) != HU_OK)
+        return;
+    hu_json_value_t *choices = hu_json_object_get(parsed, "choices");
+    if (!choices || choices->type != HU_JSON_ARRAY || choices->data.array.len == 0) {
+        hu_json_free(s->alloc, parsed);
+        return;
+    }
+    hu_json_value_t *first = choices->data.array.items[0];
+    hu_json_value_t *delta = hu_json_object_get(first, "delta");
+    if (!delta || delta->type != HU_JSON_OBJECT) {
+        hu_json_free(s->alloc, parsed);
+        return;
+    }
+
+    const char *content = hu_json_get_string(delta, "content");
+    if (content) {
+        size_t clen = strlen(content);
+        if (clen > 0) {
+            compatible_append_content(s, content, clen);
+            hu_stream_chunk_t chunk;
+            memset(&chunk, 0, sizeof(chunk));
+            chunk.type = HU_STREAM_CONTENT;
+            chunk.delta = content;
+            chunk.delta_len = clen;
+            s->callback(s->callback_ctx, &chunk);
+        }
+    }
+
+    hu_json_value_t *tc_arr = hu_json_object_get(delta, "tool_calls");
+    if (tc_arr && tc_arr->type == HU_JSON_ARRAY) {
+        for (size_t i = 0; i < tc_arr->data.array.len; i++) {
+            hu_json_value_t *tc = tc_arr->data.array.items[i];
+            if (!tc || tc->type != HU_JSON_OBJECT)
+                continue;
+            int idx = (int)hu_json_get_number(tc, "index", (double)i);
+            if (idx < 0 || (size_t)idx >= COMPATIBLE_STREAM_MAX_TOOLS)
+                continue;
+
+            while (s->tools_count <= (size_t)idx) {
+                memset(&s->tools[s->tools_count], 0, sizeof(compatible_stream_tool_t));
+                s->tools_count++;
+            }
+            compatible_stream_tool_t *t = &s->tools[idx];
+
+            const char *tc_id = hu_json_get_string(tc, "id");
+            hu_json_value_t *fn = hu_json_object_get(tc, "function");
+
+            if (tc_id && !t->started) {
+                size_t id_len = strlen(tc_id);
+                t->id = hu_strndup(s->alloc, tc_id, id_len);
+                t->id_len = id_len;
+                const char *fn_name = fn ? hu_json_get_string(fn, "name") : NULL;
+                if (fn_name) {
+                    size_t name_len = strlen(fn_name);
+                    t->name = hu_strndup(s->alloc, fn_name, name_len);
+                    t->name_len = name_len;
+                }
+                t->started = true;
+                hu_stream_chunk_t chunk;
+                memset(&chunk, 0, sizeof(chunk));
+                chunk.type = HU_STREAM_TOOL_START;
+                chunk.tool_name = t->name;
+                chunk.tool_name_len = t->name_len;
+                chunk.tool_call_id = t->id;
+                chunk.tool_call_id_len = t->id_len;
+                chunk.tool_index = idx;
+                s->callback(s->callback_ctx, &chunk);
+            }
+
+            const char *fn_args = fn ? hu_json_get_string(fn, "arguments") : NULL;
+            if (fn_args) {
+                size_t args_len = strlen(fn_args);
+                if (args_len > 0) {
+                    compatible_append_tool_args(s, (size_t)idx, fn_args, args_len);
+                    hu_stream_chunk_t chunk;
+                    memset(&chunk, 0, sizeof(chunk));
+                    chunk.type = HU_STREAM_TOOL_DELTA;
+                    chunk.delta = fn_args;
+                    chunk.delta_len = args_len;
+                    chunk.tool_call_id = t->id;
+                    chunk.tool_call_id_len = t->id_len;
+                    chunk.tool_name = t->name;
+                    chunk.tool_name_len = t->name_len;
+                    chunk.tool_index = idx;
+                    s->callback(s->callback_ctx, &chunk);
+                }
+            }
+        }
+    }
+
+    hu_json_free(s->alloc, parsed);
+}
+
+static void compatible_append_tool_args(compatible_stream_ctx_t *s, size_t idx, const char *delta,
+                                        size_t delta_len) {
+    if (idx >= s->tools_count || !delta || delta_len == 0)
+        return;
+    compatible_stream_tool_t *t = &s->tools[idx];
+    while (t->args_len + delta_len + 1 > t->args_cap) {
+        size_t new_cap = t->args_cap ? t->args_cap * 2 : 256;
+        while (new_cap < t->args_len + delta_len + 1)
+            new_cap *= 2;
+        char *nb = (char *)s->alloc->alloc(s->alloc->ctx, new_cap);
+        if (!nb)
+            return;
+        if (t->args && t->args_len > 0)
+            memcpy(nb, t->args, t->args_len);
+        if (t->args)
+            s->alloc->free(s->alloc->ctx, t->args, t->args_cap);
+        t->args = nb;
+        t->args_cap = new_cap;
+    }
+    memcpy(t->args + t->args_len, delta, delta_len);
+    t->args_len += delta_len;
+    t->args[t->args_len] = '\0';
+}
+
+static void compatible_append_content(compatible_stream_ctx_t *s, const char *delta,
+                                      size_t delta_len) {
+    if (!delta || delta_len == 0)
+        return;
+    while (s->content_len + delta_len + 1 > s->content_cap) {
+        size_t new_cap = s->content_cap ? s->content_cap * 2 : 256;
+        while (new_cap < s->content_len + delta_len + 1)
+            new_cap *= 2;
+        char *n;
+        if (s->content_buf) {
+            n = (char *)s->alloc->realloc(s->alloc->ctx, s->content_buf, s->content_cap, new_cap);
+        } else {
+            n = (char *)s->alloc->alloc(s->alloc->ctx, new_cap);
+        }
+        if (!n) {
+            s->last_error = HU_ERR_OUT_OF_MEMORY;
+            return;
+        }
+        s->content_buf = n;
+        s->content_cap = new_cap;
+    }
+    memcpy(s->content_buf + s->content_len, delta, delta_len);
+    s->content_len += delta_len;
+    s->content_buf[s->content_len] = '\0';
+}
+
+static void compatible_sse_event_cb(const char *event_type, size_t event_type_len, const char *data,
+                                    size_t data_len, void *userdata) {
+    compatible_stream_ctx_t *s = (compatible_stream_ctx_t *)userdata;
+    (void)event_type;
+    (void)event_type_len;
+    if (s->last_error != HU_OK)
+        return;
+    if (!data || data_len == 0)
+        return;
+    if (compatible_is_done_signal(data, data_len)) {
+        hu_stream_chunk_t chunk;
+        memset(&chunk, 0, sizeof(chunk));
+        chunk.type = HU_STREAM_CONTENT;
+        chunk.is_final = true;
+        s->callback(s->callback_ctx, &chunk);
+        return;
+    }
+    compatible_extract_stream_delta(s, data, data_len);
+}
+
+static size_t compatible_stream_write_cb(const char *data, size_t len, void *userdata) {
+    compatible_stream_ctx_t *s = (compatible_stream_ctx_t *)userdata;
+    hu_error_t err = hu_sse_parser_feed(&s->parser, data, len, compatible_sse_event_cb, s);
+    if (err != HU_OK) {
+        s->last_error = err;
+        return 0;
+    }
+    return len;
+}
+
+#endif /* !HU_IS_TEST */
 
 static bool compatible_supports_streaming(void *ctx) {
     (void)ctx;
@@ -404,56 +648,234 @@ static hu_error_t compatible_stream_chat(void *ctx, hu_allocator_t *alloc,
                                          size_t model_len, double temperature,
                                          hu_stream_callback_t callback, void *callback_ctx,
                                          hu_stream_chat_result_t *out) {
+    hu_compatible_ctx_t *cc = (hu_compatible_ctx_t *)ctx;
+    if (!cc || !request || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+
 #if HU_IS_TEST
-    (void)ctx;
-    (void)alloc;
-    (void)request;
     (void)model;
     (void)model_len;
     (void)temperature;
-    (void)callback_ctx;
+    memset(out, 0, sizeof(*out));
+
+    if (request->tools && request->tools_count > 0) {
+        if (callback) {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.delta = "Let me ";
+            c.delta_len = 7;
+            callback(callback_ctx, &c);
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.delta = "check. ";
+            c.delta_len = 7;
+            callback(callback_ctx, &c);
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_START;
+            c.tool_name = request->tools[0].name;
+            c.tool_name_len = request->tools[0].name_len;
+            c.tool_call_id = "call_stream_mock1";
+            c.tool_call_id_len = 17;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_DELTA;
+            c.delta = "{\"command\":\"ls\"}";
+            c.delta_len = 16;
+            c.tool_call_id = "call_stream_mock1";
+            c.tool_call_id_len = 17;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_DONE;
+            c.tool_name = request->tools[0].name;
+            c.tool_name_len = request->tools[0].name_len;
+            c.tool_call_id = "call_stream_mock1";
+            c.tool_call_id_len = 17;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.is_final = true;
+            callback(callback_ctx, &c);
+        }
+        out->content = hu_strndup(alloc, "Let me check. ", 14);
+        out->content_len = 14;
+        hu_tool_call_t *tcs = (hu_tool_call_t *)alloc->alloc(alloc->ctx, sizeof(hu_tool_call_t));
+        if (tcs) {
+            memset(tcs, 0, sizeof(hu_tool_call_t));
+            tcs[0].id = hu_strndup(alloc, "call_stream_mock1", 17);
+            tcs[0].id_len = 17;
+            tcs[0].name = hu_strndup(alloc, request->tools[0].name, request->tools[0].name_len);
+            tcs[0].name_len = request->tools[0].name_len;
+            tcs[0].arguments = hu_strndup(alloc, "{\"command\":\"ls\"}", 16);
+            tcs[0].arguments_len = 16;
+            out->tool_calls = tcs;
+            out->tool_calls_count = 1;
+        }
+        out->usage.completion_tokens = 5;
+        return HU_OK;
+    }
+
     hu_stream_chunk_t chunk;
     memset(&chunk, 0, sizeof(chunk));
+    chunk.type = HU_STREAM_CONTENT;
     chunk.delta = "test";
     chunk.delta_len = 4;
     chunk.is_final = false;
     if (callback)
         callback(callback_ctx, &chunk);
     memset(&chunk, 0, sizeof(chunk));
+    chunk.type = HU_STREAM_CONTENT;
     chunk.is_final = true;
     if (callback)
         callback(callback_ctx, &chunk);
-    if (out) {
-        out->content = hu_strndup(alloc, "test", 4);
-        out->content_len = 4;
-    }
+    out->content = hu_strndup(alloc, "test", 4);
+    out->content_len = 4;
     return HU_OK;
 #else
-    hu_chat_response_t resp;
-    memset(&resp, 0, sizeof(resp));
+    if (!callback)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    memset(out, 0, sizeof(*out));
+
+    if (!cc->base_url || cc->base_url_len == 0)
+        return HU_ERR_CONFIG_INVALID;
+
+    hu_json_value_t *root = NULL;
     hu_error_t err =
-        compatible_vtable.chat(ctx, alloc, request, model, model_len, temperature, &resp);
+        compatible_build_chat_json(alloc, request, model, model_len, temperature, &root);
     if (err != HU_OK)
         return err;
-    if (resp.content && resp.content_len > 0) {
-        hu_stream_chunk_t chunk;
-        memset(&chunk, 0, sizeof(chunk));
-        chunk.delta = resp.content;
-        chunk.delta_len = resp.content_len;
-        chunk.is_final = false;
-        if (callback)
-            callback(callback_ctx, &chunk);
-        memset(&chunk, 0, sizeof(chunk));
-        chunk.is_final = true;
-        if (callback)
-            callback(callback_ctx, &chunk);
+
+    hu_json_object_set(alloc, root, "stream", hu_json_bool_new(alloc, true));
+
+    char *body = NULL;
+    size_t body_len = 0;
+    err = hu_json_stringify(alloc, root, &body, &body_len);
+    hu_json_free(alloc, root);
+    if (err != HU_OK)
+        return err;
+
+    size_t base_len = cc->base_url_len;
+    char url_buf[512];
+    int n;
+    if (base_len >= 17 && strncmp(cc->base_url + base_len - 17, "/chat/completions", 17) == 0) {
+        n = snprintf(url_buf, sizeof(url_buf), "%.*s", (int)base_len, cc->base_url);
+    } else {
+        char *sep = (base_len > 0 && cc->base_url[base_len - 1] == '/') ? "" : "/";
+        n = snprintf(url_buf, sizeof(url_buf), "%.*s%schat/completions", (int)base_len,
+                     cc->base_url, sep);
     }
-    if (out) {
-        out->content = resp.content;
-        out->content_len = resp.content_len;
-    } else if (resp.content) {
-        alloc->free(alloc->ctx, (void *)resp.content, resp.content_len + 1);
+    if (n <= 0 || (size_t)n >= sizeof(url_buf)) {
+        alloc->free(alloc->ctx, body, body_len);
+        return HU_ERR_INVALID_ARGUMENT;
     }
+
+    const char *auth = NULL;
+    char auth_buf[512];
+    if (cc->api_key && cc->api_key_len > 0) {
+        n = snprintf(auth_buf, sizeof(auth_buf), "Bearer %.*s", (int)cc->api_key_len, cc->api_key);
+        if (n > 0 && (size_t)n < sizeof(auth_buf))
+            auth = auth_buf;
+    }
+
+    compatible_stream_ctx_t sctx;
+    memset(&sctx, 0, sizeof(sctx));
+    sctx.alloc = alloc;
+    sctx.callback = callback;
+    sctx.callback_ctx = callback_ctx;
+    sctx.last_error = HU_OK;
+    err = hu_sse_parser_init(&sctx.parser, alloc);
+    if (err != HU_OK) {
+        alloc->free(alloc->ctx, body, body_len);
+        return err;
+    }
+    err = hu_http_post_json_stream(alloc, url_buf, auth, NULL, body, body_len,
+                                   compatible_stream_write_cb, &sctx);
+    hu_sse_parser_deinit(&sctx.parser);
+    alloc->free(alloc->ctx, body, body_len);
+
+#define COMPATIBLE_STREAM_CLEANUP_TOOLS()                            \
+    do {                                                             \
+        for (size_t _ti = 0; _ti < sctx.tools_count; _ti++) {        \
+            compatible_stream_tool_t *_t = &sctx.tools[_ti];         \
+            if (_t->id)                                              \
+                alloc->free(alloc->ctx, _t->id, _t->id_len + 1);     \
+            if (_t->name)                                            \
+                alloc->free(alloc->ctx, _t->name, _t->name_len + 1); \
+            if (_t->args)                                            \
+                alloc->free(alloc->ctx, _t->args, _t->args_cap);     \
+        }                                                            \
+    } while (0)
+
+    if (err != HU_OK) {
+        COMPATIBLE_STREAM_CLEANUP_TOOLS();
+        return err;
+    }
+    if (sctx.last_error != HU_OK) {
+        if (sctx.content_buf)
+            alloc->free(alloc->ctx, sctx.content_buf, sctx.content_cap);
+        COMPATIBLE_STREAM_CLEANUP_TOOLS();
+        return sctx.last_error;
+    }
+
+    if (sctx.content_buf && sctx.content_len > 0) {
+        out->content = hu_strndup(alloc, sctx.content_buf, sctx.content_len);
+        out->content_len = sctx.content_len;
+        alloc->free(alloc->ctx, sctx.content_buf, sctx.content_cap);
+    }
+
+    if (sctx.tools_count > 0) {
+        for (size_t ti = 0; ti < sctx.tools_count; ti++) {
+            compatible_stream_tool_t *t = &sctx.tools[ti];
+            if (t->started) {
+                hu_stream_chunk_t done_chunk;
+                memset(&done_chunk, 0, sizeof(done_chunk));
+                done_chunk.type = HU_STREAM_TOOL_DONE;
+                done_chunk.tool_name = t->name;
+                done_chunk.tool_name_len = t->name_len;
+                done_chunk.tool_call_id = t->id;
+                done_chunk.tool_call_id_len = t->id_len;
+                done_chunk.tool_index = (int)ti;
+                callback(callback_ctx, &done_chunk);
+            }
+        }
+        hu_tool_call_t *tcs =
+            (hu_tool_call_t *)alloc->alloc(alloc->ctx, sctx.tools_count * sizeof(hu_tool_call_t));
+        if (tcs) {
+            size_t valid = 0;
+            for (size_t ti = 0; ti < sctx.tools_count; ti++) {
+                compatible_stream_tool_t *t = &sctx.tools[ti];
+                if (!t->started)
+                    continue;
+                tcs[valid].id = t->id;
+                tcs[valid].id_len = t->id_len;
+                tcs[valid].name = t->name;
+                tcs[valid].name_len = t->name_len;
+                tcs[valid].arguments = t->args;
+                tcs[valid].arguments_len = t->args_len;
+                t->id = NULL;
+                t->name = NULL;
+                t->args = NULL;
+                valid++;
+            }
+            out->tool_calls = tcs;
+            out->tool_calls_count = valid;
+        }
+    }
+    COMPATIBLE_STREAM_CLEANUP_TOOLS();
+#undef COMPATIBLE_STREAM_CLEANUP_TOOLS
+
+    {
+        hu_stream_chunk_t final_chunk;
+        memset(&final_chunk, 0, sizeof(final_chunk));
+        final_chunk.type = HU_STREAM_CONTENT;
+        final_chunk.is_final = true;
+        callback(callback_ctx, &final_chunk);
+    }
+
     return HU_OK;
 #endif
 }

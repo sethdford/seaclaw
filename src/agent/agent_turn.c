@@ -4900,16 +4900,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             hu_tool_cache_ttl_t *seq_cache =
                                 agent->tool_cache_ttl ? (hu_tool_cache_ttl_t *)agent->tool_cache_ttl
                                                       : NULL;
-                            bool seq_cache_hit = false;
+                            const char *seq_args = call->arguments ? call->arguments : "";
+                            size_t seq_args_len = call->arguments_len;
                             if (seq_cache &&
-                                hu_tool_cache_classify(pol_tn) != HU_TOOL_CACHE_NEVER) {
+                                hu_tool_cache_classify(pol_tn, pol_tn_len, seq_args,
+                                                       seq_args_len) != HU_TOOL_CACHE_NEVER) {
+                                uint64_t ckey = hu_tool_cache_ttl_key(pol_tn, pol_tn_len, seq_args,
+                                                                      seq_args_len);
                                 size_t cached_len = 0;
                                 const char *cached =
-                                    hu_tool_cache_ttl_lookup(seq_cache, pol_tn, pol_tn_len,
-                                                             call->arguments ? call->arguments : "",
-                                                             call->arguments_len, &cached_len);
+                                    hu_tool_cache_ttl_get(seq_cache, ckey, &cached_len);
                                 if (cached && cached_len > 0) {
-                                    seq_cache_hit = true;
                                     hu_error_t hist_err = hu_agent_internal_append_history(
                                         agent, HU_ROLE_TOOL, cached, cached_len, call->name,
                                         call->name_len, call->id, call->id_len);
@@ -4919,7 +4920,6 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     continue;
                                 }
                             }
-                            (void)seq_cache_hit;
 
                             hu_tool_t *tool =
                                 hu_agent_internal_find_tool(agent, call->name, call->name_len);
@@ -5085,12 +5085,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
                             /* TTL cache store on sequential path */
                             if (seq_cache && result.success && res_content && res_len > 0 &&
-                                hu_tool_cache_classify(pol_tn) != HU_TOOL_CACHE_NEVER) {
-                                uint32_t ttl = hu_tool_cache_ttl_default_for(pol_tn, pol_tn_len);
-                                (void)hu_tool_cache_ttl_store(
-                                    seq_cache, pol_tn, pol_tn_len,
-                                    call->arguments ? call->arguments : "", call->arguments_len,
-                                    res_content, res_len, ttl);
+                                hu_tool_cache_classify(pol_tn, pol_tn_len, seq_args,
+                                                       seq_args_len) != HU_TOOL_CACHE_NEVER) {
+                                int64_t ttl = hu_tool_cache_ttl_default_for(pol_tn, pol_tn_len);
+                                uint64_t skey = hu_tool_cache_ttl_key(pol_tn, pol_tn_len, seq_args,
+                                                                      seq_args_len);
+                                (void)hu_tool_cache_ttl_put(seq_cache, skey, res_content, res_len,
+                                                            ttl);
                             }
 
                             hu_error_t hist_err = hu_agent_internal_append_history(
