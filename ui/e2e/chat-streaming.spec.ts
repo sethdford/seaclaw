@@ -36,6 +36,30 @@ function thread(page: Page) {
   return page.locator("hu-app >> hu-chat-view >> hu-message-thread");
 }
 
+/** Innermost focused element (walks shadow roots). */
+async function deepActiveTagName(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    let el: Element | null = document.activeElement;
+    while (el?.shadowRoot?.activeElement) {
+      el = el.shadowRoot.activeElement;
+    }
+    return el?.tagName.toLowerCase() ?? "";
+  });
+}
+
+/** True if deep focus is the tool card "Input" section toggle. */
+async function deepActiveIsToolInputToggle(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    let el: Element | null = document.activeElement;
+    while (el?.shadowRoot?.activeElement) {
+      el = el.shadowRoot.activeElement;
+    }
+    if (!el || el.tagName.toLowerCase() !== "button") return false;
+    const t = el.textContent?.replace(/\s+/g, " ").trim() ?? "";
+    return t.startsWith("Input");
+  });
+}
+
 test.describe("Chat streaming UI (demo mode)", () => {
   test.describe.configure({ timeout: 60_000 });
 
@@ -137,7 +161,7 @@ test.describe("Chat streaming UI (demo mode)", () => {
   }) => {
     await sendChatMessage(page, `tool sections ${Date.now()}`);
 
-    const toolCard = page.locator("hu-app >> hu-chat-view >> hu-message-thread >> hu-tool-result");
+    const toolCard = thread(page).locator("hu-tool-result").last();
     await expect(toolCard).toBeVisible({ timeout: POLL });
 
     await expect(async () => {
@@ -147,7 +171,9 @@ test.describe("Chat streaming UI (demo mode)", () => {
     const inputToggle = toolCard.getByRole("button", { name: /^Input$/ });
     await expect(inputToggle).toBeVisible();
     await expect(inputToggle).toHaveAttribute("aria-expanded", "false");
-    await inputToggle.click({ force: true });
+    await inputToggle.scrollIntoViewIfNeeded();
+    /* Hit-testing can be intercepted by main/suggestion layers; invoke DOM click on the real button node. */
+    await inputToggle.evaluate((el) => (el as HTMLButtonElement).click());
     await expect(inputToggle).toHaveAttribute("aria-expanded", "true");
     await expect(toolCard.locator("pre.code-block")).toBeVisible();
 
@@ -172,6 +198,9 @@ test.describe("Chat streaming UI (demo mode)", () => {
       expect((await toolCard.locator(".subtitle").textContent())?.trim()).toBe("Completed");
     }).toPass({ timeout: POLL });
 
+    /* With JSON input, header is non-interactive region (expand/collapse is per-section). */
+    await expect(toolCard.locator(".header")).toHaveAttribute("role", "region");
+
     const inputToggle = toolCard.getByRole("button", { name: /^Input$/ });
     await expect(inputToggle).toHaveAttribute("aria-expanded", "false");
     const outputToggle = toolCard.getByRole("button", { name: /^Output$/ });
@@ -183,14 +212,16 @@ test.describe("Chat streaming UI (demo mode)", () => {
 
     await page.keyboard.press("Tab");
     await expect(async () => {
-      const tag = await page.evaluate(() => {
-        let el: Element | null = document.activeElement;
-        while (el?.shadowRoot?.activeElement) {
-          el = el.shadowRoot.activeElement;
-        }
-        return el?.tagName.toLowerCase() ?? "";
-      });
-      expect(["button", "textarea", "input"]).toContain(tag);
+      expect(["button", "textarea", "input"]).toContain(await deepActiveTagName(page));
     }).toPass({ timeout: 5000 });
+
+    /* Tab through thread until tool Input toggle is focused (keyboard operable chain). */
+    let reachedInput = await deepActiveIsToolInputToggle(page);
+    for (let i = 0; i < 14 && !reachedInput; i++) {
+      await page.keyboard.press("Tab");
+      reachedInput = await deepActiveIsToolInputToggle(page);
+    }
+    expect(reachedInput).toBe(true);
+    await expect(inputToggle).toBeFocused();
   });
 });
