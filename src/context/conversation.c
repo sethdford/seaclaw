@@ -7378,23 +7378,28 @@ size_t hu_conversation_split_into_texts(const char *response, size_t resp_len, s
             break;
         }
 
-        /* Find sentence boundary near max_chunk */
+        /* Find sentence boundary near max_chunk (stay within bounds) */
         size_t cut = max_chunk;
-        while (cut > max_chunk / 2) {
-            char c = response[pos + cut];
-            if (c == '.' || c == '!' || c == '?') {
-                cut++; /* include the punctuation */
+        if (pos + cut > resp_len)
+            cut = resp_len - pos;
+        size_t search = cut;
+        while (search > max_chunk / 2) {
+            search--;
+            char ch = response[pos + search];
+            if (ch == '.' || ch == '!' || ch == '?') {
+                cut = search + 1; /* include the punctuation */
                 break;
             }
-            cut--;
         }
         /* Fallback: split at last space */
-        if (cut <= max_chunk / 2) {
-            cut = max_chunk;
-            while (cut > max_chunk / 2 && response[pos + cut] != ' ')
-                cut--;
-            if (cut <= max_chunk / 2)
-                cut = max_chunk;
+        if (cut == max_chunk || (pos + cut > resp_len)) {
+            if (pos + cut > resp_len)
+                cut = resp_len - pos;
+            size_t sp = cut;
+            while (sp > max_chunk / 2 && response[pos + sp - 1] != ' ')
+                sp--;
+            if (sp > max_chunk / 2)
+                cut = sp;
         }
 
         size_t n = cut > 511 ? 511 : cut;

@@ -2020,6 +2020,28 @@ typedef struct gw_stream_ctx {
     char id[HU_BUS_ID_LEN];
 } gw_stream_ctx_t;
 
+/* Back up to last valid UTF-8 boundary at or before pos in buf of length len. */
+static size_t utf8_safe_truncate(const char *buf, size_t len) {
+    if (len == 0)
+        return 0;
+    size_t pos = len;
+    while (pos > 0 && ((unsigned char)buf[pos] & 0xC0) == 0x80)
+        --pos;
+    if (pos > 0) {
+        unsigned char lead = (unsigned char)buf[pos - 1];
+        size_t seq_len = 1;
+        if ((lead & 0xE0) == 0xC0)
+            seq_len = 2;
+        else if ((lead & 0xF0) == 0xE0)
+            seq_len = 3;
+        else if ((lead & 0xF8) == 0xF0)
+            seq_len = 4;
+        if (pos - 1 + seq_len > len)
+            pos = pos - 1;
+    }
+    return pos;
+}
+
 static void gw_stream_token_cb(const char *delta, size_t len, void *ctx) {
     gw_stream_ctx_t *sc = (gw_stream_ctx_t *)ctx;
     if (!sc || !delta || !len)
@@ -2030,6 +2052,8 @@ static void gw_stream_token_cb(const char *delta, size_t len, void *ctx) {
     memcpy(ev.channel, sc->channel, HU_BUS_CHANNEL_LEN);
     memcpy(ev.id, sc->id, HU_BUS_ID_LEN);
     size_t copy_len = len < HU_BUS_MSG_LEN - 1 ? len : HU_BUS_MSG_LEN - 1;
+    if (copy_len < len)
+        copy_len = utf8_safe_truncate(delta, copy_len);
     memcpy(ev.message, delta, copy_len);
     ev.message[copy_len] = '\0';
     hu_bus_publish(sc->bus, &ev);

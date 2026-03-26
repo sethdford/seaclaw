@@ -67,8 +67,11 @@ static bool bus_callback(hu_bus_event_type_t type, const hu_bus_event_t *ev, voi
             hu_json_string_new(bridge->proto->alloc, ev->channel, strlen(ev->channel)));
     }
     if (ev->id[0]) {
+        size_t id_len = strlen(ev->id);
         hu_json_object_set(bridge->proto->alloc, payload_obj, "id",
-                           hu_json_string_new(bridge->proto->alloc, ev->id, strlen(ev->id)));
+                           hu_json_string_new(bridge->proto->alloc, ev->id, id_len));
+        hu_json_object_set(bridge->proto->alloc, payload_obj, "session_key",
+                           hu_json_string_new(bridge->proto->alloc, ev->id, id_len));
     }
     const char *msg_text =
         (ev->payload) ? (const char *)ev->payload : (ev->message[0] ? ev->message : NULL);

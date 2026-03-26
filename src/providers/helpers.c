@@ -61,6 +61,29 @@ void hu_chat_response_free(hu_allocator_t *alloc, hu_chat_response_t *resp) {
     memset(resp, 0, sizeof(*resp));
 }
 
+void hu_stream_chat_result_free(hu_allocator_t *alloc, hu_stream_chat_result_t *result) {
+    if (!alloc || !result)
+        return;
+    if (result->content)
+        alloc->free(alloc->ctx, (void *)result->content, result->content_len + 1);
+    if (result->model)
+        alloc->free(alloc->ctx, (void *)result->model, result->model_len + 1);
+    if (result->tool_calls && result->tool_calls_count > 0) {
+        for (size_t i = 0; i < result->tool_calls_count; i++) {
+            const hu_tool_call_t *tc = &result->tool_calls[i];
+            if (tc->id)
+                alloc->free(alloc->ctx, (void *)tc->id, tc->id_len + 1);
+            if (tc->name)
+                alloc->free(alloc->ctx, (void *)tc->name, tc->name_len + 1);
+            if (tc->arguments)
+                alloc->free(alloc->ctx, (void *)tc->arguments, tc->arguments_len + 1);
+        }
+        alloc->free(alloc->ctx, (void *)result->tool_calls,
+                    result->tool_calls_count * sizeof(hu_tool_call_t));
+    }
+    memset(result, 0, sizeof(*result));
+}
+
 bool hu_helpers_is_reasoning_model(const char *model, size_t model_len) {
     if (!model || model_len == 0)
         return false;

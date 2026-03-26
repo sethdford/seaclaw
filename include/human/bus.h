@@ -33,7 +33,7 @@ typedef enum hu_bus_event_type {
 
 #define HU_BUS_CHANNEL_LEN 32
 #define HU_BUS_ID_LEN      128
-#define HU_BUS_MSG_LEN     256
+#define HU_BUS_MSG_LEN     4096
 
 typedef struct hu_bus_event {
     hu_bus_event_type_t type;

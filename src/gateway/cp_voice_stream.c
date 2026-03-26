@@ -474,9 +474,14 @@ hu_error_t cp_voice_audio_end(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     hu_error_t err = hu_voice_stt_file(alloc, &voice_cfg, tmpl, &text, &text_len);
     unlink(tmpl);
 
+    /* Audio features: only extract from raw PCM (audio/pcm, audio/l16, audio/wav).
+     * Encoded formats (webm, ogg, mp3) are NOT decodable int16 PCM — feeding them
+     * to hu_audio_features_extract produces garbage energy/pitch values. */
     hu_audio_features_t feats;
     memset(&feats, 0, sizeof(feats));
-    if (sl->pcm_len >= 320 && (sl->pcm_len % 2u) == 0u && sl->pcm_buf) {
+    bool is_raw_pcm = (strstr(mime_type, "pcm") != NULL || strstr(mime_type, "l16") != NULL ||
+                       strstr(mime_type, "wav") != NULL);
+    if (is_raw_pcm && sl->pcm_len >= 320 && (sl->pcm_len % 2u) == 0u && sl->pcm_buf) {
         (void)hu_audio_features_extract((const int16_t *)sl->pcm_buf, sl->pcm_len / 2u, 16000u,
                                         &feats);
     }

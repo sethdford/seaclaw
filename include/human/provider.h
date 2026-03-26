@@ -120,11 +120,26 @@ typedef struct hu_chat_response {
     float logprob_mean;
 } hu_chat_response_t;
 
+typedef enum hu_stream_chunk_type {
+    HU_STREAM_CONTENT = 0, /* text delta (default / backward-compatible) */
+    HU_STREAM_TOOL_START,  /* tool call beginning: tool_name + tool_call_id set */
+    HU_STREAM_TOOL_DELTA,  /* tool call arguments delta in 'delta' */
+    HU_STREAM_TOOL_DONE,   /* tool call complete for this tool_index */
+    HU_STREAM_THINKING,    /* reasoning/thinking content delta */
+} hu_stream_chunk_type_t;
+
 typedef struct hu_stream_chunk {
+    hu_stream_chunk_type_t type; /* HU_STREAM_CONTENT if unset (zero-init) */
     const char *delta;
     size_t delta_len;
     bool is_final;
     uint32_t token_count;
+    /* Tool-specific fields (only meaningful for HU_STREAM_TOOL_*) */
+    const char *tool_name;
+    size_t tool_name_len;
+    const char *tool_call_id;
+    size_t tool_call_id_len;
+    int tool_index; /* distinguishes parallel tool calls within one turn */
 } hu_stream_chunk_t;
 
 typedef struct hu_stream_chat_result {
@@ -133,7 +148,13 @@ typedef struct hu_stream_chat_result {
     hu_token_usage_t usage;
     const char *model;
     size_t model_len;
+    /* Accumulated tool calls from streaming (NULL if none) */
+    hu_tool_call_t *tool_calls;
+    size_t tool_calls_count;
 } hu_stream_chat_result_t;
+
+/* Free allocations in a stream chat result (content, model, tool_calls). */
+void hu_stream_chat_result_free(hu_allocator_t *alloc, hu_stream_chat_result_t *result);
 
 typedef void (*hu_stream_callback_t)(void *ctx, const hu_stream_chunk_t *chunk);
 

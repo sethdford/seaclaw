@@ -510,6 +510,20 @@ static bool openai_supports_streaming(void *ctx) {
 }
 
 #if !HU_IS_TEST
+
+#define OPENAI_STREAM_MAX_TOOLS 16
+
+typedef struct openai_stream_tool {
+    char *id;
+    size_t id_len;
+    char *name;
+    size_t name_len;
+    char *args;
+    size_t args_len;
+    size_t args_cap;
+    bool started;
+} openai_stream_tool_t;
+
 typedef struct openai_stream_ctx {
     hu_allocator_t *alloc;
     hu_stream_callback_t callback;
@@ -519,9 +533,13 @@ typedef struct openai_stream_ctx {
     char *content_buf;
     size_t content_len;
     size_t content_cap;
+    openai_stream_tool_t tools[OPENAI_STREAM_MAX_TOOLS];
+    size_t tools_count;
 } openai_stream_ctx_t;
 
 static void append_content(openai_stream_ctx_t *s, const char *delta, size_t delta_len);
+static void append_tool_args(openai_stream_ctx_t *s, size_t idx, const char *delta,
+                             size_t delta_len);
 
 static bool is_done_signal(const char *data, size_t data_len) {
     if (!data)
@@ -550,21 +568,114 @@ static void extract_openai_delta(openai_stream_ctx_t *s, const char *json_str, s
         hu_json_free(s->alloc, parsed);
         return;
     }
+
+    /* Text content deltas */
     const char *content = hu_json_get_string(delta, "content");
     if (content) {
         size_t clen = strlen(content);
         if (clen > 0) {
             append_content(s, content, clen);
-            hu_stream_chunk_t chunk = {
-                .delta = content,
-                .delta_len = clen,
-                .is_final = false,
-                .token_count = 0,
-            };
+            hu_stream_chunk_t chunk;
+            memset(&chunk, 0, sizeof(chunk));
+            chunk.type = HU_STREAM_CONTENT;
+            chunk.delta = content;
+            chunk.delta_len = clen;
             s->callback(s->callback_ctx, &chunk);
         }
     }
+
+    /* Tool call deltas — OpenAI sends delta.tool_calls[i] with index, id, function.name,
+     * function.arguments as incremental fragments across multiple SSE events. */
+    hu_json_value_t *tc_arr = hu_json_object_get(delta, "tool_calls");
+    if (tc_arr && tc_arr->type == HU_JSON_ARRAY) {
+        for (size_t i = 0; i < tc_arr->data.array.len; i++) {
+            hu_json_value_t *tc = tc_arr->data.array.items[i];
+            if (!tc || tc->type != HU_JSON_OBJECT)
+                continue;
+            int idx = (int)hu_json_get_number(tc, "index", (double)i);
+            if (idx < 0 || (size_t)idx >= OPENAI_STREAM_MAX_TOOLS)
+                continue;
+
+            /* Grow tools_count to accommodate this index */
+            while (s->tools_count <= (size_t)idx) {
+                memset(&s->tools[s->tools_count], 0, sizeof(openai_stream_tool_t));
+                s->tools_count++;
+            }
+            openai_stream_tool_t *t = &s->tools[idx];
+
+            const char *tc_id = hu_json_get_string(tc, "id");
+            hu_json_value_t *fn = hu_json_object_get(tc, "function");
+
+            /* First delta for this tool: capture id and name, emit TOOL_START */
+            if (tc_id && !t->started) {
+                size_t id_len = strlen(tc_id);
+                t->id = hu_strndup(s->alloc, tc_id, id_len);
+                t->id_len = id_len;
+                const char *fn_name = fn ? hu_json_get_string(fn, "name") : NULL;
+                if (fn_name) {
+                    size_t name_len = strlen(fn_name);
+                    t->name = hu_strndup(s->alloc, fn_name, name_len);
+                    t->name_len = name_len;
+                }
+                t->started = true;
+                hu_stream_chunk_t chunk;
+                memset(&chunk, 0, sizeof(chunk));
+                chunk.type = HU_STREAM_TOOL_START;
+                chunk.tool_name = t->name;
+                chunk.tool_name_len = t->name_len;
+                chunk.tool_call_id = t->id;
+                chunk.tool_call_id_len = t->id_len;
+                chunk.tool_index = idx;
+                s->callback(s->callback_ctx, &chunk);
+            }
+
+            /* Arguments delta */
+            const char *fn_args = fn ? hu_json_get_string(fn, "arguments") : NULL;
+            if (fn_args) {
+                size_t args_len = strlen(fn_args);
+                if (args_len > 0) {
+                    append_tool_args(s, (size_t)idx, fn_args, args_len);
+                    hu_stream_chunk_t chunk;
+                    memset(&chunk, 0, sizeof(chunk));
+                    chunk.type = HU_STREAM_TOOL_DELTA;
+                    chunk.delta = fn_args;
+                    chunk.delta_len = args_len;
+                    chunk.tool_call_id = t->id;
+                    chunk.tool_call_id_len = t->id_len;
+                    chunk.tool_name = t->name;
+                    chunk.tool_name_len = t->name_len;
+                    chunk.tool_index = idx;
+                    s->callback(s->callback_ctx, &chunk);
+                }
+            }
+        }
+    }
+
     hu_json_free(s->alloc, parsed);
+}
+
+static void append_tool_args(openai_stream_ctx_t *s, size_t idx, const char *delta,
+                             size_t delta_len) {
+    if (idx >= s->tools_count || !delta || delta_len == 0)
+        return;
+    openai_stream_tool_t *t = &s->tools[idx];
+    while (t->args_len + delta_len + 1 > t->args_cap) {
+        size_t new_cap = t->args_cap ? t->args_cap * 2 : 256;
+        while (new_cap < t->args_len + delta_len + 1)
+            new_cap *= 2;
+        char *nb = (char *)s->alloc->alloc(s->alloc->ctx, new_cap);
+        if (!nb)
+            return;
+        if (t->args && t->args_len > 0)
+            memcpy(nb, t->args, t->args_len);
+        if (t->args)
+            s->alloc->free(s->alloc->ctx, t->args, t->args_cap);
+        t->args = nb;
+        t->args_cap = new_cap;
+    }
+    memcpy(t->args + t->args_len, delta, delta_len);
+    t->args_len += delta_len;
+    t->args[t->args_len] = '\0';
 }
 
 static void append_content(openai_stream_ctx_t *s, const char *delta, size_t delta_len) {

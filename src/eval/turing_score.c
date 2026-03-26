@@ -158,16 +158,17 @@ static int has_opinion_markers(const char *s, size_t len) {
 static size_t last_user_msg_len(const char *ctx, size_t ctx_len) {
     if (!ctx || ctx_len == 0)
         return 0;
-    const char *last_nl = NULL;
-    for (size_t i = ctx_len; i > 0; i--) {
-        if (ctx[i - 1] == '\n') {
-            if (last_nl) {
-                return (size_t)(last_nl - &ctx[i]);
-            }
-            last_nl = &ctx[i - 1];
-        }
-    }
-    return last_nl ? (size_t)(last_nl - ctx) : ctx_len;
+    /* Skip trailing whitespace/newlines to find end of last real content */
+    size_t end = ctx_len;
+    while (end > 0 && (ctx[end - 1] == '\n' || ctx[end - 1] == '\r'))
+        end--;
+    if (end == 0)
+        return 0;
+    /* Find the newline before the last line */
+    size_t start = end;
+    while (start > 0 && ctx[start - 1] != '\n')
+        start--;
+    return end - start;
 }
 
 static int count_exclamations(const char *s, size_t len) {

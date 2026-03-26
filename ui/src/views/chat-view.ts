@@ -565,6 +565,7 @@ export class ScChatView extends GatewayAwareLitElement {
                   <hu-message-thread
                     .items=${this.chat.items}
                     .isWaiting=${this.chat.isWaiting}
+                    .isCompleting=${this.chat.isCompleting}
                     .streamElapsed=${this.chat.streamElapsed}
                     .historyLoading=${this.chat.historyLoading}
                     .hasEarlierMessages=${this.chat.hasEarlierMessages}
