@@ -1663,6 +1663,17 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         return HU_ERR_IO;
     }
 
+    /* Detect date_retracted column (macOS Ventura+) for unsend detection */
+    bool has_date_retracted = false;
+    {
+        sqlite3_stmt *col_check = NULL;
+        if (sqlite3_prepare_v2(db, "SELECT date_retracted FROM message LIMIT 0", -1, &col_check,
+                               NULL) == SQLITE_OK) {
+            has_date_retracted = true;
+            sqlite3_finalize(col_check);
+        }
+    }
+
     /* If last_rowid was never seeded (e.g. FDA wasn't granted at startup),
      * seed it now to current max so we only pick up truly new messages. */
     if (c->last_rowid == 0) {
@@ -1728,8 +1739,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "     OR LOWER(a3.filename) LIKE '%.mp3' OR LOWER(a3.filename) LIKE '%.aac' "
         "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio, "
         "  CASE WHEN m.date_edited > 0 THEN 1 ELSE 0 END AS was_edited, "
-        "  m.thread_originator_guid, "
-        "  CASE WHEN m.date_retracted > 0 THEN 1 ELSE 0 END AS was_unsent "
+        "  m.thread_originator_guid "
         "FROM message m "
         "JOIN handle h ON m.handle_id = h.ROWID "
         "WHERE m.is_from_me = 0 AND m.associated_message_type = 0 "
@@ -1772,7 +1782,6 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         (void)has_audio;
         int was_edited = sqlite3_column_int(stmt, 8);
         const char *reply_to = (const char *)sqlite3_column_text(stmt, 9);
-        int was_unsent = sqlite3_column_int(stmt, 10);
 
         if (!text || !handle)
             continue;
@@ -1827,7 +1836,19 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
             msgs[count].guid[0] = '\0';
         }
         msgs[count].was_edited = (was_edited != 0);
-        msgs[count].was_unsent = (was_unsent != 0);
+        msgs[count].was_unsent = false;
+        if (has_date_retracted) {
+            sqlite3_stmt *retract_stmt = NULL;
+            if (sqlite3_prepare_v2(db,
+                                   "SELECT CASE WHEN date_retracted > 0 THEN 1 ELSE 0 END FROM "
+                                   "message WHERE ROWID = ?",
+                                   -1, &retract_stmt, NULL) == SQLITE_OK) {
+                sqlite3_bind_int64(retract_stmt, 1, rowid);
+                if (sqlite3_step(retract_stmt) == SQLITE_ROW)
+                    msgs[count].was_unsent = (sqlite3_column_int(retract_stmt, 0) != 0);
+                sqlite3_finalize(retract_stmt);
+            }
+        }
         if (reply_to && reply_to[0]) {
             size_t rt_len = strlen(reply_to);
             if (rt_len >= sizeof(msgs[count].reply_to_guid))

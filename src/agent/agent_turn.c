@@ -1944,7 +1944,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     size_t system_prompt_len = 0;
     if (agent->cached_static_prompt && !pref_ctx && !tone_hint && !persona_prompt &&
         !awareness_ctx && !stm_ctx && !commitment_ctx && !pattern_ctx && !adaptive_ctx &&
-        !proactive_ctx && !superhuman_ctx && !skills_ctx && !emotional_ctx && !episodic_replay) {
+        !proactive_ctx && !superhuman_ctx && !skills_ctx && !emotional_ctx && !episodic_replay &&
+        !humanness_ctx && !imperfect_dir && !residue_dir && !contact_turing_hint) {
         err = hu_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
@@ -4883,10 +4884,43 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         }
                         hu_dispatch_result_free(agent->alloc, &dispatch_result);
                     } else {
-                        /* Note: TTL cache hits/results not used in fallback path */
                         /* Fallback: sequential if dispatcher fails */
                         for (size_t tc = 0; tc < tc_count; tc++) {
                             const hu_tool_call_t *call = &calls[tc];
+
+                            char pol_tn[64];
+                            size_t pol_tn_len = call->name_len < sizeof(pol_tn) - 1
+                                                    ? call->name_len
+                                                    : sizeof(pol_tn) - 1;
+                            if (pol_tn_len > 0 && call->name)
+                                memcpy(pol_tn, call->name, pol_tn_len);
+                            pol_tn[pol_tn_len] = '\0';
+
+                            /* TTL cache check on sequential path */
+                            hu_tool_cache_ttl_t *seq_cache =
+                                agent->tool_cache_ttl ? (hu_tool_cache_ttl_t *)agent->tool_cache_ttl
+                                                      : NULL;
+                            bool seq_cache_hit = false;
+                            if (seq_cache &&
+                                hu_tool_cache_classify(pol_tn) != HU_TOOL_CACHE_NEVER) {
+                                size_t cached_len = 0;
+                                const char *cached =
+                                    hu_tool_cache_ttl_lookup(seq_cache, pol_tn, pol_tn_len,
+                                                             call->arguments ? call->arguments : "",
+                                                             call->arguments_len, &cached_len);
+                                if (cached && cached_len > 0) {
+                                    seq_cache_hit = true;
+                                    hu_error_t hist_err = hu_agent_internal_append_history(
+                                        agent, HU_ROLE_TOOL, cached, cached_len, call->name,
+                                        call->name_len, call->id, call->id_len);
+                                    if (hist_err != HU_OK)
+                                        fprintf(stderr, "[agent_turn] history append failed: %s\n",
+                                                hu_error_string(hist_err));
+                                    continue;
+                                }
+                            }
+                            (void)seq_cache_hit;
+
                             hu_tool_t *tool =
                                 hu_agent_internal_find_tool(agent, call->name, call->name_len);
                             if (!tool) {
@@ -4898,13 +4932,6 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                             hu_error_string(hist_err));
                                 continue;
                             }
-                            char pol_tn[64];
-                            size_t pol_tn_len = call->name_len < sizeof(pol_tn) - 1
-                                                    ? call->name_len
-                                                    : sizeof(pol_tn) - 1;
-                            if (pol_tn_len > 0 && call->name)
-                                memcpy(pol_tn, call->name, pol_tn_len);
-                            pol_tn[pol_tn_len] = '\0';
 
                             hu_policy_action_t pa = hu_agent_internal_evaluate_tool_policy(
                                 agent, pol_tn, call->arguments ? call->arguments : "");
@@ -4942,7 +4969,75 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 }
                             }
 
-                            /* Feature 2: explicit failure when approval required but no callback */
+                            /* CausalArmor on sequential path (mirrors parallel path) */
+                            if (pa != HU_POLICY_DENY && result.success &&
+                                hu_tool_risk_level(pol_tn[0] ? pol_tn : "unknown") >=
+                                    HU_RISK_HIGH) {
+                                hu_causal_armor_config_t ca_cfg;
+                                hu_causal_armor_config_default(&ca_cfg);
+                                hu_causal_segment_t ca_segs[8];
+                                size_t ca_seg_count = 0;
+                                for (size_t hi = agent->history_count; hi > 0 && ca_seg_count < 8;
+                                     hi--) {
+                                    const hu_owned_message_t *he = &agent->history[hi - 1];
+                                    if (he->content && he->content_len > 0) {
+                                        ca_segs[ca_seg_count].content = he->content;
+                                        ca_segs[ca_seg_count].content_len = he->content_len;
+                                        ca_segs[ca_seg_count].is_trusted =
+                                            (he->role == HU_ROLE_USER);
+                                        ca_seg_count++;
+                                    }
+                                }
+                                if (ca_seg_count > 0) {
+                                    const char *args_str = call->arguments ? call->arguments : "";
+                                    size_t argl =
+                                        call->arguments ? call->arguments_len : strlen(args_str);
+                                    hu_causal_armor_result_t ca_result;
+                                    if (hu_causal_armor_evaluate(&ca_cfg, ca_segs, ca_seg_count,
+                                                                 pol_tn, pol_tn_len, args_str, argl,
+                                                                 &ca_result) == HU_OK &&
+                                        !ca_result.is_safe) {
+                                        static const char ca_msg[] =
+                                            "blocked: untrusted content dominates tool decision";
+                                        hu_tool_result_free(agent->alloc, &result);
+                                        result = hu_tool_result_fail(ca_msg, sizeof(ca_msg) - 1);
+                                    }
+                                }
+                            }
+
+                            /* History scorer on sequential path (mirrors parallel path) */
+                            if (pa != HU_POLICY_DENY && result.success &&
+                                hu_tool_risk_level(pol_tn[0] ? pol_tn : "unknown") >=
+                                    HU_RISK_MEDIUM) {
+                                hu_tool_history_entry_t thist[16];
+                                size_t thc = 0;
+                                for (size_t hi = 0; hi < agent->history_count && thc < 16; hi++) {
+                                    const hu_owned_message_t *m = &agent->history[hi];
+                                    if (m->role != HU_ROLE_TOOL || !m->name || m->name_len == 0)
+                                        continue;
+                                    thist[thc].tool_name = m->name;
+                                    thist[thc].name_len = m->name_len;
+                                    thist[thc].succeeded = !(m->content && m->content_len >= 6 &&
+                                                             memcmp(m->content, "denied", 6) == 0);
+                                    thist[thc].risk_level = (uint32_t)hu_tool_risk_level(m->name);
+                                    thc++;
+                                }
+                                if (thc > 0) {
+                                    hu_history_score_result_t hs;
+                                    if (hu_history_scorer_evaluate(
+                                            thist, thc, pol_tn, pol_tn_len,
+                                            (uint32_t)hu_tool_risk_level(pol_tn[0] ? pol_tn
+                                                                                   : "unknown"),
+                                            &hs) == HU_OK &&
+                                        hs.is_suspicious) {
+                                        static const char hs_msg[] =
+                                            "blocked: suspicious tool-call history pattern";
+                                        hu_tool_result_free(agent->alloc, &result);
+                                        result = hu_tool_result_fail(hs_msg, sizeof(hs_msg) - 1);
+                                    }
+                                }
+                            }
+
                             if (result.needs_approval && !agent->approval_cb) {
                                 hu_tool_result_free(agent->alloc, &result);
                                 result = hu_tool_result_fail("requires human approval", 23);
@@ -4987,6 +5082,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 result.success ? result.output : result.error_msg;
                             size_t res_len =
                                 result.success ? result.output_len : result.error_msg_len;
+
+                            /* TTL cache store on sequential path */
+                            if (seq_cache && result.success && res_content && res_len > 0 &&
+                                hu_tool_cache_classify(pol_tn) != HU_TOOL_CACHE_NEVER) {
+                                uint32_t ttl = hu_tool_cache_ttl_default_for(pol_tn, pol_tn_len);
+                                (void)hu_tool_cache_ttl_store(
+                                    seq_cache, pol_tn, pol_tn_len,
+                                    call->arguments ? call->arguments : "", call->arguments_len,
+                                    res_content, res_len, ttl);
+                            }
+
                             hu_error_t hist_err = hu_agent_internal_append_history(
                                 agent, HU_ROLE_TOOL, res_content, res_len, call->name,
                                 call->name_len, call->id, call->id_len);

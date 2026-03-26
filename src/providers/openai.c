@@ -867,18 +867,98 @@ static hu_error_t openai_stream_chat(void *ctx, hu_allocator_t *alloc,
     memset(out, 0, sizeof(*out));
 
 #if HU_IS_TEST
+    /* If the request includes tools, simulate a tool call response */
+    if (request->tools && request->tools_count > 0) {
+        /* Emit text before tool call */
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.delta = "Let me ";
+            c.delta_len = 7;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.delta = "check. ";
+            c.delta_len = 7;
+            callback(callback_ctx, &c);
+        }
+        /* Emit tool call */
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_START;
+            c.tool_name = request->tools[0].name;
+            c.tool_name_len = request->tools[0].name_len;
+            c.tool_call_id = "call_stream_mock1";
+            c.tool_call_id_len = 17;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_DELTA;
+            c.delta = "{\"command\":\"ls\"}";
+            c.delta_len = 16;
+            c.tool_call_id = "call_stream_mock1";
+            c.tool_call_id_len = 17;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_TOOL_DONE;
+            c.tool_name = request->tools[0].name;
+            c.tool_name_len = request->tools[0].name_len;
+            c.tool_call_id = "call_stream_mock1";
+            c.tool_call_id_len = 17;
+            c.tool_index = 0;
+            callback(callback_ctx, &c);
+        }
+        {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.is_final = true;
+            callback(callback_ctx, &c);
+        }
+        out->content = hu_strndup(alloc, "Let me check. ", 14);
+        out->content_len = 14;
+        hu_tool_call_t *tcs = (hu_tool_call_t *)alloc->alloc(alloc->ctx, sizeof(hu_tool_call_t));
+        if (tcs) {
+            tcs[0].id = hu_strndup(alloc, "call_stream_mock1", 17);
+            tcs[0].id_len = 17;
+            tcs[0].name = hu_strndup(alloc, request->tools[0].name, request->tools[0].name_len);
+            tcs[0].name_len = request->tools[0].name_len;
+            tcs[0].arguments = hu_strndup(alloc, "{\"command\":\"ls\"}", 16);
+            tcs[0].arguments_len = 16;
+            out->tool_calls = tcs;
+            out->tool_calls_count = 1;
+        }
+        out->usage.completion_tokens = 5;
+        return HU_OK;
+    }
     const char *chunks[] = {"Hello ", "from ", "mock"};
     for (int i = 0; i < 3; i++) {
-        hu_stream_chunk_t c = {
-            .delta = chunks[i],
-            .delta_len = strlen(chunks[i]),
-            .is_final = false,
-            .token_count = 1,
-        };
+        hu_stream_chunk_t c;
+        memset(&c, 0, sizeof(c));
+        c.type = HU_STREAM_CONTENT;
+        c.delta = chunks[i];
+        c.delta_len = strlen(chunks[i]);
+        c.token_count = 1;
         callback(callback_ctx, &c);
     }
     {
-        hu_stream_chunk_t c = {.delta = NULL, .delta_len = 0, .is_final = true, .token_count = 3};
+        hu_stream_chunk_t c;
+        memset(&c, 0, sizeof(c));
+        c.type = HU_STREAM_CONTENT;
+        c.is_final = true;
+        c.token_count = 3;
         callback(callback_ctx, &c);
     }
     out->content = hu_strndup(alloc, "Hello from mock", 15);
@@ -982,15 +1062,12 @@ static hu_error_t openai_stream_chat(void *ctx, hu_allocator_t *alloc,
             auth_len = (size_t)n;
     }
 
-    openai_stream_ctx_t sctx = {
-        .alloc = alloc,
-        .callback = callback,
-        .callback_ctx = callback_ctx,
-        .last_error = HU_OK,
-        .content_buf = NULL,
-        .content_len = 0,
-        .content_cap = 0,
-    };
+    openai_stream_ctx_t sctx;
+    memset(&sctx, 0, sizeof(sctx));
+    sctx.alloc = alloc;
+    sctx.callback = callback;
+    sctx.callback_ctx = callback_ctx;
+    sctx.last_error = HU_OK;
     err = hu_sse_parser_init(&sctx.parser, alloc);
     if (err != HU_OK) {
         alloc->free(alloc->ctx, body, body_len);
@@ -1000,11 +1077,29 @@ static hu_error_t openai_stream_chat(void *ctx, hu_allocator_t *alloc,
                                    openai_stream_write_cb, &sctx);
     hu_sse_parser_deinit(&sctx.parser);
     alloc->free(alloc->ctx, body, body_len);
-    if (err != HU_OK)
+
+/* Cleanup helper for tool buffers */
+#define OPENAI_STREAM_CLEANUP_TOOLS()                                \
+    do {                                                             \
+        for (size_t _ti = 0; _ti < sctx.tools_count; _ti++) {        \
+            openai_stream_tool_t *_t = &sctx.tools[_ti];             \
+            if (_t->id)                                              \
+                alloc->free(alloc->ctx, _t->id, _t->id_len + 1);     \
+            if (_t->name)                                            \
+                alloc->free(alloc->ctx, _t->name, _t->name_len + 1); \
+            if (_t->args)                                            \
+                alloc->free(alloc->ctx, _t->args, _t->args_cap);     \
+        }                                                            \
+    } while (0)
+
+    if (err != HU_OK) {
+        OPENAI_STREAM_CLEANUP_TOOLS();
         return err;
+    }
     if (sctx.last_error != HU_OK) {
         if (sctx.content_buf)
             alloc->free(alloc->ctx, sctx.content_buf, sctx.content_cap);
+        OPENAI_STREAM_CLEANUP_TOOLS();
         return sctx.last_error;
     }
 
@@ -1012,6 +1107,57 @@ static hu_error_t openai_stream_chat(void *ctx, hu_allocator_t *alloc,
         out->content = hu_strndup(alloc, sctx.content_buf, sctx.content_len);
         out->content_len = sctx.content_len;
         alloc->free(alloc->ctx, sctx.content_buf, sctx.content_cap);
+    }
+
+    /* Emit TOOL_DONE for each accumulated tool and populate result */
+    if (sctx.tools_count > 0) {
+        for (size_t ti = 0; ti < sctx.tools_count; ti++) {
+            openai_stream_tool_t *t = &sctx.tools[ti];
+            if (t->started) {
+                hu_stream_chunk_t done_chunk;
+                memset(&done_chunk, 0, sizeof(done_chunk));
+                done_chunk.type = HU_STREAM_TOOL_DONE;
+                done_chunk.tool_name = t->name;
+                done_chunk.tool_name_len = t->name_len;
+                done_chunk.tool_call_id = t->id;
+                done_chunk.tool_call_id_len = t->id_len;
+                done_chunk.tool_index = (int)ti;
+                callback(callback_ctx, &done_chunk);
+            }
+        }
+        hu_tool_call_t *tcs =
+            (hu_tool_call_t *)alloc->alloc(alloc->ctx, sctx.tools_count * sizeof(hu_tool_call_t));
+        if (tcs) {
+            size_t valid = 0;
+            for (size_t ti = 0; ti < sctx.tools_count; ti++) {
+                openai_stream_tool_t *t = &sctx.tools[ti];
+                if (!t->started)
+                    continue;
+                tcs[valid].id = t->id;
+                tcs[valid].id_len = t->id_len;
+                tcs[valid].name = t->name;
+                tcs[valid].name_len = t->name_len;
+                tcs[valid].arguments = t->args;
+                tcs[valid].arguments_len = t->args_len;
+                t->id = NULL;
+                t->name = NULL;
+                t->args = NULL;
+                valid++;
+            }
+            out->tool_calls = tcs;
+            out->tool_calls_count = valid;
+        }
+    }
+    OPENAI_STREAM_CLEANUP_TOOLS();
+#undef OPENAI_STREAM_CLEANUP_TOOLS
+
+    /* Emit final chunk */
+    {
+        hu_stream_chunk_t final_chunk;
+        memset(&final_chunk, 0, sizeof(final_chunk));
+        final_chunk.type = HU_STREAM_CONTENT;
+        final_chunk.is_final = true;
+        callback(callback_ctx, &final_chunk);
     }
 
     return HU_OK;

@@ -901,8 +901,10 @@ hu_error_t hu_turing_get_weakest_dimensions(sqlite3 *db, int *dimension_averages
     sqlite3_bind_int64(stmt, 1, cutoff);
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {
-        for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
-            dimension_averages[i] = sqlite3_column_int(stmt, i);
+        for (int i = 0; i < HU_TURING_DIM_COUNT; i++) {
+            double v = sqlite3_column_double(stmt, i);
+            dimension_averages[i] = (int)(v + 0.5);
+        }
     } else {
         memset(dimension_averages, 0, HU_TURING_DIM_COUNT * sizeof(int));
     }
@@ -935,8 +937,10 @@ hu_error_t hu_turing_get_contact_dimensions(sqlite3 *db, const char *contact_id,
     sqlite3_bind_int64(stmt, 2, cutoff);
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {
-        for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
-            dimension_averages[i] = sqlite3_column_int(stmt, i);
+        for (int i = 0; i < HU_TURING_DIM_COUNT; i++) {
+            double v = sqlite3_column_double(stmt, i);
+            dimension_averages[i] = (int)(v + 0.5);
+        }
     } else {
         memset(dimension_averages, 0, HU_TURING_DIM_COUNT * sizeof(int));
     }
@@ -1022,8 +1026,10 @@ hu_error_t hu_turing_get_channel_dimensions(sqlite3 *db, const char *channel_nam
     sqlite3_bind_int64(stmt, 2, cutoff);
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {
-        for (int i = 0; i < HU_TURING_DIM_COUNT; i++)
-            dimension_averages[i] = sqlite3_column_int(stmt, i);
+        for (int i = 0; i < HU_TURING_DIM_COUNT; i++) {
+            double v = sqlite3_column_double(stmt, i);
+            dimension_averages[i] = (int)(v + 0.5);
+        }
     } else {
         memset(dimension_averages, 0, HU_TURING_DIM_COUNT * sizeof(int));
     }

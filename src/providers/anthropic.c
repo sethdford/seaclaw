@@ -152,8 +152,34 @@ static hu_error_t anthropic_chat(void *ctx, hu_allocator_t *alloc, const hu_chat
         }
     }
     if (system_prompt && system_len > 0) {
-        hu_json_value_t *sys_val = hu_json_string_new(alloc, system_prompt, system_len);
-        hu_json_object_set(alloc, root, "system", sys_val);
+        if (request->prompt_cache_id && request->prompt_cache_id_len > 0) {
+            /* Anthropic prompt caching: send system as array with cache_control */
+            hu_json_value_t *sys_arr = hu_json_array_new(alloc);
+            hu_json_value_t *block = hu_json_object_new(alloc);
+            if (sys_arr && block) {
+                hu_json_object_set(alloc, block, "type", hu_json_string_new(alloc, "text", 4));
+                hu_json_object_set(alloc, block, "text",
+                                   hu_json_string_new(alloc, system_prompt, system_len));
+                hu_json_value_t *cc = hu_json_object_new(alloc);
+                if (cc) {
+                    hu_json_object_set(alloc, cc, "type",
+                                       hu_json_string_new(alloc, "ephemeral", 9));
+                    hu_json_object_set(alloc, block, "cache_control", cc);
+                }
+                hu_json_array_push(alloc, sys_arr, block);
+                hu_json_object_set(alloc, root, "system", sys_arr);
+            } else {
+                if (sys_arr)
+                    hu_json_free(alloc, sys_arr);
+                if (block)
+                    hu_json_free(alloc, block);
+                hu_json_object_set(alloc, root, "system",
+                                   hu_json_string_new(alloc, system_prompt, system_len));
+            }
+        } else {
+            hu_json_object_set(alloc, root, "system",
+                               hu_json_string_new(alloc, system_prompt, system_len));
+        }
     }
 
     hu_json_value_t *msgs_arr = hu_json_array_new(alloc);

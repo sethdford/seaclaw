@@ -2848,6 +2848,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (tdb) {
                             (void)hu_turing_init_tables(tdb);
                             int dim_avgs[HU_TURING_DIM_COUNT];
+                            memset(dim_avgs, 0, sizeof(dim_avgs));
                             if (hu_turing_get_weakest_dimensions(tdb, dim_avgs) == HU_OK) {
                                 int worst_dim = 0;
                                 int worst_val = dim_avgs[0];
