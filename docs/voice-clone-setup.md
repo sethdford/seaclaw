@@ -1,3 +1,9 @@
+---
+title: Voice Cloning Setup
+description: Clone your voice for Cartesia TTS and use it across all channels.
+category: guides
+---
+
 # Voice Cloning Setup
 
 Clone your voice for use with Cartesia TTS. Once cloned, Human uses your voice for all text-to-speech output — including voice messages sent via iMessage, Telegram, Discord, and other channels.

@@ -660,6 +660,7 @@ set(HU_CORE_SOURCES
     src/tools/workflow.c
     src/tools/homeassistant.c
     src/tools/diff.c
+    src/tools/voice_clone.c
     src/tools/factory.c
     src/mcp_server.c
     src/channels/thread_binding.c

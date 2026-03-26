@@ -30,18 +30,18 @@
 #include "human/tools/cron_runs.h"
 #include "human/tools/cron_update.h"
 #endif
+#include "human/tools/browser_use.h"
+#include "human/tools/code_sandbox.h"
+#include "human/tools/computer_use.h"
 #include "human/tools/delegate.h"
 #include "human/tools/diff.h"
-#include "human/tools/code_sandbox.h"
 #include "human/tools/file_append.h"
 #include "human/tools/file_edit.h"
 #include "human/tools/file_read.h"
 #include "human/tools/file_write.h"
-#include "human/tools/computer_use.h"
-#include "human/tools/image_gen.h"
-#include "human/tools/browser_use.h"
-#include "human/tools/gui_agent.h"
 #include "human/tools/git.h"
+#include "human/tools/gui_agent.h"
+#include "human/tools/image_gen.h"
 #ifdef HU_HAS_PERIPHERALS
 #include "human/tools/hardware_info.h"
 #include "human/tools/hardware_memory.h"
@@ -50,9 +50,11 @@
 #include "human/tools/spi.h"
 #endif
 #include "human/tools/analytics.h"
+#include "human/tools/bff_memory.h"
 #include "human/tools/broadcast.h"
 #include "human/tools/calendar_tool.h"
 #include "human/tools/crm.h"
+#include "human/tools/doc_ingest.h"
 #include "human/tools/facebook.h"
 #include "human/tools/firebase.h"
 #include "human/tools/gcloud.h"
@@ -62,18 +64,16 @@
 #include "human/tools/instagram.h"
 #include "human/tools/invoice.h"
 #include "human/tools/jira.h"
+#include "human/tools/meeting_transcribe.h"
 #include "human/tools/memory_forget.h"
 #include "human/tools/memory_list.h"
 #include "human/tools/memory_recall.h"
 #include "human/tools/memory_store.h"
-#include "human/tools/bff_memory.h"
-#include "human/tools/doc_ingest.h"
-#include "human/tools/meeting_transcribe.h"
-#include "human/tools/save_for_later.h"
 #include "human/tools/message.h"
 #include "human/tools/pdf.h"
 #include "human/tools/pushover.h"
 #include "human/tools/report.h"
+#include "human/tools/save_for_later.h"
 #include "human/tools/social.h"
 #include "human/tools/spreadsheet.h"
 #include "human/tools/twitter.h"
@@ -87,15 +87,16 @@
 #ifdef HU_ENABLE_CURL
 #include "human/tools/paperclip.h"
 #endif
+#include "human/tools/pwa.h"
 #include "human/tools/schema.h"
 #include "human/tools/send_message.h"
 #include "human/tools/shell.h"
-#include "human/tools/pwa.h"
 #ifdef HU_HAS_SKILLS
 #include "human/tools/skill_run.h"
 #endif
 #include "human/tools/skill_write.h"
 #include "human/tools/spawn.h"
+#include "human/tools/voice_clone.h"
 #include "human/tools/web_fetch.h"
 #include "human/tools/web_search.h"
 #include <stdlib.h>
@@ -114,8 +115,8 @@
 #define HU_TOOLS_PERSONA_COUNT 0
 #endif
 #define HU_TOOLS_COUNT_BASE         \
-    (54 + HU_TOOLS_CRON_COUNT - 1 + \
-     HU_TOOLS_PERSONA_COUNT) /* +bff_memory +doc_ingest +meeting_transcribe */
+    (55 + HU_TOOLS_CRON_COUNT - 1 + \
+     HU_TOOLS_PERSONA_COUNT) /* +bff_memory +doc_ingest +meeting_transcribe +voice_clone */
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -156,8 +157,8 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
                                    const hu_config_t *config, hu_memory_t *memory,
                                    hu_cron_scheduler_t *cron, hu_agent_pool_t *agent_pool,
                                    hu_mailbox_t *mailbox, hu_skillforge_t *skillforge,
-                                   hu_agent_registry_t *agent_registry,
-                                   hu_tool_t **out_tools, size_t *out_count) {
+                                   hu_agent_registry_t *agent_registry, hu_tool_t **out_tools,
+                                   size_t *out_count) {
     if (!alloc || !out_tools || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
 #ifndef HU_HAS_CRON
@@ -267,7 +268,8 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
         goto fail;
     idx++;
 
-    err = add_tool_ws(alloc, tools, &idx, workspace_dir, workspace_dir_len, policy, hu_doc_ingest_create);
+    err = add_tool_ws(alloc, tools, &idx, workspace_dir, workspace_dir_len, policy,
+                      hu_doc_ingest_create);
     if (err != HU_OK)
         goto fail;
 
@@ -567,6 +569,11 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     if (err != HU_OK)
         goto fail;
     idx++;
+
+    err = add_tool_ws(alloc, tools, &idx, workspace_dir, workspace_dir_len, policy,
+                      hu_voice_clone_tool_create);
+    if (err != HU_OK)
+        goto fail;
 
 #ifdef HU_ENABLE_CURL
     err = hu_paperclip_tool_create(alloc, &tools[idx]);
