@@ -9,7 +9,7 @@ Scope: entire repository.
 
 human is a C11 autonomous AI assistant runtime optimized for:
 
-- minimal binary size (~1604 KB release with LTO)
+- minimal binary size (~1620 KB release with LTO)
 - minimal memory footprint (5–6 MB peak RSS measured)
 - zero dependencies beyond libc, optional SQLite and libcurl
 - Zig reference implementation archived in `archive/zig-reference/`
@@ -35,7 +35,7 @@ Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
 | Metric                   | Measured       |
 | ------------------------ | -------------- |
-| Binary size              | ~1604 KB       |
+| Binary size              | ~1620 KB       |
 | Text section             | 480 KB         |
 | Cold-start (`--version`) | 4–27 ms avg    |
 | Peak RSS (`--version`)   | ~5.7 MB        |
@@ -64,7 +64,7 @@ These codebase realities should drive every design decision:
 2. **Binary size and memory are hard product constraints**
    - `cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON` is the release target. Every dependency and abstraction has a size cost.
    - Avoid adding unnecessary runtime allocations or large data tables without justification.
-   - Current release binary: ~1604 KB (all features with LTO).
+   - Current release binary: ~1620 KB (all features with LTO).
 
 3. **Security-critical surfaces are first-class**
    - `src/gateway/gateway.c`, `src/security/`, `src/tools/`, `src/runtime/` carry high blast radius.
@@ -98,7 +98,7 @@ src/
   agent/                agent loop, context, planner, compaction, dispatcher
   channels/             38 channel implementations (cli, telegram, discord, slack, ...)
   providers/            50+ AI provider implementations (9 core + 41 compatible services)
-  tools/                82 tool implementations
+  tools/                83 tool implementations
   memory/               SQLite + markdown + LRU + LanceDB + Lucid backends, embeddings, vector search, connections, consolidation, multimodal ingest
   security/             policy, pairing, secrets, sandbox backends (landlock, firejail, bwrap)
   runtime/              runtime adapters (native, docker, wasm, cloudflare)

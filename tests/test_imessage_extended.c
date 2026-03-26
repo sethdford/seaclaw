@@ -165,6 +165,20 @@ static void test_imessage_loop_msg_unsent_field(void) {
 }
 
 #if HU_IS_TEST
+static void test_imessage_typing_cache_field_exists(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 11, NULL, 0, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->send);
+    hu_error_t err = ch.vtable->send(ch.ctx, "+15551234567", 11, "hello", 5, NULL, 0);
+    HU_ASSERT_EQ(err, HU_OK);
+    err = ch.vtable->send(ch.ctx, "+15551234567", 11, "again", 5, NULL, 0);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_imessage_destroy(&ch);
+}
+#endif
+
+#if HU_IS_TEST
 static void test_imessage_react_test_records(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
@@ -215,6 +229,7 @@ void run_imessage_extended_tests(void) {
     HU_RUN_TEST(test_imessage_guid_lookup_stub_returns_not_supported);
     HU_RUN_TEST(test_imessage_loop_msg_unsent_field);
 #if HU_IS_TEST
+    HU_RUN_TEST(test_imessage_typing_cache_field_exists);
     HU_RUN_TEST(test_imessage_react_test_records);
 #endif
 }

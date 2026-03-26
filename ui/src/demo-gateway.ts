@@ -1672,6 +1672,14 @@ export class DemoGatewayClient extends EventTarget {
       case "chat.abort":
         return { aborted: true };
 
+      /* Mirrors gateway voice.clone result; uploads audio to Cartesia and returns a voice UUID. */
+      case "voice.clone":
+        return {
+          voice_id: "demo-clone-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+          name: (params as Record<string, unknown>)?.name ?? "Demo Voice",
+          language: (params as Record<string, unknown>)?.language ?? "en",
+        };
+
       /* Mirrors gateway voice.transcribe result; server uses config.voice for STT routing. */
       case "voice.transcribe":
         return { text: "Demo transcription of your audio" };
