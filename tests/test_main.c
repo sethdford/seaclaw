@@ -25,6 +25,7 @@ void run_memory_util_tests(void);
 void run_tunnel_tests(void);
 void run_gateway_tests(void);
 void run_auth_tests(void);
+void run_oauth_tests(void);
 void run_security_tests(void);
 void run_vault_tests(void);
 void run_provider_tests(void);
@@ -35,6 +36,9 @@ void run_channel_tests(void);
 void run_channel_format_tests(void);
 void run_channel_rate_limit_tests(void);
 void run_tool_tests(void);
+void run_hook_pipeline_tests(void);
+void run_compaction_structured_tests(void);
+void run_instruction_discover_tests(void);
 void test_vtables_run(void);
 void run_peripheral_tests(void);
 void run_e2e_tests(void);
@@ -118,6 +122,8 @@ void run_ported_modules_tests(void);
 void run_cron_tests(void);
 void run_subagent_tests(void);
 void run_mcp_tests(void);
+void run_mcp_jsonrpc_tests(void);
+void run_mcp_manager_tests(void);
 void run_mcp_transport_tests(void);
 void run_mcp_transport_sse_tests(void);
 void run_otel_trace_tests(void);
@@ -192,6 +198,7 @@ void run_emotional_residue_tests(void);
 void run_consolidation_engine_tests(void);
 void run_conv_goals_tests(void);
 void run_knowledge_tests(void);
+void run_usage_tests(void);
 void run_cognitive_tests(void);
 #ifdef HU_ENABLE_AUTHENTIC
 void run_cognitive_load_tests(void);
@@ -359,6 +366,15 @@ void run_dual_process_tests(void);
 void run_sota_research_tests(void);
 void run_sota_wiring_tests(void);
 void run_sota_live_wiring_tests(void);
+void hu_test_permission(void);
+void test_session_persist(void);
+void run_adversarial_memory_safety_tests(void);
+void run_adversarial_injection_tests(void);
+void run_adversarial_dos_protocol_tests(void);
+void run_adversarial_concurrency_tests(void);
+void run_adversarial_integration_tests(void);
+void run_config_reload_tests(void);
+void run_plugin_hooks_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -407,6 +423,7 @@ int main(int argc, char **argv) {
     run_tunnel_tests();
     run_gateway_tests();
     run_auth_tests();
+    run_oauth_tests();
     run_security_tests();
     run_vault_tests();
     run_provider_tests();
@@ -508,6 +525,8 @@ int main(int argc, char **argv) {
     run_cron_tests();
     run_subagent_tests();
     run_mcp_tests();
+    run_mcp_jsonrpc_tests();
+    run_mcp_manager_tests();
     run_mcp_transport_tests();
     run_mcp_transport_sse_tests();
     run_otel_trace_tests();
@@ -584,6 +603,7 @@ int main(int argc, char **argv) {
 #endif
     run_conv_goals_tests();
     run_knowledge_tests();
+    run_usage_tests();
     run_cognitive_tests();
 #ifdef HU_ENABLE_AUTHENTIC
     run_cognitive_load_tests();
@@ -742,6 +762,18 @@ int main(int argc, char **argv) {
     run_sota_research_tests();
     run_sota_wiring_tests();
     run_sota_live_wiring_tests();
+    hu_test_permission();
+    run_hook_pipeline_tests();
+    test_session_persist();
+    run_compaction_structured_tests();
+    run_instruction_discover_tests();
+    run_adversarial_memory_safety_tests();
+    run_adversarial_injection_tests();
+    run_adversarial_dos_protocol_tests();
+    run_adversarial_concurrency_tests();
+    run_adversarial_integration_tests();
+    run_config_reload_tests();
+    run_plugin_hooks_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

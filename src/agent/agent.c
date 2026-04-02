@@ -1,4 +1,5 @@
 #include "human/agent.h"
+#include "human/config.h"
 #include "human/agent/awareness.h"
 #include "human/agent/commitment_store.h"
 #include "human/agent/pattern_radar.h"
@@ -90,19 +91,36 @@ hu_agent_t *hu_agent_get_current_for_tools(void) {
 }
 
 void hu_agent_internal_record_cost(hu_agent_t *agent, const hu_token_usage_t *usage) {
-    if (!agent->cost_tracker || !agent->cost_tracker->enabled)
+    if (!agent || !usage)
         return;
-    hu_cost_entry_t entry;
-    memset(&entry, 0, sizeof(entry));
-    entry.model = agent->model_name;
-    entry.input_tokens = usage->prompt_tokens;
-    entry.output_tokens = usage->completion_tokens;
-    entry.total_tokens = usage->total_tokens;
-    entry.cost_usd = 0.0;
-    entry.timestamp_secs = (int64_t)time(NULL);
-    hu_error_t cost_err = hu_cost_record_usage(agent->cost_tracker, &entry, agent->active_job_id);
-    if (cost_err != HU_OK)
-        fprintf(stderr, "[agent] cost tracking failed: %s\n", hu_error_string(cost_err));
+
+    /* Record in cost tracker (backward compat) */
+    if (agent->cost_tracker && agent->cost_tracker->enabled) {
+        hu_cost_entry_t entry;
+        memset(&entry, 0, sizeof(entry));
+        entry.model = agent->model_name;
+        entry.input_tokens = usage->prompt_tokens;
+        entry.output_tokens = usage->completion_tokens;
+        entry.total_tokens = usage->total_tokens;
+        entry.cost_usd = 0.0;
+        entry.timestamp_secs = (int64_t)time(NULL);
+        hu_error_t cost_err = hu_cost_record_usage(agent->cost_tracker, &entry, agent->active_job_id);
+        if (cost_err != HU_OK)
+            fprintf(stderr, "[agent] cost tracking failed: %s\n", hu_error_string(cost_err));
+    }
+
+    /* Record in usage tracker (per-provider tracking) */
+    if (agent->usage_tracker) {
+        hu_extended_token_usage_t tu;
+        memset(&tu, 0, sizeof(tu));
+        tu.input_tokens = usage->prompt_tokens;
+        tu.output_tokens = usage->completion_tokens;
+        tu.cache_read_tokens = 0;  /* not yet exposed in provider API */
+        tu.cache_write_tokens = 0; /* not yet exposed in provider API */
+        hu_error_t usage_err = hu_usage_tracker_record(agent->usage_tracker, agent->model_name, &tu);
+        if (usage_err != HU_OK)
+            fprintf(stderr, "[agent] usage tracking failed: %s\n", hu_error_string(usage_err));
+    }
 }
 
 #define HU_AGENT_HISTORY_INIT_CAP 16
@@ -134,6 +152,8 @@ hu_error_t hu_agent_from_config(
     out->max_history_messages = max_history_messages ? max_history_messages : 50;
     out->auto_save = auto_save;
     out->autonomy_level = autonomy_level;
+    out->permission_level = HU_PERM_DANGER_FULL_ACCESS;
+    out->permission_base_level = HU_PERM_DANGER_FULL_ACCESS;
     out->reflection.enabled = true;
     out->reflection.use_llm = true;
     out->reflection.max_retries = 2;
@@ -1109,4 +1129,123 @@ void hu_agent_internal_process_mailbox_messages(hu_agent_t *agent) {
         }
         hu_message_free(agent->alloc, &msg);
     }
+}
+
+/* ── Config hot-reload (Feature 1) ─────────────────────────────────────────────── */
+
+hu_error_t hu_agent_reload_config(hu_agent_t *agent, char **summary_out, size_t *summary_len_out) {
+    if (!agent || !summary_out)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *summary_out = NULL;
+    if (summary_len_out)
+        *summary_len_out = 0;
+
+    /* Load fresh config from ~/.human/config.json */
+    hu_config_t fresh_cfg;
+    memset(&fresh_cfg, 0, sizeof(fresh_cfg));
+    hu_error_t err = hu_config_load(agent->alloc, &fresh_cfg);
+    if (err != HU_OK) {
+        char *error_msg = hu_sprintf(agent->alloc, "Failed to reload config: %s", hu_error_string(err));
+        *summary_out = error_msg;
+        if (summary_len_out && error_msg)
+            *summary_len_out = strlen(error_msg);
+        return HU_OK;  /* Return HU_OK but include error in summary */
+    }
+
+    char *summary_buf = (char *)agent->alloc->alloc(agent->alloc->ctx, 512);
+    if (!summary_buf) {
+        hu_config_deinit(&fresh_cfg);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    int offset = 0;
+
+    /* Track what changed */
+    bool hooks_changed = false;
+    bool permission_changed = false;
+    bool instructions_changed = false;
+
+    /* 1. Rebuild hook registry from fresh config */
+    if (fresh_cfg.hooks.entries_count > 0) {
+        if (agent->hook_registry) {
+            hu_hook_registry_destroy(agent->hook_registry, agent->alloc);
+            agent->hook_registry = NULL;
+        }
+        hu_error_t hook_err = hu_hook_registry_create(agent->alloc, &agent->hook_registry);
+        if (hook_err == HU_OK) {
+            for (size_t i = 0; i < fresh_cfg.hooks.entries_count; i++) {
+                hu_hook_config_entry_t *hce = &fresh_cfg.hooks.entries[i];
+                if (!hce->command || !hce->event)
+                    continue;
+                hu_hook_event_t ev = HU_HOOK_PRE_TOOL_EXECUTE;
+                if (strcmp(hce->event, "post_tool_execute") == 0)
+                    ev = HU_HOOK_POST_TOOL_EXECUTE;
+                hu_hook_entry_t he = {0};
+                he.name = hce->name;
+                he.name_len = hce->name ? strlen(hce->name) : 0;
+                he.event = ev;
+                he.command = hce->command;
+                he.command_len = strlen(hce->command);
+                he.timeout_sec = hce->timeout_sec ? hce->timeout_sec : 30;
+                he.required = hce->required;
+                hu_hook_registry_add(agent->hook_registry, agent->alloc, &he);
+            }
+            hooks_changed = true;
+            offset += snprintf(summary_buf + offset, 512 - offset,
+                             "Hooks: rebuilt (%zu entries)\n", fresh_cfg.hooks.entries_count);
+        }
+    } else if (agent->hook_registry) {
+        /* Hooks were cleared in new config */
+        hu_hook_registry_destroy(agent->hook_registry, agent->alloc);
+        agent->hook_registry = NULL;
+        hooks_changed = true;
+        offset += snprintf(summary_buf + offset, 512 - offset, "Hooks: cleared\n");
+    }
+
+    /* 2. Update permission level if changed */
+    hu_permission_level_t new_perm = (hu_permission_level_t)fresh_cfg.agent.permission_level;
+    if (new_perm != agent->permission_base_level) {
+        agent->permission_base_level = new_perm;
+        /* Update effective level if not escalated */
+        if (!agent->permission_escalated) {
+            agent->permission_level = new_perm;
+        }
+        permission_changed = true;
+        offset += snprintf(summary_buf + offset, 512 - offset,
+                         "Permission level: updated to %u\n", (unsigned int)new_perm);
+    }
+
+    /* 3. Re-discover instruction files */
+    if (agent->instruction_discovery) {
+        hu_instruction_discovery_destroy(agent->alloc, agent->instruction_discovery);
+        agent->instruction_discovery = NULL;
+    }
+    if (fresh_cfg.agent.discover_instructions) {
+        hu_error_t instr_err = hu_instruction_discovery_run(agent->alloc,
+                                                           agent->workspace_dir,
+                                                           agent->workspace_dir_len,
+                                                           &agent->instruction_discovery);
+        if (instr_err == HU_OK && agent->instruction_discovery) {
+            instructions_changed = true;
+            offset += snprintf(summary_buf + offset, 512 - offset,
+                             "Instructions: re-discovered (%zu files)\n",
+                             agent->instruction_discovery->file_count);
+        }
+    }
+
+    /* Clean up fresh config */
+    hu_config_deinit(&fresh_cfg);
+
+    /* Generate final summary */
+    if (!hooks_changed && !permission_changed && !instructions_changed) {
+        offset += snprintf(summary_buf + offset, 512 - offset, "No changes detected.");
+    } else {
+        offset += snprintf(summary_buf + offset, 512 - offset, "Config reloaded successfully.");
+    }
+
+    *summary_out = summary_buf;
+    if (summary_len_out)
+        *summary_len_out = (size_t)offset;
+
+    return HU_OK;
 }

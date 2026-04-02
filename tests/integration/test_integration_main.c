@@ -13,6 +13,7 @@ jmp_buf hu__jmp;
 
 void run_integration_http_tests(void);
 void run_integration_sqlite_tests(void);
+void run_integration_imap_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [--suite=name] [--filter=name] [--help]\n", prog);
@@ -41,6 +42,8 @@ int main(int argc, char **argv) {
     run_integration_http_tests();
     HU_TEST_SUITE("Integration SQLite");
     run_integration_sqlite_tests();
+    HU_TEST_SUITE("Integration IMAP");
+    run_integration_imap_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

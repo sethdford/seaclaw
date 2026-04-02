@@ -138,6 +138,28 @@ export class ScModal extends LitElement {
     if (this._closeTimeout) clearTimeout(this._closeTimeout);
   }
 
+  /** Includes `position: fixed` targets; avoids dropping focusables when `offsetParent` is null. */
+  private _isFocusableCandidate(el: HTMLElement): boolean {
+    if (el.hasAttribute("disabled")) return false;
+    if (el.getAttribute("aria-hidden") === "true") return false;
+    try {
+      const style = window.getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden") return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    } catch {
+      return true;
+    }
+  }
+
+  private _deepestActiveElement(): Element | null {
+    let a: Element | null = document.activeElement;
+    for (let i = 0; i < 8 && a && "shadowRoot" in a && a.shadowRoot?.activeElement; i++) {
+      a = a.shadowRoot.activeElement;
+    }
+    return a;
+  }
+
   private _getFocusable(): HTMLElement[] {
     const panel = this.renderRoot.querySelector<HTMLElement>(".panel");
     if (!panel) return [];
@@ -154,9 +176,7 @@ export class ScModal extends LitElement {
       ...(el.matches(selectors) ? [el as HTMLElement] : []),
       ...Array.from(el.querySelectorAll<HTMLElement>(selectors)),
     ]);
-    return [...shadowFocusable, ...slotFocusable].filter(
-      (el) => !el.hasAttribute("disabled") && el.offsetParent !== null,
-    );
+    return [...shadowFocusable, ...slotFocusable].filter((el) => this._isFocusableCandidate(el));
   }
 
   private _focusFirst(): void {
@@ -183,22 +203,15 @@ export class ScModal extends LitElement {
       }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
+      const active = this._deepestActiveElement();
       if (e.shiftKey) {
-        if (
-          document.activeElement === first ||
-          (this.renderRoot as ShadowRoot).activeElement === first
-        ) {
+        if (active === first) {
           e.preventDefault();
           last.focus();
         }
-      } else {
-        if (
-          document.activeElement === last ||
-          (this.renderRoot as ShadowRoot).activeElement === last
-        ) {
-          e.preventDefault();
-          first.focus();
-        }
+      } else if (active === last) {
+        e.preventDefault();
+        first.focus();
       }
     }
   }

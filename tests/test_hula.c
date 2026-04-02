@@ -1219,6 +1219,14 @@ static void hula_extract_and_strip_program_tags(void) {
     HU_ASSERT_TRUE(strstr(stripped, "Preamble") != NULL);
     HU_ASSERT_TRUE(strstr(stripped, "tail") != NULL);
     alloc.free(alloc.ctx, stripped, slen + 1);
+
+    const char *slice = NULL;
+    size_t slice_len = 0;
+    HU_ASSERT_EQ(hu_hula_program_source_slice_from_text(wrapped, (size_t)wn, &slice, &slice_len),
+                 HU_OK);
+    HU_ASSERT_NOT_NULL(slice);
+    HU_ASSERT_EQ(slice_len, strlen(inner));
+    HU_ASSERT_TRUE(memcmp(slice, inner, slice_len) == 0);
 }
 
 static void hula_cost_estimate_bounds(void) {
@@ -1461,6 +1469,47 @@ static void hula_trace_persist_embeds_program_from_to_json(void) {
     HU_ASSERT_NOT_NULL(po);
     const char *nm = hu_json_get_string(po, "name");
     HU_ASSERT_TRUE(nm && strcmp(nm, "tj") == 0);
+    hu_json_free(&alloc, root);
+    (void)unlink(path);
+    (void)rmdir(td);
+}
+
+static void hula_trace_persist_embeds_program_source(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *trace_a = "[]";
+    const char *prog =
+        "{\"name\":\"ps\",\"version\":1,\"root\":{\"op\":\"call\",\"id\":\"c\",\"tool\":\"echo\","
+        "\"args\":{\"text\":\"x\"}}}";
+    const char *src = "{\"audit\":\"model\"}";
+    char td[] = "/tmp/hu_hula_psrc_XXXXXX";
+    HU_ASSERT_NOT_NULL(mkdtemp(td));
+    HU_ASSERT_EQ(hu_hula_trace_persist(&alloc, td, trace_a, strlen(trace_a), "ps", 2, true, prog,
+                                       strlen(prog), src, strlen(src)),
+                 HU_OK);
+    DIR *d = opendir(td);
+    HU_ASSERT_NOT_NULL(d);
+    char path[640];
+    path[0] = '\0';
+    struct dirent *de;
+    while ((de = readdir(d)) != NULL) {
+        if (de->d_name[0] == '.')
+            continue;
+        (void)snprintf(path, sizeof(path), "%s/%s", td, de->d_name);
+        break;
+    }
+    closedir(d);
+    HU_ASSERT_TRUE(path[0] != '\0');
+    FILE *fp = fopen(path, "rb");
+    HU_ASSERT_NOT_NULL(fp);
+    char buf[4096];
+    size_t nr = fread(buf, 1, sizeof(buf) - 1, fp);
+    fclose(fp);
+    buf[nr] = '\0';
+    hu_json_value_t *root = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, buf, nr, &root), HU_OK);
+    HU_ASSERT_NOT_NULL(root);
+    const char *got = hu_json_get_string(root, "program_source");
+    HU_ASSERT_TRUE(got && strcmp(got, src) == 0);
     hu_json_free(&alloc, root);
     (void)unlink(path);
     (void)rmdir(td);
@@ -1890,5 +1939,6 @@ void run_hula_tests(void) {
     HU_RUN_TEST(hula_emergence_persist_scan_promote);
     HU_RUN_TEST(hula_trace_persist_embeds_program_field);
     HU_RUN_TEST(hula_trace_persist_embeds_program_from_to_json);
+    HU_RUN_TEST(hula_trace_persist_embeds_program_source);
 #endif
 }

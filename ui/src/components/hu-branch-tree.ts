@@ -73,7 +73,7 @@ export class ScBranchTree extends LitElement {
       font-weight: var(--hu-weight-semibold);
       color: var(--hu-text);
     }
-    .branch-node .node-label:focus-visible {
+    .branch-node:focus-visible {
       outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
       outline-offset: var(--hu-focus-ring-offset, 2px);
       box-shadow: 0 0 12px var(--hu-focus-glow);
@@ -167,24 +167,36 @@ export class ScBranchTree extends LitElement {
     const isCollapsed = hasChildren && this._collapsed.has(node.id);
 
     return html`
-      <div class="branch-node ${isActive ? "active" : ""} ${isCollapsed ? "collapsed" : ""}">
+      <div
+        class="branch-node ${isActive ? "active" : ""} ${isCollapsed ? "collapsed" : ""}"
+        role="treeitem"
+        aria-expanded=${hasChildren ? String(!isCollapsed) : nothing}
+        aria-selected=${isActive ? "true" : "false"}
+        tabindex="0"
+        @click=${(e: Event) => {
+          if ((e.target as HTMLElement).closest(".branch-toggle")) return;
+          this._onNodeClick(e, node);
+        }}
+        @keydown=${(e: KeyboardEvent) => {
+          if ((e.target as HTMLElement).closest(".branch-toggle")) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            this._onNodeClick(e, node);
+            return;
+          }
+          if (hasChildren && e.key === "ArrowRight" && isCollapsed) {
+            e.preventDefault();
+            this._toggleCollapse(node.id);
+          } else if (hasChildren && e.key === "ArrowLeft" && !isCollapsed) {
+            e.preventDefault();
+            this._toggleCollapse(node.id);
+          }
+        }}
+      >
         <div class="branch-row">
           <span class="node-dot" aria-hidden="true"></span>
           <div class="branch-content">
-            <div
-              role="button"
-              tabindex="0"
-              class="node-label"
-              @click=${(e: Event) => this._onNodeClick(e, node)}
-              @keydown=${(e: KeyboardEvent) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  this._onNodeClick(e, node);
-                }
-              }}
-            >
-              ${node.label}
-            </div>
+            <div class="node-label">${node.label}</div>
             <div class="node-preview" title=${node.messagePreview}>${node.messagePreview}</div>
           </div>
           ${hasChildren
@@ -196,6 +208,13 @@ export class ScBranchTree extends LitElement {
                   @click=${(e: Event) => {
                     e.stopPropagation();
                     this._toggleCollapse(node.id);
+                  }}
+                  @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      this._toggleCollapse(node.id);
+                    }
                   }}
                 >
                   <svg viewBox="0 0 256 256" fill="currentColor">
@@ -209,7 +228,7 @@ export class ScBranchTree extends LitElement {
         </div>
         ${hasChildren && !isCollapsed
           ? html`
-              <div class="branch-children">
+              <div class="branch-children" role="group">
                 ${node.children.map((child) => this._renderNode(child, _depth + 1))}
               </div>
             `

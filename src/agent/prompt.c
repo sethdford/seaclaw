@@ -131,6 +131,15 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
             if (err != HU_OK)
                 goto fail;
         }
+        if (config->instruction_context && config->instruction_context_len > 0) {
+            err = append(alloc, &buf, &len, &cap, config->instruction_context,
+                         config->instruction_context_len);
+            if (err != HU_OK)
+                goto fail;
+            err = append(alloc, &buf, &len, &cap, "\n\n", 2);
+            if (err != HU_OK)
+                goto fail;
+        }
         if (config->stm_context && config->stm_context_len > 0) {
             err = append(alloc, &buf, &len, &cap, "\n\n### Session Context\n", 22);
             if (err != HU_OK)
@@ -514,6 +523,20 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
             goto fail;
     } else {
         err = append(alloc, &buf, &len, &cap, "(none)\n\n", 8);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* Instruction file context (discovered .human.md / HUMAN.md) */
+    if (config->instruction_context && config->instruction_context_len > 0) {
+        err = append(alloc, &buf, &len, &cap, "## Project Instructions\n\n", 25);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->instruction_context,
+                     config->instruction_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n\n", 2);
         if (err != HU_OK)
             goto fail;
     }

@@ -1,6 +1,6 @@
 # Eval Suites Manifest
 
-Version: **2026-03-22b** (bump on any task add/remove/reword or judge profile change)
+Version: **2026-03-22c** (bump on any task add/remove/reword or judge profile change)
 
 ## Suites
 
@@ -10,7 +10,7 @@ Version: **2026-03-22b** (bump on any task add/remove/reword or judge profile ch
 | `capability_edges.json` | 10 | Epistemic honesty / no-AGI | `capability_honesty` | 1.0 |
 | `coding_basic.json` | 5 | Code generation | (contains) | 1.0 |
 | `fidelity.json` | 10 | Persona fidelity | (contains) | 1.0 |
-| `hula_orchestration.json` | 2 | HuLa IR: par gather + branch | `hula_structure` (harness); `llm_judge` (static) | 1.0 |
+| `hula_orchestration.json` | 4 | HuLa IR: par, branch, `$` refs, delegate | `hula_structure` (harness); `llm_judge` (static) | 1.0 |
 | `human_likeness.json` | 8 | Tone / warmth / register | `human_likeness` | 1.0 |
 | `intelligence.json` | 10 | Reasoning + knowledge | (contains) | 1.0 |
 | `memory.json` | 8 | Memory ops | (contains) | 1.0 |
@@ -35,6 +35,7 @@ Human-facing HuLa documentation (config, CLI, ethics, traces): [`docs/guides/hul
 
 ## Changelog
 
+- **2026-03-22c**: Extended `hula_orchestration.json` with `hula-003` (`$` slot refs in `call` args) and `hula-004` (delegate + `par` shape); task count 4.
 - **2026-03-22b**: Added `hula_orchestration.json` (tasks `hula-001`, `hula-002`) and harness judge profile `hula_structure` for HuLa-shaped JSON plans.
 - **2026-03-22**: `reasoning_basic.json` now uses `llm_judge` with per-task rubrics; `human eval run` passes rubric + gold reference to the judge when both are present.
 - **2026-03-21**: Initial manifest. Added `human_likeness.json`, `tool_capability.json`, `multi_turn.json`. Harness supports multi-turn scenarios.

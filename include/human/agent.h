@@ -7,6 +7,7 @@
 #include "human/agent/data_quality.h"
 #include "human/agent/degradation.h"
 #include "human/agent/gvr.h"
+#include "human/agent/instruction_discover.h"
 #include "human/agent/kv_cache.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/mar.h"
@@ -29,6 +30,7 @@
 #include "human/core/error.h"
 #include "human/core/slice.h"
 #include "human/cost.h"
+#include "human/usage.h"
 #include "human/memory.h"
 #include "human/memory/policy.h"
 #include "human/memory/retrieval.h"
@@ -55,6 +57,8 @@
 #include "human/cognition/emotional.h"
 #include "human/cognition/metacognition.h"
 #include "human/provider.h"
+#include "human/hook.h"
+#include "human/permission.h"
 #include "human/security.h"
 #include "human/security/audit.h"
 #include "human/security/policy_engine.h"
@@ -122,6 +126,7 @@ struct hu_agent {
     hu_bth_metrics_t *bth_metrics;           /* optional; set by daemon for BTH observability */
     hu_security_policy_t *policy;            /* optional, may be NULL */
     hu_cost_tracker_t *cost_tracker;         /* optional, may be NULL */
+    hu_usage_tracker_t *usage_tracker;       /* optional, per-provider token tracking */
 
     char *model_name; /* owned */
     size_t model_name_len;
@@ -223,6 +228,8 @@ struct hu_agent {
 
     char trace_id[37]; /* UUID v4 hex string + NUL, regenerated per conversation turn */
 
+    char session_id[64]; /* current session persistence ID; empty = no active session */
+
     hu_stm_buffer_t stm; /* short-term memory buffer for session context */
 
     hu_commitment_store_t *commitment_store; /* optional; when memory is set */
@@ -303,6 +310,17 @@ struct hu_agent {
 
     /* ESCALATE.md protocol */
     hu_escalate_protocol_t escalate_protocol;
+
+    /* Permission tiers */
+    hu_permission_level_t permission_level;      /* effective (may be escalated) */
+    hu_permission_level_t permission_base_level;  /* configured base level */
+    bool permission_escalated;                    /* true during temporary escalation */
+
+    /* Hook pipeline: pre/post tool execution interception */
+    hu_hook_registry_t *hook_registry;            /* optional; NULL = no hooks */
+
+    /* Instruction file discovery cache */
+    hu_instruction_discovery_t *instruction_discovery;
 
     /* Cognition subsystems */
     hu_emotional_cognition_t emotional_cognition;
@@ -447,5 +465,12 @@ hu_error_t hu_agent_set_persona(hu_agent_t *agent, const char *name, size_t name
 
 /* Run memory consolidation (merge similar entries, decay old). */
 hu_error_t hu_agent_consolidate_memory(hu_agent_t *agent);
+
+/* Reload configuration from ~/.human/config.json:
+ * - Re-parse hooks and rebuild hook registry
+ * - Update permission level if changed
+ * - Re-discover instruction files
+ * Returns summary of what changed. Caller must free. */
+hu_error_t hu_agent_reload_config(hu_agent_t *agent, char **summary_out, size_t *summary_len_out);
 
 #endif /* HU_AGENT_H */

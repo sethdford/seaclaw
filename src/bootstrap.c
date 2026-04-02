@@ -11,6 +11,7 @@
 #include "human/cognition/metacognition.h"
 #include "human/config.h"
 #include "human/context_engine.h"
+#include "human/hook.h"
 #include "human/data/loader.h"
 #include "human/memory.h"
 #include "human/memory/engines.h"
@@ -31,6 +32,10 @@
 #include "human/tool.h"
 #include "human/tools/factory.h"
 #include "human/voice.h"
+#include "human/hook.h"
+#include "human/permission.h"
+#include "human/mcp_manager.h"
+#include "human/agent/instruction_discover.h"
 #ifdef HU_HAS_VOICE_CHANNEL
 #include "human/channels/voice_channel.h"
 #endif
@@ -320,6 +325,12 @@ static void destroy_voice_wrap(hu_channel_t *ch, hu_allocator_t *a) {
 }
 #endif
 
+/* Feature 2: Plugin hook registration context (must be before bootstrap_internal) */
+typedef struct {
+    hu_hook_registry_t *hook_registry;
+    hu_allocator_t *alloc;
+} hu_plugin_hook_ctx_t;
+
 /* Internal bootstrap state (opaque to caller) */
 typedef struct hu_bootstrap_internal {
     hu_config_t cfg;
@@ -372,6 +383,8 @@ typedef struct hu_bootstrap_internal {
     bool pwa_learner_ok;
 #endif
 
+    hu_plugin_hook_ctx_t plugin_hook_ctx;
+
     bool provider_ok;
     bool agent_ok;
 } hu_bootstrap_internal_t;
@@ -398,6 +411,19 @@ static hu_error_t plugin_register_channel_stub_fn(void *ctx, const hu_channel_t 
     (void)ctx;
     (void)channel;
     return HU_OK;
+}
+
+/* Feature 2: Plugin hook registration callback */
+static hu_error_t plugin_register_hook_fn(void *ctx, const hu_hook_entry_t *hook) {
+    hu_plugin_hook_ctx_t *hctx = (hu_plugin_hook_ctx_t *)ctx;
+    if (!hctx || !hook)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!hctx->hook_registry) {
+        hu_error_t err = hu_hook_registry_create(hctx->alloc, &hctx->hook_registry);
+        if (err != HU_OK)
+            return err;
+    }
+    return hu_hook_registry_add(hctx->hook_registry, hctx->alloc, hook);
 }
 
 hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char *config_path,
@@ -432,12 +458,15 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
     bi->plugin_reg = hu_plugin_registry_create(alloc, 16);
     ctx->plugin_reg = bi->plugin_reg;
     if (bi->plugin_reg) {
+        bi->plugin_hook_ctx.alloc = alloc;
+        bi->plugin_hook_ctx.hook_registry = NULL;
         hu_plugin_host_t host = {
             .alloc = alloc,
             .register_tool = plugin_register_tool_fn,
             .register_provider = plugin_register_provider_stub_fn,
             .register_channel = plugin_register_channel_stub_fn,
-            .host_ctx = bi->plugin_reg,
+            .register_hook = plugin_register_hook_fn,
+            .host_ctx = &bi->plugin_hook_ctx,
         };
         for (size_t i = 0; i < bi->cfg.plugins.plugin_paths_len; i++) {
             if (bi->cfg.plugins.plugin_paths[i]) {
@@ -602,6 +631,50 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         ctx->tools_count = bi->tools_count;
     }
 
+    /* MCP eager startup: create manager, auto-connect, and load tools */
+    if (bi->cfg.mcp_servers_len > 0) {
+        hu_mcp_manager_t *mcp_mgr = NULL;
+        hu_error_t mcp_err = hu_mcp_manager_create(alloc, bi->cfg.mcp_servers,
+                                                   bi->cfg.mcp_servers_len, &mcp_mgr);
+        if (mcp_err == HU_OK && mcp_mgr) {
+            /* Connect all servers marked with auto_connect=true */
+            hu_error_t connect_err = hu_mcp_manager_connect_auto(mcp_mgr);
+            if (connect_err != HU_OK) {
+                fprintf(stderr, "[bootstrap] warning: MCP auto-connect failed: %s\n",
+                        hu_error_string(connect_err));
+            }
+
+            /* Load tools from connected MCP servers */
+            hu_tool_t *mcp_tools = NULL;
+            size_t mcp_tools_count = 0;
+            hu_error_t load_err = hu_mcp_manager_load_tools(mcp_mgr, alloc, &mcp_tools,
+                                                            &mcp_tools_count);
+            if (load_err == HU_OK && mcp_tools_count > 0) {
+                /* Merge MCP tools with existing tools */
+                hu_tool_t *merged = (hu_tool_t *)alloc->alloc(
+                    alloc->ctx, (bi->tools_count + mcp_tools_count) * sizeof(hu_tool_t));
+                if (merged) {
+                    memcpy(merged, bi->tools, bi->tools_count * sizeof(hu_tool_t));
+                    memcpy(merged + bi->tools_count, mcp_tools,
+                           mcp_tools_count * sizeof(hu_tool_t));
+                    alloc->free(alloc->ctx, bi->tools, bi->tools_count * sizeof(hu_tool_t));
+                    bi->tools = merged;
+                    bi->tools_count += mcp_tools_count;
+                    ctx->tools = bi->tools;
+                    ctx->tools_count = bi->tools_count;
+                }
+                hu_mcp_manager_free_tools(alloc, mcp_tools, mcp_tools_count);
+            } else if (load_err != HU_OK) {
+                fprintf(stderr, "[bootstrap] warning: MCP tool loading failed: %s\n",
+                        hu_error_string(load_err));
+            }
+            hu_mcp_manager_destroy(mcp_mgr);
+        } else if (mcp_err != HU_OK) {
+            fprintf(stderr, "[bootstrap] warning: MCP manager creation failed: %s\n",
+                    hu_error_string(mcp_err));
+        }
+    }
+
     {
         hu_error_t reg_err = hu_agent_registry_create(alloc, &bi->agent_registry);
         if (reg_err == HU_OK) {
@@ -762,6 +835,66 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                 bi->cfg.security.audit.max_size_mb > 0 ? bi->cfg.security.audit.max_size_mb : 10;
             bi->agent.audit_logger = hu_audit_logger_create(alloc, &acfg, ws);
         }
+
+        /* Permission level from config */
+        bi->agent.permission_level = (hu_permission_level_t)bi->cfg.agent.permission_level;
+        bi->agent.permission_base_level = bi->agent.permission_level;
+
+        /* Hook registry from config */
+        hu_hook_registry_t *hreg = NULL;
+        if (bi->cfg.hooks.enabled && bi->cfg.hooks.entries_count > 0) {
+            if (hu_hook_registry_create(alloc, &hreg) == HU_OK && hreg) {
+                for (size_t i = 0; i < bi->cfg.hooks.entries_count; i++) {
+                    hu_hook_config_entry_t *hce = &bi->cfg.hooks.entries[i];
+                    if (!hce->command || !hce->event)
+                        continue;
+                    hu_hook_event_t ev = HU_HOOK_PRE_TOOL_EXECUTE;
+                    if (strcmp(hce->event, "post_tool_execute") == 0)
+                        ev = HU_HOOK_POST_TOOL_EXECUTE;
+                    hu_hook_entry_t he = {0};
+                    he.name = hce->name;
+                    he.name_len = hce->name ? strlen(hce->name) : 0;
+                    he.event = ev;
+                    he.command = hce->command;
+                    he.command_len = strlen(hce->command);
+                    he.timeout_sec = hce->timeout_sec ? hce->timeout_sec : 30;
+                    he.required = hce->required;
+                    hu_hook_registry_add(hreg, alloc, &he);
+                }
+            }
+        }
+
+        /* Feature 2: Add plugin-provided hooks to agent registry */
+        if (bi->plugin_hook_ctx.hook_registry) {
+            if (!hreg) {
+                hreg = bi->plugin_hook_ctx.hook_registry;
+            } else {
+                /* Merge plugin hooks into config hooks registry */
+                size_t plugin_hook_count = hu_hook_registry_count(bi->plugin_hook_ctx.hook_registry);
+                for (size_t i = 0; i < plugin_hook_count; i++) {
+                    const hu_hook_entry_t *phook = hu_hook_registry_get(bi->plugin_hook_ctx.hook_registry, i);
+                    if (phook) {
+                        hu_hook_registry_add(hreg, alloc, phook);
+                    }
+                }
+                hu_hook_registry_destroy(bi->plugin_hook_ctx.hook_registry, alloc);
+                bi->plugin_hook_ctx.hook_registry = NULL;
+            }
+        }
+
+        if (hreg) {
+            bi->agent.hook_registry = hreg;
+        }
+
+        /* Instruction file discovery */
+        if (bi->cfg.agent.discover_instructions) {
+            hu_instruction_discovery_t *disc = NULL;
+            hu_error_t disc_err =
+                hu_instruction_discovery_run(alloc, ws, strlen(ws), &disc);
+            if (disc_err == HU_OK && disc)
+                bi->agent.instruction_discovery = disc;
+        }
+
         ctx->agent = &bi->agent;
         ctx->agent_ok = true;
     }

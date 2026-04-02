@@ -104,6 +104,7 @@ static const char *spinner_frames[] = {
 
 /* ── Global cancel flag (set by SIGINT handler) ──────────────────────── */
 static volatile sig_atomic_t g_cancel = 0;
+static volatile sig_atomic_t g_reload_requested = 0;
 static hu_agent_t *g_active_agent = NULL;
 
 static void sigint_handler(int sig) {
@@ -112,6 +113,13 @@ static void sigint_handler(int sig) {
     if (g_active_agent)
         g_active_agent->cancel_requested = 1;
 }
+
+#ifndef _WIN32
+static void sighup_handler(int sig) {
+    (void)sig;
+    g_reload_requested = 1;
+}
+#endif
 
 /* ── Memory from config — delegates to shared factory ────────────────── */
 
@@ -881,7 +889,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
 
     /* Install SIGINT handler */
     g_active_agent = &agent;
-    struct sigaction sa, old_sa;
+    struct sigaction sa, old_sa, old_hup;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sigint_handler;
     sigemptyset(&sa.sa_mask);
@@ -889,6 +897,13 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     sigaction(SIGINT, &sa, &old_sa);
 
 #if !defined(_WIN32)
+    /* Install SIGHUP handler for config hot-reload */
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = sighup_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGHUP, &sa, &old_hup);
+
     signal(SIGPIPE, SIG_IGN);
 #endif
 
@@ -904,6 +919,24 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
 
     int one_shot = single_message_mode;
     while (1) {
+        /* Check for SIGHUP signal to reload config */
+#ifndef _WIN32
+        if (g_reload_requested) {
+            g_reload_requested = 0;
+            char *summary = NULL;
+            size_t summary_len = 0;
+            hu_error_t reload_err = hu_agent_reload_config(&agent, &summary, &summary_len);
+            if (reload_err == HU_OK && summary) {
+                fprintf(stderr, HU_COLOR_DIM "[human] Config reloaded via SIGHUP\n" HU_COLOR_RESET);
+                fprintf(stderr, HU_COLOR_DIM "%s" HU_COLOR_RESET "\n", summary);
+                alloc->free(alloc->ctx, summary, summary_len + 1);
+            } else if (reload_err != HU_OK) {
+                fprintf(stderr, HU_COLOR_WARNING "[human] Config reload failed: %s\n" HU_COLOR_RESET,
+                        hu_error_string(reload_err));
+            }
+        }
+#endif
+
         char *line = NULL;
         size_t line_len = 0;
         int line_owned = 1;
@@ -1058,6 +1091,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         printf("\n" HU_COLOR_DIM "Goodbye." HU_COLOR_RESET "\n");
     g_active_agent = NULL;
     sigaction(SIGINT, &old_sa, NULL);
+#ifndef _WIN32
+    sigaction(SIGHUP, &old_hup, NULL);
+#endif
     hu_agent_deinit(&agent);
     if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
         retrieval_engine.vtable->deinit(retrieval_engine.ctx, alloc);

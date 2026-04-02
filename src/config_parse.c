@@ -458,6 +458,49 @@ static hu_error_t parse_mcp_servers(hu_allocator_t *a, hu_config_t *cfg,
     return HU_OK;
 }
 
+static hu_error_t parse_mcp_config(hu_allocator_t *a, hu_config_t *cfg,
+                                   const hu_json_value_t *obj) {
+    if (!obj || obj->type != HU_JSON_OBJECT)
+        return HU_OK;
+    cfg->mcp.enabled = hu_json_get_bool(obj, "enabled", cfg->mcp.enabled);
+    /* If "mcp" has embedded "servers" object, parse them too */
+    hu_json_value_t *servers = hu_json_object_get(obj, "servers");
+    if (servers)
+        return parse_mcp_servers(a, cfg, servers);
+    return HU_OK;
+}
+
+static hu_error_t parse_hooks_config(hu_allocator_t *a, hu_config_t *cfg,
+                                     const hu_json_value_t *arr) {
+    if (!arr || arr->type != HU_JSON_ARRAY)
+        return HU_OK;
+    cfg->hooks.entries_count = 0;
+    cfg->hooks.enabled = true;
+    for (size_t i = 0; i < arr->data.array.len && cfg->hooks.entries_count < HU_HOOKS_CONFIG_MAX;
+         i++) {
+        hu_json_value_t *item = arr->data.array.items[i];
+        if (!item || item->type != HU_JSON_OBJECT)
+            continue;
+        hu_hook_config_entry_t *e = &cfg->hooks.entries[cfg->hooks.entries_count];
+        memset(e, 0, sizeof(*e));
+        const char *nm = hu_json_get_string(item, "name");
+        if (nm)
+            e->name = hu_strdup(a, nm);
+        const char *ev = hu_json_get_string(item, "event");
+        if (ev)
+            e->event = hu_strdup(a, ev);
+        const char *cmd = hu_json_get_string(item, "command");
+        if (cmd)
+            e->command = hu_strdup(a, cmd);
+        double ts = hu_json_get_number(item, "timeout_sec", 0);
+        if (ts >= 0 && ts <= 3600)
+            e->timeout_sec = (uint32_t)ts;
+        e->required = hu_json_get_bool(item, "required", false);
+        cfg->hooks.entries_count++;
+    }
+    return HU_OK;
+}
+
 static hu_error_t parse_policy_cfg(hu_allocator_t *a, hu_config_t *cfg,
                                    const hu_json_value_t *obj) {
     if (!obj || obj->type != HU_JSON_OBJECT)
@@ -999,6 +1042,14 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
     hu_json_value_t *mcp_obj = hu_json_object_get(root, "mcp_servers");
     if (mcp_obj)
         parse_mcp_servers(a, cfg, mcp_obj);
+
+    hu_json_value_t *mcp_cfg_obj = hu_json_object_get(root, "mcp");
+    if (mcp_cfg_obj)
+        parse_mcp_config(a, cfg, mcp_cfg_obj);
+
+    hu_json_value_t *hooks_obj = hu_json_object_get(root, "hooks");
+    if (hooks_obj)
+        parse_hooks_config(a, cfg, hooks_obj);
 
     hu_json_value_t *nodes_obj = hu_json_object_get(root, "nodes");
     if (nodes_obj)

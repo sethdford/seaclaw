@@ -3,6 +3,7 @@
 #include "human/agent/mailbox.h"
 #include "human/agent/planner.h"
 #include "human/agent/prompt.h"
+#include "human/agent/session_persist.h"
 #include "human/agent/spawn.h"
 #include "human/agent/task_list.h"
 #include "human/agent/undo.h"
@@ -216,7 +217,11 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
                            "  /task add <subj>   Create task\n"
                            "  /task claim <id>   Claim task\n"
                            "  /task done <id>    Mark task complete\n"
-                           "  /undo             Undo last reversible action\n";
+                           "  /undo             Undo last reversible action\n"
+                           "  /resume <id>      Resume a saved session\n"
+                           "  /list-sessions    List saved sessions\n"
+                           "  /save-session     Save current session\n"
+                           "  /reload-config    Reload config (hooks, perms, instructions)\n";
         return hu_strndup(agent->alloc, help, strlen(help));
     }
 
@@ -330,9 +335,20 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
     }
 
     if (hu_strncasecmp(cmd_buf, "cost", 4) == 0) {
+        if (agent->usage_tracker) {
+            char *report = NULL;
+            size_t report_len = 0;
+            hu_error_t err = hu_usage_tracker_format_report(agent->usage_tracker, agent->alloc,
+                                                            &report, &report_len);
+            if (err == HU_OK && report) {
+                return report;
+            }
+        }
+        /* Fallback if no usage tracker */
         return hu_sprintf(agent->alloc,
                           "Tokens used: %llu (est. cost depends on provider pricing)\n"
-                          "History: %zu messages",
+                          "History: %zu messages\n"
+                          "(Enable usage tracking for detailed per-model cost breakdown)",
                           (unsigned long long)agent->total_tokens, (size_t)agent->history_count);
     }
 
@@ -639,6 +655,72 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
         if (err != HU_OK)
             return hu_sprintf(agent->alloc, "Undo failed: %s", hu_error_string(err));
         return hu_strndup(agent->alloc, "Undone.", 7);
+    }
+
+    if (hu_strncasecmp(cmd_buf, "resume", 6) == 0) {
+        if (arg_len == 0)
+            return hu_strndup(agent->alloc, "Usage: /resume <session_id>", 27);
+        char *sdir = hu_session_default_dir(agent->alloc);
+        if (!sdir)
+            return hu_strndup(agent->alloc, "Failed to resolve session dir.", 30);
+        hu_error_t err = hu_session_persist_load(agent->alloc, agent, sdir, arg_buf);
+        agent->alloc->free(agent->alloc->ctx, sdir, strlen(sdir) + 1);
+        if (err == HU_ERR_NOT_FOUND)
+            return hu_sprintf(agent->alloc, "Session not found: %.*s", (int)arg_len, arg_buf);
+        if (err != HU_OK)
+            return hu_sprintf(agent->alloc, "Resume failed: %s", hu_error_string(err));
+        return hu_sprintf(agent->alloc, "Resumed session %.*s (%zu messages)",
+                          (int)arg_len, arg_buf, agent->history_count);
+    }
+
+    if (hu_strncasecmp(cmd_buf, "list-sessions", 13) == 0) {
+        char *sdir = hu_session_default_dir(agent->alloc);
+        if (!sdir)
+            return hu_strndup(agent->alloc, "Failed to resolve session dir.", 30);
+        hu_session_metadata_t *sessions = NULL;
+        size_t count = 0;
+        hu_error_t err = hu_session_persist_list(agent->alloc, sdir, &sessions, &count);
+        agent->alloc->free(agent->alloc->ctx, sdir, strlen(sdir) + 1);
+        if (err != HU_OK)
+            return hu_sprintf(agent->alloc, "List failed: %s", hu_error_string(err));
+        if (count == 0)
+            return hu_strndup(agent->alloc, "No saved sessions.", 18);
+
+        char *buf = (char *)agent->alloc->alloc(agent->alloc->ctx, 4096);
+        if (!buf) {
+            hu_session_metadata_free(agent->alloc, sessions, count);
+            return NULL;
+        }
+        int off = snprintf(buf, 4096, "Sessions (%zu):\n", count);
+        for (size_t i = 0; i < count && off < 4000; i++) {
+            off += snprintf(buf + off, 4096 - (size_t)off, "  %s  (%zu msgs, model: %s)\n",
+                            sessions[i].id, sessions[i].message_count,
+                            sessions[i].model_name ? sessions[i].model_name : "?");
+        }
+        hu_session_metadata_free(agent->alloc, sessions, count);
+        return buf;
+    }
+
+    if (hu_strncasecmp(cmd_buf, "save-session", 12) == 0) {
+        char *sdir = hu_session_default_dir(agent->alloc);
+        if (!sdir)
+            return hu_strndup(agent->alloc, "Failed to resolve session dir.", 30);
+        char sid[HU_SESSION_ID_MAX];
+        hu_error_t err = hu_session_persist_save(agent->alloc, agent, sdir, sid);
+        agent->alloc->free(agent->alloc->ctx, sdir, strlen(sdir) + 1);
+        if (err != HU_OK)
+            return hu_sprintf(agent->alloc, "Save failed: %s", hu_error_string(err));
+        return hu_sprintf(agent->alloc, "Session saved: %s", sid);
+    }
+
+    if (hu_strncasecmp(cmd_buf, "reload-config", 13) == 0) {
+        char *summary = NULL;
+        size_t summary_len = 0;
+        hu_error_t err = hu_agent_reload_config(agent, &summary, &summary_len);
+        if (err != HU_OK) {
+            return hu_sprintf(agent->alloc, "Config reload failed: %s", hu_error_string(err));
+        }
+        return summary;
     }
 
     return NULL;

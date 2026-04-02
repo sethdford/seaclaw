@@ -107,7 +107,8 @@
         "HU_ENABLE_INTEGRATION_TESTS": "ON",
         "HU_ENABLE_CURL": "ON",
         "HU_ENABLE_SQLITE": "ON",
-        "HU_ENABLE_CLI": "ON"
+        "HU_ENABLE_CLI": "ON",
+        "HU_ENABLE_IMAP": "ON"
       }
     }
   ],

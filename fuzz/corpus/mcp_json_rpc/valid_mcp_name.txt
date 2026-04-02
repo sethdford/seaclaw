@@ -1,0 +1,1 @@
+mcp__myserver__read_file

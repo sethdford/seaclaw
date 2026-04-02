@@ -52,6 +52,11 @@ hu_error_t hu_hula_extract_program_from_text(hu_allocator_t *alloc, const char *
 hu_error_t hu_hula_strip_program_tags(hu_allocator_t *alloc, const char *text, size_t text_len,
                                       char **out, size_t *out_len);
 
+/* First <hula_program>...</hula_program> inner payload (whitespace-trimmed). *out_start borrows
+ * into `text` until that buffer is freed or overwritten. */
+hu_error_t hu_hula_program_source_slice_from_text(const char *text, size_t text_len,
+                                                  const char **out_start, size_t *out_len);
+
 /* Build compiler prompt → chat_fn (e.g. provider chat with response_format json_object) → parse →
  * validate → run. When pool and spawn_tpl are non-NULL, binds delegate spawns (spawn_tpl aliases
  * parent; must live through hu_hula_exec_run). trace_persist(NULL dir) when not HU_IS_TEST.

@@ -99,4 +99,28 @@ typedef struct hu_session_config {
     size_t identity_links_len;
 } hu_session_config_t;
 
+/* ── MCP config (used by mcp_manager) ─────────────────────────────────── */
+
+typedef struct hu_mcp_config {
+    bool enabled;
+} hu_mcp_config_t;
+
+/* ── Hook pipeline config ─────────────────────────────────────────────── */
+
+#define HU_HOOKS_CONFIG_MAX 16
+
+typedef struct hu_hook_config_entry {
+    char *name;           /* human-readable hook name */
+    char *event;          /* "pre_tool_execute" or "post_tool_execute" */
+    char *command;        /* shell command to run */
+    uint32_t timeout_sec; /* 0 = default (30s) */
+    bool required;        /* if true, execution error => deny */
+} hu_hook_config_entry_t;
+
+typedef struct hu_hooks_config {
+    hu_hook_config_entry_t entries[HU_HOOKS_CONFIG_MAX];
+    size_t entries_count;
+    bool enabled;
+} hu_hooks_config_t;
+
 #endif /* HU_CONFIG_TYPES_H */

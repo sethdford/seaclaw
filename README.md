@@ -62,7 +62,7 @@ Human's verified numbers (measured on macOS arm64, March 2026):
 Binary size:   ~1750 KB (MinSizeRel + LTO, all channels)
 Peak RSS:      ~5.7 MB (--version), ~5.9 MB (test suite)
 Startup:       6–27 ms avg (Apple Silicon M4 Max)
-Tests:         6374+ passing, 0 ASan errors
+Tests:         6858+ passing, 0 ASan errors
 ```
 
 ### Why Switch from OpenClaw?

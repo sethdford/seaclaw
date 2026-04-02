@@ -60,6 +60,9 @@
 #if HU_HAS_EMAIL
 #include "human/channels/email.h"
 #endif
+#if HU_HAS_IMAP
+#include "human/channels/imap.h"
+#endif
 #if HU_HAS_GMAIL
 #include "human/channels/gmail.h"
 #endif
@@ -1225,6 +1228,83 @@ static void test_email_set_imap_null_channel(void) {
     hu_error_t err = hu_email_set_imap(NULL, "x", 1, 993);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
 }
+#endif
+
+#if HU_HAS_IMAP
+static void test_imap_create(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imap_config_t cfg = {
+        .imap_host = "imap.example.com",
+        .imap_host_len = 16,
+        .imap_port = 993,
+        .imap_username = "user@example.com",
+        .imap_username_len = 16,
+        .imap_password = "secret",
+        .imap_password_len = 6,
+        .imap_folder = "INBOX",
+        .imap_folder_len = 5,
+        .imap_use_tls = true,
+        .smtp_host = "smtp.example.com",
+        .smtp_host_len = 16,
+        .smtp_port = 587,
+        .from_address = "user@example.com",
+        .from_address_len = 16,
+    };
+    hu_error_t err = hu_imap_create(&alloc, &cfg, &ch);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(ch.vtable->name(ch.ctx), "imap");
+    HU_ASSERT_TRUE(ch.vtable->health_check(ch.ctx));
+    hu_imap_destroy(&ch);
+}
+
+static void test_imap_send_invalid_target(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imap_config_t cfg = {
+        .imap_host = "imap.example.com",
+        .imap_host_len = 16,
+        .imap_port = 993,
+        .imap_username = "user",
+        .imap_username_len = 4,
+        .imap_password = "secret",
+        .imap_password_len = 6,
+        .imap_folder = "INBOX",
+        .imap_folder_len = 5,
+        .imap_use_tls = true,
+    };
+    HU_ASSERT_EQ(hu_imap_create(&alloc, &cfg, &ch), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->send(ch.ctx, "", 0, "hello", 5, NULL, 0), HU_ERR_INVALID_ARGUMENT);
+    hu_imap_destroy(&ch);
+}
+
+#if HU_IS_TEST
+static void test_imap_poll_returns_mock_message(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imap_config_t cfg = {
+        .imap_host = "imap.example.com",
+        .imap_host_len = 16,
+        .imap_port = 993,
+        .imap_username = "user",
+        .imap_username_len = 4,
+        .imap_password = "secret",
+        .imap_password_len = 6,
+        .imap_folder = "INBOX",
+        .imap_folder_len = 5,
+        .imap_use_tls = true,
+    };
+    HU_ASSERT_EQ(hu_imap_create(&alloc, &cfg, &ch), HU_OK);
+    HU_ASSERT_EQ(hu_imap_test_push_mock(&ch, "alice@example.com", 17, "subject\n\nbody", 13), HU_OK);
+    hu_channel_loop_msg_t msgs[2];
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_imap_poll(ch.ctx, &alloc, msgs, 2, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_STR_EQ(msgs[0].session_key, "alice@example.com");
+    HU_ASSERT_STR_EQ(msgs[0].content, "subject\n\nbody");
+    hu_imap_destroy(&ch);
+}
+#endif
 #endif
 
 #if HU_HAS_GMAIL
@@ -2961,6 +3041,13 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_email_poll_no_imap_returns_not_supported);
     HU_RUN_TEST(test_email_set_auth_null_channel);
     HU_RUN_TEST(test_email_set_imap_null_channel);
+#endif
+#if HU_HAS_IMAP
+    HU_RUN_TEST(test_imap_create);
+    HU_RUN_TEST(test_imap_send_invalid_target);
+#if HU_IS_TEST
+    HU_RUN_TEST(test_imap_poll_returns_mock_message);
+#endif
 #endif
 #if HU_HAS_GMAIL
     HU_RUN_TEST(test_gmail_human_active_recently_false_in_test);

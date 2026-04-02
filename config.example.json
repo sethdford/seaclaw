@@ -1,17 +1,18 @@
 {
   "workspace": "~/.human/workspace",
-  "default_provider": "openai",
-  "default_model": "gpt-4o",
+  "default_provider": "anthropic",
+  "default_model": "claude-3-5-sonnet-20241022",
   "default_temperature": 0.7,
 
   "providers": [
     {
-      "name": "openai",
-      "api_key": "YOUR_OPENAI_API_KEY"
+      "name": "anthropic",
+      "api_key": "YOUR_ANTHROPIC_API_KEY",
+      "native_tools": true
     },
     {
-      "name": "anthropic",
-      "api_key": "YOUR_ANTHROPIC_API_KEY"
+      "name": "openai",
+      "api_key": "YOUR_OPENAI_API_KEY"
     }
   ],
 
@@ -30,7 +31,54 @@
   "agent": {
     "hula": true,
     "max_tool_iterations": 25,
-    "max_history_messages": 100
+    "max_history_messages": 100,
+    "permission_level": 2,
+    "session_auto_save": true,
+    "session_dir": "~/.human/sessions",
+    "discover_instructions": true,
+    "compaction_use_structured": true
+  },
+
+  "hooks": {
+    "enabled": true,
+    "hooks": [
+      {
+        "event": "pre_tool_execute",
+        "name": "audit_logger",
+        "command": "/usr/local/bin/audit-tool.sh",
+        "timeout_sec": 5,
+        "required": false
+      },
+      {
+        "event": "post_tool_execute",
+        "name": "result_validator",
+        "command": "/usr/local/bin/validate-result.sh",
+        "timeout_sec": 3,
+        "required": false
+      }
+    ]
+  },
+
+  "mcp": {
+    "enabled": true,
+    "servers": [
+      {
+        "name": "filesystem",
+        "transport_type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+        "auto_connect": true,
+        "timeout_ms": 30000
+      },
+      {
+        "name": "github",
+        "transport_type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "auto_connect": false,
+        "timeout_ms": 30000
+      }
+    ]
   },
 
   "reliability": {

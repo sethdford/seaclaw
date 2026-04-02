@@ -37,6 +37,35 @@ static void integ_http_post_json_httpbin(void) {
     HU_ASSERT_STR_CONTAINS(r.body, "human");
     hu_http_response_free(&a, &r);
 }
+
+static void integ_http_get_with_headers(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_http_response_t r;
+    memset(&r, 0, sizeof(r));
+    hu_error_t err = hu_http_get_ex(&a, "https://httpbin.org/headers",
+                                    "X-Human-Integration: true\nAccept: application/json", &r);
+    if (err != HU_OK || r.status_code != 200L) {
+        hu_http_response_free(&a, &r);
+        HU_SKIP_IF(1, "httpbin headers endpoint unreachable");
+    }
+    HU_ASSERT_NOT_NULL(r.body);
+    HU_ASSERT_STR_CONTAINS(r.body, "X-Human-Integration");
+    hu_http_response_free(&a, &r);
+}
+
+static void integ_http_redirect_follow(void) {
+    hu_allocator_t a = hu_system_allocator();
+    hu_http_response_t r;
+    memset(&r, 0, sizeof(r));
+    hu_error_t err = hu_http_get(&a, "https://httpbin.org/redirect-to?url=https://example.com", NULL,
+                                 &r);
+    if (err != HU_OK) {
+        hu_http_response_free(&a, &r);
+        HU_SKIP_IF(1, "http redirect endpoint unreachable");
+    }
+    HU_ASSERT_TRUE(r.status_code == 200L || r.status_code == 302L);
+    hu_http_response_free(&a, &r);
+}
 #else
 static void integ_http_libcurl_disabled(void) {
     HU_SKIP_IF(1, "human_core built without HU_HTTP_CURL");
@@ -47,6 +76,8 @@ void run_integration_http_tests(void) {
 #if defined(HU_HTTP_CURL)
     HU_RUN_TEST(integ_http_get_example_com);
     HU_RUN_TEST(integ_http_post_json_httpbin);
+    HU_RUN_TEST(integ_http_get_with_headers);
+    HU_RUN_TEST(integ_http_redirect_follow);
 #else
     HU_RUN_TEST(integ_http_libcurl_disabled);
 #endif

@@ -276,12 +276,13 @@ static const char *find_hula_tag(const char *haystack, size_t haystack_len, cons
     return NULL;
 }
 
-hu_error_t hu_hula_extract_program_from_text(hu_allocator_t *alloc, const char *text,
-                                             size_t text_len, hu_hula_program_t *out) {
-    if (!alloc || !out)
+hu_error_t hu_hula_program_source_slice_from_text(const char *text, size_t text_len,
+                                                  const char **out_start, size_t *out_len) {
+    if (!text || !out_start || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
-    memset(out, 0, sizeof(*out));
-    if (!text || text_len == 0)
+    *out_start = NULL;
+    *out_len = 0;
+    if (text_len == 0)
         return HU_ERR_NOT_FOUND;
 
     const char *open = find_hula_tag(text, text_len, HULA_TAG_OPEN, HULA_TAG_OPEN_LEN);
@@ -306,6 +307,25 @@ hu_error_t hu_hula_extract_program_from_text(hu_allocator_t *alloc, const char *
     }
     if (json_len == 0)
         return HU_ERR_NOT_FOUND;
+
+    *out_start = json_start;
+    *out_len = json_len;
+    return HU_OK;
+}
+
+hu_error_t hu_hula_extract_program_from_text(hu_allocator_t *alloc, const char *text,
+                                             size_t text_len, hu_hula_program_t *out) {
+    if (!alloc || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    if (!text || text_len == 0)
+        return HU_ERR_NOT_FOUND;
+
+    const char *json_start = NULL;
+    size_t json_len = 0;
+    hu_error_t sl = hu_hula_program_source_slice_from_text(text, text_len, &json_start, &json_len);
+    if (sl != HU_OK)
+        return sl;
 
     return hu_hula_parse_json(alloc, json_start, json_len, out);
 }
@@ -412,6 +432,8 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
     }
 
     static const int max_attempts = 3;
+    char *saved_compile_json = NULL;
+    size_t saved_compile_json_len = 0;
     hu_error_t last_err = HU_ERR_INVALID_ARGUMENT;
     for (int attempt = 0; attempt < max_attempts; attempt++) {
         hu_chat_message_t hm[1] = {
@@ -450,9 +472,19 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
 
         hu_hula_program_deinit(&hcp);
         memset(&hcp, 0, sizeof(hcp));
-        err = hu_hula_compiler_parse_response(alloc, hresp.content, hresp.content_len, &hcp);
+        const char *const raw_body = hresp.content;
+        const size_t raw_len = hresp.content_len;
+        err = hu_hula_compiler_parse_response(alloc, raw_body, raw_len, &hcp);
+        char *dup_ok = NULL;
+        if (err == HU_OK && hcp.root && raw_body && raw_len > 0) {
+            dup_ok = hu_strndup(alloc, raw_body, raw_len);
+            if (!dup_ok)
+                err = HU_ERR_OUT_OF_MEMORY;
+        }
         hu_chat_response_free(alloc, &hresp);
         if (err != HU_OK || !hcp.root) {
+            if (dup_ok)
+                hu_str_free(alloc, dup_ok);
             hu_hula_program_deinit(&hcp);
             memset(&hcp, 0, sizeof(hcp));
             last_err = err != HU_OK ? err : HU_ERR_PARSE;
@@ -470,6 +502,11 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
             hprompt_len = strlen(np);
             continue;
         }
+
+        if (saved_compile_json)
+            hu_str_free(alloc, saved_compile_json);
+        saved_compile_json = dup_ok;
+        saved_compile_json_len = dup_ok ? raw_len : 0;
 
         hu_hula_validation_t hv;
         memset(&hv, 0, sizeof(hv));
@@ -513,6 +550,8 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
         alloc->free(alloc->ctx, (void *)tnames, tools_count * sizeof(const char *));
 
     if (last_err != HU_OK || !hcp.root) {
+        if (saved_compile_json)
+            hu_str_free(alloc, saved_compile_json);
         hu_hula_program_deinit(&hcp);
         return last_err;
     }
@@ -530,6 +569,8 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
     memset(&hcx, 0, sizeof(hcx));
     err = hu_hula_exec_init_full(&hcx, *alloc, &hcp, tools, tools_count, policy, observer);
     if (err != HU_OK) {
+        if (saved_compile_json)
+            hu_str_free(alloc, saved_compile_json);
         hu_hula_program_deinit(&hcp);
         return err;
     }
@@ -549,11 +590,11 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
             size_t pjl = 0;
             if (hu_hula_to_json(alloc, &hcp, &pj, &pjl) == HU_OK && pj) {
                 (void)hu_hula_trace_persist(alloc, NULL, tr, trl, hcp.name, hcp.name_len, hok, pj,
-                                            pjl, NULL, 0);
+                                            pjl, saved_compile_json, saved_compile_json_len);
                 hu_str_free(alloc, pj);
             } else {
-                (void)hu_hula_trace_persist(alloc, NULL, tr, trl, hcp.name, hcp.name_len, hok, NULL,
-                                            0, NULL, 0);
+                (void)hu_hula_trace_persist(alloc, NULL, tr, trl, hcp.name, hcp.name_len, hok, NULL, 0,
+                                            saved_compile_json, saved_compile_json_len);
             }
         }
         if (hok && done_fn)
@@ -561,6 +602,8 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
         if (hok)
             *out_ok = true;
     }
+    if (saved_compile_json)
+        hu_str_free(alloc, saved_compile_json);
     hu_hula_exec_deinit(&hcx);
     hu_hula_program_deinit(&hcp);
     return err;

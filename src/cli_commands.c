@@ -18,7 +18,10 @@
 #include "human/memory.h"
 #include "human/memory/factory.h"
 #include "human/providers/factory.h"
+#include "human/agent/spawn.h"
+#include "human/security.h"
 #include "human/security/sandbox.h"
+#include "human/tools/factory.h"
 #ifdef HU_ENABLE_FEEDS
 #include "human/feeds/findings.h"
 #include "human/feeds/processor.h"
@@ -2307,12 +2310,33 @@ static hu_error_t hula_try_open_schema(FILE **out, char *path_buf, size_t path_c
     return HU_ERR_NOT_FOUND;
 }
 
-/* Parse, validate, optionally execute; embed program_snapshot in persisted traces when set. */
-static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *json,
-                                            size_t json_len, bool json_owned,
-                                            bool run_after_validate,
+static void hula_cli_hula_free_tools_bundle(hu_allocator_t *alloc, bool have_cfg, hu_config_t *cfg,
+                                            hu_security_policy_t *cfg_policy, hu_agent_pool_t *pool,
+                                            hu_tool_t *dyn_tools, size_t dyn_count,
+                                            const char **heap_validate) {
+    if (!alloc)
+        return;
+    if (have_cfg && cfg_policy && cfg_policy->tracker) {
+        hu_rate_tracker_destroy(cfg_policy->tracker);
+        cfg_policy->tracker = NULL;
+    }
+    if (heap_validate && dyn_count > 0)
+        alloc->free(alloc->ctx, (void *)heap_validate, dyn_count * sizeof(const char *));
+    if (have_cfg && dyn_tools && dyn_count > 0)
+        hu_tools_destroy_default(alloc, dyn_tools, dyn_count);
+    if (pool)
+        hu_agent_pool_destroy(pool);
+    if (have_cfg && cfg)
+        hu_config_deinit(cfg);
+}
+
+/* Parse, validate, optionally execute; embed program_snapshot in persisted traces when set.
+ * With config_path, load ~/.human-style config and register real tools for validate + execute. */
+static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *json, size_t json_len,
+                                            bool json_owned, bool run_after_validate,
                                             const char *program_snapshot_json,
-                                            size_t program_snapshot_len) {
+                                            size_t program_snapshot_len, const char *config_path,
+                                            const char *program_source, size_t program_source_len) {
     printf("── Parse ────────────────────────────────────────────\n");
     hu_hula_program_t prog;
     hu_error_t err = hu_hula_parse_json(alloc, json, json_len, &prog);
@@ -2327,12 +2351,93 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
            prog.root ? (prog.root->id ? prog.root->id : "?") : "(none)",
            prog.root ? hu_hula_op_name(prog.root->op) : "?");
 
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    bool have_cfg = false;
+    hu_agent_pool_t *agent_pool = NULL;
+    hu_tool_t *dyn_tools = NULL;
+    size_t dyn_tools_count = 0;
+    const char **heap_validate = NULL;
+    hu_security_policy_t cfg_policy;
+    memset(&cfg_policy, 0, sizeof(cfg_policy));
+
+    static const char *const demo_validate[] = {"echo", "search", "write", "analyze"};
+    const char *const *validate_names = demo_validate;
+    size_t validate_count = 4;
+
+    if (config_path && config_path[0]) {
+        err = hu_config_load_from(alloc, config_path, &cfg);
+        if (err != HU_OK) {
+            fprintf(stderr, "  FAIL: config load: %s\n", hu_error_string(err));
+            hu_hula_program_deinit(&prog);
+            if (json_owned) hu_str_free(alloc, (char *)json);
+            return err;
+        }
+        have_cfg = true;
+        const char *ws = (cfg.workspace_dir && cfg.workspace_dir[0]) ? cfg.workspace_dir : ".";
+        uint32_t pool_n = cfg.agent.pool_max_concurrent ? cfg.agent.pool_max_concurrent : 8u;
+        agent_pool = hu_agent_pool_create(alloc, pool_n);
+        if (!agent_pool) {
+            hula_cli_hula_free_tools_bundle(alloc, true, &cfg, &cfg_policy, NULL, NULL, 0, NULL);
+            hu_hula_program_deinit(&prog);
+            if (json_owned) hu_str_free(alloc, (char *)json);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        {
+            hu_fleet_limits_t fl = {0};
+            fl.max_spawn_depth = cfg.agent.fleet_max_spawn_depth;
+            fl.max_total_spawns = cfg.agent.fleet_max_total_spawns;
+            fl.budget_limit_usd = cfg.agent.fleet_budget_usd;
+            hu_agent_pool_set_fleet_limits(agent_pool, &fl);
+        }
+        err = hu_tools_create_default(alloc, ws, strlen(ws), NULL, &cfg, NULL, NULL, agent_pool, NULL,
+                                      NULL, NULL, &dyn_tools, &dyn_tools_count);
+        if (err != HU_OK) {
+            fprintf(stderr, "  FAIL: tools from config: %s\n", hu_error_string(err));
+            hula_cli_hula_free_tools_bundle(alloc, true, &cfg, &cfg_policy, agent_pool, NULL, 0, NULL);
+            hu_hula_program_deinit(&prog);
+            if (json_owned) hu_str_free(alloc, (char *)json);
+            return err;
+        }
+        if (dyn_tools_count > 0) {
+            heap_validate =
+                (const char **)alloc->alloc(alloc->ctx, dyn_tools_count * sizeof(const char *));
+            if (!heap_validate) {
+                hula_cli_hula_free_tools_bundle(alloc, true, &cfg, &cfg_policy, agent_pool, dyn_tools,
+                                                dyn_tools_count, NULL);
+                hu_hula_program_deinit(&prog);
+                if (json_owned) hu_str_free(alloc, (char *)json);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            for (size_t ti = 0; ti < dyn_tools_count; ti++) {
+                heap_validate[ti] =
+                    (dyn_tools[ti].vtable && dyn_tools[ti].vtable->name)
+                        ? dyn_tools[ti].vtable->name(dyn_tools[ti].ctx)
+                        : "";
+            }
+        }
+        validate_names = (const char *const *)heap_validate;
+        validate_count = dyn_tools_count;
+
+        cfg_policy.autonomy = (hu_autonomy_level_t)cfg.security.autonomy_level;
+        cfg_policy.workspace_dir = ws;
+        cfg_policy.workspace_only = true;
+        cfg_policy.allow_shell = (cfg_policy.autonomy != HU_AUTONOMY_READ_ONLY);
+        cfg_policy.block_high_risk_commands = (cfg_policy.autonomy == HU_AUTONOMY_SUPERVISED);
+        cfg_policy.require_approval_for_medium_risk = false;
+        cfg_policy.max_actions_per_hour = 200;
+        cfg_policy.tracker = hu_rate_tracker_create(alloc, cfg_policy.max_actions_per_hour);
+    }
+
     printf("\n── Validate ─────────────────────────────────────────\n");
-    const char *tool_names[] = {"echo", "search", "write", "analyze"};
     hu_hula_validation_t v;
-    err = hu_hula_validate(&prog, alloc, tool_names, 4, &v);
+    memset(&v, 0, sizeof(v));
+    err = hu_hula_validate(&prog, alloc, validate_names, validate_count, &v);
     if (err != HU_OK) {
         fprintf(stderr, "  FAIL: validation error: %s\n", hu_error_string(err));
+        hu_hula_validation_deinit(alloc, &v);
+        hula_cli_hula_free_tools_bundle(alloc, have_cfg, &cfg, &cfg_policy, agent_pool, dyn_tools,
+                                        dyn_tools_count, heap_validate);
         hu_hula_program_deinit(&prog);
         if (json_owned)
             hu_str_free(alloc, (char *)json);
@@ -2348,6 +2453,8 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     hu_hula_validation_deinit(alloc, &v);
 
     if (!run_after_validate) {
+        hula_cli_hula_free_tools_bundle(alloc, have_cfg, &cfg, &cfg_policy, agent_pool, dyn_tools,
+                                        dyn_tools_count, heap_validate);
         hu_hula_program_deinit(&prog);
         if (json_owned)
             hu_str_free(alloc, (char *)json);
@@ -2362,22 +2469,33 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
         {.name = "write"},
         {.name = "analyze"},
     };
-    hu_tool_t tools[4];
-    for (size_t i = 0; i < 4; i++) {
-        tools[i].ctx = &demo_ctxs[i];
-        tools[i].vtable = &hula_demo_vtable;
-    }
+    hu_tool_t demo_tools[4];
+    hu_tool_t *exec_tools = demo_tools;
+    size_t exec_tools_count = 4;
+    hu_security_policy_t demo_policy;
+    memset(&demo_policy, 0, sizeof(demo_policy));
+    demo_policy.autonomy = HU_AUTONOMY_AUTONOMOUS;
+    hu_security_policy_t *exec_policy = &demo_policy;
 
-    hu_security_policy_t policy;
-    memset(&policy, 0, sizeof(policy));
-    policy.autonomy = HU_AUTONOMY_AUTONOMOUS;
+    if (have_cfg) {
+        exec_tools = dyn_tools;
+        exec_tools_count = dyn_tools_count;
+        exec_policy = &cfg_policy;
+    } else {
+        for (size_t i = 0; i < 4; i++) {
+            demo_tools[i].ctx = &demo_ctxs[i];
+            demo_tools[i].vtable = &hula_demo_vtable;
+        }
+    }
 
     hu_observer_t obs = hu_observer_log_stderr();
 
     hu_hula_exec_t exec;
-    err = hu_hula_exec_init_full(&exec, *alloc, &prog, tools, 4, &policy, &obs);
+    err = hu_hula_exec_init_full(&exec, *alloc, &prog, exec_tools, exec_tools_count, exec_policy, &obs);
     if (err != HU_OK) {
         fprintf(stderr, "  FAIL: exec init: %s\n", hu_error_string(err));
+        hula_cli_hula_free_tools_bundle(alloc, have_cfg, &cfg, &cfg_policy, agent_pool, dyn_tools,
+                                        dyn_tools_count, heap_validate);
         hu_hula_program_deinit(&prog);
         if (json_owned)
             hu_str_free(alloc, (char *)json);
@@ -2388,6 +2506,8 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     if (err != HU_OK) {
         fprintf(stderr, "  FAIL: exec run: %s\n", hu_error_string(err));
         hu_hula_exec_deinit(&exec);
+        hula_cli_hula_free_tools_bundle(alloc, have_cfg, &cfg, &cfg_policy, agent_pool, dyn_tools,
+                                        dyn_tools_count, heap_validate);
         hu_hula_program_deinit(&prog);
         if (json_owned)
             hu_str_free(alloc, (char *)json);
@@ -2425,12 +2545,15 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     const char *trace_dir_env = getenv("HU_HULA_TRACE_DIR");
     const char *snap = program_snapshot_json ? program_snapshot_json : json;
     size_t snap_len = program_snapshot_json ? program_snapshot_len : json_len;
+    const char *psrc = (program_source && program_source_len > 0) ? program_source : NULL;
+    size_t psrc_len = psrc ? program_source_len : 0;
     if (trace && trace_len > 0 && trace_dir_env && trace_dir_env[0]) {
         const char *pn = prog.name;
         size_t pnl = pn ? strlen(pn) : 0;
         bool trace_ok = root_r && root_r->status == HU_HULA_DONE;
-        hu_error_t tr_err = hu_hula_trace_persist(alloc, trace_dir_env, trace, trace_len, pn, pnl,
-                                                  trace_ok, snap, snap_len, NULL, 0);
+        hu_error_t tr_err =
+            hu_hula_trace_persist(alloc, trace_dir_env, trace, trace_len, pn, pnl, trace_ok, snap,
+                                  snap_len, psrc, psrc_len);
         if (tr_err != HU_OK) {
             fprintf(stderr, "hula: HU_HULA_TRACE_DIR persist failed: %s\n",
                     hu_error_string(tr_err));
@@ -2447,6 +2570,8 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     printf("  Result:  %s\n", (root_r && root_r->status == HU_HULA_DONE) ? "SUCCESS" : "FAILED");
 
     hu_hula_exec_deinit(&exec);
+    hula_cli_hula_free_tools_bundle(alloc, have_cfg, &cfg, &cfg_policy, agent_pool, dyn_tools,
+                                    dyn_tools_count, heap_validate);
     hu_hula_program_deinit(&prog);
     if (json_owned)
         hu_str_free(alloc, (char *)json);
@@ -2458,13 +2583,13 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         printf("Usage: human hula <schema|expand|compile|replay|run|validate> ...\n\n");
         printf("  schema              Print JSON Schema path and contents (if found)\n");
         printf("  expand <tmpl> <vars.json>   Expand {{keys}} using JSON object vars\n");
-        printf("  compile [--lite] <file>     Print HuLa JSON (lite syntax or JSON file "
-               "passthrough)\n");
-        printf("  replay <trace.json>         Re-run program embedded in a persisted trace file\n");
-        printf("  run [--lite] <file|'{...}'>  Execute program\n");
-        printf("  validate [--lite] <file|'{...}'>\n\n");
-        printf("Demo tools for run: echo, search, write, analyze\n");
-        printf("Optional: HU_HULA_TRACE_DIR=/path/dir persists trace JSON + program (POSIX).\n");
+        printf("  compile [--lite] <file>     Print HuLa JSON (lite syntax or JSON file passthrough)\n");
+        printf("  replay [--config path] <trace.json>  Re-run embedded program (optional config for tools)\n");
+        printf("  run [--lite] [--config path] <file|'{...}'>  Execute program\n");
+        printf("  validate [--lite] [--config path] <file|'{...}'>\n\n");
+        printf("Default run uses demo tools: echo, search, write, analyze\n");
+        printf("--config loads tools from a human config.json (same as the agent).\n");
+        printf("Optional: HU_HULA_TRACE_DIR=/path/dir persists trace JSON + program (+ program_source).\n");
         return HU_OK;
     }
 
@@ -2560,15 +2685,30 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
     }
 
     if (strcmp(sub, "replay") == 0) {
-        if (argc < 4) {
-            fprintf(stderr, "Usage: human hula replay <trace.json>\n");
+        int rj = 3;
+        const char *replay_cfg = NULL;
+        while (rj < argc - 1) {
+            if (strcmp(argv[rj], "--config") == 0) {
+                if (rj + 1 >= argc) {
+                    fprintf(stderr, "Usage: human hula replay [--config path] <trace.json>\n");
+                    return HU_ERR_INVALID_ARGUMENT;
+                }
+                replay_cfg = argv[rj + 1];
+                rj += 2;
+                continue;
+            }
+            fprintf(stderr, "hula: replay: unknown option: %s\n", argv[rj]);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        if (rj >= argc) {
+            fprintf(stderr, "Usage: human hula replay [--config path] <trace.json>\n");
             return HU_ERR_INVALID_ARGUMENT;
         }
         char *raw = NULL;
         size_t rl = 0;
-        hu_error_t err = hula_read_file(alloc, argv[3], &raw, &rl);
+        hu_error_t err = hula_read_file(alloc, argv[rj], &raw, &rl);
         if (err != HU_OK) {
-            fprintf(stderr, "hula: cannot read %s: %s\n", argv[3], hu_error_string(err));
+            fprintf(stderr, "hula: cannot read %s: %s\n", argv[rj], hu_error_string(err));
             return err;
         }
         hu_json_value_t *wrap = NULL;
@@ -2601,8 +2741,8 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
             return err != HU_OK ? err : HU_ERR_OUT_OF_MEMORY;
         }
         printf("── Replay ───────────────────────────────────────────\n");
-        printf("  trace file: %s\n\n", argv[3]);
-        return hula_cli_run_program_json(alloc, pj, pjl, true, true, pj, pjl);
+        printf("  trace file: %s\n\n", argv[rj]);
+        return hula_cli_run_program_json(alloc, pj, pjl, true, true, pj, pjl, replay_cfg, NULL, 0);
     }
 
     bool run_mode = (strcmp(sub, "run") == 0);
@@ -2614,12 +2754,26 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
 
     int argi = 3;
     bool lite_input = false;
-    if (argc > argi && strcmp(argv[argi], "--lite") == 0) {
-        lite_input = true;
-        argi++;
+    const char *run_cfg = NULL;
+    while (argi < argc) {
+        if (strcmp(argv[argi], "--lite") == 0) {
+            lite_input = true;
+            argi++;
+            continue;
+        }
+        if (strcmp(argv[argi], "--config") == 0) {
+            if (argi + 1 >= argc) {
+                fprintf(stderr, "hula: %s: --config requires a path\n", sub);
+                return HU_ERR_INVALID_ARGUMENT;
+            }
+            run_cfg = argv[argi + 1];
+            argi += 2;
+            continue;
+        }
+        break;
     }
     if (argc <= argi) {
-        fprintf(stderr, "Usage: human hula %s [--lite] <file.json | '{...}'>\n", sub);
+        fprintf(stderr, "Usage: human hula %s [--lite] [--config path] <file.json | '{...}'>\n", sub);
         return HU_ERR_INVALID_ARGUMENT;
     }
 
@@ -2654,5 +2808,6 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         }
     }
 
-    return hula_cli_run_program_json(alloc, json, json_len, json_owned, run_mode, NULL, 0);
+    return hula_cli_run_program_json(alloc, json, json_len, json_owned, run_mode, NULL, 0, run_cfg,
+                                     json, json_len);
 }

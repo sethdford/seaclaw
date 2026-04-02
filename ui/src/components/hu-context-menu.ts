@@ -124,7 +124,7 @@ export class ScContextMenu extends LitElement {
         this._focusedIndex = 0;
         document.addEventListener("click", this._clickOutsideHandler, true);
         document.addEventListener("keydown", this._keyHandler, true);
-        requestAnimationFrame(() => this._focusItem(0));
+        requestAnimationFrame(() => this._focusNearestFrom(0));
       } else {
         document.removeEventListener("click", this._clickOutsideHandler, true);
         document.removeEventListener("keydown", this._keyHandler, true);
@@ -145,6 +145,20 @@ export class ScContextMenu extends LitElement {
     }
   }
 
+  private _deepestActiveElement(): Element | null {
+    let a: Element | null = document.activeElement;
+    for (let i = 0; i < 8 && a && "shadowRoot" in a && a.shadowRoot?.activeElement; i++) {
+      a = a.shadowRoot.activeElement;
+    }
+    return a;
+  }
+
+  private _menuButtons(): HTMLButtonElement[] {
+    return Array.from(
+      this.renderRoot.querySelectorAll<HTMLButtonElement>(".menu .item:not([disabled])"),
+    );
+  }
+
   private _onKeyDown(e: KeyboardEvent): void {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -154,16 +168,31 @@ export class ScContextMenu extends LitElement {
     const actionItems = this._actionItems;
     if (actionItems.length === 0) return;
 
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const buttons = this._menuButtons();
+      if (buttons.length === 0) return;
+      const active = this._deepestActiveElement();
+      let idx = buttons.indexOf(active as HTMLButtonElement);
+      if (idx === -1) idx = 0;
+      const next = e.shiftKey
+        ? (idx - 1 + buttons.length) % buttons.length
+        : (idx + 1) % buttons.length;
+      const btn = buttons[next];
+      btn?.focus();
+      const di = btn?.dataset.actionIndex;
+      if (di !== undefined) this._focusedIndex = parseInt(di, 10);
+      return;
+    }
+
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        this._focusedIndex = (this._focusedIndex + 1) % actionItems.length;
-        this._focusItem(this._focusedIndex);
+        this._focusOffset(1);
         break;
       case "ArrowUp":
         e.preventDefault();
-        this._focusedIndex = (this._focusedIndex - 1 + actionItems.length) % actionItems.length;
-        this._focusItem(this._focusedIndex);
+        this._focusOffset(-1);
         break;
       case "Enter":
       case " ":
@@ -179,10 +208,36 @@ export class ScContextMenu extends LitElement {
     }
   }
 
-  private _focusItem(index: number): void {
-    const buttons = this.renderRoot.querySelectorAll<HTMLButtonElement>(".item:not([disabled])");
-    const btn = buttons[index];
-    btn?.focus();
+  private _focusNearestFrom(preferredIndex: number): void {
+    const n = this._actionItems.length;
+    if (n === 0) return;
+    for (let s = 0; s < n; s++) {
+      const i = (preferredIndex + s) % n;
+      const btn = this.renderRoot.querySelector<HTMLButtonElement>(
+        `.menu button.item[data-action-index="${i}"]:not([disabled])`,
+      );
+      if (btn) {
+        btn.focus();
+        this._focusedIndex = i;
+        return;
+      }
+    }
+  }
+
+  private _focusOffset(delta: 1 | -1): void {
+    const n = this._actionItems.length;
+    if (n === 0) return;
+    for (let s = 1; s <= n; s++) {
+      const i = (((this._focusedIndex + delta * s) % n) + n) % n;
+      const btn = this.renderRoot.querySelector<HTMLButtonElement>(
+        `.menu button.item[data-action-index="${i}"]:not([disabled])`,
+      );
+      if (btn) {
+        btn.focus();
+        this._focusedIndex = i;
+        return;
+      }
+    }
   }
 
   private _close(): void {
@@ -218,6 +273,7 @@ export class ScContextMenu extends LitElement {
             <button
               class="item ${focused ? "focused" : ""}"
               role="menuitem"
+              data-action-index=${String(idx)}
               ?disabled=${actionItem.disabled}
               @click=${() => this._runAction(actionItem)}
               @mouseenter=${() => (this._focusedIndex = idx)}

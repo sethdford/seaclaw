@@ -14,6 +14,8 @@ export class ScSegmentedControl extends LitElement {
   @property({ type: Array }) options: SegmentOption[] = [];
   @property({ type: Boolean }) disabled = false;
   @property({ type: String }) size: SegmentSize = "md";
+  /** Accessible name for the radiogroup (replaces misleading tab/tablist semantics). */
+  @property({ type: String, attribute: "aria-label" }) ariaLabel = "Segmented control";
 
   static override styles = css`
     :host {
@@ -143,15 +145,20 @@ export class ScSegmentedControl extends LitElement {
     if (this.options.length === 0) return html``;
 
     return html`
-      <div class="container" role="tablist" aria-disabled=${this.disabled ? "true" : "false"}>
+      <div
+        class="container"
+        role="radiogroup"
+        aria-label=${this.ariaLabel}
+        aria-disabled=${this.disabled ? "true" : "false"}
+      >
         <div class="indicator" style=${this._indicatorStyle} aria-hidden="true"></div>
         ${this.options.map(
           (opt, i) => html`
             <button
               type="button"
               class="segment size-${this.size} ${opt.value === this.value ? "active" : ""}"
-              role="tab"
-              aria-selected=${opt.value === this.value}
+              role="radio"
+              aria-checked=${opt.value === this.value ? "true" : "false"}
               aria-label=${opt.label}
               ?disabled=${this.disabled}
               @click=${() => this._onSelect(opt.value)}

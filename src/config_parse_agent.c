@@ -138,6 +138,23 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
             m->w_low_trajectory = (float)x;
     }
 
+    /* Claude Code feature integration fields */
+    double pl = hu_json_get_number(obj, "permission_level", cfg->agent.permission_level);
+    if (pl >= 0 && pl <= 2)
+        cfg->agent.permission_level = (uint8_t)pl;
+    cfg->agent.session_auto_save =
+        hu_json_get_bool(obj, "session_auto_save", cfg->agent.session_auto_save);
+    const char *sd = hu_json_get_string(obj, "session_dir");
+    if (sd) {
+        if (cfg->agent.session_dir)
+            a->free(a->ctx, cfg->agent.session_dir, strlen(cfg->agent.session_dir) + 1);
+        cfg->agent.session_dir = hu_strdup(a, sd);
+    }
+    cfg->agent.discover_instructions =
+        hu_json_get_bool(obj, "discover_instructions", cfg->agent.discover_instructions);
+    cfg->agent.compaction_use_structured =
+        hu_json_get_bool(obj, "compaction_use_structured", cfg->agent.compaction_use_structured);
+
     const char *persona = hu_json_get_string(obj, "persona");
     if (persona) {
         if (cfg->agent.persona)

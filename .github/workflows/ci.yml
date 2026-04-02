@@ -48,7 +48,7 @@ jobs:
         run: |
           COUNT=$(grep -oE '[0-9]+/[0-9]+ passed' /tmp/human_tests_output.txt | tail -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          BASELINE=6419
+          BASELINE=6858
           if [ "$COUNT" -lt "$BASELINE" ]; then
             echo "::error::Test count regression: $COUNT < $BASELINE baseline"
             exit 1
@@ -70,7 +70,8 @@ jobs:
             -DHU_ENABLE_INTEGRATION_TESTS=ON \
             -DHU_ENABLE_CURL=ON \
             -DHU_ENABLE_SQLITE=ON \
-            -DHU_ENABLE_CLI=ON
+            -DHU_ENABLE_CLI=ON \
+            -DHU_ENABLE_IMAP=ON
       - name: Build
         run: cmake --build build-integ -j$(nproc)
       - name: Run integration tests

@@ -133,6 +133,10 @@ hu_error_t hu_hula_trace_persist(hu_allocator_t *alloc, const char *trace_dir,
         if (hu_json_parse(alloc, program_json, program_json_len, &prog_val) == HU_OK && prog_val)
             hu_json_object_set(alloc, root, "program", prog_val);
     }
+    if (program_source && program_source_len > 0)
+        hu_json_object_set(
+            alloc, root, "program_source",
+            hu_json_string_new(alloc, program_source, program_source_len));
 
     if (program_source && program_source_len > 0)
         hu_json_object_set(alloc, root, "program_source",

@@ -62,6 +62,17 @@ Vtable-driven and modular. Extend by implementing vtable structs + factory regis
 - Use `--hu-surface-container*` for branded tonal surfaces, `--hu-bg-surface` for neutral.
 - Use neutral state overlays (`--hu-hover-overlay`, etc.) — white/black veils on dark/light; brand shows in rings and primaries.
 
+## Claude Code Features
+
+Six features integrated from Claude Code architecture. See `docs/guides/claude-code-features.md` for full documentation:
+
+1. **MCP Client** — Connect to external Model Context Protocol servers and discover tools
+2. **Hook Pipeline** — Pre/post tool execution interception for security and auditing
+3. **Permission Tiers** — Graduated access control (ReadOnly, WorkspaceWrite, DangerFullAccess)
+4. **Structured Compaction** — XML-based context window compression with artifact pinning
+5. **Session Persistence** — Auto-save and resume conversation history
+6. **Instruction Discovery** — Merge .human.md/HUMAN.md/instructions.md from multiple levels
+
 ## Commit Format
 
 Conventional commits enforced by `.githooks/commit-msg`:
@@ -76,7 +87,7 @@ Types: `feat fix refactor test docs chore perf ci build style`
 
 | Workflow                    | What it checks                                                                                                                                    |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ci.yml`                    | C build + ~6374 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
+| `ci.yml`                    | C build + ~6858 tests (Linux + macOS), UI tsc + vitest + build, website build, clang-tidy, E2E, visual regression, axe accessibility, Lighthouse |
 | `native-apps-fleet.yml`     | Multi-simulator iOS XCUITest + multi-API Android instrumented tests + SOTA gate (apps path / schedule / dispatch) |
 | `.github/actions/ios-uitest` | Composite: XcodeGen + HumaniOS XCUITest (shared by `ci.yml` + fleet) |
 | `benchmark.yml`             | Performance regression (binary size, startup time, RSS)                                                                                           |

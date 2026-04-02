@@ -4,6 +4,7 @@
 #include "human/channel.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/hook.h"
 #include "human/tool.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -23,6 +24,7 @@ typedef struct hu_plugin_host {
     hu_error_t (*register_tool)(void *host_ctx, const char *name, void *tool_vtable);
     hu_error_t (*register_provider)(void *host_ctx, const char *name, void *provider_vtable);
     hu_error_t (*register_channel)(void *host_ctx, const hu_channel_t *channel);
+    hu_error_t (*register_hook)(void *host_ctx, const hu_hook_entry_t *hook);
     void *host_ctx;
 } hu_plugin_host_t;
 

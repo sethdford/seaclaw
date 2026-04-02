@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "metadata": {
+    "created_at": "2025-04-02T10:00:00Z",
+    "project": "test"
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello, how can you help?"
+    },
+    {
+      "role": "assistant",
+      "content": "I can help you with coding tasks."
+    }
+  ]
+}

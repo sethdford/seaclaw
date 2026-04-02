@@ -153,6 +153,12 @@ export class ScImageViewer extends LitElement {
   private _onKeyDown(e: KeyboardEvent): void {
     if (e.key === "Escape") {
       this._close();
+      return;
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const btn = this.renderRoot.querySelector<HTMLButtonElement>(".close-btn");
+      btn?.focus();
     }
   }
 

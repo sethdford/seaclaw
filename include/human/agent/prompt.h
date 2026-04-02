@@ -89,6 +89,8 @@ typedef struct hu_prompt_config {
     size_t replay_context_len;
     const char *contact_turing_hint; /* per-contact weak-dimension hints from Turing history */
     size_t contact_turing_hint_len;
+    const char *instruction_context; /* discovered .human.md / HUMAN.md instructions */
+    size_t instruction_context_len;
 } hu_prompt_config_t;
 
 /* Build the full system prompt. Caller owns returned string; free with alloc. */

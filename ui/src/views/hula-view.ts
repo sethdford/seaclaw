@@ -29,6 +29,8 @@ interface HulaTraceRecord {
   trace_limit?: number;
   record?: {
     program_name?: string;
+    program?: unknown;
+    program_source?: string;
     success?: boolean;
     trace?: Record<string, unknown>[];
   };
@@ -255,6 +257,39 @@ export class ScHulaView extends GatewayAwareLitElement {
     }
   }
 
+  private async _onRefresh(): Promise<void> {
+    this.detailError = "";
+    await this.load();
+  }
+
+  private async _copyProgramJson(): Promise<void> {
+    const rec = this.detail?.record;
+    if (rec?.program === undefined) {
+      this.detailError = "No embedded program in this trace.";
+      return;
+    }
+    try {
+      const text =
+        typeof rec.program === "string" ? rec.program : JSON.stringify(rec.program, null, 2);
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      this.detailError = friendlyError(e);
+    }
+  }
+
+  private async _copyProgramSource(): Promise<void> {
+    const s = this.detail?.record?.program_source;
+    if (!s) {
+      this.detailError = "No program_source field in this trace.";
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(s);
+    } catch (e) {
+      this.detailError = friendlyError(e);
+    }
+  }
+
   override render() {
     return html`
       <hu-page-hero role="region" aria-label="HuLa traces">
@@ -336,12 +371,32 @@ export class ScHulaView extends GatewayAwareLitElement {
         <hu-card>
           <div class="detail-head">
             <hu-section-header heading="Trace detail"></hu-section-header>
-            <hu-button
-              variant="secondary"
-              ?disabled=${!this.selected?.id || this.detailLoading}
-              @click=${() => this._onDelete()}
-              >Delete</hu-button
-            >
+            <div style="display:flex;flex-wrap:wrap;gap:var(--hu-space-sm);align-items:center;">
+              <hu-button
+                variant="secondary"
+                ?disabled=${this.loading}
+                @click=${() => this._onRefresh()}
+                >Refresh</hu-button
+              >
+              <hu-button
+                variant="secondary"
+                ?disabled=${!this.detail?.record || this.detailLoading}
+                @click=${() => this._copyProgramJson()}
+                >Copy program</hu-button
+              >
+              <hu-button
+                variant="secondary"
+                ?disabled=${!this.detail?.record?.program_source || this.detailLoading}
+                @click=${() => this._copyProgramSource()}
+                >Copy source</hu-button
+              >
+              <hu-button
+                variant="secondary"
+                ?disabled=${!this.selected?.id || this.detailLoading}
+                @click=${() => this._onDelete()}
+                >Delete</hu-button
+              >
+            </div>
           </div>
           ${this.detailError
             ? html`<div class="detail-error" role="alert">${this.detailError}</div>`

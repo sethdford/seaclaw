@@ -37,6 +37,7 @@ option(HU_ENABLE_FEEDS "Build feed ingestion and research agent" OFF)
 option(HU_ENABLE_SOCIAL "Build social feed ingestion (Facebook, Instagram)" OFF)
 option(HU_ENABLE_EMBEDDED_MODEL "Enable embedded model provider (llama.cpp/llama-cli)" OFF)
 option(HU_ENABLE_COREML "Enable CoreML/MLX provider (macOS only)" OFF)
+option(HU_ENABLE_MCP "Enable MCP client (multi-server tool discovery)" ON)
 
 # WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
 
@@ -334,6 +335,7 @@ set(HU_CORE_SOURCES
     src/status.c
     src/http_util.c
     src/mcp.c
+    src/mcp_jsonrpc.c
     src/mcp_transport_stdio.c
     src/mcp_transport_sse.c
     src/mcp_transport_http.c
@@ -412,6 +414,8 @@ set(HU_CORE_SOURCES
     src/runtime/docker.c
     src/runtime/gce.c
     src/runtime/factory.c
+    src/hook.c
+    src/hook_pipeline.c
     src/agent/action_preview.c
     src/agent/agent.c
     src/agent/agent_plan.c
@@ -517,6 +521,12 @@ set(HU_CORE_SOURCES
     src/agent/speculative.c
     src/agent/uncertainty.c
     src/agent/autonomy.c
+    src/permission.c
+    src/mcp_manager.c
+    src/mcp_tool_wrapper.c
+    src/agent/compaction_structured.c
+    src/agent/session_persist.c
+    src/agent/instruction_discover.c
     src/providers/error_classify.c
     src/providers/api_key.c
     src/providers/helpers.c
@@ -685,6 +695,8 @@ set(HU_CORE_SOURCES
     src/version.c
     src/cli_commands.c
     src/cost.c
+    src/usage.c
+    src/oauth.c
     src/memory/vector/math.c
     src/memory/vector/cosine.c
     src/memory/vector/chunker.c
@@ -1136,6 +1148,9 @@ if(HU_ENABLE_CARTESIA)
 endif()
 if(HU_ENABLE_ML)
     target_compile_definitions(human_core PRIVATE HU_ENABLE_ML=1)
+endif()
+if(HU_ENABLE_MCP)
+    target_compile_definitions(human_core PRIVATE HU_ENABLE_MCP=1)
 endif()
 
 # --- Compile definitions for enabled channels (for conditional compilation in source) ---
@@ -1971,6 +1986,7 @@ set(HU_TEST_SOURCES
     tests/test_ported_modules.c
     tests/test_subagent.c
     tests/test_mcp.c
+    tests/test_mcp_jsonrpc.c
     tests/test_voice.c
     tests/test_local_voice.c
     tests/test_vector_stores.c
@@ -2039,6 +2055,7 @@ set(HU_TEST_SOURCES
     tests/test_consolidation_engine.c
     tests/test_conv_goals.c
     tests/test_knowledge.c
+    tests/test_usage.c
     tests/test_cognitive.c
     tests/test_deep_memory.c
     tests/test_compression.c
@@ -2136,6 +2153,9 @@ list(APPEND HU_TEST_SOURCES tests/test_world_simulation.c tests/test_world_conte
 list(APPEND HU_TEST_SOURCES tests/test_agent_registry.c)
 list(APPEND HU_TEST_SOURCES tests/test_pwa.c)
 list(APPEND HU_TEST_SOURCES tests/test_integration.c)
+list(APPEND HU_TEST_SOURCES tests/test_hook_pipeline.c)
+list(APPEND HU_TEST_SOURCES tests/test_config_reload.c)
+list(APPEND HU_TEST_SOURCES tests/test_plugin_hooks.c)
 
 # SOTA capability tests
 list(APPEND HU_TEST_SOURCES
@@ -2194,6 +2214,16 @@ list(APPEND HU_TEST_SOURCES
     tests/test_forgetting.c
     tests/test_bootstrap.c
     tests/test_thread_pool.c
+    tests/test_permission.c
+    tests/test_mcp_manager.c
+    tests/test_compaction_structured.c
+    tests/test_session_persist.c
+    tests/test_instruction_discover.c
+    tests/test_adversarial_memory_safety.c
+    tests/test_adversarial_injection.c
+    tests/test_adversarial_dos_protocol.c
+    tests/test_adversarial_concurrency.c
+    tests/test_adversarial_integration.c
 )
 
 add_executable(human_tests ${HU_TEST_SOURCES} wasm/wasm_alloc.c src/bootstrap.c)
@@ -2368,11 +2398,15 @@ if(HU_ENABLE_INTEGRATION_TESTS)
         tests/integration/test_integration_main.c
         tests/integration/test_integ_http.c
         tests/integration/test_integ_sqlite.c
+        tests/integration/test_integ_imap.c
     )
     target_link_libraries(human_integration_tests PRIVATE human_core)
     target_include_directories(human_integration_tests PRIVATE ${HU_ROOT}/tests ${HU_ROOT}/include)
     target_compile_definitions(human_integration_tests PRIVATE HU_ENABLE_CURL=1 HU_HTTP_CURL=1
         HU_ENABLE_SQLITE=1)
+    if(HU_ENABLE_IMAP)
+        target_compile_definitions(human_integration_tests PRIVATE HU_HAS_IMAP=1)
+    endif()
     if(UNIX AND NOT WIN32)
         target_compile_definitions(human_integration_tests PRIVATE HU_GATEWAY_POSIX=1)
     endif()
@@ -2730,6 +2764,46 @@ if(HU_ENABLE_FUZZ)
     target_link_libraries(fuzz_twilio_webhook PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
     target_compile_options(fuzz_twilio_webhook PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
     target_link_options(fuzz_twilio_webhook PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_compaction_overflow fuzz/fuzz_compaction_overflow.c)
+    set_target_properties(fuzz_compaction_overflow PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_definitions(fuzz_compaction_overflow PRIVATE HU_IS_TEST=1)
+    target_compile_options(fuzz_compaction_overflow PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_compaction_overflow PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_compaction_overflow PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_compaction_overflow PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_instruction_discovery fuzz/fuzz_instruction_discovery.c)
+    set_target_properties(fuzz_instruction_discovery PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_definitions(fuzz_instruction_discovery PRIVATE HU_IS_TEST=1)
+    target_compile_options(fuzz_instruction_discovery PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_instruction_discovery PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_instruction_discovery PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_instruction_discovery PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_mcp_json_rpc fuzz/fuzz_mcp_json_rpc.c)
+    set_target_properties(fuzz_mcp_json_rpc PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_definitions(fuzz_mcp_json_rpc PRIVATE HU_IS_TEST=1)
+    target_compile_options(fuzz_mcp_json_rpc PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_mcp_json_rpc PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_mcp_json_rpc PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_mcp_json_rpc PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_hook_injection fuzz/fuzz_hook_injection.c)
+    set_target_properties(fuzz_hook_injection PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_definitions(fuzz_hook_injection PRIVATE HU_IS_TEST=1)
+    target_compile_options(fuzz_hook_injection PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_hook_injection PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_hook_injection PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_hook_injection PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_session_deserialization fuzz/fuzz_session_deserialization.c)
+    set_target_properties(fuzz_session_deserialization PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_definitions(fuzz_session_deserialization PRIVATE HU_IS_TEST=1)
+    target_compile_options(fuzz_session_deserialization PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_session_deserialization PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_session_deserialization PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_session_deserialization PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
 endif()
 
 # Benchmark suite (micro-benchmarks of core operations)

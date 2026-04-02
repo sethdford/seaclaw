@@ -1900,6 +1900,12 @@ export class DemoGatewayClient extends EventTarget {
             success: true,
             ts: Math.floor(Date.now() / 1000),
             program_name: "demo",
+            program: {
+              name: "demo",
+              version: 1,
+              root: { op: "call", id: "c1", tool: "echo", args: { text: "hello" } },
+            },
+            program_source: '{"name":"demo","version":1}',
             trace: slice,
           },
         };

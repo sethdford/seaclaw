@@ -1,4 +1,5 @@
 #include "human/agent/compaction.h"
+#include "human/agent/compaction_structured.h"
 #include "human/core/string.h"
 #include "human/provider.h"
 #include <stdint.h>
@@ -29,6 +30,11 @@ void hu_compaction_config_default(hu_compaction_config_t *cfg) {
     cfg->max_source_chars = HU_COMPACTION_DEFAULT_MAX_SOURCE_CHARS;
     cfg->token_limit = HU_COMPACTION_DEFAULT_TOKEN_LIMIT;
     cfg->max_history_messages = HU_COMPACTION_DEFAULT_MAX_HISTORY;
+    cfg->use_structured_summary = false;
+    cfg->preserve_recent_count = 0;
+    cfg->inject_continuation_preamble = false;
+    cfg->pinned_artifacts = NULL;
+    cfg->pinned_artifacts_count = 0;
 }
 
 /*
@@ -244,6 +250,70 @@ hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t *history
         return HU_OK;
     if (!hu_should_compact(history, count, config))
         return HU_OK;
+
+    /* Structured compaction path: generate XML summary with metadata */
+    if (config->use_structured_summary) {
+        uint32_t keep = config->preserve_recent_count > 0
+            ? config->preserve_recent_count : config->keep_recent;
+
+        hu_compaction_summary_t meta;
+        hu_error_t err = hu_compact_extract_metadata(alloc, history, count, keep, &meta);
+        if (err != HU_OK) return err;
+
+        /* Determine range to summarize */
+        bool sys = count > 0 && history[0].role == HU_ROLE_SYSTEM;
+        size_t s = sys ? 1 : 0;
+        size_t non_sys = count - s;
+        if (keep > (uint32_t)non_sys) keep = (uint32_t)non_sys;
+        size_t compact_end = s + (non_sys - keep);
+
+        /* Build structured summary from messages being compacted */
+        char *xml = NULL;
+        size_t xml_len = 0;
+        err = hu_compact_build_structured_summary(alloc, history + s, compact_end - s, &meta,
+                                                  &xml, &xml_len);
+        if (err != HU_OK) {
+            hu_compaction_summary_free(alloc, &meta);
+            return err;
+        }
+
+        /* Free compacted messages */
+        free_messages(alloc, history, s, compact_end);
+
+        /* Replace first slot with structured summary */
+        history[s].role = HU_ROLE_ASSISTANT;
+        history[s].content = xml;
+        history[s].content_len = xml_len;
+        history[s].name = NULL;
+        history[s].name_len = 0;
+        history[s].tool_call_id = NULL;
+        history[s].tool_call_id_len = 0;
+        history[s].tool_calls = NULL;
+        history[s].tool_calls_count = 0;
+        history[s].content_parts = NULL;
+        history[s].content_parts_count = 0;
+
+        /* Shift remaining messages down */
+        if (compact_end > s + 1) {
+            size_t shift = compact_end - s - 1;
+            size_t remaining = count - compact_end;
+            if (remaining > 0) {
+                memmove(&history[s + 1], &history[compact_end],
+                        remaining * sizeof(hu_owned_message_t));
+            }
+            count -= shift;
+        }
+        *history_count = count;
+
+        /* Inject continuation preamble if configured */
+        if (config->inject_continuation_preamble) {
+            err = hu_compact_inject_continuation_preamble(
+                alloc, &meta, history, history_count, history_cap);
+        }
+
+        hu_compaction_summary_free(alloc, &meta);
+        return err;
+    }
 
     bool has_system = history[0].role == HU_ROLE_SYSTEM;
     size_t start = has_system ? 1 : 0;

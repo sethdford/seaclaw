@@ -575,7 +575,7 @@ describe("hu-segmented-control", () => {
     expect(el.value).toBe("b");
   });
 
-  it("should have role tablist and tab", async () => {
+  it("should expose radiogroup and radio roles", async () => {
     const { ScSegmentedControl } = await import("./hu-segmented-control.js");
     const el = new ScSegmentedControl();
     el.options = [
@@ -586,11 +586,11 @@ describe("hu-segmented-control", () => {
     document.body.appendChild(el);
     await el.updateComplete;
     const container = el.shadowRoot?.querySelector(".container");
-    expect(container?.getAttribute("role")).toBe("tablist");
-    const tabs = el.shadowRoot?.querySelectorAll("[role='tab']");
-    expect(tabs?.length).toBe(2);
-    const activeTab = el.shadowRoot?.querySelector(".segment.active");
-    expect(activeTab?.getAttribute("aria-selected")).toBe("true");
+    expect(container?.getAttribute("role")).toBe("radiogroup");
+    const radios = el.shadowRoot?.querySelectorAll("[role='radio']");
+    expect(radios?.length).toBe(2);
+    const activeSegment = el.shadowRoot?.querySelector(".segment.active");
+    expect(activeSegment?.getAttribute("aria-checked")).toBe("true");
     document.body.removeChild(el);
   });
 });

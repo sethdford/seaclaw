@@ -2,9 +2,9 @@ import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import {
   deepText,
+  shadowClick,
   shadowExists,
   waitForViewReady,
-  waitForShadowSelector,
   POLL,
 } from "./helpers.js";
 
@@ -53,16 +53,10 @@ test.describe("HuLa (Demo)", () => {
   }) => {
     await page.goto("/?demo#hula");
     await waitForViewReady(page, "hu-hula-view");
-    await waitForShadowSelector(page, "hu-hula-view", ".trace-row");
-    await page.evaluate(`(() => {
-      const app = document.querySelector("hu-app");
-      const view = app?.shadowRoot?.querySelector("hu-hula-view");
-      const row = view?.shadowRoot?.querySelector(".trace-row");
-      if (row) row.click();
-    })()`);
     await expect(async () => {
+      await page.evaluate(shadowClick("hu-hula-view", ".trace-row"));
       const text = await page.evaluate(deepText("hu-hula-view"));
-      expect(text).toMatch(/steps \(offset|Saved traces|Trace detail/);
+      expect(text).toMatch(/Showing \d+ of|steps \(offset|Trace detail/);
     }).toPass({ timeout: POLL });
   });
 });
@@ -71,20 +65,25 @@ test.describe("HuLa from Observability (Demo)", () => {
   test("metrics Open HuLa traces navigates to HuLa view", async ({ page }) => {
     await page.goto("/?demo#metrics");
     await waitForViewReady(page, "hu-metrics-view");
-    await waitForShadowSelector(
-      page,
-      "hu-metrics-view",
-      "hu-button[data-testid='metrics-open-hula-traces']",
-    );
-    await page.evaluate(`(() => {
-      const app = document.querySelector("hu-app");
-      const view = app?.shadowRoot?.querySelector("hu-metrics-view");
-      const host = view?.shadowRoot?.querySelector(
-        "hu-button[data-testid='metrics-open-hula-traces']",
-      );
-      const btn = host?.shadowRoot?.querySelector("button");
-      if (btn) btn.click();
-    })()`);
+    await expect(async () => {
+      const clicked = await page.evaluate(() => {
+        const app = document.querySelector("hu-app");
+        const view = app?.shadowRoot?.querySelector("hu-metrics-view");
+        const hosts = view?.shadowRoot?.querySelectorAll("hu-button") ?? [];
+        for (const h of hosts) {
+          const t = h.textContent?.trim() ?? "";
+          if (t.includes("Open HuLa traces")) {
+            const btn = h.shadowRoot?.querySelector("button");
+            if (btn) {
+              btn.click();
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+      expect(clicked).toBe(true);
+    }).toPass({ timeout: POLL });
     await expect(page).toHaveURL(/#hula/);
     await waitForViewReady(page, "hu-hula-view");
     const text = await page.evaluate(deepText("hu-hula-view"));

@@ -13,12 +13,22 @@
  * Agent Compaction — context window management
  * ────────────────────────────────────────────────────────────────────────── */
 
+/* Forward declare structured types (full defs in compaction_structured.h) */
+struct hu_artifact_pin;
+
 typedef struct hu_compaction_config {
     uint32_t keep_recent;          /* keep this many most-recent messages */
     uint32_t max_summary_chars;    /* max chars in compaction summary */
     uint32_t max_source_chars;     /* max chars from source when building summary */
     uint64_t token_limit;          /* 0 = no token-based trigger */
     uint32_t max_history_messages; /* message count trigger */
+
+    /* Structured compaction v2 fields */
+    bool use_structured_summary;       /* emit XML <summary> instead of plain text */
+    uint32_t preserve_recent_count;    /* override keep_recent for structured mode */
+    bool inject_continuation_preamble; /* prepend continuation context after compaction */
+    struct hu_artifact_pin *pinned_artifacts; /* borrowed; messages referencing these are kept */
+    size_t pinned_artifacts_count;
 } hu_compaction_config_t;
 
 /* Default config values */

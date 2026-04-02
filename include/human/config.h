@@ -127,6 +127,12 @@ typedef struct hu_agent_config {
     bool prompt_cache_enabled;           /* enable cross-turn system prompt dedup (default true) */
     bool agent_comm_enabled;             /* enable ACP inter-agent messaging (default false) */
     char *context_engine_type;           /* "legacy" (default) or "rag" */
+    /* Claude Code feature integration */
+    uint8_t permission_level;          /* 0=ReadOnly, 1=WorkspaceWrite, 2=DangerFullAccess */
+    bool session_auto_save;            /* auto-save session after each turn */
+    char *session_dir;                 /* directory for session JSON files */
+    bool discover_instructions;        /* discover .human.md/HUMAN.md files */
+    bool compaction_use_structured;    /* use XML structured summaries */
 } hu_agent_config_t;
 
 typedef struct hu_policy_config {
@@ -249,9 +255,19 @@ typedef struct hu_node_entry {
 
 typedef struct hu_mcp_server_entry {
     char *name;
-    char *command;
+    char *transport_type; /* "stdio" (default), "sse", "http" */
+    char *command;        /* stdio: binary path */
     char *args[HU_MCP_SERVER_ARGS_MAX];
     size_t args_count;
+    char *url;            /* sse/http: endpoint URL */
+    bool auto_connect;
+    uint32_t timeout_ms;  /* 0 = use default (30s) */
+    /* OAuth2 PKCE authentication (optional, for HTTP/SSE servers) */
+    char *oauth_client_id;
+    char *oauth_auth_url;
+    char *oauth_token_url;
+    char *oauth_scopes;
+    char *oauth_redirect_uri;
 } hu_mcp_server_entry_t;
 
 #define HU_SLACK_CHANNEL_IDS_MAX 16
@@ -591,6 +607,8 @@ typedef struct hu_config {
     hu_behavior_config_t behavior;
     hu_node_entry_t nodes[HU_NODES_MAX];
     size_t nodes_len;
+    hu_mcp_config_t mcp;
+    hu_hooks_config_t hooks;
     hu_mcp_server_entry_t mcp_servers[HU_MCP_SERVERS_MAX];
     size_t mcp_servers_len;
     hu_policy_config_t policy;
