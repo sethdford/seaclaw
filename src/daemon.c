@@ -114,6 +114,7 @@
 #include "human/platform/calendar.h"
 #include <stdlib.h>
 #ifdef HU_HAS_PERSONA
+#include "human/agent/inner_thoughts.h"
 #include "human/context/anticipatory.h"
 #include "human/context/authentic.h"
 #include "human/context/humor.h"
@@ -129,6 +130,7 @@
 #include "human/persona/life_sim.h"
 #include "human/persona/mood.h"
 #include "human/persona/replay.h"
+#include "human/persona/temporal.h"
 #ifdef HU_ENABLE_AUTHENTIC
 #include "human/context/cognitive_load.h"
 #endif
@@ -2012,6 +2014,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     hu_bth_metrics_init(&bth_metrics);
     if (agent)
         agent->bth_metrics = &bth_metrics;
+
+    /* Phase 3: Inner thought store — accumulates thoughts between conversations */
+#ifdef HU_HAS_PERSONA
+    static hu_inner_thought_store_t inner_thought_store;
+    static bool inner_thought_store_ok = false;
+    if (!inner_thought_store_ok) {
+        inner_thought_store_ok =
+            (hu_inner_thought_store_init(&inner_thought_store, alloc) == HU_OK);
+    }
+#endif
+
+    /* Phase 3: Global turn counter for anti-sycophancy contrarian budget */
+    static uint32_t daemon_turn_counter = 0;
 
     hu_inbox_watcher_t inbox_watcher = {0};
     static int64_t last_inbox_poll_ms = 0;
@@ -4475,7 +4490,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 #endif /* HU_HAS_PERSONA timezone */
 
-                    /* 9. Humor (F69) — only when playful and not concerning */
+                    /* 9. Humor (F69) — persona directive + strategy (Phase 3) */
 #ifdef HU_HAS_PERSONA
                     if (agent->persona && agent->persona->humor.type) {
                         hu_emotional_state_t emo_humor =
@@ -4487,15 +4502,57 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                        (strstr(combined, "lol") || strstr(combined, "haha") ||
                                         strstr(combined, "😂") || strstr(combined, "😄"));
                         if (playful && !emo_humor.concerning) {
-                            const char *dom =
-                                emo_humor.dominant_emotion ? emo_humor.dominant_emotion : "neutral";
-                            size_t hum_len = 0;
-                            char *hum_dir = hu_humor_build_persona_directive(
-                                alloc, &agent->persona->humor, dom, strlen(dom), true, &hum_len);
-                            if (hum_dir && hum_len > 0)
-                                PHASE6_APPEND(hum_dir, hum_len);
-                            else if (hum_dir)
-                                alloc->free(alloc->ctx, hum_dir, hum_len + 1);
+                            /* Check timing appropriateness (Phase 3) */
+                            time_t hum_now = time(NULL);
+                            struct tm hum_tm;
+                            int hum_hour = 12;
+                            if (hu_platform_localtime_r(&hum_now, &hum_tm))
+                                hum_hour = hum_tm.tm_hour;
+                            float hum_valence = emo_humor.valence;
+                            const char *rel_stage = (cp_p6 && cp_p6->relationship_stage)
+                                                        ? cp_p6->relationship_stage
+                                                        : "friend";
+                            hu_humor_timing_result_t timing =
+                                hu_humor_check_timing(hum_hour, hum_valence, false, rel_stage);
+
+                            if (timing.allowed) {
+                                const char *dom = emo_humor.dominant_emotion
+                                                      ? emo_humor.dominant_emotion
+                                                      : "neutral";
+                                size_t hum_len = 0;
+                                char *hum_dir = hu_humor_build_persona_directive(
+                                    alloc, &agent->persona->humor, dom, strlen(dom), true,
+                                    &hum_len);
+                                if (hum_dir && hum_len > 0)
+                                    PHASE6_APPEND(hum_dir, hum_len);
+                                else if (hum_dir)
+                                    alloc->free(alloc->ctx, hum_dir, hum_len + 1);
+
+                                /* Generate humor strategy from audience model (Phase 3) */
+#ifdef HU_ENABLE_SQLITE
+                                if (agent->memory) {
+                                    sqlite3 *hum_db = hu_sqlite_memory_get_db(agent->memory);
+                                    if (hum_db) {
+                                        hu_humor_audience_t audience = {0};
+                                        (void)hu_humor_audience_load(hum_db, batch_key, &audience);
+                                        char topic_hint[80] = {0};
+                                        size_t th_len = combined_len < sizeof(topic_hint) - 1
+                                                            ? combined_len
+                                                            : sizeof(topic_hint) - 1;
+                                        memcpy(topic_hint, combined, th_len);
+                                        topic_hint[th_len] = '\0';
+                                        size_t strat_len = 0;
+                                        char *strat_dir = hu_humor_generate_strategy(
+                                            alloc, &audience, topic_hint, hum_valence, rel_stage,
+                                            &agent->persona->humor, &strat_len);
+                                        if (strat_dir && strat_len > 0)
+                                            PHASE6_APPEND(strat_dir, strat_len);
+                                        else if (strat_dir)
+                                            alloc->free(alloc->ctx, strat_dir, strat_len + 1);
+                                    }
+                                }
+#endif
+                            }
                         }
                     }
 #endif /* HU_HAS_PERSONA humor */
@@ -4524,6 +4581,156 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 #endif /* HU_HAS_PERSONA weather per-contact */
+
+                    /* 11. Inner thought surfacing (Phase 3) — inject accumulated thoughts
+                     * that are relevant to the current conversation topic */
+#ifdef HU_HAS_PERSONA
+                    if (inner_thought_store_ok && combined_len > 0) {
+                        hu_inner_thought_t *surfaced_thoughts[HU_INNER_THOUGHT_MAX_SURFACE];
+                        char topic_hint[128] = {0};
+                        size_t hint_len = combined_len < sizeof(topic_hint) - 1
+                                              ? combined_len
+                                              : sizeof(topic_hint) - 1;
+                        memcpy(topic_hint, combined, hint_len);
+                        topic_hint[hint_len] = '\0';
+                        uint64_t now_ms = (uint64_t)time(NULL) * 1000ULL;
+                        size_t surfaced_count = hu_inner_thought_surface(
+                            &inner_thought_store, batch_key, key_len, topic_hint, hint_len, now_ms,
+                            surfaced_thoughts, HU_INNER_THOUGHT_MAX_SURFACE);
+                        if (surfaced_count > 0) {
+                            /* Build a directive from surfaced thoughts */
+                            char thought_dir[512];
+                            int tdir_len = 0;
+                            for (size_t si = 0; si < surfaced_count && si < 3; si++) {
+                                const hu_inner_thought_t *th = surfaced_thoughts[si];
+                                if (th->thought_text && th->thought_text_len > 0) {
+                                    int wrote =
+                                        snprintf(thought_dir + tdir_len,
+                                                 sizeof(thought_dir) - (size_t)tdir_len,
+                                                 "%s[Inner thought: %.*s]", tdir_len > 0 ? " " : "",
+                                                 (int)th->thought_text_len, th->thought_text);
+                                    if (wrote > 0 &&
+                                        (size_t)wrote < sizeof(thought_dir) - (size_t)tdir_len)
+                                        tdir_len += wrote;
+                                }
+                            }
+                            if (tdir_len > 0) {
+                                size_t td_alloc_len = (size_t)tdir_len;
+                                char *td_copy =
+                                    (char *)alloc->realloc(alloc->ctx, NULL, 0, td_alloc_len + 1);
+                                if (td_copy) {
+                                    memcpy(td_copy, thought_dir, td_alloc_len);
+                                    td_copy[td_alloc_len] = '\0';
+                                    PHASE6_APPEND(td_copy, td_alloc_len);
+                                }
+                            }
+                        }
+                    }
+#endif /* HU_HAS_PERSONA inner thoughts */
+
+                    /* 12. Temporal reasoning (Phase 3) — seasonal awareness, anniversaries,
+                     * life transitions */
+#ifdef HU_HAS_PERSONA
+                    {
+                        time_t temp_now = time(NULL);
+                        struct tm temp_tm;
+                        if (hu_platform_localtime_r(&temp_now, &temp_tm)) {
+                            int cur_month = temp_tm.tm_mon + 1;
+                            int cur_day = temp_tm.tm_mday;
+                            int cur_year = temp_tm.tm_year + 1900;
+
+                            /* Check anniversaries from persona important_dates */
+                            hu_anniversary_t ann_buf[8];
+                            size_t ann_count = 0;
+                            if (agent->persona && agent->persona->important_dates &&
+                                agent->persona->important_dates_count > 0) {
+                                hu_date_entry_t date_entries[16];
+                                size_t de_count = 0;
+                                for (size_t di = 0;
+                                     di < agent->persona->important_dates_count && de_count < 16;
+                                     di++) {
+                                    const hu_important_date_t *id =
+                                        &agent->persona->important_dates[di];
+                                    if (id->date[0] && id->date[2] == '-') {
+                                        date_entries[de_count].label = id->type;
+                                        date_entries[de_count].label_len = strlen(id->type);
+                                        date_entries[de_count].month =
+                                            (id->date[0] - '0') * 10 + (id->date[1] - '0');
+                                        date_entries[de_count].day =
+                                            (id->date[3] - '0') * 10 + (id->date[4] - '0');
+                                        de_count++;
+                                    }
+                                }
+                                if (de_count > 0)
+                                    ann_count = hu_temporal_check_anniversaries(
+                                        date_entries, de_count, cur_year, cur_month, cur_day, 7,
+                                        ann_buf, 8);
+                            }
+
+                            /* Detect life transitions from recent messages */
+                            hu_life_transition_t transition = HU_TRANSITION_NONE;
+                            if (combined_len > 0) {
+                                hu_temporal_message_t tmsg = {.text = combined,
+                                                              .text_len = combined_len};
+                                transition = hu_temporal_detect_life_transition(&tmsg, 1);
+                            }
+
+                            /* Build temporal context directive */
+                            char *temp_dir = NULL;
+                            size_t temp_dir_len = 0;
+                            if (hu_temporal_build_context(alloc, cur_month, cur_day, ann_buf,
+                                                          ann_count, transition, &temp_dir,
+                                                          &temp_dir_len) == HU_OK &&
+                                temp_dir && temp_dir_len > 0)
+                                PHASE6_APPEND(temp_dir, temp_dir_len);
+                            else if (temp_dir)
+                                alloc->free(alloc->ctx, temp_dir, temp_dir_len + 1);
+
+                            /* Free anniversary labels (allocated by
+                             * hu_temporal_check_anniversaries)
+                             */
+                            for (size_t ai = 0; ai < ann_count; ai++) {
+                                if (ann_buf[ai].label)
+                                    free(ann_buf[ai].label);
+                            }
+                        }
+                    }
+#endif /* HU_HAS_PERSONA temporal */
+
+                    /* 13. Anti-sycophancy (Phase 3) — check existing opinions before agreeing,
+                     * and inject contrarian prompt on ~15% budget */
+#ifdef HU_ENABLE_SQLITE
+                    if (agent->memory && combined_len > 0) {
+                        sqlite3 *syc_db = hu_sqlite_memory_get_db(agent->memory);
+                        if (syc_db) {
+                            /* Extract rough topic from user message for opinion lookup */
+                            char syc_topic[128];
+                            size_t syc_topic_len = combined_len < sizeof(syc_topic) - 1
+                                                       ? combined_len
+                                                       : sizeof(syc_topic) - 1;
+                            memcpy(syc_topic, combined, syc_topic_len);
+                            syc_topic[syc_topic_len] = '\0';
+
+                            /* Check if user's message touches an existing opinion */
+                            size_t cba_len = 0;
+                            char *cba_dir = hu_opinion_check_before_agree(alloc, syc_db, syc_topic,
+                                                                          syc_topic_len, &cba_len);
+                            if (cba_dir && cba_len > 0)
+                                PHASE6_APPEND(cba_dir, cba_len);
+                            else if (cba_dir)
+                                alloc->free(alloc->ctx, cba_dir, cba_len + 1);
+
+                            /* ~15% random contrarian prompt */
+                            size_t cp_len = 0;
+                            char *cp_dir = hu_opinion_contrarian_prompt(
+                                alloc, syc_topic, syc_topic_len, daemon_turn_counter, &cp_len);
+                            if (cp_dir && cp_len > 0)
+                                PHASE6_APPEND(cp_dir, cp_len);
+                            else if (cp_dir)
+                                alloc->free(alloc->ctx, cp_dir, cp_len + 1);
+                        }
+                    }
+#endif /* HU_ENABLE_SQLITE anti-sycophancy */
 
                     /* Phase 7 (F72–F76): Prospective memory, emotional residue, episodic context */
 #ifdef HU_ENABLE_SQLITE
@@ -5365,23 +5572,28 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             /* Topic-switch consolidation (EdgeClaw-inspired):
                              * trigger memory consolidation on topic change
                              * with debounce to avoid excessive consolidation. */
-                            if (hu_consolidation_should_run(&topic_consolidation_debounce,
-                                                            (int64_t)(now_ms / 1000))) {
-                                hu_consolidation_config_t tc_cfg = {
-                                    .decay_days = config ? config->behavior.decay_days : 30,
-                                    .decay_factor = 0.5,
-                                    .dedup_threshold = config ? config->behavior.dedup_threshold : 0,
-                                    .max_entries = 5000,
-                                    .provider = &agent->provider,
-                                    .model = agent->model_name,
-                                    .model_len = agent->model_name_len,
-                                };
-                                if (hu_memory_consolidate(alloc, agent->memory, &tc_cfg) == HU_OK) {
-                                    hu_consolidation_debounce_reset(&topic_consolidation_debounce,
-                                                                    (int64_t)(now_ms / 1000));
-                                    hu_log_info("human", agent ? agent->observer : NULL,
-                                                "topic-switch consolidation: '%s' -> '%s'",
-                                                topic_before, topic_after);
+                            {
+                                int64_t tc_now = (int64_t)time(NULL);
+                                if (hu_consolidation_should_run(&topic_consolidation_debounce,
+                                                                tc_now)) {
+                                    hu_consolidation_config_t tc_cfg = {
+                                        .decay_days = config ? config->behavior.decay_days : 30,
+                                        .decay_factor = 0.5,
+                                        .dedup_threshold =
+                                            config ? config->behavior.dedup_threshold : 0,
+                                        .max_entries = 5000,
+                                        .provider = &agent->provider,
+                                        .model = agent->model_name,
+                                        .model_len = agent->model_name_len,
+                                    };
+                                    if (hu_memory_consolidate(alloc, agent->memory, &tc_cfg) ==
+                                        HU_OK) {
+                                        hu_consolidation_debounce_reset(
+                                            &topic_consolidation_debounce, tc_now);
+                                        hu_log_info("human", agent ? agent->observer : NULL,
+                                                    "topic-switch consolidation: '%s' -> '%s'",
+                                                    topic_before, topic_after);
+                                    }
                                 }
                             }
                         }
@@ -8160,6 +8372,44 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 #endif
 
+                /* ── Phase 3 post-turn: inner thought accumulation ──────── */
+#ifdef HU_HAS_PERSONA
+                if (err == HU_OK && inner_thought_store_ok && combined_len > 0 && batch_key &&
+                    key_len > 0) {
+                    /* Extract a rough topic from the user's message for accumulation */
+                    char it_topic[128] = {0};
+                    size_t it_topic_len =
+                        combined_len < sizeof(it_topic) - 1 ? combined_len : sizeof(it_topic) - 1;
+                    memcpy(it_topic, combined, it_topic_len);
+                    it_topic[it_topic_len] = '\0';
+                    uint64_t it_now_ms = (uint64_t)time(NULL) * 1000ULL;
+                    (void)hu_inner_thought_accumulate(&inner_thought_store, batch_key, key_len,
+                                                      it_topic, it_topic_len, it_topic,
+                                                      it_topic_len, 0.5, it_now_ms);
+                }
+#endif
+
+                /* ── Phase 3 post-turn: humor audience tracking ──────── */
+#ifdef HU_HAS_PERSONA
+#ifdef HU_ENABLE_SQLITE
+                if (err == HU_OK && response && response_len > 0 && agent->memory &&
+                    agent->persona && agent->persona->humor.type) {
+                    sqlite3 *ha_db = hu_sqlite_memory_get_db(agent->memory);
+                    if (ha_db) {
+                        /* Check if user's NEXT message signals humor failure */
+                        bool humor_failed = hu_humor_detect_failure(combined, combined_len);
+                        hu_humor_audience_t ha_cur = {0};
+                        (void)hu_humor_audience_load(ha_db, batch_key, &ha_cur);
+                        hu_humor_type_t pref = hu_humor_audience_preferred_type(&ha_cur);
+                        (void)hu_humor_audience_record(ha_db, batch_key, pref, !humor_failed);
+                    }
+                }
+#endif
+#endif
+
+                /* ── Phase 3 post-turn: increment turn counter for anti-sycophancy ── */
+                daemon_turn_counter++;
+
                 /* ── BTH post-turn: Theory of Mind record (t1b-post) ──────── */
 #ifndef HU_IS_TEST
                 if (err == HU_OK && response && response_len > 0) {
@@ -9832,6 +10082,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     }
 
 #undef HU_STOP_FLAG
+    /* Phase 3: clean up inner thought store */
+#ifdef HU_HAS_PERSONA
+    if (inner_thought_store_ok) {
+        hu_inner_thought_store_deinit(&inner_thought_store);
+        inner_thought_store_ok = false;
+    }
+#endif
+
     hu_bus_unsubscribe(&daemon_outbound_bus, daemon_outbound_bus_cb, &daemon_out_bus_bridge);
     hu_bus_deinit(&daemon_outbound_bus);
     hu_inbox_deinit(&inbox_watcher);

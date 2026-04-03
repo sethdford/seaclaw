@@ -2,6 +2,7 @@
  * Inner thoughts accumulation — per-contact anticipatory state between conversations.
  */
 #include "human/agent/inner_thoughts.h"
+#include "human/core/debug.h"
 #include "human/core/string.h"
 #include <string.h>
 
@@ -53,6 +54,7 @@ hu_error_t hu_inner_thought_accumulate(hu_inner_thought_store_t *store, const ch
         return HU_ERR_INVALID_ARGUMENT;
     if (relevance < 0.0 || relevance > 1.0)
         return HU_ERR_INVALID_ARGUMENT;
+    HU_ASSERT_NOT_REENTRANT(thought_accumulate);
 
     /* Evict oldest entry if at max capacity */
     if (store->count >= HU_INNER_THOUGHT_MAX_CAPACITY) {
@@ -90,8 +92,10 @@ hu_error_t hu_inner_thought_accumulate(hu_inner_thought_store_t *store, const ch
         hu_inner_thought_t *new_items = (hu_inner_thought_t *)alloc->realloc(
             alloc->ctx, store->items, store->capacity * sizeof(hu_inner_thought_t),
             new_cap * sizeof(hu_inner_thought_t));
-        if (!new_items)
+        if (!new_items) {
+            HU_LEAVE_NOT_REENTRANT(thought_accumulate);
             return HU_ERR_OUT_OF_MEMORY;
+        }
         memset(new_items + store->capacity, 0,
                (new_cap - store->capacity) * sizeof(hu_inner_thought_t));
         store->items = new_items;
@@ -102,8 +106,10 @@ hu_error_t hu_inner_thought_accumulate(hu_inner_thought_store_t *store, const ch
     hu_inner_thought_t *t = &store->items[store->count];
 
     t->contact_id = hu_strndup(alloc, contact_id, contact_id_len);
-    if (!t->contact_id)
+    if (!t->contact_id) {
+        HU_LEAVE_NOT_REENTRANT(thought_accumulate);
         return HU_ERR_OUT_OF_MEMORY;
+    }
     t->contact_id_len = contact_id_len;
 
     if (topic && topic_len > 0) {
@@ -111,6 +117,7 @@ hu_error_t hu_inner_thought_accumulate(hu_inner_thought_store_t *store, const ch
         if (!t->topic) {
             alloc->free(alloc->ctx, t->contact_id, contact_id_len + 1);
             t->contact_id = NULL;
+            HU_LEAVE_NOT_REENTRANT(thought_accumulate);
             return HU_ERR_OUT_OF_MEMORY;
         }
         t->topic_len = topic_len;
@@ -127,6 +134,7 @@ hu_error_t hu_inner_thought_accumulate(hu_inner_thought_store_t *store, const ch
             alloc->free(alloc->ctx, t->topic, topic_len + 1);
             t->topic = NULL;
         }
+        HU_LEAVE_NOT_REENTRANT(thought_accumulate);
         return HU_ERR_OUT_OF_MEMORY;
     }
     t->thought_text_len = text_len;
@@ -135,6 +143,7 @@ hu_error_t hu_inner_thought_accumulate(hu_inner_thought_store_t *store, const ch
     t->accumulated_at = now_ms;
     t->surfaced = false;
     store->count++;
+    HU_LEAVE_NOT_REENTRANT(thought_accumulate);
     return HU_OK;
 }
 
@@ -187,6 +196,7 @@ size_t hu_inner_thought_surface(hu_inner_thought_store_t *store, const char *con
                                 hu_inner_thought_t **surfaced, size_t max_count) {
     if (!store || !contact_id || contact_id_len == 0 || !surfaced || max_count == 0)
         return 0;
+    HU_ASSERT_NOT_REENTRANT(thought_surface);
 
     /* Collect eligible thoughts for this contact, sorted by relevance */
     size_t eligible_count = 0;
@@ -204,8 +214,10 @@ size_t hu_inner_thought_surface(hu_inner_thought_store_t *store, const char *con
         eligible_indices[eligible_count++] = i;
     }
 
-    if (eligible_count == 0)
+    if (eligible_count == 0) {
+        HU_LEAVE_NOT_REENTRANT(thought_surface);
         return 0;
+    }
 
     /* Simple selection sort by relevance descending, pick top max_count */
     for (size_t i = 0; i < eligible_count && i < max_count; i++) {
@@ -229,6 +241,7 @@ size_t hu_inner_thought_surface(hu_inner_thought_store_t *store, const char *con
         t->surfaced = true;
         surfaced[i] = t;
     }
+    HU_LEAVE_NOT_REENTRANT(thought_surface);
     return result_count;
 }
 

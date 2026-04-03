@@ -22,6 +22,11 @@ typedef struct hu_inner_thought {
     bool surfaced;
 } hu_inner_thought_t;
 
+/**
+ * Thread safety: NOT THREAD SAFE. Caller must ensure single-threaded access.
+ *   Mutating functions (accumulate, surface, deinit) assert non-reentrancy
+ *   in debug builds.
+ */
 typedef struct hu_inner_thought_store {
     hu_inner_thought_t *items;
     size_t count;

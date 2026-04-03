@@ -41,6 +41,7 @@
 #include "human/platform/calendar.h"
 #endif
 
+#include "human/core/debug.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -49,9 +50,11 @@
 void hu_proactive_context_reset(hu_proactive_context_t *ctx) {
     if (!ctx)
         return;
+    HU_ASSERT_NOT_REENTRANT(proactive_reset);
     memset(ctx->entries, 0, sizeof(ctx->entries));
     ctx->count = 0;
     ctx->seq = 0;
+    HU_LEAVE_NOT_REENTRANT(proactive_reset);
 }
 
 bool hu_daemon_channel_list_has_name(const hu_service_channel_t *channels, size_t channel_count,
@@ -74,6 +77,7 @@ void hu_daemon_contact_activity_record(hu_proactive_context_t *ctx, const char *
     if (!ctx || !contact_id || !contact_id[0] || !channel_name || !channel_name[0] ||
         !session_key || !session_key[0])
         return;
+    HU_ASSERT_NOT_REENTRANT(proactive_record);
 
     size_t slot = (size_t)-1;
     for (size_t i = 0; i < ctx->count; i++) {
@@ -116,6 +120,7 @@ void hu_daemon_contact_activity_record(hu_proactive_context_t *ctx, const char *
 
     ctx->entries[slot].last_activity = time(NULL);
     ctx->entries[slot].lru_seq = ++ctx->seq;
+    HU_LEAVE_NOT_REENTRANT(proactive_record);
 }
 
 /* ── Proactive route parsing ────────────────────────────────────────── */

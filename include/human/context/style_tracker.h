@@ -8,7 +8,11 @@
 #include <stddef.h>
 
 /* Style fingerprint: per-contact texting style learned from our sent messages.
- * Used to enforce consistency (e.g. "haha" not "lol" if we used "haha" recently). */
+ * Used to enforce consistency (e.g. "haha" not "lol" if we used "haha" recently).
+ *
+ * Thread safety: NOT THREAD SAFE. All functions that write to the database
+ *   (update, update_self, drift_check) must be called from a single thread.
+ *   Debug builds assert non-reentrancy on mutating functions. */
 typedef struct hu_style_fingerprint {
     bool uses_lowercase;
     bool uses_periods;

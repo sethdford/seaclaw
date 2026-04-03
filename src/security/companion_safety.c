@@ -1,5 +1,6 @@
 #include "human/security/companion_safety.h"
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -168,6 +169,39 @@ static char homoglyph_to_ascii(const unsigned char *p, size_t remaining, size_t 
     return 0;
 }
 
+/* Check if current position is an invisible Unicode character that should be
+ * stripped during normalization. Returns bytes to skip, or 0 if not invisible.
+ * Covers: zero-width (U+200B-200F), bidi overrides (U+202A-202E),
+ *         bidi isolates (U+2066-2069), BOM (U+FEFF),
+ *         combining diacritical marks (U+0300-036F). */
+static size_t invisible_char_len(const unsigned char *p, size_t remaining) {
+    /* 2-byte: Combining diacritical marks U+0300-036F */
+    if (remaining >= 2) {
+        if (p[0] == 0xCC && p[1] >= 0x80 && p[1] <= 0xBF)
+            return 2; /* U+0300-033F */
+        if (p[0] == 0xCD && p[1] >= 0x80 && p[1] <= 0xAF)
+            return 2; /* U+0340-036F */
+    }
+    /* 3-byte invisible characters */
+    if (remaining >= 3) {
+        if (p[0] == 0xE2 && p[1] == 0x80) {
+            /* Zero-width U+200B-200F */
+            if (p[2] >= 0x8B && p[2] <= 0x8F)
+                return 3;
+            /* Bidi overrides U+202A-202E */
+            if (p[2] >= 0xAA && p[2] <= 0xAE)
+                return 3;
+        }
+        /* Bidi isolates U+2066-2069 */
+        if (p[0] == 0xE2 && p[1] == 0x81 && p[2] >= 0xA6 && p[2] <= 0xA9)
+            return 3;
+        /* BOM U+FEFF */
+        if (p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF)
+            return 3;
+    }
+    return 0;
+}
+
 size_t hu_companion_safety_normalize(const char *input, size_t input_len, char *out,
                                      size_t out_cap) {
     if (!input || input_len == 0 || !out || out_cap == 0)
@@ -185,6 +219,13 @@ size_t hu_companion_safety_normalize(const char *input, size_t input_len, char *
 
         /* Check for multi-byte UTF-8 homoglyphs */
         if (c >= 0xC0) {
+            /* Strip invisible Unicode (zero-width, bidi, combining marks) */
+            size_t skip = invisible_char_len((const unsigned char *)input + i, input_len - i);
+            if (skip > 0) {
+                i += skip;
+                continue;
+            }
+
             size_t consumed = 1;
             char replacement =
                 homoglyph_to_ascii((const unsigned char *)input + i, input_len - i, &consumed);
@@ -440,6 +481,9 @@ hu_error_t hu_companion_safety_check(hu_allocator_t *alloc, const char *response
 
     if (!response || response_len == 0)
         return HU_OK;
+
+    if (response_len >= SIZE_MAX)
+        return HU_ERR_INVALID_ARGUMENT;
 
     /* Normalize input to defeat leetspeak, spacing, and homoglyph bypasses */
     char *norm_buf = (char *)malloc(response_len + 1);

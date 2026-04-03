@@ -1,3 +1,8 @@
+---
+title: Phase 2 Fleet — Closing Report
+date: 2026-04-03
+---
+
 # Phase 2 Fleet — Closing Report
 
 **Date:** 2026-04-03
