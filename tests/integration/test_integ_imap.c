@@ -9,18 +9,6 @@
 #include <string.h>
 #include <unistd.h>
 
-/*
- * Optional real IMAP/SMTP integration test.
- * Enable by setting HU_INTEG_IMAP=1 and these env vars:
- * - HU_INTEG_IMAP_HOST, HU_INTEG_IMAP_PORT
- * - HU_INTEG_IMAP_USER, HU_INTEG_IMAP_PASS
- * - HU_INTEG_SMTP_HOST, HU_INTEG_SMTP_PORT
- * - HU_INTEG_IMAP_TO (recipient, often same as user)
- * Optional:
- * - HU_INTEG_IMAP_FROM
- * - HU_INTEG_IMAP_FOLDER (default INBOX)
- * - HU_INTEG_IMAP_TLS (1|0, default 1)
- */
 #if HU_HAS_IMAP
 static int env_enabled(const char *name) {
     const char *v = getenv(name);
@@ -85,7 +73,6 @@ static void integ_imap_send_and_poll_live(void) {
     err = ch.vtable->send(ch.ctx, to, strlen(to), payload, strlen(payload), NULL, 0);
     HU_ASSERT_EQ(err, HU_OK);
 
-    /* Delivery + UNSEEN indexing can lag (especially Gmail). Poll with backoff. */
     hu_channel_loop_msg_t msgs[4];
     bool saw_payload = false;
     for (int attempt = 0; attempt < 8 && !saw_payload; attempt++) {

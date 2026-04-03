@@ -706,6 +706,7 @@ set(HU_CORE_SOURCES
     src/daemon_lifecycle.c
     src/daemon_cron.c
     src/daemon_routing.c
+    src/daemon_proactive.c
     src/cron.c
     src/crontab.c
     src/webhook.c
@@ -1947,6 +1948,7 @@ set(HU_TEST_SOURCES
     tests/test_daemon_cron.c
     tests/test_daemon_lifecycle.c
     tests/test_daemon_routing.c
+    tests/test_daemon_proactive.c
     tests/test_daemon_trust.c
     tests/test_config_parse.c
     tests/test_config_migrate.c
@@ -2002,7 +2004,6 @@ set(HU_TEST_SOURCES
     tests/test_channel_integration.c
     tests/test_gmail.c
     tests/test_imessage_extended.c
-    tests/test_imessage_adversarial.c
     tests/test_config_extended.c
     tests/test_config_getters.c
     tests/test_config_validation.c
@@ -2152,6 +2153,9 @@ set(HU_TEST_SOURCES
     tests/test_prove_e2e.c
     tests/test_self_improve_loop.c
     tests/test_weakness.c
+    tests/test_anti_sycophancy.c
+    tests/test_mutual_tom.c
+    tests/test_opinion_history.c
     tests/test_trust.c
     tests/test_distiller.c
     tests/test_model_router.c
