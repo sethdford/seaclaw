@@ -1,3 +1,7 @@
+---
+title: Claude Code Feature Integration Guide
+---
+
 # Claude Code Feature Integration Guide
 
 This guide covers six features integrated from Claude Code architecture into h-uman: MCP Client, Hook Pipeline, Permission Tiers, Structured Compaction, Session Persistence, and Instruction File Discovery.

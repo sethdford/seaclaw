@@ -286,6 +286,40 @@ Features adopted from OpenClaw's architecture, adapted to h-uman's vtable model:
 - **Skill scaffolding** (`human skills init` with category-specific templates)
 - **RAG context engine** (second vtable implementation wiring memory retrieval into assemble hook)
 
+## EdgeClaw Comparison
+
+_Last updated: 2026-04-03. EdgeClaw is a third-party extension ecosystem for OpenClaw (TypeScript/Node.js). Key extensions: ClawXRouter (LLM-as-Judge model routing), ClawXMemory (multi-layered long-term memory), and a three-tier privacy system._
+
+### EdgeClaw Feature Analysis
+
+| Feature | EdgeClaw | human (before) | human (after) | Notes |
+| --- | --- | --- | --- | --- |
+| **LLM-as-Judge routing** | SHA-256 cache, 5-tier classification, ~58% cost savings | Heuristic scoring (keyword, emotional, relational) | LLM judge path + FNV-1a cache + heuristic fallback | Adapted: FNV-1a instead of SHA-256, fixed-size cache, judge system prompt |
+| **Content sensitivity** | Rule + local LLM, S1/S2/S3 tiers, checkpoint-based | Sandbox isolation only (system-level) | Rule-based S1/S2/S3 (keywords, PII regex, path patterns) | Adapted: rule-based engine in `src/security/sensitivity.c` |
+| **Topic-switch consolidation** | LLM topic shift → close topic buffer → L1/L2 index | Periodic consolidation (turn-count, timer) | Topic-change trigger + debounce + existing consolidation | Wired `hu_conversation_detect_topic_change` to `hu_memory_consolidate` |
+| **Routing dashboard** | localhost:18790 stats page | No routing visibility | Ring buffer log + `models.decisions` gateway method + UI | New "Routing Decisions" section in models view |
+| **Multi-layer memory** | L0/L1/L2 + Global Profile, auto-indexing | CORE/RECALL/ARCHIVAL tiers, hybrid RAG, emotional graph | — | human already has deeper memory; EdgeClaw's layers are simpler |
+| **Privacy router** | Sensitivity → model selection constraint | — | S3 → local-only provider routing | Integrated with model selection |
+
+### Features Adopted from EdgeClaw (April 2026)
+
+1. **LLM-as-Judge cost router** — Opt-in LLM classification of message complexity into four cognitive tiers (REFLEXIVE/CONVERSATIONAL/ANALYTICAL/DEEP), with FNV-1a prompt hash cache (64 entries, 5-min TTL). Falls back to existing heuristic scoring when judge unavailable. Files: `include/human/agent/model_router.h`, `src/agent/model_router.c`.
+
+2. **Content sensitivity tiers (S1/S2/S3)** — Rule-based classification detecting secrets (S3: private keys, API keys, passwords, SSN patterns), PII (S2: dates of birth, phone numbers, salary, credit card patterns), and safe content (S1). S3 forces local-only provider routing. Files: `include/human/security/sensitivity.h`, `src/security/sensitivity.c`.
+
+3. **Topic-switch memory consolidation** — Triggers `hu_memory_consolidate()` when `hu_conversation_detect_topic_change()` detects a topic shift, with debounce (minimum 5 entries, 60-second interval). Files: `include/human/memory/consolidation.h`, `src/memory/consolidation.c`, `src/daemon.c`.
+
+4. **Routing decision log + dashboard** — 100-entry ring buffer recording every model routing decision (tier, source, model, heuristic score, timestamp). Exposed via `models.decisions` gateway method with tier distribution. UI section in the Models view. Files: `src/agent/model_router.c`, `src/gateway/cp_admin.c`, `ui/src/views/models-view.ts`.
+
+### Where human Exceeds EdgeClaw
+
+- **Performance**: C11 vs TypeScript — zero-dependency binary, 30x smaller, 20x less RAM
+- **Memory depth**: 85+ files, emotional graph, hybrid RAG vs EdgeClaw's 4-layer index
+- **Cognitive architecture**: Dual-process + metacognition vs single-loop agent
+- **ML pipeline**: On-device GPT/DPO/LoRA training (EdgeClaw has none)
+- **Privacy approach**: human's sandbox isolation + sensitivity tiers vs EdgeClaw's routing-only approach
+- **Hardware**: Direct peripheral access (Arduino, STM32, RPi) — no equivalent
+
 ## Related
 
 - [Quality Scorecard](quality-scorecard.md) — detailed audit methodology and scorecard templates
