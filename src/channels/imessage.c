@@ -59,6 +59,50 @@ static void imessage_save_rowid(int64_t rowid) {
     fprintf(f, "%lld\n", (long long)rowid);
     fclose(f);
 }
+
+/*
+ * Extract plain text from an NSAttributedString (NSKeyedArchiver) blob.
+ * macOS 15+ stores iMessage text in attributedBody instead of the text column.
+ *
+ * Binary format: ... 0x01 0x2B <length> <utf8_text> ...
+ *   - If length byte < 0x80: single-byte length, text starts at offset+3
+ *   - If length byte >= 0x80: low 7 bits = number of following length bytes (little-endian)
+ *
+ * Returns extracted length, or 0 on failure. Output is null-terminated.
+ */
+static size_t extract_text_from_attributed_body(const unsigned char *blob, size_t blob_len,
+                                                 char *out, size_t out_cap) {
+    if (!blob || blob_len < 4 || !out || out_cap < 2)
+        return 0;
+
+    for (size_t i = 0; i + 3 < blob_len; i++) {
+        if (blob[i] == 0x01 && blob[i + 1] == 0x2B) {
+            size_t text_len = 0;
+            size_t text_start = 0;
+            unsigned char lb = blob[i + 2];
+            if (lb < 0x80) {
+                text_len = lb;
+                text_start = i + 3;
+            } else {
+                size_t len_bytes = lb & 0x7F;
+                if (len_bytes == 0 || len_bytes > 4 || i + 3 + len_bytes > blob_len)
+                    return 0;
+                for (size_t b = 0; b < len_bytes; b++)
+                    text_len |= (size_t)blob[i + 3 + b] << (8 * b);
+                text_start = i + 3 + len_bytes;
+            }
+
+            if (text_start + text_len > blob_len)
+                text_len = blob_len - text_start;
+            if (text_len >= out_cap)
+                text_len = out_cap - 1;
+            memcpy(out, blob + text_start, text_len);
+            out[text_len] = '\0';
+            return text_len;
+        }
+    }
+    return 0;
+}
 #endif
 
 typedef struct hu_imessage_ctx {
@@ -356,13 +400,22 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
 #if HU_IS_TEST
     (void)target;
     (void)target_len;
-    (void)media;
-    (void)media_count;
     {
         hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
+        if (!c)
+            return HU_ERR_INVALID_ARGUMENT;
+        /* Match production imessage_send validation (no AppleScript in tests). */
+        if (message_len > 0 && !message)
+            return HU_ERR_INVALID_ARGUMENT;
+        if (message_len == 0 && media_count == 0)
+            return HU_ERR_INVALID_ARGUMENT;
+        (void)media;
+        (void)media_count;
         size_t len = message_len > 4095 ? 4095 : message_len;
         if (message && len > 0)
             memcpy(c->last_message, message, len);
+        else
+            len = 0;
         c->last_message[len] = '\0';
         c->last_message_len = len;
         return HU_OK;
@@ -735,7 +788,8 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
                       "   WHERE maj3.message_id = m.ROWID AND a3.filename IS NOT NULL "
                       "   AND (LOWER(a3.filename) LIKE '%.caf' OR LOWER(a3.filename) LIKE '%.m4a' "
                       "     OR LOWER(a3.filename) LIKE '%.mp3' OR LOWER(a3.filename) LIKE '%.aac' "
-                      "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio "
+                      "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio, "
+                      "  m.attributedBody "
                       "FROM message m "
                       "JOIN handle h ON m.handle_id = h.ROWID "
                       "WHERE h.id = ?1 AND m.associated_message_type = 0 "
@@ -774,6 +828,19 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
         int has_video = sqlite3_column_int(stmt, 3);
         int has_image = sqlite3_column_int(stmt, 4);
         int has_audio = sqlite3_column_int(stmt, 5);
+
+        /* macOS 15+: extract from attributedBody when text column is NULL */
+        char attr_buf[4096];
+        if ((!txt || txt[0] == '\0')) {
+            const unsigned char *ab = sqlite3_column_blob(stmt, 6);
+            int ab_len = sqlite3_column_bytes(stmt, 6);
+            if (ab && ab_len > 0) {
+                size_t extracted =
+                    extract_text_from_attributed_body(ab, (size_t)ab_len, attr_buf, sizeof(attr_buf));
+                if (extracted > 0)
+                    txt = attr_buf;
+            }
+        }
         if (txt && strlen(txt) > 0) {
             size_t tlen = strlen(txt);
             if (tlen >= sizeof(entries[0].text))
@@ -1188,12 +1255,21 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
                 sqlite3 *db = NULL;
                 if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK) {
                     sqlite3_stmt *stmt = NULL;
-                    if (sqlite3_prepare_v2(db, "SELECT text, guid FROM message WHERE ROWID = ?", -1,
-                                           &stmt, NULL) == SQLITE_OK) {
+                    if (sqlite3_prepare_v2(
+                            db,
+                            "SELECT text, guid, attributedBody FROM message WHERE ROWID = ?",
+                            -1, &stmt, NULL) == SQLITE_OK) {
                         sqlite3_bind_int64(stmt, 1, message_id);
                         if (sqlite3_step(stmt) == SQLITE_ROW) {
                             const char *text = (const char *)sqlite3_column_text(stmt, 0);
-                            if (text) {
+                            if (!text || text[0] == '\0') {
+                                const unsigned char *ab = sqlite3_column_blob(stmt, 2);
+                                int ab_len = sqlite3_column_bytes(stmt, 2);
+                                if (ab && ab_len > 0) {
+                                    content_len = extract_text_from_attributed_body(
+                                        ab, (size_t)ab_len, content_buf, sizeof(content_buf));
+                                }
+                            } else {
                                 size_t len = strlen(text);
                                 if (len >= sizeof(content_buf))
                                     len = sizeof(content_buf) - 1;
@@ -1844,12 +1920,14 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "     OR LOWER(a3.filename) LIKE '%.mp3' OR LOWER(a3.filename) LIKE '%.aac' "
         "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio, "
         "  CASE WHEN m.date_edited > 0 THEN 1 ELSE 0 END AS was_edited, "
-        "  m.thread_originator_guid "
+        "  m.thread_originator_guid, "
+        "  m.attributedBody "
         "FROM message m "
         "JOIN handle h ON m.handle_id = h.ROWID "
         "WHERE m.is_from_me = 0 AND m.associated_message_type = 0 "
         "AND m.ROWID > ? "
         "AND ((m.text IS NOT NULL AND LENGTH(m.text) > 0) "
+        "     OR (m.attributedBody IS NOT NULL AND LENGTH(m.attributedBody) > 0) "
         "     OR (EXISTS (SELECT 1 FROM message_attachment_join maj "
         "         JOIN attachment a ON maj.attachment_id = a.ROWID "
         "         WHERE maj.message_id = m.ROWID AND a.filename IS NOT NULL "
@@ -1896,6 +1974,20 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         (void)has_audio;
         int was_edited = sqlite3_column_int(stmt, 8);
         const char *reply_to = (const char *)sqlite3_column_text(stmt, 9);
+
+        /* macOS 15+: text column may be NULL while attributedBody has the content.
+         * Extract plain text from NSAttributedString (NSKeyedArchiver) blob. */
+        char attr_text_buf[4096];
+        if (!text || text[0] == '\0') {
+            const unsigned char *attr_blob = sqlite3_column_blob(stmt, 10);
+            int attr_len = sqlite3_column_bytes(stmt, 10);
+            if (attr_blob && attr_len > 0) {
+                size_t extracted = extract_text_from_attributed_body(
+                    attr_blob, (size_t)attr_len, attr_text_buf, sizeof(attr_text_buf));
+                if (extracted > 0)
+                    text = attr_text_buf;
+            }
+        }
 
         if (!text || !handle) {
             c->last_rowid = rowid;
@@ -2152,7 +2244,8 @@ hu_error_t hu_imessage_lookup_message_by_guid(hu_allocator_t *alloc, const char 
         return HU_ERR_IO;
     }
 
-    const char *sql = "SELECT m.text FROM message m WHERE m.guid = ? LIMIT 1";
+    const char *sql =
+        "SELECT m.text, m.attributedBody FROM message m WHERE m.guid = ? LIMIT 1";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         sqlite3_close(db);
@@ -2162,13 +2255,20 @@ hu_error_t hu_imessage_lookup_message_by_guid(hu_allocator_t *alloc, const char 
     sqlite3_bind_text(stmt, 1, guid, (int)guid_len, SQLITE_STATIC);
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         const char *text = (const char *)sqlite3_column_text(stmt, 0);
-        if (text) {
+        if (text && text[0] != '\0') {
             size_t tlen = strlen(text);
             if (tlen >= out_cap)
                 tlen = out_cap - 1;
             memcpy(out_text, text, tlen);
             out_text[tlen] = '\0';
             *out_len = tlen;
+        } else {
+            const unsigned char *ab = sqlite3_column_blob(stmt, 1);
+            int ab_len = sqlite3_column_bytes(stmt, 1);
+            if (ab && ab_len > 0) {
+                *out_len =
+                    extract_text_from_attributed_body(ab, (size_t)ab_len, out_text, out_cap);
+            }
         }
     }
 

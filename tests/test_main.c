@@ -156,6 +156,7 @@ void run_plugin_tests(void);
 void run_tenant_tests(void);
 void run_gmail_tests(void);
 void run_imessage_extended_tests(void);
+void run_imessage_adversarial_tests(void);
 void run_intelligence_tests(void);
 void run_protective_tests(void);
 void run_humor_tests(void);
@@ -188,6 +189,7 @@ void run_graph_tests(void);
 void run_fast_capture_tests(void);
 void run_promotion_tests(void);
 void run_consolidation_tests(void);
+void run_verify_claim_tests(void);
 void run_deep_extract_tests(void);
 void run_commitment_tests(void);
 void run_pattern_radar_tests(void);
@@ -319,6 +321,8 @@ void run_multigraph_tests(void);
 void run_memory_graph_tests(void);
 void run_experience_tests(void);
 void run_experience_engine_tests(void);
+void run_intelligence_wiring_tests(void);
+void run_prove_e2e_tests(void);
 void run_self_improve_loop_tests(void);
 void run_a2a_tests(void);
 void run_gvr_tests(void);
@@ -351,6 +355,7 @@ void run_sota_adversarial_tests(void);
 void run_otel_tests(void);
 void run_cot_audit_tests(void);
 void run_moderation_tests(void);
+void run_companion_safety_tests(void);
 void run_code_sandbox_tests(void);
 void run_computer_use_tests(void);
 void run_image_gen_tests(void);
@@ -366,6 +371,7 @@ void run_forgetting_tests(void);
 void run_bootstrap_tests(void);
 void run_thread_pool_tests(void);
 void run_weakness_tests(void);
+void run_trust_tests(void);
 void run_distiller_tests(void);
 void run_plan_executor_tests(void);
 void run_planner_mcts_wiring_tests(void);
@@ -389,6 +395,11 @@ void run_config_reload_tests(void);
 void run_plugin_hooks_tests(void);
 void run_approval_gate_tests(void);
 void run_workflow_commands_tests(void);
+void run_repair_tests(void);
+void run_daemon_cron_tests(void);
+void run_daemon_lifecycle_tests(void);
+void run_daemon_routing_tests(void);
+void run_daemon_trust_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -570,6 +581,7 @@ int main(int argc, char **argv) {
     run_tenant_tests();
     run_gmail_tests();
     run_imessage_extended_tests();
+    run_imessage_adversarial_tests();
     run_intelligence_tests();
     run_protective_tests();
     run_humor_tests();
@@ -602,6 +614,7 @@ int main(int argc, char **argv) {
     run_fast_capture_tests();
     run_promotion_tests();
     run_consolidation_tests();
+    run_verify_claim_tests();
     run_deep_extract_tests();
     run_commitment_tests();
     run_pattern_radar_tests();
@@ -726,6 +739,8 @@ int main(int argc, char **argv) {
 
     run_experience_tests();
     run_experience_engine_tests();
+    run_intelligence_wiring_tests();
+    run_prove_e2e_tests();
     run_self_improve_loop_tests();
     run_a2a_tests();
     run_gvr_tests();
@@ -758,6 +773,7 @@ int main(int argc, char **argv) {
     run_otel_tests();
     run_cot_audit_tests();
     run_moderation_tests();
+    run_companion_safety_tests();
     run_code_sandbox_tests();
     run_computer_use_tests();
     run_image_gen_tests();
@@ -773,6 +789,7 @@ int main(int argc, char **argv) {
     run_bootstrap_tests();
     run_thread_pool_tests();
     run_weakness_tests();
+    run_trust_tests();
     run_distiller_tests();
     run_plan_executor_tests();
     run_planner_mcts_wiring_tests();
@@ -802,6 +819,11 @@ int main(int argc, char **argv) {
     run_tool_ask_user_tests();
     run_approval_gate_tests();
     run_workflow_commands_tests();
+    run_repair_tests();
+    run_daemon_cron_tests();
+    run_daemon_lifecycle_tests();
+    run_daemon_routing_tests();
+    run_daemon_trust_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

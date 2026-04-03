@@ -194,19 +194,19 @@ hu_error_t hu_multigraph_retrieve(hu_allocator_t *alloc, hu_graph_t *graph,
 
         switch (dc->dim) {
         case HU_GRAPH_DIM_SEMANTIC:
-            err = hu_graph_build_context(graph, alloc, query, query_len, 2, max_chars, &buf, &buf_len);
+            err = hu_graph_build_context(graph, alloc, "", 0, query, query_len, 2, max_chars, &buf, &buf_len);
             break;
         case HU_GRAPH_DIM_TEMPORAL:
-            err = hu_graph_query_temporal(graph, alloc, 0, INT64_MAX, 10, &buf, &buf_len);
+            err = hu_graph_query_temporal(graph, alloc, "", 0, 0, INT64_MAX, 10, &buf, &buf_len);
             break;
         case HU_GRAPH_DIM_CAUSAL:
-            err = hu_graph_query_causal(graph, alloc, 0, 5, &buf, &buf_len);
+            err = hu_graph_query_causal(graph, alloc, "", 0, 0, 5, &buf, &buf_len);
             break;
         case HU_GRAPH_DIM_RELATIONAL:
-            err = hu_graph_build_context(graph, alloc, query, query_len, 3, max_chars, &buf, &buf_len);
+            err = hu_graph_build_context(graph, alloc, "", 0, query, query_len, 3, max_chars, &buf, &buf_len);
             break;
         case HU_GRAPH_DIM_COMMUNITY:
-            err = hu_graph_build_communities(graph, alloc, 5, max_chars, &buf, &buf_len);
+            err = hu_graph_build_communities(graph, alloc, "", 0, 5, max_chars, &buf, &buf_len);
             break;
         default:
             break;

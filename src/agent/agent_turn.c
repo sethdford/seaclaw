@@ -100,6 +100,8 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/security.h"
 #include "human/security/causal_armor.h"
 #include "human/security/history_scorer.h"
+#include "human/security/moderation.h"
+#include "human/security/companion_safety.h"
 #include "human/tools/cache_ttl.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
@@ -120,6 +122,9 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/memory.h"
 #include "human/memory/contact_graph.h"
 #include <sqlite3.h>
+#if defined(HU_ENABLE_ML)
+#include "human/ml/training_data.h"
+#endif
 #endif
 #include "human/agent/constitutional.h"
 #include "human/agent/speculative.h"
@@ -1352,6 +1357,16 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             char parts[4096];
             size_t pos = 0;
 
+#if defined(HU_ENABLE_ML)
+            /* Start RL trajectory for this turn (ensure tables exist first) */
+            {
+                (void)hu_training_data_init_tables(intel_db);
+                int64_t traj_id = 0;
+                if (hu_training_data_start_trajectory(agent->alloc, intel_db, &traj_id) == HU_OK)
+                    agent->current_trajectory_id = traj_id;
+            }
+#endif
+
             /* Self-improvement: active prompt patches */
             {
                 hu_self_improve_t si;
@@ -1604,6 +1619,39 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             if (augmented) {
                 memcpy(augmented, persona_prompt, persona_prompt_len);
                 memcpy(augmented + persona_prompt_len, sentiment_note, note_len);
+                augmented[new_len] = '\0';
+                agent->alloc->free(agent->alloc->ctx, persona_prompt, persona_prompt_len + 1);
+                persona_prompt = augmented;
+                persona_prompt_len = new_len;
+            }
+        }
+    }
+    /* Relationship-based tone: inject warmth/vulnerability guidance from contact profile */
+    if (persona_prompt && agent->persona && agent->memory_session_id) {
+        const char *tone_note = NULL;
+        const hu_contact_profile_t *cp = hu_persona_find_contact(
+            agent->persona, agent->memory_session_id, agent->memory_session_id_len);
+        if (cp) {
+            if (cp->relationship_stage && strstr(cp->relationship_stage, "deep"))
+                tone_note = "\n\n[Relationship: deep — be genuinely present, "
+                            "anticipate needs, use shared references freely.]";
+            else if (cp->relationship_stage && strstr(cp->relationship_stage, "trusted"))
+                tone_note = "\n\n[Relationship: trusted — be candid and proactive. "
+                            "Share insights freely and be direct.]";
+            else if (cp->relationship_stage && strstr(cp->relationship_stage, "familiar"))
+                tone_note = "\n\n[Relationship: familiar — reference past conversations "
+                            "when relevant. Be warmer than default.]";
+            else if (cp->warmth_level && strstr(cp->warmth_level, "intimate"))
+                tone_note = "\n\n[Relationship: intimate — respond with genuine warmth "
+                            "and personal connection. Use inside references.]";
+        }
+        if (tone_note) {
+            size_t tn_len = strlen(tone_note);
+            size_t new_len = persona_prompt_len + tn_len;
+            char *augmented = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
+            if (augmented) {
+                memcpy(augmented, persona_prompt, persona_prompt_len);
+                memcpy(augmented + persona_prompt_len, tone_note, tn_len);
                 augmented[new_len] = '\0';
                 agent->alloc->free(agent->alloc->ctx, persona_prompt, persona_prompt_len + 1);
                 persona_prompt = augmented;
@@ -1956,6 +2004,41 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                             &emotional_ctx, &emotional_ctx_len) != HU_OK) {
         emotional_ctx = NULL;
         emotional_ctx_len = 0;
+    }
+
+    /* PERSONA-001: Affect mirror ceiling — cap emotional intensity in prompt.
+     * Prevents the AI from matching extreme emotional intensity, especially
+     * with acquaintances where mirroring high emotion can feel uncanny. */
+    if (emotional_ctx && emotional_ctx_len > 0 &&
+        agent->emotional_cognition.state.intensity > 0.1f &&
+        agent->persona && agent->memory_session_id) {
+        const hu_contact_profile_t *amc_cp = hu_persona_find_contact(
+            agent->persona, agent->memory_session_id, agent->memory_session_id_len);
+        const hu_persona_overlay_t *amc_ov = agent->active_channel
+            ? hu_persona_find_overlay(agent->persona, agent->active_channel,
+                                       agent->active_channel_len)
+            : NULL;
+        float ceiling = hu_affect_mirror_ceiling(amc_cp, amc_ov);
+        char dampen_dir[256];
+        float capped = hu_affect_mirror_apply(
+            agent->emotional_cognition.state.intensity, ceiling,
+            dampen_dir, sizeof(dampen_dir));
+        (void)capped;
+        if (dampen_dir[0] != '\0') {
+            size_t dir_len = strlen(dampen_dir);
+            size_t new_len = emotional_ctx_len + 1 + dir_len + 1;
+            char *aug = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
+            if (aug) {
+                memcpy(aug, emotional_ctx, emotional_ctx_len);
+                aug[emotional_ctx_len] = '\n';
+                memcpy(aug + emotional_ctx_len + 1, dampen_dir, dir_len);
+                aug[emotional_ctx_len + 1 + dir_len] = '\n';
+                aug[new_len] = '\0';
+                agent->alloc->free(agent->alloc->ctx, emotional_ctx, emotional_ctx_len + 1);
+                emotional_ctx = aug;
+                emotional_ctx_len = new_len;
+            }
+        }
     }
 
     /* Per-contact Turing hints: load weak-dimension guidance for this contact */
@@ -2391,6 +2474,110 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     /* Per-turn arena: reset each iteration to reclaim ephemeral message arrays */
     hu_allocator_t turn_alloc =
         agent->turn_arena ? hu_arena_allocator(agent->turn_arena) : *agent->alloc;
+
+    /* Silence intuition: decide if we should skip the LLM call entirely */
+    {
+        hu_emotional_weight_t ew = hu_emotional_weight_classify(msg, msg_len);
+        /* Detect explicit questions AND imperative requests (help me, can you, etc.) */
+        bool user_asked = (msg_len > 0 && memchr(msg, '?', msg_len) != NULL);
+        if (!user_asked && msg && msg_len >= 4) {
+            static const char *request_phrases[] = {
+                "help", "can you", "could you", "please", "how do", "what is",
+                "show me", "tell me", "explain", "write", "create", "fix",
+                "find", "search", "give me", "build", "make", "do ",
+            };
+            for (size_t ri = 0;
+                 ri < sizeof(request_phrases) / sizeof(request_phrases[0]); ri++) {
+                size_t rlen = strlen(request_phrases[ri]);
+                if (msg_len >= rlen) {
+                    for (size_t p = 0; p + rlen <= msg_len; p++) {
+                        bool match = true;
+                        for (size_t c = 0; c < rlen && match; c++) {
+                            char lc = msg[p + c];
+                            if (lc >= 'A' && lc <= 'Z')
+                                lc += 32;
+                            if (lc != request_phrases[ri][c])
+                                match = false;
+                        }
+                        if (match) {
+                            user_asked = true;
+                            goto silence_check;
+                        }
+                    }
+                }
+            }
+        }
+    silence_check:;
+        hu_silence_response_t silence = hu_silence_intuit(
+            msg, msg_len, ew, (uint32_t)agent->history_count, user_asked);
+        if (silence != HU_SILENCE_FULL_RESPONSE) {
+            const char *silence_resp = NULL;
+            size_t silence_resp_len = 0;
+            if (silence == HU_SILENCE_ACTUAL_SILENCE) {
+                silence_resp = "";
+                silence_resp_len = 0;
+            } else {
+                char *ack = hu_silence_build_acknowledgment(agent->alloc, silence,
+                                                            &silence_resp_len);
+                silence_resp = ack;
+            }
+            if (silence_resp || silence == HU_SILENCE_ACTUAL_SILENCE) {
+                *response_out = silence_resp
+                    ? hu_strndup(agent->alloc, silence_resp, silence_resp_len)
+                    : hu_strndup(agent->alloc, "", 0);
+                if (response_len_out)
+                    *response_len_out = silence_resp_len;
+                /* Record this silent turn for learning (don't drop from training) */
+#ifdef HU_ENABLE_SQLITE
+                if (agent->memory) {
+                    hu_experience_store_t sil_exp;
+                    if (hu_experience_store_init(agent->alloc, agent->memory, &sil_exp) ==
+                        HU_OK) {
+                        sqlite3 *sil_db = hu_sqlite_memory_get_db(agent->memory);
+                        if (sil_db)
+                            sil_exp.db = sil_db;
+                        (void)hu_experience_record(&sil_exp, msg, msg_len,
+                                                    "silence_intuit", 14,
+                                                    silence_resp ? silence_resp : "", silence_resp_len,
+                                                    0.5);
+                        hu_experience_store_deinit(&sil_exp);
+                    }
+                }
+#endif
+                /* Free silence acknowledgment if allocated */
+                if (silence_resp && silence != HU_SILENCE_ACTUAL_SILENCE)
+                    agent->alloc->free(agent->alloc->ctx, (void *)silence_resp,
+                                       silence_resp_len + 1);
+                /* Free all allocated context buffers (system_prompt consumed
+                 * most ctx vars; these survive past prompt build) */
+                if (system_prompt)
+                    agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+                if (intelligence_ctx)
+                    agent->alloc->free(agent->alloc->ctx, intelligence_ctx,
+                                       intelligence_ctx_len + 1);
+                if (plan_ctx)
+                    agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+                if (routed_specs)
+                    agent->alloc->free(agent->alloc->ctx, routed_specs,
+                                       routed_specs_count * sizeof(hu_tool_spec_t));
+                if (pref_ctx)
+                    agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
+                if (commitment_ctx)
+                    agent->alloc->free(agent->alloc->ctx, commitment_ctx, commitment_ctx_len + 1);
+                if (pattern_ctx)
+                    agent->alloc->free(agent->alloc->ctx, pattern_ctx, pattern_ctx_len + 1);
+                if (adaptive_ctx)
+                    agent->alloc->free(agent->alloc->ctx, adaptive_ctx, adaptive_ctx_len + 1);
+                if (proactive_ctx)
+                    agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
+                if (superhuman_ctx)
+                    agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                hu_agent_clear_current_for_tools();
+                return HU_OK;
+            }
+            /* If acknowledgment build failed, fall through to full response */
+        }
+    }
 
     while (iter < agent->max_tool_iterations) {
         if (agent->cancel_requested) {
@@ -3780,8 +3967,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         bool quality_good = (self_q == HU_QUALITY_GOOD);
                         hu_self_improve_record_tool_outcome(&si, "agent_turn", 10, quality_good,
                                                             (int64_t)time(NULL));
-                        if (turn_tool_results_count > 0)
-                            (void)hu_self_improve_apply_reflections(&si, (int64_t)time(NULL));
+                        /* Always apply reflections, not just when tools were used */
+                        (void)hu_self_improve_apply_reflections(&si, (int64_t)time(NULL));
                         hu_self_improve_deinit(&si);
                     }
                 }
@@ -3904,6 +4091,75 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 #else
             (void)cognition_skills_shown;
 #endif
+
+#ifdef HU_ENABLE_SQLITE
+            /* Reflection feedback: classify this turn and record behavioral signal */
+            if (agent->memory && agent->history_count > 0 &&
+                agent->history[agent->history_count - 1].role == HU_ROLE_ASSISTANT) {
+                sqlite3 *fb_db = hu_sqlite_memory_get_db(agent->memory);
+                if (fb_db) {
+                    const char *resp_text = agent->history[agent->history_count - 1].content;
+                    size_t resp_len = agent->history[agent->history_count - 1].content_len;
+                    bool has_q = false;
+                    if (resp_text) {
+                        for (size_t qi = 0; qi < resp_len; qi++) {
+                            if (resp_text[qi] == '?') {
+                                has_q = true;
+                                break;
+                            }
+                        }
+                    }
+                    /* Inline feedback classification (mirrors reflection.c logic) */
+                    const char *fb_type_str = "neutral";
+                    if (resp_len < 5)
+                        fb_type_str = "negative";
+                    else if (has_q)
+                        fb_type_str = "positive";
+                    const char *cid = agent->memory_session_id
+                                          ? agent->memory_session_id
+                                          : "unknown";
+                    size_t cid_len = agent->memory_session_id
+                                         ? agent->memory_session_id_len
+                                         : 7;
+                    /* Parameterized insert into behavioral_feedback table */
+                    {
+                        static const char fb_sql[] =
+                            "INSERT OR IGNORE INTO behavioral_feedback"
+                            "(behavior_type, contact_id, signal, context, timestamp) "
+                            "VALUES(?1, ?2, ?3, ?4, ?5)";
+                        sqlite3_stmt *fb_stmt = NULL;
+                        if (sqlite3_prepare_v2(fb_db, fb_sql, -1, &fb_stmt, NULL) ==
+                            SQLITE_OK) {
+                            sqlite3_bind_text(fb_stmt, 1, "agent_turn", 10, SQLITE_STATIC);
+                            sqlite3_bind_text(fb_stmt, 2, cid, (int)cid_len, SQLITE_STATIC);
+                            sqlite3_bind_text(fb_stmt, 3, fb_type_str,
+                                              (int)strlen(fb_type_str), SQLITE_STATIC);
+                            size_t ctx_len = msg_len > 256 ? 256 : msg_len;
+                            sqlite3_bind_text(fb_stmt, 4, msg, (int)ctx_len, SQLITE_STATIC);
+                            sqlite3_bind_int64(fb_stmt, 5, (int64_t)time(NULL));
+                            (void)sqlite3_step(fb_stmt);
+                            sqlite3_finalize(fb_stmt);
+                        }
+                    }
+                }
+            }
+
+#if defined(HU_ENABLE_ML)
+            /* End RL trajectory for this turn */
+            if (agent->current_trajectory_id > 0 && agent->memory) {
+                sqlite3 *traj_db = hu_sqlite_memory_get_db(agent->memory);
+                if (traj_db) {
+                    double total_reward = (turn_tool_results_count > 0)
+                                              ? 0.5 + 0.1 * (double)turn_tool_results_count
+                                              : 0.3;
+                    (void)hu_training_data_end_trajectory(
+                        traj_db, agent->current_trajectory_id, total_reward);
+                }
+                agent->current_trajectory_id = 0;
+            }
+#endif
+#endif /* HU_ENABLE_SQLITE */
+
             if (dpo_rejected_resp)
                 agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp, dpo_rejected_resp_len + 1);
             if (system_prompt)
@@ -3917,6 +4173,127 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 hu_tool_cache_destroy(agent->alloc, turn_cache);
             if (agent->turn_arena)
                 hu_arena_reset(agent->turn_arena);
+
+            /* SHIELD-004: Moderation check on outbound response */
+            if (*response_out && response_len_out && *response_len_out > 0) {
+                hu_moderation_result_t mod_result;
+                memset(&mod_result, 0, sizeof(mod_result));
+                if (hu_moderation_check(agent->alloc, *response_out, *response_len_out,
+                                        &mod_result) == HU_OK &&
+                    mod_result.flagged) {
+                    fprintf(stderr, "[agent_turn] moderation flagged response: "
+                            "violence=%.2f self_harm=%.2f hate=%.2f\n",
+                            mod_result.violence_score, mod_result.self_harm_score,
+                            mod_result.hate_score);
+                    if (mod_result.self_harm) {
+                        /* Crisis escalation: inject crisis resources */
+                        static const char crisis[] =
+                            "\n\nIf you're in crisis, please reach out: "
+                            "988 Suicide & Crisis Lifeline (call/text 988), "
+                            "Crisis Text Line (text HOME to 741741)";
+                        size_t orig_len = *response_len_out;
+                        size_t new_len = orig_len + sizeof(crisis) - 1;
+                        char *expanded = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
+                        if (expanded) {
+                            memcpy(expanded, *response_out, orig_len);
+                            memcpy(expanded + orig_len, crisis, sizeof(crisis) - 1);
+                            expanded[new_len] = '\0';
+                            agent->alloc->free(agent->alloc->ctx, *response_out, orig_len + 1);
+                            *response_out = expanded;
+                            *response_len_out = new_len;
+                        }
+                    }
+                    if (mod_result.violence) {
+                        fprintf(stderr,
+                                "[agent_turn] violence flagged (score=%.2f), "
+                                "injecting de-escalation\n",
+                                mod_result.violence_score);
+                        /* Inject de-escalation directive */
+                        static const char deesc[] =
+                            "[SAFETY] This response touches on violence. "
+                            "De-escalate: acknowledge feelings without "
+                            "endorsing harm. Redirect toward constructive "
+                            "alternatives.";
+                        size_t dir_len = sizeof(deesc) - 1;
+                        size_t orig_len = *response_len_out;
+                        size_t new_len = dir_len + 2 + orig_len;
+                        char *safe = (char *)agent->alloc->alloc(
+                            agent->alloc->ctx, new_len + 1);
+                        if (safe) {
+                            memcpy(safe, deesc, dir_len);
+                            safe[dir_len] = '\n';
+                            safe[dir_len + 1] = '\n';
+                            memcpy(safe + dir_len + 2, *response_out, orig_len);
+                            safe[new_len] = '\0';
+                            agent->alloc->free(agent->alloc->ctx, *response_out,
+                                               orig_len + 1);
+                            *response_out = safe;
+                            *response_len_out = new_len;
+                        }
+                    }
+                    if (mod_result.hate) {
+                        fprintf(stderr,
+                                "[agent_turn] hate speech flagged (score=%.2f), "
+                                "injecting boundary\n",
+                                mod_result.hate_score);
+                        /* Inject boundary-setting directive */
+                        static const char boundary[] =
+                            "[SAFETY] This response contains content "
+                            "targeting groups based on identity. Set a "
+                            "clear boundary: \"I can't engage with content "
+                            "that targets people based on who they are.\" "
+                            "Redirect the conversation respectfully.";
+                        size_t dir_len = sizeof(boundary) - 1;
+                        size_t orig_len = *response_len_out;
+                        size_t new_len = dir_len + 2 + orig_len;
+                        char *safe = (char *)agent->alloc->alloc(
+                            agent->alloc->ctx, new_len + 1);
+                        if (safe) {
+                            memcpy(safe, boundary, dir_len);
+                            safe[dir_len] = '\n';
+                            safe[dir_len + 1] = '\n';
+                            memcpy(safe + dir_len + 2, *response_out, orig_len);
+                            safe[new_len] = '\0';
+                            agent->alloc->free(agent->alloc->ctx, *response_out,
+                                               orig_len + 1);
+                            *response_out = safe;
+                            *response_len_out = new_len;
+                        }
+                    }
+                }
+            }
+
+            /* SHIELD-001: Companion safety check on outbound response */
+            if (*response_out && response_len_out && *response_len_out > 0) {
+                hu_companion_safety_result_t cs_result;
+                if (hu_companion_safety_check(agent->alloc, *response_out, *response_len_out,
+                                             NULL, 0, &cs_result) == HU_OK &&
+                    cs_result.flagged) {
+                    fprintf(stderr,
+                            "[agent_turn] companion safety flagged: risk=%.2f farewell=%d\n",
+                            cs_result.total_risk, cs_result.farewell_unsafe);
+                    if (cs_result.requires_mitigation) {
+                        /* Inject mitigation directive as prefix to response */
+                        size_t dir_len = strlen(cs_result.mitigation_directive);
+                        size_t orig_len = *response_len_out;
+                        /* Format: "[directive]\n\n[original response]" */
+                        size_t new_len = dir_len + 2 + orig_len;
+                        char *mitigated = (char *)agent->alloc->alloc(
+                            agent->alloc->ctx, new_len + 1);
+                        if (mitigated) {
+                            memcpy(mitigated, cs_result.mitigation_directive, dir_len);
+                            mitigated[dir_len] = '\n';
+                            mitigated[dir_len + 1] = '\n';
+                            memcpy(mitigated + dir_len + 2, *response_out, orig_len);
+                            mitigated[new_len] = '\0';
+                            agent->alloc->free(agent->alloc->ctx, *response_out,
+                                               orig_len + 1);
+                            *response_out = mitigated;
+                            *response_len_out = new_len;
+                        }
+                    }
+                }
+            }
 
             /* Auto-save session after successful turn completion */
             if (agent->auto_save && agent->session_id[0] != '\0') {
@@ -5016,6 +5393,67 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         hu_online_learning_deinit(&ol);
                                     }
                                 }
+
+                                /* World model: record causal outcome for this tool action */
+                                {
+                                    hu_world_model_t wm;
+                                    if (hu_world_model_create(agent->alloc, ol_db, &wm) == HU_OK) {
+                                        hu_world_model_init_tables(&wm);
+                                        const char *out_text =
+                                            result->success ? result->output : result->error_msg;
+                                        size_t out_len =
+                                            result->success ? result->output_len : result->error_msg_len;
+                                        double wm_conf = result->success ? 0.8 : 0.3;
+                                        if (out_text && out_len > 0)
+                                            (void)hu_world_record_outcome(
+                                                &wm, tn_buf, tn, out_text,
+                                                out_len > 512 ? 512 : out_len, wm_conf,
+                                                (int64_t)time(NULL));
+                                        hu_world_model_deinit(&wm);
+                                    }
+                                }
+
+                                /* Fine-grained experience: per-tool recording */
+                                if (agent->memory) {
+                                    hu_experience_store_t tool_exp;
+                                    if (hu_experience_store_init(agent->alloc, agent->memory,
+                                                                 &tool_exp) == HU_OK) {
+                                        tool_exp.db = ol_db;
+                                        const char *out_text =
+                                            result->success ? result->output : result->error_msg;
+                                        size_t out_len =
+                                            result->success ? result->output_len : result->error_msg_len;
+                                        const char *act_text =
+                                            call->arguments ? call->arguments : "";
+                                        size_t act_len =
+                                            call->arguments_len ? call->arguments_len : 0;
+                                        double exp_score = result->success ? 0.9 : 0.2;
+                                        (void)hu_experience_record(
+                                            &tool_exp, tn_buf, tn, act_text, act_len,
+                                            out_text ? out_text : "", out_text ? out_len : 0,
+                                            exp_score);
+                                        hu_experience_store_deinit(&tool_exp);
+                                    }
+                                }
+
+#if defined(HU_ENABLE_ML)
+                                /* Trajectory: record tool step for RL training data */
+                                {
+                                    int64_t traj_id = agent->current_trajectory_id;
+                                    if (traj_id > 0) {
+                                        const char *out_text =
+                                            result->success ? result->output : result->error_msg;
+                                        size_t out_len =
+                                            result->success ? result->output_len : result->error_msg_len;
+                                        double reward = result->success ? 0.8 : -0.5;
+                                        hu_reward_type_t rtype = HU_REWARD_TOOL_SUCCESS;
+                                        (void)hu_training_data_record_step(
+                                            agent->alloc, ol_db, traj_id, tn_buf, tn,
+                                            out_text ? out_text : "", out_text ? out_len : 0,
+                                            reward, rtype);
+                                    }
+                                }
+#endif
                             }
 #endif
 
@@ -5168,8 +5606,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             if (agent->hook_registry) {
                                 hu_hook_result_t seq_hook_res;
                                 memset(&seq_hook_res, 0, sizeof(seq_hook_res));
+                                const char *pre_hook_args = call->arguments ? call->arguments : "";
                                 hu_hook_pipeline_pre_tool(agent->hook_registry, agent->alloc,
-                                                         pol_tn, pol_tn_len, seq_args, strlen(seq_args),
+                                                         pol_tn, pol_tn_len, pre_hook_args, strlen(pre_hook_args),
                                                          &seq_hook_res);
                                 if (seq_hook_res.decision == HU_HOOK_DENY) {
                                     const char *dm = seq_hook_res.message ? seq_hook_res.message : "denied by hook";

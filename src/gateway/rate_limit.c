@@ -50,8 +50,29 @@ static rate_entry_t *find_or_create(hu_rate_limiter_t *lim, const char *ip) {
         if (strcmp(lim->entries[i].ip, ip) == 0)
             return &lim->entries[i];
     }
-    if (lim->count >= HU_RATE_ENTRIES_MAX)
-        return NULL;
+    if (lim->count >= HU_RATE_ENTRIES_MAX) {
+        /* Evict the oldest entry (earliest last-seen timestamp) */
+        size_t oldest = 0;
+        time_t oldest_time = lim->entries[0].count > 0
+                                 ? lim->entries[0].timestamps[lim->entries[0].count - 1]
+                                 : 0;
+        for (size_t i = 1; i < lim->count; i++) {
+            time_t t = lim->entries[i].count > 0
+                           ? lim->entries[i].timestamps[lim->entries[i].count - 1]
+                           : 0;
+            if (t < oldest_time) {
+                oldest_time = t;
+                oldest = i;
+            }
+        }
+        if (lim->entries[oldest].timestamps)
+            lim->alloc->free(lim->alloc->ctx, lim->entries[oldest].timestamps,
+                             lim->entries[oldest].cap * sizeof(time_t));
+        if (oldest < lim->count - 1)
+            memmove(&lim->entries[oldest], &lim->entries[oldest + 1],
+                    (lim->count - 1 - oldest) * sizeof(rate_entry_t));
+        lim->count--;
+    }
     rate_entry_t *e = &lim->entries[lim->count];
     memset(e, 0, sizeof(*e));
     strncpy(e->ip, ip, HU_RATE_IP_MAX - 1);

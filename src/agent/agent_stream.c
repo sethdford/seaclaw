@@ -12,23 +12,44 @@
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #endif
+#include "human/humanness.h"
 #include "human/provider.h"
 #include "human/voice.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 typedef struct stream_token_wrap {
     hu_agent_stream_token_cb on_token;
     void *token_ctx;
+    uint32_t initial_delay_ms; /* emotional pacing: delay before first chunk */
+    bool first_chunk_sent;
 } stream_token_wrap_t;
 
 static void stream_chunk_to_token_cb(void *ctx, const hu_stream_chunk_t *chunk) {
     stream_token_wrap_t *w = (stream_token_wrap_t *)ctx;
     if (chunk->is_final || !w->on_token)
         return;
-    if (chunk->type == HU_STREAM_CONTENT && chunk->delta && chunk->delta_len > 0)
+    if (chunk->type == HU_STREAM_CONTENT && chunk->delta && chunk->delta_len > 0) {
+        /* Emotional pacing: pause before first content chunk for heavy messages */
+        if (!w->first_chunk_sent && w->initial_delay_ms > 0) {
+            uint32_t delay = w->initial_delay_ms;
+            if (delay > 100)
+                delay = 100; /* cap at 100ms */
+#ifdef _WIN32
+            Sleep(delay);
+#else
+            usleep((useconds_t)delay * 1000);
+#endif
+        }
+        w->first_chunk_sent = true;
         w->on_token(chunk->delta, chunk->delta_len, w->token_ctx);
+    }
 }
 
 /* v1 shim: translates hu_agent_stream_event_t back to the simple token callback */
@@ -47,6 +68,8 @@ static void v1_shim_event_cb(const hu_agent_stream_event_t *event, void *ctx) {
 typedef struct v2_stream_wrap {
     hu_agent_stream_event_cb on_event;
     void *event_ctx;
+    uint32_t initial_delay_ms; /* emotional pacing */
+    bool first_content_sent;
 } v2_stream_wrap_t;
 
 static void stream_chunk_to_event_cb(void *ctx, const hu_stream_chunk_t *chunk) {
@@ -59,6 +82,18 @@ static void stream_chunk_to_event_cb(void *ctx, const hu_stream_chunk_t *chunk) 
     case HU_STREAM_CONTENT:
         if (!chunk->delta || chunk->delta_len == 0)
             return;
+        /* Emotional pacing: pause before first content chunk */
+        if (!w->first_content_sent && w->initial_delay_ms > 0) {
+            uint32_t delay = w->initial_delay_ms;
+            if (delay > 100)
+                delay = 100;
+#ifdef _WIN32
+            Sleep(delay);
+#else
+            usleep((useconds_t)delay * 1000);
+#endif
+        }
+        w->first_content_sent = true;
         ev.type = HU_AGENT_STREAM_TEXT;
         ev.data = chunk->delta;
         ev.data_len = chunk->delta_len;
@@ -90,6 +125,33 @@ static void stream_chunk_to_event_cb(void *ctx, const hu_stream_chunk_t *chunk) 
         return; /* handled after stream_chat returns */
     }
     w->on_event(&ev, w->event_ctx);
+}
+
+/* Tool streaming: bridges tool execute_streaming chunks to agent stream events */
+typedef struct tool_stream_bridge {
+    hu_agent_stream_event_cb on_event;
+    void *event_ctx;
+    const char *tool_name;
+    size_t tool_name_len;
+    const char *tool_call_id;
+    size_t tool_call_id_len;
+} tool_stream_bridge_t;
+
+static void tool_chunk_to_event(void *ctx, const char *data, size_t len) {
+    tool_stream_bridge_t *b = (tool_stream_bridge_t *)ctx;
+    if (!b->on_event || !data || len == 0)
+        return;
+    hu_agent_stream_event_t ev;
+    memset(&ev, 0, sizeof(ev));
+    ev.type = HU_AGENT_STREAM_TOOL_RESULT;
+    ev.data = data;
+    ev.data_len = len;
+    ev.tool_name = b->tool_name;
+    ev.tool_name_len = b->tool_name_len;
+    ev.tool_call_id = b->tool_call_id;
+    ev.tool_call_id_len = b->tool_call_id_len;
+    ev.is_error = false;
+    b->on_event(&ev, b->event_ctx);
 }
 
 hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_len,
@@ -309,7 +371,13 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
     req.tools_count = agent->tool_specs_count;
 
     {
-        stream_token_wrap_t wrap = {.on_token = on_token, .token_ctx = token_ctx};
+        /* Emotional pacing: compute delay from message weight */
+        hu_emotional_weight_t ew = hu_emotional_weight_classify(msg, msg_len);
+        uint32_t pacing_delay = (uint32_t)hu_emotional_pacing_adjust(0, ew);
+        stream_token_wrap_t wrap = {.on_token = on_token,
+                                    .token_ctx = token_ctx,
+                                    .initial_delay_ms = pacing_delay,
+                                    .first_chunk_sent = false};
         hu_stream_chat_result_t sresp;
         memset(&sresp, 0, sizeof(sresp));
         err = agent->provider.vtable->stream_chat(
@@ -573,8 +641,13 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
         req.tools_count = agent->tool_specs_count;
 
-        /* Stream from the provider */
-        v2_stream_wrap_t wrap = {.on_event = on_event, .event_ctx = event_ctx};
+        /* Stream from the provider (with emotional pacing on first chunk) */
+        hu_emotional_weight_t v2_ew = hu_emotional_weight_classify(msg, msg_len);
+        uint32_t v2_pacing = (uint32_t)hu_emotional_pacing_adjust(0, v2_ew);
+        v2_stream_wrap_t wrap = {.on_event = on_event,
+                                 .event_ctx = event_ctx,
+                                 .initial_delay_ms = v2_pacing,
+                                 .first_content_sent = false};
         hu_stream_chat_result_t sresp;
         memset(&sresp, 0, sizeof(sresp));
         err = agent->provider.vtable->stream_chat(
@@ -636,8 +709,21 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 }
                 if (args) {
                     result = hu_tool_result_fail("invalid arguments", 16);
-                    if (tool->vtable->execute)
+                    /* Prefer streaming execution for progressive output */
+                    if (tool->vtable->execute_streaming && on_event) {
+                        tool_stream_bridge_t bridge = {
+                            .on_event = on_event,
+                            .event_ctx = event_ctx,
+                            .tool_name = call->name,
+                            .tool_name_len = call->name_len,
+                            .tool_call_id = call->id,
+                            .tool_call_id_len = call->id_len,
+                        };
+                        tool->vtable->execute_streaming(tool->ctx, agent->alloc, args,
+                                                         tool_chunk_to_event, &bridge, &result);
+                    } else if (tool->vtable->execute) {
                         tool->vtable->execute(tool->ctx, agent->alloc, args, &result);
+                    }
                     hu_json_free(agent->alloc, args);
                 } else {
                     result = hu_tool_result_fail("invalid arguments", 16);

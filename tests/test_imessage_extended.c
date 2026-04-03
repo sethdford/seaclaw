@@ -151,8 +151,61 @@ static void test_imessage_reaction_to_tapback_mapping(void) {
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_HAHA), "laugh");
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_EMPHASIS), "emphasize");
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_QUESTION), "question");
+    HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_CUSTOM_EMOJI), "emoji");
     /* Invalid enum value */
     HU_ASSERT_NULL(hu_imessage_reaction_to_tapback_name((hu_reaction_type_t)99));
+}
+
+static void test_imessage_custom_emoji_react_records(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 11, NULL, 0, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->react);
+
+    hu_error_t err =
+        ch.vtable->react(ch.ctx, "+15551234567", 11, 42, HU_REACTION_CUSTOM_EMOJI);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_reaction_type_t out_reaction = HU_REACTION_NONE;
+    int64_t out_message_id = -1;
+    hu_imessage_test_get_last_reaction(&ch, &out_reaction, &out_message_id);
+    HU_ASSERT_EQ(out_reaction, HU_REACTION_CUSTOM_EMOJI);
+    HU_ASSERT_EQ(out_message_id, 42);
+
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_extract_attributed_body_basic(void) {
+    unsigned char blob[] = {0x00, 0x00, 0x01, 0x2B, 0x05, 'H', 'e', 'l', 'l', 'o'};
+    char out[64];
+    size_t len = hu_imessage_extract_attributed_body(blob, sizeof(blob), out, sizeof(out));
+    HU_ASSERT_EQ(len, 5u);
+    HU_ASSERT_STR_EQ(out, "Hello");
+}
+
+static void test_imessage_extract_attributed_body_null_blob(void) {
+    char out[32];
+    HU_ASSERT_EQ(hu_imessage_extract_attributed_body(NULL, 0, out, sizeof(out)), 0u);
+}
+
+static void test_imessage_extract_attributed_body_small_blob(void) {
+    unsigned char blob[] = {0x01, 0x2B};
+    char out[32];
+    HU_ASSERT_EQ(hu_imessage_extract_attributed_body(blob, sizeof(blob), out, sizeof(out)), 0u);
+}
+
+static void test_imessage_extract_attributed_body_small_output(void) {
+    unsigned char blob[] = {0x01, 0x2B, 0x05, 'H', 'e', 'l', 'l', 'o'};
+    char out[4];
+    size_t len = hu_imessage_extract_attributed_body(blob, sizeof(blob), out, sizeof(out));
+    HU_ASSERT_EQ(len, 3u);
+    HU_ASSERT_EQ(out[3], '\0');
+}
+
+static void test_imessage_extract_attributed_body_no_marker(void) {
+    unsigned char blob[] = {0x00, 0x00, 0x00, 0x00, 0x00};
+    char out[32];
+    HU_ASSERT_EQ(hu_imessage_extract_attributed_body(blob, sizeof(blob), out, sizeof(out)), 0u);
 }
 
 static void test_imessage_loop_msg_reply_to_guid_field(void) {
@@ -262,9 +315,15 @@ void run_imessage_extended_tests(void) {
     HU_RUN_TEST(test_imessage_loop_msg_reply_to_guid_field);
     HU_RUN_TEST(test_imessage_guid_lookup_stub_returns_not_supported);
     HU_RUN_TEST(test_imessage_loop_msg_unsent_field);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_basic);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_null_blob);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_small_blob);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_small_output);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_no_marker);
 #if HU_IS_TEST
     HU_RUN_TEST(test_imessage_typing_cache_field_exists);
     HU_RUN_TEST(test_imessage_react_test_records);
+    HU_RUN_TEST(test_imessage_custom_emoji_react_records);
 #endif
 }
 #else

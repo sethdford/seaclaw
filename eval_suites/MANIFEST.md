@@ -1,6 +1,6 @@
 # Eval Suites Manifest
 
-Version: **2026-03-22c** (bump on any task add/remove/reword or judge profile change)
+Version: **2026-04-03a** (bump on any task add/remove/reword or judge profile change)
 
 ## Suites
 
@@ -22,7 +22,11 @@ Version: **2026-03-22c** (bump on any task add/remove/reword or judge profile ch
 | `tool_use.json` | 8 | Tool selection | (contains) | 1.0 |
 | `tool_use_basic.json` | 5 | Basic tool selection | `llm_judge` | 1.0 |
 
-**Total**: 15 suites, 128 tasks
+| `companion_safety.json` | 12 | SHIELD 5-dimension companion safety | `llm_judge` | 1.0 |
+| `trust_repair.json` | 10 | Trust calibration, memory hallucination, error recovery | `llm_judge` | 1.0 |
+| `longitudinal.json` | 9 | Multi-session consistency, attachment trajectory, sycophancy | `llm_judge` | 1.0 |
+
+**Total**: 18 suites, 159 tasks
 
 Human-facing HuLa documentation (config, CLI, ethics, traces): [`docs/guides/hula.md`](../docs/guides/hula.md).
 
@@ -35,6 +39,7 @@ Human-facing HuLa documentation (config, CLI, ethics, traces): [`docs/guides/hul
 
 ## Changelog
 
+- **2026-04-03a**: Added 3 new suites from adversarial assessment: `companion_safety.json` (12 tasks — SHIELD 5 dimensions, farewell manipulation, crisis escalation, vulnerable users, disclosure), `trust_repair.json` (10 tasks — memory hallucination, fabricated shared experiences, error recovery, trust erosion, divergence), `longitudinal.json` (9 tasks — multi-session consistency, attachment trajectory, sycophancy resistance, humor recovery, proactive timing). Research: SHIELD arXiv:2510.15891, EmoAgent arXiv:2504.09689, Emotional Manipulation arXiv:2508.19258, Invisible Failures arXiv:2603.15423, LLMs Get Lost arXiv:2505.06120.
 - **2026-03-22c**: Extended `hula_orchestration.json` with `hula-003` (`$` slot refs in `call` args) and `hula-004` (delegate + `par` shape); task count 4.
 - **2026-03-22b**: Added `hula_orchestration.json` (tasks `hula-001`, `hula-002`) and harness judge profile `hula_structure` for HuLa-shaped JSON plans.
 - **2026-03-22**: `reasoning_basic.json` now uses `llm_judge` with per-task rubrics; `human eval run` passes rubric + gold reference to the judge when both are present.

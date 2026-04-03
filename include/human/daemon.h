@@ -5,6 +5,7 @@
 #include "channel_loop.h"
 #include "core/allocator.h"
 #include "core/error.h"
+#include "intelligence/trust.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
@@ -89,5 +90,22 @@ void hu_daemon_set_missed_msg_threshold(uint32_t secs);
 /* Missed-message acknowledgment (F10): returns phrase or NULL if none needed. */
 const char *hu_missed_message_acknowledgment(int64_t delay_secs, int receive_hour, int current_hour,
                                              uint32_t seed);
+
+/* Per-contact trust state entry (used by daemon trust cache) */
+typedef struct hu_daemon_contact_trust {
+    char contact_id[128];
+    hu_trust_state_t state;
+} hu_daemon_contact_trust_t;
+
+/* Thread-safe per-contact trust state lookup with LRU eviction.
+ * Returns pointer to existing or newly-created trust state for contact_id.
+ * When the cache is full (4096 entries), evicts the least recently updated entry. */
+hu_trust_state_t *hu_daemon_get_trust_state(const char *contact_id, size_t cid_len);
+
+#ifdef HU_IS_TEST
+/* Test helpers for trust cache */
+size_t hu_daemon_trust_count(void);
+void hu_daemon_trust_reset(void);
+#endif
 
 #endif /* HU_DAEMON_H */

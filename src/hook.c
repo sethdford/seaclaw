@@ -190,6 +190,7 @@ static const char *const HU_HOOK_DANGEROUS_ENV_PREFIXES[] = {
     NULL,
 };
 
+__attribute__((unused))
 static bool hu_hook_is_dangerous_env(const char *var) {
     for (const char *const *p = HU_HOOK_DANGEROUS_ENV_PREFIXES; *p; p++) {
         size_t plen = strlen(*p);

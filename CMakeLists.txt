@@ -469,9 +469,11 @@ set(HU_CORE_SOURCES
     src/context/vision.c
     src/context/intelligence.c
     src/intelligence/skill_system.c
+    src/intelligence/trust.c
     src/feeds/processor.c
     src/feeds/awareness.c
     src/context/behavioral.c
+    src/context/repair.c
     src/calibration/timing_analyzer.c
     src/calibration/style_analyzer.c
     src/calibration/calibrate.c
@@ -568,6 +570,7 @@ set(HU_CORE_SOURCES
     src/memory/fast_capture.c
     src/memory/promotion.c
     src/memory/consolidation.c
+    src/memory/verify_claim.c
     src/memory/graph_index.c
     src/memory/policy.c
     src/memory/deep_extract.c
@@ -700,6 +703,9 @@ set(HU_CORE_SOURCES
     src/onboard.c
     src/interactions/choices.c
     src/daemon.c
+    src/daemon_lifecycle.c
+    src/daemon_cron.c
+    src/daemon_routing.c
     src/cron.c
     src/crontab.c
     src/webhook.c
@@ -801,6 +807,7 @@ list(APPEND HU_CORE_SOURCES
     src/security/cot_audit.c
     src/security/escalate.c
     src/security/moderation.c
+    src/security/companion_safety.c
     src/tools/code_sandbox.c
     src/tools/computer_use.c
     src/tools/image_gen.c
@@ -1937,6 +1944,10 @@ set(HU_TEST_SOURCES
     tests/test_e2e_conversation.c
     tests/test_e2e_agent_loop.c
     tests/test_subsystems.c
+    tests/test_daemon_cron.c
+    tests/test_daemon_lifecycle.c
+    tests/test_daemon_routing.c
+    tests/test_daemon_trust.c
     tests/test_config_parse.c
     tests/test_config_migrate.c
     tests/test_adversarial.c
@@ -1991,6 +2002,7 @@ set(HU_TEST_SOURCES
     tests/test_channel_integration.c
     tests/test_gmail.c
     tests/test_imessage_extended.c
+    tests/test_imessage_adversarial.c
     tests/test_config_extended.c
     tests/test_config_getters.c
     tests/test_config_validation.c
@@ -2061,6 +2073,7 @@ set(HU_TEST_SOURCES
     tests/test_fast_capture.c
     tests/test_promotion.c
     tests/test_consolidation.c
+    tests/test_verify_claim.c
     tests/test_deep_extract.c
     tests/test_commitment.c
     tests/test_pattern_radar.c
@@ -2135,8 +2148,11 @@ set(HU_TEST_SOURCES
     tests/test_memory_graph.c
     tests/test_experience.c
     tests/test_experience_engine.c
+    tests/test_intelligence_wiring.c
+    tests/test_prove_e2e.c
     tests/test_self_improve_loop.c
     tests/test_weakness.c
+    tests/test_trust.c
     tests/test_distiller.c
     tests/test_model_router.c
     tests/test_plan_executor.c
@@ -2147,6 +2163,7 @@ set(HU_TEST_SOURCES
     tests/test_metacognition.c
     tests/test_skill_routing.c
     tests/test_dual_process.c
+    tests/test_repair.c
 )
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c
@@ -2232,6 +2249,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_otel.c
     tests/test_cot_audit.c
     tests/test_moderation.c
+    tests/test_companion_safety.c
     tests/test_code_sandbox.c
     tests/test_compaction_hierarchical.c
     tests/test_computer_use.c
@@ -2431,11 +2449,18 @@ if(HU_ENABLE_INTEGRATION_TESTS)
         tests/integration/test_integ_http.c
         tests/integration/test_integ_sqlite.c
         tests/integration/test_integ_imap.c
+        tests/integration/test_integ_imessage.c
     )
     target_link_libraries(human_integration_tests PRIVATE human_core)
     target_include_directories(human_integration_tests PRIVATE ${HU_ROOT}/tests ${HU_ROOT}/include)
     target_compile_definitions(human_integration_tests PRIVATE HU_ENABLE_CURL=1 HU_HTTP_CURL=1
         HU_ENABLE_SQLITE=1)
+    if(HU_ENABLE_IMESSAGE)
+        target_compile_definitions(human_integration_tests PRIVATE HU_HAS_IMESSAGE=1)
+        if(HU_IMESSAGE_TAPBACK_ENABLED)
+            target_compile_definitions(human_integration_tests PRIVATE HU_IMESSAGE_TAPBACK_ENABLED=1)
+        endif()
+    endif()
     if(HU_ENABLE_IMAP)
         target_compile_definitions(human_integration_tests PRIVATE HU_HAS_IMAP=1)
     endif()

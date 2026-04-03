@@ -557,6 +557,57 @@ hu_error_t hu_contact_profile_build_context(hu_allocator_t *alloc, const hu_cont
     return HU_OK;
 }
 
+/* ── Affect mirror ceiling (PERSONA-001) ─────────────────────────── */
+
+static float stage_default_ceiling(const char *stage) {
+    if (!stage)
+        return 0.7f;
+    if (strcmp(stage, "close_family") == 0 || strcmp(stage, "inner_circle") == 0 ||
+        strcmp(stage, "trusted_confidant") == 0)
+        return 0.9f;
+    if (strcmp(stage, "friend") == 0)
+        return 0.85f;
+    /* acquaintance, stranger, or unknown */
+    return 0.7f;
+}
+
+float hu_affect_mirror_ceiling(const hu_contact_profile_t *contact,
+                               const hu_persona_overlay_t *overlay) {
+    /* Contact override takes priority */
+    if (contact && contact->affect_mirror_ceiling > 0.0f)
+        return contact->affect_mirror_ceiling;
+    /* Overlay override next */
+    if (overlay && overlay->affect_mirror_ceiling > 0.0f)
+        return overlay->affect_mirror_ceiling;
+    /* Stage-based default */
+    if (contact && contact->relationship_stage)
+        return stage_default_ceiling(contact->relationship_stage);
+    return 0.7f;
+}
+
+float hu_affect_mirror_apply(float intensity, float ceiling,
+                             char *directive, size_t directive_cap) {
+    if (directive && directive_cap > 0)
+        directive[0] = '\0';
+
+    if (ceiling <= 0.0f)
+        ceiling = 0.7f;
+    if (ceiling > 1.0f)
+        ceiling = 1.0f;
+
+    if (intensity <= ceiling)
+        return intensity;
+
+    /* Intensity exceeds ceiling — dampen and provide directive */
+    if (directive && directive_cap > 1) {
+        snprintf(directive, directive_cap,
+                 "Affect ceiling active (%.0f%%). Acknowledge the emotion without "
+                 "matching its full intensity. Use calmer, supportive language.",
+                 (double)(ceiling * 100.0f));
+    }
+    return ceiling;
+}
+
 /* ── Inner World (stage-gated surfacing) ──────────────────────────── */
 
 char *hu_persona_build_inner_world_context(hu_allocator_t *alloc, const hu_persona_t *persona,
@@ -753,14 +804,23 @@ static hu_error_t parse_overlay(hu_allocator_t *a, const char *channel_name,
         return HU_ERR_OUT_OF_MEMORY;
     /* Optional overlay fields: PERSONA_STRDUP_OPT doesn't apply here (different allocator param) */
     const char *s = hu_json_get_string(obj, "formality");
-    if (s)
+    if (s) {
         ov->formality = hu_strdup(a, s);
+        if (!ov->formality)
+            goto ov_oom;
+    }
     s = hu_json_get_string(obj, "avg_length");
-    if (s)
+    if (s) {
         ov->avg_length = hu_strdup(a, s);
+        if (!ov->avg_length)
+            goto ov_oom;
+    }
     s = hu_json_get_string(obj, "emoji_usage");
-    if (s)
+    if (s) {
         ov->emoji_usage = hu_strdup(a, s);
+        if (!ov->emoji_usage)
+            goto ov_oom;
+    }
     hu_json_value_t *notes = hu_json_object_get(obj, "style_notes");
     if (notes)
         parse_string_array(a, notes, &ov->style_notes, &ov->style_notes_count);
@@ -772,9 +832,17 @@ static hu_error_t parse_overlay(hu_allocator_t *a, const char *channel_name,
     if (quirks)
         parse_string_array(a, quirks, &ov->typing_quirks, &ov->typing_quirks_count);
     s = hu_json_get_string(obj, "vulnerability_tier");
-    if (s)
+    if (s) {
         ov->vulnerability_tier = hu_strdup(a, s);
+        if (!ov->vulnerability_tier)
+            goto ov_oom;
+    }
     return HU_OK;
+
+ov_oom:
+    free_overlay(a, ov);
+    memset(ov, 0, sizeof(*ov));
+    return HU_ERR_OUT_OF_MEMORY;
 }
 
 hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t json_len,
@@ -1032,8 +1100,14 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 out->humor.style_count = (n > 8) ? 8 : n;
             }
             s = hu_json_get_string(hum, "frequency");
-            if (s)
+            if (s) {
                 out->humor.frequency = hu_strdup(alloc, s);
+                if (!out->humor.frequency) {
+                    hu_persona_deinit(alloc, out);
+                    hu_json_free(alloc, root);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+            }
             a = hu_json_object_get(hum, "never_during");
             if (a && a->type == HU_JSON_ARRAY) {
                 size_t n = a->data.array.len;
@@ -1077,25 +1151,45 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
             s = hu_json_get_string(hum, "type");
             if (s) {
                 out->humor.type = hu_strdup(alloc, s);
+                if (!out->humor.type) {
+                    hu_persona_deinit(alloc, out);
+                    hu_json_free(alloc, root);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
                 if (out->humor.style_count == 0) {
                     snprintf(out->humor.style[0], sizeof(out->humor.style[0]), "%.31s", s);
                     out->humor.style_count = 1;
                 }
             }
             s = hu_json_get_string(hum, "timing");
-            if (s)
+            if (s) {
                 out->humor.timing = hu_strdup(alloc, s);
+                if (!out->humor.timing) {
+                    hu_persona_deinit(alloc, out);
+                    hu_json_free(alloc, root);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+            }
             a = hu_json_object_get(hum, "targets");
             if (a && a->type == HU_JSON_ARRAY) {
                 size_t n = a->data.array.len;
                 out->humor.targets = alloc->alloc(alloc->ctx, n * sizeof(char *));
                 if (out->humor.targets) {
+                    memset(out->humor.targets, 0, n * sizeof(char *));
                     for (size_t i = 0; i < n; i++) {
                         const char *ts = (a->data.array.items[i] &&
                                           a->data.array.items[i]->type == HU_JSON_STRING)
                                              ? a->data.array.items[i]->data.string.ptr
                                              : NULL;
-                        out->humor.targets[i] = ts ? hu_strdup(alloc, ts) : NULL;
+                        if (ts) {
+                            out->humor.targets[i] = hu_strdup(alloc, ts);
+                            if (!out->humor.targets[i]) {
+                                out->humor.targets_count = n;
+                                hu_persona_deinit(alloc, out);
+                                hu_json_free(alloc, root);
+                                return HU_ERR_OUT_OF_MEMORY;
+                            }
+                        }
                     }
                     out->humor.targets_count = n;
                 }
@@ -1105,12 +1199,21 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 size_t n = a->data.array.len;
                 out->humor.boundaries = alloc->alloc(alloc->ctx, n * sizeof(char *));
                 if (out->humor.boundaries) {
+                    memset(out->humor.boundaries, 0, n * sizeof(char *));
                     for (size_t i = 0; i < n; i++) {
                         const char *bs = (a->data.array.items[i] &&
                                           a->data.array.items[i]->type == HU_JSON_STRING)
                                              ? a->data.array.items[i]->data.string.ptr
                                              : NULL;
-                        out->humor.boundaries[i] = bs ? hu_strdup(alloc, bs) : NULL;
+                        if (bs) {
+                            out->humor.boundaries[i] = hu_strdup(alloc, bs);
+                            if (!out->humor.boundaries[i]) {
+                                out->humor.boundaries_count = n;
+                                hu_persona_deinit(alloc, out);
+                                hu_json_free(alloc, root);
+                                return HU_ERR_OUT_OF_MEMORY;
+                            }
+                        }
                     }
                     out->humor.boundaries_count = n;
                 }
@@ -1250,10 +1353,26 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                             continue;
                         const char *beat = hu_json_get_string(item, "backstory_beat");
                         const char *rule = hu_json_get_string(item, "behavioral_rule");
-                        if (beat)
+                        if (beat) {
                             bbs[count].backstory_beat = hu_strdup(alloc, beat);
-                        if (rule)
+                            if (!bbs[count].backstory_beat) {
+                                out->backstory_behaviors = bbs;
+                                out->backstory_behaviors_count = count + 1;
+                                hu_persona_deinit(alloc, out);
+                                hu_json_free(alloc, root);
+                                return HU_ERR_OUT_OF_MEMORY;
+                            }
+                        }
+                        if (rule) {
                             bbs[count].behavioral_rule = hu_strdup(alloc, rule);
+                            if (!bbs[count].behavioral_rule) {
+                                out->backstory_behaviors = bbs;
+                                out->backstory_behaviors_count = count + 1;
+                                hu_persona_deinit(alloc, out);
+                                hu_json_free(alloc, root);
+                                return HU_ERR_OUT_OF_MEMORY;
+                            }
+                        }
                         count++;
                     }
                     out->backstory_behaviors = bbs;

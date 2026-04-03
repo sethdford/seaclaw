@@ -317,6 +317,66 @@ fail:
 #endif
 }
 
+/* ── Voice Provider vtable wrapper ────────────────────────────────────── */
+
+#include "human/voice/provider.h"
+
+static hu_error_t openai_vp_connect(void *ctx) {
+    return hu_voice_rt_connect((hu_voice_rt_session_t *)ctx);
+}
+
+static hu_error_t openai_vp_send_audio(void *ctx, const void *pcm16, size_t len) {
+    return hu_voice_rt_send_audio((hu_voice_rt_session_t *)ctx, pcm16, len);
+}
+
+static hu_error_t openai_vp_recv_event(void *ctx, hu_allocator_t *alloc,
+                                        hu_voice_rt_event_t *out, int timeout_ms) {
+    return hu_voice_rt_recv_event((hu_voice_rt_session_t *)ctx, alloc, out, timeout_ms);
+}
+
+static hu_error_t openai_vp_add_tool(void *ctx, const char *name, const char *description,
+                                      const char *parameters_json) {
+    return hu_voice_rt_add_tool((hu_voice_rt_session_t *)ctx, name, description, parameters_json);
+}
+
+static hu_error_t openai_vp_cancel_response(void *ctx) {
+    return hu_voice_rt_response_cancel((hu_voice_rt_session_t *)ctx);
+}
+
+static void openai_vp_disconnect(void *ctx, hu_allocator_t *alloc) {
+    (void)alloc;
+    hu_voice_rt_session_destroy((hu_voice_rt_session_t *)ctx);
+}
+
+static const char *openai_vp_get_name(void *ctx) {
+    (void)ctx;
+    return "openai_realtime";
+}
+
+static const hu_voice_provider_vtable_t openai_voice_vtable = {
+    .connect = openai_vp_connect,
+    .send_audio = openai_vp_send_audio,
+    .recv_event = openai_vp_recv_event,
+    .add_tool = openai_vp_add_tool,
+    .cancel_response = openai_vp_cancel_response,
+    .disconnect = openai_vp_disconnect,
+    .get_name = openai_vp_get_name,
+};
+
+hu_error_t hu_voice_provider_openai_create(hu_allocator_t *alloc,
+                                            const hu_voice_rt_config_t *config,
+                                            hu_voice_provider_t *out) {
+    if (!alloc || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    hu_voice_rt_session_t *session = NULL;
+    hu_error_t err = hu_voice_rt_session_create(alloc, config, &session);
+    if (err != HU_OK)
+        return err;
+    out->ctx = session;
+    out->vtable = &openai_voice_vtable;
+    return HU_OK;
+}
+
 void hu_voice_rt_session_destroy(hu_voice_rt_session_t *session) {
     if (!session)
         return;

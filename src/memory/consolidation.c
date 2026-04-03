@@ -104,6 +104,28 @@ static int compare_timestamp(const char *ts_a, size_t ts_a_len, const char *ts_b
     return 0;
 }
 
+/* Extract the contact prefix from a key. Contact keys are "contact:<id>:..."
+ * Returns the length through the second colon (inclusive), or 0 for non-contact keys. */
+static size_t contact_prefix_len(const char *key, size_t key_len) {
+    static const char pfx[] = "contact:";
+    static const size_t pfx_len = 8;
+    if (!key || key_len <= pfx_len || memcmp(key, pfx, pfx_len) != 0)
+        return 0;
+    for (size_t i = pfx_len; i < key_len; i++) {
+        if (key[i] == ':')
+            return i + 1;
+    }
+    return 0;
+}
+
+static bool same_contact(const hu_memory_entry_t *a, const hu_memory_entry_t *b) {
+    size_t pa = contact_prefix_len(a->key, a->key_len);
+    size_t pb = contact_prefix_len(b->key, b->key_len);
+    if (pa == 0 && pb == 0) return true; /* both non-contact */
+    if (pa != pb) return false;
+    return memcmp(a->key, b->key, pa) == 0;
+}
+
 hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
                                  const hu_consolidation_config_t *config) {
     if (!alloc || !memory || !memory->vtable || !config)
@@ -128,11 +150,14 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
     }
     memset(to_forget, 0, count * sizeof(bool));
 
+    /* MEM-003: Only compare entries within the same contact scope */
     for (size_t i = 0; i < count; i++) {
         if (to_forget[i])
             continue;
         for (size_t j = i + 1; j < count; j++) {
             if (to_forget[j])
+                continue;
+            if (!same_contact(&entries[i], &entries[j]))
                 continue;
             uint32_t sim = hu_similarity_score(entries[i].content, entries[i].content_len,
                                                entries[j].content, entries[j].content_len);
@@ -239,6 +264,7 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
     if (err != HU_OK || !entries || count <= config->max_entries)
         return HU_OK;
 
+    /* Sort by timestamp (oldest first) for eviction */
     for (size_t i = 0; i < count; i++) {
         for (size_t j = i + 1; j < count; j++) {
             int cmp = compare_timestamp(entries[i].timestamp, entries[i].timestamp_len,
@@ -251,17 +277,45 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
         }
     }
 
+    /* Count entries per contact to ensure eviction doesn't wipe a contact.
+     * Track evicted indices to correctly count remaining per-contact entries. */
     size_t to_remove = count - config->max_entries;
-    for (size_t i = 0; i < to_remove && i < count; i++) {
-        if (entries[i].key) {
-            bool deleted = false;
-            hu_error_t ferr =
-                memory->vtable->forget(memory->ctx, entries[i].key, entries[i].key_len, &deleted);
-            if (ferr != HU_OK)
-                fprintf(stderr, "[consolidation] evict key '%.*s' failed: %s\n",
-                        (int)entries[i].key_len, entries[i].key, hu_error_string(ferr));
+    bool *evicted = (bool *)alloc->alloc(alloc->ctx, count * sizeof(bool));
+    if (!evicted) {
+        for (size_t i = 0; i < count; i++)
+            hu_memory_entry_free_fields(alloc, &entries[i]);
+        alloc->free(alloc->ctx, entries, count * sizeof(hu_memory_entry_t));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    memset(evicted, 0, count * sizeof(bool));
+
+    size_t removed = 0;
+    for (size_t i = 0; i < count && removed < to_remove; i++) {
+        if (!entries[i].key || evicted[i])
+            continue;
+        /* Count how many non-evicted entries share this contact prefix */
+        size_t contact_remaining = 0;
+        for (size_t j = 0; j < count; j++) {
+            if (j == i || evicted[j] || !entries[j].key)
+                continue;
+            if (same_contact(&entries[i], &entries[j]))
+                contact_remaining++;
+        }
+        /* Never evict the last entry for a contact */
+        if (contact_remaining == 0)
+            continue;
+        bool deleted = false;
+        hu_error_t ferr =
+            memory->vtable->forget(memory->ctx, entries[i].key, entries[i].key_len, &deleted);
+        if (ferr != HU_OK)
+            fprintf(stderr, "[consolidation] evict key '%.*s' failed: %s\n",
+                    (int)entries[i].key_len, entries[i].key, hu_error_string(ferr));
+        else {
+            evicted[i] = true;
+            removed++;
         }
     }
+    alloc->free(alloc->ctx, evicted, count * sizeof(bool));
 
     for (size_t i = 0; i < count; i++)
         hu_memory_entry_free_fields(alloc, &entries[i]);

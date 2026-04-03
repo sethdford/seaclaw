@@ -23,6 +23,7 @@ typedef struct hu_persona_overlay {
     char **typing_quirks;
     size_t typing_quirks_count;
     char *vulnerability_tier;
+    float affect_mirror_ceiling; /* 0.0-1.0; caps emotional intensity mirroring. 0 = use default */
 } hu_persona_overlay_t;
 
 typedef struct hu_persona_example {
@@ -68,6 +69,7 @@ typedef struct hu_contact_profile {
     char *proactive_schedule;
     char *attachment_style;
     char *dunbar_layer;
+    float affect_mirror_ceiling; /* per-contact ceiling override. 0 = use stage default */
 } hu_contact_profile_t;
 
 /* Motivation — the character's core drive (anti-drift anchor) */
@@ -459,6 +461,20 @@ const hu_contact_profile_t *hu_persona_find_contact(const hu_persona_t *persona,
 hu_error_t hu_contact_profile_build_context(hu_allocator_t *alloc,
                                             const hu_contact_profile_t *contact, char **out,
                                             size_t *out_len);
+
+/* Affect mirror ceiling: get the effective ceiling for emotional mirroring.
+ * Priority: contact override > overlay override > stage default.
+ * Stage defaults: acquaintance=0.7, friend=0.85, close_friend/family=0.9.
+ * Returns 0.7 if no stage is set. */
+float hu_affect_mirror_ceiling(const hu_contact_profile_t *contact,
+                               const hu_persona_overlay_t *overlay);
+
+/* Apply affect mirror ceiling to emotional intensity.
+ * If intensity > ceiling, returns the ceiling value.
+ * Also returns a dampening directive in *directive (stack buffer, may be "").
+ * directive_cap: capacity of directive buffer. */
+float hu_affect_mirror_apply(float intensity, float ceiling,
+                             char *directive, size_t directive_cap);
 
 /* Build inner world context, stage-gated. Only surfaces for friend+ stages.
  * Returns NULL if stage is too low or no inner world content. */
