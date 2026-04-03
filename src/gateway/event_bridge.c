@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/gateway/event_bridge.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
@@ -113,7 +114,7 @@ static bool bus_callback(hu_bus_event_type_t type, const hu_bus_event_t *ev, voi
             const char *body = msg_text ? msg_text : event_name;
             hu_error_t push_err = hu_push_send(bridge->push, title, body, payload_str);
             if (push_err != HU_OK)
-                (void)fprintf(stderr, "[event_bridge] push send failed: %s\n",
+                hu_log_error("event_bridge", NULL, "push send failed: %s",
                               hu_error_string(push_err));
         }
 #endif

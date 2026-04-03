@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/feeds/processor.h"
 #include "human/memory/vector.h"
 #ifdef HU_ENABLE_FEEDS
@@ -1141,7 +1142,7 @@ hu_error_t hu_feed_correlate_recent(hu_allocator_t *alloc, sqlite3 *db,
     alloc->free(alloc->ctx, assigned, count * sizeof(int));
     alloc->free(alloc->ctx, rows, cap * sizeof(row_t));
     if (clusters_formed > 0)
-        fprintf(stderr, "[feeds] correlated %zu clusters from %zu items\n", clusters_formed, count);
+        hu_log_info("feeds", NULL, "correlated %zu clusters from %zu items", clusters_formed, count);
     return HU_OK;
 }
 

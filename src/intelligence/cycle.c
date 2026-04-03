@@ -1,5 +1,6 @@
 #ifdef HU_ENABLE_SQLITE
 
+#include "human/core/log.h"
 #include "human/intelligence/cycle.h"
 #include "human/core/error.h"
 #include "human/intelligence/distiller.h"
@@ -147,7 +148,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
         if (hu_self_improve_create(alloc, db, &si) == HU_OK) {
             hu_error_t tbl_err = hu_self_improve_init_tables(&si);
             if (tbl_err != HU_OK)
-                fprintf(stderr, "[cycle] self_improve table init failed: %s\n", hu_error_string(tbl_err));
+                hu_log_error("cycle", NULL, "self_improve table init failed: %s", hu_error_string(tbl_err));
 
             /* MAX(id) over all rows — a new insert always gets a new rowid even if older active
              * rows have larger ids than some inactive rows (uncommon); monotonic ids detect inserts. */
@@ -207,8 +208,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
                         hu_error_t eval_err = hu_self_improve_eval_and_apply(alloc, db, &sp, &delta);
                         if (eval_err == HU_OK) {
                             const char *rb = delta.should_rollback ? " [rolled back]" : "";
-                            fprintf(stderr,
-                                    "[self-improve] patch %s: %.2f → %.2f (delta: %+.2f)%s\n",
+                            hu_log_info("self-improve", NULL, "patch %s: %.2f → %.2f (delta: %+.2f)%s",
                                     delta.patch_id, delta.score_before, delta.score_after, delta.delta, rb);
                             (void)hu_self_improve_rollback_if_negative(alloc, db, &delta);
                         }
@@ -238,12 +238,12 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
             if (wm_err == HU_OK) {
                 hu_error_t tbl_err = hu_world_model_init_tables(&wm);
                 if (tbl_err != HU_OK)
-                    fprintf(stderr, "[cycle] world_model table init failed: %s\n", hu_error_string(tbl_err));
+                    hu_log_error("cycle", NULL, "world_model table init failed: %s", hu_error_string(tbl_err));
             }
             if (ol_err == HU_OK) {
                 hu_error_t tbl_err = hu_online_learning_init_tables(&ol);
                 if (tbl_err != HU_OK)
-                    fprintf(stderr, "[cycle] online_learning table init failed: %s\n", hu_error_string(tbl_err));
+                    hu_log_error("cycle", NULL, "online_learning table init failed: %s", hu_error_string(tbl_err));
             }
 
             while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -315,7 +315,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
             if (result->findings_actioned > 0)
                 steps_succeeded++;
         } else {
-            fprintf(stderr, "intelligence/cycle: step 1 prepare failed\n");
+            hu_log_error("cycle", NULL, "intelligence/cycle: step 1 prepare failed");
         }
     }
 
@@ -387,7 +387,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
             if (result->events_recorded > 0)
                 steps_succeeded++;
         } else {
-            fprintf(stderr, "intelligence/cycle: step 2 prepare failed (feed_items may not exist)\n");
+            hu_log_error("cycle", NULL, "intelligence/cycle: step 2 prepare failed (feed_items may not exist)");
         }
     }
 
@@ -433,7 +433,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
             if (result->lessons_extracted > 0)
                 steps_succeeded++;
         } else {
-            fprintf(stderr, "intelligence/cycle: step 3 prepare failed\n");
+            hu_log_error("cycle", NULL, "intelligence/cycle: step 3 prepare failed");
         }
     }
 
@@ -441,7 +441,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
     {
         hu_error_t tbl_err = hu_distiller_init_tables(db);
         if (tbl_err != HU_OK)
-            fprintf(stderr, "[cycle] distiller table init failed: %s\n", hu_error_string(tbl_err));
+            hu_log_error("cycle", NULL, "distiller table init failed: %s", hu_error_string(tbl_err));
         size_t distilled = 0;
         if (hu_experience_distill(alloc, db, 2, now_ts, &distilled) == HU_OK)
             result->lessons_extracted += distilled;
@@ -453,7 +453,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
         if (hu_value_engine_create(alloc, db, &ve) == HU_OK) {
             hu_error_t tbl_err = hu_value_init_tables(&ve);
             if (tbl_err != HU_OK)
-                fprintf(stderr, "[cycle] value table init failed: %s\n", hu_error_string(tbl_err));
+                hu_log_error("cycle", NULL, "value table init failed: %s", hu_error_string(tbl_err));
             const char *sql = "SELECT finding, suggested_action FROM research_findings "
                               "WHERE priority = 'HIGH' AND status = 'actioned'";
             sqlite3_stmt *stmt = NULL;
@@ -483,7 +483,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
             if (result->values_learned > 0)
                 steps_succeeded++;
         } else {
-            fprintf(stderr, "intelligence/cycle: step 4 value engine create failed\n");
+            hu_log_error("cycle", NULL, "intelligence/cycle: step 4 value engine create failed");
         }
     }
 
@@ -500,7 +500,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
             }
             hu_reflection_engine_deinit(&re);
         } else {
-            fprintf(stderr, "intelligence/cycle: step 5 reflection engine create failed\n");
+            hu_log_error("cycle", NULL, "intelligence/cycle: step 5 reflection engine create failed");
         }
     }
 
@@ -667,7 +667,7 @@ hu_error_t hu_intelligence_run_cycle(hu_allocator_t *alloc, sqlite3 *db,
         if (hu_online_learning_create(alloc, db, 0.1, &ol) == HU_OK) {
             hu_error_t tbl_err = hu_online_learning_init_tables(&ol);
             if (tbl_err != HU_OK)
-                fprintf(stderr, "[cycle] online_learning table init failed: %s\n", hu_error_string(tbl_err));
+                hu_log_error("cycle", NULL, "online_learning table init failed: %s", hu_error_string(tbl_err));
             if (result->findings_actioned > 0)
                 (void)hu_online_learning_update_weight(&ol, "research_findings", 18,
                                                        1.0, now_ts);

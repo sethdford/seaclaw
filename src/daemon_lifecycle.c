@@ -7,6 +7,7 @@
  *   - hu_daemon_install/uninstall/logs (launchd on macOS, systemd on Linux)
  *   - Internal helpers: validate_home, get_pid_path
  */
+#include "human/core/log.h"
 #include "human/daemon_lifecycle.h"
 #include "human/daemon.h"
 #include "human/core/error.h"
@@ -30,14 +31,14 @@
 
 hu_error_t hu_daemon_validate_home(const char *home) {
     if (!home || !home[0]) {
-        fprintf(stderr, "HOME not set\n");
+        hu_log_info("daemon", NULL, "HOME not set");
         return HU_ERR_INVALID_ARGUMENT;
     }
     for (const char *p = home; *p; p++) {
         char c = *p;
         if (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') &&
             c != '/' && c != '.' && c != '_' && c != '-' && c != ' ') {
-            fprintf(stderr, "HOME contains unsafe characters\n");
+            hu_log_info("daemon", NULL, "HOME contains unsafe characters");
             return HU_ERR_INVALID_ARGUMENT;
         }
     }
@@ -327,7 +328,7 @@ hu_error_t hu_daemon_uninstall(void) {
     n = snprintf(cmd, sizeof(cmd), "launchctl unload \"%s\"", plist);
     if (n > 0 && (size_t)n < sizeof(cmd)) {
         if (system(cmd) != 0)
-            fprintf(stderr, "[daemon] launchctl unload failed (best-effort)\n");
+            hu_log_error("daemon", NULL, "launchctl unload failed (best-effort)");
     }
 
     remove(plist);
@@ -422,7 +423,7 @@ hu_error_t hu_daemon_install(hu_allocator_t *alloc) {
     fclose(f);
 
     if (system("systemctl --user daemon-reload") != 0)
-        fprintf(stderr, "[daemon] systemctl daemon-reload failed\n");
+        hu_log_error("daemon", NULL, "systemctl daemon-reload failed");
     if (system("systemctl --user enable --now " HU_SYSTEMD_UNIT) != 0)
         return HU_ERR_IO;
 
@@ -431,7 +432,7 @@ hu_error_t hu_daemon_install(hu_allocator_t *alloc) {
 
 hu_error_t hu_daemon_uninstall(void) {
     if (system("systemctl --user disable --now " HU_SYSTEMD_UNIT) != 0)
-        fprintf(stderr, "[daemon] systemctl disable failed (best-effort)\n");
+        hu_log_error("daemon", NULL, "systemctl disable failed (best-effort)");
 
     const char *home = getenv("HOME");
     if (!home)
@@ -444,7 +445,7 @@ hu_error_t hu_daemon_uninstall(void) {
         remove(unit_path);
 
     if (system("systemctl --user daemon-reload") != 0)
-        fprintf(stderr, "[daemon] systemctl daemon-reload failed (best-effort)\n");
+        hu_log_error("daemon", NULL, "systemctl daemon-reload failed (best-effort)");
     return HU_OK;
 }
 

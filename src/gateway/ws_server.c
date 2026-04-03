@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/gateway/ws_server.h"
 #include "human/core/string.h"
 #include "human/websocket/websocket.h"
@@ -393,7 +394,7 @@ hu_error_t hu_ws_server_upgrade(hu_ws_server_t *srv, int fd, const char *req, si
     tv.tv_sec = 5;
     tv.tv_usec = 0;
     if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0)
-        (void)fprintf(stderr, "[ws] failed to set SO_SNDTIMEO: %s\n", strerror(errno));
+        hu_log_error("ws", NULL, "failed to set SO_SNDTIMEO: %s", strerror(errno));
 
     *out = slot;
     return HU_OK;
@@ -518,9 +519,9 @@ void hu_ws_server_close_conn(hu_ws_server_t *srv, hu_ws_conn_t *conn) {
     close_frame[1] = 0;
     ssize_t n = send(conn->fd, close_frame, 2, MSG_NOSIGNAL);
     if (n < 0)
-        (void)fprintf(stderr, "[ws] close frame send failed: %s\n", strerror(errno));
+        hu_log_error("ws", NULL, "close frame send failed: %s", strerror(errno));
     else if ((size_t)n < 2)
-        (void)fprintf(stderr, "[ws] close frame partial send (%zd/2)\n", n);
+        hu_log_info("ws", NULL, "close frame partial send (%zd/2)", n);
     close(conn->fd);
 #endif
     if (srv && srv->on_close)
@@ -620,7 +621,7 @@ hu_error_t hu_ws_server_process(hu_ws_server_t *srv, hu_ws_conn_t *conn) {
                 memcpy(pong + 2, payload, plen);
             ssize_t wn = send(conn->fd, pong, 2 + plen, MSG_NOSIGNAL);
             if (wn < 0 || (size_t)wn < 2 + plen) {
-                (void)fprintf(stderr, "[ws] pong send failed: %s\n",
+                hu_log_error("ws", NULL, "pong send failed: %s",
                               wn < 0 ? strerror(errno) : "partial write");
                 hu_ws_server_close_conn(srv, conn);
                 return HU_ERR_IO;

@@ -4,6 +4,7 @@
  * channel creation, and agent creation into a single module.
  */
 
+#include "human/core/log.h"
 #include "human/bootstrap.h"
 #include "human/agent/agent_comm.h"
 #include "human/agent/mailbox.h"
@@ -642,7 +643,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             /* Connect all servers marked with auto_connect=true */
             hu_error_t connect_err = hu_mcp_manager_connect_auto(mcp_mgr);
             if (connect_err != HU_OK) {
-                fprintf(stderr, "[bootstrap] warning: MCP auto-connect failed: %s\n",
+                hu_log_error("bootstrap", NULL, "warning: MCP auto-connect failed: %s",
                         hu_error_string(connect_err));
             }
 
@@ -667,12 +668,12 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                 }
                 hu_mcp_manager_free_tools(alloc, mcp_tools, mcp_tools_count);
             } else if (load_err != HU_OK) {
-                fprintf(stderr, "[bootstrap] warning: MCP tool loading failed: %s\n",
+                hu_log_error("bootstrap", NULL, "warning: MCP tool loading failed: %s",
                         hu_error_string(load_err));
             }
             hu_mcp_manager_destroy(mcp_mgr);
         } else if (mcp_err != HU_OK) {
-            fprintf(stderr, "[bootstrap] warning: MCP manager creation failed: %s\n",
+            hu_log_error("bootstrap", NULL, "warning: MCP manager creation failed: %s",
                     hu_error_string(mcp_err));
         }
     }
@@ -1002,9 +1003,8 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         }
 #else
         if (cfg->channels.imessage.default_target)
-            fprintf(stderr,
-                    "[bootstrap] WARNING: iMessage configured in config but binary was built "
-                    "without HU_ENABLE_IMESSAGE — rebuild with -DSC_ENABLE_IMESSAGE=ON\n");
+            hu_log_error("bootstrap", NULL, "WARNING: iMessage configured in config but binary was built "
+                    "without HU_ENABLE_IMESSAGE — rebuild with -DSC_ENABLE_IMESSAGE=ON");
 #endif
 
 #if HU_HAS_PWA

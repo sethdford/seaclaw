@@ -1,5 +1,6 @@
 /* Streaming infrastructure: token callback wiring, hu_agent_turn_stream, hu_agent_turn_stream_v2 */
 #include "agent_internal.h"
+#include "human/core/log.h"
 #include "human/agent/awareness.h"
 #include "human/agent/commands.h"
 #include "human/agent/memory_loader.h"
@@ -223,7 +224,7 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
         hu_error_t mem_err =
             hu_memory_loader_load(&loader, msg, msg_len, "", 0, &memory_ctx, &memory_ctx_len);
         if (mem_err != HU_OK && mem_err != HU_ERR_NOT_SUPPORTED)
-            fprintf(stderr, "[agent_stream] memory_loader_load failed: %s\n",
+            hu_log_error("agent_stream", NULL, "memory_loader_load failed: %s",
                     hu_error_string(mem_err));
     }
 
@@ -398,7 +399,7 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
                 hu_error_t hist_err = hu_agent_internal_append_history(
                     agent, HU_ROLE_ASSISTANT, sresp.content, sresp.content_len, NULL, 0, NULL, 0);
                 if (hist_err != HU_OK)
-                    fprintf(stderr, "[agent_stream] append_history failed: %s\n",
+                    hu_log_error("agent_stream", NULL, "append_history failed: %s",
                             hu_error_string(hist_err));
             }
             *response_out = hu_strndup(agent->alloc, sresp.content, sresp.content_len);
@@ -493,7 +494,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         hu_error_t mem_err =
             hu_memory_loader_load(&loader, msg, msg_len, "", 0, &memory_ctx, &memory_ctx_len);
         if (mem_err != HU_OK && mem_err != HU_ERR_NOT_SUPPORTED)
-            fprintf(stderr, "[agent_stream_v2] memory_loader_load failed: %s\n",
+            hu_log_error("agent_stream_v2", NULL, "memory_loader_load failed: %s",
                     hu_error_string(mem_err));
     }
 
@@ -673,7 +674,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 hu_error_t hist_err = hu_agent_internal_append_history(
                     agent, HU_ROLE_ASSISTANT, sresp.content, sresp.content_len, NULL, 0, NULL, 0);
                 if (hist_err != HU_OK)
-                    fprintf(stderr, "[agent_stream_v2] append_history failed: %s\n",
+                    hu_log_error("agent_stream_v2", NULL, "append_history failed: %s",
                             hu_error_string(hist_err));
                 final_content = hu_strndup(agent->alloc, sresp.content, sresp.content_len);
                 final_content_len = sresp.content_len;

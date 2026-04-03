@@ -1,0 +1,206 @@
+#include "human/daemon_proactive.h"
+#include "human/memory.h"
+#include "human/persona.h"
+#include "test_framework.h"
+#include <string.h>
+
+/* ── hu_daemon_channel_list_has_name ─────────────────────────────────── */
+
+static const char *mock_channel_name(void *ctx) {
+    return (const char *)ctx;
+}
+
+static void test_channel_list_has_name_null(void) {
+    HU_ASSERT_FALSE(hu_daemon_channel_list_has_name(NULL, 0, "test"));
+    HU_ASSERT_FALSE(hu_daemon_channel_list_has_name(NULL, 0, NULL));
+}
+
+static void test_channel_list_has_name_empty_name(void) {
+    hu_service_channel_t ch[1];
+    memset(ch, 0, sizeof(ch));
+    HU_ASSERT_FALSE(hu_daemon_channel_list_has_name(ch, 1, ""));
+    HU_ASSERT_FALSE(hu_daemon_channel_list_has_name(ch, 1, NULL));
+}
+
+static void test_channel_list_has_name_found(void) {
+    hu_channel_vtable_t vt = {0};
+    vt.name = mock_channel_name;
+    hu_channel_t chan = {.ctx = (void *)"imessage", .vtable = &vt};
+    hu_service_channel_t ch[1];
+    memset(ch, 0, sizeof(ch));
+    ch[0].channel = &chan;
+    HU_ASSERT_TRUE(hu_daemon_channel_list_has_name(ch, 1, "imessage"));
+}
+
+static void test_channel_list_has_name_not_found(void) {
+    hu_channel_vtable_t vt = {0};
+    vt.name = mock_channel_name;
+    hu_channel_t chan = {.ctx = (void *)"telegram", .vtable = &vt};
+    hu_service_channel_t ch[1];
+    memset(ch, 0, sizeof(ch));
+    ch[0].channel = &chan;
+    HU_ASSERT_FALSE(hu_daemon_channel_list_has_name(ch, 1, "imessage"));
+}
+
+/* ── hu_daemon_contact_activity_record / count / reset ───────────────── */
+
+static void test_contact_activity_record_basic(void) {
+    hu_daemon_contact_activity_reset();
+    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+
+    hu_daemon_contact_activity_record("user_a", "imessage", "+1234567890");
+    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 1);
+
+    hu_daemon_contact_activity_record("user_b", "telegram", "user_b_tg");
+    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 2);
+
+    hu_daemon_contact_activity_reset();
+    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+}
+
+static void test_contact_activity_record_null(void) {
+    hu_daemon_contact_activity_reset();
+    hu_daemon_contact_activity_record(NULL, "imessage", "+1234567890");
+    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+
+    hu_daemon_contact_activity_record("user_a", NULL, "+1234567890");
+    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+
+    hu_daemon_contact_activity_record("user_a", "imessage", NULL);
+    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+
+    hu_daemon_contact_activity_record("", "imessage", "+1234567890");
+    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+
+    hu_daemon_contact_activity_reset();
+}
+
+static void test_contact_activity_record_update_existing(void) {
+    hu_daemon_contact_activity_reset();
+    hu_daemon_contact_activity_record("user_a", "imessage", "+1234567890");
+    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 1);
+
+    /* Same contact, different channel — should update, not add */
+    hu_daemon_contact_activity_record("user_a", "telegram", "user_a_tg");
+    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 1);
+
+    hu_daemon_contact_activity_reset();
+}
+
+/* ── hu_daemon_proactive_parse_route ─────────────────────────────────── */
+
+static void test_parse_route_with_colon(void) {
+    hu_contact_profile_t cp = {0};
+    cp.proactive_channel = "imessage:+1234567890";
+    cp.contact_id = "user_a";
+
+    char ch[64], target[128];
+    hu_daemon_proactive_parse_route(&cp, ch, target);
+
+    HU_ASSERT_STR_EQ(ch, "imessage");
+    HU_ASSERT_STR_EQ(target, "+1234567890");
+}
+
+static void test_parse_route_without_colon(void) {
+    hu_contact_profile_t cp = {0};
+    cp.proactive_channel = "telegram";
+    cp.contact_id = "user_b_tg";
+
+    char ch[64], target[128];
+    hu_daemon_proactive_parse_route(&cp, ch, target);
+
+    HU_ASSERT_STR_EQ(ch, "telegram");
+    HU_ASSERT_STR_EQ(target, "user_b_tg");
+}
+
+/* ── hu_daemon_proactive_apply_route ─────────────────────────────────── */
+
+static void test_apply_route_no_activity(void) {
+    hu_daemon_contact_activity_reset();
+    char ch[64] = "imessage";
+    char target[128] = "+1111111111";
+    size_t len = strlen(target);
+
+    hu_daemon_proactive_apply_route("user_x", time(NULL), NULL, 0, ch, target, &len);
+
+    /* No activity recorded — should not change route */
+    HU_ASSERT_STR_EQ(ch, "imessage");
+    HU_ASSERT_STR_EQ(target, "+1111111111");
+
+    hu_daemon_contact_activity_reset();
+}
+
+static void test_apply_route_with_fresh_activity(void) {
+    hu_daemon_contact_activity_reset();
+
+    /* Record activity on telegram */
+    hu_daemon_contact_activity_record("user_a", "telegram", "user_a_tg");
+
+    /* Set up a channel list that includes telegram */
+    hu_channel_vtable_t vt = {0};
+    vt.name = mock_channel_name;
+    hu_channel_t chan = {.ctx = (void *)"telegram", .vtable = &vt};
+    hu_service_channel_t channels[1];
+    memset(channels, 0, sizeof(channels));
+    channels[0].channel = &chan;
+
+    char ch[64] = "imessage";
+    char target[128] = "+1111111111";
+    size_t len = strlen(target);
+
+    hu_daemon_proactive_apply_route("user_a", time(NULL), channels, 1, ch, target, &len);
+
+    /* Should override to telegram */
+    HU_ASSERT_STR_EQ(ch, "telegram");
+    HU_ASSERT_STR_EQ(target, "user_a_tg");
+
+    hu_daemon_contact_activity_reset();
+}
+
+/* ── hu_daemon_build_callback_context ────────────────────────────────── */
+
+static void test_build_callback_context_null_memory(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    size_t out_len = 999;
+    char *result = hu_daemon_build_callback_context(&alloc, NULL, "s", 1, "msg", 3, &out_len, NULL);
+    HU_ASSERT_NULL(result);
+    HU_ASSERT_EQ(out_len, 0);
+}
+
+static void test_build_callback_context_null_msg(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = {0};
+    size_t out_len = 999;
+    char *result = hu_daemon_build_callback_context(&alloc, &mem, "s", 1, NULL, 0, &out_len, NULL);
+    HU_ASSERT_NULL(result);
+    HU_ASSERT_EQ(out_len, 0);
+}
+
+/* ── Test runner ─────────────────────────────────────────────────────── */
+
+void run_daemon_proactive_tests(void) {
+    HU_TEST_SUITE("daemon_proactive");
+
+    /* channel list */
+    HU_RUN_TEST(test_channel_list_has_name_null);
+    HU_RUN_TEST(test_channel_list_has_name_empty_name);
+    HU_RUN_TEST(test_channel_list_has_name_found);
+    HU_RUN_TEST(test_channel_list_has_name_not_found);
+
+    /* contact activity LRU */
+    HU_RUN_TEST(test_contact_activity_record_basic);
+    HU_RUN_TEST(test_contact_activity_record_null);
+    HU_RUN_TEST(test_contact_activity_record_update_existing);
+
+    /* route parsing */
+    HU_RUN_TEST(test_parse_route_with_colon);
+    HU_RUN_TEST(test_parse_route_without_colon);
+
+    /* route application */
+    HU_RUN_TEST(test_apply_route_no_activity);
+    HU_RUN_TEST(test_apply_route_with_fresh_activity);
+
+    /* callback context builder */
+    HU_RUN_TEST(test_build_callback_context_null_memory);
+    HU_RUN_TEST(test_build_callback_context_null_msg);
+}

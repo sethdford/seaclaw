@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/gateway/control_protocol.h"
 #include "human/core/allocator.h"
 #include "human/core/json.h"
@@ -339,7 +340,7 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
             res_buf[pos] = '\0';
             hu_error_t send_err = hu_ws_server_send(proto->ws, conn, res_buf, pos);
             if (send_err != HU_OK) {
-                (void)fprintf(stderr, "[control] send response failed: %s\n",
+                hu_log_error("control", NULL, "send response failed: %s",
                               hu_error_string(send_err));
             }
             proto->alloc->free(proto->alloc->ctx, res_buf, res_cap);
@@ -450,7 +451,7 @@ hu_error_t hu_control_send_response(hu_control_protocol_t *proto, hu_ws_conn_t *
 
     hu_error_t err = hu_ws_server_send(proto->ws, conn, buf, pos);
     if (err != HU_OK) {
-        (void)fprintf(stderr, "[control] send_response failed: %s\n", hu_error_string(err));
+        hu_log_error("control", NULL, "send_response failed: %s", hu_error_string(err));
     }
     alloc->free(alloc->ctx, buf, cap);
     return err;

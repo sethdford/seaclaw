@@ -5,6 +5,7 @@
 
 #ifdef HU_ENABLE_SQLITE
 
+#include "human/core/log.h"
 #include "human/intelligence/self_improve.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
@@ -882,8 +883,7 @@ static hu_error_t self_improve_closed_loop_simulate(hu_allocator_t *alloc, sqlit
     if (err != HU_OK)
         return err;
 
-    fprintf(stderr,
-            "[self_improve] closed_loop: suite=sim baseline=60.0%% after=75.0%% action=kept patch_id=%lld\n",
+    hu_log_info("self_improve", NULL, "closed_loop: suite=sim baseline=60.0%% after=75.0%% action=kept patch_id=%lld",
             (long long)patch_id);
     return HU_OK;
 }
@@ -918,7 +918,7 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
 
     FILE *f = fopen(eval_suite_path, "rb");
     if (!f) {
-        fprintf(stderr, "[self_improve] closed_loop: cannot open %s: %s\n", eval_suite_path,
+        hu_log_info("self_improve", NULL, "closed_loop: cannot open %s: %s", eval_suite_path,
                 strerror(errno));
         return HU_ERR_IO;
     }
@@ -929,7 +929,7 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
     long sz = ftell(f);
     if (sz <= 0 || sz > 1024 * 1024) {
         fclose(f);
-        fprintf(stderr, "[self_improve] closed_loop: invalid suite file size\n");
+        hu_log_info("self_improve", NULL, "closed_loop: invalid suite file size");
         return HU_ERR_INVALID_ARGUMENT;
     }
     if (fseek(f, 0, SEEK_SET) != 0) {
@@ -954,7 +954,7 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
     err = hu_eval_suite_load_json(alloc, json, json_len, &suite);
     alloc->free(alloc->ctx, json, json_len + 1);
     if (err != HU_OK) {
-        fprintf(stderr, "[self_improve] closed_loop: load suite failed (%s)\n",
+        hu_log_error("self_improve", NULL, "closed_loop: load suite failed (%s)",
                 hu_error_string(err));
         return err;
     }
@@ -963,7 +963,7 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
     err = hu_eval_run_suite(alloc, provider, model, model_len, &suite, HU_EVAL_CONTAINS, &baseline);
     if (err != HU_OK) {
         hu_eval_suite_free(alloc, &suite);
-        fprintf(stderr, "[self_improve] closed_loop: baseline eval failed (%s)\n",
+        hu_log_error("self_improve", NULL, "closed_loop: baseline eval failed (%s)",
                 hu_error_string(err));
         return err;
     }
@@ -981,8 +981,7 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
         hu_weakness_report_free(alloc, &report);
         hu_eval_run_free(alloc, &baseline);
         hu_eval_suite_free(alloc, &suite);
-        fprintf(stderr,
-                "[self_improve] closed_loop: suite=%s baseline=%.1f%% no weaknesses; skip patch\n",
+        hu_log_info("self_improve", NULL, "closed_loop: suite=%s baseline=%.1f%% no weaknesses; skip patch",
                 suite.name ? suite.name : "", baseline_rate * 100.0);
         return HU_OK;
     }
@@ -1013,7 +1012,7 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
         hu_self_improve_rollback_patch(&engine, patch_id);
         hu_eval_run_free(alloc, &baseline);
         hu_eval_suite_free(alloc, &suite);
-        fprintf(stderr, "[self_improve] closed_loop: re-eval failed (%s); rolled back\n",
+        hu_log_error("self_improve", NULL, "closed_loop: re-eval failed (%s); rolled back",
                 hu_error_string(err));
         return err;
     }
@@ -1040,8 +1039,7 @@ hu_error_t hu_self_improve_closed_loop(hu_allocator_t *alloc, void *db_void,
         }
     }
 
-    fprintf(stderr,
-            "[self_improve] closed_loop: suite=%s baseline=%.1f%% after=%.1f%% action=%s patch_id=%lld\n",
+    hu_log_info("self_improve", NULL, "closed_loop: suite=%s baseline=%.1f%% after=%.1f%% action=%s patch_id=%lld",
             suite.name ? suite.name : "", baseline_rate * 100.0, after_rate * 100.0, action,
             (long long)patch_id);
 

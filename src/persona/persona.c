@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/persona.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
@@ -347,8 +348,7 @@ const hu_contact_profile_t *hu_persona_find_contact(const hu_persona_t *persona,
                                                     const char *contact_id, size_t contact_id_len) {
     if (!persona || !contact_id || !persona->contacts) {
         if (getenv("HU_DEBUG"))
-            fprintf(stderr,
-                    "[persona] find_contact: early NULL (persona=%p contact_id=%p contacts=%p)\n",
+            hu_log_info("persona", NULL, "find_contact: early NULL (persona=%p contact_id=%p contacts=%p)",
                     (const void *)persona, (const void *)contact_id,
                     persona ? (const void *)persona->contacts : NULL);
         return NULL;
@@ -362,7 +362,7 @@ const hu_contact_profile_t *hu_persona_find_contact(const hu_persona_t *persona,
             return cp;
     }
     if (getenv("HU_DEBUG"))
-        fprintf(stderr, "[persona] find_contact: no match for '%.*s' among %zu contacts\n",
+        hu_log_info("persona", NULL, "find_contact: no match for '%.*s' among %zu contacts",
                 (int)(contact_id_len > 30 ? 30 : contact_id_len), contact_id,
                 persona->contacts_count);
     return NULL;
@@ -2003,7 +2003,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
     }
 
     if (oom_on_optional)
-        fprintf(stderr, "[persona] warning: some optional fields dropped due to OOM\n");
+        hu_log_error("persona", NULL, "warning: some optional fields dropped due to OOM");
 
     hu_json_free(alloc, root);
     return HU_OK;

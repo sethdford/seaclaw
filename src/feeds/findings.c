@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/feeds/findings.h"
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
@@ -336,7 +337,7 @@ hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db,
     }
 
     if (stored > 0)
-        fprintf(stderr, "[findings] parsed and stored %zu findings\n", stored);
+        hu_log_info("findings", NULL, "parsed and stored %zu findings", stored);
     return HU_OK;
 }
 

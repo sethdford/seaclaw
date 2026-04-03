@@ -2,6 +2,7 @@
  * Gmail channel — READ-ONLY ingest via Gmail REST API with OAuth2.
  * Polls unread emails, extracts From/Subject/body, marks as read.
  */
+#include "human/core/log.h"
 #include "human/channels/gmail.h"
 #include "human/channel.h"
 #include "human/channel_loop.h"
@@ -108,12 +109,12 @@ static hu_error_t refresh_access_token(hu_gmail_ctx_t *c) {
         "Human/1.0",
         body, j, &resp);
     if (err != HU_OK) {
-        fprintf(stderr, "[gmail] token refresh HTTP error: %s\n", hu_error_string(err));
+        hu_log_error("gmail", NULL, "token refresh HTTP error: %s", hu_error_string(err));
         return err;
     }
     if (resp.status_code < 200 || resp.status_code >= 300) {
         int blen = resp.body_len > 500 ? 500 : (int)resp.body_len;
-        fprintf(stderr, "[gmail] token refresh HTTP %ld: %.*s\n", (long)resp.status_code, blen,
+        hu_log_info("gmail", NULL, "token refresh HTTP %ld: %.*s", (long)resp.status_code, blen,
                 resp.body ? resp.body : "(null)");
         if (resp.owned && resp.body)
             hu_http_response_free(c->alloc, &resp);
@@ -130,7 +131,7 @@ static hu_error_t refresh_access_token(hu_gmail_ctx_t *c) {
     const char *at = hu_json_get_string(root, "access_token");
     double exp_in = hu_json_get_number(root, "expires_in", 3600.0);
     if (!at || !at[0]) {
-        fprintf(stderr, "[gmail] token refresh: no access_token in response\n");
+        hu_log_info("gmail", NULL, "token refresh: no access_token in response");
         hu_json_free(c->alloc, root);
         return HU_ERR_PROVIDER_AUTH;
     }

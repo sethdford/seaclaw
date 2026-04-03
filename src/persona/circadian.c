@@ -2,9 +2,10 @@
  * Circadian persona overlay — time-of-day adaptive guidance.
  */
 #include "human/persona/circadian.h"
+#include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/data/loader.h"
-#include "human/core/json.h"
+#include "human/persona.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,8 +58,10 @@ hu_error_t hu_circadian_data_init(hu_allocator_t *alloc) {
         return HU_OK;
     }
 
-    const char **names = (const char **)alloc->alloc(alloc->ctx, phase_count * sizeof(const char *));
-    const char **guidance = (const char **)alloc->alloc(alloc->ctx, phase_count * sizeof(const char *));
+    const char **names =
+        (const char **)alloc->alloc(alloc->ctx, phase_count * sizeof(const char *));
+    const char **guidance =
+        (const char **)alloc->alloc(alloc->ctx, phase_count * sizeof(const char *));
     if (!names || !guidance) {
         if (names)
             alloc->free(alloc->ctx, names, phase_count * sizeof(const char *));
@@ -108,7 +111,8 @@ void hu_circadian_data_cleanup(hu_allocator_t *alloc) {
     if (s_phase_guidance != (const char **)DEFAULT_PHASE_GUIDANCE) {
         for (size_t i = 0; i < s_phase_count; i++) {
             if (s_phase_guidance[i])
-                alloc->free(alloc->ctx, (char *)s_phase_guidance[i], strlen(s_phase_guidance[i]) + 1);
+                alloc->free(alloc->ctx, (char *)s_phase_guidance[i],
+                            strlen(s_phase_guidance[i]) + 1);
         }
         alloc->free(alloc->ctx, s_phase_guidance, s_phase_count * sizeof(const char *));
     }
@@ -162,5 +166,89 @@ hu_error_t hu_circadian_build_prompt(hu_allocator_t *alloc, uint8_t hour, char *
     *out = shrunk;
     *out_len = (size_t)n;
 #undef HU_CIRCADIAN_BUF_CAP
+    return HU_OK;
+}
+
+/* ── Routine-aware circadian prompt ──────────────────────────────── */
+
+/* Parse "HH:MM" from a routine block time string, return the hour. */
+static int routine_block_hour(const char *time_str) {
+    if (!time_str || time_str[0] == '\0')
+        return -1;
+    int h = 0;
+    for (int i = 0; i < 2 && time_str[i] >= '0' && time_str[i] <= '9'; i++)
+        h = h * 10 + (time_str[i] - '0');
+    return h;
+}
+
+/* Find the routine block whose time falls closest to (but not after) the given hour.
+ * Returns NULL if no blocks exist. */
+static const hu_routine_block_t *find_routine_block_for_hour(const hu_routine_block_t *blocks,
+                                                             size_t count, uint8_t hour) {
+    if (!blocks || count == 0)
+        return NULL;
+    const hu_routine_block_t *best = NULL;
+    int best_diff = 25;
+    for (size_t i = 0; i < count; i++) {
+        int bh = routine_block_hour(blocks[i].time);
+        if (bh < 0)
+            continue;
+        /* How far back is this block from the target hour? */
+        int diff = (int)hour - bh;
+        if (diff < 0)
+            diff += 24; /* wrapped past midnight */
+        if (diff < best_diff) {
+            best_diff = diff;
+            best = &blocks[i];
+        }
+    }
+    return best;
+}
+
+hu_error_t hu_circadian_build_prompt_with_routine(hu_allocator_t *alloc, uint8_t hour,
+                                                  const struct hu_daily_routine *routine,
+                                                  char **out, size_t *out_len) {
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* No routine — fall back to default */
+    if (!routine || routine->weekday_count == 0)
+        return hu_circadian_build_prompt(alloc, hour, out, out_len);
+
+    /* Find the routine block active at this hour (weekday for now) */
+    const hu_routine_block_t *block =
+        find_routine_block_for_hour(routine->weekday, routine->weekday_count, hour);
+
+    /* No matching block or empty mood_modifier — fall back */
+    if (!block || block->mood_modifier[0] == '\0')
+        return hu_circadian_build_prompt(alloc, hour, out, out_len);
+
+    hu_time_phase_t phase = hu_circadian_phase(hour);
+    const char *name = s_phase_names[(size_t)phase];
+    const char *default_guidance = s_phase_guidance[(size_t)phase];
+
+#define HU_CIRCADIAN_ROUTINE_BUF_CAP 512
+    char *buf = (char *)alloc->alloc(alloc->ctx, HU_CIRCADIAN_ROUTINE_BUF_CAP);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    int n = snprintf(buf, HU_CIRCADIAN_ROUTINE_BUF_CAP,
+                     "\n### Time Awareness\nCurrent phase: %s. "
+                     "Persona energy: %s (activity: %s). %s\n",
+                     name, block->mood_modifier, block->activity, default_guidance);
+    if (n <= 0 || (size_t)n >= HU_CIRCADIAN_ROUTINE_BUF_CAP) {
+        alloc->free(alloc->ctx, buf, HU_CIRCADIAN_ROUTINE_BUF_CAP);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    size_t need = (size_t)n + 1;
+    char *shrunk = (char *)alloc->realloc(alloc->ctx, buf, HU_CIRCADIAN_ROUTINE_BUF_CAP, need);
+    if (!shrunk) {
+        alloc->free(alloc->ctx, buf, HU_CIRCADIAN_ROUTINE_BUF_CAP);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    *out = shrunk;
+    *out_len = (size_t)n;
+#undef HU_CIRCADIAN_ROUTINE_BUF_CAP
     return HU_OK;
 }

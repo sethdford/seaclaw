@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/memory/graph.h"
 #include "human/core/string.h"
 #include "human/memory/consolidation.h"
@@ -1725,7 +1726,7 @@ hu_error_t hu_graph_reconsolidate(hu_graph_t *g, hu_allocator_t *alloc, const ch
                 sqlite3_bind_int64(stmt, 4, now);
                 sqlite3_bind_int64(stmt, 5, entity.id);
                 if (sqlite3_step(stmt) != SQLITE_DONE)
-                    fprintf(stderr, "[graph] supersede entity %lld: step failed\n",
+                    hu_log_error("graph", NULL, "supersede entity %lld: step failed",
                             (long long)entity.id);
             }
             sqlite3_finalize(stmt);
@@ -1741,7 +1742,7 @@ hu_error_t hu_graph_reconsolidate(hu_graph_t *g, hu_allocator_t *alloc, const ch
         sqlite3_bind_int64(up_stmt, 3, entity.id);
         sqlite3_bind_int64(up_stmt, 4, entity.id);
         if (sqlite3_step(up_stmt) != SQLITE_DONE)
-            fprintf(stderr, "[graph] update relations for entity %lld: step failed\n",
+            hu_log_error("graph", NULL, "update relations for entity %lld: step failed",
                     (long long)entity.id);
         sqlite3_finalize(up_stmt);
     }

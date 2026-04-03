@@ -6,6 +6,7 @@
  *   - System crontab tick (load, match, execute)
  *   - Agent-type cron jobs (hu_service_run_agent_cron)
  */
+#include "human/core/log.h"
 #include "human/daemon_cron.h"
 #include "human/daemon.h"
 
@@ -177,7 +178,7 @@ void hu_daemon_cron_tick(hu_allocator_t *alloc) {
         hu_run_result_t result = {0};
         hu_error_t run_err = hu_process_run(alloc, argv, NULL, 65536, &result);
         if (run_err != HU_OK)
-            fprintf(stderr, "[human] cron job failed: %s (err=%s)\n", entries[i].command,
+            hu_log_error("human", NULL, "cron job failed: %s (err=%s)", entries[i].command,
                     hu_error_string(run_err));
         hu_run_result_free(alloc, &result);
 #endif
@@ -300,11 +301,10 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
                                 hu_error_t mod_err =
                                     hu_moderation_check(alloc, response, response_len, &mod_r);
                                 if (mod_err != HU_OK) {
-                                    fprintf(stderr, "[human] cron moderation check failed: %s\n",
+                                    hu_log_error("human", NULL, "cron moderation check failed: %s",
                                             hu_error_string(mod_err));
                                 } else if (mod_r.flagged) {
-                                    fprintf(stderr,
-                                            "[human] cron moderation flagged: v=%.2f sh=%.2f\n",
+                                    hu_log_info("human", NULL, "cron moderation flagged: v=%.2f sh=%.2f",
                                             mod_r.violence_score, mod_r.self_harm_score);
                                 }
                             }
@@ -312,7 +312,7 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
                                 channels[c].channel->ctx, target_part, target_part_len, response,
                                 response_len, NULL, 0);
                             if (send_err != HU_OK) {
-                                fprintf(stderr, "[human] cron send failed: %s\n",
+                                hu_log_error("human", NULL, "cron send failed: %s",
                                         hu_error_string(send_err));
                             }
                         }
@@ -328,7 +328,7 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
                     hu_error_t parse_err =
                         hu_findings_parse_and_store(alloc, fdb, response, response_len);
                     if (parse_err != HU_OK && parse_err != HU_ERR_NOT_FOUND) {
-                        fprintf(stderr, "[human] cron findings parse failed: %s\n",
+                        hu_log_error("human", NULL, "cron findings parse failed: %s",
                                 hu_error_string(parse_err));
                     }
 #ifdef HU_HAS_SKILLS
@@ -336,10 +336,10 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
                     hu_error_t cycle_err = hu_intelligence_run_cycle(alloc, fdb, &cron_cycle);
                     if (cycle_err == HU_OK &&
                         (cron_cycle.findings_actioned > 0 || cron_cycle.lessons_extracted > 0)) {
-                        fprintf(stderr, "[human] post-research cycle: %zu findings, %zu lessons\n",
+                        hu_log_info("human", NULL, "post-research cycle: %zu findings, %zu lessons",
                                 cron_cycle.findings_actioned, cron_cycle.lessons_extracted);
                     } else if (cycle_err != HU_OK) {
-                        fprintf(stderr, "[human] post-research cycle failed: %s\n",
+                        hu_log_error("human", NULL, "post-research cycle failed: %s",
                                 hu_error_string(cycle_err));
                     }
 #endif
@@ -351,7 +351,7 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
         hu_error_t log_err = hu_cron_add_run(agent->scheduler, alloc, jobs[i].id, (int64_t)now,
                                               err == HU_OK ? "success" : "failed", response);
         if (log_err != HU_OK) {
-            fprintf(stderr, "[human] cron add_run failed: %s\n", hu_error_string(log_err));
+            hu_log_error("human", NULL, "cron add_run failed: %s", hu_error_string(log_err));
         }
 
         if (response)

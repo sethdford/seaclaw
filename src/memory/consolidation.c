@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/memory/consolidation.h"
 #include "human/core/error.h"
 #include "human/core/string.h"
@@ -241,7 +242,7 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
             hu_error_t ferr =
                 memory->vtable->forget(memory->ctx, entries[i].key, entries[i].key_len, &deleted);
             if (ferr != HU_OK)
-                fprintf(stderr, "[consolidation] forget key '%.*s' failed: %s\n",
+                hu_log_error("consolidation", NULL, "forget key '%.*s' failed: %s",
                         (int)entries[i].key_len, entries[i].key, hu_error_string(ferr));
         }
     }
@@ -308,7 +309,7 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
         hu_error_t ferr =
             memory->vtable->forget(memory->ctx, entries[i].key, entries[i].key_len, &deleted);
         if (ferr != HU_OK)
-            fprintf(stderr, "[consolidation] evict key '%.*s' failed: %s\n",
+            hu_log_error("consolidation", NULL, "evict key '%.*s' failed: %s",
                     (int)entries[i].key_len, entries[i].key, hu_error_string(ferr));
         else {
             evicted[i] = true;

@@ -2,9 +2,9 @@
  * Relationship depth tracker — session-based warmth and formality adaptation.
  */
 #include "human/persona/relationship.h"
+#include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/data/loader.h"
-#include "human/core/json.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,8 +55,10 @@ hu_error_t hu_relationship_data_init(hu_allocator_t *alloc) {
         return HU_OK;
     }
 
-    const char **names = (const char **)alloc->alloc(alloc->ctx, stage_count * sizeof(const char *));
-    const char **guidance = (const char **)alloc->alloc(alloc->ctx, stage_count * sizeof(const char *));
+    const char **names =
+        (const char **)alloc->alloc(alloc->ctx, stage_count * sizeof(const char *));
+    const char **guidance =
+        (const char **)alloc->alloc(alloc->ctx, stage_count * sizeof(const char *));
     if (!names || !guidance) {
         if (names)
             alloc->free(alloc->ctx, names, stage_count * sizeof(const char *));
@@ -106,7 +108,8 @@ void hu_relationship_data_cleanup(hu_allocator_t *alloc) {
     if (s_stage_guidance != (const char **)DEFAULT_STAGE_GUIDANCE) {
         for (size_t i = 0; i < s_stage_count; i++) {
             if (s_stage_guidance[i])
-                alloc->free(alloc->ctx, (char *)s_stage_guidance[i], strlen(s_stage_guidance[i]) + 1);
+                alloc->free(alloc->ctx, (char *)s_stage_guidance[i],
+                            strlen(s_stage_guidance[i]) + 1);
         }
         alloc->free(alloc->ctx, s_stage_guidance, s_stage_count * sizeof(const char *));
     }
@@ -115,6 +118,32 @@ void hu_relationship_data_cleanup(hu_allocator_t *alloc) {
     s_stage_count = 4;
 }
 
+/* Compute weighted quality from a single session's signals */
+float hu_session_quality_score(const hu_session_quality_t *q) {
+    if (!q)
+        return 0.0f;
+    float score = q->emotional_exchanges * 0.3f + q->topic_diversity * 0.2f +
+                  q->vulnerability_events * 0.3f + q->humor_shared * 0.1f +
+                  q->repair_survived * 0.1f;
+    if (score < 0.0f)
+        score = 0.0f;
+    if (score > 1.0f)
+        score = 1.0f;
+    return score;
+}
+
+/* Map cumulative quality to relationship stage */
+static hu_relationship_stage_t stage_from_quality(float quality) {
+    if (quality >= 0.80f)
+        return HU_REL_DEEP;
+    if (quality >= 0.55f)
+        return HU_REL_TRUSTED;
+    if (quality >= 0.25f)
+        return HU_REL_FAMILIAR;
+    return HU_REL_NEW;
+}
+
+/* Legacy: session-count-only progression */
 void hu_relationship_new_session(hu_relationship_state_t *state) {
     if (!state)
         return;
@@ -127,6 +156,50 @@ void hu_relationship_new_session(hu_relationship_state_t *state) {
         state->stage = HU_REL_FAMILIAR;
     else
         state->stage = HU_REL_NEW;
+}
+
+/* Quality-weighted session progression with regression support */
+void hu_relationship_new_session_quality(hu_relationship_state_t *state,
+                                         const hu_session_quality_t *quality,
+                                         float velocity_factor) {
+    if (!state || !quality)
+        return;
+
+    state->session_count++;
+    float session_score = hu_session_quality_score(quality);
+
+    /* Apply velocity factor as acceleration/deceleration */
+    if (velocity_factor <= 0.0f)
+        velocity_factor = 1.0f;
+    session_score *= velocity_factor;
+    if (session_score > 1.0f)
+        session_score = 1.0f;
+
+    /* Update cumulative quality: exponential moving average.
+     * session_count contributes a small baseline (max 0.1 at 50 sessions)
+     * so pure session count alone never reaches DEEP. */
+    float session_baseline = (float)state->session_count / 500.0f;
+    if (session_baseline > 0.1f)
+        session_baseline = 0.1f;
+
+    hu_relationship_quality_score_t *qs = &state->quality;
+    if (qs->quality_sessions == 0) {
+        qs->cumulative_quality = session_score + session_baseline;
+    } else {
+        /* EMA with alpha = 0.3 (recent sessions matter more) */
+        qs->cumulative_quality =
+            qs->cumulative_quality * 0.7f + (session_score + session_baseline) * 0.3f;
+    }
+    if (qs->cumulative_quality > 1.0f)
+        qs->cumulative_quality = 1.0f;
+    if (qs->cumulative_quality < 0.0f)
+        qs->cumulative_quality = 0.0f;
+
+    qs->recent_quality = session_score;
+    qs->quality_sessions++;
+
+    /* Stage can both advance AND regress based on quality */
+    state->stage = stage_from_quality(qs->cumulative_quality);
 }
 
 void hu_relationship_update(hu_relationship_state_t *state, uint32_t turn_count) {

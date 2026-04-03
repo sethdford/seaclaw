@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/mcp_manager.h"
 #include "human/config.h"
 #include "human/core/allocator.h"
@@ -114,7 +115,7 @@ hu_error_t hu_mcp_manager_create(hu_allocator_t *alloc,
         bool is_sse = (strcmp(transport_type, "sse") == 0);
 
         if (!is_stdio && !is_http && !is_sse) {
-            fprintf(stderr, "mcp_manager: invalid transport_type '%s' for server '%s'\n",
+            hu_log_info("mcp-manager", NULL, "mcp_manager: invalid transport_type '%s' for server '%s'",
                     transport_type, e->name);
             continue;
         }
@@ -211,30 +212,27 @@ static void slot_load_oauth_token(hu_allocator_t *alloc, hu_mcp_mgr_slot_t *slot
     char token_path[512];
     int written = snprintf(token_path, sizeof(token_path), "%s/.human/oauth_tokens.json", home);
     if (written < 0 || (size_t)written >= sizeof(token_path)) {
-        fprintf(stderr, "mcp_manager: token path too long for server '%s'\n", slot->name);
+        hu_log_info("mcp-manager", NULL, "mcp_manager: token path too long for server '%s'", slot->name);
         return;
     }
 
     hu_error_t err = hu_mcp_oauth_token_load(alloc, token_path, slot->name, &slot->oauth_token);
     if (err == HU_OK) {
         if (hu_mcp_oauth_token_is_expired(&slot->oauth_token)) {
-            fprintf(stderr,
-                    "mcp_manager: OAuth token for '%s' has expired. "
-                    "Please re-authenticate.\n",
+            hu_log_info("mcp-manager", NULL, "mcp_manager: OAuth token for '%s' has expired. "
+                    "Please re-authenticate.",
                     slot->name);
             hu_mcp_oauth_token_free(alloc, &slot->oauth_token);
         } else {
-            fprintf(stderr,
-                    "mcp_manager: loaded cached OAuth token for '%s' (valid until %lld)\n",
+            hu_log_info("mcp-manager", NULL, "mcp_manager: loaded cached OAuth token for '%s' (valid until %lld)",
                     slot->name, (long long)slot->oauth_token.expires_at);
         }
     } else if (err == HU_ERR_NOT_FOUND) {
-        fprintf(stderr,
-                "mcp_manager: no cached OAuth token for '%s'. "
-                "Please authenticate via: human oauth %s\n",
+        hu_log_info("mcp-manager", NULL, "mcp_manager: no cached OAuth token for '%s'. "
+                "Please authenticate via: human oauth %s",
                 slot->name, slot->name);
     } else {
-        fprintf(stderr, "mcp_manager: failed to load OAuth token for '%s': %d\n", slot->name,
+        hu_log_error("mcp-manager", NULL, "mcp_manager: failed to load OAuth token for '%s': %d", slot->name,
                 (int)err);
     }
 }
@@ -317,7 +315,7 @@ hu_error_t hu_mcp_manager_connect_auto(hu_mcp_manager_t *mgr) {
             continue;
         hu_error_t err = connect_slot(mgr->alloc, &mgr->slots[i]);
         if (err != HU_OK)
-            fprintf(stderr, "mcp_manager: failed to connect server '%s': %d\n",
+            hu_log_error("mcp-manager", NULL, "mcp_manager: failed to connect server '%s': %d",
                     mgr->slots[i].name ? mgr->slots[i].name : "?", (int)err);
     }
     return HU_OK;
@@ -553,6 +551,12 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
         hu_mcp_mgr_slot_t *slot = &mgr->slots[si];
         if (!slot->connected)
             continue;
+
+        if (!slot->server) {
+            hu_log_info("mcp-manager", NULL, "mcp_manager: tool discovery not yet supported for %s transport",
+                    slot->transport_type ? slot->transport_type : "unknown");
+            continue;
+        }
 
         char **names = NULL, **descs = NULL, **params = NULL;
         size_t n = 0;

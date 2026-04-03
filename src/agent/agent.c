@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/agent.h"
 #include "human/config.h"
 #include "human/agent/awareness.h"
@@ -110,7 +111,7 @@ void hu_agent_internal_record_cost(hu_agent_t *agent, const hu_token_usage_t *us
         entry.timestamp_secs = (int64_t)time(NULL);
         hu_error_t cost_err = hu_cost_record_usage(agent->cost_tracker, &entry, agent->active_job_id);
         if (cost_err != HU_OK)
-            fprintf(stderr, "[agent] cost tracking failed: %s\n", hu_error_string(cost_err));
+            hu_log_error("agent", NULL, "cost tracking failed: %s", hu_error_string(cost_err));
     }
 
     /* Record in usage tracker (per-provider tracking) */
@@ -123,7 +124,7 @@ void hu_agent_internal_record_cost(hu_agent_t *agent, const hu_token_usage_t *us
         tu.cache_write_tokens = 0; /* not yet exposed in provider API */
         hu_error_t usage_err = hu_usage_tracker_record(agent->usage_tracker, agent->model_name, &tu);
         if (usage_err != HU_OK)
-            fprintf(stderr, "[agent] usage tracking failed: %s\n", hu_error_string(usage_err));
+            hu_log_error("agent", NULL, "usage tracking failed: %s", hu_error_string(usage_err));
     }
 }
 
@@ -318,8 +319,7 @@ hu_error_t hu_agent_from_config(
             hu_error_t perr = hu_persona_load(alloc, persona, persona_len, out->persona);
             if (perr != HU_OK) {
 #ifndef HU_IS_TEST
-                fprintf(stderr,
-                        "[human] warning: persona '%.*s' not found, running without persona\n",
+                hu_log_error("human", NULL, "warning: persona '%.*s' not found, running without persona",
                         (int)persona_len, persona);
 #endif
                 alloc->free(alloc->ctx, out->persona, sizeof(hu_persona_t));
@@ -558,13 +558,13 @@ void hu_agent_set_mailbox(hu_agent_t *agent, hu_mailbox_t *mailbox) {
     if (agent->mailbox) {
         hu_error_t err = hu_mailbox_unregister(agent->mailbox, id);
         if (err != HU_OK)
-            fprintf(stderr, "warning: mailbox unregister failed: %s\n", hu_error_string(err));
+            hu_log_error("agent", NULL, "warning: mailbox unregister failed: %s", hu_error_string(err));
     }
     agent->mailbox = mailbox;
     if (agent->mailbox) {
         hu_error_t err = hu_mailbox_register(agent->mailbox, id);
         if (err != HU_OK)
-            fprintf(stderr, "warning: mailbox register failed: %s\n", hu_error_string(err));
+            hu_log_error("agent", NULL, "warning: mailbox register failed: %s", hu_error_string(err));
     }
 }
 
@@ -720,7 +720,7 @@ void hu_agent_deinit(hu_agent_t *agent) {
         hu_error_t promo_err =
             hu_promotion_run(agent->alloc, &agent->stm, agent->memory, &promo_config);
         if (promo_err != HU_OK)
-            fprintf(stderr, "[agent] STM promotion failed: %s\n", hu_error_string(promo_err));
+            hu_log_error("agent", NULL, "STM promotion failed: %s", hu_error_string(promo_err));
     }
     hu_stm_deinit(&agent->stm);
     if (agent->sota_initialized) {
@@ -1185,7 +1185,7 @@ void hu_agent_internal_process_mailbox_messages(hu_agent_t *agent) {
                     hu_error_t hist_err = hu_agent_internal_append_history(
                         agent, HU_ROLE_USER, buf, (size_t)n, NULL, 0, NULL, 0);
                     if (hist_err != HU_OK)
-                        fprintf(stderr, "[agent] mailbox ACP history append failed: %s\n",
+                        hu_log_error("agent", NULL, "mailbox ACP history append failed: %s",
                                 hu_error_string(hist_err));
                 }
             }
@@ -1200,7 +1200,7 @@ void hu_agent_internal_process_mailbox_messages(hu_agent_t *agent) {
                 hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_USER, buf,
                                                                        (size_t)n, NULL, 0, NULL, 0);
                 if (hist_err != HU_OK)
-                    fprintf(stderr, "[agent] mailbox message append failed: %s\n",
+                    hu_log_error("agent", NULL, "mailbox message append failed: %s",
                             hu_error_string(hist_err));
             }
         }
