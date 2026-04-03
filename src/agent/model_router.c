@@ -1,7 +1,9 @@
 #include "human/agent/model_router.h"
+#include "human/provider.h"
 #include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 
 static bool ci_contains(const char *haystack, size_t haystack_len, const char *needle) {
     size_t nlen = strlen(needle);
@@ -113,6 +115,112 @@ hu_model_router_config_t hu_model_router_default_config(void) {
     return cfg;
 }
 
+/* Internal heuristic scoring — returns the raw score for use by both
+ * hu_model_route and hu_model_route_with_judge. */
+static int compute_heuristic_score(const char *msg, size_t msg_len,
+                                   const char *relationship, size_t relationship_len,
+                                   int hour, size_t history_count) {
+    size_t words = word_count(msg, msg_len);
+    int emotion = emotional_weight(msg, msg_len);
+    bool question = has_question(msg, msg_len);
+    bool reasoning = needs_reasoning(msg, msg_len);
+    int rel_w = relationship_weight(relationship, relationship_len);
+
+    int score = 0;
+
+    if (words <= 3)
+        score -= 2;
+    else if (words <= 8)
+        score -= 1;
+    else if (words > 30)
+        score += 1;
+    else if (words > 80)
+        score += 2;
+
+    score += emotion;
+
+    if (emotion >= 3)
+        score += 3;
+
+    if (question)
+        score += 1;
+    if (reasoning)
+        score += 2;
+
+    score += rel_w;
+
+    if (history_count > 6)
+        score += 1;
+
+    if ((hour >= 23 || hour <= 4) && emotion > 0)
+        score += 1;
+
+    return score;
+}
+
+static void apply_tier_to_selection(hu_model_selection_t *sel, const hu_model_router_config_t *cfg,
+                                    int score) {
+    if (score <= 0) {
+        sel->tier = HU_TIER_REFLEXIVE;
+        sel->model = cfg->reflexive_model;
+        sel->model_len = cfg->reflexive_model_len;
+        sel->thinking_budget = 0;
+        sel->temperature = 0.9;
+    } else if (score <= 3) {
+        sel->tier = HU_TIER_CONVERSATIONAL;
+        sel->model = cfg->conversational_model;
+        sel->model_len = cfg->conversational_model_len;
+        sel->thinking_budget = 1024;
+        sel->temperature = 0.8;
+    } else if (score <= 6) {
+        sel->tier = HU_TIER_ANALYTICAL;
+        sel->model = cfg->analytical_model;
+        sel->model_len = cfg->analytical_model_len;
+        sel->thinking_budget = 4096;
+        sel->temperature = 0.7;
+    } else {
+        sel->tier = HU_TIER_DEEP;
+        sel->model = cfg->deep_model;
+        sel->model_len = cfg->deep_model_len;
+        sel->thinking_budget = 8192;
+        sel->temperature = 0.6;
+    }
+}
+
+static void apply_tier_override(hu_model_selection_t *sel, const hu_model_router_config_t *cfg,
+                                hu_cognitive_tier_t tier) {
+    switch (tier) {
+    case HU_TIER_REFLEXIVE:
+        sel->tier = HU_TIER_REFLEXIVE;
+        sel->model = cfg->reflexive_model;
+        sel->model_len = cfg->reflexive_model_len;
+        sel->thinking_budget = 0;
+        sel->temperature = 0.9;
+        break;
+    case HU_TIER_CONVERSATIONAL:
+        sel->tier = HU_TIER_CONVERSATIONAL;
+        sel->model = cfg->conversational_model;
+        sel->model_len = cfg->conversational_model_len;
+        sel->thinking_budget = 1024;
+        sel->temperature = 0.8;
+        break;
+    case HU_TIER_ANALYTICAL:
+        sel->tier = HU_TIER_ANALYTICAL;
+        sel->model = cfg->analytical_model;
+        sel->model_len = cfg->analytical_model_len;
+        sel->thinking_budget = 4096;
+        sel->temperature = 0.7;
+        break;
+    case HU_TIER_DEEP:
+        sel->tier = HU_TIER_DEEP;
+        sel->model = cfg->deep_model;
+        sel->model_len = cfg->deep_model_len;
+        sel->thinking_budget = 8192;
+        sel->temperature = 0.6;
+        break;
+    }
+}
+
 hu_model_selection_t hu_model_route(const hu_model_router_config_t *cfg,
                                     const char *msg, size_t msg_len,
                                     const char *relationship, size_t relationship_len,
@@ -128,75 +236,92 @@ hu_model_selection_t hu_model_route(const hu_model_router_config_t *cfg,
         return sel;
     }
 
-    size_t words = word_count(msg, msg_len);
-    int emotion = emotional_weight(msg, msg_len);
-    bool question = has_question(msg, msg_len);
-    bool reasoning = needs_reasoning(msg, msg_len);
-    int rel_w = relationship_weight(relationship, relationship_len);
+    int score = compute_heuristic_score(msg, msg_len, relationship, relationship_len, hour,
+                                        history_count);
+    apply_tier_to_selection(&sel, cfg, score);
 
-    /* Score accumulation: higher = needs more capable model */
-    int score = 0;
-
-    /* Message characteristics */
-    if (words <= 3)
-        score -= 2;
-    else if (words <= 8)
-        score -= 1;
-    else if (words > 30)
-        score += 1;
-    else if (words > 80)
-        score += 2;
-
-    score += emotion;
-
-    /* Emotional messages always deserve a capable model regardless of length */
-    if (emotion >= 3)
-        score += 3;
-
-    if (question)
-        score += 1;
-    if (reasoning)
-        score += 2;
-
-    /* Relationship boost: family/close = higher quality */
-    score += rel_w;
-
-    /* Long conversation = more context needed */
-    if (history_count > 6)
-        score += 1;
-
-    /* Late-night emotional = probably important */
-    if ((hour >= 23 || hour <= 4) && emotion > 0)
-        score += 1;
-
-    /* Route to tier */
-    if (score <= 0) {
-        sel.tier = HU_TIER_REFLEXIVE;
-        sel.model = cfg->reflexive_model;
-        sel.model_len = cfg->reflexive_model_len;
-        sel.thinking_budget = 0;
-        sel.temperature = 0.9;
-    } else if (score <= 3) {
-        sel.tier = HU_TIER_CONVERSATIONAL;
-        sel.model = cfg->conversational_model;
-        sel.model_len = cfg->conversational_model_len;
-        sel.thinking_budget = 1024;
-        sel.temperature = 0.8;
-    } else if (score <= 6) {
-        sel.tier = HU_TIER_ANALYTICAL;
-        sel.model = cfg->analytical_model;
-        sel.model_len = cfg->analytical_model_len;
-        sel.thinking_budget = 4096;
-        sel.temperature = 0.7;
-    } else {
-        sel.tier = HU_TIER_DEEP;
-        sel.model = cfg->deep_model;
-        sel.model_len = cfg->deep_model_len;
-        sel.thinking_budget = 8192;
-        sel.temperature = 0.6;
-    }
+    /* Record to global decision log for dashboard visibility */
+    hu_route_log_record(hu_route_global_log(), &sel, score, (int64_t)time(NULL));
 
     return sel;
+}
+
+hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *cfg,
+                                               const char *msg, size_t msg_len,
+                                               const char *relationship, size_t relationship_len,
+                                               int hour, size_t history_count,
+                                               hu_provider_t *judge_provider,
+                                               const char *judge_model, size_t judge_model_len,
+                                               hu_allocator_t *alloc,
+                                               hu_route_cache_t *cache) {
+    hu_model_selection_t sel;
+    memset(&sel, 0, sizeof(sel));
+
+    if (!cfg || !msg || msg_len == 0 || !judge_provider || !alloc) {
+        return hu_model_route(cfg, msg, msg_len, relationship, relationship_len, hour,
+                              history_count);
+    }
+
+    int score = compute_heuristic_score(msg, msg_len, relationship, relationship_len, hour,
+                                        history_count);
+
+    int64_t now = (int64_t)time(NULL);
+
+    /* Check cache first */
+    hu_cognitive_tier_t cached_tier;
+    if (cache && hu_route_cache_get(cache, msg, msg_len, now, &cached_tier)) {
+        sel.source = HU_ROUTE_JUDGE_CACHED;
+        apply_tier_override(&sel, cfg, cached_tier);
+        hu_route_log_record(hu_route_global_log(), &sel, score, now);
+        return sel;
+    }
+
+    /* Call the judge provider */
+#ifdef HU_IS_TEST
+    /* In test mode, skip the actual LLM call and fall through to heuristics */
+    sel.source = HU_ROUTE_JUDGE_FALLBACK;
+    apply_tier_to_selection(&sel, cfg, score);
+    hu_route_log_record(hu_route_global_log(), &sel, score, now);
+    return sel;
+#else
+    if (!judge_provider->vtable || !judge_provider->vtable->chat_with_system) {
+        sel.source = HU_ROUTE_JUDGE_FALLBACK;
+        apply_tier_to_selection(&sel, cfg, score);
+        hu_route_log_record(hu_route_global_log(), &sel, score, now);
+        return sel;
+    }
+
+    const char *system_prompt = hu_route_judge_system_prompt();
+    char *response = NULL;
+    size_t response_len = 0;
+    hu_error_t err = judge_provider->vtable->chat_with_system(
+        judge_provider->ctx, alloc, system_prompt, strlen(system_prompt),
+        msg, msg_len, judge_model, judge_model_len, 0.0, &response, &response_len);
+
+    if (err != HU_OK || !response || response_len == 0) {
+        if (response)
+            alloc->free(alloc->ctx, response, response_len + 1);
+        sel.source = HU_ROUTE_JUDGE_FALLBACK;
+        apply_tier_to_selection(&sel, cfg, score);
+        hu_route_log_record(hu_route_global_log(), &sel, score, now);
+        return sel;
+    }
+
+    hu_cognitive_tier_t judge_tier;
+    if (hu_route_parse_judge_response(response, response_len, &judge_tier)) {
+        sel.source = HU_ROUTE_JUDGE;
+        apply_tier_override(&sel, cfg, judge_tier);
+        if (cache)
+            hu_route_cache_put(cache, msg, msg_len, now, judge_tier);
+    } else {
+        sel.source = HU_ROUTE_JUDGE_FALLBACK;
+        apply_tier_to_selection(&sel, cfg, score);
+    }
+
+    alloc->free(alloc->ctx, response, response_len + 1);
+    hu_route_log_record(hu_route_global_log(), &sel, score, now);
+    return sel;
+#endif
 }
 
 /* ── FNV-1a prompt hash for cache keys ────────────────────────────────── */
@@ -432,4 +557,17 @@ const char *hu_route_source_str(hu_route_source_t source) {
     default:
         return "unknown";
     }
+}
+
+/* ── Global decision log ──────────────────────────────────────────────── */
+
+static hu_route_decision_log_t s_global_log;
+static bool s_global_log_initialized = false;
+
+hu_route_decision_log_t *hu_route_global_log(void) {
+    if (!s_global_log_initialized) {
+        hu_route_log_init(&s_global_log);
+        s_global_log_initialized = true;
+    }
+    return &s_global_log;
 }
