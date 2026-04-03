@@ -100,6 +100,8 @@ void run_channel_manager_tests(void);
 void run_new_modules_tests(void);
 void run_provider_all_tests(void);
 void run_channel_all_tests(void);
+void run_idempotency_tests(void);
+void run_idempotency_hula_integration_tests(void);
 void run_meta_common_tests(void);
 void run_channel_integration_tests(void);
 void run_config_extended_tests(void);
@@ -224,6 +226,7 @@ void run_tool_router_tests(void);
 void run_dag_tests(void);
 void run_hula_tests(void);
 void run_hula_golden_tests(void);
+void run_workflow_event_tests(void);
 void run_sota_features_tests(void);
 void run_mood_tests(void);
 void run_style_tracker_tests(void);
@@ -382,6 +385,8 @@ void run_adversarial_concurrency_tests(void);
 void run_adversarial_integration_tests(void);
 void run_config_reload_tests(void);
 void run_plugin_hooks_tests(void);
+void run_approval_gate_tests(void);
+void run_workflow_commands_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -416,6 +421,8 @@ int main(int argc, char **argv) {
 
     run_allocator_tests();
     run_data_loader_tests();
+    run_idempotency_tests();
+    run_idempotency_hula_integration_tests();
     run_agent_modules_tests();
     run_compaction_hierarchical_tests();
     run_tot_recursive_tests();
@@ -633,6 +640,7 @@ int main(int argc, char **argv) {
     run_dag_tests();
     run_hula_tests();
     run_hula_golden_tests();
+    run_workflow_event_tests();
     run_sota_features_tests();
     run_mood_tests();
     run_style_tracker_tests();
@@ -788,6 +796,8 @@ int main(int argc, char **argv) {
     run_task_manager_tests();
     run_task_tools_tests();
     run_tool_ask_user_tests();
+    run_approval_gate_tests();
+    run_workflow_commands_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

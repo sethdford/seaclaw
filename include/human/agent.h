@@ -1,6 +1,7 @@
 #ifndef HU_AGENT_H
 #define HU_AGENT_H
 
+#include "human/agent/approval_gate.h"
 #include "human/agent/chaos.h"
 #include "human/agent/checkpoint.h"
 #include "human/agent/commitment_store.h"
@@ -346,6 +347,9 @@ struct hu_agent {
 
     /* SOTA: agent communication protocol inbox for multi-agent coordination */
     struct hu_acp_inbox *acp_inbox; /* owned; NULL until multi_agent enabled */
+
+    /* Idempotency registry for crash-proof tool execution (HuLa replay engine) */
+    struct hu_idempotency_registry *idempotency_registry; /* optional; NULL = no dedup */
 };
 
 /* Create agent from minimal config (no full config loader yet).

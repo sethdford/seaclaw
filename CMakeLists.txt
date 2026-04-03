@@ -438,6 +438,7 @@ set(HU_CORE_SOURCES
     src/agent/dag.c
     src/agent/dag_executor.c
     src/agent/hula.c
+    src/agent/idempotency.c
     src/agent/hula_compiler.c
     src/agent/hula_emergence.c
     src/agent/hula_compiler_examples.c
@@ -485,6 +486,8 @@ set(HU_CORE_SOURCES
     src/agent/mar.c
     src/agent/prompt_optimizer.c
     src/agent/checkpoint.c
+    src/agent/approval_gate.c
+    src/agent/workflow_event.c
     src/agent/chaos.c
     src/agent/scratchpad.c
     src/agent/tree_of_thought.c
@@ -1894,6 +1897,8 @@ set(HU_TEST_SOURCES
     tests/test_wasm.c
     tests/test_allocator.c
     tests/test_data_loader.c
+    tests/test_idempotency.c
+    tests/test_idempotency_hula_integration.c
     tests/test_json.c
     tests/test_string.c
     tests/test_slice.c
@@ -2080,6 +2085,7 @@ set(HU_TEST_SOURCES
     tests/test_dag.c
     tests/test_hula.c
     tests/test_hula_golden.c
+    tests/test_workflow_event.c
     tests/test_sota_features.c
     tests/test_mood.c
     tests/test_bth_e2e.c
@@ -2189,6 +2195,8 @@ list(APPEND HU_TEST_SOURCES
     tests/test_prompt_optimizer.c
     tests/test_chaos.c
     tests/test_checkpoint.c
+    tests/test_approval_gate.c
+    tests/test_workflow_commands.c
     tests/test_scratchpad.c
     tests/test_mcp_resources.c
     tests/test_mcp_resource_tools.c
