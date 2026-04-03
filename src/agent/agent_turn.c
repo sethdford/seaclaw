@@ -83,7 +83,6 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/agent/prompt_cache.h"
 #include "human/context.h"
 #include "human/context/conversation.h"
-#include "human/memory/consolidation.h"
 #include "human/context_engine.h"
 #include "human/context_tokens.h"
 #include "human/core/json.h"
@@ -91,6 +90,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/eval/turing_score.h"
 #include "human/hook.h"
 #include "human/hook_pipeline.h"
+#include "human/memory/consolidation.h"
 #include "human/memory/deep_extract.h"
 #include "human/memory/emotional_moments.h"
 #include "human/memory/fast_capture.h"
@@ -2295,6 +2295,43 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
+    /* Anti-sycophancy: inject directive when we hold a strong opinion on the topic */
+#ifdef HU_ENABLE_SQLITE
+    if (system_prompt && agent->memory && msg && msg_len > 0) {
+        sqlite3 *syc_db = hu_sqlite_memory_get_db(agent->memory);
+        size_t syc_len = 0;
+        char *syc_directive =
+            hu_opinion_check_before_agree(agent->alloc, syc_db, msg, msg_len, &syc_len);
+        if (syc_directive && syc_len > 0) {
+            size_t new_len = system_prompt_len + syc_len;
+            char *new_sp = (char *)agent->alloc->realloc(agent->alloc->ctx, system_prompt,
+                                                         system_prompt_len + 1, new_len + 1);
+            if (new_sp) {
+                memcpy(new_sp + system_prompt_len, syc_directive, syc_len);
+                new_sp[new_len] = '\0';
+                system_prompt = new_sp;
+                system_prompt_len = new_len;
+            }
+            agent->alloc->free(agent->alloc->ctx, syc_directive, syc_len + 1);
+        }
+        size_t contr_len = 0;
+        char *contr_directive = hu_opinion_contrarian_prompt(agent->alloc, msg, msg_len,
+                                                             (int)agent->history_count, &contr_len);
+        if (contr_directive && contr_len > 0) {
+            size_t new_len = system_prompt_len + contr_len;
+            char *new_sp = (char *)agent->alloc->realloc(agent->alloc->ctx, system_prompt,
+                                                         system_prompt_len + 1, new_len + 1);
+            if (new_sp) {
+                memcpy(new_sp + system_prompt_len, contr_directive, contr_len);
+                new_sp[new_len] = '\0';
+                system_prompt = new_sp;
+                system_prompt_len = new_len;
+            }
+            agent->alloc->free(agent->alloc->ctx, contr_directive, contr_len + 1);
+        }
+    }
+#endif
+
     /* Prompt cache: hash system prompt for provider-level deduplication.
      * On first occurrence of a prompt hash, generate a stable cache ID from the hash
      * (hex-encoded) so providers with server-side caching (Anthropic, Gemini) can
@@ -3969,10 +4006,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     bool should_consolidate = (agent->history_count % 10 == 0);
                     if (!should_consolidate) {
                         int64_t tc_now = (int64_t)time(NULL);
-                        should_consolidate = hu_consolidation_should_run(&agent_turn_debounce,
-                                                                         tc_now);
-                        if (should_consolidate &&
-                            hu_agent_consolidate_memory(agent) == HU_OK) {
+                        should_consolidate =
+                            hu_consolidation_should_run(&agent_turn_debounce, tc_now);
+                        if (should_consolidate && hu_agent_consolidate_memory(agent) == HU_OK) {
                             hu_consolidation_debounce_reset(&agent_turn_debounce, tc_now);
                         } else if (should_consolidate) {
                             should_consolidate = false;

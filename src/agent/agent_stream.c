@@ -17,7 +17,15 @@
 #include "human/agent/gvr.h"
 #include "human/agent/session_persist.h"
 #include "human/cognition/metacognition.h"
+#include "human/experience.h"
 #include "human/humanness.h"
+#ifdef HU_ENABLE_SQLITE
+#include "human/intelligence/online_learning.h"
+#include "human/intelligence/self_improve.h"
+#include "human/intelligence/value_learning.h"
+#include "human/memory.h"
+#include <sqlite3.h>
+#endif
 #include "human/provider.h"
 #include "human/voice.h"
 #include <stdio.h>
@@ -533,6 +541,65 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
     }
 #endif
 
+    /* Intelligence context: learned behaviors, online learning, value learning. */
+    char *intelligence_ctx = NULL;
+    size_t intelligence_ctx_len = 0;
+#ifdef HU_ENABLE_SQLITE
+    if (agent->memory) {
+        sqlite3 *idb = hu_sqlite_memory_get_db(agent->memory);
+        if (idb) {
+            char ip[4096];
+            size_t ipo = 0;
+            {
+                hu_self_improve_t si;
+                if (hu_self_improve_create(agent->alloc, idb, &si) == HU_OK) {
+                    char *p = NULL;
+                    size_t pl = 0;
+                    if (hu_self_improve_get_prompt_patches(&si, &p, &pl) == HU_OK && p && pl > 0) {
+                        int n = snprintf(ip + ipo, sizeof(ip) - ipo,
+                                         "### Learned Behaviors\n%.*s\n", (int)pl, p);
+                        if (n > 0 && ipo + (size_t)n < sizeof(ip))
+                            ipo += (size_t)n;
+                        agent->alloc->free(agent->alloc->ctx, p, pl + 1);
+                    }
+                    hu_self_improve_deinit(&si);
+                }
+            }
+            {
+                hu_online_learning_t ol;
+                if (hu_online_learning_create(agent->alloc, idb, 0.1, &ol) == HU_OK) {
+                    char *lc = NULL;
+                    size_t ll = 0;
+                    if (hu_online_learning_build_context(&ol, &lc, &ll) == HU_OK && lc && ll > 0) {
+                        int n = snprintf(ip + ipo, sizeof(ip) - ipo, "### %.*s\n", (int)ll, lc);
+                        if (n > 0 && ipo + (size_t)n < sizeof(ip))
+                            ipo += (size_t)n;
+                        agent->alloc->free(agent->alloc->ctx, lc, ll + 1);
+                    }
+                    hu_online_learning_deinit(&ol);
+                }
+            }
+            {
+                hu_value_engine_t ve;
+                if (hu_value_engine_create(agent->alloc, idb, &ve) == HU_OK) {
+                    char *vc = NULL;
+                    size_t vl = 0;
+                    if (hu_value_build_prompt(&ve, &vc, &vl) == HU_OK && vc && vl > 0) {
+                        int n = snprintf(ip + ipo, sizeof(ip) - ipo, "### %.*s\n", (int)vl, vc);
+                        if (n > 0 && ipo + (size_t)n < sizeof(ip))
+                            ipo += (size_t)n;
+                        agent->alloc->free(agent->alloc->ctx, vc, vl + 1);
+                    }
+                    hu_value_engine_deinit(&ve);
+                }
+            }
+            if (ipo > 0) {
+                intelligence_ctx = hu_strndup(agent->alloc, ip, ipo);
+                intelligence_ctx_len = ipo;
+            }
+        }
+    }
+#endif
     char *system_prompt = NULL;
     size_t system_prompt_len = 0;
     if (agent->cached_static_prompt && !persona_prompt && !awareness_ctx) {
@@ -579,6 +646,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             .conversation_context = agent->conversation_context,
             .conversation_context_len = agent->conversation_context_len,
             .max_response_chars = agent->max_response_chars,
+            .intelligence_context = intelligence_ctx,
+            .intelligence_context_len = intelligence_ctx_len,
         };
         err = hu_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
         if (persona_prompt)
@@ -589,6 +658,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
         if (outcome_ctx)
             agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
+        if (intelligence_ctx)
+            agent->alloc->free(agent->alloc->ctx, intelligence_ctx, intelligence_ctx_len + 1);
         if (err != HU_OK) {
             hu_agent_clear_current_for_tools();
             return err;
