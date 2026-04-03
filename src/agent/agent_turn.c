@@ -84,6 +84,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/agent/prompt_cache.h"
 #include "human/context.h"
 #include "human/context/conversation.h"
+#include "human/memory/consolidation.h"
 #include "human/context_engine.h"
 #include "human/context_tokens.h"
 #include "human/core/json.h"
@@ -111,6 +112,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/eval/turing_score.h"
 #include "human/provider.h"
 #include "human/security/cot_audit.h"
+#include "human/security/sensitivity.h"
 #include "human/voice.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/agent/goals.h"
@@ -2887,6 +2889,26 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
         }
 
+        /* Content sensitivity check (EdgeClaw-inspired S1/S2/S3 tiers):
+         * S3 content (secrets, private keys) prefers local/fallback model. */
+        {
+            hu_sensitivity_result_t sens = hu_sensitivity_classify_message(msg, msg_len);
+            if (hu_sensitivity_requires_local(sens.level)) {
+                hu_log_info("agent", agent->observer,
+                            "S3 sensitivity detected (%s) — preferring local/fallback model",
+                            sens.reason ? sens.reason : "private content");
+                if (agent->degradation_config.fallback_model &&
+                    agent->degradation_config.fallback_model_len > 0) {
+                    turn_model = agent->degradation_config.fallback_model;
+                    turn_model_len = agent->degradation_config.fallback_model_len;
+                }
+            } else if (sens.level == HU_SENSITIVITY_S2) {
+                hu_log_info("agent", agent->observer,
+                            "S2 sensitivity detected (%s) — PII present, logged for audit",
+                            sens.reason ? sens.reason : "personal data");
+            }
+        }
+
         clock_t llm_start = clock();
         hu_chat_response_t resp;
         memset(&resp, 0, sizeof(resp));
@@ -3958,8 +3980,35 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                             memory_ctx_len < 128 ? memory_ctx_len : 128,
                                             HU_TIER_ARCHIVAL, HU_TIER_RECALL);
                 }
-                if (agent->history_count % 10 == 0)
-                    hu_agent_consolidate_memory(agent);
+
+                /* Periodic consolidation: every 10 turns, plus debounce-based
+                 * supplemental consolidation (EdgeClaw-inspired). The debounce
+                 * tracker allows topic-switch triggers from daemon.c to also
+                 * feed into this path. */
+                {
+                    static hu_consolidation_debounce_t agent_turn_debounce;
+                    static bool agent_turn_debounce_inited = false;
+                    if (!agent_turn_debounce_inited) {
+                        hu_consolidation_debounce_init(&agent_turn_debounce);
+                        agent_turn_debounce_inited = true;
+                    }
+                    hu_consolidation_debounce_tick(&agent_turn_debounce);
+
+                    bool should_consolidate = (agent->history_count % 10 == 0);
+                    if (!should_consolidate) {
+                        int64_t tc_now = (int64_t)time(NULL);
+                        should_consolidate = hu_consolidation_should_run(&agent_turn_debounce,
+                                                                         tc_now);
+                        if (should_consolidate &&
+                            hu_agent_consolidate_memory(agent) == HU_OK) {
+                            hu_consolidation_debounce_reset(&agent_turn_debounce, tc_now);
+                        } else if (should_consolidate) {
+                            should_consolidate = false;
+                        }
+                    }
+                    if (should_consolidate && agent->history_count % 10 == 0)
+                        hu_agent_consolidate_memory(agent);
+                }
             }
 
             /* Self-eval feedback: score this turn's output and feed into

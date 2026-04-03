@@ -208,6 +208,53 @@ static void consolidation_null_memory_returns_error(void) {
     HU_ASSERT_NEQ(err, HU_OK);
 }
 
+/* ── Topic-switch consolidation debounce tests ────────────────────────── */
+
+static void debounce_init_prevents_immediate_run(void) {
+    hu_consolidation_debounce_t d;
+    hu_consolidation_debounce_init(&d);
+    HU_ASSERT(!hu_consolidation_should_run(&d, 1000));
+}
+
+static void debounce_needs_min_entries(void) {
+    hu_consolidation_debounce_t d;
+    hu_consolidation_debounce_init(&d);
+    for (int i = 0; i < HU_CONSOLIDATION_MIN_ENTRIES - 1; i++)
+        hu_consolidation_debounce_tick(&d);
+    HU_ASSERT(!hu_consolidation_should_run(&d, 1000));
+    hu_consolidation_debounce_tick(&d);
+    HU_ASSERT(hu_consolidation_should_run(&d, 1000));
+}
+
+static void debounce_respects_min_interval(void) {
+    hu_consolidation_debounce_t d;
+    hu_consolidation_debounce_init(&d);
+    for (int i = 0; i < 10; i++)
+        hu_consolidation_debounce_tick(&d);
+    hu_consolidation_debounce_reset(&d, 1000);
+    for (int i = 0; i < 10; i++)
+        hu_consolidation_debounce_tick(&d);
+    HU_ASSERT(!hu_consolidation_should_run(&d, 1000 + HU_CONSOLIDATION_MIN_INTERVAL_SECS - 1));
+    HU_ASSERT(hu_consolidation_should_run(&d, 1000 + HU_CONSOLIDATION_MIN_INTERVAL_SECS));
+}
+
+static void debounce_reset_clears_counters(void) {
+    hu_consolidation_debounce_t d;
+    hu_consolidation_debounce_init(&d);
+    for (int i = 0; i < 10; i++)
+        hu_consolidation_debounce_tick(&d);
+    HU_ASSERT(hu_consolidation_should_run(&d, 1000));
+    hu_consolidation_debounce_reset(&d, 1000);
+    HU_ASSERT(!hu_consolidation_should_run(&d, 2000));
+}
+
+static void debounce_null_safety(void) {
+    hu_consolidation_debounce_init(NULL);
+    hu_consolidation_debounce_tick(NULL);
+    HU_ASSERT(!hu_consolidation_should_run(NULL, 1000));
+    hu_consolidation_debounce_reset(NULL, 1000);
+}
+
 void run_consolidation_tests(void) {
     HU_TEST_SUITE("consolidation");
     HU_RUN_TEST(similarity_identical_returns_100);
@@ -223,4 +270,11 @@ void run_consolidation_tests(void) {
     HU_RUN_TEST(similarity_both_empty_returns_100);
     HU_RUN_TEST(similarity_same_prefix_reasonable);
     HU_RUN_TEST(consolidation_null_memory_returns_error);
+
+    /* Topic-switch debounce */
+    HU_RUN_TEST(debounce_init_prevents_immediate_run);
+    HU_RUN_TEST(debounce_needs_min_entries);
+    HU_RUN_TEST(debounce_respects_min_interval);
+    HU_RUN_TEST(debounce_reset_clears_counters);
+    HU_RUN_TEST(debounce_null_safety);
 }
