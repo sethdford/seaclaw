@@ -42,6 +42,7 @@ export class ScChannelsView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-channels;
         display: block;
+        width: 100%;
         max-width: 75rem;
         container-type: inline-size;
       }

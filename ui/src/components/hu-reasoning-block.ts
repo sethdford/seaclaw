@@ -17,10 +17,15 @@ export class ScReasoningBlock extends LitElement {
   @property({ type: Boolean }) collapsed = true;
 
   @state() private _elapsedDisplay = "";
+  @state() private _visibleContent = "";
 
   private _streamingStartedAt = 0;
   private _rafId = 0;
   private _collapseTimer: number | null = null;
+  private _wordQueue: string[] = [];
+  private _arrivalSamples: Array<{ at: number; count: number }> = [];
+  private _releaseTimer = 0;
+  private _lastContentLength = 0;
 
   static override styles = css`
     @keyframes hu-pulse {
@@ -291,7 +296,8 @@ export class ScReasoningBlock extends LitElement {
   `;
 
   private get _preview(): string {
-    const text = this.content.trim().replace(/\s+/g, " ");
+    const src = this.streaming ? this._visibleContent : this.content;
+    const text = src.trim().replace(/\s+/g, " ");
     if (text.length <= PREVIEW_LENGTH) return text;
     return text.slice(0, PREVIEW_LENGTH) + "...";
   }
@@ -339,14 +345,100 @@ export class ScReasoningBlock extends LitElement {
     }, AUTO_COLLAPSE_DELAY_MS);
   }
 
+  private static readonly _STREAM_BATCH_SIZE = 5;
+  private static readonly _STREAM_BATCH_MS = 100;
+  private static readonly _ARRIVAL_WINDOW_MS = 200;
+  private static readonly _HIGH_THROUGHPUT_WORDS = 10;
+  private static readonly _LOW_THROUGHPUT_WORDS = 5;
+  private static readonly _MEDIUM_DRAIN_DELAY_MS = 16;
+
+  private _updateWordBuffer(): void {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!this.streaming || reducedMotion) {
+      this._visibleContent = this.content;
+      this._wordQueue = [];
+      this._arrivalSamples = [];
+      this._clearWordReleaseTimer();
+      this._lastContentLength = this.content.length;
+      return;
+    }
+
+    const newChars = this.content.slice(this._lastContentLength);
+    this._lastContentLength = this.content.length;
+    if (!newChars) return;
+
+    const newWords = newChars.match(/\S+\s*/g) ?? [newChars];
+    this._wordQueue.push(...newWords);
+    const now = performance.now();
+    this._arrivalSamples.push({ at: now, count: newWords.length });
+    this._pruneArrivalSamples(now);
+
+    if (!this._releaseTimer) {
+      this._releaseNextWord();
+    }
+  }
+
+  private _pruneArrivalSamples(now: number): void {
+    const cutoff = now - ScReasoningBlock._ARRIVAL_WINDOW_MS;
+    while (this._arrivalSamples.length > 0 && this._arrivalSamples[0].at < cutoff) {
+      this._arrivalSamples.shift();
+    }
+  }
+
+  private _recentArrivalWordCount(now: number): number {
+    this._pruneArrivalSamples(now);
+    let sum = 0;
+    for (const s of this._arrivalSamples) sum += s.count;
+    return sum;
+  }
+
+  private _releaseNextWord(): void {
+    if (this._wordQueue.length === 0) {
+      this._releaseTimer = 0;
+      return;
+    }
+    const now = performance.now();
+    const recent = this._recentArrivalWordCount(now);
+
+    let batchSize: number;
+    let delayMs: number;
+    if (recent > ScReasoningBlock._HIGH_THROUGHPUT_WORDS) {
+      batchSize = this._wordQueue.length;
+      delayMs = 0;
+    } else if (recent < ScReasoningBlock._LOW_THROUGHPUT_WORDS) {
+      batchSize = Math.min(ScReasoningBlock._STREAM_BATCH_SIZE, this._wordQueue.length);
+      delayMs = ScReasoningBlock._STREAM_BATCH_MS;
+    } else {
+      batchSize = this._wordQueue.length;
+      delayMs = ScReasoningBlock._MEDIUM_DRAIN_DELAY_MS;
+    }
+
+    for (let i = 0; i < batchSize; i++) {
+      this._visibleContent += this._wordQueue.shift()!;
+    }
+    this.requestUpdate();
+    this._releaseTimer = window.setTimeout(() => this._releaseNextWord(), delayMs);
+  }
+
+  private _clearWordReleaseTimer(): void {
+    if (this._releaseTimer) {
+      window.clearTimeout(this._releaseTimer);
+      this._releaseTimer = 0;
+    }
+  }
+
   override disconnectedCallback() {
     this._stopElapsedTicker();
     this._clearCollapseTimer();
+    this._clearWordReleaseTimer();
     super.disconnectedCallback();
   }
 
   override willUpdate(changed: PropertyValues<this>) {
     super.willUpdate(changed);
+    if (changed.has("content") || changed.has("streaming")) {
+      this._updateWordBuffer();
+    }
     if (!changed.has("streaming")) {
       return;
     }
@@ -413,7 +505,11 @@ export class ScReasoningBlock extends LitElement {
           role=${this.streaming ? "status" : nothing}
           aria-live=${this.streaming ? "polite" : nothing}
         >
-          ${this.collapsed ? nothing : renderMarkdown(this.content, { streaming: this.streaming })}
+          ${this.collapsed
+            ? nothing
+            : renderMarkdown(this.streaming ? this._visibleContent : this.content, {
+                streaming: this.streaming,
+              })}
         </div>
       </div>
     `;

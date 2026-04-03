@@ -6,6 +6,8 @@ import "./hu-typing-indicator.js";
 import "./hu-delivery-status.js";
 import "./hu-tool-result.js";
 import "./hu-reasoning-block.js";
+import "./hu-memory-event.js";
+import "./hu-web-search-result.js";
 import "./hu-skeleton.js";
 import "./hu-message-actions.js";
 import type { ChatItem, ArtifactData } from "../controllers/chat-controller.js";
@@ -63,7 +65,9 @@ type Block =
       lastTs: number;
     }
   | { type: "tool_call"; item: Extract<ChatItem, { type: "tool_call" }>; idx: number }
-  | { type: "thinking"; item: Extract<ChatItem, { type: "thinking" }>; idx: number };
+  | { type: "thinking"; item: Extract<ChatItem, { type: "thinking" }>; idx: number }
+  | { type: "memory"; item: Extract<ChatItem, { type: "memory" }>; idx: number }
+  | { type: "web_search"; item: Extract<ChatItem, { type: "web_search" }>; idx: number };
 
 @customElement("hu-message-thread")
 export class ScMessageThread extends LitElement {
@@ -880,6 +884,12 @@ export class ScMessageThread extends LitElement {
       } else if (item.type === "thinking") {
         flushGroup();
         blocks.push({ type: "thinking", item, idx: i });
+      } else if (item.type === "memory") {
+        flushGroup();
+        blocks.push({ type: "memory", item, idx: i });
+      } else if (item.type === "web_search") {
+        flushGroup();
+        blocks.push({ type: "web_search", item, idx: i });
       }
     }
     flushGroup();
@@ -1255,6 +1265,18 @@ export class ScMessageThread extends LitElement {
                       .streaming=${block.item.streaming}
                       .duration=${block.item.duration ?? ""}
                     ></hu-reasoning-block>`;
+                  if (block.type === "memory")
+                    return html`<hu-memory-event
+                      .action=${block.item.action}
+                      .key=${block.item.key}
+                      .value=${block.item.value ?? ""}
+                    ></hu-memory-event>`;
+                  if (block.type === "web_search")
+                    return html`<hu-web-search-result
+                      .query=${block.item.query}
+                      .sites=${block.item.sites}
+                      .sources=${block.item.sources ?? []}
+                    ></hu-web-search-result>`;
                   return nothing;
                 })}
                 ${!this.isWaiting &&

@@ -56,6 +56,8 @@ export class ScChatComposer extends LitElement {
   @property({ type: String }) model = "";
   @property({ type: Boolean, attribute: "voice-active" }) voiceActive = false;
   @property({ type: Boolean, attribute: "voice-supported" }) voiceSupported = true;
+  @property({ type: Boolean, attribute: "thinking-enabled" }) thinkingEnabled = false;
+  @property({ type: Number, attribute: "active-memories" }) activeMemories = 0;
 
   @state() private _dragOver = false;
   @state() private _attachedFiles: FilePreviewItem[] = [];
@@ -160,6 +162,82 @@ export class ScChatComposer extends LitElement {
     .model-chip:hover {
       color: var(--hu-text);
       border-color: var(--hu-border);
+    }
+    .thinking-toggle {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: var(--hu-space-2xs);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      background: var(--hu-bg-elevated);
+      border: 1px solid var(--hu-border-subtle);
+      border-radius: var(--hu-radius-full);
+      font-size: var(--hu-text-xs);
+      font-family: var(--hu-font);
+      color: var(--hu-text-muted);
+      cursor: pointer;
+      transition:
+        color var(--hu-duration-fast),
+        border-color var(--hu-duration-fast),
+        background var(--hu-duration-fast);
+    }
+    .thinking-toggle:hover {
+      color: var(--hu-text);
+      border-color: var(--hu-border);
+    }
+    .thinking-toggle.active {
+      color: var(--hu-accent-text, var(--hu-accent));
+      border-color: color-mix(in srgb, var(--hu-accent) 40%, transparent);
+      background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
+    }
+    .thinking-toggle .toggle-icon {
+      width: 0.875rem;
+      height: 0.875rem;
+      display: flex;
+      align-items: center;
+    }
+    .thinking-toggle .toggle-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .thinking-toggle:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
+    .memory-chip {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: var(--hu-space-2xs);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      background: color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 8%, transparent);
+      border: 1px solid
+        color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 30%, transparent);
+      border-radius: var(--hu-radius-full);
+      font-size: var(--hu-text-xs);
+      font-family: var(--hu-font);
+      color: var(--hu-accent-tertiary, var(--hu-accent));
+      cursor: pointer;
+      transition:
+        background var(--hu-duration-fast),
+        border-color var(--hu-duration-fast);
+    }
+    .memory-chip:hover {
+      background: color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 14%, transparent);
+    }
+    .memory-chip:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
+    .memory-chip .chip-icon {
+      width: 0.75rem;
+      height: 0.75rem;
+      display: flex;
+      align-items: center;
+    }
+    .memory-chip .chip-icon svg {
+      width: 100%;
+      height: 100%;
     }
     textarea {
       flex: 1;
@@ -708,6 +786,17 @@ export class ScChatComposer extends LitElement {
     this._syncContextChips();
   }
 
+  private _toggleThinking(): void {
+    this.thinkingEnabled = !this.thinkingEnabled;
+    this.dispatchEvent(
+      new CustomEvent("hu-thinking-toggle", {
+        bubbles: true,
+        composed: true,
+        detail: { enabled: this.thinkingEnabled },
+      }),
+    );
+  }
+
   private _emitSend(): void {
     const msg = this.value.trim();
     if (!msg || this.waiting || this.disabled) return;
@@ -720,7 +809,7 @@ export class ScChatComposer extends LitElement {
       new CustomEvent("hu-send", {
         bubbles: true,
         composed: true,
-        detail: { message: msg, files, mentionedFiles },
+        detail: { message: msg, files, mentionedFiles, thinkingEnabled: this.thinkingEnabled },
       }),
     );
   }
@@ -983,6 +1072,32 @@ export class ScChatComposer extends LitElement {
                     )}
                 >
                   ${this.model}
+                </button>`
+              : nothing}
+            <button
+              class="thinking-toggle ${this.thinkingEnabled ? "active" : ""}"
+              type="button"
+              @click=${this._toggleThinking}
+              aria-label=${this.thinkingEnabled ? "Disable extended thinking" : "Enable extended thinking"}
+              aria-pressed=${this.thinkingEnabled}
+              title="Extended thinking (${this.thinkingEnabled ? "on" : "off"})"
+            >
+              <span class="toggle-icon">${icons.brain}</span>
+              <span>Think</span>
+            </button>
+            ${this.activeMemories > 0
+              ? html`<button
+                  class="memory-chip"
+                  type="button"
+                  @click=${() =>
+                    this.dispatchEvent(
+                      new CustomEvent("hu-memory-open", { bubbles: true, composed: true }),
+                    )}
+                  aria-label="${this.activeMemories} active memories"
+                  title="${this.activeMemories} memories active"
+                >
+                  <span class="chip-icon">${icons.brain}</span>
+                  <span>${this.activeMemories}</span>
                 </button>`
               : nothing}
             <textarea

@@ -445,11 +445,18 @@ export class ScModelsView extends GatewayAwareLitElement {
 
   private _renderChart() {
     const data = this.requestDistributionChartData;
-    if (!data) return nothing;
     return html`
       <div class="chart-section hu-scroll-reveal-stagger">
         <div class="chart-header">Request distribution by provider</div>
-        <hu-chart type="doughnut" .data=${data} height="200"></hu-chart>
+        ${data
+          ? html`<hu-chart type="doughnut" .data=${data} height="200"></hu-chart>`
+          : html`<hu-empty-state
+              .icon=${icons["chart-line"]}
+              heading="No usage data"
+              description="Provider request distribution will appear here after usage is recorded."
+            >
+              <hu-button variant="ghost" size="sm" @click=${() => this.load()}>Retry</hu-button>
+            </hu-empty-state>`}
       </div>
     `;
   }
