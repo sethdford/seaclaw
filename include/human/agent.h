@@ -36,6 +36,7 @@
 #include "human/memory/policy.h"
 #include "human/memory/retrieval.h"
 #include "human/security/escalate.h"
+#include "human/security/delegation.h"
 #include "human/tools/validation.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/meta_learning.h"
@@ -210,6 +211,9 @@ struct hu_agent {
 
     hu_audit_logger_t *audit_logger;
     struct hu_undo_stack *undo_stack;
+
+    /* Delegation and authorization */
+    char delegation_token_id[64]; /* current delegation token for agent-to-agent authorization */
 
     /* Superhuman intelligence features */
     struct hu_awareness *awareness;      /* optional; bus-based situational awareness */

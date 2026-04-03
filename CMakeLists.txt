@@ -367,6 +367,7 @@ set(HU_CORE_SOURCES
     src/security/secrets.c
     src/security/vault.c
     src/security/audit.c
+    src/security/delegation.c
     src/security/noop_sandbox.c
     src/security/docker.c
     src/security/detect.c
@@ -640,6 +641,7 @@ set(HU_CORE_SOURCES
     src/task_manager.c
     src/tools/ask_user.c
     src/tools/task_tools.c
+    src/tools/webhook_tools.c
     src/tools/meeting_transcribe.c
     src/tools/message.c
     src/tools/delegate.c
@@ -700,6 +702,7 @@ set(HU_CORE_SOURCES
     src/daemon.c
     src/cron.c
     src/crontab.c
+    src/webhook.c
     src/migration.c
     src/version.c
     src/cli_commands.c
@@ -891,6 +894,7 @@ if(HU_ENABLE_TOOLS_ADVANCED)
         src/tools/canvas.c
         src/tools/notebook.c
         src/tools/database.c
+        src/tools/db_introspect.c
     )
 endif()
 
@@ -1917,6 +1921,7 @@ set(HU_TEST_SOURCES
     tests/test_channel_format.c
     tests/test_channel_rate_limit.c
     tests/test_tool.c
+    tests/test_webhook.c
     tests/test_peripheral.c
     tests/test_peripheral_ctrl.c
     tests/test_value_learning.c
@@ -2017,6 +2022,7 @@ set(HU_TEST_SOURCES
     tests/test_plugin.c
     tests/test_tenant.c
     tests/test_agent_teams.c
+    tests/test_delegation.c
     tests/test_diagnostic_commands.c
     tests/test_untested_modules.c
     tests/test_modules_coverage.c
