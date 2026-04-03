@@ -2902,6 +2902,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                            agent->tools_count, agent->policy, agent->observer);
                 if (hxe == HU_OK) {
                     agent_turn_hula_exec_bind_spawn(agent, &hx, &hula_spawn_tpl);
+                    if (agent->idempotency_registry) {
+                        hu_hula_exec_set_idempotency_registry(&hx, agent->idempotency_registry);
+                    }
                     hxe = hu_hula_exec_run(&hx);
                 }
                 if (hxe == HU_OK) {
@@ -5030,6 +5033,20 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                            result->success ? NULL
                                                                            : result->error_msg);
                                 hu_audit_logger_log(agent->audit_logger, &aev);
+                            }
+
+                            /* Log tool execution to workflow event log */
+                            if (agent->workflow_log) {
+                                hu_workflow_event_t wf_ev;
+                                memset(&wf_ev, 0, sizeof(wf_ev));
+                                wf_ev.type = HU_WF_EVENT_TOOL_RESULT;
+                                wf_ev.workflow_id = (char *)agent->session_id;
+                                wf_ev.workflow_id_len = strlen(agent->session_id);
+                                wf_ev.step_id = (char *)call->id;
+                                wf_ev.step_id_len = call->id_len;
+                                wf_ev.data_json = (char *)res_content;
+                                wf_ev.data_json_len = res_len;
+                                (void)hu_workflow_event_log_append(agent->workflow_log, agent->alloc, &wf_ev);
                             }
 
                             if (agent->cancel_requested)

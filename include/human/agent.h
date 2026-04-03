@@ -3,6 +3,7 @@
 
 #include "human/agent/approval_gate.h"
 #include "human/agent/chaos.h"
+#include "human/agent/workflow_event.h"
 #include "human/agent/checkpoint.h"
 #include "human/agent/commitment_store.h"
 #include "human/agent/data_quality.h"
@@ -38,6 +39,7 @@
 #include "human/security/escalate.h"
 #include "human/security/delegation.h"
 #include "human/tools/validation.h"
+#include "human/webhook.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/meta_learning.h"
 #endif
@@ -354,6 +356,18 @@ struct hu_agent {
 
     /* Idempotency registry for crash-proof tool execution (HuLa replay engine) */
     struct hu_idempotency_registry *idempotency_registry; /* optional; NULL = no dedup */
+
+    /* Workflow event log for durable execution and audit trail */
+    hu_workflow_event_log_t *workflow_log; /* optional; NULL = no event logging */
+
+    /* Approval gate manager for human-in-the-loop workflow pauses */
+    hu_gate_manager_t *gate_manager; /* optional; NULL = no approval gates */
+
+    /* Delegation token registry for agent-to-agent authorization */
+    hu_delegation_registry_t *delegation_registry; /* optional; NULL = no delegation */
+
+    /* Webhook manager for incoming webhook event handling */
+    hu_webhook_manager_t *webhook_manager; /* optional; NULL = no webhooks */
 };
 
 /* Create agent from minimal config (no full config loader yet).

@@ -2,6 +2,10 @@
 #include "human/config.h"
 #include "human/agent/awareness.h"
 #include "human/agent/commitment_store.h"
+#include "human/agent/idempotency.h"
+#include "human/agent/workflow_event.h"
+#include "human/agent/approval_gate.h"
+#include "human/webhook.h"
 #include "human/agent/pattern_radar.h"
 #include "human/agent/superhuman.h"
 #include "human/agent/superhuman_commitment.h"
@@ -361,6 +365,45 @@ hu_error_t hu_agent_from_config(
         out->commitment_store = NULL;
     }
 
+    /* Idempotency registry for crash-proof tool execution (HuLa replay engine) */
+    hu_idempotency_registry_t *idem_reg = NULL;
+    hu_error_t idem_err = hu_idempotency_create(alloc, &idem_reg);
+    if (idem_err == HU_OK) {
+        out->idempotency_registry = idem_reg;
+    } else {
+        out->idempotency_registry = NULL;
+    }
+
+    /* Workflow event log for durable execution and audit trail */
+    hu_workflow_event_log_t *wf_log = NULL;
+    hu_error_t wf_err = hu_workflow_event_log_create(alloc, "~/.human/workflows", &wf_log);
+    if (wf_err == HU_OK) {
+        out->workflow_log = wf_log;
+    } else {
+        out->workflow_log = NULL;
+    }
+
+    /* Approval gate manager for human-in-the-loop workflow pauses */
+    hu_gate_manager_t *gate_mgr = NULL;
+    hu_error_t gate_err = hu_gate_manager_create(alloc, "~/.human/gates", &gate_mgr);
+    if (gate_err == HU_OK) {
+        out->gate_manager = gate_mgr;
+    } else {
+        out->gate_manager = NULL;
+    }
+
+    /* Delegation token registry for agent-to-agent authorization */
+    out->delegation_registry = hu_delegation_registry_create(alloc);
+
+    /* Webhook manager for incoming webhook event handling */
+    hu_webhook_manager_t *webhook_mgr = NULL;
+    hu_error_t webhook_err = hu_webhook_manager_create(alloc, &webhook_mgr);
+    if (webhook_err == HU_OK) {
+        out->webhook_manager = webhook_mgr;
+    } else {
+        out->webhook_manager = NULL;
+    }
+
     /* Superhuman services */
     (void)hu_superhuman_registry_init(&out->superhuman);
     memset(&out->superhuman_commitment_ctx, 0, sizeof(out->superhuman_commitment_ctx));
@@ -690,6 +733,26 @@ void hu_agent_deinit(hu_agent_t *agent) {
     if (agent->commitment_store) {
         hu_commitment_store_destroy(agent->commitment_store);
         agent->commitment_store = NULL;
+    }
+    if (agent->idempotency_registry) {
+        hu_idempotency_destroy(agent->idempotency_registry, agent->alloc);
+        agent->idempotency_registry = NULL;
+    }
+    if (agent->workflow_log) {
+        hu_workflow_event_log_destroy(agent->workflow_log, agent->alloc);
+        agent->workflow_log = NULL;
+    }
+    if (agent->gate_manager) {
+        hu_gate_manager_destroy(agent->gate_manager, agent->alloc);
+        agent->gate_manager = NULL;
+    }
+    if (agent->delegation_registry) {
+        hu_delegation_registry_destroy(agent->delegation_registry);
+        agent->delegation_registry = NULL;
+    }
+    if (agent->webhook_manager) {
+        hu_webhook_manager_destroy(agent->alloc, agent->webhook_manager);
+        agent->webhook_manager = NULL;
     }
 #ifdef HU_ENABLE_SQLITE
     if (agent->cognition_db) {

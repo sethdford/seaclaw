@@ -103,6 +103,8 @@
 #include "human/tools/web_search.h"
 #include "human/tools/ask_user.h"
 #include "human/tools/task_tools.h"
+#include "human/tools/webhook_tools.h"
+#include "human/tools/db_introspect.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -123,9 +125,11 @@
 #else
 #define HU_TOOLS_CARTESIA_COUNT 0
 #endif
-/* Base: 56 (core tools incl. lsp + tool_search) + 5 (ask_user + 4 task tools) + cron - 1 (skill_run conditional) + persona + cartesia */
+#define HU_TOOLS_WEBHOOK_COUNT 3  /* webhook_register, webhook_poll, webhook_list */
+#define HU_TOOLS_DB_INTROSPECT_COUNT 1  /* db_introspect */
+/* Base: 56 (core tools incl. lsp + tool_search) + 5 (ask_user + 4 task tools) + 1 (db_introspect) + cron - 1 (skill_run conditional) + persona + cartesia + webhook */
 #define HU_TOOLS_COUNT_BASE \
-    (56 + 5 + HU_TOOLS_CRON_COUNT - 1 + HU_TOOLS_PERSONA_COUNT + HU_TOOLS_CARTESIA_COUNT)
+    (56 + 5 + HU_TOOLS_DB_INTROSPECT_COUNT + HU_TOOLS_CRON_COUNT - 1 + HU_TOOLS_PERSONA_COUNT + HU_TOOLS_CARTESIA_COUNT + HU_TOOLS_WEBHOOK_COUNT)
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -636,6 +640,12 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     if (!tools[idx].ctx || !tools[idx].vtable) {
         goto fail;
     }
+    idx++;
+
+    /* db_introspect tool */
+    err = hu_db_introspect_tool_create(alloc, NULL, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
     idx++;
 
     /* Load MCP server tools from config when available */

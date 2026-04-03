@@ -894,9 +894,13 @@ if(HU_ENABLE_TOOLS_ADVANCED)
         src/tools/canvas.c
         src/tools/notebook.c
         src/tools/database.c
-        src/tools/db_introspect.c
     )
 endif()
+
+# Database introspection tool (SQLite-based, always available)
+list(APPEND HU_CORE_SOURCES
+    src/tools/db_introspect.c
+)
 
 # Paperclip integration (requires libcurl for API calls)
 if(HU_ENABLE_CURL)
