@@ -201,6 +201,63 @@ static void hula_compiler_agent_done(void *ctx, const hu_hula_program_t *prog,
     agent_turn_hula_append_histories(agent, prog, exec);
     hu_bth_metrics_record_hula_tool_turn(agent->bth_metrics);
 }
+
+/* Audit JSON for HuLa IR path: provider native tool_calls folded into a HuLa program. */
+static char *agent_turn_hula_ir_tool_calls_audit_json(hu_allocator_t *alloc,
+                                                      const hu_tool_call_t *calls, size_t tc_count,
+                                                      size_t *out_len) {
+    *out_len = 0;
+    if (!alloc || !calls || tc_count == 0)
+        return NULL;
+
+    hu_json_value_t *root = hu_json_object_new(alloc);
+    if (!root)
+        return NULL;
+    static const char src_lit[] = "native_tool_calls_ir";
+    hu_json_object_set(alloc, root, "source",
+                       hu_json_string_new(alloc, src_lit, sizeof(src_lit) - 1));
+
+    hu_json_value_t *arr = hu_json_array_new(alloc);
+    if (!arr) {
+        hu_json_free(alloc, root);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < tc_count; i++) {
+        hu_json_value_t *o = hu_json_object_new(alloc);
+        if (!o) {
+            hu_json_free(alloc, arr);
+            hu_json_free(alloc, root);
+            return NULL;
+        }
+        if (calls[i].name && calls[i].name_len > 0)
+            hu_json_object_set(alloc, o, "tool",
+                               hu_json_string_new(alloc, calls[i].name, calls[i].name_len));
+        if (calls[i].arguments && calls[i].arguments_len > 0) {
+            hu_json_value_t *args_parsed = NULL;
+            if (hu_json_parse(alloc, calls[i].arguments, calls[i].arguments_len, &args_parsed) ==
+                    HU_OK &&
+                args_parsed) {
+                hu_json_object_set(alloc, o, "arguments", args_parsed);
+            } else {
+                hu_json_object_set(
+                    alloc, o, "arguments_raw",
+                    hu_json_string_new(alloc, calls[i].arguments, calls[i].arguments_len));
+            }
+        }
+        hu_json_array_push(alloc, arr, o);
+    }
+    hu_json_object_set(alloc, root, "calls", arr);
+
+    char *body = NULL;
+    size_t blen = 0;
+    hu_error_t se = hu_json_stringify(alloc, root, &body, &blen);
+    hu_json_free(alloc, root);
+    if (se != HU_OK || !body)
+        return NULL;
+    *out_len = blen;
+    return body;
+}
 #endif
 
 static void *dag_parallel_worker(void *arg) {
@@ -4962,6 +5019,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                     ->status == HU_HULA_DONE;
                                         else
                                             root_ok = true;
+                                        size_t ir_audit_len = 0;
+                                        char *ir_audit = agent_turn_hula_ir_tool_calls_audit_json(
+                                            agent->alloc, calls, tc_count, &ir_audit_len);
                                         char *pj = NULL;
                                         size_t pjl = 0;
                                         if (hu_hula_to_json(agent->alloc, &hula_prog, &pj, &pjl) ==
@@ -4969,13 +5029,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                             pj) {
                                             (void)hu_hula_trace_persist(
                                                 agent->alloc, NULL, tr, trl, hula_prog.name,
-                                                hula_prog.name_len, root_ok, pj, pjl, NULL, 0);
+                                                hula_prog.name_len, root_ok, pj, pjl, ir_audit,
+                                                ir_audit_len);
                                             hu_str_free(agent->alloc, pj);
                                         } else {
                                             (void)hu_hula_trace_persist(
                                                 agent->alloc, NULL, tr, trl, hula_prog.name,
-                                                hula_prog.name_len, root_ok, NULL, 0, NULL, 0);
+                                                hula_prog.name_len, root_ok, NULL, 0, ir_audit,
+                                                ir_audit_len);
                                         }
+                                        if (ir_audit)
+                                            hu_str_free(agent->alloc, ir_audit);
                                         used_hula = true;
                                         hu_bth_metrics_record_hula_tool_turn(agent->bth_metrics);
                                         agent_turn_hula_append_histories(agent, &hula_prog,

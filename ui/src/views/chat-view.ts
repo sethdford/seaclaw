@@ -215,9 +215,27 @@ export class ScChatView extends GatewayAwareLitElement {
   @state() private _sessionsPanelOpen = false;
   @state() private _sessions: ChatSession[] = [];
   private _demoProjects: ChatProject[] = [
-    { id: "proj-1", name: "h-uman Core", instructions: "", pinned: true, color: "#7AB648" },
-    { id: "proj-2", name: "UI Dashboard", instructions: "", pinned: false, color: "#E5A00D" },
-    { id: "proj-3", name: "Research", instructions: "", pinned: false, color: "#6366F1" },
+    {
+      id: "proj-1",
+      name: "h-uman Core",
+      instructions: "",
+      pinned: true,
+      color: "var(--hu-accent)",
+    },
+    {
+      id: "proj-2",
+      name: "UI Dashboard",
+      instructions: "",
+      pinned: false,
+      color: "var(--hu-accent-secondary)",
+    },
+    {
+      id: "proj-3",
+      name: "Research",
+      instructions: "",
+      pinned: false,
+      color: "var(--hu-accent-tertiary)",
+    },
   ];
   @state() private _tapback = { open: false, x: 0, y: 0, index: -1, content: "" };
   @state() private _sessionsLoading = false;
