@@ -1,4 +1,4 @@
-import { html, css } from "lit";
+import { html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
@@ -197,19 +197,20 @@ export class CanvasView extends GatewayAwareLitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.gateway?.addEventListener(GatewayClient.EVENT_GATEWAY, this._onGateway);
-    document.addEventListener("hu-gateway-changed", this._onGatewaySwap as EventListener);
   }
 
   override disconnectedCallback(): void {
     this.gateway?.removeEventListener(GatewayClient.EVENT_GATEWAY, this._onGateway);
-    document.removeEventListener("hu-gateway-changed", this._onGatewaySwap as EventListener);
     super.disconnectedCallback();
   }
 
-  private _onGatewaySwap = (): void => {
-    this.gateway?.removeEventListener(GatewayClient.EVENT_GATEWAY, this._onGateway);
-    this.gateway?.addEventListener(GatewayClient.EVENT_GATEWAY, this._onGateway);
-  };
+  protected override onGatewaySwapped(
+    previous: GatewayClient | null,
+    current: GatewayClient,
+  ): void {
+    previous?.removeEventListener(GatewayClient.EVENT_GATEWAY, this._onGateway);
+    current.addEventListener(GatewayClient.EVENT_GATEWAY, this._onGateway);
+  }
 
   protected override async load(): Promise<void> {
     this.lastLoadedAt = Date.now();
@@ -226,8 +227,8 @@ export class CanvasView extends GatewayAwareLitElement {
           ${!hasList
             ? html`
                 <hu-empty-state
-                  icon=${icons.image}
-                  title="No active canvases"
+                  .icon=${icons.image}
+                  heading="No active canvases"
                   description="When the agent uses the canvas tool, visual surfaces appear here."
                 ></hu-empty-state>
               `
@@ -268,14 +269,11 @@ export class CanvasView extends GatewayAwareLitElement {
                 </div>
               </div>
             `
-          : nothing}
+            : nothing}
       </div>
     `;
   }
 }
-
-// `nothing` used in template — import from lit
-import { nothing } from "lit";
 
 declare global {
   interface HTMLElementTagNameMap {

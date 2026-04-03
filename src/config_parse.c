@@ -1103,6 +1103,21 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
     hu_json_value_t *feeds_obj = hu_json_object_get(root, "feeds");
     if (feeds_obj)
         parse_feeds(a, cfg, feeds_obj);
+    hu_json_value_t *mg_obj = hu_json_object_get(root, "media_gen");
+    if (mg_obj && mg_obj->type == HU_JSON_OBJECT) {
+        const char *dim = hu_json_get_string(mg_obj, "default_image_model");
+        if (dim)
+            cfg->media_gen.default_image_model = hu_strdup(a, dim);
+        const char *dvm = hu_json_get_string(mg_obj, "default_video_model");
+        if (dvm)
+            cfg->media_gen.default_video_model = hu_strdup(a, dvm);
+        const char *mgp = hu_json_get_string(mg_obj, "vertex_project");
+        if (mgp)
+            cfg->media_gen.vertex_project = hu_strdup(a, mgp);
+        const char *mgr = hu_json_get_string(mg_obj, "vertex_region");
+        if (mgr)
+            cfg->media_gen.vertex_region = hu_strdup(a, mgr);
+    }
     hu_json_value_t *sec = hu_json_object_get(root, "security");
     if (sec && sec->type == HU_JSON_OBJECT) {
         double al = hu_json_get_number(sec, "autonomy_level", cfg->security.autonomy_level);

@@ -2,7 +2,7 @@ import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import DOMPurify from "dompurify";
-import "../components/hu-button.js";
+import "./hu-button.js";
 
 /**
  * Renders Live Canvas / A2UI markup (HTML or SVG) in a sandboxed shadow subtree.

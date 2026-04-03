@@ -47,6 +47,7 @@ static const char *const hu_config_top_keys[] = {
     "secrets",
     "identity",
     "feeds",
+    "media_gen",
     "voice",
     "provider",
     "model",
