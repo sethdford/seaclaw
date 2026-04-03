@@ -39,8 +39,6 @@ static hu_error_t ask_user_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         return HU_OK;
     }
 
-    size_t question_len = strlen(question);
-
 #if HU_IS_TEST
     /* Test mode: return stub response */
     char *msg = hu_strndup(alloc, "(ask_user stub: awaiting user response)", 39);
@@ -51,6 +49,7 @@ static hu_error_t ask_user_execute(void *ctx, hu_allocator_t *alloc, const hu_js
     *out = hu_tool_result_ok_owned(msg, 39);
     return HU_OK;
 #else
+    size_t question_len = strlen(question);
     /* Non-test: use approval callback if available */
     if (!c->approval_cb) {
         /* No callback in non-interactive mode */

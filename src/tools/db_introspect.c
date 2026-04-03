@@ -26,6 +26,7 @@ typedef struct {
 
 static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
                                         hu_tool_result_t *out) {
+    (void)alloc;
     db_introspect_ctx_t *c = (db_introspect_ctx_t *)ctx;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;

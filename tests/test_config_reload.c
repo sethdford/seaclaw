@@ -65,7 +65,7 @@ void test_config_reload_with_hooks(void) {
         .required = false,
     };
     hu_hook_registry_add(agent.hook_registry, &alloc, &entry);
-    size_t initial_count = hu_hook_registry_count(agent.hook_registry);
+    (void)hu_hook_registry_count(agent.hook_registry);
 
     char *summary = NULL;
     size_t summary_len = 0;
@@ -145,9 +145,8 @@ void test_config_reload_invalid_agent(void) {
     memset(&agent, 0, sizeof(agent));
     agent.alloc = &alloc;
 
-    char *summary = NULL;
-    err = hu_agent_reload_config(&agent, NULL, NULL);
-    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    hu_error_t err2 = hu_agent_reload_config(&agent, NULL, NULL);
+    HU_ASSERT_EQ(err2, HU_ERR_INVALID_ARGUMENT);
 }
 
 void test_config_reload_summary_format(void) {

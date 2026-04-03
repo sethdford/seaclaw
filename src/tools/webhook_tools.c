@@ -24,7 +24,6 @@ typedef struct {
 
 static hu_error_t webhook_register_execute(void *ctx, hu_allocator_t *alloc,
                                            const hu_json_value_t *args, hu_tool_result_t *out) {
-    webhook_register_ctx_t *c = (webhook_register_ctx_t *)ctx;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;
     if (!args) {
@@ -39,6 +38,7 @@ static hu_error_t webhook_register_execute(void *ctx, hu_allocator_t *alloc,
     }
 
 #if HU_IS_TEST
+    (void)ctx;
     char *result = hu_sprintf(alloc, "{\"id\":\"webhook_test_12345\"}");
     *out = hu_tool_result_ok_owned(result, result ? strlen(result) : 0);
     return HU_OK;

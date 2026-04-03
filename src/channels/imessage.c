@@ -25,6 +25,40 @@
 #define HU_IMESSAGE_SENT_PREFIX_LEN 256
 #define HU_IMESSAGE_ROWID_FILE      ".human/imessage.rowid"
 
+size_t hu_imessage_extract_attributed_body(const unsigned char *blob, size_t blob_len, char *out,
+                                           size_t out_cap) {
+    if (!blob || blob_len < 4 || !out || out_cap < 2)
+        return 0;
+
+    for (size_t i = 0; i + 3 < blob_len; i++) {
+        if (blob[i] == 0x01 && blob[i + 1] == 0x2B) {
+            size_t text_len = 0;
+            size_t text_start = 0;
+            unsigned char lb = blob[i + 2];
+            if (lb < 0x80) {
+                text_len = lb;
+                text_start = i + 3;
+            } else {
+                size_t len_bytes = lb & 0x7F;
+                if (len_bytes == 0 || len_bytes > 4 || i + 3 + len_bytes > blob_len)
+                    return 0;
+                for (size_t b = 0; b < len_bytes; b++)
+                    text_len |= (size_t)blob[i + 3 + b] << (8 * b);
+                text_start = i + 3 + len_bytes;
+            }
+
+            if (text_start + text_len > blob_len)
+                text_len = blob_len - text_start;
+            if (text_len >= out_cap)
+                text_len = out_cap - 1;
+            memcpy(out, blob + text_start, text_len);
+            out[text_len] = '\0';
+            return text_len;
+        }
+    }
+    return 0;
+}
+
 #if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__) && defined(HU_ENABLE_SQLITE)
 static void imessage_rowid_path(char *buf, size_t cap) {
     const char *home = getenv("HOME");
@@ -61,49 +95,6 @@ static void imessage_save_rowid(int64_t rowid) {
     fclose(f);
 }
 
-/*
- * Extract plain text from an NSAttributedString (NSKeyedArchiver) blob.
- * macOS 15+ stores iMessage text in attributedBody instead of the text column.
- *
- * Binary format: ... 0x01 0x2B <length> <utf8_text> ...
- *   - If length byte < 0x80: single-byte length, text starts at offset+3
- *   - If length byte >= 0x80: low 7 bits = number of following length bytes (little-endian)
- *
- * Returns extracted length, or 0 on failure. Output is null-terminated.
- */
-static size_t extract_text_from_attributed_body(const unsigned char *blob, size_t blob_len,
-                                                 char *out, size_t out_cap) {
-    if (!blob || blob_len < 4 || !out || out_cap < 2)
-        return 0;
-
-    for (size_t i = 0; i + 3 < blob_len; i++) {
-        if (blob[i] == 0x01 && blob[i + 1] == 0x2B) {
-            size_t text_len = 0;
-            size_t text_start = 0;
-            unsigned char lb = blob[i + 2];
-            if (lb < 0x80) {
-                text_len = lb;
-                text_start = i + 3;
-            } else {
-                size_t len_bytes = lb & 0x7F;
-                if (len_bytes == 0 || len_bytes > 4 || i + 3 + len_bytes > blob_len)
-                    return 0;
-                for (size_t b = 0; b < len_bytes; b++)
-                    text_len |= (size_t)blob[i + 3 + b] << (8 * b);
-                text_start = i + 3 + len_bytes;
-            }
-
-            if (text_start + text_len > blob_len)
-                text_len = blob_len - text_start;
-            if (text_len >= out_cap)
-                text_len = out_cap - 1;
-            memcpy(out, blob + text_start, text_len);
-            out[text_len] = '\0';
-            return text_len;
-        }
-    }
-    return 0;
-}
 #endif
 
 typedef struct hu_imessage_ctx {
@@ -342,6 +333,8 @@ const char *hu_imessage_reaction_to_tapback_name(hu_reaction_type_t reaction) {
         return "emphasize";
     case HU_REACTION_QUESTION:
         return "question";
+    case HU_REACTION_CUSTOM_EMOJI:
+        return "emoji";
     default:
         return NULL;
     }
@@ -837,7 +830,7 @@ static hu_error_t imessage_load_conversation_history(void *ctx, hu_allocator_t *
             int ab_len = sqlite3_column_bytes(stmt, 6);
             if (ab && ab_len > 0) {
                 size_t extracted =
-                    extract_text_from_attributed_body(ab, (size_t)ab_len, attr_buf, sizeof(attr_buf));
+                    hu_imessage_extract_attributed_body(ab, (size_t)ab_len, attr_buf, sizeof(attr_buf));
                 if (extracted > 0)
                     txt = attr_buf;
             }
@@ -911,7 +904,7 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *
         "SELECT m.associated_message_type, COUNT(*) "
         "FROM message m "
         "WHERE m.is_from_me = 0 "
-        "  AND m.associated_message_type BETWEEN 2000 AND 2005 "
+        "  AND m.associated_message_type BETWEEN 2000 AND 2006 "
         "  AND m.associated_message_guid IN ("
         "    SELECT m2.guid FROM message m2 "
         "    WHERE m2.is_from_me = 1 "
@@ -935,6 +928,7 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *
     sqlite3_bind_text(stmt, 1, contact_buf, (int)clen, SQLITE_STATIC);
 
     int hearts = 0, likes = 0, dislikes = 0, laughs = 0, emphasis = 0, questions = 0;
+    int custom_emoji = 0;
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         int type = sqlite3_column_int(stmt, 0);
         int cnt = sqlite3_column_int(stmt, 1);
@@ -957,12 +951,15 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *
         case 2005:
             questions = cnt;
             break;
+        case 2006:
+            custom_emoji = cnt;
+            break;
         }
     }
     sqlite3_finalize(stmt);
     sqlite3_close(db);
 
-    int total = hearts + likes + dislikes + laughs + emphasis + questions;
+    int total = hearts + likes + dislikes + laughs + emphasis + questions + custom_emoji;
     if (total == 0)
         return HU_OK;
 
@@ -986,6 +983,9 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *
     if (dislikes > 0)
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d dislike%s", dislikes,
                                 dislikes > 1 ? "s" : "");
+    if (custom_emoji > 0)
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d emoji reaction%s", custom_emoji,
+                                custom_emoji > 1 ? "s" : "");
     pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "]");
 
     *out = hu_strndup(alloc, buf, pos);
@@ -1015,12 +1015,13 @@ int hu_imessage_count_recent_gif_tapbacks(const char *contact_id, size_t contact
         return 0;
     }
 
-    /* Find positive tapbacks (love/like/laugh/emphasis = 2000-2004) on our messages
-     * that have GIF attachments, from this contact, in the last 24 hours. */
+    /* Find positive tapbacks (love/like/laugh/emphasis/emoji = 2000-2004,2006) on our
+     * messages that have GIF attachments, from this contact, in the last 24 hours. */
     const char *sql =
         "SELECT COUNT(*) FROM message m "
         "WHERE m.is_from_me = 0 "
-        "  AND m.associated_message_type BETWEEN 2000 AND 2004 "
+        "  AND (m.associated_message_type BETWEEN 2000 AND 2004 "
+        "       OR m.associated_message_type = 2006) "
         "  AND m.handle_id = (SELECT ROWID FROM handle WHERE id = ?1) "
         "  AND m.date > (strftime('%s', 'now') - 86400) * 1000000000 - 978307200000000000 "
         "  AND m.associated_message_guid IN ("
@@ -1267,7 +1268,7 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
                                 const unsigned char *ab = sqlite3_column_blob(stmt, 2);
                                 int ab_len = sqlite3_column_bytes(stmt, 2);
                                 if (ab && ab_len > 0) {
-                                    content_len = extract_text_from_attributed_body(
+                                    content_len = hu_imessage_extract_attributed_body(
                                         ab, (size_t)ab_len, content_buf, sizeof(content_buf));
                                 }
                             } else {
@@ -1980,7 +1981,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
             const unsigned char *attr_blob = sqlite3_column_blob(stmt, 10);
             int attr_len = sqlite3_column_bytes(stmt, 10);
             if (attr_blob && attr_len > 0) {
-                size_t extracted = extract_text_from_attributed_body(
+                size_t extracted = hu_imessage_extract_attributed_body(
                     attr_blob, (size_t)attr_len, attr_text_buf, sizeof(attr_text_buf));
                 if (extracted > 0)
                     text = attr_text_buf;
@@ -2187,7 +2188,9 @@ char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t que
     }
 
     char tmp_path[256];
-    snprintf(tmp_path, sizeof(tmp_path), "/tmp/human_gif_%u.gif", (unsigned)time(NULL));
+    static unsigned gif_counter;
+    snprintf(tmp_path, sizeof(tmp_path), "/tmp/human_gif_%u_%d_%u.gif", (unsigned)time(NULL),
+             (int)getpid(), ++gif_counter);
 
     FILE *f = fopen(tmp_path, "wb");
     if (!f) {
@@ -2265,7 +2268,7 @@ hu_error_t hu_imessage_lookup_message_by_guid(hu_allocator_t *alloc, const char 
             int ab_len = sqlite3_column_bytes(stmt, 1);
             if (ab && ab_len > 0) {
                 *out_len =
-                    extract_text_from_attributed_body(ab, (size_t)ab_len, out_text, out_cap);
+                    hu_imessage_extract_attributed_body(ab, (size_t)ab_len, out_text, out_cap);
             }
         }
     }

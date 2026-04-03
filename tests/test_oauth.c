@@ -270,7 +270,7 @@ static void test_token_free_no_leaks(void) {
     strcpy(token.token_type, "Bearer");
     token.token_type_len = strlen(token.token_type);
 
-    size_t allocated = hu_tracking_allocator_total_allocated(ta);
+    (void)hu_tracking_allocator_total_allocated(ta);
     HU_ASSERT_EQ(hu_tracking_allocator_leaks(ta), 3);
 
     /* Free token */

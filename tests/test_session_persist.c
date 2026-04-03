@@ -294,7 +294,7 @@ static void test_list_sessions(void) {
     add_message(&agent, HU_ROLE_USER, "msg1");
 
     /* Save two sessions */
-    char sid1[HU_SESSION_ID_MAX], sid2[HU_SESSION_ID_MAX];
+    char sid1[HU_SESSION_ID_MAX];
     hu_error_t err = hu_session_persist_save(&g_alloc, &agent, g_tmpdir, sid1);
     HU_ASSERT_EQ(err, HU_OK);
 
