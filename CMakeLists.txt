@@ -60,6 +60,8 @@ else()
     option(HU_ENABLE_IMESSAGE "Build iMessage channel" OFF)
 endif()
 option(HU_IMESSAGE_TAPBACK_ENABLED "Enable iMessage tapback reactions via JXA (requires accessibility)" OFF)
+option(HU_IMESSAGE_TAPBACK_IMSG "Enable iMessage tapback reactions via imsg CLI (brew install steipete/tap/imsg)" OFF)
+option(HU_IMESSAGE_SEND_IMSG "Enable iMessage send via imsg CLI (faster, better errors; brew install steipete/tap/imsg)" OFF)
 if(APPLE)
     option(HU_ENABLE_PWA "Build PWA channel (browser tab polling)" ON)
 else()
@@ -367,6 +369,7 @@ set(HU_CORE_SOURCES
     src/security/secrets.c
     src/security/vault.c
     src/security/audit.c
+    src/security/delegation.c
     src/security/noop_sandbox.c
     src/security/docker.c
     src/security/detect.c
@@ -439,6 +442,7 @@ set(HU_CORE_SOURCES
     src/agent/dag.c
     src/agent/dag_executor.c
     src/agent/hula.c
+    src/agent/idempotency.c
     src/agent/hula_compiler.c
     src/agent/hula_emergence.c
     src/agent/hula_compiler_examples.c
@@ -488,6 +492,8 @@ set(HU_CORE_SOURCES
     src/agent/mar.c
     src/agent/prompt_optimizer.c
     src/agent/checkpoint.c
+    src/agent/approval_gate.c
+    src/agent/workflow_event.c
     src/agent/chaos.c
     src/agent/scratchpad.c
     src/agent/tree_of_thought.c
@@ -502,6 +508,7 @@ set(HU_CORE_SOURCES
     src/agent/inner_thoughts.c
     src/agent/weather_awareness.c
     src/agent/weather_fetch.c
+    src/agent/workspace_context.c
     src/agent/timing.c
     src/agent/governor.c
     src/agent/relationship_dynamics.c
@@ -638,6 +645,10 @@ set(HU_CORE_SOURCES
     src/tools/memory_forget.c
     src/tools/bff_memory.c
     src/tools/doc_ingest.c
+    src/task_manager.c
+    src/tools/ask_user.c
+    src/tools/task_tools.c
+    src/tools/webhook_tools.c
     src/tools/meeting_transcribe.c
     src/tools/message.c
     src/tools/delegate.c
@@ -678,6 +689,8 @@ set(HU_CORE_SOURCES
     src/tools/diff.c
     src/tools/voice_clone.c
     src/tools/factory.c
+    src/tools/mcp_resource_tools.c
+    src/tools/cron_session_tools.c
     src/mcp_server.c
     src/channels/thread_binding.c
     src/channels/format.c
@@ -700,6 +713,7 @@ set(HU_CORE_SOURCES
     src/daemon_proactive.c
     src/cron.c
     src/crontab.c
+    src/webhook.c
     src/migration.c
     src/version.c
     src/cli_commands.c
@@ -806,11 +820,13 @@ list(APPEND HU_CORE_SOURCES
     src/tools/browser_use.c
     src/tools/gui_agent.c
     src/tools/lsp.c
+    src/tools/tool_search.c
     src/voice/webrtc.c
     src/voice/webrtc_ice.c
     src/voice/webrtc_dtls.c
     src/voice/webrtc_srtp.c
     src/voice/realtime.c
+    src/voice/gemini_live.c
     src/voice/duplex.c
     src/voice/session.c
     src/voice/turn_signal.c
@@ -894,6 +910,11 @@ if(HU_ENABLE_TOOLS_ADVANCED)
         src/tools/database.c
     )
 endif()
+
+# Database introspection tool (SQLite-based, always available)
+list(APPEND HU_CORE_SOURCES
+    src/tools/db_introspect.c
+)
 
 # Paperclip integration (requires libcurl for API calls)
 if(HU_ENABLE_CURL)
@@ -1218,6 +1239,12 @@ if(HU_ENABLE_IMESSAGE)
     if(HU_IMESSAGE_TAPBACK_ENABLED)
         target_compile_definitions(human_core PRIVATE HU_IMESSAGE_TAPBACK_ENABLED=1)
     endif()
+    if(HU_IMESSAGE_TAPBACK_IMSG)
+        target_compile_definitions(human_core PRIVATE HU_IMESSAGE_TAPBACK_IMSG=1)
+    endif()
+    if(HU_IMESSAGE_SEND_IMSG)
+        target_compile_definitions(human_core PRIVATE HU_IMESSAGE_SEND_IMSG=1)
+    endif()
 endif()
 if(HU_ENABLE_PWA)
     target_compile_definitions(human_core PRIVATE HU_HAS_PWA=1)
@@ -1496,6 +1523,12 @@ if(HU_ENABLE_IMESSAGE)
     target_compile_definitions(human PRIVATE HU_HAS_IMESSAGE=1)
     if(HU_IMESSAGE_TAPBACK_ENABLED)
         target_compile_definitions(human PRIVATE HU_IMESSAGE_TAPBACK_ENABLED=1)
+    endif()
+    if(HU_IMESSAGE_TAPBACK_IMSG)
+        target_compile_definitions(human PRIVATE HU_IMESSAGE_TAPBACK_IMSG=1)
+    endif()
+    if(HU_IMESSAGE_SEND_IMSG)
+        target_compile_definitions(human PRIVATE HU_IMESSAGE_SEND_IMSG=1)
     endif()
 endif()
 if(HU_ENABLE_PWA)
@@ -1898,6 +1931,8 @@ set(HU_TEST_SOURCES
     tests/test_wasm.c
     tests/test_allocator.c
     tests/test_data_loader.c
+    tests/test_idempotency.c
+    tests/test_idempotency_hula_integration.c
     tests/test_json.c
     tests/test_string.c
     tests/test_slice.c
@@ -1917,6 +1952,7 @@ set(HU_TEST_SOURCES
     tests/test_channel_format.c
     tests/test_channel_rate_limit.c
     tests/test_tool.c
+    tests/test_webhook.c
     tests/test_peripheral.c
     tests/test_peripheral_ctrl.c
     tests/test_value_learning.c
@@ -1952,6 +1988,7 @@ set(HU_TEST_SOURCES
     tests/test_path_security.c
     tests/test_process_util.c
     tests/test_cron.c
+    tests/test_cron_session_tools.c
     tests/test_channel_loop.c
     tests/test_rag.c
     tests/test_multimodal.c
@@ -1965,10 +2002,12 @@ set(HU_TEST_SOURCES
     tests/test_sota_wiring.c
     tests/test_sota_live_wiring.c
     tests/test_voice_rt_openai.c
+    tests/test_gemini_live.c
     tests/test_voice_session.c
     tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c
+    tests/test_tool_search.c
     tests/test_vector.c
     tests/test_vector_full.c
     tests/test_lifecycle.c
@@ -2021,6 +2060,8 @@ set(HU_TEST_SOURCES
     tests/test_plugin.c
     tests/test_tenant.c
     tests/test_agent_teams.c
+    tests/test_delegation.c
+    tests/test_diagnostic_commands.c
     tests/test_untested_modules.c
     tests/test_modules_coverage.c
     tests/test_coverage_new.c
@@ -2090,6 +2131,7 @@ set(HU_TEST_SOURCES
     tests/test_dag.c
     tests/test_hula.c
     tests/test_hula_golden.c
+    tests/test_workflow_event.c
     tests/test_sota_features.c
     tests/test_mood.c
     tests/test_bth_e2e.c
@@ -2197,14 +2239,20 @@ list(APPEND HU_TEST_SOURCES
     tests/test_token_budget.c
     tests/test_data_quality.c
     tests/test_tool_validation.c
+    tests/test_tool_ask_user.c
+    tests/test_task_manager.c
+    tests/test_task_tools.c
     tests/test_otlp.c
     tests/test_mar.c
     tests/test_mem_policy.c
     tests/test_prompt_optimizer.c
     tests/test_chaos.c
     tests/test_checkpoint.c
+    tests/test_approval_gate.c
+    tests/test_workflow_commands.c
     tests/test_scratchpad.c
     tests/test_mcp_resources.c
+    tests/test_mcp_resource_tools.c
     tests/test_context_engine.c
     tests/test_exec_env.c
     tests/test_channel_monitor.c
@@ -2336,6 +2384,12 @@ if(HU_ENABLE_IMESSAGE)
     target_compile_definitions(human_tests PRIVATE HU_HAS_IMESSAGE=1)
     if(HU_IMESSAGE_TAPBACK_ENABLED)
         target_compile_definitions(human_tests PRIVATE HU_IMESSAGE_TAPBACK_ENABLED=1)
+    endif()
+    if(HU_IMESSAGE_TAPBACK_IMSG)
+        target_compile_definitions(human_tests PRIVATE HU_IMESSAGE_TAPBACK_IMSG=1)
+    endif()
+    if(HU_IMESSAGE_SEND_IMSG)
+        target_compile_definitions(human_tests PRIVATE HU_IMESSAGE_SEND_IMSG=1)
     endif()
 endif()
 if(HU_ENABLE_PWA)

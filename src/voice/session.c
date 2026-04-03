@@ -1,5 +1,6 @@
 #include "human/voice/session.h"
 #include "human/core/log.h"
+#include "human/voice/gemini_live.h"
 #include "human/voice/provider.h"
 #include <math.h>
 #include <stdio.h>
@@ -74,6 +75,16 @@ hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *ses
                                : config->voice.tts_voice;
     bool realtime_mode = (config->voice.mode && strcmp(config->voice.mode, "realtime") == 0) ||
                          (tp && strcmp(tp, "realtime") == 0);
+    bool gemini_live_mode =
+        (config->voice.mode && strcmp(config->voice.mode, "gemini_live") == 0) ||
+        (tp && strcmp(tp, "gemini_live") == 0) || (tp && strcmp(tp, "gemini") == 0);
+
+    if (gemini_live_mode) {
+        /* TODO: Gemini Live voice provider not yet implemented.
+         * hu_voice_provider_gemini_live_create() is declared but not defined.
+         * Fall through to realtime mode or no-op. */
+        (void)gemini_live_mode;
+    }
     if (realtime_mode) {
         const char *key = hu_config_get_provider_key(config, "openai");
         if (key && key[0]) {
@@ -82,12 +93,10 @@ hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *ses
                                         .api_key = key,
                                         .sample_rate = 24000,
                                         .vad_enabled = true};
-            /* Use provider vtable abstraction (preferred path). */
             hu_voice_provider_t vp = {0};
             if (hu_voice_provider_openai_create(alloc, &rtc, &vp) == HU_OK && vp.vtable) {
                 if (vp.vtable->connect(vp.ctx) == HU_OK) {
                     session->provider = vp;
-                    /* Keep legacy rt pointer for backwards compat with existing callers */
                     session->rt = (hu_voice_rt_session_t *)vp.ctx;
                 } else {
                     vp.vtable->disconnect(vp.ctx, alloc);

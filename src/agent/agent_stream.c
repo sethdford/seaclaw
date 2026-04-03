@@ -23,9 +23,13 @@
 #include "human/intelligence/online_learning.h"
 #include "human/intelligence/self_improve.h"
 #include "human/intelligence/value_learning.h"
+#include "human/intelligence/world_model.h"
 #include "human/memory.h"
 #include <sqlite3.h>
 #endif
+#include "human/agent/commitment.h"
+#include "human/agent/reflection.h"
+#include "human/eval/turing_score.h"
 #include "human/provider.h"
 #include "human/voice.h"
 #include <stdio.h>
@@ -498,6 +502,41 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         return err;
     }
 
+    /* Detect commitments from user message (e.g. "I'll send that tomorrow") */
+    {
+        hu_commitment_detect_result_t cdr;
+        memset(&cdr, 0, sizeof(cdr));
+        if (hu_commitment_detect(agent->alloc, msg, msg_len, "user", 4, &cdr) == HU_OK &&
+            cdr.count > 0) {
+#ifdef HU_ENABLE_SQLITE
+            if (agent->memory) {
+                sqlite3 *cdb = hu_sqlite_memory_get_db(agent->memory);
+                if (cdb) {
+                    for (size_t ci = 0; ci < cdr.count; ci++) {
+                        hu_commitment_t *cm = &cdr.commitments[ci];
+                        if (cm->statement && cm->statement_len > 0) {
+                            sqlite3_stmt *cstmt = NULL;
+                            if (sqlite3_prepare_v2(
+                                    cdb,
+                                    "INSERT OR IGNORE INTO commitments(role,text,detected_at) "
+                                    "VALUES(?1,?2,?3)",
+                                    -1, &cstmt, NULL) == SQLITE_OK) {
+                                sqlite3_bind_text(cstmt, 1, "user", 4, SQLITE_STATIC);
+                                sqlite3_bind_text(cstmt, 2, cm->statement, (int)cm->statement_len,
+                                                  SQLITE_STATIC);
+                                sqlite3_bind_int64(cstmt, 3, (int64_t)time(NULL));
+                                sqlite3_step(cstmt);
+                                sqlite3_finalize(cstmt);
+                            }
+                        }
+                    }
+                }
+            }
+#endif
+            hu_commitment_detect_result_deinit(&cdr, agent->alloc);
+        }
+    }
+
     /* Build system prompt (memory, persona, awareness, outcomes) */
     char *memory_ctx = NULL;
     size_t memory_ctx_len = 0;
@@ -825,6 +864,51 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             hu_agent_internal_append_history(agent, HU_ROLE_TOOL, result_text, result_text_len,
                                              call->name, call->name_len, call->id, call->id_len);
 
+            /* Record tool outcome to intelligence subsystems */
+#ifdef HU_ENABLE_SQLITE
+            if (agent->memory) {
+                sqlite3 *rec_db = hu_sqlite_memory_get_db(agent->memory);
+                if (rec_db) {
+                    /* Online learning signal */
+                    hu_online_learning_t ol;
+                    if (hu_online_learning_create(agent->alloc, rec_db, 0.1, &ol) == HU_OK) {
+                        hu_learning_signal_t sig = {
+                            .type =
+                                result.success ? HU_SIGNAL_TOOL_SUCCESS : HU_SIGNAL_TOOL_FAILURE,
+                            .magnitude = 1.0,
+                            .timestamp = (int64_t)time(NULL),
+                        };
+                        sig.tool_name_len = call->name_len < sizeof(sig.tool_name)
+                                                ? call->name_len
+                                                : sizeof(sig.tool_name) - 1;
+                        memcpy(sig.tool_name, call->name, sig.tool_name_len);
+                        hu_online_learning_record(&ol, &sig);
+                        hu_online_learning_deinit(&ol);
+                    }
+                    /* World model outcome */
+                    hu_world_model_t wm;
+                    if (hu_world_model_create(agent->alloc, rec_db, &wm) == HU_OK) {
+                        double conf = result.success ? 0.8 : 0.3;
+                        size_t out_cap = result_text_len > 512 ? 512 : result_text_len;
+                        (void)hu_world_record_outcome(&wm, call->name, call->name_len, result_text,
+                                                      out_cap, conf, (int64_t)time(NULL));
+                        hu_world_model_deinit(&wm);
+                    }
+                    /* Experience record */
+                    hu_experience_store_t exp;
+                    if (hu_experience_store_init(agent->alloc, agent->memory, &exp) == HU_OK) {
+                        exp.db = rec_db;
+                        double score = result.success ? 0.9 : 0.2;
+                        (void)hu_experience_record(&exp, call->name, call->name_len,
+                                                   call->arguments ? call->arguments : "",
+                                                   call->arguments_len, result_text,
+                                                   result_text_len, score);
+                        hu_experience_store_deinit(&exp);
+                    }
+                }
+            }
+#endif
+
             /* Emit TOOL_RESULT event to the callback */
             if (on_event) {
                 hu_agent_stream_event_t tev;
@@ -989,7 +1073,42 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             }
         }
 
-        /* Update final_content pointer if it was replaced by quality pipeline */
+        /* 4. Turing score: heuristic evaluation of response naturalness */
+#ifdef HU_ENABLE_SQLITE
+        if (agent->memory && final_content_len > 10) {
+            hu_turing_score_t tscore;
+            memset(&tscore, 0, sizeof(tscore));
+            if (hu_turing_score_heuristic(final_content, final_content_len, msg, msg_len,
+                                          &tscore) == HU_OK &&
+                tscore.overall > 0.0) {
+                sqlite3 *tdb = hu_sqlite_memory_get_db(agent->memory);
+                if (tdb) {
+                    sqlite3_stmt *ts = NULL;
+                    if (sqlite3_prepare_v2(
+                            tdb,
+                            "INSERT INTO turing_scores(score,response_len,timestamp) "
+                            "VALUES(?1,?2,?3)",
+                            -1, &ts, NULL) == SQLITE_OK) {
+                        sqlite3_bind_double(ts, 1, tscore.overall);
+                        sqlite3_bind_int(ts, 2, (int)final_content_len);
+                        sqlite3_bind_int64(ts, 3, (int64_t)time(NULL));
+                        sqlite3_step(ts);
+                        sqlite3_finalize(ts);
+                    }
+                }
+            }
+        }
+#endif
+
+        /* 5. Heuristic reflection: quick quality check (no LLM call) */
+        {
+            hu_reflection_config_t rcfg = {.enabled = true, .use_llm = false};
+            hu_reflection_quality_t rq =
+                hu_reflection_evaluate(msg, msg_len, final_content, final_content_len, &rcfg);
+            if (rq == HU_QUALITY_NEEDS_RETRY)
+                hu_log_info("human", NULL, "[reflection] response quality: NEEDS_RETRY");
+        }
+
         (void)content_owned;
     }
 #endif /* !HU_IS_TEST */
