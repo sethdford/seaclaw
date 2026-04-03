@@ -9,7 +9,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 PLIST_LABEL="ai.human.service-loop"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
 INSTALL_PATH="$HOME/bin/human"
-BUILD_DIR="$REPO/build"
+BUILD_DIR="$REPO/build-release"
 LOG_DIR="$HOME/.human/logs"
 QUICK="${1:-}"
 
@@ -59,16 +59,12 @@ for plist in "$HOME"/Library/LaunchAgents/*human*service*.plist; do
 done
 ok "Deduplicate plists ($REMOVED stale removed, keeping $PLIST_LABEL)"
 
-# ── 3. Build ──────────────────────────────────────────────────────────
+# ── 3. Build (release: MinSizeRel + LTO, no ASan) ────────────────────
 JOBS=$(sysctl -n hw.ncpu 2>/dev/null || echo 4)
-cmake -B "$BUILD_DIR" \
-    -DCMAKE_BUILD_TYPE=Debug \
-    -DHU_ENABLE_SQLITE=ON \
-    -DHU_ENABLE_ML=ON \
-    -DHU_ENABLE_CURL=ON \
-    > /dev/null 2>&1
-cmake --build "$BUILD_DIR" -j"$JOBS" > /dev/null 2>&1
-ok "Build ($(du -sh "$BUILD_DIR/human" | awk '{print $1}'))"
+cmake --preset release > /dev/null 2>&1
+cmake --build --preset release -j"$JOBS" > /dev/null 2>&1
+BUILD_DIR="$REPO/build-release"
+ok "Build release ($(du -sh "$BUILD_DIR/human" | awk '{print $1}'), no ASan)"
 
 # ── 4. Tests (unless --quick) ─────────────────────────────────────────
 if [ "$QUICK" != "--quick" ]; then
