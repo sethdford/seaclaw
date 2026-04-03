@@ -161,10 +161,10 @@ static char homoglyph_to_ascii(const unsigned char *p, size_t remaining, size_t 
             return (char)('a' + (p[2] - 0x81));
         return 0;
     }
-    /* 4-byte UTF-8: 0xF0-0xF7 lead byte */
+    /* 4-byte UTF-8: 0xF0-0xF7 lead byte — strip (emoji/symbols, no ASCII equivalent) */
     if (p[0] >= 0xF0 && p[0] <= 0xF7 && remaining >= 4) {
         *consumed = 4;
-        return 0;
+        return ' ';  /* replace with space so keyword matching isn't disrupted */
     }
     return 0;
 }
@@ -583,33 +583,42 @@ hu_error_t hu_vulnerability_assess(const hu_vulnerability_input_t *input,
         return HU_OK;
     }
 
+    /* Sanitize floating-point inputs: treat NaN/Inf as zero (fail-safe) */
+    double safe_slope = isfinite(input->trajectory_slope) ? input->trajectory_slope : 0.0;
+    double safe_deviation = isfinite(input->deviation_severity) ? input->deviation_severity : 0.0;
+    double safe_freq_ratio =
+        isfinite(input->message_frequency_ratio) ? input->message_frequency_ratio : 0.0;
+    double safe_self_harm = isfinite(input->self_harm_score) ? input->self_harm_score : 0.0;
+    double safe_companion_risk =
+        isfinite(input->companion_total_risk) ? input->companion_total_risk : 0.0;
+
     /* Evaluate individual risk factors */
-    result->emotional_decline = (input->trajectory_slope < -0.05f);
+    result->emotional_decline = (safe_slope < -0.05);
     result->negative_valence = (input->valence_count >= 2 &&
                                 mean_valence(input->valence_history, input->valence_count) < -0.3);
     result->crisis_keywords = input->self_harm_flagged;
-    result->behavioral_deviation = (input->deviation_severity > 0.3f);
-    result->attachment_escalation = (input->message_frequency_ratio > 1.33);
+    result->behavioral_deviation = (safe_deviation > 0.3);
+    result->attachment_escalation = (safe_freq_ratio > 1.33);
     result->companion_risk = input->companion_flagged;
 
     /* Weighted aggregate score */
     double score = 0.0;
     if (result->crisis_keywords)
-        score += 0.35 + input->self_harm_score * 0.15;
+        score += 0.35 + safe_self_harm * 0.15;
     if (result->emotional_decline)
         score += 0.15;
     if (result->negative_valence)
         score += 0.10;
     if (result->behavioral_deviation)
-        score += (double)input->deviation_severity * 0.15;
+        score += safe_deviation * 0.15;
     if (result->attachment_escalation) {
-        double excess = input->message_frequency_ratio - 1.0;
+        double excess = safe_freq_ratio - 1.0;
         if (excess > 1.0)
             excess = 1.0;
         score += excess * 0.10;
     }
     if (result->companion_risk)
-        score += input->companion_total_risk * 0.15;
+        score += safe_companion_risk * 0.15;
 
     /* Escalation detection from emotional cognition is a strong signal */
     if (input->escalation_detected)
