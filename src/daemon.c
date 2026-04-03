@@ -8508,6 +8508,34 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* ── Phase 3 post-turn: increment turn counter for anti-sycophancy ── */
                 daemon_turn_counter++;
 
+                /* ── Phase 4 post-turn: style drift self-tracking ─────── */
+#ifdef HU_ENABLE_SQLITE
+                if (err == HU_OK && response && response_len > 0 && agent->memory)
+                    (void)hu_style_fingerprint_update_self(agent->memory, alloc,
+                                                           response, response_len);
+#endif
+
+                /* ── Phase 4 post-turn: voice vulnerability tracking ──── */
+#ifdef HU_HAS_PERSONA
+                if (err == HU_OK && combined_len > 0 && agent->persona) {
+                    float vuln = hu_voice_vulnerability_from_content(combined, combined_len);
+                    if (vuln > 0.0f) {
+                        float cur = agent->persona->voice.vulnerability_level;
+                        cur = cur * 0.7f + vuln * 0.3f;
+                        if (cur > 1.0f) cur = 1.0f;
+                        agent->persona->voice.vulnerability_level = cur;
+                    }
+                }
+#endif
+
+                /* ── Phase 4 post-turn: conversation repair detection ─── */
+                if (err == HU_OK && combined_len > 0) {
+                    hu_repair_signal_t rs = {0};
+                    if (hu_repair_detect(combined, combined_len, &rs) == HU_OK &&
+                        rs.should_acknowledge)
+                        repair_signal = rs;
+                }
+
                 /* ── BTH post-turn: Theory of Mind record (t1b-post) ──────── */
 #ifndef HU_IS_TEST
                 if (err == HU_OK && response && response_len > 0) {
