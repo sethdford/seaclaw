@@ -26,7 +26,6 @@ export class ScChatView extends GatewayAwareLitElement {
     staggerMotion9Styles,
     css`
       :host {
-        view-transition-name: view-chat;
         display: flex;
         flex-direction: column;
         contain: layout style;
@@ -251,8 +250,15 @@ export class ScChatView extends GatewayAwareLitElement {
     this._messageThread?.scrollToItem(indices[matchIndex]);
   }
 
+  private _lastLoadedSession = "";
+
   override willUpdate(changed: Map<string, unknown>): void {
-    if (changed.has("sessionKey") && changed.get("sessionKey") !== undefined) {
+    if (
+      changed.has("sessionKey") &&
+      changed.get("sessionKey") !== undefined &&
+      this.sessionKey !== this._lastLoadedSession
+    ) {
+      this._lastLoadedSession = this.sessionKey;
       this.chat.loadHistory(this.sessionKey);
     }
   }
@@ -414,10 +420,11 @@ export class ScChatView extends GatewayAwareLitElement {
     };
   }
 
-  private _handleEdit(content: string, _index: number): void {
+  private async _handleEdit(content: string, _index: number): Promise<void> {
     this.inputValue = content;
     this.requestUpdate();
-    this.updateComplete.then(() => this._composer?.focus?.());
+    await this.updateComplete;
+    this._composer?.focus?.();
   }
 
   private _handleRegenerate(idx: number): void {
@@ -444,6 +451,7 @@ export class ScChatView extends GatewayAwareLitElement {
     message: string,
     files?: Array<{ name: string; size: number; type: string; dataUrl?: string }>,
     mentionedFiles?: string[],
+    options?: { thinkingEnabled?: boolean },
   ): Promise<void> {
     if (!message || !this.gateway) return;
     this.inputValue = "";
@@ -470,6 +478,7 @@ export class ScChatView extends GatewayAwareLitElement {
         this.sessionKey,
         attachments.length > 0 ? attachments : undefined,
         mentionedFiles,
+        options,
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to send message";
@@ -597,10 +606,11 @@ export class ScChatView extends GatewayAwareLitElement {
                     }}
                     @hu-toggle-reaction=${(e: CustomEvent<{ index: number; value: string }>) =>
                       this.chat.toggleReaction?.(e.detail.index, e.detail.value)}
-                    @hu-swipe-reply=${(e: CustomEvent<{ index: number; content: string }>) => {
+                    @hu-swipe-reply=${async (e: CustomEvent<{ index: number; content: string }>) => {
                       this.inputValue = e.detail.content;
                       this.requestUpdate();
-                      this.updateComplete.then(() => this._composer?.focus?.());
+                      await this.updateComplete;
+                      this._composer?.focus?.();
                     }}
                     @hu-swipe-copy=${(e: CustomEvent<{ index: number; content: string }>) => {
                       navigator.clipboard?.writeText(e.detail.content).then(
@@ -640,10 +650,11 @@ export class ScChatView extends GatewayAwareLitElement {
                         this._handleEdit(item.content, e.detail.index);
                       }
                     }}
-                    @hu-reply-message=${(e: CustomEvent<{ content: string }>) => {
+                    @hu-reply-message=${async (e: CustomEvent<{ content: string }>) => {
                       this.inputValue = e.detail.content;
                       this.requestUpdate();
-                      this.updateComplete.then(() => this._composer?.focus?.());
+                      await this.updateComplete;
+                      this._composer?.focus?.();
                     }}
                     @hu-copy-message=${() => {
                       ScToast.show({ message: "Copied to clipboard", variant: "success" });
@@ -686,8 +697,9 @@ export class ScChatView extends GatewayAwareLitElement {
                 message: string;
                 files?: Array<{ name: string; size: number; type: string; dataUrl?: string }>;
                 mentionedFiles?: string[];
+                thinkingEnabled?: boolean;
               }>,
-            ) => this._handleSend(e.detail.message, e.detail.files, e.detail.mentionedFiles)}
+            ) => this._handleSend(e.detail.message, e.detail.files, e.detail.mentionedFiles, { thinkingEnabled: e.detail.thinkingEnabled })}
             @hu-use-suggestion=${(e: CustomEvent<{ text: string }>) =>
               this._handleSend(e.detail.text)}
             @hu-input-change=${(e: CustomEvent<{ value: string }>) => {

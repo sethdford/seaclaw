@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import { formatRelative } from "../utils.js";
@@ -9,22 +9,39 @@ export interface ChatSession {
   title: string;
   ts: number;
   active: boolean;
+  projectId?: string;
+}
+
+export interface ChatProject {
+  id: string;
+  name: string;
+  instructions?: string;
+  pinned?: boolean;
+  color?: string;
 }
 
 @customElement("hu-chat-sessions-panel")
 export class ScChatSessionsPanel extends LitElement {
   @property({ type: Array }) sessions: ChatSession[] = [];
+  @property({ type: Array }) projects: ChatProject[] = [];
 
   @property({ type: Boolean, reflect: true }) open = false;
 
   @state() private _searchQuery = "";
-
   @state() private _focusedIndex = -1;
+  @state() private _activeProjectFilter: string | null = null;
+  @state() private _creatingProject = false;
+  @state() private _newProjectName = "";
+  @state() private _editingProjectId: string | null = null;
 
   private get _filteredSessions(): ChatSession[] {
+    let sessions = this.sessions;
+    if (this._activeProjectFilter) {
+      sessions = sessions.filter((s) => s.projectId === this._activeProjectFilter);
+    }
     const q = this._searchQuery.toLowerCase();
-    if (!q) return this.sessions;
-    return this.sessions.filter((s) => s.title.toLowerCase().includes(q));
+    if (!q) return sessions;
+    return sessions.filter((s) => s.title.toLowerCase().includes(q));
   }
 
   static override styles = css`
@@ -251,6 +268,128 @@ export class ScChatSessionsPanel extends LitElement {
       height: 0.875rem;
     }
 
+    .projects-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--hu-space-2xs);
+      padding: var(--hu-space-xs) var(--hu-space-sm);
+      border-bottom: 1px solid var(--hu-border-subtle);
+    }
+    .project-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--hu-space-2xs);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      background: var(--hu-bg-elevated);
+      border: 1px solid var(--hu-border-subtle);
+      border-radius: var(--hu-radius-full);
+      font-size: var(--hu-text-xs);
+      font-family: var(--hu-font);
+      color: var(--hu-text-muted);
+      cursor: pointer;
+      transition:
+        color var(--hu-duration-fast),
+        border-color var(--hu-duration-fast),
+        background var(--hu-duration-fast);
+    }
+    .project-chip:hover {
+      color: var(--hu-text);
+      border-color: var(--hu-border);
+    }
+    .project-chip.active {
+      color: var(--hu-accent-text, var(--hu-accent));
+      border-color: color-mix(in srgb, var(--hu-accent) 40%, transparent);
+      background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
+    }
+    .project-chip:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
+    .project-chip svg {
+      width: 0.75rem;
+      height: 0.75rem;
+    }
+    .project-dot {
+      width: var(--hu-space-xs);
+      height: var(--hu-space-xs);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .add-project-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--hu-space-2xs);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      background: transparent;
+      border: 1px dashed var(--hu-border-subtle);
+      border-radius: var(--hu-radius-full);
+      font-size: var(--hu-text-xs);
+      font-family: var(--hu-font);
+      color: var(--hu-text-muted);
+      cursor: pointer;
+      transition:
+        color var(--hu-duration-fast),
+        border-color var(--hu-duration-fast);
+    }
+    .add-project-chip:hover {
+      color: var(--hu-accent);
+      border-color: var(--hu-accent);
+    }
+    .add-project-chip:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
+    .add-project-chip svg {
+      width: 0.75rem;
+      height: 0.75rem;
+    }
+    .new-project-row {
+      display: flex;
+      gap: var(--hu-space-2xs);
+      padding: var(--hu-space-xs) var(--hu-space-sm);
+    }
+    .new-project-input {
+      flex: 1;
+      min-width: 0;
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      background: var(--hu-bg-inset);
+      border: 1px solid var(--hu-accent);
+      border-radius: var(--hu-radius);
+      color: var(--hu-text);
+      font-family: var(--hu-font);
+      font-size: var(--hu-text-xs);
+      outline: none;
+    }
+    .new-project-input::placeholder {
+      color: var(--hu-text-faint);
+    }
+    .new-project-confirm {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--hu-space-2xs);
+      background: var(--hu-accent);
+      color: var(--hu-on-accent);
+      border: none;
+      border-radius: var(--hu-radius);
+      cursor: pointer;
+    }
+    .new-project-confirm:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .new-project-confirm svg {
+      width: 0.75rem;
+      height: 0.75rem;
+    }
+    .session-project-indicator {
+      display: inline-flex;
+      width: var(--hu-space-xs);
+      height: var(--hu-space-xs);
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-right: var(--hu-space-2xs);
+    }
     @media (prefers-reduced-motion: reduce) {
       :host {
         transition: none;
@@ -258,7 +397,9 @@ export class ScChatSessionsPanel extends LitElement {
       .new-chat-btn,
       .session-item,
       .delete-btn,
-      .search-input {
+      .search-input,
+      .project-chip,
+      .add-project-chip {
         transition: none;
       }
     }
@@ -374,6 +515,60 @@ export class ScChatSessionsPanel extends LitElement {
     }
   }
 
+  private _toggleProjectFilter(projectId: string): void {
+    this._activeProjectFilter =
+      this._activeProjectFilter === projectId ? null : projectId;
+    this._focusedIndex = -1;
+  }
+
+  private _startCreateProject(): void {
+    this._creatingProject = true;
+    this._newProjectName = "";
+  }
+
+  private _confirmCreateProject(): void {
+    const name = this._newProjectName.trim();
+    if (!name) return;
+    this._creatingProject = false;
+    this.dispatchEvent(
+      new CustomEvent("hu-project-create", {
+        bubbles: true,
+        composed: true,
+        detail: { name },
+      }),
+    );
+    this._newProjectName = "";
+  }
+
+  private _cancelCreateProject(): void {
+    this._creatingProject = false;
+    this._newProjectName = "";
+  }
+
+  private _onProjectKeydown(e: KeyboardEvent): void {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      this._confirmCreateProject();
+    } else if (e.key === "Escape") {
+      this._cancelCreateProject();
+    }
+  }
+
+  private _getProjectColor(project: ChatProject): string {
+    return project.color ?? "var(--hu-accent)";
+  }
+
+  private _renderProjectDot(session: ChatSession) {
+    if (!session.projectId) return nothing;
+    const project = this.projects.find((p) => p.id === session.projectId);
+    if (!project) return nothing;
+    return html`<span
+      class="session-project-indicator"
+      style="background: ${this._getProjectColor(project)}"
+      title=${project.name}
+    ></span>`;
+  }
+
   override render() {
     const filteredGroups = this._groupSessions(this._filteredSessions);
     let startIndex = 0;
@@ -388,6 +583,80 @@ export class ScChatSessionsPanel extends LitElement {
         <button type="button" class="new-chat-btn" @click=${this._onNewChat} aria-label="New chat">
           ${icons["file-text"]} New Chat
         </button>
+        ${this.projects.length > 0 || this._creatingProject
+          ? html`
+              <div class="projects-bar" role="toolbar" aria-label="Projects">
+                <button
+                  class="project-chip ${this._activeProjectFilter === null ? "active" : ""}"
+                  type="button"
+                  @click=${() => (this._activeProjectFilter = null)}
+                >
+                  All
+                </button>
+                ${this.projects.map(
+                  (p) => html`
+                    <button
+                      class="project-chip ${this._activeProjectFilter === p.id ? "active" : ""}"
+                      type="button"
+                      @click=${() => this._toggleProjectFilter(p.id)}
+                      title=${p.instructions ? `Instructions: ${p.instructions}` : p.name}
+                    >
+                      <span
+                        class="project-dot"
+                        style="background: ${this._getProjectColor(p)}"
+                      ></span>
+                      ${p.name}
+                      ${p.pinned ? icons["push-pin"] : nothing}
+                    </button>
+                  `,
+                )}
+                <button
+                  class="add-project-chip"
+                  type="button"
+                  @click=${this._startCreateProject}
+                  aria-label="Create project"
+                >
+                  ${icons.plus} Project
+                </button>
+              </div>
+            `
+          : html`
+              <div class="projects-bar">
+                <button
+                  class="add-project-chip"
+                  type="button"
+                  @click=${this._startCreateProject}
+                  aria-label="Create project"
+                >
+                  ${icons.plus} New Project
+                </button>
+              </div>
+            `}
+        ${this._creatingProject
+          ? html`
+              <div class="new-project-row">
+                <input
+                  class="new-project-input"
+                  type="text"
+                  placeholder="Project name..."
+                  .value=${this._newProjectName}
+                  @input=${(e: Event) =>
+                    (this._newProjectName = (e.target as HTMLInputElement).value)}
+                  @keydown=${this._onProjectKeydown}
+                  autofocus
+                />
+                <button
+                  class="new-project-confirm"
+                  type="button"
+                  ?disabled=${!this._newProjectName.trim()}
+                  @click=${this._confirmCreateProject}
+                  aria-label="Create"
+                >
+                  ${icons.check}
+                </button>
+              </div>
+            `
+          : nothing}
         <div class="search-wrap">
           <input
             class="search-input"
@@ -453,7 +722,7 @@ export class ScChatSessionsPanel extends LitElement {
                               @dblclick=${(e: Event) => this._startRename(e, s)}
                               @blur=${(e: Event) => this._finishRename(e, s.id)}
                               @keydown=${(e: KeyboardEvent) => this._renameKeydown(e, s.id)}
-                              >${s.title || "Untitled"}</span
+                              >${this._renderProjectDot(s)}${s.title || "Untitled"}</span
                             >
                             <span class="session-ts">${formatRelative(s.ts)}</span>
                           </div>

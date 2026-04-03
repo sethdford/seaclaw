@@ -43,6 +43,20 @@ export type ChatItem =
       streaming: boolean;
       duration?: string;
       ts?: number;
+    }
+  | {
+      type: "memory";
+      action: "recall" | "store" | "forget";
+      key: string;
+      value?: string;
+      ts?: number;
+    }
+  | {
+      type: "web_search";
+      query: string;
+      sites: string[];
+      sources?: Array<{ title: string; url: string }>;
+      ts?: number;
     };
 
 export interface GatewayLike {
@@ -132,6 +146,7 @@ export class ChatController implements ReactiveController {
     sessionKey: string,
     attachments?: Array<{ name: string; type: string; data: string }>,
     mentionedFiles?: string[],
+    options?: { thinkingEnabled?: boolean },
   ): Promise<void> {
     const gw = this._getGateway();
     if (!gw) return;
@@ -157,6 +172,7 @@ export class ChatController implements ReactiveController {
         sessionKey,
         ...(attachments?.length ? { attachments } : {}),
         ...(mentionedFiles?.length ? { mentionedFiles } : {}),
+        ...(options?.thinkingEnabled != null ? { thinkingEnabled: options.thinkingEnabled } : {}),
       });
       this._setLastUserStatus("sent");
     } catch (err) {
@@ -275,6 +291,42 @@ export class ChatController implements ReactiveController {
       this._handleArtifact(payload, sessionKey);
       return;
     }
+
+    if (event === "memory.recall" || event === "memory.store" || event === "memory.forget") {
+      this._handleMemory(event, payload, sessionKey);
+      return;
+    }
+
+    if (event === "web_search" || event === "web_search.result") {
+      this._handleWebSearch(payload, sessionKey);
+      return;
+    }
+  }
+
+  private _handleMemory(
+    event: string,
+    payload: Record<string, unknown>,
+    sessionKey: string,
+  ): void {
+    const action = event.split(".")[1] as "recall" | "store" | "forget";
+    const key = (payload.key as string) ?? "";
+    const value = payload.value as string | undefined;
+    const item: ChatItem = { type: "memory", action, key, value, ts: Date.now() };
+    this.items = [...this.items, item];
+    this._trimIfNeeded();
+    this.cacheMessages(sessionKey);
+    this._requestUpdate();
+  }
+
+  private _handleWebSearch(payload: Record<string, unknown>, sessionKey: string): void {
+    const query = (payload.query as string) ?? "";
+    const sites = (payload.sites as string[]) ?? [];
+    const sources = (payload.sources as Array<{ title: string; url: string }>) ?? [];
+    const item: ChatItem = { type: "web_search", query, sites, sources, ts: Date.now() };
+    this.items = [...this.items, item];
+    this._trimIfNeeded();
+    this.cacheMessages(sessionKey);
+    this._requestUpdate();
   }
 
   openArtifact(id: string): void {

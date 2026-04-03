@@ -130,6 +130,11 @@ export class ScMemoryView extends GatewayAwareLitElement {
         flex: 1;
         min-width: 12rem;
       }
+      .controls hu-segmented-control {
+        flex-shrink: 0;
+        overflow-x: auto;
+        max-width: 100%;
+      }
       .memory-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));

@@ -1298,6 +1298,34 @@ export class DemoGatewayClient extends EventTarget {
       afterFirstChunks + 2000,
     );
 
+    /* Emit memory recall/store and web search events so the new components render */
+    if (Math.random() < 0.3) {
+      setTimeout(
+        () => emit("memory.recall", { key: "user_preferences", value: "Prefers concise answers, uses dark mode, timezone PST" }),
+        afterFirstChunks + 600,
+      );
+    }
+    if (Math.random() < 0.2) {
+      setTimeout(
+        () => emit("memory.store", { key: "topic_interest", value: userMessage.slice(0, 80) }),
+        afterFirstChunks + 1200,
+      );
+    }
+    if (toolName === "web_search") {
+      setTimeout(
+        () =>
+          emit("web_search.result", {
+            query: userMessage.slice(0, 60),
+            sites: ["docs.rust-lang.org", "stackoverflow.com", "github.com"],
+            sources: [
+              { title: "Rust Async Book", url: "https://rust-lang.github.io/async-book/" },
+              { title: "Tokio Tutorial", url: "https://tokio.rs/tokio/tutorial" },
+            ],
+          }),
+        afterFirstChunks + 1600,
+      );
+    }
+
     const secondStart = afterFirstChunks + 2100;
     let secondTotal = 0;
     for (const word of secondWords) {

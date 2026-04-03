@@ -960,11 +960,16 @@ export class ScApp extends LitElement {
 
   private async _switchView(newTab: TabId): Promise<void> {
     if (document.startViewTransition && !this.prefersReducedMotion) {
-      const transition = document.startViewTransition(() => {
+      try {
+        const transition = document.startViewTransition(() => {
+          this._performViewSwitch(newTab);
+          return this.updateComplete;
+        });
+        await transition.finished;
+      } catch {
         this._performViewSwitch(newTab);
-        return this.updateComplete;
-      });
-      await transition.finished;
+        await this.updateComplete;
+      }
     } else {
       this._performViewSwitch(newTab);
       await this.updateComplete;
@@ -1129,7 +1134,7 @@ export class ScApp extends LitElement {
         }}
       ></hu-shortcut-overlay>
 
-      <hu-floating-mic></hu-floating-mic>
+      ${this.tab !== "voice" ? html`<hu-floating-mic></hu-floating-mic>` : nothing}
     `;
   }
 

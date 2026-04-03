@@ -96,6 +96,7 @@ export class ScSidebar extends LitElement {
       width: var(--hu-sidebar-width);
       min-width: var(--hu-sidebar-width);
       contain: layout style;
+      z-index: 1;
       /* Glass-standard equivalent — uses tokens directly because :host
          can't receive utility classes from theme.css light DOM */
       background: color-mix(
@@ -131,6 +132,13 @@ export class ScSidebar extends LitElement {
         background: var(--hu-surface-container);
         border-right: 1px solid var(--hu-border);
       }
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
     }
 
     .header {
@@ -377,6 +385,7 @@ export class ScSidebar extends LitElement {
       align-items: center;
       gap: var(--hu-space-sm);
       width: 100%;
+      min-height: 2.75rem;
       padding: var(--hu-space-sm);
       background: transparent;
       border: none;
@@ -393,6 +402,11 @@ export class ScSidebar extends LitElement {
     .theme-toggle:hover {
       background: var(--hu-hover-overlay);
       color: var(--hu-text);
+    }
+
+    .theme-toggle:focus-visible {
+      outline: var(--hu-focus-ring-width) solid var(--hu-accent);
+      outline-offset: calc(-1 * var(--hu-focus-ring-width));
     }
 
     .theme-toggle .icon {
@@ -415,6 +429,7 @@ export class ScSidebar extends LitElement {
       align-items: center;
       justify-content: center;
       width: 100%;
+      min-height: 2.75rem;
       padding: var(--hu-space-sm);
       background: transparent;
       border: none;
@@ -434,6 +449,11 @@ export class ScSidebar extends LitElement {
     .collapse-btn:hover {
       background: var(--hu-hover-overlay);
       color: var(--hu-text);
+    }
+
+    .collapse-btn:focus-visible {
+      outline: var(--hu-focus-ring-width) solid var(--hu-accent);
+      outline-offset: calc(-1 * var(--hu-focus-ring-width));
     }
 
     :host([collapsed]) .collapse-btn .icon {

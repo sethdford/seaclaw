@@ -243,7 +243,7 @@ export class ScTuringView extends GatewayAwareLitElement {
 
       .trajectory-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
         gap: var(--hu-space-lg);
         margin-bottom: var(--hu-space-2xl);
       }
@@ -262,6 +262,7 @@ export class ScTuringView extends GatewayAwareLitElement {
         color: var(--hu-text-muted);
         text-transform: uppercase;
         letter-spacing: var(--hu-tracking-xs);
+        white-space: nowrap;
       }
 
       .trajectory-value {

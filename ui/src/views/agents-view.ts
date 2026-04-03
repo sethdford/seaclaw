@@ -326,13 +326,20 @@ export class ScAgentsView extends GatewayAwareLitElement {
 
   private _renderChart() {
     const chartData = this.sessionsPerDayChart;
-    if (chartData.labels.length === 0) return nothing;
     return html`
       <hu-card class="chart-section">
         <div class="section-header">
           <span class="section-title">Sessions per day</span>
         </div>
-        <hu-chart type="bar" .data=${chartData} height=${200}></hu-chart>
+        ${chartData.labels.length === 0
+          ? html`<hu-empty-state
+              .icon=${icons["bar-chart"]}
+              heading="No chart data"
+              description="Session activity will appear here once conversations are created."
+            >
+              <hu-button variant="ghost" size="sm" @click=${() => this.load()}>Retry</hu-button>
+            </hu-empty-state>`
+          : html`<hu-chart type="bar" .data=${chartData} height=${200}></hu-chart>`}
       </hu-card>
     `;
   }
