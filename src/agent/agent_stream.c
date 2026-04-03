@@ -807,10 +807,30 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             hu_gvr_pipeline_result_free(agent->alloc, &gvr_result);
         }
 
-        /* 1b. Persona quality: if response is suspiciously short or generic,
-         * re-prompt the model with a directive to elaborate in character. */
-        if (agent->persona && final_content_len > 0 && final_content_len < 120 && msg_len > 15 &&
+        /* 1b. Persona quality rethink: re-prompt for more substance.
+         * Triggers when response is short (<80 chars) for a substantive question,
+         * but ONLY if the first draft lacks engagement (no question mark).
+         * Short + in-persona + has follow-up question = good, skip rethink.
+         * Short + formal/no-question = needs help, do rethink. */
+        bool needs_rethink = false;
+        if (agent->persona && final_content_len > 0 && final_content_len < 80 && msg_len > 15 &&
             agent->provider.vtable && agent->provider.vtable->chat_with_system) {
+            bool has_question = (memchr(final_content, '?', final_content_len) != NULL);
+            bool starts_lowercase = (final_content[0] >= 'a' && final_content[0] <= 'z');
+            /* In persona + asks follow-up = engaged, skip rethink */
+            if (starts_lowercase && has_question)
+                needs_rethink = false;
+            /* In persona + short but no question = could use more, rethink */
+            else if (starts_lowercase && final_content_len < 45)
+                needs_rethink = true;
+            /* Formal/uppercase start = definitely rethink */
+            else if (!starts_lowercase)
+                needs_rethink = true;
+            /* 45-80 chars in persona = borderline, skip */
+            else
+                needs_rethink = false;
+        }
+        if (needs_rethink) {
             /* Build rethink prompt with persona context for style fidelity */
             const char *persona_name = agent->persona ? agent->persona->name : "the persona";
             const char *persona_identity =
