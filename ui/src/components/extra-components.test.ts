@@ -3635,6 +3635,34 @@ describe("hu-chart", () => {
     expect(empty?.textContent).toContain("No data");
     el.remove();
   });
+
+  it("should keep the same canvas when only data changes (update path, not destroy)", async () => {
+    const el = document.createElement("hu-chart") as ScChart;
+    el.type = "bar";
+    el.data = { labels: ["A"], datasets: [{ data: [1] }] };
+    document.body.appendChild(el);
+
+    const deadline = Date.now() + 8000;
+    let canvas1: HTMLCanvasElement | null = null;
+    while (Date.now() < deadline) {
+      await el.updateComplete;
+      canvas1 = el.shadowRoot?.querySelector("canvas") ?? null;
+      if (canvas1) break;
+      if (el.shadowRoot?.querySelector(".empty")?.textContent?.includes("Chart unavailable")) {
+        el.remove();
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    expect(canvas1).toBeTruthy();
+
+    el.data = { labels: ["A"], datasets: [{ data: [42] }] };
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 200));
+    const canvas2 = el.shadowRoot?.querySelector("canvas");
+    expect(canvas2).toBe(canvas1);
+    el.remove();
+  });
 });
 
 describe("hu-activity-timeline", () => {

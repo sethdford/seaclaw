@@ -17,6 +17,8 @@ export class HuRingProgress extends LitElement {
   @state() private _reducedMotion = false;
   @state() private _celebrate = false;
   @state() private _mounted = false;
+  /** Unique SVG defs ids when multiple instances exist */
+  private _svgUid = "";
 
   static override styles = css`
     :host {
@@ -40,7 +42,11 @@ export class HuRingProgress extends LitElement {
       transform-origin: center;
       transition: stroke-dashoffset var(--hu-duration-slower, 450ms)
         var(--hu-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
-      filter: drop-shadow(0 0 2px color-mix(in srgb, currentColor 35%, transparent));
+      filter: drop-shadow(0 0 1px color-mix(in srgb, var(--hu-accent) 25%, transparent));
+    }
+    .ring-tip {
+      pointer-events: none;
+      transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
     }
     .progress.celebrate {
       animation: hu-ring-celebrate var(--hu-duration-normal, 250ms)
@@ -60,10 +66,11 @@ export class HuRingProgress extends LitElement {
     @keyframes hu-ring-celebrate {
       0%,
       100% {
-        filter: drop-shadow(0 0 0 transparent);
+        opacity: 1;
       }
       50% {
-        filter: drop-shadow(0 0 10px var(--hu-accent));
+        opacity: 0.88;
+        filter: drop-shadow(0 0 8px var(--hu-accent));
       }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -79,6 +86,10 @@ export class HuRingProgress extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this._reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this._svgUid =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID().replace(/-/g, "")
+        : `rp${Math.floor(Math.random() * 1e9)}`;
   }
 
   override updated(changed: Map<string, unknown>): void {
@@ -118,6 +129,12 @@ export class HuRingProgress extends LitElement {
     return { cx, cy, r, sw, c, vb };
   }
 
+  /** Arc endpoint (radians from +x), after visual -90° start = top of ring */
+  private _tipPosition(cx: number, cy: number, r: number, drawRatio: number) {
+    const theta = -Math.PI / 2 + 2 * Math.PI * drawRatio;
+    return { tx: cx + r * Math.cos(theta), ty: cy + r * Math.sin(theta) };
+  }
+
   override render() {
     const items = (this.rings ?? []).slice(0, 3);
     if (items.length === 0) {
@@ -125,19 +142,48 @@ export class HuRingProgress extends LitElement {
     }
 
     const labels = items.map((r) => r.label).filter(Boolean);
+    const uid = this._svgUid || "rp0";
 
     return html`
       <div style="width:${this.size}px" role="img" aria-label="Ring progress" class="ring-wrap">
         <svg viewBox="0 0 120 120" aria-hidden="true">
+          <defs>
+            <filter id="${uid}-tipBlur" x="-100%" y="-100%" width="300%" height="300%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="b" />
+              <feMerge>
+                <feMergeNode in="b" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            ${items.map((ring, i) => {
+              const color = ring.color ?? this._defaultColor(i);
+              return html`
+                <linearGradient
+                  id="${uid}-lg${i}"
+                  gradientUnits="userSpaceOnUse"
+                  x1="0"
+                  y1="60"
+                  x2="120"
+                  y2="60"
+                >
+                  <stop offset="0%" stop-color=${color} stop-opacity="0.55" />
+                  <stop offset="100%" stop-color=${color} stop-opacity="1" />
+                </linearGradient>
+              `;
+            })}
+          </defs>
           ${items.map((ring, i) => {
             const { cx, cy, r, sw, c } = this._ringGeometry(i);
             const max = ring.max ?? 1;
-            const ratio = Math.min(Math.max(ring.value / max, 0), 1.5);
-            const visible = Math.min(ratio, 1);
-            const offset = c * (1 - visible);
+            const ratioRaw = ring.value / max;
+            const drawRatio = Math.min(Math.max(ratioRaw, 0), 1.5);
+            const offset = c * (1 - drawRatio);
             const color = ring.color ?? this._defaultColor(i);
-            const celebrate = this._celebrate && ratio >= 1;
+            const celebrate = this._celebrate && ratioRaw >= 1;
             const dashOff = this._mounted || this._reducedMotion ? offset : c;
+            const { tx, ty } = this._tipPosition(cx, cy, r, drawRatio);
+            const showTip = drawRatio > 0.04 && !this._reducedMotion;
+            const strokeRef = `url(#${uid}-lg${i})`;
             return html`
               <circle class="track" cx=${cx} cy=${cy} r=${r} stroke-width=${sw} />
               <circle
@@ -146,11 +192,25 @@ export class HuRingProgress extends LitElement {
                 cy=${cy}
                 r=${r}
                 stroke-width=${sw}
-                stroke=${color}
+                stroke=${strokeRef}
                 style="color: ${color}"
                 stroke-dasharray=${c}
                 stroke-dashoffset=${dashOff}
               />
+              ${showTip
+                ? html`
+                    <circle
+                      class="ring-tip"
+                      cx=${tx}
+                      cy=${ty}
+                      r=${Math.max(2.5, sw * 0.22)}
+                      fill=${color}
+                      filter=${`url(#${uid}-tipBlur)`}
+                      opacity="0.95"
+                      aria-hidden="true"
+                    />
+                  `
+                : nothing}
             `;
           })}
         </svg>

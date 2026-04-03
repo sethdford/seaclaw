@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 export interface SankeyNode {
@@ -43,7 +43,19 @@ export class HuSankey extends LitElement {
     .link {
       fill: none;
       stroke-opacity: 0.35;
-      transition: stroke-opacity var(--hu-duration-fast) var(--hu-ease-out);
+      transition:
+        stroke-opacity var(--hu-duration-fast) var(--hu-ease-out),
+        stroke-dashoffset var(--hu-duration-slower, 550ms)
+          var(--hu-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+    }
+    :host(:not(.sankey-ready)) .link {
+      stroke-dasharray: 800;
+      stroke-dashoffset: 800;
+      stroke-opacity: 0;
+    }
+    :host(.sankey-ready) .link {
+      stroke-dashoffset: 0;
+      stroke-opacity: 0.35;
     }
     .link:hover,
     .link.active {
@@ -52,6 +64,11 @@ export class HuSankey extends LitElement {
     @media (prefers-reduced-motion: reduce) {
       .link {
         transition: none;
+      }
+      :host(:not(.sankey-ready)) .link {
+        stroke-dasharray: none;
+        stroke-dashoffset: 0;
+        stroke-opacity: 0.35;
       }
     }
   `;
@@ -125,6 +142,17 @@ export class HuSankey extends LitElement {
     }
 
     return { positions, linkPaths, vbW, vbH };
+  }
+
+  override firstUpdated(changedProperties: PropertyValues): void {
+    super.firstUpdated(changedProperties);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.classList.add("sankey-ready");
+      return;
+    }
+    requestAnimationFrame(() => {
+      this.classList.add("sankey-ready");
+    });
   }
 
   override render() {

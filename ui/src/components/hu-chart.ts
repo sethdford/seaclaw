@@ -59,6 +59,8 @@ export class ScChart extends LitElement {
   private _resizeObserver: ResizeObserver | null = null;
   private _chartLoadPromise: Promise<unknown> | null = null;
   private _chartUnavailable = false;
+  /** Serializes async init/patch so rapid updates do not double-construct Chart.js on one canvas. */
+  private _chartWorkChain: Promise<void> = Promise.resolve();
 
   static override styles = css`
     :host {
@@ -106,7 +108,8 @@ export class ScChart extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this._chartLoadPromise = import("https://esm.sh/chart.js@4").catch(() => {
+    // Use the npm package so Vitest/Node can resolve the module (https: imports fail there).
+    this._chartLoadPromise = import("chart.js").catch(() => {
       this._chartUnavailable = true;
       this.requestUpdate();
       return null;
@@ -126,22 +129,39 @@ export class ScChart extends LitElement {
       return;
     }
 
-    const needsRecreate =
+    const structChanged =
       changed.has("type") ||
       changed.has("height") ||
       changed.has("horizontal") ||
-      changed.has("hideLegend") ||
-      !this._chart;
+      changed.has("hideLegend");
 
-    if (needsRecreate) {
-      if (this._chart) this._destroyChart();
-      this._initChart();
+    // Chart.destroy() can remove the canvas from the DOM. Re-render first so Lit restores
+    // a fresh <canvas>, then init on the next updated pass (see !this._chart branch).
+    if (this._chart && structChanged) {
+      this._destroyChart();
+      this.requestUpdate();
       return;
     }
 
-    if (changed.has("data") && this._chart) {
+    if (!this._chart) {
+      this._enqueueChartWork(async () => {
+        if (!this._hasData() || this._chartUnavailable) return;
+        if (this._chart) {
+          this._patchChartData();
+          return;
+        }
+        await this._initChart();
+      });
+      return;
+    }
+
+    if (changed.has("data")) {
       this._patchChartData();
     }
+  }
+
+  private _enqueueChartWork(work: () => Promise<void>): void {
+    this._chartWorkChain = this._chartWorkChain.then(work).catch(() => {});
   }
 
   private _patchChartData(): void {
@@ -151,7 +171,6 @@ export class ScChart extends LitElement {
     chart.data.datasets = this._buildChartDatasets() as never[];
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     chart.update(reducedMotion ? "none" : "default");
-    this.requestUpdate();
   }
 
   private _hasData(): boolean {
@@ -225,24 +244,22 @@ export class ScChart extends LitElement {
     const canvas = this.renderRoot.querySelector("canvas");
     if (!canvas || !this._hasData()) return;
 
-    const ChartModule = (await this._chartLoadPromise) as {
-      default?: new (
-        el: HTMLCanvasElement,
-        config: unknown,
-      ) => {
-        destroy(): void;
-        resize(): void;
-        data: { labels: unknown[]; datasets: unknown[] };
-        update(mode?: string): void;
-      };
-    } | null;
-    if (!ChartModule?.default) {
+    type ChartInstance = {
+      destroy(): void;
+      resize(): void;
+      data: { labels: unknown[]; datasets: unknown[] };
+      update(mode?: string): void;
+    };
+    type ChartCtor = new (el: HTMLCanvasElement, config: unknown) => ChartInstance;
+
+    const mod = (await this._chartLoadPromise) as { default?: ChartCtor; Chart?: ChartCtor } | null;
+    // chart.js ships named `Chart` (no default); support both shapes for compatibility.
+    const Chart = mod?.default ?? mod?.Chart;
+    if (!Chart) {
       this._chartUnavailable = true;
       this.requestUpdate();
       return;
     }
-
-    const Chart = ChartModule.default;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const cs = getComputedStyle(this);
     const fontFamily = cs.getPropertyValue("--hu-font").trim() || "Avenir, system-ui, sans-serif";

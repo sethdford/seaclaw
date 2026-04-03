@@ -11,7 +11,7 @@ export class HuAnimatedValue extends LitElement {
   @property({ type: String }) prefix = "";
   @property({ type: String }) suffix = "";
   @property({ type: String }) currency = "USD";
-  @property({ type: Boolean }) showDelta = false;
+  @property({ type: Boolean, reflect: true, attribute: "show-delta" }) showDelta = false;
   @property({ type: Number }) duration = 500;
 
   @state() private _displayed = 0;
