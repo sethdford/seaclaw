@@ -19,6 +19,8 @@ typedef struct hu_provider_degradation_config {
     bool enabled;
     char *fallback_model;           /* simpler/cheaper model to try on primary failure */
     size_t fallback_model_len;
+    char *s3_local_model;           /* dedicated model for S3 (secrets/private) content; NULL = use fallback */
+    size_t s3_local_model_len;
     uint32_t max_retries;           /* per-model retry count (default 1) */
     hu_circuit_breaker_t breaker;   /* embedded; caller inits via hu_circuit_breaker_init */
 } hu_provider_degradation_config_t;

@@ -24,16 +24,21 @@ function computeLineDiff(oldText: string, newText: string): DiffLine[] {
   const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = oldLines[i - 1] === newLines[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+      dp[i][j] =
+        oldLines[i - 1] === newLines[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
     }
   }
 
-  let i = m, j = n;
+  let i = m,
+    j = n;
   const stack: DiffLine[] = [];
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
       stack.push({ type: "unchanged", content: oldLines[i - 1] });
-      i--; j--;
+      i--;
+      j--;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
       stack.push({ type: "added", content: newLines[j - 1] });
       j--;
@@ -258,7 +263,8 @@ export class ScArtifactViewer extends LitElement {
       padding-left: var(--hu-space-xs);
     }
     @media (prefers-reduced-motion: reduce) {
-      .copy-btn, .diff-toggle {
+      .copy-btn,
+      .diff-toggle {
         transition: none;
       }
     }
@@ -472,7 +478,9 @@ export class ScArtifactViewer extends LitElement {
         ${lines.map(
           (line) => html`
             <div class="diff-line ${line.type}">
-              <span class="diff-gutter">${line.type === "added" ? "+" : line.type === "removed" ? "−" : " "}</span>
+              <span class="diff-gutter"
+                >${line.type === "added" ? "+" : line.type === "removed" ? "−" : " "}</span
+              >
               <span class="diff-content">${line.content || " "}</span>
             </div>
           `,

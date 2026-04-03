@@ -255,6 +255,36 @@ static void debounce_null_safety(void) {
     hu_consolidation_debounce_reset(NULL, 1000);
 }
 
+static void debounce_inject_adds_ticks(void) {
+    hu_consolidation_debounce_t d;
+    hu_consolidation_debounce_init(&d);
+    hu_consolidation_debounce_inject(&d, HU_CONSOLIDATION_MIN_ENTRIES);
+    HU_ASSERT(hu_consolidation_should_run(&d, 1000));
+}
+
+static void topic_switch_signal_roundtrip(void) {
+    hu_consolidation_set_topic_switch(false);
+    HU_ASSERT(!hu_consolidation_get_and_clear_topic_switch());
+    hu_consolidation_set_topic_switch(true);
+    HU_ASSERT(hu_consolidation_get_and_clear_topic_switch());
+    HU_ASSERT(!hu_consolidation_get_and_clear_topic_switch());
+}
+
+static void similarity_case_insensitive(void) {
+    uint32_t score = hu_similarity_score("Hello World", 11, "hello world", 11);
+    HU_ASSERT(score == 100);
+}
+
+static void similarity_ignores_stop_words(void) {
+    uint32_t score = hu_similarity_score("the cat is on the mat", 21, "cat mat", 7);
+    HU_ASSERT(score >= 90);
+}
+
+static void similarity_strips_punctuation(void) {
+    uint32_t score = hu_similarity_score("hello, world!", 13, "hello world", 11);
+    HU_ASSERT(score == 100);
+}
+
 void run_consolidation_tests(void) {
     HU_TEST_SUITE("consolidation");
     HU_RUN_TEST(similarity_identical_returns_100);
@@ -277,4 +307,11 @@ void run_consolidation_tests(void) {
     HU_RUN_TEST(debounce_respects_min_interval);
     HU_RUN_TEST(debounce_reset_clears_counters);
     HU_RUN_TEST(debounce_null_safety);
+    HU_RUN_TEST(debounce_inject_adds_ticks);
+    HU_RUN_TEST(topic_switch_signal_roundtrip);
+
+    /* Improved similarity */
+    HU_RUN_TEST(similarity_case_insensitive);
+    HU_RUN_TEST(similarity_ignores_stop_words);
+    HU_RUN_TEST(similarity_strips_punctuation);
 }

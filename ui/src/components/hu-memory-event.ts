@@ -108,13 +108,8 @@ export class ScMemoryEvent extends LitElement {
 
   override render() {
     const actionLabel =
-      this.action === "recall"
-        ? "Recalled"
-        : this.action === "store"
-          ? "Stored"
-          : "Forgot";
-    const actionIcon =
-      this.action === "forget" ? icons.trash : icons.brain;
+      this.action === "recall" ? "Recalled" : this.action === "store" ? "Stored" : "Forgot";
+    const actionIcon = this.action === "forget" ? icons.trash : icons.brain;
 
     return html`
       <div class="memory-event" role="status" aria-label="Memory ${this.action}">
@@ -131,9 +126,7 @@ export class ScMemoryEvent extends LitElement {
                 >`
               : nothing}
           </div>
-          ${this._expanded && this.value
-            ? html`<div class="detail">${this.value}</div>`
-            : nothing}
+          ${this._expanded && this.value ? html`<div class="detail">${this.value}</div>` : nothing}
         </div>
       </div>
     `;

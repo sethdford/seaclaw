@@ -2,6 +2,7 @@
 #include "human/agent/model_router.h"
 #include "human/provider.h"
 #include "human/core/allocator.h"
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
@@ -381,6 +382,41 @@ static void route_with_judge_cache_hit_returns_cached(void) {
     HU_ASSERT(sel.tier == HU_TIER_DEEP);
 }
 
+static void analytical_and_deep_use_different_models(void) {
+    hu_model_router_config_t c = hu_model_router_default_config();
+    HU_ASSERT(strcmp(c.analytical_model, c.deep_model) != 0);
+}
+
+static void very_long_message_scores_higher(void) {
+    hu_model_router_config_t c = hu_model_router_default_config();
+    char buf[8192];
+    size_t off = 0;
+    for (int i = 0; i < 100 && off < sizeof(buf) - 10; i++)
+        off += (size_t)snprintf(buf + off, sizeof(buf) - off, "word%d ", i);
+    hu_model_selection_t sel = hu_model_route(&c, buf, off, NULL, 0, 12, 5);
+    HU_ASSERT(sel.tier >= HU_TIER_CONVERSATIONAL);
+}
+
+static void parse_judge_bare_tier_name(void) {
+    hu_cognitive_tier_t tier;
+    HU_ASSERT(hu_route_parse_judge_response("ANALYTICAL", 10, &tier));
+    HU_ASSERT(tier == HU_TIER_ANALYTICAL);
+}
+
+static void parse_judge_multiline_json(void) {
+    const char *resp = "{\n  \"tier\" :\n    \"DEEP\"\n}";
+    hu_cognitive_tier_t tier;
+    HU_ASSERT(hu_route_parse_judge_response(resp, strlen(resp), &tier));
+    HU_ASSERT(tier == HU_TIER_DEEP);
+}
+
+static void parse_judge_markdown_wrapped(void) {
+    const char *resp = "```json\n{\"tier\": \"conversational\"}\n```";
+    hu_cognitive_tier_t tier;
+    HU_ASSERT(hu_route_parse_judge_response(resp, strlen(resp), &tier));
+    HU_ASSERT(tier == HU_TIER_CONVERSATIONAL);
+}
+
 void run_model_router_tests(void) {
     HU_TEST_SUITE("Model Router");
 
@@ -416,6 +452,9 @@ void run_model_router_tests(void) {
     HU_RUN_TEST(parse_judge_with_whitespace);
     HU_RUN_TEST(parse_judge_invalid_returns_false);
     HU_RUN_TEST(parse_judge_case_insensitive);
+    HU_RUN_TEST(parse_judge_bare_tier_name);
+    HU_RUN_TEST(parse_judge_multiline_json);
+    HU_RUN_TEST(parse_judge_markdown_wrapped);
 
     /* Prompt hash */
     HU_RUN_TEST(hash_deterministic);
@@ -439,4 +478,8 @@ void run_model_router_tests(void) {
     HU_RUN_TEST(route_with_judge_null_provider_falls_through);
     HU_RUN_TEST(route_with_judge_test_mode_returns_fallback);
     HU_RUN_TEST(route_with_judge_cache_hit_returns_cached);
+
+    /* SOTA gap fixes */
+    HU_RUN_TEST(analytical_and_deep_use_different_models);
+    HU_RUN_TEST(very_long_message_scores_higher);
 }

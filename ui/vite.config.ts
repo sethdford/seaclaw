@@ -4,7 +4,8 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
-    chunkSizeWarningLimit: 500,
+    chunkSizeWarningLimit: 200,
+    target: "esnext",
     rollupOptions: {
       output: {
         manualChunks: {
@@ -14,6 +15,9 @@ export default defineConfig({
             "lit/directives/class-map.js",
             "lit/directives/style-map.js",
           ],
+          markdown: ["marked", "dompurify"],
+          syntax: ["shiki"],
+          math: ["katex"],
         },
       },
     },

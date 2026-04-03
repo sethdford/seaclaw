@@ -156,7 +156,8 @@ typedef struct hu_stream_chat_result {
 /* Free allocations in a stream chat result (content, model, tool_calls). */
 void hu_stream_chat_result_free(hu_allocator_t *alloc, hu_stream_chat_result_t *result);
 
-typedef void (*hu_stream_callback_t)(void *ctx, const hu_stream_chunk_t *chunk);
+/* Returns true to continue streaming, false to signal the provider to stop. */
+typedef bool (*hu_stream_callback_t)(void *ctx, const hu_stream_chunk_t *chunk);
 
 typedef struct hu_tool_spec {
     const char *name;

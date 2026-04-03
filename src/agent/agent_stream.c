@@ -44,10 +44,10 @@ typedef struct stream_token_wrap {
     bool first_chunk_sent;
 } stream_token_wrap_t;
 
-static void stream_chunk_to_token_cb(void *ctx, const hu_stream_chunk_t *chunk) {
+static bool stream_chunk_to_token_cb(void *ctx, const hu_stream_chunk_t *chunk) {
     stream_token_wrap_t *w = (stream_token_wrap_t *)ctx;
     if (chunk->is_final || !w->on_token)
-        return;
+        return true;
     if (chunk->type == HU_STREAM_CONTENT && chunk->delta && chunk->delta_len > 0) {
         /* Emotional pacing: pause before first content chunk for heavy messages */
         if (!w->first_chunk_sent && w->initial_delay_ms > 0) {
@@ -63,6 +63,7 @@ static void stream_chunk_to_token_cb(void *ctx, const hu_stream_chunk_t *chunk) 
         w->first_chunk_sent = true;
         w->on_token(chunk->delta, chunk->delta_len, w->token_ctx);
     }
+    return true;
 }
 
 /* v1 shim: translates hu_agent_stream_event_t back to the simple token callback */
@@ -85,16 +86,16 @@ typedef struct v2_stream_wrap {
     bool first_content_sent;
 } v2_stream_wrap_t;
 
-static void stream_chunk_to_event_cb(void *ctx, const hu_stream_chunk_t *chunk) {
+static bool stream_chunk_to_event_cb(void *ctx, const hu_stream_chunk_t *chunk) {
     v2_stream_wrap_t *w = (v2_stream_wrap_t *)ctx;
     if (!w->on_event || chunk->is_final)
-        return;
+        return true;
     hu_agent_stream_event_t ev;
     memset(&ev, 0, sizeof(ev));
     switch (chunk->type) {
     case HU_STREAM_CONTENT:
         if (!chunk->delta || chunk->delta_len == 0)
-            return;
+            return true;
         /* Emotional pacing: pause before first content chunk */
         if (!w->first_content_sent && w->initial_delay_ms > 0) {
             uint32_t delay = w->initial_delay_ms;
@@ -113,7 +114,7 @@ static void stream_chunk_to_event_cb(void *ctx, const hu_stream_chunk_t *chunk) 
         break;
     case HU_STREAM_THINKING:
         if (!chunk->delta || chunk->delta_len == 0)
-            return;
+            return true;
         ev.type = HU_AGENT_STREAM_THINKING;
         ev.data = chunk->delta;
         ev.data_len = chunk->delta_len;
@@ -135,9 +136,10 @@ static void stream_chunk_to_event_cb(void *ctx, const hu_stream_chunk_t *chunk) 
         ev.tool_call_id_len = chunk->tool_call_id_len;
         break;
     case HU_STREAM_TOOL_DONE:
-        return; /* handled after stream_chat returns */
+        return true; /* handled after stream_chat returns */
     }
     w->on_event(&ev, w->event_ctx);
+    return true;
 }
 
 /* Tool streaming: bridges tool execute_streaming chunks to agent stream events */
@@ -884,20 +886,20 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * Short + in-persona + has follow-up question = good, skip rethink.
          * Short + formal/no-question = needs help, do rethink. */
         bool needs_rethink = false;
-        if (agent->persona && final_content_len > 0 && final_content_len < 80 && msg_len > 15 &&
+        if (agent->persona && final_content_len > 0 && final_content_len < 100 && msg_len > 15 &&
             agent->provider.vtable && agent->provider.vtable->chat_with_system) {
             bool has_question = (memchr(final_content, '?', final_content_len) != NULL);
             bool starts_lowercase = (final_content[0] >= 'a' && final_content[0] <= 'z');
-            /* In persona + asks follow-up = engaged, skip rethink */
-            if (starts_lowercase && has_question)
+            /* Has follow-up question = engaged, skip rethink regardless of length */
+            if (has_question)
                 needs_rethink = false;
-            /* In persona + short but no question = could use more, rethink */
-            else if (starts_lowercase && final_content_len < 45)
+            /* No question + under 70 chars = needs more substance */
+            else if (final_content_len < 70)
                 needs_rethink = true;
-            /* Formal/uppercase start = definitely rethink */
+            /* 70-100 chars, no question, uppercase = definitely rethink */
             else if (!starts_lowercase)
                 needs_rethink = true;
-            /* 45-80 chars in persona = borderline, skip */
+            /* 70-100 chars, lowercase, no question = borderline, skip */
             else
                 needs_rethink = false;
         }

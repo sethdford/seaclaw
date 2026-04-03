@@ -589,6 +589,7 @@ hu_error_t cp_admin_models_decisions(hu_allocator_t *alloc, hu_app_context_t *ap
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
 
+    hu_route_global_log_lock();
     hu_route_decision_log_t *log = hu_route_global_log();
     hu_json_value_t *arr = hu_json_array_new(alloc);
 
@@ -611,9 +612,9 @@ hu_error_t cp_admin_models_decisions(hu_allocator_t *alloc, hu_app_context_t *ap
     hu_json_object_set(alloc, obj, "decisions", arr);
     hu_json_object_set(alloc, obj, "total", hu_json_number_new(alloc, (double)count));
 
-    /* Tier distribution */
     size_t tier_counts[4];
     hu_route_log_tier_counts(log, tier_counts);
+    hu_route_global_log_unlock();
     hu_json_value_t *dist = hu_json_object_new(alloc);
     hu_json_object_set(alloc, dist, "reflexive",
                        hu_json_number_new(alloc, (double)tier_counts[HU_TIER_REFLEXIVE]));

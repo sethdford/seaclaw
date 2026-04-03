@@ -226,6 +226,47 @@ static void level_str_values(void) {
     HU_ASSERT(strcmp(hu_sensitivity_level_str(HU_SENSITIVITY_S3), "S3") == 0);
 }
 
+static void confidence_s1_is_high(void) {
+    hu_sensitivity_result_t r = hu_sensitivity_classify_message("Hello!", 6);
+    HU_ASSERT(r.level == HU_SENSITIVITY_S1);
+    HU_ASSERT(r.confidence >= 0.9f);
+}
+
+static void confidence_s3_multiple_signals_is_high(void) {
+    const char *msg = "my api key is sk-abc and my password is secret";
+    hu_sensitivity_result_t r = hu_sensitivity_classify_message(msg, strlen(msg));
+    HU_ASSERT(r.level == HU_SENSITIVITY_S3);
+    HU_ASSERT(r.signal_count >= 2);
+    HU_ASSERT(r.confidence >= 0.8f);
+}
+
+static void confidence_s2_single_signal_is_moderate(void) {
+    const char *msg = "my date of birth is 1990-01-01";
+    hu_sensitivity_result_t r = hu_sensitivity_classify_message(msg, strlen(msg));
+    HU_ASSERT(r.level == HU_SENSITIVITY_S2);
+    HU_ASSERT(r.signal_count >= 1);
+    HU_ASSERT(r.confidence >= 0.4f && r.confidence <= 0.9f);
+}
+
+static void luhn_valid_card_detected(void) {
+    const char *msg = "card 4111111111111111";
+    hu_sensitivity_result_t r = hu_sensitivity_classify_message(msg, strlen(msg));
+    HU_ASSERT(r.level >= HU_SENSITIVITY_S2);
+}
+
+static void luhn_invalid_card_not_flagged(void) {
+    const char *msg = "number 1234567890123456";
+    hu_sensitivity_result_t r = hu_sensitivity_classify_message(msg, strlen(msg));
+    HU_ASSERT(r.level == HU_SENSITIVITY_S1 || r.reason == NULL ||
+              strstr(r.reason, "credit") == NULL);
+}
+
+static void email_pattern_returns_s2(void) {
+    const char *msg = "send to user@example.com please";
+    hu_sensitivity_result_t r = hu_sensitivity_classify_message(msg, strlen(msg));
+    HU_ASSERT(r.level >= HU_SENSITIVITY_S2);
+}
+
 void run_sensitivity_tests(void) {
     HU_TEST_SUITE("Sensitivity");
 
@@ -247,6 +288,18 @@ void run_sensitivity_tests(void) {
     HU_RUN_TEST(null_message_returns_s1);
     HU_RUN_TEST(empty_message_returns_s1);
     HU_RUN_TEST(case_insensitive_detection);
+
+    /* Confidence scoring */
+    HU_RUN_TEST(confidence_s1_is_high);
+    HU_RUN_TEST(confidence_s3_multiple_signals_is_high);
+    HU_RUN_TEST(confidence_s2_single_signal_is_moderate);
+
+    /* Luhn validation */
+    HU_RUN_TEST(luhn_valid_card_detected);
+    HU_RUN_TEST(luhn_invalid_card_not_flagged);
+
+    /* Pattern detection */
+    HU_RUN_TEST(email_pattern_returns_s2);
 
     /* Path classification */
     HU_RUN_TEST(ssh_path_returns_s3);

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static uint64_t tool_cache_hash(const char *name, size_t name_len,
                                  const char *args, size_t args_len) {
@@ -133,6 +134,35 @@ static void execute_one_cached(hu_allocator_t *alloc, hu_tool_t *tools, size_t t
     execute_one_impl(alloc, tools, tools_count, call, result_out, cache, NULL, NULL);
 }
 
+static void execute_one_retried(hu_allocator_t *alloc, hu_tool_t *tools, size_t tools_count,
+                                const hu_tool_call_t *call, hu_tool_result_t *result_out,
+                                hu_tool_cache_t *cache,
+                                void (*on_chunk)(void *ctx, const char *data, size_t len),
+                                void *cb_ctx, uint32_t max_retries, uint32_t base_ms) {
+    execute_one_impl(alloc, tools, tools_count, call, result_out, cache, on_chunk, cb_ctx);
+    if (max_retries == 0 || result_out->success)
+        return;
+    if (result_out->output && (strstr(result_out->output, "tool not found") ||
+                               strstr(result_out->output, "invalid arguments")))
+        return;
+#ifndef HU_IS_TEST
+    uint32_t delay_ms = base_ms ? base_ms : 100;
+    for (uint32_t attempt = 0; attempt < max_retries; attempt++) {
+        hu_tool_result_free(alloc, result_out);
+        struct timespec ts = {.tv_sec = delay_ms / 1000,
+                              .tv_nsec = (long)(delay_ms % 1000) * 1000000L};
+        nanosleep(&ts, NULL);
+        execute_one_impl(alloc, tools, tools_count, call, result_out, cache, on_chunk, cb_ctx);
+        if (result_out->success)
+            return;
+        delay_ms *= 2;
+        if (delay_ms > 10000)
+            delay_ms = 10000;
+    }
+#else
+    (void)base_ms;
+#endif
+}
 
 #if defined(HU_GATEWAY_POSIX) && !defined(HU_IS_TEST)
 #include <time.h>
@@ -304,6 +334,8 @@ void hu_dispatcher_default(hu_dispatcher_t *out) {
     out->max_parallel = 1;
     out->timeout_secs = 0;
     out->cache = NULL;
+    out->max_retries = 0;
+    out->retry_base_ms = 100;
 }
 
 hu_error_t hu_dispatcher_create(hu_allocator_t *alloc, uint32_t max_parallel, uint32_t timeout_secs,
@@ -316,6 +348,8 @@ hu_error_t hu_dispatcher_create(hu_allocator_t *alloc, uint32_t max_parallel, ui
     d->max_parallel = max_parallel ? max_parallel : 1;
     d->timeout_secs = timeout_secs;
     d->cache = NULL;
+    d->max_retries = 0;
+    d->retry_base_ms = 100;
     *out = d;
     return HU_OK;
 }
@@ -370,8 +404,8 @@ hu_error_t hu_dispatcher_dispatch_streaming(hu_dispatcher_t *d, hu_allocator_t *
     if (!results)
         return HU_ERR_OUT_OF_MEMORY;
     for (size_t i = 0; i < calls_count; i++) {
-        execute_one_impl(alloc, tools, tools_count, &calls[i], &results[i],
-                         d->cache, on_chunk, cb_ctx);
+        execute_one_retried(alloc, tools, tools_count, &calls[i], &results[i],
+                            d->cache, on_chunk, cb_ctx, d->max_retries, d->retry_base_ms);
     }
     out->results = results;
     out->count = calls_count;
