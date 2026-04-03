@@ -139,9 +139,7 @@ export class GatewayClient extends EventTarget {
     this.#ws.send(payload);
   }
 
-  voiceSessionStart(
-    params?: Record<string, unknown>,
-  ): Promise<{
+  voiceSessionStart(params?: Record<string, unknown>): Promise<{
     sessionId?: string;
     sampleRate?: number;
     inputSampleRate?: number;
@@ -164,11 +162,7 @@ export class GatewayClient extends EventTarget {
     return this.request("voice.audio.end", params);
   }
 
-  voiceToolResponse(params: {
-    name: string;
-    callId: string;
-    result: string;
-  }): Promise<unknown> {
+  voiceToolResponse(params: { name: string; callId: string; result: string }): Promise<unknown> {
     return this.request("voice.tool_response", params);
   }
 

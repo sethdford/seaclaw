@@ -66,9 +66,7 @@ hu_error_t cp_turing_scores(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
     }
 
     hu_json_object_set(alloc, obj, "scores", arr);
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_turing_trend(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -116,9 +114,7 @@ hu_error_t cp_turing_trend(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     }
 
     hu_json_object_set(alloc, obj, "trend", arr);
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_turing_dimensions(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -153,9 +149,7 @@ hu_error_t cp_turing_dimensions(hu_allocator_t *alloc, hu_app_context_t *app, hu
     }
 
     hu_json_object_set(alloc, obj, "dimensions", dims);
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_turing_contact(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -211,9 +205,7 @@ hu_error_t cp_turing_contact(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws
         alloc->free(alloc->ctx, hint, hint_len + 1);
     }
 
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_turing_trajectory(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -254,9 +246,7 @@ hu_error_t cp_turing_trajectory(hu_allocator_t *alloc, hu_app_context_t *app, hu
     hu_json_object_set(alloc, obj, "stability", hu_json_number_new(alloc, (double)traj.stability));
     hu_json_object_set(alloc, obj, "overall", hu_json_number_new(alloc, (double)traj.overall));
 
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_turing_ab_tests(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -311,9 +301,7 @@ hu_error_t cp_turing_ab_tests(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     }
 
     hu_json_object_set(alloc, obj, "tests", arr);
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_turing_channel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -361,9 +349,7 @@ hu_error_t cp_turing_channel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws
     hu_json_object_set(alloc, obj, "channel", hu_json_string_new(alloc, channel, channel_len));
     hu_json_object_set(alloc, obj, "dimensions", dims);
 
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 #else /* !HU_ENABLE_SQLITE */

@@ -1,6 +1,7 @@
-/* media_image — Generate images via Nano Banana 2 (Gemini 3.1 Flash Image)
- * or Imagen 4 on Vertex AI. Writes the decoded PNG to a temp file and returns
- * the local path in media_path so the daemon can attach it to a channel send. */
+/* media_image — Generate images via Gemini native image generation
+ * (gemini-2.5-flash-image or gemini-3.x-*-image-preview) or Imagen 4 on
+ * Vertex AI. Writes the decoded PNG to a temp file and returns the local path
+ * in media_path so the daemon can attach it to a channel send. */
 
 #include "human/tools/media_image.h"
 #include "human/agent.h"
@@ -87,7 +88,7 @@ static const char *mi_name(void *ctx) { (void)ctx; return "media_image"; }
 
 static const char *mi_desc(void *ctx) {
     (void)ctx;
-    return "Generate an image from a text prompt using Nano Banana 2 (Gemini 3.1 Flash Image) "
+    return "Generate an image from a text prompt using Gemini native image generation "
            "or Imagen 4. Returns a local file path to the generated PNG.";
 }
 
@@ -96,8 +97,8 @@ static const char *mi_params(void *ctx) {
     return "{\"type\":\"object\",\"properties\":{"
            "\"prompt\":{\"type\":\"string\",\"description\":\"Image description\"},"
            "\"model\":{\"type\":\"string\","
-           "\"enum\":[\"nano_banana\",\"imagen4\",\"imagen4_fast\",\"imagen4_ultra\"],"
-           "\"description\":\"Model to use (default nano_banana)\"},"
+           "\"enum\":[\"gemini\",\"imagen4\",\"imagen4_fast\",\"imagen4_ultra\"],"
+           "\"description\":\"Model to use (default gemini)\"},"
            "\"aspect_ratio\":{\"type\":\"string\","
            "\"enum\":[\"1:1\",\"16:9\",\"9:16\",\"3:4\",\"4:3\"],"
            "\"description\":\"Aspect ratio (default 1:1)\"}},"
@@ -112,8 +113,9 @@ static bool mi_aspect_ok(const char *s) {
 
 static bool mi_model_ok(const char *s) {
     if (!s) return false;
-    return strcmp(s, "nano_banana") == 0 || strcmp(s, "imagen4") == 0 ||
-           strcmp(s, "imagen4_fast") == 0 || strcmp(s, "imagen4_ultra") == 0;
+    return strcmp(s, "gemini") == 0 || strcmp(s, "nano_banana") == 0 ||
+           strcmp(s, "imagen4") == 0 || strcmp(s, "imagen4_fast") == 0 ||
+           strcmp(s, "imagen4_ultra") == 0;
 }
 
 static const char *mi_imagen4_model_id(const char *model) {
@@ -144,7 +146,7 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
         if (cfg_agent && cfg_agent->config && cfg_agent->config->media_gen.default_image_model)
             model = cfg_agent->config->media_gen.default_image_model;
         else
-            model = "nano_banana";
+            model = "gemini";
     } else if (!mi_model_ok(model)) {
         *out = hu_tool_result_fail("invalid model", 13);
         return HU_OK;
@@ -345,13 +347,15 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
         return HU_OK;
 
     } else {
-        /* Nano Banana 2 via Gemini generateContent API */
+        /* Gemini native image generation via generateContent API.
+         * Model priority: gemini-2.5-flash-image (GA, broadly available),
+         * with future upgrade to gemini-3.x-*-image-preview when accessible. */
         const char *api_key = getenv("GEMINI_API_KEY");
         if (!api_key) api_key = getenv("GOOGLE_API_KEY");
 
         char auth_buf[1024];
         char url[512];
-        const char *nb_model = "gemini-3.1-flash-image-preview";
+        const char *nb_model = "gemini-2.5-flash-image";
 
         if (api_key && api_key[0]) {
             int ulen = snprintf(url, sizeof(url),

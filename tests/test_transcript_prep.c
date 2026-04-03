@@ -277,6 +277,173 @@ static void test_prep_long_text_truncated_safely(void) {
     HU_ASSERT_TRUE(result.output[result.output_len] == '\0');
 }
 
+/* ── Strip-SSML Fallback Tests ───────────────────────────────────────── */
+
+static void test_prep_strip_ssml_no_tags(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .strip_ssml = true,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "First sentence. Second sentence.";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.output_len > 0);
+    HU_ASSERT_TRUE(strstr(result.output, "<break") == NULL);
+    HU_ASSERT_TRUE(strstr(result.output, "<emotion") == NULL);
+    HU_ASSERT_TRUE(strstr(result.output, "<speed") == NULL);
+    HU_ASSERT_TRUE(strstr(result.output, "<volume") == NULL);
+}
+
+static void test_prep_strip_ssml_converts_long_pause_to_period(void) {
+    hu_prep_config_t cfg = {
+        .incoming_msg = "Tell me something sad",
+        .incoming_msg_len = 21,
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .strip_ssml = true,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "I understand your pain. Happiness will come.";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.output_len > 0);
+}
+
+static void test_prep_strip_ssml_nonverbals_text_only(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .strip_ssml = true,
+        .nonverbals_enabled = true,
+        .hour_local = 14,
+    };
+    hu_prep_result_t result = {0};
+    bool found_text_nonverbal = false;
+    for (uint32_t s = 0; s < 200 && !found_text_nonverbal; s++) {
+        cfg.seed = s;
+        memset(&result, 0, sizeof(result));
+        const char *text = "That's hilarious lol. So funny haha.";
+        hu_transcript_prep(text, strlen(text), &cfg, &result);
+        if (strstr(result.output, "[laughter]"))
+            found_text_nonverbal = true;
+        HU_ASSERT_TRUE(strstr(result.output, "<break") == NULL);
+    }
+}
+
+/* ── Per-Sentence Volume Tests ──────────────────────────────────────── */
+
+static void test_prep_per_sentence_volume_tags(void) {
+    hu_prep_config_t cfg = {
+        .incoming_msg = "I'm feeling very sad today",
+        .incoming_msg_len = 26,
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "I'm so sorry. But you are amazing!";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    /* Multi-sentence emotional arc should produce volume variation */
+    HU_ASSERT_TRUE(result.output_len > 0);
+}
+
+/* ── Clause-Level Break Tests ───────────────────────────────────────── */
+
+static void test_prep_clause_breaks_at_commas(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "Well, I think that, honestly, it matters.";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    /* Should have intra-sentence breaks at clause boundaries */
+    int break_count = 0;
+    const char *p = result.output;
+    while ((p = strstr(p, "<break time=")) != NULL) {
+        break_count++;
+        p++;
+    }
+    HU_ASSERT_TRUE(break_count >= 2);
+}
+
+static void test_prep_clause_breaks_strip_ssml_no_tags(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .strip_ssml = true,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "Well, I think that, honestly, it matters.";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(strstr(result.output, "<break") == NULL);
+}
+
+/* ── Speed Variation (voiceai-inspired) Tests ───────────────────────── */
+
+static void test_prep_emotional_words_slower(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 1.0f,
+        .pause_factor = 1.0f,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "I really feel for you.";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.sentences[0].speed_ratio < 1.0f);
+}
+
+static void test_prep_list_words_faster(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 1.0f,
+        .pause_factor = 1.0f,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "For example this is a list item.";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.sentences[0].speed_ratio > 1.0f);
+}
+
+static void test_prep_discourse_off_by_default(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .discourse_rate = 0.0f,
+        .hour_local = 14,
+    };
+    hu_prep_result_t result = {0};
+    bool found_marker = false;
+    for (uint32_t s = 0; s < 50 && !found_marker; s++) {
+        cfg.seed = s;
+        memset(&result, 0, sizeof(result));
+        const char *text = "First part. I really believe in you.";
+        hu_transcript_prep(text, strlen(text), &cfg, &result);
+        if (strstr(result.output, "honestly") || strstr(result.output, "you know") ||
+            strstr(result.output, "I mean"))
+            found_marker = true;
+    }
+    HU_ASSERT_TRUE(!found_marker);
+}
+
 /* ── Registration ────────────────────────────────────────────────────── */
 
 void run_transcript_prep_tests(void) {
@@ -309,4 +476,14 @@ void run_transcript_prep_tests(void) {
     HU_RUN_TEST(test_prep_nonverbals_contextual);
     HU_RUN_TEST(test_prep_output_not_empty);
     HU_RUN_TEST(test_prep_long_text_truncated_safely);
+
+    HU_RUN_TEST(test_prep_strip_ssml_no_tags);
+    HU_RUN_TEST(test_prep_strip_ssml_converts_long_pause_to_period);
+    HU_RUN_TEST(test_prep_strip_ssml_nonverbals_text_only);
+    HU_RUN_TEST(test_prep_per_sentence_volume_tags);
+    HU_RUN_TEST(test_prep_clause_breaks_at_commas);
+    HU_RUN_TEST(test_prep_clause_breaks_strip_ssml_no_tags);
+    HU_RUN_TEST(test_prep_emotional_words_slower);
+    HU_RUN_TEST(test_prep_list_words_faster);
+    HU_RUN_TEST(test_prep_discourse_off_by_default);
 }

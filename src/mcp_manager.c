@@ -567,8 +567,9 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
             uint32_t rpc_id = mgr->next_rpc_id++;
             err = hu_mcp_jsonrpc_build_tools_list(alloc, rpc_id, &request, &request_len);
             if (err != HU_OK) {
-                fprintf(stderr, "mcp_manager: failed to build tools/list request for %s\n",
-                        slot->name ? slot->name : "?");
+                hu_log_warn("mcp-manager", NULL,
+                            "failed to build tools/list request for %s",
+                            slot->name ? slot->name : "?");
                 continue;
             }
 
@@ -589,8 +590,9 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
             alloc->free(alloc->ctx, request, request_len + 1);
 
             if (http_err != HU_OK || response.status_code < 200 || response.status_code >= 300) {
-                fprintf(stderr, "mcp_manager: HTTP tools/list failed for %s (status %ld)\n",
-                        slot->name ? slot->name : "?", response.status_code);
+                hu_log_warn("mcp-manager", NULL,
+                            "HTTP tools/list failed for %s (status %ld)",
+                            slot->name ? slot->name : "?", response.status_code);
                 hu_http_response_free(alloc, &response);
                 continue;
             }
@@ -606,8 +608,9 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
 
             if (err != HU_OK || is_error || !result_json) {
                 if (result_json) alloc->free(alloc->ctx, result_json, result_len + 1);
-                fprintf(stderr, "mcp_manager: tools/list RPC error for %s\n",
-                        slot->name ? slot->name : "?");
+                hu_log_warn("mcp-manager", NULL,
+                            "tools/list RPC error for %s",
+                            slot->name ? slot->name : "?");
                 continue;
             }
 
@@ -618,8 +621,9 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
             alloc->free(alloc->ctx, result_json, result_len + 1);
 
             if (err != HU_OK || !root) {
-                fprintf(stderr, "mcp_manager: failed to parse tools/list result for %s\n",
-                        slot->name ? slot->name : "?");
+                hu_log_warn("mcp-manager", NULL,
+                            "failed to parse tools/list result for %s",
+                            slot->name ? slot->name : "?");
                 continue;
             }
 
@@ -684,8 +688,9 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
             err = HU_OK;
 #endif /* HU_ENABLE_CURL */
         } else {
-            fprintf(stderr, "mcp_manager: tool discovery not supported for %s (no server or URL)\n",
-                    slot->name ? slot->name : "?");
+            hu_log_warn("mcp-manager", NULL,
+                        "tool discovery not supported for %s (no server or URL)",
+                        slot->name ? slot->name : "?");
             continue;
         }
         if (err != HU_OK || n == 0)
@@ -718,8 +723,12 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
         }
 
         for (size_t j = 0; j < n; j++) {
-            if (!names[j])
+            if (!names[j]) {
+                free_str(alloc, descs[j]);
+                if (params[j])
+                    free_str(alloc, params[j]);
                 continue;
+            }
 
             /* Build prefixed name: mcp__<server_name>__<tool_name> */
             const char *srv_name = slot->name ? slot->name : "unknown";

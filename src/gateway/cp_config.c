@@ -59,9 +59,7 @@ hu_error_t cp_config_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_con
         hu_json_object_set(alloc, obj, "exists", hu_json_bool_new(alloc, false));
     }
 
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_config_schema(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -119,9 +117,7 @@ hu_error_t cp_config_schema(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
     hu_json_object_set(alloc, schema, "properties", props);
     hu_json_object_set(alloc, obj, "schema", schema);
 
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_config_set(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -149,9 +145,7 @@ hu_error_t cp_config_set(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_con
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
     hu_json_object_set(alloc, obj, "saved", hu_json_bool_new(alloc, saved));
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_config_apply(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -182,7 +176,5 @@ hu_error_t cp_config_apply(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
         return HU_ERR_OUT_OF_MEMORY;
     hu_json_object_set(alloc, obj, "applied", hu_json_bool_new(alloc, applied));
     hu_json_object_set(alloc, obj, "saved", hu_json_bool_new(alloc, saved));
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }

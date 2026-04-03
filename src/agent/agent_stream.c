@@ -968,7 +968,11 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * Skip when persona is active — GVR's generic verifier rejects
          * persona-style responses (casual, terse) and rewrites them into
          * bland AI-speak, which is worse. */
-        if (agent->gvr_config.enabled && !agent->persona) {
+        bool persona_active = false;
+#ifdef HU_HAS_PERSONA
+        persona_active = (agent->persona != NULL);
+#endif
+        if (agent->gvr_config.enabled && !persona_active) {
             hu_gvr_pipeline_result_t gvr_result;
             memset(&gvr_result, 0, sizeof(gvr_result));
             hu_error_t gvr_err = hu_gvr_pipeline(
@@ -993,7 +997,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * Short + in-persona + has follow-up question = good, skip rethink.
          * Short + formal/no-question = needs help, do rethink. */
         bool needs_rethink = false;
-        if (agent->persona && final_content_len > 0 && final_content_len < 100 && msg_len > 15 &&
+        if (persona_active && final_content_len > 0 && final_content_len < 100 && msg_len > 15 &&
             agent->provider.vtable && agent->provider.vtable->chat_with_system) {
             bool has_question = (memchr(final_content, '?', final_content_len) != NULL);
             bool starts_lowercase = (final_content[0] >= 'a' && final_content[0] <= 'z');
@@ -1012,9 +1016,14 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         }
         if (needs_rethink) {
             /* Build rethink prompt with persona context for style fidelity */
-            const char *persona_name = agent->persona ? agent->persona->name : "the persona";
-            const char *persona_identity =
-                (agent->persona && agent->persona->identity) ? agent->persona->identity : "";
+            const char *persona_name = "the persona";
+            const char *persona_identity = "";
+#ifdef HU_HAS_PERSONA
+            if (agent->persona) {
+                persona_name = agent->persona->name ? agent->persona->name : persona_name;
+                persona_identity = agent->persona->identity ? agent->persona->identity : "";
+            }
+#endif
             char rethink_sys[2048];
             snprintf(rethink_sys, sizeof(rethink_sys),
                      "You are %s. %.*s\n\n"

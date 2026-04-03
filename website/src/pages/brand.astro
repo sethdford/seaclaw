@@ -22,7 +22,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     <link rel="canonical" href="https://h-uman.ai/brand/" />
     <link
       rel="preload"
-      href="/fonts/avenir/Avenir-Black.woff2"
+      href={`${base}fonts/avenir/Avenir-Black.woff2`}
       as="font"
       type="font/woff2"
       crossorigin
@@ -30,7 +30,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     />
     <link
       rel="preload"
-      href="/fonts/avenir/Avenir-Book.woff2"
+      href={`${base}fonts/avenir/Avenir-Book.woff2`}
       as="font"
       type="font/woff2"
       crossorigin
@@ -670,7 +670,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       {/* ═══ 7. Footer ═══ */}
     </main>
 
-    <footer class="site-footer py-12 px-6" role="contentinfo">
+    <footer class="site-footer py-8 sm:py-12 px-6" role="contentinfo">
       <div
         class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4"
       >
@@ -683,6 +683,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             class="w-5 h-5"
             loading="lazy"
             decoding="async"
+            fetchpriority="low"
           />
           <span class="text-[13px]" style="color: var(--color-text-tertiary)">
             h-uman
@@ -705,7 +706,6 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             target="_blank"
             rel="noopener noreferrer"
             class="hover:opacity-80 transition-opacity"
-            style="transition-duration: var(--hu-duration-normal);"
           >
             GitHub
           </a>

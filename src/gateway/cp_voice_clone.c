@@ -1,6 +1,7 @@
 /*
  * Gateway handler for voice.clone — uploads base64 audio to Cartesia and returns voice_id.
  */
+#include "cp_internal.h"
 #include "human/agent.h"
 #include "human/config.h"
 #include "human/core/allocator.h"
@@ -130,9 +131,7 @@ hu_error_t cp_voice_clone(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
     hu_json_object_set(alloc, resp, "name", hu_json_string_new(alloc, out_name, out_name_len));
     hu_json_object_set(alloc, resp, "language", hu_json_string_new(alloc, out_lang, out_lang_len));
 
-    err = hu_json_stringify(alloc, resp, out, out_len);
-    hu_json_free(alloc, resp);
-    return err;
+    return cp_respond_json(alloc, resp, out, out_len);
 }
 
 #else

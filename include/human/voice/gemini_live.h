@@ -43,8 +43,21 @@ typedef struct hu_gemini_live_config {
     bool affective_dialog;        /* enable affective dialog (tone matching) */
     bool manual_vad;              /* disable server VAD; caller manages activityStart/End */
     bool enable_session_resumption; /* request sessionResumptionUpdate tokens from server */
+    bool enable_proactivity;        /* allow model to initiate conversation proactively */
+    bool enable_context_compression; /* auto-compress context window on long sessions */
+    float temperature;              /* generation temperature; 0.0 = server default */
+    int max_output_tokens;          /* 0 = server default */
     hu_gemini_live_thinking_t thinking_level;
 } hu_gemini_live_config_t;
+
+typedef struct hu_gl_pending_tool_call {
+    char *name;
+    size_t name_len;
+    char *call_id;
+    size_t call_id_len;
+    char *args_json;
+    size_t args_json_len;
+} hu_gl_pending_tool_call_t;
 
 typedef struct hu_gemini_live_session {
     hu_allocator_t *alloc;
@@ -55,6 +68,8 @@ typedef struct hu_gemini_live_session {
     void *ws_client;              /* hu_ws_client_t * when connected */
     char *resumption_handle;      /* latest session resumption token from server */
     size_t resumption_handle_len;
+    hu_gl_pending_tool_call_t *pending_calls; /* buffered multi-tool calls from a single message */
+    size_t pending_calls_count;
 #if HU_IS_TEST
     unsigned test_recv_seq;
 #endif

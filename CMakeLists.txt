@@ -843,6 +843,7 @@ list(APPEND HU_CORE_SOURCES
     src/voice/webrtc_dtls.c
     src/voice/webrtc_srtp.c
     src/voice/realtime.c
+    src/voice/provider_factory.c
     src/voice/gemini_live.c
     src/voice/duplex.c
     src/voice/session.c
@@ -2305,6 +2306,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_tool_validation.c
     tests/test_tool_ask_user.c
     tests/test_canvas_tool.c
+    tests/test_sota_e2e.c
     tests/test_task_manager.c
     tests/test_task_store.c
     tests/test_task_tools.c

@@ -133,21 +133,38 @@ static hu_error_t vision_ocr_execute(void *ctx, hu_allocator_t *alloc,
         return HU_OK;
     }
 
-    char buf[4096];
-    int pos = snprintf(buf, sizeof(buf), "{\"results\":[");
-    for (size_t i = 0; i < count && (size_t)pos < sizeof(buf) - 128; i++) {
-        if (i > 0)
-            buf[pos++] = ',';
-        int n = snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                         "{\"text\":\"%s\",\"confidence\":%.2f,\"x\":%.1f,\"y\":%.1f}",
-                         results[i].text ? results[i].text : "", results[i].confidence,
-                         results[i].x, results[i].y);
-        if (n > 0)
-            pos += n;
+    hu_json_buf_t jb = {0};
+    err = hu_json_buf_init(&jb, alloc);
+    if (err != HU_OK) {
+        hu_ocr_results_free(alloc, results, count);
+        return err;
     }
-    pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos, "]}");
+    hu_json_buf_append_raw(&jb, "{\"results\":[", 12);
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0)
+            hu_json_buf_append_raw(&jb, ",", 1);
+        hu_json_buf_append_raw(&jb, "{\"text\":", 8);
+        const char *t = results[i].text ? results[i].text : "";
+        hu_json_append_string(&jb, t, strlen(t));
+        char numfmt[128];
+        int n = snprintf(numfmt, sizeof(numfmt),
+                         ",\"confidence\":%.2f,\"x\":%.1f,\"y\":%.1f}",
+                         results[i].confidence, results[i].x, results[i].y);
+        if (n > 0)
+            hu_json_buf_append_raw(&jb, numfmt, (size_t)n);
+    }
+    hu_json_buf_append_raw(&jb, "]}", 2);
     hu_ocr_results_free(alloc, results, count);
-    *out = hu_tool_result_ok(buf, (size_t)pos);
+
+    char *heap_out = hu_strndup(alloc, jb.ptr, jb.len);
+    size_t heap_len = jb.len;
+    hu_json_buf_free(&jb);
+    if (!heap_out)
+        return HU_ERR_OUT_OF_MEMORY;
+    out->success = true;
+    out->output = heap_out;
+    out->output_len = heap_len;
+    out->output_owned = true;
     return HU_OK;
 #endif
 }

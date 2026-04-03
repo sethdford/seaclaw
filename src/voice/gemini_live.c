@@ -156,6 +156,26 @@ hu_error_t hu_gemini_live_build_setup_json(hu_allocator_t *alloc,
             goto fail;
     }
 
+    /* temperature + maxOutputTokens inside generationConfig */
+    if (config->temperature > 0.0f) {
+        char tbuf[64];
+        int tn = snprintf(tbuf, sizeof(tbuf), ",\"temperature\":%.2f",
+                          (double)config->temperature);
+        if (tn > 0)
+            err = hu_json_buf_append_raw(&buf, tbuf, (size_t)tn);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->max_output_tokens > 0) {
+        char mbuf[64];
+        int mn = snprintf(mbuf, sizeof(mbuf), ",\"maxOutputTokens\":%d",
+                          config->max_output_tokens);
+        if (mn > 0)
+            err = hu_json_buf_append_raw(&buf, mbuf, (size_t)mn);
+        if (err != HU_OK)
+            goto fail;
+    }
+
     /* close generationConfig */
     err = hu_json_buf_append_raw(&buf, "}", 1);
     if (err != HU_OK)
@@ -181,11 +201,11 @@ hu_error_t hu_gemini_live_build_setup_json(hu_allocator_t *alloc,
 
     /* sessionResumption (setup-level) — only include handle field when non-empty */
     if (resumption_handle && resumption_handle[0]) {
-        err = hu_json_buf_append_raw(&buf, ",\"sessionResumption\":{\"handle\":\"", 32);
+        err = hu_json_buf_append_raw(&buf, ",\"sessionResumption\":{\"handle\":", 31);
         if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, resumption_handle, strlen(resumption_handle));
+            err = hu_json_append_string(&buf, resumption_handle, strlen(resumption_handle));
         if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, "\"}", 2);
+            err = hu_json_buf_append_raw(&buf, "}", 1);
         if (err != HU_OK)
             goto fail;
     } else if (config->enable_session_resumption) {
@@ -215,6 +235,24 @@ hu_error_t hu_gemini_live_build_setup_json(hu_allocator_t *alloc,
             err = hu_json_append_string(&buf, sys, strlen(sys));
         if (err == HU_OK)
             err = hu_json_buf_append_raw(&buf, "}]}", 3);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* proactivity (setup-level) */
+    if (config->enable_proactivity) {
+        static const char pa[] = ",\"proactivity\":{\"proactiveAudio\":true}";
+        err = hu_json_buf_append_raw(&buf, pa, sizeof(pa) - 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* contextWindowCompression (setup-level) */
+    if (config->enable_context_compression) {
+        static const char cc[] =
+            ",\"contextWindowCompression\":"
+            "{\"slidingWindow\":{\"targetTokens\":8192}}";
+        err = hu_json_buf_append_raw(&buf, cc, sizeof(cc) - 1);
         if (err != HU_OK)
             goto fail;
     }
@@ -646,6 +684,29 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
     if (!session->connected || !session->ws_client)
         return HU_ERR_IO;
 
+    /* Drain buffered tool calls from a previous multi-tool message */
+    if (session->pending_calls_count > 0) {
+        hu_gl_pending_tool_call_t *pc = &session->pending_calls[0];
+        gl_copy_event_type("toolCall", out);
+        out->transcript = pc->name;
+        out->transcript_len = pc->name_len;
+        out->tool_call_id = pc->call_id;
+        out->tool_call_id_len = pc->call_id_len;
+        out->tool_args_json = pc->args_json;
+        out->tool_args_json_len = pc->args_json_len;
+        size_t old_count = session->pending_calls_count;
+        session->pending_calls_count--;
+        if (session->pending_calls_count > 0) {
+            memmove(&session->pending_calls[0], &session->pending_calls[1],
+                    session->pending_calls_count * sizeof(hu_gl_pending_tool_call_t));
+        } else {
+            alloc->free(alloc->ctx, session->pending_calls,
+                        old_count * sizeof(hu_gl_pending_tool_call_t));
+            session->pending_calls = NULL;
+        }
+        return HU_OK;
+    }
+
     char *msg = NULL;
     size_t msg_len = 0;
     hu_error_t err =
@@ -774,11 +835,7 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
         gl_copy_event_type("toolCall", out);
         hu_json_value_t *fcs = hu_json_object_get(tc, "functionCalls");
         if (fcs && fcs->type == HU_JSON_ARRAY && fcs->data.array.len > 0) {
-            if (fcs->data.array.len > 1) {
-                hu_log_info("gemini_live", NULL,
-                            "toolCall contains %zu function calls; only processing first",
-                            fcs->data.array.len);
-            }
+            /* Parse first call into the event output */
             hu_json_value_t *fc0 = fcs->data.array.items[0];
             const char *name = hu_json_get_string(fc0, "name");
             if (name) {
@@ -812,6 +869,41 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
                     out->tool_args_json_len = args_len;
                 }
             }
+            /* Buffer remaining calls for subsequent recv_event invocations */
+            size_t extra = fcs->data.array.len - 1;
+            if (extra > 0) {
+                hu_gl_pending_tool_call_t *pcs = (hu_gl_pending_tool_call_t *)
+                    alloc->alloc(alloc->ctx, extra * sizeof(hu_gl_pending_tool_call_t));
+                if (pcs) {
+                    memset(pcs, 0, extra * sizeof(hu_gl_pending_tool_call_t));
+                    size_t stored = 0;
+                    for (size_t fi = 1; fi < fcs->data.array.len; fi++) {
+                        hu_json_value_t *fc = fcs->data.array.items[fi];
+                        const char *fn = hu_json_get_string(fc, "name");
+                        if (!fn)
+                            continue;
+                        pcs[stored].name = hu_strndup(alloc, fn, strlen(fn));
+                        pcs[stored].name_len = strlen(fn);
+                        const char *fi2 = hu_json_get_string(fc, "id");
+                        if (fi2 && fi2[0]) {
+                            pcs[stored].call_id = hu_strndup(alloc, fi2, strlen(fi2));
+                            pcs[stored].call_id_len = strlen(fi2);
+                        }
+                        hu_json_value_t *fa = hu_json_object_get(fc, "args");
+                        if (fa) {
+                            char *fas = NULL;
+                            size_t fal = 0;
+                            if (hu_json_stringify(alloc, fa, &fas, &fal) == HU_OK && fas) {
+                                pcs[stored].args_json = fas;
+                                pcs[stored].args_json_len = fal;
+                            }
+                        }
+                        stored++;
+                    }
+                    session->pending_calls = pcs;
+                    session->pending_calls_count = stored;
+                }
+            }
         }
     }
 
@@ -833,9 +925,15 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
                         id_err = hu_json_buf_append_raw(&id_buf, v->data.string.ptr,
                                                         v->data.string.len);
                 }
-                if (id_buf.len > 0) {
+                if (id_err == HU_OK && id_buf.len > 0) {
                     out->transcript = hu_strndup(alloc, id_buf.ptr, id_buf.len);
-                    out->transcript_len = out->transcript ? strlen(out->transcript) : 0;
+                    if (!out->transcript) {
+                        hu_json_buf_free(&id_buf);
+                        hu_json_free(alloc, json);
+                        alloc->free(alloc->ctx, msg, msg_len + 1);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
+                    out->transcript_len = id_buf.len;
                 }
                 hu_json_buf_free(&id_buf);
             }
@@ -870,12 +968,15 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
         const char *handle = hu_json_get_string(sru, "newHandle");
         if (handle && handle[0]) {
             size_t hlen = strlen(handle);
-            if (session->resumption_handle) {
-                session->alloc->free(session->alloc->ctx, session->resumption_handle,
-                                     session->resumption_handle_len + 1);
+            char *dup = hu_strndup(session->alloc, handle, hlen);
+            if (dup) {
+                if (session->resumption_handle) {
+                    session->alloc->free(session->alloc->ctx, session->resumption_handle,
+                                         session->resumption_handle_len + 1);
+                }
+                session->resumption_handle = dup;
+                session->resumption_handle_len = hlen;
             }
-            session->resumption_handle = hu_strndup(session->alloc, handle, hlen);
-            session->resumption_handle_len = hlen;
         }
         if (out->type[0] == '\0')
             gl_copy_event_type("sessionResumptionUpdate", out);
@@ -1002,8 +1103,20 @@ void hu_gemini_live_session_destroy(hu_gemini_live_session_t *session) {
         session->ws_client = NULL;
     }
 #endif
-    if (session->resumption_handle) {
+    if (session->resumption_handle)
         alloc->free(alloc->ctx, session->resumption_handle, session->resumption_handle_len + 1);
+    if (session->pending_calls) {
+        for (size_t i = 0; i < session->pending_calls_count; i++) {
+            hu_gl_pending_tool_call_t *pc = &session->pending_calls[i];
+            if (pc->name)
+                alloc->free(alloc->ctx, pc->name, pc->name_len + 1);
+            if (pc->call_id)
+                alloc->free(alloc->ctx, pc->call_id, pc->call_id_len + 1);
+            if (pc->args_json)
+                alloc->free(alloc->ctx, pc->args_json, pc->args_json_len + 1);
+        }
+        alloc->free(alloc->ctx, session->pending_calls,
+                    session->pending_calls_count * sizeof(hu_gl_pending_tool_call_t));
     }
     alloc->free(alloc->ctx, session, sizeof(hu_gemini_live_session_t));
 }

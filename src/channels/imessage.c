@@ -131,6 +131,7 @@ typedef struct hu_imessage_ctx {
 #endif
 } hu_imessage_ctx_t;
 
+#if HU_IS_TEST || (defined(__APPLE__) && defined(__MACH__))
 static uint32_t imessage_hash(const char *s, size_t len) {
     uint32_t h = 2166136261u;
     for (size_t i = 0; i < len; i++)
@@ -155,14 +156,14 @@ static bool imessage_was_sent_by_us(hu_imessage_ctx_t *c, const char *text, size
         size_t slen = c->sent_ring_len[i];
         if (slen == 0)
             continue;
-        if (c->sent_ring_hash[i] == h) {
-            size_t cmp_len = text_len < slen ? text_len : slen;
-            if (cmp_len > 0 && memcmp(text, c->sent_ring[i], cmp_len) == 0)
+        if (c->sent_ring_hash[i] == h && text_len == slen) {
+            if (memcmp(text, c->sent_ring[i], slen) == 0)
                 return true;
         }
     }
     return false;
 }
+#endif
 
 #if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
 
@@ -422,6 +423,8 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
         hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
         if (!c)
             return HU_ERR_INVALID_ARGUMENT;
+        if (!c->running)
+            return HU_ERR_NOT_SUPPORTED;
         if (message_len > 0 && !message)
             return HU_ERR_INVALID_ARGUMENT;
         if (message_len == 0 && media_count == 0)
@@ -449,6 +452,10 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
     return HU_ERR_NOT_SUPPORTED;
 #else
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
+    if (!c || !c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!c->running)
+        return HU_ERR_NOT_SUPPORTED;
     /* Use target if provided, else default_target */
     const char *tgt = target;
     size_t tgt_len = target_len;
@@ -456,7 +463,7 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
         tgt = c->default_target;
         tgt_len = c->default_target_len;
     }
-    if (!c || !c->alloc || !tgt || tgt_len == 0)
+    if (!tgt || tgt_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
     if (message_len == 0 && media_count == 0)
         return HU_ERR_INVALID_ARGUMENT;
@@ -1335,7 +1342,9 @@ hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const c
     sqlite3_finalize(stmt);
     sqlite3_close(db);
 
-    if (pos > 0 && pos < sizeof(buf)) {
+    if (pos > 0) {
+        if (pos >= sizeof(buf))
+            pos = sizeof(buf) - 1;
         *out = hu_strndup(alloc, buf, pos);
         if (!*out)
             return HU_ERR_OUT_OF_MEMORY;
@@ -1514,6 +1523,11 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
             }
         }
     }
+#else
+    /* Without SQLite we have no DB lookup for message GUID / row offset.
+     * Reacting blindly risks targeting the wrong message — bail out. */
+    (void)message_id;
+    return HU_ERR_NOT_SUPPORTED;
 #endif
     (void)message_id;
     (void)guid_buf;
@@ -1540,10 +1554,15 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
         }
     }
 
-    /* Escape content_prefix and tapback_ax for JavaScript string literals. */
+    /* Escape content_prefix and tapback_ax for JavaScript string literals.
+     * If the raw content exceeds our escape buffer, truncate to a safe word
+     * boundary so the JXA literal stays well-formed. */
     size_t esc_cap = (content_len + strlen(tapback_ax)) * 2 + 64;
-    if (esc_cap > 2048)
+    if (esc_cap > 2048) {
         esc_cap = 2048;
+        if (content_len > 200)
+            content_len = 200;
+    }
     char *content_esc = (char *)c->alloc->alloc(c->alloc->ctx, esc_cap);
     if (!content_esc)
         return HU_ERR_OUT_OF_MEMORY;
@@ -2266,10 +2285,12 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
     /* Pre-prepare retraction query once (avoids N+1 prepare/finalize) */
     sqlite3_stmt *retract_stmt = NULL;
     if (has_date_retracted) {
-        sqlite3_prepare_v2(db,
-                           "SELECT CASE WHEN date_retracted > 0 THEN 1 ELSE 0 END "
-                           "FROM message WHERE ROWID = ?",
-                           -1, &retract_stmt, NULL);
+        int retract_rc = sqlite3_prepare_v2(db,
+                                            "SELECT CASE WHEN date_retracted > 0 THEN 1 ELSE 0 END "
+                                            "FROM message WHERE ROWID = ?",
+                                            -1, &retract_stmt, NULL);
+        if (retract_rc != SQLITE_OK)
+            hu_log_warn("imessage", NULL, "retract_stmt prepare failed: %s", sqlite3_errmsg(db));
     }
 
     size_t count = 0;
@@ -2531,12 +2552,31 @@ char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t que
     if (gif_url_len == 0)
         return NULL;
 
-    /* Validate URL scheme and host — only allow HTTPS from known Tenor domains */
+    /* Validate URL scheme and host — only allow HTTPS from known Tenor CDN domains.
+     * Parse actual host from URL to prevent path/query/userinfo bypass. */
     if (strncmp(gif_url, "https://", 8) != 0)
         return NULL;
-    if (strstr(gif_url, "tenor.com") == NULL && strstr(gif_url, "googleapis.com") == NULL &&
-        strstr(gif_url, "gstatic.com") == NULL)
-        return NULL;
+    {
+        const char *host_start = gif_url + 8;
+        const char *host_end = host_start;
+        while (*host_end && *host_end != '/' && *host_end != ':' && *host_end != '?' &&
+               *host_end != '#')
+            host_end++;
+        size_t host_len = (size_t)(host_end - host_start);
+        bool host_ok = false;
+        static const char *allowed_suffixes[] = {".tenor.com", ".googleapis.com", ".gstatic.com",
+                                                 "tenor.com", "googleapis.com", "gstatic.com"};
+        for (size_t i = 0; i < sizeof(allowed_suffixes) / sizeof(allowed_suffixes[0]); i++) {
+            size_t slen = strlen(allowed_suffixes[i]);
+            if (host_len >= slen &&
+                memcmp(host_start + host_len - slen, allowed_suffixes[i], slen) == 0) {
+                host_ok = true;
+                break;
+            }
+        }
+        if (!host_ok)
+            return NULL;
+    }
 
     /* Download the GIF to a temp file */
     hu_http_response_t gif_resp = {0};

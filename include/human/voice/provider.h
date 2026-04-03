@@ -49,4 +49,22 @@ hu_error_t hu_voice_provider_gemini_live_create(hu_allocator_t *alloc,
                                                 const struct hu_gemini_live_config *config,
                                                 hu_voice_provider_t *out);
 
+/* Optional extras for the voice provider factory (all fields may be NULL). */
+typedef struct hu_voice_provider_extras {
+    const char *system_instruction; /* persona/system prompt for Gemini Live */
+    const char *tools_json;         /* JSON array of tool declarations for Gemini Live setup */
+} hu_voice_provider_extras_t;
+
+/*
+ * High-level factory: create a voice provider from hu_config_t + mode string.
+ * Handles API key lookup, model/voice defaults, and backend-specific config.
+ * Mode: "gemini_live", "openai_realtime", "realtime". Returns HU_ERR_NOT_SUPPORTED for unknown.
+ * extras may be NULL. Does NOT call connect() — caller must connect after creation.
+ */
+struct hu_config;
+hu_error_t hu_voice_provider_create_from_config(hu_allocator_t *alloc,
+                                                const struct hu_config *config, const char *mode,
+                                                const hu_voice_provider_extras_t *extras,
+                                                hu_voice_provider_t *out);
+
 #endif

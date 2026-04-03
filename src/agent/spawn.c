@@ -468,6 +468,10 @@ void hu_agent_pool_destroy(hu_agent_pool_t *pool) {
     pthread_mutex_unlock(&pool->mu);
     pthread_mutex_destroy(&pool->mu);
 #endif
+    if (pool->fleet_limits.depth_model_overrides)
+        pool->alloc->free(pool->alloc->ctx, pool->fleet_limits.depth_model_overrides,
+                          pool->fleet_limits.depth_model_overrides_count *
+                              sizeof(hu_depth_model_override_t));
     pool->alloc->free(pool->alloc->ctx, pool, sizeof(*pool));
 }
 

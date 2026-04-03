@@ -16,6 +16,9 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Forward declaration (defined below) */
+static bool ci_has(const char *hay, size_t hlen, const char *needle);
+
 /* ── Abbreviation table (don't split on these periods) ────────────────── */
 
 static const char *const ABBREVIATIONS[] = {
@@ -131,7 +134,7 @@ static const char *emotion_for_sentence(const char *sentence, size_t len,
     return hu_cartesia_emotion_from_context(incoming, incoming_len, sentence, len, hour);
 }
 
-/* ── Speed variation ─────────────────────────────────────────────────── */
+/* ── Speed variation (informed by voiceai rhythm analysis) ────────────── */
 
 static float speed_for_sentence(const char *sentence, size_t len, float base_speed) {
     if (!sentence || len == 0)
@@ -142,19 +145,47 @@ static float speed_for_sentence(const char *sentence, size_t len, float base_spe
         return base_speed * 1.15f;
 
     bool has_excl = false;
+    bool has_question = false;
     size_t comma_count = 0;
     for (size_t i = 0; i < len; i++) {
         if (sentence[i] == '!')
             has_excl = true;
+        if (sentence[i] == '?')
+            has_question = true;
         if (sentence[i] == ',')
             comma_count++;
     }
 
-    /* Emphatic/emotional sentences: slower for gravity */
+    /* Emotional keywords: slower for weight */
+    if (ci_has(sentence, len, "feel") || ci_has(sentence, len, "love") ||
+        ci_has(sentence, len, "care") || ci_has(sentence, len, "heart") ||
+        ci_has(sentence, len, "worry"))
+        return base_speed * 0.90f;
+
+    /* Important/emphasis words: slower, deliberate */
+    if (ci_has(sentence, len, "important") || ci_has(sentence, len, "crucial") ||
+        ci_has(sentence, len, "remember"))
+        return base_speed * 0.92f;
+
+    /* Conclusions: slower, more weight */
+    if (ci_has(sentence, len, "so ") || ci_has(sentence, len, "therefore") ||
+        ci_has(sentence, len, "the point is"))
+        return base_speed * 0.93f;
+
+    /* Questions: slightly slower, thoughtful */
+    if (has_question)
+        return base_speed * 0.95f;
+
+    /* Emphatic exclamatory: slower for gravity */
     if (has_excl)
         return base_speed * 0.92f;
 
-    /* Long compound sentences with many clauses: slightly faster to stay natural */
+    /* Lists/examples: slightly faster */
+    if (ci_has(sentence, len, "for example") || ci_has(sentence, len, "such as") ||
+        ci_has(sentence, len, "first") || ci_has(sentence, len, "second"))
+        return base_speed * 1.05f;
+
+    /* Long compound sentences: slightly faster to stay natural */
     if (comma_count >= 3 && len > 80)
         return base_speed * 1.05f;
 
@@ -197,6 +228,54 @@ static int break_duration_ms(const char *prev_emo, const char *next_emo, float p
         base_ms = 650;
 
     return (int)(base_ms * pause_factor);
+}
+
+/* ── Breath-group clause pauses (inspired by voiceai) ────────────────── */
+
+static size_t inject_clause_breaks(const char *text, size_t len, float pause_factor,
+                                   bool strip_ssml, char *out, size_t cap) {
+    size_t pos = 0;
+    for (size_t i = 0; i < len && pos < cap - 1; i++) {
+        out[pos++] = text[i];
+
+        if (text[i] == ',' || text[i] == ';' || text[i] == ':') {
+            if (i + 1 < len && text[i + 1] == ' ') {
+                int ms = (text[i] == ',') ? (int)(150 * pause_factor) : (int)(200 * pause_factor);
+                /* Before conjunctions: slightly longer pause */
+                if (i + 2 < len) {
+                    const char *after = text + i + 2;
+                    size_t remain = len - (i + 2);
+                    if ((remain >= 4 && (memcmp(after, "but ", 4) == 0 ||
+                                         memcmp(after, "yet ", 4) == 0)) ||
+                        (remain >= 8 && memcmp(after, "however ", 8) == 0) ||
+                        (remain >= 9 && memcmp(after, "although ", 9) == 0))
+                        ms = (int)(250 * pause_factor);
+                }
+                if (strip_ssml) {
+                    /* SSML-free mode: use punctuation spacing (already have comma) */
+                } else if (pos + 30 < cap) {
+                    int n = snprintf(out + pos, cap - pos, " <break time=\"%dms\"/>", ms);
+                    if (n > 0 && pos + (size_t)n < cap)
+                        pos += (size_t)n;
+                    i++;
+                    continue;
+                }
+            }
+        }
+
+        /* Em-dash: short pause before */
+        if (text[i] == '\xe2' && i + 2 < len && (unsigned char)text[i + 1] == 0x80 &&
+            (unsigned char)text[i + 2] == 0x94) {
+            if (!strip_ssml && pos + 30 < cap) {
+                int n = snprintf(out + pos, cap - pos, "<break time=\"%dms\"/>",
+                                 (int)(150 * pause_factor));
+                if (n > 0 && pos + (size_t)n < cap)
+                    pos += (size_t)n;
+            }
+        }
+    }
+    out[pos] = '\0';
+    return pos;
 }
 
 /* ── Discourse marker injection ──────────────────────────────────────── */
@@ -334,7 +413,9 @@ hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
     result->dominant_emotion = result->sentences[0].emotion;
     result->volume = hu_emotion_to_volume(result->dominant_emotion);
 
-    /* Build SSML-annotated output */
+    bool strip = config->strip_ssml;
+
+    /* Build output (SSML-annotated or punctuation-stripped depending on config) */
     char *out = result->output;
     size_t cap = HU_PREP_MAX_OUTPUT - 1;
     size_t pos = 0;
@@ -346,24 +427,50 @@ hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
         if (i > 0) {
             const char *prev_emo = result->sentences[i - 1].emotion;
             int brk_ms = break_duration_ms(prev_emo, s->emotion, pause_factor);
-            int n = snprintf(out + pos, cap - pos, "<break time=\"%dms\"/>", brk_ms);
-            if (n > 0 && pos + (size_t)n < cap)
-                pos += (size_t)n;
+            if (strip) {
+                /* voiceai approach: convert breaks to punctuation */
+                if (brk_ms >= 500 && pos + 2 < cap) {
+                    out[pos++] = '.';
+                    out[pos++] = ' ';
+                } else if (brk_ms >= 200 && pos + 2 < cap) {
+                    out[pos++] = ',';
+                    out[pos++] = ' ';
+                } else if (pos + 1 < cap) {
+                    out[pos++] = ' ';
+                }
+            } else {
+                int n = snprintf(out + pos, cap - pos, "<break time=\"%dms\"/>", brk_ms);
+                if (n > 0 && pos + (size_t)n < cap)
+                    pos += (size_t)n;
+            }
         }
 
-        /* Emotion tag if different from previous */
-        if (s->emotion && (i == 0 || strcmp(s->emotion, result->sentences[i - 1].emotion) != 0)) {
+        /* Emotion tag if different from previous (SSML mode only) */
+        if (!strip && s->emotion &&
+            (i == 0 || strcmp(s->emotion, result->sentences[i - 1].emotion) != 0)) {
             int n = snprintf(out + pos, cap - pos, "<emotion value=\"%s\"/>", s->emotion);
             if (n > 0 && pos + (size_t)n < cap)
                 pos += (size_t)n;
         }
 
-        /* Speed tag if non-default */
+        /* Speed tag if non-default (SSML mode only) */
         float speed_delta = s->speed_ratio - base_speed;
-        if (speed_delta > 0.03f || speed_delta < -0.03f) {
-            int n = snprintf(out + pos, cap - pos, "<speed ratio=\"%.2f\"/>", (double)s->speed_ratio);
+        if (!strip && (speed_delta > 0.03f || speed_delta < -0.03f)) {
+            int n = snprintf(out + pos, cap - pos, "<speed ratio=\"%.2f\"/>",
+                             (double)s->speed_ratio);
             if (n > 0 && pos + (size_t)n < cap)
                 pos += (size_t)n;
+        }
+
+        /* Per-sentence volume (SSML mode only) */
+        if (!strip) {
+            float sv = hu_emotion_to_volume(s->emotion);
+            float vol_delta = sv - result->volume;
+            if (vol_delta > 0.05f || vol_delta < -0.05f) {
+                int n = snprintf(out + pos, cap - pos, "<volume ratio=\"%.2f\"/>", (double)sv);
+                if (n > 0 && pos + (size_t)n < cap)
+                    pos += (size_t)n;
+            }
         }
 
         /* Nonverbal before sentence (context-dependent) */
@@ -371,15 +478,26 @@ hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
             const char *nv = pick_nonverbal(s->text, s->len, s->emotion,
                                             config->seed ^ (uint32_t)(i * 97));
             if (nv) {
-                size_t nvlen = strlen(nv);
-                if (pos + nvlen < cap) {
-                    memcpy(out + pos, nv, nvlen);
-                    pos += nvlen;
+                if (strip) {
+                    /* In strip mode, only emit text nonverbals, not SSML breaks */
+                    if (nv[0] != '<') {
+                        size_t nvlen = strlen(nv);
+                        if (pos + nvlen < cap) {
+                            memcpy(out + pos, nv, nvlen);
+                            pos += nvlen;
+                        }
+                    }
+                } else {
+                    size_t nvlen = strlen(nv);
+                    if (pos + nvlen < cap) {
+                        memcpy(out + pos, nv, nvlen);
+                        pos += nvlen;
+                    }
                 }
             }
         }
 
-        /* Discourse marker (sparse, contextual) */
+        /* Discourse marker (sparse, contextual — opt-in via discourse_rate) */
         if (config->discourse_rate > 0.0f && i > 0) {
             const char *marker = pick_discourse_marker(
                 s->text, s->len, config->seed ^ (uint32_t)(i * 53));
@@ -388,21 +506,30 @@ hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
                 if (pos + mlen < cap) {
                     memcpy(out + pos, marker, mlen);
                     pos += mlen;
-                    /* Lowercase the sentence start after marker */
                     size_t text_start = pos;
                     if (s->len > 0 && pos + s->len < cap) {
                         memcpy(out + pos, s->text, s->len);
                         if (out[text_start] >= 'A' && out[text_start] <= 'Z')
                             out[text_start] += 32;
                         pos += s->len;
+                        if (i + 1 < result->sentence_count && pos < cap)
+                            out[pos++] = ' ';
                         continue;
                     }
                 }
             }
         }
 
-        /* Sentence text */
-        if (pos + s->len < cap) {
+        /* Sentence text with intra-clause breath-group pauses */
+        if (pos + s->len + 256 < cap) {
+            char clause_buf[4096];
+            size_t clen = inject_clause_breaks(s->text, s->len, pause_factor, strip,
+                                               clause_buf, sizeof(clause_buf));
+            if (clen > 0 && pos + clen < cap) {
+                memcpy(out + pos, clause_buf, clen);
+                pos += clen;
+            }
+        } else if (pos + s->len < cap) {
             memcpy(out + pos, s->text, s->len);
             pos += s->len;
         } else {
@@ -414,7 +541,6 @@ hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
             break;
         }
 
-        /* Space between sentences */
         if (i + 1 < result->sentence_count && pos < cap)
             out[pos++] = ' ';
     }

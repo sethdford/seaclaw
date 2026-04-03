@@ -181,8 +181,29 @@ static hu_error_t mg_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
     hu_json_array_push(alloc, instances, inst);
     hu_json_object_set(alloc, root, "instances", instances);
 
+    const char *storage_uri = NULL;
+    if (mg_agent && mg_agent->config)
+        storage_uri = mg_agent->config->media_gen.veo_storage_uri;
+    if (!storage_uri || !storage_uri[0])
+        storage_uri = getenv("HU_VEO_STORAGE_URI");
+    char storage_buf[256] = {0};
+    if (!storage_uri || !storage_uri[0]) {
+        int sn = snprintf(storage_buf, sizeof(storage_buf),
+                          "gs://%s-human-media/veo/", project);
+        if (sn > 0 && (size_t)sn < sizeof(storage_buf))
+            storage_uri = storage_buf;
+    }
+    if (!storage_uri || !storage_uri[0]) {
+        hu_json_free(alloc, root);
+        hu_vertex_auth_free(&vauth);
+        *out = hu_tool_result_fail("veo_storage_uri not configured (set in config or HU_VEO_STORAGE_URI)", 69);
+        return HU_OK;
+    }
+
     hu_json_value_t *params = hu_json_object_new(alloc);
     if (params) {
+        hu_json_value_t *su = hu_json_string_new(alloc, storage_uri, strlen(storage_uri));
+        if (su) hu_json_object_set(alloc, params, "storageUri", su);
         hu_json_value_t *ar = hu_json_string_new(alloc, aspect, strlen(aspect));
         if (ar) hu_json_object_set(alloc, params, "aspectRatio", ar);
         hu_json_value_t *sc = hu_json_number_new(alloc, 1.0);

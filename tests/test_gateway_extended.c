@@ -1388,6 +1388,29 @@ static void test_rpc_tasks_cancel_no_store_returns_error(void) {
     teardown_proto(&ws, &proto);
 }
 
+static void test_connect_handshake_advertises_critical_methods(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_app_context_t app;
+    hu_config_t cfg;
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_bus_t bus;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_admin_connect(&alloc, &app, NULL, &proto, NULL, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_NOT_NULL(strstr(out, "\"models.decisions\""));
+    HU_ASSERT_NOT_NULL(strstr(out, "\"voice.clone\""));
+    HU_ASSERT_NOT_NULL(strstr(out, "\"tasks.list\""));
+    HU_ASSERT_NOT_NULL(strstr(out, "\"security.cot.summary\""));
+    HU_ASSERT_NOT_NULL(strstr(out, "\"turing.contact\""));
+    alloc.free(alloc.ctx, out, out_len + 1);
+    teardown_proto(&ws, &proto);
+}
+
 void run_gateway_extended_tests(void) {
     HU_TEST_SUITE("Gateway Extended");
     HU_RUN_TEST(test_gateway_webhook_paths);
@@ -1478,6 +1501,7 @@ void run_gateway_extended_tests(void) {
     HU_RUN_TEST(test_rpc_voice_config_no_crash);
     HU_RUN_TEST(test_rpc_nodes_action_missing_fields_no_crash);
     HU_RUN_TEST(test_cp_admin_nodes_action_restart_returns_mock_json);
+    HU_RUN_TEST(test_connect_handshake_advertises_critical_methods);
     HU_RUN_TEST(test_event_bridge_payload_propagation);
 
     HU_TEST_SUITE("Gateway Tasks RPC");

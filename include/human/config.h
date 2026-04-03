@@ -557,10 +557,11 @@ typedef struct hu_cost_config {
 } hu_cost_config_t;
 
 typedef struct hu_media_gen_config {
-    char *default_image_model; /* "nano-banana-2" (default), "imagen-4" */
-    char *default_video_model; /* "veo-3.1" (default), "veo-3.1-lite" */
+    char *default_image_model; /* "gemini" (default), "imagen4", "imagen4_fast", "imagen4_ultra" */
+    char *default_video_model; /* "veo_3.1" (default), "veo_3.1_fast", "veo_3.1_lite" */
     char *vertex_project;      /* Vertex AI project ID; NULL = env GOOGLE_CLOUD_PROJECT */
     char *vertex_region;       /* Vertex AI region; NULL = env GOOGLE_CLOUD_LOCATION or "us-central1" */
+    char *veo_storage_uri;     /* GCS URI for Veo output; NULL = env HU_VEO_STORAGE_URI or gs://{project}-human-media/veo/ */
 } hu_media_gen_config_t;
 
 typedef struct hu_peripherals_config {

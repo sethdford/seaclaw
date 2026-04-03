@@ -7,9 +7,9 @@ struct HumanShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: AskHumanIntent(),
             phrases: [
-                "Ask \(.applicationName) \(\.$query)",
-                "Hey \(.applicationName) \(\.$query)",
-                "Tell \(.applicationName) \(\.$query)",
+                "Ask \(.applicationName) a question",
+                "Hey \(.applicationName)",
+                "Tell \(.applicationName) something",
             ],
             shortTitle: "Ask Human",
             systemImageName: "brain.head.profile"
@@ -18,7 +18,7 @@ struct HumanShortcuts: AppShortcutsProvider {
             intent: SendMessageIntent(),
             phrases: [
                 "Send a message via \(.applicationName)",
-                "Message \(.applicationName) \(\.$message)",
+                "Message with \(.applicationName)",
             ],
             shortTitle: "Send via Human",
             systemImageName: "bubble.left.and.bubble.right"

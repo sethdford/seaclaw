@@ -56,11 +56,16 @@ Use this to find the right files for a given task without searching the full cod
 | **HUML checkpoint (on-device)** | `src/providers/huml.c`, `include/human/providers/huml.h` | `test_ml.c`                          |
 | **Embedded / llama-cli**        | `src/providers/embedded.c`, `include/human/providers/embedded.h` | `test_ml.c`                    |
 
-### Voice session (unified)
+### Voice
 
 | Concept | Primary Source Files | Test Files |
 | --- | --- | --- |
+| **Voice provider vtable** | `include/human/voice/provider.h` | `test_voice_provider.c` |
+| **OpenAI Realtime provider** | `src/voice/realtime.c` | `test_voice_rt_openai.c`, `test_voice_provider.c` |
+| **Gemini Live provider** | `src/voice/gemini_live.c` | `test_gemini_live.c`, `test_voice_provider.c` |
 | **Voice session API** | `src/voice/session.c`, `include/human/voice/session.h` | `test_voice_session.c` |
+| **Duplex turn-taking** | `src/voice/duplex.c`, `src/voice/semantic_eot.c` | `test_voice_duplex.c` |
+| **Gateway voice streaming** | `src/gateway/cp_voice_stream.c` | `test_gateway_voice.c` |
 
 ## Channels
 

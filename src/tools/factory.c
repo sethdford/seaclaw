@@ -113,6 +113,7 @@
 #include "human/tools/send_voice_message.h"
 #include "human/tools/voice_clone.h"
 #endif
+#include "human/tools/vision_ocr.h"
 #include "human/tools/web_fetch.h"
 #include "human/tools/web_search.h"
 #include "human/tools/ask_user.h"
@@ -141,9 +142,9 @@
 #endif
 #define HU_TOOLS_WEBHOOK_COUNT 3  /* webhook_register, webhook_poll, webhook_list */
 #define HU_TOOLS_DB_INTROSPECT_COUNT 1  /* db_introspect */
-/* Base: 56 (core tools incl. lsp + tool_search) + 5 (ask_user + 4 task tools) + 1 (db_introspect) + cron - 1 (skill_run conditional) + persona + cartesia + webhook */
+/* Base: 57 (core tools incl. lsp + tool_search + vision_ocr) + 5 (ask_user + 4 task tools) + 1 (db_introspect) + cron - 1 (skill_run conditional) + persona + cartesia + webhook */
 #define HU_TOOLS_COUNT_BASE \
-    (56 + 5 + HU_TOOLS_DB_INTROSPECT_COUNT + HU_TOOLS_CRON_COUNT - 1 + HU_TOOLS_PERSONA_COUNT + HU_TOOLS_CARTESIA_COUNT + HU_TOOLS_WEBHOOK_COUNT)
+    (57 + 5 + HU_TOOLS_DB_INTROSPECT_COUNT + HU_TOOLS_CRON_COUNT - 1 + HU_TOOLS_PERSONA_COUNT + HU_TOOLS_CARTESIA_COUNT + HU_TOOLS_WEBHOOK_COUNT)
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -404,6 +405,11 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     idx++;
 
     err = hu_image_gen_create(alloc, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
+
+    err = hu_vision_ocr_tool_create(alloc, &tools[idx]);
     if (err != HU_OK)
         goto fail;
     idx++;

@@ -78,9 +78,9 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     hu_error_t err;
 
     /* Cartesia and Groq need a file, not inline base64. Gemini takes base64 directly. */
-    bool use_file = (stt_provider && (strcmp(stt_provider, "cartesia") == 0 ||
-                                      strcmp(stt_provider, "groq") == 0 ||
-                                      strcmp(stt_provider, "local") == 0));
+    bool use_file =
+        (stt_provider && (strcmp(stt_provider, "cartesia") == 0 ||
+                          strcmp(stt_provider, "groq") == 0 || strcmp(stt_provider, "local") == 0));
 
     if (use_file) {
 #if HU_IS_TEST
@@ -146,9 +146,7 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     hu_json_object_set(alloc, resp, "text", hu_json_string_new(alloc, text, text_len));
     alloc->free(alloc->ctx, text, text_len + 1);
 
-    err = hu_json_stringify(alloc, resp, out, out_len);
-    hu_json_free(alloc, resp);
-    return err;
+    return cp_respond_json(alloc, resp, out, out_len);
 }
 
 hu_error_t cp_voice_config(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -189,9 +187,7 @@ hu_error_t cp_voice_config(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     cp_json_set_str(alloc, obj, "stt_model", v->stt_model ? v->stt_model : "");
     cp_json_set_str(alloc, obj, "realtime_voice", v->realtime_voice ? v->realtime_voice : "");
 #endif
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 #else /* !HU_GATEWAY_POSIX */
@@ -199,16 +195,26 @@ hu_error_t cp_voice_config(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
 hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                                const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                char **out, size_t *out_len) {
-    (void)alloc; (void)app; (void)conn; (void)proto; (void)root;
-    *out = NULL; *out_len = 0;
+    (void)alloc;
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_voice_config(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                            const hu_control_protocol_t *proto, const hu_json_value_t *root,
                            char **out, size_t *out_len) {
-    (void)alloc; (void)app; (void)conn; (void)proto; (void)root;
-    *out = NULL; *out_len = 0;
+    (void)alloc;
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
 }
 

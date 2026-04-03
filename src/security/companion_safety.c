@@ -755,8 +755,11 @@ hu_error_t hu_safety_judge_check(hu_allocator_t *alloc, hu_provider_t *provider,
                                    (int)(user_msg_len > 500 ? 500 : user_msg_len),
                                    user_msg ? user_msg : "", (int)(response_len > 2000 ? 2000 : response_len),
                                    response);
-    if (!user_prompt)
+    if (!user_prompt) {
+        result->safe = false;
+        result->confidence = 0.3;
         return HU_OK;
+    }
 
     char *judge_response = NULL;
     size_t judge_response_len = 0;

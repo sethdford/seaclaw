@@ -51,10 +51,8 @@ export class AudioRecorder {
 
   get isSupported(): boolean {
     const hasMic =
-      typeof navigator !== "undefined" &&
-      typeof navigator.mediaDevices !== "undefined";
-    const hasMediaRecorder =
-      typeof MediaRecorder !== "undefined" && selectMimeType() !== "";
+      typeof navigator !== "undefined" && typeof navigator.mediaDevices !== "undefined";
+    const hasMediaRecorder = typeof MediaRecorder !== "undefined" && selectMimeType() !== "";
     const hasAudioContext = typeof AudioContext !== "undefined";
     return hasMic && (hasMediaRecorder || hasAudioContext);
   }

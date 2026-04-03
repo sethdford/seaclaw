@@ -60,17 +60,21 @@ static void voice_provider_openai_get_name_returns_openai_realtime(void) {
     p.vtable->disconnect(p.ctx, &alloc);
 }
 
-static void voice_provider_openai_optional_slots_null(void) {
-    /* OpenAI Realtime doesn't support manual VAD, tool responses, or reconnect */
+static void voice_provider_openai_optional_slots_have_noop_stubs(void) {
+    /* OpenAI Realtime fills optional slots with no-op stubs (not NULL) */
     hu_allocator_t alloc = hu_system_allocator();
     hu_voice_rt_config_t cfg = {0};
     hu_voice_provider_t p = {0};
     hu_voice_provider_openai_create(&alloc, &cfg, &p);
-    HU_ASSERT_NULL(p.vtable->send_activity_start);
-    HU_ASSERT_NULL(p.vtable->send_activity_end);
-    HU_ASSERT_NULL(p.vtable->send_audio_stream_end);
-    HU_ASSERT_NULL(p.vtable->reconnect);
-    HU_ASSERT_NULL(p.vtable->send_tool_response);
+    HU_ASSERT_NOT_NULL(p.vtable->send_activity_start);
+    HU_ASSERT_NOT_NULL(p.vtable->send_activity_end);
+    HU_ASSERT_NOT_NULL(p.vtable->send_audio_stream_end);
+    HU_ASSERT_NOT_NULL(p.vtable->reconnect);
+    HU_ASSERT_NOT_NULL(p.vtable->send_tool_response);
+    /* No-op stubs return HU_OK for signals, HU_ERR_NOT_SUPPORTED for tool response */
+    HU_ASSERT_EQ(p.vtable->send_activity_start(p.ctx), HU_OK);
+    HU_ASSERT_EQ(p.vtable->reconnect(p.ctx), HU_OK);
+    HU_ASSERT_EQ(p.vtable->send_tool_response(p.ctx, "x", "y", "{}"), HU_ERR_NOT_SUPPORTED);
     p.vtable->disconnect(p.ctx, &alloc);
 }
 
@@ -229,7 +233,7 @@ void run_voice_provider_tests(void) {
     HU_RUN_TEST(voice_provider_openai_send_audio_dispatches);
     HU_RUN_TEST(voice_provider_openai_recv_event_dispatches);
     HU_RUN_TEST(voice_provider_openai_get_name_returns_openai_realtime);
-    HU_RUN_TEST(voice_provider_openai_optional_slots_null);
+    HU_RUN_TEST(voice_provider_openai_optional_slots_have_noop_stubs);
     HU_RUN_TEST(voice_provider_openai_create_null_out_fails);
     HU_RUN_TEST(voice_provider_openai_create_null_alloc_fails);
     HU_RUN_TEST(voice_provider_gemini_create_connect_destroy);

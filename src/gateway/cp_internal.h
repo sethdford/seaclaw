@@ -16,6 +16,25 @@ static inline void cp_json_set_str(hu_allocator_t *a, hu_json_value_t *obj, cons
     hu_json_object_set(a, obj, key, hu_json_string_new(a, val, strlen(val)));
 }
 
+/* ── Response helpers ───────────────────────────────────────────────────── */
+
+/* Serialize a JSON object to *out / *out_len and free it. Returns the stringify error. */
+static inline hu_error_t cp_respond_json(hu_allocator_t *a, hu_json_value_t *obj, char **out,
+                                         size_t *out_len) {
+    hu_error_t err = hu_json_stringify(a, obj, out, out_len);
+    hu_json_free(a, obj);
+    return err;
+}
+
+/* Return {"ok":true} (with optional extra fields set before calling). */
+static inline hu_error_t cp_respond_ok(hu_allocator_t *a, char **out, size_t *out_len) {
+    hu_json_value_t *obj = hu_json_object_new(a);
+    if (!obj)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_json_object_set(a, obj, "ok", hu_json_bool_new(a, true));
+    return cp_respond_json(a, obj, out, out_len);
+}
+
 /* Chat handlers */
 hu_error_t cp_chat_send(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                         const hu_control_protocol_t *proto, const hu_json_value_t *root, char **out,
@@ -246,8 +265,8 @@ hu_error_t cp_tasks_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_con
                          const hu_control_protocol_t *proto, const hu_json_value_t *root,
                          char **out, size_t *out_len);
 hu_error_t cp_tasks_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
-                        const hu_control_protocol_t *proto, const hu_json_value_t *root,
-                        char **out, size_t *out_len);
+                        const hu_control_protocol_t *proto, const hu_json_value_t *root, char **out,
+                        size_t *out_len);
 hu_error_t cp_tasks_cancel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                            const hu_control_protocol_t *proto, const hu_json_value_t *root,
                            char **out, size_t *out_len);

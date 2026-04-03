@@ -1117,6 +1117,9 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
         const char *mgr = hu_json_get_string(mg_obj, "vertex_region");
         if (mgr)
             cfg->media_gen.vertex_region = hu_strdup(a, mgr);
+        const char *vsu = hu_json_get_string(mg_obj, "veo_storage_uri");
+        if (vsu)
+            cfg->media_gen.veo_storage_uri = hu_strdup(a, vsu);
     }
     hu_json_value_t *sec = hu_json_object_get(root, "security");
     if (sec && sec->type == HU_JSON_OBJECT) {

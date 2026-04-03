@@ -1,19 +1,28 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import DOMPurify from "dompurify";
 import "./hu-button.js";
+import "./hu-canvas-sandbox.js";
+
+export type CanvasFormat =
+  | "html"
+  | "svg"
+  | "mockup"
+  | "react"
+  | "mermaid"
+  | "markdown"
+  | "code";
 
 /**
- * Renders Live Canvas / A2UI markup (HTML or SVG) in a sandboxed shadow subtree.
- * Scripts are stripped; use with agent-driven visual content only.
+ * Renders Live Canvas / A2UI content in a sandboxed iframe.
+ * Supports HTML, SVG, React/JSX, Mermaid, Markdown, and code display.
  */
 @customElement("hu-canvas")
 export class HuCanvas extends LitElement {
   @property({ type: String }) title = "";
   @property({ type: String }) content = "";
-  /** html | svg | mockup */
-  @property({ type: String }) format: "html" | "svg" | "mockup" = "html";
+  @property({ type: String }) format: CanvasFormat = "html";
+  @property({ type: Object }) imports: Record<string, string> = {};
+  @property({ type: String }) language = "";
 
   @state() private _fullscreen = false;
 
@@ -48,18 +57,35 @@ export class HuCanvas extends LitElement {
       white-space: nowrap;
     }
 
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--hu-space-xs);
+    }
+
+    .format-badge {
+      display: inline-flex;
+      padding: 2px var(--hu-space-xs);
+      border-radius: var(--hu-radius-sm);
+      background: color-mix(in srgb, var(--hu-accent-tertiary) 15%, transparent);
+      color: var(--hu-accent-tertiary);
+      font-size: var(--hu-text-xs);
+      font-weight: var(--hu-weight-semibold);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
     .stage-wrap {
       flex: 1;
       min-height: 12rem;
       position: relative;
       overflow: auto;
-      padding: var(--hu-space-md);
       background: var(--hu-bg-elevated);
     }
 
     .mockup {
       max-width: 24rem;
-      margin: 0 auto;
+      margin: var(--hu-space-md) auto;
       border-radius: var(--hu-radius-xl);
       border: var(--hu-space-xs) solid var(--hu-border-strong);
       box-shadow: var(--hu-shadow-lg);
@@ -82,17 +108,10 @@ export class HuCanvas extends LitElement {
       flex: 1;
       min-height: 0;
       overflow: auto;
-      padding: var(--hu-space-sm);
     }
 
-    .sandbox {
+    hu-canvas-sandbox {
       width: 100%;
-      min-height: 8rem;
-    }
-
-    .sandbox :where(img, svg) {
-      max-width: 100%;
-      height: auto;
     }
 
     .empty {
@@ -107,6 +126,7 @@ export class HuCanvas extends LitElement {
       border: 1px dashed var(--hu-border-subtle);
       border-radius: var(--hu-radius-lg);
       background: color-mix(in srgb, var(--hu-surface-container) 40%, transparent);
+      margin: var(--hu-space-md);
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -115,15 +135,6 @@ export class HuCanvas extends LitElement {
       }
     }
   `;
-
-  private _sanitize(htmlIn: string): string {
-    const isSvg = this.format === "svg";
-    return DOMPurify.sanitize(htmlIn, {
-      USE_PROFILES: isSvg ? { svg: true, svgFilters: true } : { html: true },
-      FORBID_TAGS: ["script", "iframe", "object", "embed", "link"],
-      FORBID_ATTR: ["onerror", "onclick", "onload", "onmouseover"],
-    });
-  }
 
   private _toggleFullscreen(): void {
     const root = this.renderRoot.querySelector(".stage-wrap") as HTMLElement | null;
@@ -156,9 +167,14 @@ export class HuCanvas extends LitElement {
 
   override render() {
     const hasContent = this.content.trim().length > 0;
-    const safe = hasContent ? this._sanitize(this.content) : "";
-    const inner = hasContent
-      ? html`<div class="sandbox">${unsafeHTML(safe)}</div>`
+
+    const sandbox = hasContent
+      ? html`<hu-canvas-sandbox
+          .content=${this.content}
+          .format=${this.format}
+          .imports=${this.imports}
+          .language=${this.language}
+        ></hu-canvas-sandbox>`
       : html`<div class="empty" role="status">No canvas content yet.</div>`;
 
     const framed =
@@ -166,22 +182,25 @@ export class HuCanvas extends LitElement {
         ? html`
             <div class="mockup" aria-label="Device mockup frame">
               <div class="mockup-notch" aria-hidden="true"></div>
-              <div class="mockup-body">${inner}</div>
+              <div class="mockup-body">${sandbox}</div>
             </div>
           `
-        : inner;
+        : sandbox;
 
     return html`
       <div class="toolbar">
         <h2>${this.title || "Canvas"}</h2>
-        <hu-button
-          variant="tonal"
-          size="sm"
-          @click=${() => this._toggleFullscreen()}
-          aria-label=${this._fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-        >
-          ${this._fullscreen ? "Exit" : "Fullscreen"}
-        </hu-button>
+        <div class="toolbar-actions">
+          <span class="format-badge">${this.format}</span>
+          <hu-button
+            variant="tonal"
+            size="sm"
+            @click=${() => this._toggleFullscreen()}
+            aria-label=${this._fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          >
+            ${this._fullscreen ? "Exit" : "Fullscreen"}
+          </hu-button>
+        </div>
       </div>
       <div class="stage-wrap">${framed}</div>
     `;

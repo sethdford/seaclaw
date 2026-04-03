@@ -61,9 +61,8 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
         const char *mdl = (session->config.model && session->config.model[0])
                               ? session->config.model
                               : "gpt-4o-realtime-preview";
-        const char *voice = (session->config.voice && session->config.voice[0])
-                                ? session->config.voice
-                                : "alloy";
+        const char *voice =
+            (session->config.voice && session->config.voice[0]) ? session->config.voice : "alloy";
         const char *td = session->config.vad_enabled
                              ? "\"turn_detection\":{\"type\":\"server_vad\",\"threshold\":0.5,"
                                "\"prefix_padding_ms\":300,\"silence_duration_ms\":500}"
@@ -79,12 +78,14 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
                           "%s"
                           "}}",
                           mdl, voice, td);
-        if (su > 0 && (size_t)su < sizeof(session_update)) {
-            hu_error_t su_err = hu_ws_send(ws, session_update, (size_t)su);
-            if (su_err != HU_OK) {
-                session->connected = false;
-                return su_err;
-            }
+        if (su <= 0 || (size_t)su >= sizeof(session_update)) {
+            session->connected = false;
+            return HU_ERR_IO;
+        }
+        hu_error_t su_err = hu_ws_send(ws, session_update, (size_t)su);
+        if (su_err != HU_OK) {
+            session->connected = false;
+            return su_err;
         }
     }
     return HU_OK;
@@ -93,7 +94,8 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
 #endif
 }
 
-hu_error_t hu_voice_rt_send_audio(hu_voice_rt_session_t *session, const void *data, size_t data_len) {
+hu_error_t hu_voice_rt_send_audio(hu_voice_rt_session_t *session, const void *data,
+                                  size_t data_len) {
     if (!session || !data)
         return HU_ERR_INVALID_ARGUMENT;
 #if HU_IS_TEST
@@ -256,10 +258,21 @@ hu_error_t hu_voice_rt_recv_event(hu_voice_rt_session_t *session, hu_allocator_t
             if (name && call_id) {
                 size_t nlen = strlen(name);
                 size_t clen = strlen(call_id);
-                out->transcript = hu_strndup(alloc, name, nlen);
-                out->transcript_len = out->transcript ? nlen : 0;
-                out->tool_call_id = hu_strndup(alloc, call_id, clen);
-                out->tool_call_id_len = out->tool_call_id ? clen : 0;
+                char *n_dup = hu_strndup(alloc, name, nlen);
+                char *c_dup = hu_strndup(alloc, call_id, clen);
+                if (!n_dup || !c_dup) {
+                    if (n_dup)
+                        alloc->free(alloc->ctx, n_dup, nlen + 1);
+                    if (c_dup)
+                        alloc->free(alloc->ctx, c_dup, clen + 1);
+                    hu_json_free(alloc, json);
+                    alloc->free(alloc->ctx, msg, msg_len + 1);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                out->transcript = n_dup;
+                out->transcript_len = nlen;
+                out->tool_call_id = c_dup;
+                out->tool_call_id_len = clen;
                 if (arguments) {
                     size_t alen = strlen(arguments);
                     out->tool_args_json = hu_strndup(alloc, arguments, alen);
@@ -362,13 +375,13 @@ static hu_error_t openai_vp_send_audio(void *ctx, const void *pcm16, size_t len)
     return hu_voice_rt_send_audio((hu_voice_rt_session_t *)ctx, pcm16, len);
 }
 
-static hu_error_t openai_vp_recv_event(void *ctx, hu_allocator_t *alloc,
-                                        hu_voice_rt_event_t *out, int timeout_ms) {
+static hu_error_t openai_vp_recv_event(void *ctx, hu_allocator_t *alloc, hu_voice_rt_event_t *out,
+                                       int timeout_ms) {
     return hu_voice_rt_recv_event((hu_voice_rt_session_t *)ctx, alloc, out, timeout_ms);
 }
 
 static hu_error_t openai_vp_add_tool(void *ctx, const char *name, const char *description,
-                                      const char *parameters_json) {
+                                     const char *parameters_json) {
     return hu_voice_rt_add_tool((hu_voice_rt_session_t *)ctx, name, description, parameters_json);
 }
 
@@ -386,6 +399,22 @@ static const char *openai_vp_get_name(void *ctx) {
     return "openai_realtime";
 }
 
+/* No-op stubs for optional vtable slots OpenAI Realtime doesn't support.
+ * Filling these eliminates scattered NULL checks at every call site. */
+static hu_error_t openai_vp_noop(void *ctx) {
+    (void)ctx;
+    return HU_OK;
+}
+
+static hu_error_t openai_vp_noop_tool_response(void *ctx, const char *name, const char *call_id,
+                                               const char *response_json) {
+    (void)ctx;
+    (void)name;
+    (void)call_id;
+    (void)response_json;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
 static const hu_voice_provider_vtable_t openai_voice_vtable = {
     .connect = openai_vp_connect,
     .send_audio = openai_vp_send_audio,
@@ -394,11 +423,16 @@ static const hu_voice_provider_vtable_t openai_voice_vtable = {
     .cancel_response = openai_vp_cancel_response,
     .disconnect = openai_vp_disconnect,
     .get_name = openai_vp_get_name,
+    .send_activity_start = openai_vp_noop,
+    .send_activity_end = openai_vp_noop,
+    .send_audio_stream_end = openai_vp_noop,
+    .reconnect = openai_vp_noop,
+    .send_tool_response = openai_vp_noop_tool_response,
 };
 
 hu_error_t hu_voice_provider_openai_create(hu_allocator_t *alloc,
-                                            const hu_voice_rt_config_t *config,
-                                            hu_voice_provider_t *out) {
+                                           const hu_voice_rt_config_t *config,
+                                           hu_voice_provider_t *out) {
     if (!alloc || !out)
         return HU_ERR_INVALID_ARGUMENT;
     hu_voice_rt_session_t *session = NULL;

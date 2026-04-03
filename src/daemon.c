@@ -2075,7 +2075,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
     /* Phase 3: Global turn counter for anti-sycophancy contrarian budget */
+#ifdef HU_HAS_PERSONA
     static uint32_t daemon_turn_counter = 0;
+#endif
     /* SOTA: Persona drift detector — tracks consistency across turns */
     static hu_drift_detector_t persona_drift = {0};
     static bool persona_drift_initialized = false;
@@ -2084,9 +2086,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
         persona_drift_initialized = true;
     }
     /* Phase 4: Conversation repair signal (persists across turn boundary) */
+#ifdef HU_HAS_PERSONA
     static hu_repair_signal_t repair_signal = {0};
+#endif
     /* Phase 4: Style drift check counter */
+#if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_PERSONA)
     static unsigned drift_check_counter = 0;
+#endif
 
     hu_inbox_watcher_t inbox_watcher = {0};
     static int64_t last_inbox_poll_ms = 0;
@@ -8103,6 +8109,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* F29: Backchannel — send brief cue and skip LLM when narrative detected */
                 if (use_backchannel && backchannel_len > 0 && ch->channel->vtable->send) {
+                    bool bc_suppress = ch->channel->vtable->human_active_recently &&
+                                       ch->channel->vtable->human_active_recently(
+                                           ch->channel->ctx, batch_key, key_len, 30);
+                    if (bc_suppress)
+                        goto skip_llm_this_batch;
                     ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, backchannel_buf,
                                               backchannel_len, NULL, 0);
                     hu_log_info("human", agent ? agent->observer : NULL, "backchannel: %.*s",
@@ -8287,6 +8298,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         unsigned int delay_ms =
                                             1000u + (burst_seed + (uint32_t)bi) % 2000u;
                                         hu_platform_sleep_ms(delay_ms);
+                                        if (ch->channel->vtable->human_active_recently &&
+                                            ch->channel->vtable->human_active_recently(
+                                                ch->channel->ctx, batch_key, key_len, 30))
+                                            break;
                                     }
                                 }
                             }
@@ -8348,8 +8363,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             hu_log_info("human", agent ? agent->observer : NULL,
                                         "silence intuition: \"%.*s\" for %.*s", (int)ack_len, ack,
                                         (int)(key_len > 20 ? 20 : key_len), batch_key);
-                            ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, ack,
-                                                      ack_len, NULL, 0);
+                            bool si_suppress =
+                                ch->channel->vtable->human_active_recently &&
+                                ch->channel->vtable->human_active_recently(ch->channel->ctx,
+                                                                           batch_key, key_len, 30);
+                            if (!si_suppress)
+                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                          ack, ack_len, NULL, 0);
                             alloc->free(alloc->ctx, ack, ack_len + 1);
                             goto skip_llm_this_batch;
                         }
@@ -8799,7 +8819,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                 /* ── Phase 3 post-turn: increment turn counter for anti-sycophancy ── */
+#ifdef HU_HAS_PERSONA
                 daemon_turn_counter++;
+#endif
 
                 /* ── SOTA post-turn: persona consistency drift detection ── */
                 if (err == HU_OK && response && response_len > 0) {
@@ -8880,12 +8902,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                 /* ── Phase 4 post-turn: conversation repair detection ─── */
+#ifdef HU_HAS_PERSONA
                 if (err == HU_OK && combined_len > 0) {
                     hu_repair_signal_t rs = {0};
                     if (hu_repair_detect(combined, combined_len, &rs) == HU_OK &&
                         rs.should_acknowledge)
                         repair_signal = rs;
                 }
+#endif
 
                 /* ── BTH post-turn: Theory of Mind record (t1b-post) ──────── */
 #ifndef HU_IS_TEST
@@ -9391,6 +9415,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                 size_t response_alloc_len = response_len;
+                bool send_was_aborted = false;
                 uint32_t typo_seed = 0;
 #ifndef HU_HAS_PERSONA
                 (void)typo_seed;
@@ -9607,6 +9632,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         "pre-send abort: real user active "
                                         "for %.*s — dropping generated response",
                                         (int)(key_len > 20 ? 20 : key_len), batch_key);
+                            send_was_aborted = true;
                             goto skip_send;
                         }
                     }
@@ -9729,14 +9755,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                  strstr(pb, "rapid"))
                                             persona_pause *= 0.7f;
                                     }
-                                    float persona_disc = 0.3f;
-                                    if (agent->persona->voice_rhythm.response_tempo) {
-                                        const char *rt = agent->persona->voice_rhythm.response_tempo;
-                                        if (strstr(rt, "casual") || strstr(rt, "conversational"))
-                                            persona_disc = 0.4f;
-                                        else if (strstr(rt, "formal") || strstr(rt, "direct"))
-                                            persona_disc = 0.1f;
+                                    float persona_disc = 0.0f;
+                                    if (agent->persona->voice.discourse_markers) {
+                                        persona_disc = 0.3f;
+                                        if (agent->persona->voice_rhythm.response_tempo) {
+                                            const char *rt =
+                                                agent->persona->voice_rhythm.response_tempo;
+                                            if (strstr(rt, "casual") ||
+                                                strstr(rt, "conversational"))
+                                                persona_disc = 0.4f;
+                                            else if (strstr(rt, "formal") || strstr(rt, "direct"))
+                                                persona_disc = 0.1f;
+                                        }
                                     }
+
+                                    bool voice_strip_ssml =
+                                        agent->persona->voice.strip_ssml;
 
                                     hu_prep_config_t prep_cfg = {
                                         .incoming_msg = combined,
@@ -9746,6 +9780,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         .pause_factor = persona_pause,
                                         .discourse_rate = persona_disc,
                                         .nonverbals_enabled = agent->persona->voice.nonverbals,
+                                        .strip_ssml = voice_strip_ssml,
                                         .seed = (uint32_t)time(NULL),
                                         .hour_local = (uint8_t)bth_hour,
                                     };
@@ -9987,7 +10022,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             syc_r.total_risk, syc_r.pattern_count);
                                 /* Boost contrarian counter to increase the probability that
                                  * the next turn's Phase 3 anti-sycophancy prompt fires. */
+#ifdef HU_HAS_PERSONA
                                 daemon_turn_counter += 3;
+#endif
                             }
                         }
                         /* SHIELD-004/005: Moderation + crisis escalation before send */
@@ -10124,6 +10161,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     else if (bth_hour >= 22)
                                         total_ms = total_ms * 2;
                                     usleep((useconds_t)(total_ms * 1000));
+                                    if (ch->channel->vtable->human_active_recently &&
+                                        ch->channel->vtable->human_active_recently(
+                                            ch->channel->ctx, batch_key, key_len, 30)) {
+                                        hu_log_info("human", agent ? agent->observer : NULL,
+                                                    "user active mid-fragment — suppressing f=%zu+",
+                                                    f);
+                                        break;
+                                    }
                                 }
 #ifndef HU_IS_TEST
                                 {
@@ -10256,8 +10301,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 if (corr_len > 0) {
                                     unsigned int delay_ms = 2500 + (unsigned int)(typo_seed % 2500);
                                     usleep((useconds_t)(delay_ms * 1000));
-                                    ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
-                                                              correction, corr_len, NULL, 0);
+                                    bool corr_suppress =
+                                        ch->channel->vtable->human_active_recently &&
+                                        ch->channel->vtable->human_active_recently(
+                                            ch->channel->ctx, batch_key, key_len, 30);
+                                    if (!corr_suppress)
+                                        ch->channel->vtable->send(ch->channel->ctx, batch_key,
+                                                                  key_len, correction, corr_len,
+                                                                  NULL, 0);
                                     if (agent->bth_metrics)
                                         agent->bth_metrics->corrections_sent++;
                                 }
@@ -10389,12 +10440,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
+#if !defined(HU_IS_TEST) && defined(HU_HAS_PERSONA)
                 const char *_ch_name_for_gate =
                     ch->channel->vtable->name ? ch->channel->vtable->name(ch->channel->ctx) : NULL;
                 bool is_imessage_ch =
                     (_ch_name_for_gate && strcmp(_ch_name_for_gate, "imessage") == 0);
-
-#if !defined(HU_IS_TEST) && defined(HU_HAS_PERSONA)
                 /* F9: Double-text — natural afterthought follow-up */
                 if (response && response_len > 0 && agent->persona && ch->channel->vtable->send &&
                     agent->provider.vtable && agent->provider.vtable->chat_with_system) {
@@ -10478,6 +10528,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* GIF calibration + send: iMessage-only (requires chat.db access) */
 
+#ifdef HU_HAS_IMESSAGE
                 if (is_imessage_ch) {
                     int gif_taps = hu_imessage_count_recent_gif_tapbacks(batch_key, key_len);
                     if (gif_taps > 0) {
@@ -10498,6 +10549,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+#endif
 
                 /* GIF reaction: send a GIF when the moment calls for it (iMessage-only) */
                 bool gif_sent_this_turn = false;
@@ -10683,7 +10735,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key, key_len);
                 }
 #endif
-                if (response) {
+                if (response && !send_was_aborted) {
                     /* Bump consecutive response counter for this contact */
                     if (consec_idx == SIZE_MAX && consec_contact_count < HU_CONSEC_MAX_CONTACTS &&
                         key_len < sizeof(consec_contact_keys[0])) {

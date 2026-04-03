@@ -1860,6 +1860,8 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                            s);
         out->voice.default_speed = (float)hu_json_get_number(voice_obj, "default_speed", 0.95);
         out->voice.nonverbals = hu_json_get_bool(voice_obj, "nonverbals", true);
+        out->voice.strip_ssml = hu_json_get_bool(voice_obj, "strip_ssml", false);
+        out->voice.discourse_markers = hu_json_get_bool(voice_obj, "discourse_markers", false);
     }
 
     /* Phase 5: voice_messages (defaults: enabled=false, frequency="rare", max_duration_sec=30) */

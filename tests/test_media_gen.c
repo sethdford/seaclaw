@@ -427,16 +427,19 @@ static void media_config_fallback_chain(void) {
     cfg.media_gen.default_video_model = hu_strdup(&alloc, "veo_3.1_lite");
     cfg.media_gen.vertex_project = hu_strdup(&alloc, "my-project-123");
     cfg.media_gen.vertex_region = hu_strdup(&alloc, "europe-west4");
+    cfg.media_gen.veo_storage_uri = hu_strdup(&alloc, "gs://my-bucket/veo/");
 
     HU_ASSERT_STR_EQ(cfg.media_gen.default_image_model, "imagen4");
     HU_ASSERT_STR_EQ(cfg.media_gen.default_video_model, "veo_3.1_lite");
     HU_ASSERT_STR_EQ(cfg.media_gen.vertex_project, "my-project-123");
     HU_ASSERT_STR_EQ(cfg.media_gen.vertex_region, "europe-west4");
+    HU_ASSERT_STR_EQ(cfg.media_gen.veo_storage_uri, "gs://my-bucket/veo/");
 
     alloc.free(alloc.ctx, cfg.media_gen.default_image_model, strlen("imagen4") + 1);
     alloc.free(alloc.ctx, cfg.media_gen.default_video_model, strlen("veo_3.1_lite") + 1);
     alloc.free(alloc.ctx, cfg.media_gen.vertex_project, strlen("my-project-123") + 1);
     alloc.free(alloc.ctx, cfg.media_gen.vertex_region, strlen("europe-west4") + 1);
+    alloc.free(alloc.ctx, cfg.media_gen.veo_storage_uri, strlen("gs://my-bucket/veo/") + 1);
 }
 
 static void media_agent_deinit_cleans_generated_media(void) {

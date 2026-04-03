@@ -55,7 +55,8 @@ static int emotional_weight(const char *msg, size_t len) {
         "frustrated", "stressed", "upset", "annoyed", "confused", "angry",
         "disappointed", "tired", "exhausted", "sick", "hurt", "lonely",
         "nervous", "worried", "sorry", "ugh", "hate", "awful", "terrible",
-        "not working", "broken", "failing"
+        "not working", "broken", "failing", "sad", "unhappy", "miserable",
+        "hopeless", "helpless", "numb", "empty"
     };
     for (size_t i = 0; i < sizeof(heavy) / sizeof(heavy[0]); i++)
         if (ci_contains(msg, len, heavy[i]))

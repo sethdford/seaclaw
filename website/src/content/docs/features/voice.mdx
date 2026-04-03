@@ -18,11 +18,11 @@ The voice channel provides:
 
 ## Modes
 
-| Mode | How it works | Latency |
-| --- | --- | --- |
-| **Standard (Cartesia)** | Mic → STT → Agent → TTS → Speaker | Medium |
-| **Gemini Live** | Mic → Gemini 3.1 Flash Live → Speaker | Low |
-| **Realtime** | OpenAI Realtime API (full-duplex) | Low |
+| Mode                    | How it works                          | Latency |
+| ----------------------- | ------------------------------------- | ------- |
+| **Standard (Cartesia)** | Mic → STT → Agent → TTS → Speaker     | Medium  |
+| **Gemini Live**         | Mic → Gemini 3.1 Flash Live → Speaker | Low     |
+| **Realtime**            | OpenAI Realtime API (full-duplex)     | Low     |
 
 ## Configuration
 
@@ -64,19 +64,19 @@ When `vertex_region` and `vertex_project` are set, Human uses the Vertex AI endp
 
 ### Voice Configuration Fields
 
-| Field | Description | Default |
-| --- | --- | --- |
-| `mode` | Voice mode: `gemini_live`, `realtime`, `sonata`, `webrtc` | — |
-| `realtime_model` | Model for Gemini Live or OpenAI Realtime | `gemini-3.1-flash-live-preview` |
-| `realtime_voice` | Voice name for the realtime model | `Puck` |
-| `tts_provider` | TTS provider for standard mode | — |
-| `tts_voice` | Voice ID for Cartesia TTS | — |
-| `tts_model` | TTS model name | — |
-| `stt_provider` | STT provider for standard mode | — |
-| `stt_model` | STT model name | — |
-| `vertex_region` | Vertex AI region (enables Vertex endpoint) | — |
-| `vertex_project` | Vertex AI project ID | — |
-| `vertex_access_token` | Pre-fetched OAuth2 token (empty = use ADC) | — |
+| Field                 | Description                                               | Default                         |
+| --------------------- | --------------------------------------------------------- | ------------------------------- |
+| `mode`                | Voice mode: `gemini_live`, `realtime`, `sonata`, `webrtc` | —                               |
+| `realtime_model`      | Model for Gemini Live or OpenAI Realtime                  | `gemini-3.1-flash-live-preview` |
+| `realtime_voice`      | Voice name for the realtime model                         | `Puck`                          |
+| `tts_provider`        | TTS provider for standard mode                            | —                               |
+| `tts_voice`           | Voice ID for Cartesia TTS                                 | —                               |
+| `tts_model`           | TTS model name                                            | —                               |
+| `stt_provider`        | STT provider for standard mode                            | —                               |
+| `stt_model`           | STT model name                                            | —                               |
+| `vertex_region`       | Vertex AI region (enables Vertex endpoint)                | —                               |
+| `vertex_project`      | Vertex AI project ID                                      | —                               |
+| `vertex_access_token` | Pre-fetched OAuth2 token (empty = use ADC)                | —                               |
 
 ## Build Flag
 
@@ -88,13 +88,13 @@ cmake .. -DHU_ENABLE_VOICE=ON
 
 ## Supported Providers
 
-| Provider | STT | TTS | Notes |
-| --- | --- | --- | --- |
-| Gemini Live | Native | Native | End-to-end multimodal, lowest latency |
-| OpenAI Whisper | ✓ | — | Best transcription accuracy |
-| Cartesia | — | ✓ | Streaming TTS with emotion controls |
-| OpenAI TTS | — | ✓ | Multiple voices |
-| Deepgram | ✓ | — | Low latency |
+| Provider       | STT    | TTS    | Notes                                 |
+| -------------- | ------ | ------ | ------------------------------------- |
+| Gemini Live    | Native | Native | End-to-end multimodal, lowest latency |
+| OpenAI Whisper | ✓      | —      | Best transcription accuracy           |
+| Cartesia       | —      | ✓      | Streaming TTS with emotion controls   |
+| OpenAI TTS     | —      | ✓      | Multiple voices                       |
+| Deepgram       | ✓      | —      | Low latency                           |
 
 ## Security
 

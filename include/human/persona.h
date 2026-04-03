@@ -303,6 +303,8 @@ typedef struct hu_persona_voice_config {
     char default_emotion[32]; /* "content" */
     float default_speed;      /* 0.95 */
     bool nonverbals;          /* true */
+    bool strip_ssml;          /* false = SSML mode, true = punctuation fallback */
+    bool discourse_markers;   /* false = off by default (voiceai learned static fillers degrade) */
     float vulnerability_level; /* 0.0–1.0, EMA-tracked from content */
 } hu_persona_voice_config_t;
 

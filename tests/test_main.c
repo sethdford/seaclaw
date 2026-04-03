@@ -99,6 +99,8 @@ void run_inner_world_tests(void);
 void run_humor_fw_tests(void);
 void run_markdown_loader_tests(void);
 #endif
+void hu_test_permission(void);
+void test_session_persist(void);
 void run_lifecycle_tests(void);
 void run_observer_tests(void);
 void run_session_tests(void);
@@ -140,6 +142,7 @@ void run_task_store_tests(void);
 void run_task_tools_tests(void);
 void run_tool_ask_user_tests(void);
 void run_canvas_tool_tests(void);
+void run_sota_e2e_tests(void);
 void run_mcp_tests(void);
 void run_mcp_jsonrpc_tests(void);
 void run_mcp_manager_tests(void);
@@ -558,6 +561,8 @@ int main(int argc, char **argv) {
     run_humor_fw_tests();
     run_markdown_loader_tests();
 #endif
+    hu_test_permission();
+    test_session_persist();
     run_lifecycle_tests();
     run_observer_tests();
     run_session_tests();
@@ -868,6 +873,7 @@ int main(int argc, char **argv) {
     run_task_tools_tests();
     run_tool_ask_user_tests();
     run_canvas_tool_tests();
+    run_sota_e2e_tests();
     run_approval_gate_tests();
     run_workflow_commands_tests();
     run_repair_tests();

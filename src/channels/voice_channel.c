@@ -146,10 +146,9 @@ static void voice_stop(void *ctx) {
     v->running = false;
 
     if (v->provider.vtable) {
-        if (v->vad_active && v->provider.vtable->send_activity_end)
+        if (v->vad_active)
             (void)v->provider.vtable->send_activity_end(v->provider.ctx);
-        if (v->provider.vtable->send_audio_stream_end)
-            (void)v->provider.vtable->send_audio_stream_end(v->provider.ctx);
+        (void)v->provider.vtable->send_audio_stream_end(v->provider.ctx);
         v->vad_active = false;
         v->provider.vtable->disconnect(v->provider.ctx, v->alloc);
         memset(&v->provider, 0, sizeof(v->provider));
@@ -180,7 +179,7 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
 
     if ((v->config.mode == HU_VOICE_MODE_REALTIME || v->config.mode == HU_VOICE_MODE_GEMINI_LIVE) &&
         v->provider.vtable) {
-        if (!v->vad_active && v->provider.vtable->send_activity_start) {
+        if (!v->vad_active) {
             (void)v->provider.vtable->send_activity_start(v->provider.ctx);
             v->vad_active = true;
         }
@@ -289,8 +288,7 @@ hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_lo
                 *out_count = 1;
             }
             if (event.done && v->vad_active) {
-                if (v->provider.vtable->send_activity_end)
-                    (void)v->provider.vtable->send_activity_end(v->provider.ctx);
+                (void)v->provider.vtable->send_activity_end(v->provider.ctx);
                 v->vad_active = false;
             }
         }

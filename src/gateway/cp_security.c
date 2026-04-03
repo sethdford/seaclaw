@@ -29,7 +29,5 @@ hu_error_t cp_security_cot_summary(hu_allocator_t *alloc, hu_app_context_t *app,
     hu_json_object_set(alloc, obj, "total_blocked", hu_json_number_new(alloc, 0));
     hu_json_object_set(alloc, obj, "total_suspicious", hu_json_number_new(alloc, 0));
 
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }

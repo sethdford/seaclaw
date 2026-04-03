@@ -1,9 +1,10 @@
 {
+  "_comment": "Stretch-goal config — not consumed by CI/deploy (those use website/.lighthouserc*.json). Changes here trigger competitive-benchmark.yml only.",
   "ci": {
     "collect": {
       "staticDistDir": "website/dist",
       "numberOfRuns": 5,
-      "url": ["http://localhost/", "http://localhost/404.html"]
+      "url": ["/", "/404.html"]
     },
     "assert": {
       "assertions": {
@@ -21,19 +22,6 @@
           "matchingUrlPattern": ".*/404\\.html$",
           "assertions": {
             "categories:seo": ["warn", { "minScore": 0.5 }]
-          }
-        },
-        {
-          "matchingUrlPattern": ".*:3000.*",
-          "assertions": {
-            "categories:performance": ["warn", { "minScore": 0.9 }],
-            "categories:accessibility": ["error", { "minScore": 0.95 }],
-            "categories:best-practices": ["warn", { "minScore": 0.9 }],
-            "categories:seo": "off",
-            "largest-contentful-paint": ["warn", { "maxNumericValue": 2000 }],
-            "cumulative-layout-shift": ["error", { "maxNumericValue": 0.01 }],
-            "interactive": ["warn", { "maxNumericValue": 3000 }],
-            "total-blocking-time": ["warn", { "maxNumericValue": 200 }]
           }
         }
       ]

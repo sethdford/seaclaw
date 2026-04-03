@@ -472,6 +472,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   }
 
   async #onGatewayDisconnectedDuringVoice(): Promise<void> {
+    this.#clearProcessingTimeout();
     const gw = this.gateway ?? this._boundGateway;
     gw?.setOnBinaryChunk?.(null);
     if (this._recorder.isRecording) {
@@ -654,9 +655,19 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
 
     if (detail.event === "voice.error") {
-      const msg =
-        (detail.payload?.message as string) ?? "Voice session error";
+      const msg = (detail.payload?.message as string) ?? "Voice session error";
       ScToast.show({ message: msg, variant: "error" });
+      this.#clearProcessingTimeout();
+      if (this._recorder.isRecording) {
+        this._recorder.dispose();
+      }
+      const gw = this.gateway;
+      gw?.setOnBinaryChunk?.(null);
+      if (this.#voiceStreaming && gw && typeof gw.voiceSessionStop === "function") {
+        void gw.voiceSessionStop().catch(() => {});
+      }
+      this.#voiceStreaming = false;
+      this.#activeSessionIsGL = false;
       this.#playback.interrupt();
       this._speaking = false;
       this.voiceStatus = "idle";
@@ -734,13 +745,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
         if (this._geminiLiveMode) {
           startParams.mode = "gemini_live";
         }
-        const result = (await gw.voiceSessionStart(startParams)) as Record<
-          string,
-          unknown
-        >;
+        const result = (await gw.voiceSessionStart(startParams)) as Record<string, unknown>;
         const isGeminiLive = result?.mode === "gemini_live";
-        const isProviderDuplex =
-          isGeminiLive || result?.mode === "openai_realtime";
+        const isProviderDuplex = isGeminiLive || result?.mode === "openai_realtime";
         this.#activeSessionIsGL = isProviderDuplex;
 
         gw.setOnBinaryChunk((ab) => {
@@ -807,8 +814,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
         } else if (low.includes("invalid") || low.includes("argument")) {
           detail = "Voice streaming unavailable (gateway or provider configuration).";
         } else if (low.includes("gemini") || low.includes("google")) {
-          detail =
-            "Gemini Live session failed: check Google API key in config.";
+          detail = "Gemini Live session failed: check Google API key in config.";
         }
         ScToast.show({ message: detail, variant: "error" });
         gw.setOnBinaryChunk(null);
@@ -997,10 +1003,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
             @click=${() => {
               this._geminiLiveMode = !this._geminiLiveMode;
               try {
-                localStorage.setItem(
-                  "hu-gemini-live",
-                  String(this._geminiLiveMode),
-                );
+                localStorage.setItem("hu-gemini-live", String(this._geminiLiveMode));
               } catch {
                 /* ignore */
               }

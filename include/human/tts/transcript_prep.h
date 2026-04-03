@@ -17,6 +17,7 @@ typedef struct hu_prep_config {
     float pause_factor;
     float discourse_rate;
     bool nonverbals_enabled;
+    bool strip_ssml;
     uint32_t seed;
     uint8_t hour_local;
 } hu_prep_config_t;

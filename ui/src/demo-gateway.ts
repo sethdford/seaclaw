@@ -1780,11 +1780,13 @@ export class DemoGatewayClient extends EventTarget {
         return { text: "Demo transcription of your audio" };
 
       case "voice.session.start": {
-        const isGeminiLive =
-          (params as Record<string, unknown>)?.mode === "gemini_live";
+        const reqMode = (params as Record<string, unknown>)?.mode as string | undefined;
+        const isGeminiLive = reqMode === "gemini_live";
+        const isOpenAIRealtime = reqMode === "openai_realtime";
         this.#glMode = isGeminiLive;
         if (isGeminiLive) {
           return {
+            ok: true,
             sessionId: `demo-${Date.now()}`,
             encoding: "pcm_f32le",
             inputSampleRate: 16000,
@@ -1792,7 +1794,18 @@ export class DemoGatewayClient extends EventTarget {
             mode: "gemini_live",
           };
         }
+        if (isOpenAIRealtime) {
+          return {
+            ok: true,
+            sessionId: `demo-${Date.now()}`,
+            encoding: "pcm16",
+            inputSampleRate: 24000,
+            outputSampleRate: 24000,
+            mode: "openai_realtime",
+          };
+        }
         return {
+          ok: true,
           sessionId: `demo-${Date.now()}`,
           sampleRate: 24000,
           encoding: "pcm_f32le",
@@ -1817,9 +1830,7 @@ export class DemoGatewayClient extends EventTarget {
         if (this.#glMode) {
           this.#scheduleDemoGeminiLiveResponse();
         } else {
-          this.#scheduleDemoVoicePipeline(
-            "Demo transcription from streaming mic",
-          );
+          this.#scheduleDemoVoicePipeline("Demo transcription from streaming mic");
         }
         return { ok: true };
 
@@ -2399,11 +2410,7 @@ export class DemoGatewayClient extends EventTarget {
     return this.request("voice.audio.end", params);
   }
 
-  voiceToolResponse(params: {
-    name: string;
-    callId: string;
-    result: string;
-  }): Promise<unknown> {
+  voiceToolResponse(params: { name: string; callId: string; result: string }): Promise<unknown> {
     return this.request("voice.tool_response", params);
   }
 

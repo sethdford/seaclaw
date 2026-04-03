@@ -24,7 +24,8 @@ cp_admin.c             Admin control methods (status, config, restart)
 cp_chat.c              Chat control methods (send, receive, history)
 cp_config.c            Config control methods (get, set, reload)
 cp_memory.c            Memory control methods (store, recall, search)
-cp_voice.c             Voice control methods (start, stop, status)
+cp_voice.c             Voice control methods (transcribe, config, clone)
+cp_voice_stream.c      Streaming voice (provider vtable dispatch, Gemini Live/OpenAI Realtime)
 cp_internal.h          Internal shared definitions
 ```
 
@@ -34,6 +35,17 @@ cp_internal.h          Internal shared definitions
 - **Examples**: `chat.send`, `admin.status`, `memory.recall`, `config.get`
 - **Responses**: always valid JSON, even for errors
 - **Never** leak internal error details or stack traces to clients
+
+## Voice Streaming (`cp_voice_stream.c`)
+
+Real-time bidirectional voice via WebSocket:
+- **Provider abstraction**: `hu_voice_provider_t` vtable dispatches to OpenAI Realtime or Gemini Live
+- **Modes**: `gemini_live` (default), `openai_realtime`, or Cartesia STT+TTS
+- **Binary path**: WebSocket binary frames → `provider.vtable->send_audio()` → provider backend
+- **Event poll**: `hu_voice_stream_poll_gemini_live()` drains events from provider, sends to client
+- **Tool execution**: Poll loop finds tools by name in `app->tools`, executes, sends result via `provider.vtable->send_tool_response()`
+- **Reconnect**: goAway events trigger `provider.vtable->reconnect()` for session resumption
+- **Tests**: `test_gateway_voice.c` (24 tests covering Cartesia, Gemini Live, and provider vtable paths)
 
 ## Demo Gateway Sync
 

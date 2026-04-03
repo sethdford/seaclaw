@@ -1007,6 +1007,12 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
 #endif
 
 #if HU_HAS_IMESSAGE
+        if (!cfg->channels.imessage.default_target &&
+            cfg->channels.imessage.allow_from_count > 0) {
+            hu_log_warn("bootstrap", NULL,
+                        "iMessage: allow_from configured without default_target — "
+                        "channel will not be created (set default_target to enable)");
+        }
         if (cfg->channels.imessage.default_target && ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
             err = hu_imessage_create(alloc, cfg->channels.imessage.default_target,
                                      strlen(cfg->channels.imessage.default_target),
@@ -1639,7 +1645,12 @@ void hu_app_teardown(hu_app_ctx_t *ctx) {
     if (!bi)
         return;
 
-    /* Channels (reverse order, though order typically doesn't matter) */
+    /* Stop then destroy channels (stop first for clean lifecycle) */
+    for (size_t i = 0; i < bi->channel_count && i < HU_BOOTSTRAP_CHANNELS_MAX; i++) {
+        if (bi->channel_slots[i].vtable && bi->channel_slots[i].vtable->stop &&
+            bi->channel_slots[i].ctx)
+            bi->channel_slots[i].vtable->stop(bi->channel_slots[i].ctx);
+    }
     for (size_t i = 0; i < bi->channel_count && i < HU_BOOTSTRAP_CHANNELS_MAX; i++) {
         if (bi->channel_destroys[i] && bi->channel_slots[i].ctx)
             bi->channel_destroys[i](&bi->channel_slots[i], alloc);

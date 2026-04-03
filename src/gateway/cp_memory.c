@@ -109,9 +109,7 @@ hu_error_t cp_memory_status(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
         hu_json_object_set(alloc, obj, "categories", cats);
     }
 
-    err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_memory_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -171,9 +169,7 @@ hu_error_t cp_memory_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
         alloc->free(alloc->ctx, entries, count * sizeof(hu_memory_entry_t));
     }
 
-    err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_memory_recall(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -204,9 +200,7 @@ hu_error_t cp_memory_recall(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
         hu_json_value_t *arr = hu_json_array_new(alloc);
         if (arr)
             hu_json_object_set(alloc, obj, "entries", arr);
-        hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-        hu_json_free(alloc, obj);
-        return err;
+        return cp_respond_json(alloc, obj, out, out_len);
     }
 
     hu_memory_t *memory = app->agent->memory;
@@ -244,9 +238,7 @@ hu_error_t cp_memory_recall(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
         alloc->free(alloc->ctx, entries, count * sizeof(hu_memory_entry_t));
     }
 
-    err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_memory_store(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -275,9 +267,7 @@ hu_error_t cp_memory_store(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
         if (!obj)
             return HU_ERR_OUT_OF_MEMORY;
         cp_json_set_str(alloc, obj, "error", "key is required");
-        hu_error_t e = hu_json_stringify(alloc, obj, out, out_len);
-        hu_json_free(alloc, obj);
-        return e;
+        return cp_respond_json(alloc, obj, out, out_len);
     }
     if (!content)
         content = "";
@@ -296,9 +286,7 @@ hu_error_t cp_memory_store(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
     hu_json_object_set(alloc, obj, "stored", hu_json_bool_new(alloc, true));
-    err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_memory_forget(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -321,9 +309,7 @@ hu_error_t cp_memory_forget(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
         if (!obj)
             return HU_ERR_OUT_OF_MEMORY;
         cp_json_set_str(alloc, obj, "error", "key is required");
-        hu_error_t e = hu_json_stringify(alloc, obj, out, out_len);
-        hu_json_free(alloc, obj);
-        return e;
+        return cp_respond_json(alloc, obj, out, out_len);
     }
 
     hu_memory_t *memory = app->agent->memory;
@@ -336,9 +322,7 @@ hu_error_t cp_memory_forget(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
     hu_json_object_set(alloc, obj, "deleted", hu_json_bool_new(alloc, deleted));
-    err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_memory_ingest(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -365,18 +349,14 @@ hu_error_t cp_memory_ingest(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
         if (!obj)
             return HU_ERR_OUT_OF_MEMORY;
         cp_json_set_str(alloc, obj, "error", "text is required");
-        hu_error_t e = hu_json_stringify(alloc, obj, out, out_len);
-        hu_json_free(alloc, obj);
-        return e;
+        return cp_respond_json(alloc, obj, out, out_len);
     }
     if (!source || !source[0]) {
         hu_json_value_t *obj = hu_json_object_new(alloc);
         if (!obj)
             return HU_ERR_OUT_OF_MEMORY;
         cp_json_set_str(alloc, obj, "error", "source is required");
-        hu_error_t e = hu_json_stringify(alloc, obj, out, out_len);
-        hu_json_free(alloc, obj);
-        return e;
+        return cp_respond_json(alloc, obj, out, out_len);
     }
 
     size_t source_len = strlen(source);
@@ -402,9 +382,7 @@ hu_error_t cp_memory_ingest(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
     hu_json_object_set(alloc, obj, "stored", hu_json_bool_new(alloc, true));
-    err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_memory_graph(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -424,7 +402,8 @@ hu_error_t cp_memory_graph(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     if (app && app->graph) {
         hu_graph_entity_t *entities = NULL;
         size_t entity_count = 0;
-        if (hu_graph_list_entities(app->graph, alloc, "", 0, 100, &entities, &entity_count) == HU_OK &&
+        if (hu_graph_list_entities(app->graph, alloc, "", 0, 100, &entities, &entity_count) ==
+                HU_OK &&
             entities) {
             for (size_t i = 0; i < entity_count; i++) {
                 hu_json_value_t *e = hu_json_object_new(alloc);
@@ -444,7 +423,8 @@ hu_error_t cp_memory_graph(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
 
         hu_graph_relation_t *relations = NULL;
         size_t relation_count = 0;
-        if (hu_graph_list_relations(app->graph, alloc, "", 0, 200, &relations, &relation_count) == HU_OK &&
+        if (hu_graph_list_relations(app->graph, alloc, "", 0, 200, &relations, &relation_count) ==
+                HU_OK &&
             relations) {
             for (size_t i = 0; i < relation_count; i++) {
                 hu_json_value_t *r = hu_json_object_new(alloc);
@@ -468,9 +448,7 @@ hu_error_t cp_memory_graph(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
         hu_json_object_set(alloc, obj, "entities", entities_arr);
     if (relations_arr)
         hu_json_object_set(alloc, obj, "relations", relations_arr);
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 hu_error_t cp_memory_consolidate(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -495,9 +473,7 @@ hu_error_t cp_memory_consolidate(hu_allocator_t *alloc, hu_app_context_t *app, h
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
     hu_json_object_set(alloc, obj, "consolidated", hu_json_bool_new(alloc, true));
-    err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
+    return cp_respond_json(alloc, obj, out, out_len);
 }
 
 #endif /* HU_GATEWAY_POSIX */

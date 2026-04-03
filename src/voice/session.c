@@ -1,6 +1,5 @@
 #include "human/voice/session.h"
 #include "human/core/log.h"
-#include "human/voice/gemini_live.h"
 #include "human/voice/provider.h"
 #include <math.h>
 #include <stdio.h>
@@ -66,71 +65,34 @@ hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *ses
     session->started_at = voice_session_now_ms();
     session->active = true;
 
+    /* Determine mode from config */
+    const char *mode = config->voice.mode;
     const char *tp = config->voice.tts_provider;
-    const char *rt_model = (config->voice.realtime_model && config->voice.realtime_model[0])
-                               ? config->voice.realtime_model
-                               : config->voice.tts_model;
-    const char *rt_voice = (config->voice.realtime_voice && config->voice.realtime_voice[0])
-                               ? config->voice.realtime_voice
-                               : config->voice.tts_voice;
-    bool realtime_mode = (config->voice.mode && strcmp(config->voice.mode, "realtime") == 0) ||
-                         (tp && strcmp(tp, "realtime") == 0);
-    bool gemini_live_mode =
-        (config->voice.mode && strcmp(config->voice.mode, "gemini_live") == 0) ||
-        (tp && strcmp(tp, "gemini_live") == 0) || (tp && strcmp(tp, "gemini") == 0);
-
-    if (gemini_live_mode) {
-        const char *key = hu_config_get_provider_key(config, "google");
-        if (!key || !key[0])
-            key = hu_config_get_provider_key(config, "gemini");
-        const char *vtok = config->voice.vertex_access_token;
-        if ((key && key[0]) || (vtok && vtok[0])) {
-            hu_gemini_live_config_t glc = {
-                .api_key = (key && key[0]) ? key : NULL,
-                .access_token = vtok,
-                .model = rt_model,
-                .voice = rt_voice,
-                .region = config->voice.vertex_region,
-                .project_id = config->voice.vertex_project,
-                .transcribe_input = true,
-                .transcribe_output = true,
-                .affective_dialog = true,
-                .manual_vad = true,
-                .enable_session_resumption = true,
-                .thinking_level = HU_GL_THINKING_MINIMAL,
-            };
-            hu_voice_provider_t vp = {0};
-            if (hu_voice_provider_gemini_live_create(alloc, &glc, &vp) == HU_OK && vp.vtable) {
-                if (vp.vtable->connect(vp.ctx) == HU_OK) {
-                    session->provider = vp;
-                    return HU_OK;
-                }
-                vp.vtable->disconnect(vp.ctx, alloc);
-            }
-        }
+    if (!mode || !mode[0]) {
+        if (tp && (strcmp(tp, "gemini_live") == 0 || strcmp(tp, "gemini") == 0))
+            mode = "gemini_live";
+        else if (tp && (strcmp(tp, "realtime") == 0 || strcmp(tp, "openai_realtime") == 0))
+            mode = "openai_realtime";
     }
-    if (realtime_mode) {
-        const char *key = hu_config_get_provider_key(config, "openai");
-        if (key && key[0]) {
-            hu_voice_rt_config_t rtc = {.model = rt_model,
-                                        .voice = rt_voice,
-                                        .api_key = key,
-                                        .sample_rate = 24000,
-                                        .vad_enabled = true};
-            hu_voice_provider_t vp = {0};
-            if (hu_voice_provider_openai_create(alloc, &rtc, &vp) == HU_OK && vp.vtable) {
-                if (vp.vtable->connect(vp.ctx) == HU_OK) {
-                    session->provider = vp;
-                    return HU_OK;
-                }
-                vp.vtable->disconnect(vp.ctx, alloc);
-            }
-        }
+    if (!mode || !mode[0]) {
+        session->active = false;
+        return HU_ERR_PROVIDER_UNAVAILABLE;
     }
 
-    /* No provider connected — roll back active state */
-    session->active = false;
-    return HU_ERR_PROVIDER_UNAVAILABLE;
+    hu_voice_provider_t vp = {0};
+    hu_error_t err = hu_voice_provider_create_from_config(alloc, config, mode, NULL, &vp);
+    if (err != HU_OK || !vp.vtable) {
+        session->active = false;
+        return err == HU_OK ? HU_ERR_PROVIDER_UNAVAILABLE : err;
+    }
+    err = vp.vtable->connect(vp.ctx);
+    if (err != HU_OK) {
+        vp.vtable->disconnect(vp.ctx, alloc);
+        session->active = false;
+        return err;
+    }
+    session->provider = vp;
+    return HU_OK;
 #endif
 }
 
@@ -251,8 +213,14 @@ void hu_voice_session_note_response_first_byte(hu_voice_session_t *session) {
 void hu_voice_session_note_response_complete(hu_voice_session_t *session) {
     if (!session || !session->active)
         return;
+    /* Clear VAD so next mic chunk re-opens activity */
+    if (session->gl_vad_active && session->provider.vtable &&
+        session->provider.vtable->send_activity_end) {
+        (void)session->provider.vtable->send_activity_end(session->provider.ctx);
+        session->gl_vad_active = false;
+    }
 #if HU_IS_TEST
-    (void)session;
+    (void)0;
 #else
     int64_t now = voice_session_now_ms();
     int64_t dt = now - session->latency_rt_mark_ms;

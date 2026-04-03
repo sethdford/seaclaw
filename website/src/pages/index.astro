@@ -404,6 +404,7 @@ const chapterCount = 9;
                 >git clone https://github.com/sethdford/h-uman.git</code
               >
               <button
+                type="button"
                 class="shrink-0 p-1.5 rounded-lg transition-all hover:scale-110"
                 style="color: var(--color-text-tertiary)"
                 aria-label="Copy to clipboard"
@@ -419,7 +420,9 @@ const chapterCount = 9;
           </div>
         </div>
 
-        <div class="hero-fade-in max-w-5xl mx-auto w-full mt-12 mb-6 relative z-10 numbers-section">
+        <div
+          class="hero-fade-in max-w-5xl mx-auto w-full mt-12 mb-6 relative z-10 numbers-section"
+        >
           <div
             class="numbers-grid glass glass-enter px-4 md:px-8 py-8 md:py-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-0"
           >
@@ -476,22 +479,51 @@ const chapterCount = 9;
           >
             {
               [
-                { icon: "M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z", label: "CLI Automation" },
-                { icon: "M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z", label: "DevOps" },
-                { icon: "M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z", label: "IoT" },
-                { icon: "M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z", label: "Security" },
-                { icon: "M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z", label: "Research" },
-                { icon: "M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z", label: "Enterprise" },
+                {
+                  icon: "M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z",
+                  label: "CLI Automation",
+                },
+                {
+                  icon: "M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z",
+                  label: "DevOps",
+                },
+                {
+                  icon: "M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z",
+                  label: "IoT",
+                },
+                {
+                  icon: "M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z",
+                  label: "Security",
+                },
+                {
+                  icon: "M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z",
+                  label: "Research",
+                },
+                {
+                  icon: "M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z",
+                  label: "Enterprise",
+                },
               ].map(({ icon, label }, i) => (
                 <div
                   class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
                   data-reveal="scale"
                   style={`--ri: ${i}`}
                 >
-                  <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
-                    <path d={icon}></path>
+                  <svg
+                    class="w-8 h-8 shrink-0"
+                    viewBox="0 0 256 256"
+                    fill="currentColor"
+                    style="color: var(--color-accent)"
+                    aria-hidden="true"
+                  >
+                    <path d={icon} />
                   </svg>
-                  <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">{label}</span>
+                  <span
+                    class="text-[13px] font-medium text-center"
+                    style="color: var(--color-text-secondary)"
+                  >
+                    {label}
+                  </span>
                 </div>
               ))
             }
@@ -1044,7 +1076,6 @@ const chapterCount = 9;
               Unused space
             </span>
           </div>
-
         </div>
       </section>
 
@@ -1580,7 +1611,7 @@ const chapterCount = 9;
             <span>Minimum footprint</span>
           </div>
         </div>
-      <!-- Architecture -->
+        <!-- Architecture -->
         <span id="architecture" class="sr-only">Architecture</span>
         <div class="ambient-coral" style="top: 20%; left: 10%;"></div>
         <div class="ambient-blue" style="bottom: 10%; right: 15%;"></div>
@@ -1622,7 +1653,8 @@ const chapterCount = 9;
                   dx="0"
                   dy="2"
                   stdDeviation="4"
-                  flood-color="rgba(0,0,0,0.06)"></feDropShadow>
+                  flood-color="black"
+                  flood-opacity="0.06"></feDropShadow>
               </filter>
             </defs>
 
@@ -1728,7 +1760,13 @@ const chapterCount = 9;
                   tip: "Arduino, STM32, Raspberry Pi peripherals",
                 },
               ].map(({ cx, cy, label, tip }) => (
-                <g class="arch-node opacity-0" style="cursor: pointer;" tabindex="0" role="img" aria-label={`${label}: ${tip}`}>
+                <g
+                  class="arch-node opacity-0"
+                  style="cursor: pointer;"
+                  tabindex="0"
+                  role="img"
+                  aria-label={`${label}: ${tip}`}
+                >
                   <title>{tip}</title>
                   <circle
                     cx={cx}
@@ -1882,14 +1920,14 @@ const chapterCount = 9;
           </div>
 
           <a
-            href="/features/hula/"
+            href={`${base}#chapter-6`}
             class="btn-outline mt-8 inline-block"
             data-reveal
           >
             Learn more about HuLa
           </a>
         </div>
-      <!-- Ecosystem -->
+        <!-- Ecosystem -->
         <div class="max-w-4xl mx-auto text-center">
           <h2
             class="providers-title hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
@@ -2072,7 +2110,7 @@ const chapterCount = 9;
             </div>
           </div>
         </div>
-      <!-- Dashboard Preview -->
+        <!-- Dashboard Preview -->
         <div class="max-w-4xl mx-auto text-center">
           <h2
             class="dash-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
@@ -2267,7 +2305,7 @@ const chapterCount = 9;
             style="color: var(--color-text-tertiary)"
           >
             <a
-              href="/?demo=true"
+              href={`${base}#chapter-1`}
               class="underline hover:opacity-80 transition-opacity"
               style="color: var(--color-accent)">Try the live demo</a
             > — no installation required.
@@ -2388,7 +2426,7 @@ const chapterCount = 9;
             </div>
           </div>
         </div>
-      <!-- Comparison -->
+        <!-- Comparison -->
         <div class="max-w-4xl mx-auto px-4">
           <h3
             class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] text-center mb-4"
@@ -2581,10 +2619,19 @@ const chapterCount = 9;
         </div>
       </section>
 
-      <div class="mobile-chapter-indicator glass-subtle" id="mobile-chapter-ind" aria-hidden="true">
-        {Array.from({ length: chapterCount }, (_, i) => (
-          <span class={`chapter-pip${i === 0 ? " active" : ""}`} data-pip={i} />
-        ))}
+      <div
+        class="mobile-chapter-indicator glass-subtle"
+        id="mobile-chapter-ind"
+        aria-hidden="true"
+      >
+        {
+          Array.from({ length: chapterCount }, (_, i) => (
+            <span
+              class={`chapter-pip${i === 0 ? " active" : ""}`}
+              data-pip={i}
+            />
+          ))
+        }
       </div>
 
       <nav class="chapter-nav" aria-label="Page sections">
@@ -2603,7 +2650,11 @@ const chapterCount = 9;
     </main>
 
     {/* ── Footer ── */}
-    <footer class="site-footer py-8 sm:py-12 px-6" role="contentinfo" data-reveal>
+    <footer
+      class="site-footer py-8 sm:py-12 px-6"
+      role="contentinfo"
+      data-reveal
+    >
       <div
         class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4"
       >
@@ -2656,7 +2707,9 @@ const chapterCount = 9;
           }
           if (sections.length && dots.length) {
             var mobileInd = document.getElementById("mobile-chapter-ind");
-            var pips = mobileInd ? Array.from(mobileInd.querySelectorAll(".chapter-pip")) : [];
+            var pips = mobileInd
+              ? Array.from(mobileInd.querySelectorAll(".chapter-pip"))
+              : [];
             var setActive = function (index) {
               dots.forEach(function (d, i) {
                 var on = i === index;
@@ -2829,350 +2882,373 @@ const chapterCount = 9;
             return;
           }
           var fired = false;
-          function once() { if (fired) return; fired = true; mo.disconnect(); clearTimeout(tid); fn(); }
+          function once() {
+            if (fired) return;
+            fired = true;
+            mo.disconnect();
+            clearTimeout(tid);
+            fn();
+          }
           const mo = new MutationObserver(() => {
-            if (document.documentElement.classList.contains("hu-lcp-done")) once();
+            if (document.documentElement.classList.contains("hu-lcp-done"))
+              once();
           });
-          mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+          mo.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["class"],
+          });
           var tid = setTimeout(once, 3000);
         }
 
         afterLcp(() => {
-        // ═══ Count-up numbers (lazy GSAP) ═══
-        const numbersGrid = document.querySelector(".numbers-grid");
-        if (numbersGrid) {
-          const numbersObs = new IntersectionObserver(
-            async (entries) => {
-              if (!entries[0]?.isIntersecting) return;
-              numbersObs.disconnect();
-              try {
-              const { gsap } = await import("gsap");
-              document.querySelectorAll(".number-item").forEach((item, i) => {
-                const el = item.querySelector("[data-count]") as HTMLElement;
-                if (!el) return;
-                const target = parseInt(el.dataset.count || "0");
-                const valSpan = el.querySelector(".count-value");
-                if (!valSpan) return;
-                const obj = { val: 0 };
-                gsap.to(obj, {
-                  val: target,
-                  duration: 1.5,
-                  ease: "power3.out",
-                  delay: i * 0.08,
-                  onUpdate: () => {
-                    valSpan.textContent =
-                      target > 100
-                        ? Math.round(obj.val).toLocaleString()
-                        : Math.round(obj.val).toString();
-                  },
-                  onComplete: () => {
-                    gsap.fromTo(
-                      item,
-                      { scale: 1 },
-                      {
-                        scale: 1.04,
-                        duration: 0.15,
-                        yoyo: true,
-                        repeat: 1,
-                        ease: "power2.out",
-                      },
-                    );
-                  },
-                });
-              });
-              } catch (e) {
-                console.warn("[gsap] numbers animation failed:", e);
-                document.querySelectorAll(".number-item [data-count]").forEach((el) => {
-                  const valSpan = el.querySelector(".count-value");
-                  if (valSpan) valSpan.textContent = (el as HTMLElement).dataset.count || "0";
-                });
-              }
-            },
-            { threshold: 0.15 },
-          );
-          numbersObs.observe(numbersGrid);
-        }
-
-        // ═══ Architecture SVG line drawing (lazy GSAP) ═══
-        const archDiagram = document.getElementById("arch-diagram");
-        if (archDiagram) {
-          const archObs = new IntersectionObserver(
-            async (entries) => {
-              if (!entries[0]?.isIntersecting) return;
-              archObs.disconnect();
-              try {
-              const { gsap } = await import("gsap");
-              const archTl = gsap.timeline({
-                defaults: { ease: "power3.out" },
-              });
-              archTl
-                .to("#arch-core", { opacity: 1, duration: 0.6 })
-                .fromTo(
-                  ".arch-line",
-                  {
-                    attr: {
-                      "stroke-dasharray": "200",
-                      "stroke-dashoffset": "200",
-                    },
-                  },
-                  {
-                    attr: {
-                      "stroke-dashoffset": "0",
-                      stroke: "var(--color-accent)",
-                    },
-                    duration: 0.7,
-                    stagger: 0.06,
-                  },
-                  0.3,
-                )
-                .to(
-                  ".arch-node",
-                  { opacity: 1, duration: 0.5, stagger: 0.08 },
-                  0.6,
-                );
-              } catch (e) {
-                console.warn("[gsap] arch animation failed:", e);
-                document.querySelectorAll("#arch-core, .arch-line, .arch-node").forEach((el) => {
-                  (el as HTMLElement).style.opacity = "1";
-                });
-              }
-            },
-            { threshold: 0.15 },
-          );
-          archObs.observe(archDiagram);
-
-          document.querySelectorAll(".arch-node").forEach((node) => {
-            const highlight = () => {
-              const c = node.querySelector("circle");
-              if (c) c.setAttribute("stroke", "var(--color-accent)");
-            };
-            const unhighlight = () => {
-              const c = node.querySelector("circle");
-              if (c) c.setAttribute("stroke", "var(--color-node-stroke)");
-            };
-            node.addEventListener("mouseenter", highlight);
-            node.addEventListener("mouseleave", unhighlight);
-            node.addEventListener("focusin", highlight);
-            node.addEventListener("focusout", unhighlight);
-          });
-        }
-
-        // ═══ Terminal typewriter (lazy GSAP) ═══
-        const terminalEl = document.getElementById("terminal");
-        const outputEl = document.getElementById("terminal-output");
-        if (terminalEl && outputEl) {
-          const termObs = new IntersectionObserver(
-            async (entries) => {
-              if (!entries[0]?.isIntersecting) return;
-              termObs.disconnect();
-              try {
-              const { gsap } = await import("gsap");
-              gsap.to(terminalEl, { opacity: 1, duration: 0.6 });
-              typeTerminal(outputEl, gsap);
-              } catch (e) {
-                console.warn("[gsap] terminal animation failed:", e);
-                terminalEl.style.opacity = "1";
-                outputEl.textContent = "$ ./human agent -m \"Hello\"\nHello! I'm h-uman — a fully autonomous AI assistant.";
-              }
-            },
-            { threshold: 0.15 },
-          );
-          termObs.observe(terminalEl);
-        }
-
-        interface TermLine {
-          prompt: boolean;
-          text: string;
-          highlights?: Array<{ text: string; cls: string }>;
-        }
-
-        function typeTerminal(container: HTMLElement, gsap: any) {
-          const accentColor = "var(--color-accent)";
-          const lines: TermLine[] = [
-            {
-              prompt: true,
-              text: "git clone https://github.com/sethdford/h-uman.git",
-            },
-            {
-              prompt: true,
-              text: "cd h-uman && mkdir -p build && cd build",
-            },
-            {
-              prompt: true,
-              text: "cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON",
-            },
-            { prompt: true, text: "cmake --build ." },
-            { prompt: false, text: "[100%] Built target human" },
-            { prompt: true, text: "ls -lh human" },
-            {
-              prompt: false,
-              text: "-rwxr-xr-x  1 user  staff  1750K  human",
-              highlights: [{ text: "1750K", cls: accentColor }],
-            },
-            {
-              prompt: true,
-              text: './human agent -m "Hello from a ~1.7 MB binary."',
-            },
-            {
-              prompt: false,
-              text: "Hello! I'm h-uman — a fully autonomous AI assistant",
-              highlights: [{ text: "h-uman", cls: accentColor }],
-            },
-            {
-              prompt: false,
-              text: "running in 1,750 kilobytes. How can I help?",
-            },
-          ];
-
-          let lineIdx = 0;
-          function nextLine() {
-            if (lineIdx >= lines.length) {
-              const cursor = document.createElement("span");
-              cursor.className = "terminal-cursor";
-              container.lastElementChild?.appendChild(cursor);
-              return;
-            }
-            const line = lines[lineIdx];
-            const div = document.createElement("div");
-            div.className = "terminal-line";
-
-            if (line.prompt) {
-              const p = document.createElement("span");
-              p.style.color = "var(--color-accent)";
-              p.textContent = "$ ";
-              div.appendChild(p);
-              const t = document.createElement("span");
-              t.style.color = "var(--hu-text)";
-              div.appendChild(t);
-              container.appendChild(div);
-              let ci = 0;
-              const tc = () => {
-                if (ci < line.text.length) {
-                  t.textContent += line.text[ci];
-                  ci++;
-                  setTimeout(tc, 18);
-                } else {
-                  lineIdx++;
-                  setTimeout(nextLine, 300);
-                }
-              };
-              tc();
-            } else {
-              const w = document.createElement("span");
-              w.style.color = "var(--hu-text-muted)";
-              if (line.highlights?.length) {
-                let rem = line.text;
-                for (const hl of line.highlights) {
-                  const idx = rem.indexOf(hl.text);
-                  if (idx >= 0) {
-                    if (idx > 0)
-                      w.appendChild(document.createTextNode(rem.slice(0, idx)));
-                    const s = document.createElement("span");
-                    s.style.color = hl.cls;
-                    s.textContent = hl.text;
-                    w.appendChild(s);
-                    rem = rem.slice(idx + hl.text.length);
-                  }
-                }
-                if (rem) w.appendChild(document.createTextNode(rem));
-              } else {
-                w.textContent = line.text;
-              }
-              div.appendChild(w);
-              div.style.opacity = "0";
-              container.appendChild(div);
-              gsap.to(div, { opacity: 1, duration: 0.3 });
-              lineIdx++;
-              setTimeout(nextLine, 200);
-            }
-          }
-          nextLine();
-        }
-
-        // ═══ Dashboard preview (lazy GSAP for count-up + activity) ═══
-        const dashPreview = document.querySelector(".dash-preview");
-        if (dashPreview) {
-          const dashObs = new IntersectionObserver(
-            async (entries) => {
-              if (!entries[0]?.isIntersecting) return;
-              dashObs.disconnect();
-              try {
-              const { gsap } = await import("gsap");
-              gsap.to(dashPreview, { opacity: 1, duration: 0.6 });
-              document.querySelectorAll(".dash-count").forEach((el, i) => {
-                const target = parseInt(
-                  (el as HTMLElement).dataset.target || "0",
-                );
-                const obj = { val: 0 };
-                gsap.to(obj, {
-                  val: target,
-                  duration: 1.2,
-                  ease: "power3.out",
-                  delay: 0.3 + i * 0.1,
-                  onUpdate: () => {
-                    el.textContent = Math.round(obj.val).toString();
-                  },
-                });
-              });
-              const actContainer = document.getElementById("dash-activity");
-              if (actContainer) {
-                const iconChatCircle =
-                  '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-4-1.08,8.09,8.09,0,0,0-2.53.41L40,216l12.47-37.4a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>';
-                const iconLightning =
-                  '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,12.95l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112-120A8,8,0,0,0,215.79,118.17Z"/></svg>';
-                const iconPlayCircle =
-                  '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm36.44-94.66-48-32A8,8,0,0,0,104,96v64a8,8,0,0,0,12.44,6.66l48-32a8,8,0,0,0,0-13.32ZM120,145.05V111l25.58,17Z"/></svg>';
-                const activities = [
-                  {
-                    icon: iconChatCircle,
-                    text: "Alice via Telegram: Can you review the PR?",
-                    time: "just now",
-                  },
-                  {
-                    icon: iconLightning,
-                    text: "Tool shell: git status",
-                    time: "1m ago",
-                  },
-                  {
-                    icon: iconChatCircle,
-                    text: "Bob via Discord: Deploy looks good",
-                    time: "2m ago",
-                  },
-                  {
-                    icon: iconPlayCircle,
-                    text: 'Session "Code Review" started',
-                    time: "3m ago",
-                  },
-                ];
-                activities.forEach((act, i) => {
-                  setTimeout(
-                    () => {
-                      const div = document.createElement("div");
-                      div.className = "flex items-center gap-2";
-                      div.style.opacity = "0";
-                      div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-[11px]" style="color: var(--hu-text-muted)">${act.time}</span>`;
-                      actContainer.appendChild(div);
-                      requestAnimationFrame(() => {
-                        div.style.transition = "opacity 0.4s ease-out";
-                        div.style.opacity = "1";
+          // ═══ Count-up numbers (lazy GSAP) ═══
+          const numbersGrid = document.querySelector(".numbers-grid");
+          if (numbersGrid) {
+            const numbersObs = new IntersectionObserver(
+              async (entries) => {
+                if (!entries[0]?.isIntersecting) return;
+                numbersObs.disconnect();
+                try {
+                  const { gsap } = await import("gsap");
+                  document
+                    .querySelectorAll(".number-item")
+                    .forEach((item, i) => {
+                      const el = item.querySelector(
+                        "[data-count]",
+                      ) as HTMLElement;
+                      if (!el) return;
+                      const target = parseInt(el.dataset.count || "0");
+                      const valSpan = el.querySelector(".count-value");
+                      if (!valSpan) return;
+                      const obj = { val: 0 };
+                      gsap.to(obj, {
+                        val: target,
+                        duration: 1.5,
+                        ease: "power3.out",
+                        delay: i * 0.08,
+                        onUpdate: () => {
+                          valSpan.textContent =
+                            target > 100
+                              ? Math.round(obj.val).toLocaleString()
+                              : Math.round(obj.val).toString();
+                        },
+                        onComplete: () => {
+                          gsap.fromTo(
+                            item,
+                            { scale: 1 },
+                            {
+                              scale: 1.04,
+                              duration: 0.15,
+                              yoyo: true,
+                              repeat: 1,
+                              ease: "power2.out",
+                            },
+                          );
+                        },
                       });
-                    },
-                    800 + i * 400,
-                  );
-                });
+                    });
+                } catch (e) {
+                  console.warn("[gsap] numbers animation failed:", e);
+                  document
+                    .querySelectorAll(".number-item [data-count]")
+                    .forEach((el) => {
+                      const valSpan = el.querySelector(".count-value");
+                      if (valSpan)
+                        valSpan.textContent =
+                          (el as HTMLElement).dataset.count || "0";
+                    });
+                }
+              },
+              { threshold: 0.15 },
+            );
+            numbersObs.observe(numbersGrid);
+          }
+
+          // ═══ Architecture SVG line drawing (lazy GSAP) ═══
+          const archDiagram = document.getElementById("arch-diagram");
+          if (archDiagram) {
+            const archObs = new IntersectionObserver(
+              async (entries) => {
+                if (!entries[0]?.isIntersecting) return;
+                archObs.disconnect();
+                try {
+                  const { gsap } = await import("gsap");
+                  const archTl = gsap.timeline({
+                    defaults: { ease: "power3.out" },
+                  });
+                  archTl
+                    .to("#arch-core", { opacity: 1, duration: 0.6 })
+                    .fromTo(
+                      ".arch-line",
+                      {
+                        attr: {
+                          "stroke-dasharray": "200",
+                          "stroke-dashoffset": "200",
+                        },
+                      },
+                      {
+                        attr: {
+                          "stroke-dashoffset": "0",
+                          stroke: "var(--color-accent)",
+                        },
+                        duration: 0.7,
+                        stagger: 0.06,
+                      },
+                      0.3,
+                    )
+                    .to(
+                      ".arch-node",
+                      { opacity: 1, duration: 0.5, stagger: 0.08 },
+                      0.6,
+                    );
+                } catch (e) {
+                  console.warn("[gsap] arch animation failed:", e);
+                  document
+                    .querySelectorAll("#arch-core, .arch-line, .arch-node")
+                    .forEach((el) => {
+                      (el as HTMLElement).style.opacity = "1";
+                    });
+                }
+              },
+              { threshold: 0.15 },
+            );
+            archObs.observe(archDiagram);
+
+            document.querySelectorAll(".arch-node").forEach((node) => {
+              const highlight = () => {
+                const c = node.querySelector("circle");
+                if (c) c.setAttribute("stroke", "var(--color-accent)");
+              };
+              const unhighlight = () => {
+                const c = node.querySelector("circle");
+                if (c) c.setAttribute("stroke", "var(--color-node-stroke)");
+              };
+              node.addEventListener("mouseenter", highlight);
+              node.addEventListener("mouseleave", unhighlight);
+              node.addEventListener("focusin", highlight);
+              node.addEventListener("focusout", unhighlight);
+            });
+          }
+
+          // ═══ Terminal typewriter (lazy GSAP) ═══
+          const terminalEl = document.getElementById("terminal");
+          const outputEl = document.getElementById("terminal-output");
+          if (terminalEl && outputEl) {
+            const termObs = new IntersectionObserver(
+              async (entries) => {
+                if (!entries[0]?.isIntersecting) return;
+                termObs.disconnect();
+                try {
+                  const { gsap } = await import("gsap");
+                  gsap.to(terminalEl, { opacity: 1, duration: 0.6 });
+                  typeTerminal(outputEl, gsap);
+                } catch (e) {
+                  console.warn("[gsap] terminal animation failed:", e);
+                  terminalEl.style.opacity = "1";
+                  outputEl.textContent =
+                    '$ ./human agent -m "Hello"\nHello! I\'m h-uman — a fully autonomous AI assistant.';
+                }
+              },
+              { threshold: 0.15 },
+            );
+            termObs.observe(terminalEl);
+          }
+
+          interface TermLine {
+            prompt: boolean;
+            text: string;
+            highlights?: Array<{ text: string; cls: string }>;
+          }
+
+          function typeTerminal(container: HTMLElement, gsap: any) {
+            const accentColor = "var(--color-accent)";
+            const lines: TermLine[] = [
+              {
+                prompt: true,
+                text: "git clone https://github.com/sethdford/h-uman.git",
+              },
+              {
+                prompt: true,
+                text: "cd h-uman && mkdir -p build && cd build",
+              },
+              {
+                prompt: true,
+                text: "cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON",
+              },
+              { prompt: true, text: "cmake --build ." },
+              { prompt: false, text: "[100%] Built target human" },
+              { prompt: true, text: "ls -lh human" },
+              {
+                prompt: false,
+                text: "-rwxr-xr-x  1 user  staff  1750K  human",
+                highlights: [{ text: "1750K", cls: accentColor }],
+              },
+              {
+                prompt: true,
+                text: './human agent -m "Hello from a ~1.7 MB binary."',
+              },
+              {
+                prompt: false,
+                text: "Hello! I'm h-uman — a fully autonomous AI assistant",
+                highlights: [{ text: "h-uman", cls: accentColor }],
+              },
+              {
+                prompt: false,
+                text: "running in 1,750 kilobytes. How can I help?",
+              },
+            ];
+
+            let lineIdx = 0;
+            function nextLine() {
+              if (lineIdx >= lines.length) {
+                const cursor = document.createElement("span");
+                cursor.className = "terminal-cursor";
+                container.lastElementChild?.appendChild(cursor);
+                return;
               }
-              } catch (e) {
-                console.warn("[gsap] dashboard animation failed:", e);
-                (dashPreview as HTMLElement).style.opacity = "1";
-                document.querySelectorAll(".dash-count").forEach((el) => {
-                  el.textContent = (el as HTMLElement).dataset.target || "0";
-                });
+              const line = lines[lineIdx];
+              const div = document.createElement("div");
+              div.className = "terminal-line";
+
+              if (line.prompt) {
+                const p = document.createElement("span");
+                p.style.color = "var(--color-accent)";
+                p.textContent = "$ ";
+                div.appendChild(p);
+                const t = document.createElement("span");
+                t.style.color = "var(--hu-text)";
+                div.appendChild(t);
+                container.appendChild(div);
+                let ci = 0;
+                const tc = () => {
+                  if (ci < line.text.length) {
+                    t.textContent += line.text[ci];
+                    ci++;
+                    setTimeout(tc, 18);
+                  } else {
+                    lineIdx++;
+                    setTimeout(nextLine, 300);
+                  }
+                };
+                tc();
+              } else {
+                const w = document.createElement("span");
+                w.style.color = "var(--hu-text-muted)";
+                if (line.highlights?.length) {
+                  let rem = line.text;
+                  for (const hl of line.highlights) {
+                    const idx = rem.indexOf(hl.text);
+                    if (idx >= 0) {
+                      if (idx > 0)
+                        w.appendChild(
+                          document.createTextNode(rem.slice(0, idx)),
+                        );
+                      const s = document.createElement("span");
+                      s.style.color = hl.cls;
+                      s.textContent = hl.text;
+                      w.appendChild(s);
+                      rem = rem.slice(idx + hl.text.length);
+                    }
+                  }
+                  if (rem) w.appendChild(document.createTextNode(rem));
+                } else {
+                  w.textContent = line.text;
+                }
+                div.appendChild(w);
+                div.style.opacity = "0";
+                container.appendChild(div);
+                gsap.to(div, { opacity: 1, duration: 0.3 });
+                lineIdx++;
+                setTimeout(nextLine, 200);
               }
-            },
-            { threshold: 0.15 },
-          );
-          dashObs.observe(dashPreview);
-        }
+            }
+            nextLine();
+          }
+
+          // ═══ Dashboard preview (lazy GSAP for count-up + activity) ═══
+          const dashPreview = document.querySelector(".dash-preview");
+          if (dashPreview) {
+            const dashObs = new IntersectionObserver(
+              async (entries) => {
+                if (!entries[0]?.isIntersecting) return;
+                dashObs.disconnect();
+                try {
+                  const { gsap } = await import("gsap");
+                  gsap.to(dashPreview, { opacity: 1, duration: 0.6 });
+                  document.querySelectorAll(".dash-count").forEach((el, i) => {
+                    const target = parseInt(
+                      (el as HTMLElement).dataset.target || "0",
+                    );
+                    const obj = { val: 0 };
+                    gsap.to(obj, {
+                      val: target,
+                      duration: 1.2,
+                      ease: "power3.out",
+                      delay: 0.3 + i * 0.1,
+                      onUpdate: () => {
+                        el.textContent = Math.round(obj.val).toString();
+                      },
+                    });
+                  });
+                  const actContainer = document.getElementById("dash-activity");
+                  if (actContainer) {
+                    const iconChatCircle =
+                      '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-4-1.08,8.09,8.09,0,0,0-2.53.41L40,216l12.47-37.4a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>';
+                    const iconLightning =
+                      '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,12.95l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112-120A8,8,0,0,0,215.79,118.17Z"/></svg>';
+                    const iconPlayCircle =
+                      '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm36.44-94.66-48-32A8,8,0,0,0,104,96v64a8,8,0,0,0,12.44,6.66l48-32a8,8,0,0,0,0-13.32ZM120,145.05V111l25.58,17Z"/></svg>';
+                    const activities = [
+                      {
+                        icon: iconChatCircle,
+                        text: "Alice via Telegram: Can you review the PR?",
+                        time: "just now",
+                      },
+                      {
+                        icon: iconLightning,
+                        text: "Tool shell: git status",
+                        time: "1m ago",
+                      },
+                      {
+                        icon: iconChatCircle,
+                        text: "Bob via Discord: Deploy looks good",
+                        time: "2m ago",
+                      },
+                      {
+                        icon: iconPlayCircle,
+                        text: 'Session "Code Review" started',
+                        time: "3m ago",
+                      },
+                    ];
+                    activities.forEach((act, i) => {
+                      setTimeout(
+                        () => {
+                          const div = document.createElement("div");
+                          div.className = "flex items-center gap-2";
+                          div.style.opacity = "0";
+                          div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-[11px]" style="color: var(--hu-text-muted)">${act.time}</span>`;
+                          actContainer.appendChild(div);
+                          requestAnimationFrame(() => {
+                            div.style.transition = "opacity 0.4s ease-out";
+                            div.style.opacity = "1";
+                          });
+                        },
+                        800 + i * 400,
+                      );
+                    });
+                  }
+                } catch (e) {
+                  console.warn("[gsap] dashboard animation failed:", e);
+                  (dashPreview as HTMLElement).style.opacity = "1";
+                  document.querySelectorAll(".dash-count").forEach((el) => {
+                    el.textContent = (el as HTMLElement).dataset.target || "0";
+                  });
+                }
+              },
+              { threshold: 0.15 },
+            );
+            dashObs.observe(dashPreview);
+          }
         }); // end afterLcp
 
         // ═══ Custom cursor (desktop only, no touch) ═══
@@ -3475,374 +3551,381 @@ const chapterCount = 9;
           heroObs.observe(heroCanvas);
         } else if (heroCanvas) {
           heroCanvas.style.display = "none";
-          const fallback = heroCanvas.parentElement?.querySelector(".hero-static-constellation");
+          const fallback = heroCanvas.parentElement?.querySelector(
+            ".hero-static-constellation",
+          );
           if (fallback instanceof HTMLElement) fallback.style.display = "block";
         }
 
         async function initHeroWebGL(canvas: HTMLCanvasElement) {
           try {
-          const THREE = await import("three");
-          const section = canvas.closest("section")!;
-          const w = () => section.clientWidth;
-          const h = () => section.clientHeight;
-          const renderer = new THREE.WebGLRenderer({
-            canvas,
-            alpha: true,
-            antialias: true,
-            powerPreference: "low-power",
-          });
-          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-          renderer.setSize(w(), h());
+            const THREE = await import("three");
+            const section = canvas.closest("section")!;
+            const w = () => section.clientWidth;
+            const h = () => section.clientHeight;
+            const renderer = new THREE.WebGLRenderer({
+              canvas,
+              alpha: true,
+              antialias: true,
+              powerPreference: "low-power",
+            });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(w(), h());
 
-          const scene = new THREE.Scene();
-          const camera = new THREE.PerspectiveCamera(60, w() / h(), 0.1, 100);
-          camera.position.z = 30;
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(60, w() / h(), 0.1, 100);
+            camera.position.z = 30;
 
-          const noise3D = createNoise3D();
+            const noise3D = createNoise3D();
 
-          const accentColor =
-            getComputedStyle(document.documentElement)
-              .getPropertyValue("--hu-accent")
-              .trim() || "#7AB648";
-          const accentSecondary =
-            getComputedStyle(document.documentElement)
-              .getPropertyValue("--hu-accent-secondary")
-              .trim() || "#f59e0b";
+            const accentColor =
+              getComputedStyle(document.documentElement)
+                .getPropertyValue("--hu-accent")
+                .trim() || "#7AB648";
+            const accentSecondary =
+              getComputedStyle(document.documentElement)
+                .getPropertyValue("--hu-accent-secondary")
+                .trim() || "#f59e0b";
 
-          // Neural network topology: 5 layers, 8–15 nodes per layer
-          const layerSizes = [10, 12, 10, 12, 10];
-          const layerZ = [-14, -7, 0, 7, 14];
-          const layerWidth = 18;
-          const nodeBasePos: number[][] = [];
-          for (let L = 0; L < layerSizes.length; L++) {
-            const n = layerSizes[L];
-            const z = layerZ[L];
-            for (let i = 0; i < n; i++) {
-              const t = n > 1 ? i / (n - 1) : 0.5;
-              const x = (t - 0.5) * layerWidth;
-              const y = Math.sin(i * 0.7) * 1.5;
-              nodeBasePos.push([x, y, z]);
-            }
-          }
-          const nodeCount = nodeBasePos.length;
-
-          // Orbital/breathing params per node
-          const orbitRadius = new Float32Array(nodeCount);
-          const orbitPhase = new Float32Array(nodeCount);
-          const breathPhase = new Float32Array(nodeCount);
-          const isAccent = new Uint8Array(nodeCount);
-          for (let i = 0; i < nodeCount; i++) {
-            orbitRadius[i] = 0.15 + Math.random() * 0.25;
-            orbitPhase[i] = Math.random() * Math.PI * 2;
-            breathPhase[i] = Math.random() * Math.PI * 2;
-            isAccent[i] = Math.random() < 0.2 ? 1 : 0;
-          }
-
-          // Connections between adjacent layers (each node → 2–4 random next-layer nodes)
-          const connections: [number, number][] = [];
-          let layerStart = 0;
-          for (let L = 0; L < layerSizes.length - 1; L++) {
-            const nCur = layerSizes[L];
-            const nNext = layerSizes[L + 1];
-            const nextStart = layerStart + nCur;
-            for (let i = 0; i < nCur; i++) {
-              const src = layerStart + i;
-              const k = 2 + Math.floor(Math.random() * 3);
-              const used = new Set<number>();
-              for (let c = 0; c < Math.min(k, nNext); c++) {
-                let t = Math.floor(Math.random() * nNext);
-                while (used.has(t)) t = (t + 1) % nNext;
-                used.add(t);
-                connections.push([src, nextStart + t]);
+            // Neural network topology: 5 layers, 8–15 nodes per layer
+            const layerSizes = [10, 12, 10, 12, 10];
+            const layerZ = [-14, -7, 0, 7, 14];
+            const layerWidth = 18;
+            const nodeBasePos: number[][] = [];
+            for (let L = 0; L < layerSizes.length; L++) {
+              const n = layerSizes[L];
+              const z = layerZ[L];
+              for (let i = 0; i < n; i++) {
+                const t = n > 1 ? i / (n - 1) : 0.5;
+                const x = (t - 0.5) * layerWidth;
+                const y = Math.sin(i * 0.7) * 1.5;
+                nodeBasePos.push([x, y, z]);
               }
             }
-            layerStart = nextStart;
-          }
+            const nodeCount = nodeBasePos.length;
 
-          const FLOW_TOTAL_CAP = 5000;
-          const flowCount = Math.max(0, FLOW_TOTAL_CAP - nodeCount);
-          const FLOW_WRAP = 20;
-          const flowPosArr = new Float32Array(flowCount * 3);
-          for (let fi = 0; fi < flowCount; fi++) {
-            flowPosArr[fi * 3] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
-            flowPosArr[fi * 3 + 1] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
-            flowPosArr[fi * 3 + 2] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
-          }
-          const flowGeo = new THREE.BufferGeometry();
-          flowGeo.setAttribute(
-            "position",
-            new THREE.BufferAttribute(flowPosArr, 3),
-          );
-          const flowMat = new THREE.PointsMaterial({
-            color: new THREE.Color(accentColor),
-            size: 0.055,
-            sizeAttenuation: true,
-            transparent: true,
-            opacity: 0.22,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-          });
-          const flowPoints = new THREE.Points(flowGeo, flowMat);
-          scene.add(flowPoints);
-
-          const linePositions = new Float32Array(connections.length * 6);
-          const lineColors = new Float32Array(connections.length * 6);
-          const lineGeo = new THREE.BufferGeometry();
-          lineGeo.setAttribute(
-            "position",
-            new THREE.BufferAttribute(linePositions, 3),
-          );
-          lineGeo.setAttribute(
-            "color",
-            new THREE.BufferAttribute(lineColors, 3),
-          );
-          const lineMat = new THREE.LineBasicMaterial({
-            vertexColors: true,
-            transparent: true,
-            opacity: 0.18,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-          });
-          const lines = new THREE.LineSegments(lineGeo, lineMat);
-          scene.add(lines);
-
-          const posArr = new Float32Array(nodeCount * 3);
-          const colorArr = new Float32Array(nodeCount * 3);
-          const geo = new THREE.BufferGeometry();
-          geo.setAttribute("position", new THREE.BufferAttribute(posArr, 3));
-          geo.setAttribute("color", new THREE.BufferAttribute(colorArr, 3));
-
-          const accentCol = new THREE.Color(accentColor);
-          const secondaryCol = new THREE.Color(accentSecondary);
-          const mat = new THREE.PointsMaterial({
-            size: 0.18,
-            vertexColors: true,
-            sizeAttenuation: true,
-            transparent: true,
-            opacity: 0.7,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-          });
-          const points = new THREE.Points(geo, mat);
-          scene.add(points);
-
-          // Mouse interaction
-          const mouse = new THREE.Vector2(-10, -10);
-          const mouse3D = new THREE.Vector3(0, 0, 0);
-          const raycaster = new THREE.Raycaster();
-          const plane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
-          const intersect = new THREE.Vector3();
-          const onDocMouseMove = (e: MouseEvent) => {
-            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-          };
-          const onDocMouseLeave = () => {
-            mouse.x = -10;
-            mouse.y = -10;
-          };
-          document.addEventListener("mousemove", onDocMouseMove);
-          document.addEventListener("mouseleave", onDocMouseLeave);
-
-          // Mouse glow sprite
-          const glowGeo = new THREE.BufferGeometry();
-          glowGeo.setAttribute(
-            "position",
-            new THREE.Float32BufferAttribute([0, 0, 0], 3),
-          );
-          const glowMat = new THREE.PointsMaterial({
-            size: 4,
-            color: new THREE.Color(accentColor),
-            transparent: true,
-            opacity: 0.15,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            sizeAttenuation: true,
-          });
-          const glowPoint = new THREE.Points(glowGeo, glowMat);
-          glowPoint.visible = false;
-          scene.add(glowPoint);
-
-          const MOUSE_RADIUS = 8;
-          const MOUSE_STRENGTH = 0.015;
-          const FRAME_INTERVAL = 1000 / 60;
-          let lastFrame = 0;
-          let animId: number;
-
-          const animate = (now: number) => {
-            animId = requestAnimationFrame(animate);
-            if (now - lastFrame < FRAME_INTERVAL) return;
-            lastFrame = now;
-            const t = now * 0.001;
-            const breath = 1 + 0.04 * Math.sin(t * 0.8);
-
-            raycaster.setFromCamera(mouse, camera);
-            raycaster.ray.intersectPlane(plane, intersect);
-            mouse3D.copy(intersect);
-            const mouseActive =
-              mouse.x > -2 && mouse.x < 2 && mouse.y > -2 && mouse.y < 2;
-            glowPoint.visible = mouseActive;
-            if (mouseActive) {
-              glowPoint.position.copy(mouse3D);
+            // Orbital/breathing params per node
+            const orbitRadius = new Float32Array(nodeCount);
+            const orbitPhase = new Float32Array(nodeCount);
+            const breathPhase = new Float32Array(nodeCount);
+            const isAccent = new Uint8Array(nodeCount);
+            for (let i = 0; i < nodeCount; i++) {
+              orbitRadius[i] = 0.15 + Math.random() * 0.25;
+              orbitPhase[i] = Math.random() * Math.PI * 2;
+              breathPhase[i] = Math.random() * Math.PI * 2;
+              isAccent[i] = Math.random() < 0.2 ? 1 : 0;
             }
 
-            for (let i = 0; i < nodeCount; i++) {
-              const [bx, by, bz] = nodeBasePos[i];
-              const orb = orbitRadius[i];
-              const ph = orbitPhase[i];
-              const br = breathPhase[i];
-              let x = bx + orb * Math.cos(t * 0.6 + ph) * breath;
-              let y = by + orb * Math.sin(t * 0.5 + ph * 1.1) * breath;
-              let z = bz + orb * 0.5 * Math.sin(t * 0.4 + br) * breath;
-
-              const nScale = 0.4;
-              x += nScale * noise3D(x * 0.15, y * 0.15, t * 0.3);
-              y += nScale * noise3D(y * 0.15, z * 0.15, t * 0.3);
-              z += nScale * noise3D(z * 0.15, x * 0.15, t * 0.3);
-
-              if (mouseActive) {
-                const dx = x - mouse3D.x;
-                const dy = y - mouse3D.y;
-                const dz = z - mouse3D.z;
-                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                if (dist < MOUSE_RADIUS && dist > 0.01) {
-                  const f = (1 - dist / MOUSE_RADIUS) * MOUSE_STRENGTH;
-                  x += (dx / dist) * f;
-                  y += (dy / dist) * f;
-                  z += (dz / dist) * f;
+            // Connections between adjacent layers (each node → 2–4 random next-layer nodes)
+            const connections: [number, number][] = [];
+            let layerStart = 0;
+            for (let L = 0; L < layerSizes.length - 1; L++) {
+              const nCur = layerSizes[L];
+              const nNext = layerSizes[L + 1];
+              const nextStart = layerStart + nCur;
+              for (let i = 0; i < nCur; i++) {
+                const src = layerStart + i;
+                const k = 2 + Math.floor(Math.random() * 3);
+                const used = new Set<number>();
+                for (let c = 0; c < Math.min(k, nNext); c++) {
+                  let t = Math.floor(Math.random() * nNext);
+                  while (used.has(t)) t = (t + 1) % nNext;
+                  used.add(t);
+                  connections.push([src, nextStart + t]);
                 }
               }
-
-              posArr[i * 3] = x;
-              posArr[i * 3 + 1] = y;
-              posArr[i * 3 + 2] = z;
-              const depth = (z + 14) / 28;
-              const col = isAccent[i] ? secondaryCol : accentCol;
-              const alphaMult = 0.4 + 0.6 * depth;
-              const pulseMult = isAccent[i]
-                ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathPhase[i])
-                : 1;
-              colorArr[i * 3] = col.r * alphaMult * pulseMult;
-              colorArr[i * 3 + 1] = col.g * alphaMult * pulseMult;
-              colorArr[i * 3 + 2] = col.b * alphaMult * pulseMult;
+              layerStart = nextStart;
             }
-            geo.attributes.position.needsUpdate = true;
-            geo.attributes.color!.needsUpdate = true;
 
-            const flowStep = 0.038;
+            const FLOW_TOTAL_CAP = 5000;
+            const flowCount = Math.max(0, FLOW_TOTAL_CAP - nodeCount);
+            const FLOW_WRAP = 20;
+            const flowPosArr = new Float32Array(flowCount * 3);
             for (let fi = 0; fi < flowCount; fi++) {
-              let fx = flowPosArr[fi * 3];
-              let fy = flowPosArr[fi * 3 + 1];
-              let fz = flowPosArr[fi * 3 + 2];
-              fx += flowStep * noise3D(fy * 0.15, fz * 0.15, t * 0.3);
-              fy += flowStep * noise3D(fz * 0.15 + 23.1, fx * 0.15, t * 0.3);
-              fz += flowStep * noise3D(fx * 0.15, fy * 0.15 + 61.4, t * 0.3);
-              if (fx > FLOW_WRAP) fx -= FLOW_WRAP * 2;
-              else if (fx < -FLOW_WRAP) fx += FLOW_WRAP * 2;
-              if (fy > FLOW_WRAP) fy -= FLOW_WRAP * 2;
-              else if (fy < -FLOW_WRAP) fy += FLOW_WRAP * 2;
-              if (fz > FLOW_WRAP) fz -= FLOW_WRAP * 2;
-              else if (fz < -FLOW_WRAP) fz += FLOW_WRAP * 2;
-              flowPosArr[fi * 3] = fx;
-              flowPosArr[fi * 3 + 1] = fy;
-              flowPosArr[fi * 3 + 2] = fz;
+              flowPosArr[fi * 3] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
+              flowPosArr[fi * 3 + 1] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
+              flowPosArr[fi * 3 + 2] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
             }
-            flowGeo.attributes.position.needsUpdate = true;
-
-            for (let c = 0; c < connections.length; c++) {
-              const [a, b] = connections[c];
-              const ax = posArr[a * 3];
-              const ay = posArr[a * 3 + 1];
-              const az = posArr[a * 3 + 2];
-              const bx = posArr[b * 3];
-              const by = posArr[b * 3 + 1];
-              const bz = posArr[b * 3 + 2];
-              linePositions[c * 6] = ax;
-              linePositions[c * 6 + 1] = ay;
-              linePositions[c * 6 + 2] = az;
-              linePositions[c * 6 + 3] = bx;
-              linePositions[c * 6 + 4] = by;
-              linePositions[c * 6 + 5] = bz;
-
-              const midX = (ax + bx) * 0.5;
-              const midY = (ay + by) * 0.5;
-              const midZ = (az + bz) * 0.5;
-              const distToMouse = mouseActive
-                ? Math.sqrt(
-                    (midX - mouse3D.x) ** 2 +
-                      (midY - mouse3D.y) ** 2 +
-                      (midZ - mouse3D.z) ** 2,
-                  )
-                : 999;
-              const brighten =
-                distToMouse < MOUSE_RADIUS * 1.5
-                  ? 1 + 0.8 * (1 - distToMouse / (MOUSE_RADIUS * 1.5))
-                  : 1;
-              const flowPhase = (t * 3 + c * 0.1) % 1;
-              const flowPulse = 0.6 + 0.4 * Math.sin(flowPhase * Math.PI * 2);
-              const base = Math.min(1, (0.2 + 0.15 * flowPulse) * brighten);
-              lineColors[c * 6] = accentCol.r * base;
-              lineColors[c * 6 + 1] = accentCol.g * base;
-              lineColors[c * 6 + 2] = accentCol.b * base;
-              lineColors[c * 6 + 3] = accentCol.r * base;
-              lineColors[c * 6 + 4] = accentCol.g * base;
-              lineColors[c * 6 + 5] = accentCol.b * base;
-            }
-            lineGeo.attributes.position.needsUpdate = true;
-            lineGeo.attributes.color!.needsUpdate = true;
-
-            camera.position.x += (mouse.x * 2 - camera.position.x * 0.3) * 0.02;
-            camera.position.y +=
-              (-mouse.y * 1.5 - camera.position.y * 0.3) * 0.02;
-            camera.lookAt(0, 0, 0);
-
-            renderer.render(scene, camera);
-          };
-
-          canvas.style.opacity = "1";
-          canvas.style.transition = "opacity 1.5s ease-out";
-          animate(performance.now());
-
-          const onResize = () => {
-            camera.aspect = w() / h();
-            camera.updateProjectionMatrix();
-            renderer.setSize(w(), h());
-          };
-          window.addEventListener("resize", onResize);
-
-          const cleanObs = new IntersectionObserver(
-            (entries) => {
-              if (!entries[0]?.isIntersecting) {
-                cancelAnimationFrame(animId);
-              } else {
-                lastFrame = 0;
-                animate(performance.now());
-              }
-            },
-            { threshold: 0 },
-          );
-          cleanObs.observe(canvas);
-
-          const disposeWebGL = () => {
-            cancelAnimationFrame(animId);
-            cleanObs.disconnect();
-            window.removeEventListener("resize", onResize);
-            document.removeEventListener("mousemove", onDocMouseMove);
-            document.removeEventListener("mouseleave", onDocMouseLeave);
-            renderer.dispose();
-            scene.traverse((obj: any) => {
-              if (obj.geometry) obj.geometry.dispose();
-              if (obj.material) {
-                if (Array.isArray(obj.material)) obj.material.forEach((m: any) => m.dispose());
-                else obj.material.dispose();
-              }
+            const flowGeo = new THREE.BufferGeometry();
+            flowGeo.setAttribute(
+              "position",
+              new THREE.BufferAttribute(flowPosArr, 3),
+            );
+            const flowMat = new THREE.PointsMaterial({
+              color: new THREE.Color(accentColor),
+              size: 0.055,
+              sizeAttenuation: true,
+              transparent: true,
+              opacity: 0.22,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
             });
-          };
-          window.addEventListener("pagehide", disposeWebGL, { once: true });
+            const flowPoints = new THREE.Points(flowGeo, flowMat);
+            scene.add(flowPoints);
+
+            const linePositions = new Float32Array(connections.length * 6);
+            const lineColors = new Float32Array(connections.length * 6);
+            const lineGeo = new THREE.BufferGeometry();
+            lineGeo.setAttribute(
+              "position",
+              new THREE.BufferAttribute(linePositions, 3),
+            );
+            lineGeo.setAttribute(
+              "color",
+              new THREE.BufferAttribute(lineColors, 3),
+            );
+            const lineMat = new THREE.LineBasicMaterial({
+              vertexColors: true,
+              transparent: true,
+              opacity: 0.18,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+            });
+            const lines = new THREE.LineSegments(lineGeo, lineMat);
+            scene.add(lines);
+
+            const posArr = new Float32Array(nodeCount * 3);
+            const colorArr = new Float32Array(nodeCount * 3);
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute("position", new THREE.BufferAttribute(posArr, 3));
+            geo.setAttribute("color", new THREE.BufferAttribute(colorArr, 3));
+
+            const accentCol = new THREE.Color(accentColor);
+            const secondaryCol = new THREE.Color(accentSecondary);
+            const mat = new THREE.PointsMaterial({
+              size: 0.18,
+              vertexColors: true,
+              sizeAttenuation: true,
+              transparent: true,
+              opacity: 0.7,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+            });
+            const points = new THREE.Points(geo, mat);
+            scene.add(points);
+
+            // Mouse interaction
+            const mouse = new THREE.Vector2(-10, -10);
+            const mouse3D = new THREE.Vector3(0, 0, 0);
+            const raycaster = new THREE.Raycaster();
+            const plane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+            const intersect = new THREE.Vector3();
+            const onDocMouseMove = (e: MouseEvent) => {
+              mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+              mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            };
+            const onDocMouseLeave = () => {
+              mouse.x = -10;
+              mouse.y = -10;
+            };
+            document.addEventListener("mousemove", onDocMouseMove);
+            document.addEventListener("mouseleave", onDocMouseLeave);
+
+            // Mouse glow sprite
+            const glowGeo = new THREE.BufferGeometry();
+            glowGeo.setAttribute(
+              "position",
+              new THREE.Float32BufferAttribute([0, 0, 0], 3),
+            );
+            const glowMat = new THREE.PointsMaterial({
+              size: 4,
+              color: new THREE.Color(accentColor),
+              transparent: true,
+              opacity: 0.15,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+              sizeAttenuation: true,
+            });
+            const glowPoint = new THREE.Points(glowGeo, glowMat);
+            glowPoint.visible = false;
+            scene.add(glowPoint);
+
+            const MOUSE_RADIUS = 8;
+            const MOUSE_STRENGTH = 0.015;
+            const FRAME_INTERVAL = 1000 / 60;
+            let lastFrame = 0;
+            let animId: number;
+
+            const animate = (now: number) => {
+              animId = requestAnimationFrame(animate);
+              if (now - lastFrame < FRAME_INTERVAL) return;
+              lastFrame = now;
+              const t = now * 0.001;
+              const breath = 1 + 0.04 * Math.sin(t * 0.8);
+
+              raycaster.setFromCamera(mouse, camera);
+              raycaster.ray.intersectPlane(plane, intersect);
+              mouse3D.copy(intersect);
+              const mouseActive =
+                mouse.x > -2 && mouse.x < 2 && mouse.y > -2 && mouse.y < 2;
+              glowPoint.visible = mouseActive;
+              if (mouseActive) {
+                glowPoint.position.copy(mouse3D);
+              }
+
+              for (let i = 0; i < nodeCount; i++) {
+                const [bx, by, bz] = nodeBasePos[i];
+                const orb = orbitRadius[i];
+                const ph = orbitPhase[i];
+                const br = breathPhase[i];
+                let x = bx + orb * Math.cos(t * 0.6 + ph) * breath;
+                let y = by + orb * Math.sin(t * 0.5 + ph * 1.1) * breath;
+                let z = bz + orb * 0.5 * Math.sin(t * 0.4 + br) * breath;
+
+                const nScale = 0.4;
+                x += nScale * noise3D(x * 0.15, y * 0.15, t * 0.3);
+                y += nScale * noise3D(y * 0.15, z * 0.15, t * 0.3);
+                z += nScale * noise3D(z * 0.15, x * 0.15, t * 0.3);
+
+                if (mouseActive) {
+                  const dx = x - mouse3D.x;
+                  const dy = y - mouse3D.y;
+                  const dz = z - mouse3D.z;
+                  const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                  if (dist < MOUSE_RADIUS && dist > 0.01) {
+                    const f = (1 - dist / MOUSE_RADIUS) * MOUSE_STRENGTH;
+                    x += (dx / dist) * f;
+                    y += (dy / dist) * f;
+                    z += (dz / dist) * f;
+                  }
+                }
+
+                posArr[i * 3] = x;
+                posArr[i * 3 + 1] = y;
+                posArr[i * 3 + 2] = z;
+                const depth = (z + 14) / 28;
+                const col = isAccent[i] ? secondaryCol : accentCol;
+                const alphaMult = 0.4 + 0.6 * depth;
+                const pulseMult = isAccent[i]
+                  ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathPhase[i])
+                  : 1;
+                colorArr[i * 3] = col.r * alphaMult * pulseMult;
+                colorArr[i * 3 + 1] = col.g * alphaMult * pulseMult;
+                colorArr[i * 3 + 2] = col.b * alphaMult * pulseMult;
+              }
+              geo.attributes.position.needsUpdate = true;
+              geo.attributes.color!.needsUpdate = true;
+
+              const flowStep = 0.038;
+              for (let fi = 0; fi < flowCount; fi++) {
+                let fx = flowPosArr[fi * 3];
+                let fy = flowPosArr[fi * 3 + 1];
+                let fz = flowPosArr[fi * 3 + 2];
+                fx += flowStep * noise3D(fy * 0.15, fz * 0.15, t * 0.3);
+                fy += flowStep * noise3D(fz * 0.15 + 23.1, fx * 0.15, t * 0.3);
+                fz += flowStep * noise3D(fx * 0.15, fy * 0.15 + 61.4, t * 0.3);
+                if (fx > FLOW_WRAP) fx -= FLOW_WRAP * 2;
+                else if (fx < -FLOW_WRAP) fx += FLOW_WRAP * 2;
+                if (fy > FLOW_WRAP) fy -= FLOW_WRAP * 2;
+                else if (fy < -FLOW_WRAP) fy += FLOW_WRAP * 2;
+                if (fz > FLOW_WRAP) fz -= FLOW_WRAP * 2;
+                else if (fz < -FLOW_WRAP) fz += FLOW_WRAP * 2;
+                flowPosArr[fi * 3] = fx;
+                flowPosArr[fi * 3 + 1] = fy;
+                flowPosArr[fi * 3 + 2] = fz;
+              }
+              flowGeo.attributes.position.needsUpdate = true;
+
+              for (let c = 0; c < connections.length; c++) {
+                const [a, b] = connections[c];
+                const ax = posArr[a * 3];
+                const ay = posArr[a * 3 + 1];
+                const az = posArr[a * 3 + 2];
+                const bx = posArr[b * 3];
+                const by = posArr[b * 3 + 1];
+                const bz = posArr[b * 3 + 2];
+                linePositions[c * 6] = ax;
+                linePositions[c * 6 + 1] = ay;
+                linePositions[c * 6 + 2] = az;
+                linePositions[c * 6 + 3] = bx;
+                linePositions[c * 6 + 4] = by;
+                linePositions[c * 6 + 5] = bz;
+
+                const midX = (ax + bx) * 0.5;
+                const midY = (ay + by) * 0.5;
+                const midZ = (az + bz) * 0.5;
+                const distToMouse = mouseActive
+                  ? Math.sqrt(
+                      (midX - mouse3D.x) ** 2 +
+                        (midY - mouse3D.y) ** 2 +
+                        (midZ - mouse3D.z) ** 2,
+                    )
+                  : 999;
+                const brighten =
+                  distToMouse < MOUSE_RADIUS * 1.5
+                    ? 1 + 0.8 * (1 - distToMouse / (MOUSE_RADIUS * 1.5))
+                    : 1;
+                const flowPhase = (t * 3 + c * 0.1) % 1;
+                const flowPulse = 0.6 + 0.4 * Math.sin(flowPhase * Math.PI * 2);
+                const base = Math.min(1, (0.2 + 0.15 * flowPulse) * brighten);
+                lineColors[c * 6] = accentCol.r * base;
+                lineColors[c * 6 + 1] = accentCol.g * base;
+                lineColors[c * 6 + 2] = accentCol.b * base;
+                lineColors[c * 6 + 3] = accentCol.r * base;
+                lineColors[c * 6 + 4] = accentCol.g * base;
+                lineColors[c * 6 + 5] = accentCol.b * base;
+              }
+              lineGeo.attributes.position.needsUpdate = true;
+              lineGeo.attributes.color!.needsUpdate = true;
+
+              camera.position.x +=
+                (mouse.x * 2 - camera.position.x * 0.3) * 0.02;
+              camera.position.y +=
+                (-mouse.y * 1.5 - camera.position.y * 0.3) * 0.02;
+              camera.lookAt(0, 0, 0);
+
+              renderer.render(scene, camera);
+            };
+
+            canvas.style.opacity = "1";
+            canvas.style.transition = "opacity 1.5s ease-out";
+            animate(performance.now());
+
+            const onResize = () => {
+              camera.aspect = w() / h();
+              camera.updateProjectionMatrix();
+              renderer.setSize(w(), h());
+            };
+            window.addEventListener("resize", onResize);
+
+            const cleanObs = new IntersectionObserver(
+              (entries) => {
+                if (!entries[0]?.isIntersecting) {
+                  cancelAnimationFrame(animId);
+                } else {
+                  lastFrame = 0;
+                  animate(performance.now());
+                }
+              },
+              { threshold: 0 },
+            );
+            cleanObs.observe(canvas);
+
+            const disposeWebGL = () => {
+              cancelAnimationFrame(animId);
+              cleanObs.disconnect();
+              window.removeEventListener("resize", onResize);
+              document.removeEventListener("mousemove", onDocMouseMove);
+              document.removeEventListener("mouseleave", onDocMouseLeave);
+              renderer.dispose();
+              scene.traverse((obj: any) => {
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) {
+                  if (Array.isArray(obj.material))
+                    obj.material.forEach((m: any) => m.dispose());
+                  else obj.material.dispose();
+                }
+              });
+            };
+            window.addEventListener("pagehide", disposeWebGL, { once: true });
           } catch (e) {
             console.warn("[hero-webgl] init failed, falling back:", e);
             canvas.style.display = "none";
-            const fallback = canvas.parentElement?.querySelector(".hero-static-constellation");
-            if (fallback instanceof HTMLElement) fallback.style.display = "block";
+            const fallback = canvas.parentElement?.querySelector(
+              ".hero-static-constellation",
+            );
+            if (fallback instanceof HTMLElement)
+              fallback.style.display = "block";
           }
         }
       }
@@ -3995,7 +4078,9 @@ const chapterCount = 9;
         if (location.hostname === "localhost") return;
         var s = document.createElement("script");
         s.src = "https://unpkg.com/web-vitals@4/dist/web-vitals.iife.js";
-        s.onerror = function () { console.warn("[web-vitals] failed to load"); };
+        s.onerror = function () {
+          console.warn("[web-vitals] failed to load");
+        };
         s.onload = function () {
           var wv = window.webVitals;
           if (!wv) return;
@@ -4006,7 +4091,12 @@ const chapterCount = 9;
               rating: m.rating,
               path: location.pathname,
             };
-            console.debug("[web-vitals]", payload.name, payload.value, payload.rating);
+            console.debug(
+              "[web-vitals]",
+              payload.name,
+              payload.value,
+              payload.rating,
+            );
             /* sendBeacon to RUM endpoint when deployed */
           };
           wv.onCLS(log);

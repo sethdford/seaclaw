@@ -85,6 +85,12 @@ static void null_cfg_returns_default(void) {
     HU_ASSERT(sel.model_len > 0);
 }
 
+static void short_emotional_routes_above_reflexive(void) {
+    cfg = hu_model_router_default_config();
+    hu_model_selection_t sel = hu_model_route(&cfg, "i'm so sad", 10, NULL, 0, 8, 0);
+    HU_ASSERT(sel.tier >= HU_TIER_CONVERSATIONAL);
+}
+
 static void frustrated_message_not_reflexive(void) {
     cfg = hu_model_router_default_config();
     const char *msg = "ugh this budget is not working at all, the numbers are broken and i'm so frustrated with it";
@@ -430,6 +436,7 @@ void run_model_router_tests(void) {
     HU_RUN_TEST(late_night_emotional_upgraded);
     HU_RUN_TEST(null_msg_returns_conversational);
     HU_RUN_TEST(null_cfg_returns_default);
+    HU_RUN_TEST(short_emotional_routes_above_reflexive);
     HU_RUN_TEST(frustrated_message_not_reflexive);
     HU_RUN_TEST(thinking_budget_scales_with_tier);
 

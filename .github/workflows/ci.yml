@@ -545,13 +545,20 @@ jobs:
             website/package-lock.json
       - run: cd design-tokens && npm ci --ignore-scripts && npm run build
       - run: cd website && npm ci && npm run build
-      - name: Lighthouse CI
+      - name: Lighthouse CI (desktop)
         uses: treosh/lighthouse-ci-action@v12
         with:
           uploadArtifacts: true
           temporaryPublicStorage: true
-          configPath: .lighthouserc.json
-          artifactName: lighthouse-website
+          configPath: website/.lighthouserc.json
+          artifactName: lighthouse-website-desktop
+      - name: Lighthouse CI (mobile)
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+          configPath: website/.lighthouserc-mobile.json
+          artifactName: lighthouse-website-mobile
 
   lighthouse-dashboard:
     runs-on: ubuntu-latest
