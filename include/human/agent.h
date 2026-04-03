@@ -105,6 +105,7 @@ typedef struct hu_agent_context_config {
     bool tool_routing_enabled;
     bool multi_agent;
     bool hula_enabled;
+    bool compaction_use_structured; /* use XML structured summaries in compaction */
 } hu_agent_context_config_t;
 
 /* Called when a tool needs user approval before execution.
@@ -246,6 +247,7 @@ struct hu_agent {
     bool tool_routing_enabled;
     bool tree_of_thought_enabled;
     bool hula_enabled;
+    bool compaction_use_structured; /* use XML structured summaries in compaction */
 
     bool constitutional_enabled;
     bool multi_agent_enabled;

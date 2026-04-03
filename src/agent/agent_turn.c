@@ -2312,6 +2312,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     hu_compaction_config_default(&compact_cfg);
     compact_cfg.max_history_messages = agent->max_history_messages;
     compact_cfg.token_limit = max_tokens;
+    compact_cfg.use_structured_summary = agent->compaction_use_structured;
 
 #ifdef HU_ENABLE_SQLITE
     if (agent->metacognition.cfg.enabled && agent->cognition_db &&
@@ -4570,12 +4571,16 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     memset(&dispatch_result, 0, sizeof(dispatch_result));
                     const size_t uncached_count = tc_count - ttl_hit_count;
 
-                    if (uncached_count > 0) {
-                        const hu_tool_call_t *dispatch_calls = calls_to_dispatch;
-                        size_t dispatch_count = tc_count;
-                        hu_tool_call_t *filtered_calls = NULL;
-                        size_t *filtered_map = NULL;
+                    /* SECURITY FIX: Pre-check permissions and pre-hooks BEFORE dispatching.
+                     * This prevents bypassing permission tiers and hook policies. */
+                    const hu_tool_call_t *dispatch_calls = calls_to_dispatch;
+                    size_t dispatch_count = tc_count;
+                    hu_tool_call_t *filtered_calls = NULL;
+                    size_t *filtered_map = NULL;
+                    bool *dispatch_allowed = NULL;
+                    size_t dispatch_allowed_count = 0;
 
+                    if (uncached_count > 0) {
                         if (ttl_hit_count > 0) {
                             filtered_calls = (hu_tool_call_t *)agent->alloc->alloc(
                                 agent->alloc->ctx, uncached_count * sizeof(hu_tool_call_t));
@@ -4590,20 +4595,74 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         fi++;
                                     }
                                 }
-                                dispatch_calls = filtered_calls;
+                                dispatch_calls = (const hu_tool_call_t *)filtered_calls;
                                 dispatch_count = uncached_count;
                             }
                         }
 
-                        if (agent->tool_stream_cb) {
-                            err = hu_dispatcher_dispatch_streaming(
-                                &dispatcher, agent->alloc, agent->tools, agent->tools_count,
-                                dispatch_calls, dispatch_count, agent->tool_stream_cb,
-                                agent->tool_stream_ctx, &dispatch_result);
+                        /* SECURITY FIX: Pre-check permissions and pre-hooks BEFORE dispatching.
+                         * Build a whitelist of tools allowed to execute. Tools denied by
+                         * permissions or pre-hooks will get failure results instead. */
+                        dispatch_allowed = (bool *)agent->alloc->alloc(
+                            agent->alloc->ctx, dispatch_count * sizeof(bool));
+                        if (dispatch_allowed) {
+                            memset(dispatch_allowed, 1, dispatch_count * sizeof(bool));
+                            for (size_t dci = 0; dci < dispatch_count; dci++) {
+                                const hu_tool_call_t *dcall = &dispatch_calls[dci];
+                                char dn_buf[64];
+                                size_t dn = (dcall->name_len < sizeof(dn_buf) - 1)
+                                                ? dcall->name_len
+                                                : sizeof(dn_buf) - 1;
+                                if (dn > 0 && dcall->name)
+                                    memcpy(dn_buf, dcall->name, dn);
+                                dn_buf[dn] = '\0';
+
+                                /* 1. Permission tier check FIRST */
+                                {
+                                    hu_permission_level_t dreq =
+                                        hu_permission_get_tool_level(dn_buf);
+                                    if (!hu_permission_check(agent->permission_level, dreq)) {
+                                        dispatch_allowed[dci] = false;
+                                        hu_permission_reset_escalation(agent);
+                                        continue;
+                                    }
+                                }
+
+                                /* 2. Pre-hook pipeline SECOND */
+                                if (agent->hook_registry) {
+                                    hu_hook_result_t dhook_res;
+                                    memset(&dhook_res, 0, sizeof(dhook_res));
+                                    const char *dargs_str = dcall->arguments ? dcall->arguments : "";
+                                    hu_hook_pipeline_pre_tool(
+                                        agent->hook_registry, agent->alloc,
+                                        dn_buf, dn, dargs_str, strlen(dargs_str),
+                                        &dhook_res);
+                                    if (dhook_res.decision == HU_HOOK_DENY) {
+                                        dispatch_allowed[dci] = false;
+                                        hu_hook_result_free(agent->alloc, &dhook_res);
+                                        continue;
+                                    }
+                                    hu_hook_result_free(agent->alloc, &dhook_res);
+                                }
+
+                                dispatch_allowed_count++;
+                            }
+                        }
+
+                        /* Only dispatch if we have allowed tools */
+                        if (dispatch_allowed_count > 0) {
+                            if (agent->tool_stream_cb) {
+                                err = hu_dispatcher_dispatch_streaming(
+                                    &dispatcher, agent->alloc, agent->tools, agent->tools_count,
+                                    dispatch_calls, dispatch_count, agent->tool_stream_cb,
+                                    agent->tool_stream_ctx, &dispatch_result);
+                            } else {
+                                err = hu_dispatcher_dispatch(&dispatcher, agent->alloc, agent->tools,
+                                                             agent->tools_count, dispatch_calls,
+                                                             dispatch_count, &dispatch_result);
+                            }
                         } else {
-                            err = hu_dispatcher_dispatch(&dispatcher, agent->alloc, agent->tools,
-                                                         agent->tools_count, dispatch_calls,
-                                                         dispatch_count, &dispatch_result);
+                            err = HU_OK;  /* No tools to dispatch after security checks */
                         }
 
                         if (err == HU_OK && dispatch_result.results && merged_results &&
@@ -4624,6 +4683,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     } else {
                         err = HU_OK;
                     }
+
                     if (err == HU_OK)
                         turn_tool_results_count += tc_count;
                     (void)(turn_tool_results_count |
@@ -4647,35 +4707,37 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             tn_buf[tn] = '\0';
                             const char *args_str = call->arguments ? call->arguments : "";
 
-                            /* Permission tier check: deny if insufficient */
-                            {
-                                hu_permission_level_t required = hu_permission_get_tool_level(tn_buf);
-                                if (!hu_permission_check(agent->permission_level, required)) {
+                            /* SECURITY FIX: Permission and pre-hook checks are done PRE-dispatch.
+                             * Check the dispatch_allowed array to see if this tool was denied. */
+                            if (dispatch_allowed && ttl_hit_count == 0 && tc < tc_count) {
+                                /* No TTL filtering: direct index mapping */
+                                if (!dispatch_allowed[tc]) {
                                     hu_tool_result_free(agent->alloc, result);
-                                    *result = hu_tool_result_fail("insufficient permission", 23);
-                                    hu_permission_reset_escalation(agent);
+                                    *result = hu_tool_result_fail("denied by security policy", 25);
                                     goto dispatch_tool_done;
                                 }
-                            }
-
-                            /* Pre-hook pipeline: deny stops execution */
-                            if (agent->hook_registry) {
-                                hu_hook_result_t hook_res;
-                                memset(&hook_res, 0, sizeof(hook_res));
-                                hu_hook_pipeline_pre_tool(agent->hook_registry, agent->alloc,
-                                                         tn_buf, tn, args_str, strlen(args_str),
-                                                         &hook_res);
-                                if (hook_res.decision == HU_HOOK_DENY) {
+                            } else if (dispatch_allowed && ttl_hit_count > 0) {
+                                /* TTL filtering: need to find the tool in the filtered list */
+                                bool found_allowed = false;
+                                if (filtered_map) {
+                                    /* Use the mapping directly */
+                                    for (size_t mi = 0; mi < uncached_count; mi++) {
+                                        if (filtered_map[mi] == tc) {
+                                            if (dispatch_allowed[mi])
+                                                found_allowed = true;
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    /* TTL hits existed but no filtered map means uncached_count == tc_count */
+                                    if (tc < dispatch_count && dispatch_allowed[tc])
+                                        found_allowed = true;
+                                }
+                                if (!found_allowed) {
                                     hu_tool_result_free(agent->alloc, result);
-                                    const char *deny_msg = hook_res.message ? hook_res.message
-                                                                            : "denied by hook";
-                                    size_t deny_len = hook_res.message ? hook_res.message_len : 14;
-                                    *result = hu_tool_result_fail(deny_msg, deny_len);
-                                    result->error_msg_owned = false;
-                                    hu_hook_result_free(agent->alloc, &hook_res);
+                                    *result = hu_tool_result_fail("denied by security policy", 25);
                                     goto dispatch_tool_done;
                                 }
-                                hu_hook_result_free(agent->alloc, &hook_res);
                             }
 
                             /* ESCALATE enforcement: check approval matrix */
@@ -4974,6 +5036,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 break;
                         }
                         hu_dispatch_result_free(agent->alloc, &dispatch_result);
+
+                        /* Clean up dispatch_allowed array after result processing */
+                        if (dispatch_allowed)
+                            agent->alloc->free(agent->alloc->ctx, dispatch_allowed,
+                                              dispatch_count * sizeof(bool));
+                        dispatch_allowed = NULL;
                     } else {
                         /* Fallback: sequential if dispatcher fails */
                         for (size_t tc = 0; tc < tc_count; tc++) {
