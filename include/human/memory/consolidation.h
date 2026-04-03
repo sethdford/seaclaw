@@ -52,4 +52,9 @@ bool hu_consolidation_should_run(const hu_consolidation_debounce_t *d, int64_t n
 /* Reset counters after a successful consolidation. */
 void hu_consolidation_debounce_reset(hu_consolidation_debounce_t *d, int64_t now_secs);
 
+void hu_consolidation_debounce_inject(hu_consolidation_debounce_t *d, size_t extra_ticks);
+
+void hu_consolidation_set_topic_switch(bool detected);
+bool hu_consolidation_get_and_clear_topic_switch(void);
+
 #endif

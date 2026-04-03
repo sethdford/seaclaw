@@ -303,11 +303,7 @@ export class ChatController implements ReactiveController {
     }
   }
 
-  private _handleMemory(
-    event: string,
-    payload: Record<string, unknown>,
-    sessionKey: string,
-  ): void {
+  private _handleMemory(event: string, payload: Record<string, unknown>, sessionKey: string): void {
     const action = event.split(".")[1] as "recall" | "store" | "forget";
     const key = (payload.key as string) ?? "";
     const value = payload.value as string | undefined;

@@ -2927,22 +2927,42 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 
         /* Content sensitivity check (EdgeClaw-inspired S1/S2/S3 tiers):
-         * S3 content (secrets, private keys) prefers local/fallback model. */
+         * S3 content (secrets, private keys) requires local-only model.
+         * S2 content (PII) logs audit trail. */
         {
             hu_sensitivity_result_t sens = hu_sensitivity_classify_message(msg, msg_len);
             if (hu_sensitivity_requires_local(sens.level)) {
-                hu_log_info("agent", agent->observer,
-                            "S3 sensitivity detected (%s) — preferring local/fallback model",
-                            sens.reason ? sens.reason : "private content");
-                if (agent->degradation_config.fallback_model &&
-                    agent->degradation_config.fallback_model_len > 0) {
+                const char *prev_model = turn_model;
+                if (agent->degradation_config.s3_local_model &&
+                    agent->degradation_config.s3_local_model_len > 0) {
+                    turn_model = agent->degradation_config.s3_local_model;
+                    turn_model_len = agent->degradation_config.s3_local_model_len;
+                } else if (agent->degradation_config.fallback_model &&
+                           agent->degradation_config.fallback_model_len > 0) {
                     turn_model = agent->degradation_config.fallback_model;
                     turn_model_len = agent->degradation_config.fallback_model_len;
+                }
+                hu_log_info("agent", agent->observer,
+                            "S3 sensitivity: %s — routed %.*s -> %.*s",
+                            sens.reason ? sens.reason : "private content",
+                            (int)(prev_model ? strlen(prev_model) : 0), prev_model ? prev_model : "",
+                            (int)turn_model_len, turn_model ? turn_model : "");
+                {
+                    hu_observer_event_t sev = {.tag = HU_OBSERVER_EVENT_ERR, .data = {{0}}};
+                    sev.data.err.component = "sensitivity";
+                    sev.data.err.message = sens.reason ? sens.reason : "S3 private — model rerouted";
+                    HU_OBS_SAFE_RECORD_EVENT(agent, &sev);
                 }
             } else if (sens.level == HU_SENSITIVITY_S2) {
                 hu_log_info("agent", agent->observer,
                             "S2 sensitivity detected (%s) — PII present, logged for audit",
                             sens.reason ? sens.reason : "personal data");
+                {
+                    hu_observer_event_t sev = {.tag = HU_OBSERVER_EVENT_ERR, .data = {{0}}};
+                    sev.data.err.component = "sensitivity";
+                    sev.data.err.message = sens.reason ? sens.reason : "S2 PII detected";
+                    HU_OBS_SAFE_RECORD_EVENT(agent, &sev);
+                }
             }
         }
 
@@ -4031,6 +4051,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     }
                     hu_consolidation_debounce_tick(&agent_turn_debounce);
 
+                    if (hu_consolidation_get_and_clear_topic_switch())
+                        hu_consolidation_debounce_inject(&agent_turn_debounce,
+                                                         HU_CONSOLIDATION_MIN_ENTRIES);
+
                     bool should_consolidate = (agent->history_count % 10 == 0);
                     if (!should_consolidate) {
                         int64_t tc_now = (int64_t)time(NULL);
@@ -4976,6 +5000,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         dispatcher.max_parallel = 4;
                     dispatcher.timeout_secs = 30;
                     dispatcher.cache = turn_cache;
+                    dispatcher.max_retries = 2;
+                    dispatcher.retry_base_ms = 200;
 
                     const hu_tool_call_t *calls_to_dispatch = calls;
 #ifdef HU_ENABLE_SQLITE

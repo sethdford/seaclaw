@@ -321,7 +321,9 @@ export class ScArtifactPanel extends LitElement {
             .type=${a.type}
             .content=${content}
             .language=${a.language ?? ""}
-            .previousContent=${this._currentVersionIndex > 0 ? a.versions[this._currentVersionIndex - 1]?.content ?? "" : ""}
+            .previousContent=${this._currentVersionIndex > 0
+              ? (a.versions[this._currentVersionIndex - 1]?.content ?? "")
+              : ""}
             .artifactId=${a.id}
           ></hu-artifact-viewer>
         </div>

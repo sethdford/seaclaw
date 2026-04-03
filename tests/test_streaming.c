@@ -320,12 +320,13 @@ typedef struct {
     size_t count;
 } stream_chunk_type_collector_t;
 
-static void collect_stream_chunk_types(void *ctx, const hu_stream_chunk_t *chunk) {
+static bool collect_stream_chunk_types(void *ctx, const hu_stream_chunk_t *chunk) {
     stream_chunk_type_collector_t *c = (stream_chunk_type_collector_t *)ctx;
     if (chunk->is_final)
-        return;
+        return true;
     if (c->count < 24)
         c->types[c->count++] = chunk->type;
+    return true;
 }
 
 static bool collector_has_tool_phases(const stream_chunk_type_collector_t *c) {
@@ -342,11 +343,12 @@ static bool collector_has_tool_phases(const stream_chunk_type_collector_t *c) {
 static int openai_stream_chunk_count;
 static bool openai_stream_got_final;
 
-static void openai_stream_cb(void *ctx, const hu_stream_chunk_t *chunk) {
+static bool openai_stream_cb(void *ctx, const hu_stream_chunk_t *chunk) {
     (void)ctx;
     openai_stream_chunk_count++;
     if (chunk->is_final)
         openai_stream_got_final = true;
+    return true;
 }
 
 static void test_openai_stream_mock(void) {
@@ -405,11 +407,12 @@ static void test_openai_stream_mock(void) {
 static int anthropic_stream_chunk_count;
 static bool anthropic_stream_got_final;
 
-static void anthropic_stream_cb(void *ctx, const hu_stream_chunk_t *chunk) {
+static bool anthropic_stream_cb(void *ctx, const hu_stream_chunk_t *chunk) {
     (void)ctx;
     anthropic_stream_chunk_count++;
     if (chunk->is_final)
         anthropic_stream_got_final = true;
+    return true;
 }
 
 static void test_anthropic_stream_mock(void) {

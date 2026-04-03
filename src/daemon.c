@@ -93,6 +93,7 @@
 #include "human/channel_monitor.h"
 #include "human/context/context_ext.h"
 #include "human/humanness.h"
+#include "human/context/repair.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona/voice_maturity.h"
 #endif
@@ -2027,6 +2028,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
     /* Phase 3: Global turn counter for anti-sycophancy contrarian budget */
     static uint32_t daemon_turn_counter = 0;
+    /* Phase 4: Conversation repair signal (persists across turn boundary) */
+    static hu_repair_signal_t repair_signal = {0};
+    /* Phase 4: Style drift check counter */
+    static unsigned drift_check_counter = 0;
 
     hu_inbox_watcher_t inbox_watcher = {0};
     static int64_t last_inbox_poll_ms = 0;
@@ -4732,6 +4737,36 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 #endif /* HU_ENABLE_SQLITE anti-sycophancy */
 
+                    /* ── Phase 4 pre-turn: style drift correction ─────── */
+#ifdef HU_ENABLE_SQLITE
+                    if (++drift_check_counter % 10 == 0 && agent->memory) {
+                        hu_style_drift_result_t drift_res = {0};
+                        hu_style_fingerprint_t drift_bl = {0};
+                        if (hu_style_drift_check(agent->memory, alloc, &drift_bl,
+                                                  &drift_res) == HU_OK &&
+                            drift_res.corrective && drift_res.directive[0] != '\0') {
+                            size_t dlen = strlen(drift_res.directive);
+                            char *dc = (char *)alloc->alloc(alloc->ctx, dlen + 1);
+                            if (dc) {
+                                memcpy(dc, drift_res.directive, dlen + 1);
+                                PHASE6_APPEND(dc, dlen);
+                            }
+                        }
+                    }
+#endif
+
+                    /* ── Phase 4 pre-turn: conversation repair acknowledgment ── */
+                    if (repair_signal.should_acknowledge &&
+                        repair_signal.directive[0] != '\0') {
+                        size_t rlen = strlen(repair_signal.directive);
+                        char *rc = (char *)alloc->alloc(alloc->ctx, rlen + 1);
+                        if (rc) {
+                            memcpy(rc, repair_signal.directive, rlen + 1);
+                            PHASE6_APPEND(rc, rlen);
+                        }
+                        memset(&repair_signal, 0, sizeof(repair_signal));
+                    }
+
                     /* Phase 7 (F72–F76): Prospective memory, emotional residue, episodic context */
 #ifdef HU_ENABLE_SQLITE
                     if (agent->memory && batch_key && key_len > 0) {
@@ -5568,6 +5603,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (tb_len > 0)
                                 (void)hu_superhuman_avoidance_record(
                                     agent->memory, batch_key, key_len, topic_before, tb_len, true);
+
+                            hu_consolidation_set_topic_switch(true);
 
                             /* Topic-switch consolidation (EdgeClaw-inspired):
                              * trigger memory consolidation on topic change
@@ -7161,6 +7198,40 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (tom_ctx)
                                 alloc->free(alloc->ctx, tom_ctx, tom_ctx_len + 1);
                         }
+
+                        /* ── Phase 4: MToM gap detection ─────────── */
+                        hu_tom_gap_t *tom_gaps = NULL;
+                        size_t tom_gap_count = 0;
+                        if (hu_tom_detect_gaps(&tom_states[tom_idx], alloc,
+                                                &tom_gaps, &tom_gap_count) == HU_OK &&
+                            tom_gaps && tom_gap_count > 0) {
+                            size_t gd_len = 0;
+                            char *gd = hu_tom_build_gap_directive(
+                                alloc, tom_gaps, tom_gap_count, &gd_len);
+                            if (gd && gd_len > 0) {
+                                if (convo_ctx) {
+                                    size_t gt = convo_ctx_len + gd_len + 2;
+                                    char *gm = (char *)alloc->alloc(alloc->ctx, gt);
+                                    if (gm) {
+                                        memcpy(gm, convo_ctx, convo_ctx_len);
+                                        gm[convo_ctx_len] = '\n';
+                                        memcpy(gm + convo_ctx_len + 1, gd, gd_len);
+                                        gm[gt - 1] = '\0';
+                                        alloc->free(alloc->ctx, convo_ctx,
+                                                    convo_ctx_len + 1);
+                                        convo_ctx = gm;
+                                        convo_ctx_len = gt - 1;
+                                    }
+                                    alloc->free(alloc->ctx, gd, gd_len + 1);
+                                } else {
+                                    convo_ctx = gd;
+                                    convo_ctx_len = gd_len;
+                                }
+                            } else if (gd) {
+                                alloc->free(alloc->ctx, gd, gd_len + 1);
+                            }
+                            hu_tom_gaps_free(alloc, tom_gaps, tom_gap_count);
+                        }
                     }
                 }
 
@@ -7674,6 +7745,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Adaptive model selection: route to optimal model + thinking budget
                  * based on message content, relationship, and time of day */
 #ifndef HU_IS_TEST
+                if (config && config->agent.s3_local_model &&
+                    !agent->degradation_config.s3_local_model) {
+                    agent->degradation_config.s3_local_model = config->agent.s3_local_model;
+                    agent->degradation_config.s3_local_model_len =
+                        strlen(config->agent.s3_local_model);
+                }
                 {
                     hu_model_router_config_t mr_cfg = hu_model_router_default_config();
                     if (config && config->agent.mr_reflexive_model) {

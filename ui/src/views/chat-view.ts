@@ -612,7 +612,9 @@ export class ScChatView extends GatewayAwareLitElement {
                     }}
                     @hu-toggle-reaction=${(e: CustomEvent<{ index: number; value: string }>) =>
                       this.chat.toggleReaction?.(e.detail.index, e.detail.value)}
-                    @hu-swipe-reply=${async (e: CustomEvent<{ index: number; content: string }>) => {
+                    @hu-swipe-reply=${async (
+                      e: CustomEvent<{ index: number; content: string }>,
+                    ) => {
                       this.inputValue = e.detail.content;
                       this.requestUpdate();
                       await this.updateComplete;
@@ -705,7 +707,10 @@ export class ScChatView extends GatewayAwareLitElement {
                 mentionedFiles?: string[];
                 thinkingEnabled?: boolean;
               }>,
-            ) => this._handleSend(e.detail.message, e.detail.files, e.detail.mentionedFiles, { thinkingEnabled: e.detail.thinkingEnabled })}
+            ) =>
+              this._handleSend(e.detail.message, e.detail.files, e.detail.mentionedFiles, {
+                thinkingEnabled: e.detail.thinkingEnabled,
+              })}
             @hu-use-suggestion=${(e: CustomEvent<{ text: string }>) =>
               this._handleSend(e.detail.text)}
             @hu-input-change=${(e: CustomEvent<{ value: string }>) => {

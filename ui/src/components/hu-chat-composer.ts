@@ -1078,7 +1078,9 @@ export class ScChatComposer extends LitElement {
               class="thinking-toggle ${this.thinkingEnabled ? "active" : ""}"
               type="button"
               @click=${this._toggleThinking}
-              aria-label=${this.thinkingEnabled ? "Disable extended thinking" : "Enable extended thinking"}
+              aria-label=${this.thinkingEnabled
+                ? "Disable extended thinking"
+                : "Enable extended thinking"}
               aria-pressed=${this.thinkingEnabled}
               title="Extended thinking (${this.thinkingEnabled ? "on" : "off"})"
             >

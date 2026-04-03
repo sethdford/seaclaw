@@ -582,7 +582,11 @@ export class ScModelsView extends GatewayAwareLitElement {
   private _formatTime(ts: number): string {
     if (!ts) return "—";
     const d = new Date(ts * 1000);
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
   }
 
   private _renderRoutingDecisions() {

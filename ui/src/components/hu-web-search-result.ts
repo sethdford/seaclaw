@@ -43,11 +43,7 @@ export class ScWebSearchResult extends LitElement {
     }
 
     .header:hover {
-      background: color-mix(
-        in srgb,
-        var(--hu-accent-secondary, var(--hu-accent)) 8%,
-        transparent
-      );
+      background: color-mix(in srgb, var(--hu-accent-secondary, var(--hu-accent)) 8%, transparent);
     }
 
     .header:focus-visible {
@@ -244,13 +240,9 @@ export class ScWebSearchResult extends LitElement {
           <span class="search-icon" aria-hidden="true">${icons["magnifying-glass"]}</span>
           <span class="label">
             <span class="site-count">Searched ${sitesLabel}</span>
-            ${this.query
-              ? html`<span class="query-text">\u201C${this.query}\u201D</span>`
-              : nothing}
+            ${this.query ? html`<span class="query-text">“${this.query}”</span>` : nothing}
           </span>
-          <span class="caret ${this._expanded ? "open" : ""}"
-            >${icons["caret-right"]}</span
-          >
+          <span class="caret ${this._expanded ? "open" : ""}">${icons["caret-right"]}</span>
         </button>
         <div id="search-detail" class="detail ${this._expanded ? "open" : ""}">
           ${this.query
@@ -271,7 +263,9 @@ export class ScWebSearchResult extends LitElement {
                         <span class="site-badge">
                           <img
                             class="site-favicon"
-                            src="https://www.google.com/s2/favicons?domain=${this._getDomain(site)}&sz=16"
+                            src="https://www.google.com/s2/favicons?domain=${this._getDomain(
+                              site,
+                            )}&sz=16"
                             alt=""
                             loading="lazy"
                             width="12"

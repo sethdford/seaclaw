@@ -1,6 +1,7 @@
 #include "human/agent/model_router.h"
 #include "human/provider.h"
 #include <ctype.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
@@ -108,7 +109,7 @@ hu_model_router_config_t hu_model_router_default_config(void) {
     cfg.reflexive_model_len = 29;
     cfg.conversational_model = "gemini-3-flash-preview";
     cfg.conversational_model_len = 22;
-    cfg.analytical_model = "gemini-3.1-pro-preview";
+    cfg.analytical_model = "gemini-3-flash-preview";
     cfg.analytical_model_len = 22;
     cfg.deep_model = "gemini-3.1-pro-preview";
     cfg.deep_model_len = 22;
@@ -132,10 +133,10 @@ static int compute_heuristic_score(const char *msg, size_t msg_len,
         score -= 2;
     else if (words <= 8)
         score -= 1;
-    else if (words > 30)
-        score += 1;
     else if (words > 80)
         score += 2;
+    else if (words > 30)
+        score += 1;
 
     score += emotion;
 
@@ -348,12 +349,17 @@ bool hu_route_cache_get(hu_route_cache_t *cache, const char *msg, size_t msg_len
     if (!cache || !msg || msg_len == 0 || !tier)
         return false;
     uint64_t hash = hu_route_hash_prompt(msg, msg_len);
-    size_t idx = (size_t)(hash % HU_ROUTE_CACHE_SIZE);
-    hu_route_cache_entry_t *e = &cache->entries[idx];
-    if (e->occupied && e->hash == hash &&
-        (now_secs - e->timestamp) < HU_ROUTE_CACHE_TTL_SECS) {
-        *tier = e->tier;
-        return true;
+    size_t start = (size_t)(hash % HU_ROUTE_CACHE_SIZE);
+    for (size_t probe = 0; probe < 4; probe++) {
+        size_t idx = (start + probe) % HU_ROUTE_CACHE_SIZE;
+        hu_route_cache_entry_t *e = &cache->entries[idx];
+        if (!e->occupied)
+            return false;
+        if (e->hash == hash && e->msg_len == msg_len &&
+            (now_secs - e->timestamp) < HU_ROUTE_CACHE_TTL_SECS) {
+            *tier = e->tier;
+            return true;
+        }
     }
     return false;
 }
@@ -363,9 +369,23 @@ void hu_route_cache_put(hu_route_cache_t *cache, const char *msg, size_t msg_len
     if (!cache || !msg || msg_len == 0)
         return;
     uint64_t hash = hu_route_hash_prompt(msg, msg_len);
-    size_t idx = (size_t)(hash % HU_ROUTE_CACHE_SIZE);
-    hu_route_cache_entry_t *e = &cache->entries[idx];
+    size_t start = (size_t)(hash % HU_ROUTE_CACHE_SIZE);
+    size_t best = start;
+    for (size_t probe = 0; probe < 4; probe++) {
+        size_t idx = (start + probe) % HU_ROUTE_CACHE_SIZE;
+        hu_route_cache_entry_t *e = &cache->entries[idx];
+        if (!e->occupied || (now_secs - e->timestamp) >= HU_ROUTE_CACHE_TTL_SECS) {
+            best = idx;
+            break;
+        }
+        if (e->hash == hash && e->msg_len == msg_len) {
+            best = idx;
+            break;
+        }
+    }
+    hu_route_cache_entry_t *e = &cache->entries[best];
     e->hash = hash;
+    e->msg_len = msg_len;
     e->tier = tier;
     e->timestamp = now_secs;
     e->occupied = true;
@@ -384,53 +404,74 @@ static bool ci_match(const char *a, size_t a_len, const char *b) {
     return true;
 }
 
+static bool match_tier_value(const char *val, size_t val_len, hu_cognitive_tier_t *tier) {
+    if (ci_match(val, val_len, "REFLEXIVE") || ci_match(val, val_len, "SIMPLE")) {
+        *tier = HU_TIER_REFLEXIVE;
+        return true;
+    }
+    if (ci_match(val, val_len, "CONVERSATIONAL") || ci_match(val, val_len, "MEDIUM")) {
+        *tier = HU_TIER_CONVERSATIONAL;
+        return true;
+    }
+    if (ci_match(val, val_len, "ANALYTICAL") || ci_match(val, val_len, "COMPLEX") ||
+        ci_match(val, val_len, "RESEARCH")) {
+        *tier = HU_TIER_ANALYTICAL;
+        return true;
+    }
+    if (ci_match(val, val_len, "DEEP") || ci_match(val, val_len, "REASONING")) {
+        *tier = HU_TIER_DEEP;
+        return true;
+    }
+    return false;
+}
+
 bool hu_route_parse_judge_response(const char *response, size_t response_len,
                                    hu_cognitive_tier_t *tier) {
     if (!response || response_len == 0 || !tier)
         return false;
 
-    /* Find "tier" key and extract its string value from JSON-like response */
-    const char *p = response;
     const char *end = response + response_len;
 
-    while (p < end) {
-        const char *key = "\"tier\"";
-        size_t key_len = 6;
-        if ((size_t)(end - p) >= key_len && memcmp(p, key, key_len) == 0) {
-            p += key_len;
-            while (p < end && (*p == ' ' || *p == ':'))
-                p++;
-            if (p < end && *p == '"') {
-                p++;
-                const char *val_start = p;
-                while (p < end && *p != '"')
-                    p++;
-                size_t val_len = (size_t)(p - val_start);
-                if (ci_match(val_start, val_len, "REFLEXIVE") ||
-                    ci_match(val_start, val_len, "SIMPLE")) {
-                    *tier = HU_TIER_REFLEXIVE;
+    /* Scan for "tier" key in JSON (tolerant of whitespace, newlines, single quotes) */
+    for (const char *p = response; p < end - 4; p++) {
+        if (p > response && (p[-1] == '"' || p[-1] == '\'') &&
+            (p[0] == 't' || p[0] == 'T') && (p[1] == 'i' || p[1] == 'I') &&
+            (p[2] == 'e' || p[2] == 'E') && (p[3] == 'r' || p[3] == 'R')) {
+            const char *after_key = p + 4;
+            if (after_key < end && (*after_key == '"' || *after_key == '\''))
+                after_key++;
+            while (after_key < end && (*after_key == ' ' || *after_key == '\t' ||
+                                       *after_key == '\n' || *after_key == '\r' ||
+                                       *after_key == ':'))
+                after_key++;
+            if (after_key < end && (*after_key == '"' || *after_key == '\'')) {
+                char quote = *after_key;
+                after_key++;
+                const char *val_start = after_key;
+                while (after_key < end && *after_key != quote)
+                    after_key++;
+                size_t val_len = (size_t)(after_key - val_start);
+                if (match_tier_value(val_start, val_len, tier))
                     return true;
-                }
-                if (ci_match(val_start, val_len, "CONVERSATIONAL") ||
-                    ci_match(val_start, val_len, "MEDIUM")) {
-                    *tier = HU_TIER_CONVERSATIONAL;
-                    return true;
-                }
-                if (ci_match(val_start, val_len, "ANALYTICAL") ||
-                    ci_match(val_start, val_len, "COMPLEX") ||
-                    ci_match(val_start, val_len, "RESEARCH")) {
-                    *tier = HU_TIER_ANALYTICAL;
-                    return true;
-                }
-                if (ci_match(val_start, val_len, "DEEP") ||
-                    ci_match(val_start, val_len, "REASONING")) {
-                    *tier = HU_TIER_DEEP;
-                    return true;
-                }
-                return false;
             }
         }
-        p++;
+    }
+
+    /* Fallback: scan for bare tier names (handles malformed responses) */
+    static const char *bare_names[] = {
+        "REFLEXIVE", "CONVERSATIONAL", "ANALYTICAL", "DEEP",
+        "SIMPLE",    "MEDIUM",         "COMPLEX",    "RESEARCH", "REASONING",
+    };
+    for (size_t i = 0; i < sizeof(bare_names) / sizeof(bare_names[0]); i++) {
+        size_t nlen = strlen(bare_names[i]);
+        for (const char *p = response; p + nlen <= end; p++) {
+            if (ci_match(p, nlen, bare_names[i])) {
+                bool left_ok = (p == response || !isalpha((unsigned char)p[-1]));
+                bool right_ok = (p + nlen >= end || !isalpha((unsigned char)p[nlen]));
+                if (left_ok && right_ok)
+                    return match_tier_value(p, nlen, tier);
+            }
+        }
     }
     return false;
 }
@@ -563,11 +604,22 @@ const char *hu_route_source_str(hu_route_source_t source) {
 
 static hu_route_decision_log_t s_global_log;
 static bool s_global_log_initialized = false;
+static pthread_mutex_t s_global_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 hu_route_decision_log_t *hu_route_global_log(void) {
+    pthread_mutex_lock(&s_global_log_mutex);
     if (!s_global_log_initialized) {
         hu_route_log_init(&s_global_log);
         s_global_log_initialized = true;
     }
+    pthread_mutex_unlock(&s_global_log_mutex);
     return &s_global_log;
+}
+
+void hu_route_global_log_lock(void) {
+    pthread_mutex_lock(&s_global_log_mutex);
+}
+
+void hu_route_global_log_unlock(void) {
+    pthread_mutex_unlock(&s_global_log_mutex);
 }

@@ -31,6 +31,8 @@ typedef struct hu_dispatcher {
     uint32_t max_parallel; /* 1 = sequential; >1 = parallel (when supported) */
     uint32_t timeout_secs; /* per-tool timeout; 0 = no limit */
     hu_tool_cache_t *cache; /* optional; NULL disables caching */
+    uint32_t max_retries;   /* per-tool retries on failure; 0 = no retries */
+    uint32_t retry_base_ms; /* base delay for exponential backoff; default 100 */
 } hu_dispatcher_t;
 
 typedef struct hu_dispatch_result {

@@ -23,18 +23,20 @@
 static char stream_recv_buf[64];
 static size_t stream_recv_len;
 
-static void stream_cb_openai(void *ctx, const hu_stream_chunk_t *chunk) {
+static bool stream_cb_openai(void *ctx, const hu_stream_chunk_t *chunk) {
     (void)ctx;
     if (chunk->delta && chunk->delta_len > 0 &&
         stream_recv_len + chunk->delta_len < sizeof(stream_recv_buf)) {
         memcpy(stream_recv_buf + stream_recv_len, chunk->delta, chunk->delta_len);
         stream_recv_len += chunk->delta_len;
     }
+    return true;
 }
 
-static void stream_cb_noop(void *ctx, const hu_stream_chunk_t *chunk) {
+static bool stream_cb_noop(void *ctx, const hu_stream_chunk_t *chunk) {
     (void)ctx;
     (void)chunk;
+    return true;
 }
 
 static size_t sse_call_order[4];

@@ -326,6 +326,13 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
                         strlen(cfg->agent.mr_judge_model) + 1);
             cfg->agent.mr_judge_model = hu_strdup(a, mr_judge_model);
         }
+        const char *s3_local = hu_json_get_string(mr_obj, "s3_local_model");
+        if (s3_local) {
+            if (cfg->agent.s3_local_model)
+                a->free(a->ctx, cfg->agent.s3_local_model,
+                        strlen(cfg->agent.s3_local_model) + 1);
+            cfg->agent.s3_local_model = hu_strdup(a, s3_local);
+        }
     }
 
     return HU_OK;

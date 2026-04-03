@@ -62,6 +62,7 @@ struct hu_allocator;
 
 typedef struct hu_route_cache_entry {
     uint64_t hash;
+    size_t msg_len;
     hu_cognitive_tier_t tier;
     int64_t timestamp;
     bool occupied;
@@ -134,7 +135,10 @@ void hu_route_log_tier_counts(const hu_route_decision_log_t *log, size_t counts[
 const char *hu_cognitive_tier_str(hu_cognitive_tier_t tier);
 const char *hu_route_source_str(hu_route_source_t source);
 
-/* Global decision log singleton — threadsafe reads from gateway. */
+/* Global decision log singleton — threadsafe reads from gateway.
+ * For thread-safe iteration, bracket reads with lock/unlock. */
 hu_route_decision_log_t *hu_route_global_log(void);
+void hu_route_global_log_lock(void);
+void hu_route_global_log_unlock(void);
 
 #endif

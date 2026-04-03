@@ -11,27 +11,64 @@
 
 #define HU_CONS_MAX_TOKENS 64
 
-static void tokenize(const char *s, size_t len, const char **tokens, size_t *count) {
+static bool is_stop_word(const char *w, size_t wlen) {
+    static const char *stops[] = {
+        "a", "an", "the", "is", "was", "are", "were", "be", "been", "being",
+        "to", "of", "in", "for", "on", "with", "at", "by", "from", "and",
+        "or", "but", "not", "this", "that", "it", "i", "my", "me", "we",
+    };
+    for (size_t i = 0; i < sizeof(stops) / sizeof(stops[0]); i++) {
+        size_t slen = strlen(stops[i]);
+        if (wlen == slen) {
+            bool match = true;
+            for (size_t j = 0; j < slen; j++) {
+                if (tolower((unsigned char)w[j]) != stops[i][j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match)
+                return true;
+        }
+    }
+    return false;
+}
+
+typedef struct {
+    const char *start;
+    size_t len;
+} cons_token_t;
+
+static void tokenize(const char *s, size_t len, cons_token_t *tokens, size_t *count) {
     *count = 0;
     if (!s || len == 0)
         return;
     size_t i = 0;
     while (i < len && *count < HU_CONS_MAX_TOKENS) {
-        while (i < len && (unsigned char)s[i] <= ' ')
+        while (i < len && !isalnum((unsigned char)s[i]))
             i++;
         if (i >= len)
             break;
-        tokens[(*count)++] = s + i;
-        while (i < len && (unsigned char)s[i] > ' ')
+        size_t start = i;
+        while (i < len && isalnum((unsigned char)s[i]))
             i++;
+        size_t tlen = i - start;
+        if (tlen > 0 && !is_stop_word(s + start, tlen)) {
+            tokens[*count].start = s + start;
+            tokens[*count].len = tlen;
+            (*count)++;
+        }
     }
 }
 
-static size_t token_len(const char *token, const char *end) {
-    size_t n = 0;
-    while (token + n < end && (unsigned char)token[n] > ' ')
-        n++;
-    return n;
+static bool tokens_equal_ci(const cons_token_t *a, const cons_token_t *b) {
+    if (a->len != b->len)
+        return false;
+    for (size_t i = 0; i < a->len; i++) {
+        if (tolower((unsigned char)a->start[i]) != tolower((unsigned char)b->start[i]))
+            return false;
+    }
+    return true;
 }
 
 uint32_t hu_similarity_score(const char *a, size_t a_len, const char *b, size_t b_len) {
@@ -40,8 +77,8 @@ uint32_t hu_similarity_score(const char *a, size_t a_len, const char *b, size_t 
     if (a_len == 0 && b_len == 0)
         return 100;
 
-    const char *a_tokens[HU_CONS_MAX_TOKENS];
-    const char *b_tokens[HU_CONS_MAX_TOKENS];
+    cons_token_t a_tokens[HU_CONS_MAX_TOKENS];
+    cons_token_t b_tokens[HU_CONS_MAX_TOKENS];
     size_t a_count = 0, b_count = 0;
     tokenize(a, a_len, a_tokens, &a_count);
     tokenize(b, b_len, b_tokens, &b_count);
@@ -52,14 +89,9 @@ uint32_t hu_similarity_score(const char *a, size_t a_len, const char *b, size_t 
         return 0;
 
     size_t shared = 0;
-    const char *a_end = a + a_len;
-    const char *b_end = b + b_len;
-
     for (size_t i = 0; i < a_count; i++) {
-        size_t ai_len = token_len(a_tokens[i], a_end);
         for (size_t j = 0; j < b_count; j++) {
-            size_t bj_len = token_len(b_tokens[j], b_end);
-            if (ai_len == bj_len && memcmp(a_tokens[i], b_tokens[j], ai_len) == 0) {
+            if (tokens_equal_ci(&a_tokens[i], &b_tokens[j])) {
                 shared++;
                 break;
             }
@@ -355,4 +387,23 @@ void hu_consolidation_debounce_reset(hu_consolidation_debounce_t *d, int64_t now
         return;
     d->last_consolidation_secs = now_secs;
     d->entries_since_last = 0;
+}
+
+void hu_consolidation_debounce_inject(hu_consolidation_debounce_t *d, size_t extra_ticks) {
+    if (d)
+        d->entries_since_last += extra_ticks;
+}
+
+static bool s_topic_switch_detected = false;
+
+void hu_consolidation_set_topic_switch(bool detected) {
+    s_topic_switch_detected = detected;
+}
+
+bool hu_consolidation_get_and_clear_topic_switch(void) {
+    if (s_topic_switch_detected) {
+        s_topic_switch_detected = false;
+        return true;
+    }
+    return false;
 }

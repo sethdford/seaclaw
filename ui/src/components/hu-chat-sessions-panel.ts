@@ -516,8 +516,7 @@ export class ScChatSessionsPanel extends LitElement {
   }
 
   private _toggleProjectFilter(projectId: string): void {
-    this._activeProjectFilter =
-      this._activeProjectFilter === projectId ? null : projectId;
+    this._activeProjectFilter = this._activeProjectFilter === projectId ? null : projectId;
     this._focusedIndex = -1;
   }
 
@@ -605,8 +604,7 @@ export class ScChatSessionsPanel extends LitElement {
                         class="project-dot"
                         style="background: ${this._getProjectColor(p)}"
                       ></span>
-                      ${p.name}
-                      ${p.pinned ? icons["push-pin"] : nothing}
+                      ${p.name} ${p.pinned ? icons["push-pin"] : nothing}
                     </button>
                   `,
                 )}
