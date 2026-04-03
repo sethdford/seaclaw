@@ -362,6 +362,24 @@ const hu_contact_profile_t *hu_persona_find_contact(const hu_persona_t *persona,
         if (cp_len == contact_id_len && memcmp(cp->contact_id, contact_id, contact_id_len) == 0)
             return cp;
     }
+    /* Fallback: match against email field (e.g. iMessage uses email addresses) */
+    for (size_t i = 0; i < persona->contacts_count; i++) {
+        const hu_contact_profile_t *cp = &persona->contacts[i];
+        if (!cp->email)
+            continue;
+        size_t em_len = strlen(cp->email);
+        if (em_len == contact_id_len && memcmp(cp->email, contact_id, contact_id_len) == 0)
+            return cp;
+    }
+    /* Fallback: match against name field (case-insensitive, partial) */
+    for (size_t i = 0; i < persona->contacts_count; i++) {
+        const hu_contact_profile_t *cp = &persona->contacts[i];
+        if (!cp->name)
+            continue;
+        size_t nm_len = strlen(cp->name);
+        if (nm_len == contact_id_len && strncasecmp(cp->name, contact_id, contact_id_len) == 0)
+            return cp;
+    }
     if (getenv("HU_DEBUG"))
         hu_log_info("persona", NULL, "find_contact: no match for '%.*s' among %zu contacts",
                     (int)(contact_id_len > 30 ? 30 : contact_id_len), contact_id,

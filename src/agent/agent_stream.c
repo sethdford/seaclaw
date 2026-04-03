@@ -1,6 +1,5 @@
 /* Streaming infrastructure: token callback wiring, hu_agent_turn_stream, hu_agent_turn_stream_v2 */
 #include "agent_internal.h"
-#include "human/core/log.h"
 #include "human/agent/awareness.h"
 #include "human/agent/commands.h"
 #include "human/agent/memory_loader.h"
@@ -8,11 +7,13 @@
 #include "human/agent/prompt.h"
 #include "human/context.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/tool.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #endif
+#include "human/agent/session_persist.h"
 #include "human/humanness.h"
 #include "human/provider.h"
 #include "human/voice.h"
@@ -225,7 +226,7 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
             hu_memory_loader_load(&loader, msg, msg_len, "", 0, &memory_ctx, &memory_ctx_len);
         if (mem_err != HU_OK && mem_err != HU_ERR_NOT_SUPPORTED)
             hu_log_error("agent_stream", NULL, "memory_loader_load failed: %s",
-                    hu_error_string(mem_err));
+                         hu_error_string(mem_err));
     }
 
     /* Build situational awareness context */
@@ -400,7 +401,7 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
                     agent, HU_ROLE_ASSISTANT, sresp.content, sresp.content_len, NULL, 0, NULL, 0);
                 if (hist_err != HU_OK)
                     hu_log_error("agent_stream", NULL, "append_history failed: %s",
-                            hu_error_string(hist_err));
+                                 hu_error_string(hist_err));
             }
             *response_out = hu_strndup(agent->alloc, sresp.content, sresp.content_len);
             hu_agent_internal_maybe_tts(agent, sresp.content, sresp.content_len);
@@ -495,7 +496,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             hu_memory_loader_load(&loader, msg, msg_len, "", 0, &memory_ctx, &memory_ctx_len);
         if (mem_err != HU_OK && mem_err != HU_ERR_NOT_SUPPORTED)
             hu_log_error("agent_stream_v2", NULL, "memory_loader_load failed: %s",
-                    hu_error_string(mem_err));
+                         hu_error_string(mem_err));
     }
 
     char *awareness_ctx = NULL;
@@ -675,7 +676,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     agent, HU_ROLE_ASSISTANT, sresp.content, sresp.content_len, NULL, 0, NULL, 0);
                 if (hist_err != HU_OK)
                     hu_log_error("agent_stream_v2", NULL, "append_history failed: %s",
-                            hu_error_string(hist_err));
+                                 hu_error_string(hist_err));
                 final_content = hu_strndup(agent->alloc, sresp.content, sresp.content_len);
                 final_content_len = sresp.content_len;
             }
@@ -721,7 +722,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                             .tool_call_id_len = call->id_len,
                         };
                         tool->vtable->execute_streaming(tool->ctx, agent->alloc, args,
-                                                         tool_chunk_to_event, &bridge, &result);
+                                                        tool_chunk_to_event, &bridge, &result);
                     } else if (tool->vtable->execute) {
                         tool->vtable->execute(tool->ctx, agent->alloc, args, &result);
                     }
@@ -772,6 +773,17 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         if (response_len_out)
             *response_len_out = final_content_len;
         hu_agent_internal_maybe_tts(agent, final_content, final_content_len);
+    }
+
+    /* Auto-save session after successful streaming turn */
+    if (agent->auto_save && agent->session_id[0] != '\0') {
+        const char *home = getenv("HOME");
+        char sdir[512];
+        if (home)
+            snprintf(sdir, sizeof(sdir), "%s/.human/sessions", home);
+        else
+            snprintf(sdir, sizeof(sdir), ".human/sessions");
+        hu_session_persist_save(agent->alloc, agent, sdir, NULL);
     }
 
     hu_agent_clear_current_for_tools();

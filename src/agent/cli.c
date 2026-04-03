@@ -1,4 +1,3 @@
-#include "human/core/log.h"
 #include "human/agent/cli.h"
 #include "human/agent.h"
 #include "human/agent/awareness.h"
@@ -7,6 +6,7 @@
 #include "human/agent/spawn.h"
 #include "human/agent/tui.h"
 #include "human/channels/cli.h"
+#include "human/core/log.h"
 #ifdef HU_HAS_VOICE_CHANNEL
 #include "human/channels/voice_channel.h"
 #endif
@@ -39,6 +39,7 @@
 #include "human/observability/otel.h"
 #endif
 #include "human/agent/model_router.h"
+#include "human/agent/session_persist.h"
 #include "human/plugin.h"
 #include "human/provider.h"
 #include "human/providers/factory.h"
@@ -298,7 +299,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_error_t err = (config_path && config_path[0]) ? hu_config_load_from(alloc, config_path, &cfg)
                                                      : hu_config_load(alloc, &cfg);
     if (err != HU_OK) {
-        fprintf(stderr, "[%s] Config error: %s\n", HU_CODENAME, hu_error_string(err));
+        hu_log_error("human", NULL, "config error: %s", hu_error_string(err));
         return err;
     }
 
@@ -322,8 +323,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     err = hu_provider_create(alloc, prov_name, prov_name_len, api_key, api_key_len, base_url,
                              base_url_len, &provider);
     if (err != HU_OK) {
-        fprintf(stderr, "[%s] Provider '%s' init failed: %s\n", HU_CODENAME, prov_name,
-                hu_error_string(err));
+        hu_log_error("human", NULL, "provider '%s' init failed: %s", prov_name,
+                     hu_error_string(err));
 #ifdef HU_HAS_VOICE_CHANNEL
         hu_channel_voice_destroy(&cli_voice_ch);
 #endif
@@ -340,8 +341,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_runtime_t runtime;
     err = hu_runtime_from_config(&cfg, &runtime);
     if (err != HU_OK) {
-        fprintf(stderr, "[%s] Runtime '%s' not supported: %s\n", HU_CODENAME,
-                cfg.runtime.kind ? cfg.runtime.kind : "(null)", hu_error_string(err));
+        hu_log_error("human", NULL, "runtime '%s' not supported: %s",
+                     cfg.runtime.kind ? cfg.runtime.kind : "(null)", hu_error_string(err));
 #ifdef HU_HAS_VOICE_CHANNEL
         hu_channel_voice_destroy(&cli_voice_ch);
 #endif
@@ -411,7 +412,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     if (log_env && log_env[0]) {
         log_fp = fopen(log_env, "a");
         if (!log_fp) {
-            hu_log_error("warn", NULL, "could not open log file '%s': %s", log_env, strerror(errno));
+            hu_log_error("warn", NULL, "could not open log file '%s': %s", log_env,
+                         strerror(errno));
         } else {
             observer = hu_log_observer_create(alloc, log_fp);
         }
@@ -458,7 +460,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                                   memory.vtable ? &memory : NULL, cron, cli_agent_pool, cli_mailbox,
                                   NULL, NULL, &tools, &tools_count);
     if (err != HU_OK) {
-        fprintf(stderr, "[%s] Tools init failed: %s\n", HU_CODENAME, hu_error_string(err));
+        hu_log_error("human", NULL, "tools init failed: %s", hu_error_string(err));
         if (cron)
             hu_cron_destroy(cron, alloc);
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
@@ -509,7 +511,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         prov_name, prov_name_len, temp, ws, strlen(ws), max_iters, max_hist, cfg.memory.auto_save,
         2, NULL, 0, cfg.agent.persona, cfg.agent.persona ? strlen(cfg.agent.persona) : 0, &ctx_cfg);
     if (err != HU_OK) {
-        fprintf(stderr, "[%s] Agent init failed: %s\n", HU_CODENAME, hu_error_string(err));
+        hu_log_error("human", NULL, "agent init failed: %s", hu_error_string(err));
         if (observer.vtable && observer.vtable->deinit)
             observer.vtable->deinit(observer.ctx);
         if (log_fp)
@@ -651,6 +653,36 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_agent_set_outcomes(&agent, &cli_outcomes);
     agent.scheduler = (struct hu_cron_scheduler *)cron;
 
+    /* Session persistence: load prior conversation if --session was given,
+     * or generate a session ID so auto_save works for new sessions. */
+    {
+        char sessions_dir[512];
+        const char *home = getenv("HOME");
+        if (home)
+            snprintf(sessions_dir, sizeof(sessions_dir), "%s/.human/sessions", home);
+        else
+            snprintf(sessions_dir, sizeof(sessions_dir), ".human/sessions");
+        if (parsed_args.session_id && parsed_args.session_id[0]) {
+            size_t sid_len = strlen(parsed_args.session_id);
+            if (sid_len < sizeof(agent.session_id)) {
+                memcpy(agent.session_id, parsed_args.session_id, sid_len);
+                agent.session_id[sid_len] = '\0';
+                hu_error_t lerr =
+                    hu_session_persist_load(alloc, &agent, sessions_dir, parsed_args.session_id);
+                if (lerr == HU_OK)
+                    hu_log_info("human", NULL, "resumed session: %s", parsed_args.session_id);
+                else
+                    hu_log_info("human", NULL, "new session: %s", parsed_args.session_id);
+            }
+        } else if (agent.auto_save) {
+            /* Generate a default session ID from timestamp so auto_save works */
+            time_t now = time(NULL);
+            int sn = snprintf(agent.session_id, sizeof(agent.session_id), "cli-%ld", (long)now);
+            if (sn <= 0 || (size_t)sn >= sizeof(agent.session_id))
+                agent.session_id[0] = '\0';
+        }
+    }
+
     /* TUI mode: launch split-pane terminal UI if --tui was passed */
     if (parsed_args.use_tui) {
         hu_tui_state_t tui_state;
@@ -659,7 +691,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             err = hu_tui_run(&tui_state);
             hu_tui_deinit(&tui_state);
         } else {
-            fprintf(stderr, "[%s] TUI not available: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("human", &observer, "TUI not available: %s", hu_error_string(err));
         }
         hu_agent_deinit(&agent);
         if (retrieval_engine.vtable && retrieval_engine.vtable->deinit)
@@ -797,10 +829,11 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                     hu_intelligence_cycle_result_t cycle_result;
                     memset(&cycle_result, 0, sizeof(cycle_result));
                     if (hu_intelligence_run_cycle(alloc, findings_db, &cycle_result) == HU_OK) {
-                        hu_log_info("intelligence", NULL, "cycle: %zu actioned, %zu lessons, %zu events, %zu "
-                                "values",
-                                cycle_result.findings_actioned, cycle_result.lessons_extracted,
-                                cycle_result.events_recorded, cycle_result.values_learned);
+                        hu_log_info("intelligence", NULL,
+                                    "cycle: %zu actioned, %zu lessons, %zu events, %zu "
+                                    "values",
+                                    cycle_result.findings_actioned, cycle_result.lessons_extracted,
+                                    cycle_result.events_recorded, cycle_result.values_learned);
                     }
 #endif
                 }
@@ -808,7 +841,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
 #endif
             alloc->free(alloc->ctx, response, response_len + 1);
         } else if (err != HU_OK) {
-            fprintf(stderr, "[%s] Agent turn failed: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("human", &observer, "agent turn failed: %s", hu_error_string(err));
 #if defined(HU_ENABLE_FEEDS) && defined(HU_ENABLE_SQLITE)
             {
                 sqlite3 *fail_db = hu_sqlite_memory_get_db(&memory);
@@ -927,12 +960,12 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             size_t summary_len = 0;
             hu_error_t reload_err = hu_agent_reload_config(&agent, &summary, &summary_len);
             if (reload_err == HU_OK && summary) {
-                fprintf(stderr, HU_COLOR_DIM "[human] Config reloaded via SIGHUP\n" HU_COLOR_RESET);
-                fprintf(stderr, HU_COLOR_DIM "%s" HU_COLOR_RESET "\n", summary);
+                hu_log_info("human", &observer, "config reloaded via SIGHUP");
+                hu_log_info("human", &observer, "%s", summary);
                 alloc->free(alloc->ctx, summary, summary_len + 1);
             } else if (reload_err != HU_OK) {
-                fprintf(stderr, HU_COLOR_WARNING "[human] Config reload failed: %s\n" HU_COLOR_RESET,
-                        hu_error_string(reload_err));
+                hu_log_error("human", &observer, "config reload failed: %s",
+                             hu_error_string(reload_err));
             }
         }
 #endif
