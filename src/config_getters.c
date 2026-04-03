@@ -1,5 +1,6 @@
 #include "human/config.h"
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,9 +53,9 @@ hu_error_t hu_config_validate(const hu_config_t *cfg) {
         bool vertex_adc = burl && strstr(burl, "aiplatform.googleapis.com") != NULL;
         if (!key || !key[0]) {
             if (!vertex_adc)
-                fprintf(stderr,
-                        "Warning: provider %s requires an API key but none is configured\n",
-                        cfg->default_provider ? cfg->default_provider : "(unknown)");
+                hu_log_error("config", NULL,
+                             "provider %s requires an API key but none is configured",
+                             cfg->default_provider ? cfg->default_provider : "(unknown)");
         }
     }
     return HU_OK;

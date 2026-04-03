@@ -1,6 +1,7 @@
 /* Style learning loop: re-analyze conversations to update persona */
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/memory.h"
 #include "human/persona.h"
@@ -9,16 +10,16 @@
 #include <string.h>
 
 #define HU_STYLE_REANALYZE_PROMPT_CAP 16384
-#define HU_STYLE_REANALYZE_MSG_LIMIT 20
-#define HU_STYLE_REANALYZE_MIN_MSGS 2
+#define HU_STYLE_REANALYZE_MSG_LIMIT  20
+#define HU_STYLE_REANALYZE_MIN_MSGS   2
 
-#define HU_STYLE_ANALYST_SYS "You are a communication style analyst. Analyze the following " \
+#define HU_STYLE_ANALYST_SYS                                                          \
+    "You are a communication style analyst. Analyze the following "                   \
     "messages and extract personality traits, vocabulary preferences, communication " \
     "patterns, and style rules in JSON format."
 
 hu_error_t hu_persona_style_reanalyze(hu_allocator_t *alloc, hu_provider_t *provider,
-                                      const char *model, size_t model_len,
-                                      hu_memory_t *memory,
+                                      const char *model, size_t model_len, hu_memory_t *memory,
                                       const char *persona_name, size_t persona_name_len,
                                       const char *channel, size_t channel_len,
                                       const char *contact_id, size_t contact_id_len) {
@@ -52,8 +53,8 @@ hu_error_t hu_persona_style_reanalyze(hu_allocator_t *alloc, hu_provider_t *prov
     hu_memory_entry_t *entries = NULL;
     size_t entry_count = 0;
     hu_error_t err = memory->vtable->recall(memory->ctx, alloc, query, sizeof(query) - 1,
-                                            HU_STYLE_REANALYZE_MSG_LIMIT, sess, sess_len,
-                                            &entries, &entry_count);
+                                            HU_STYLE_REANALYZE_MSG_LIMIT, sess, sess_len, &entries,
+                                            &entry_count);
     if (err != HU_OK || !entries || entry_count < HU_STYLE_REANALYZE_MIN_MSGS) {
         if (entries) {
             for (size_t i = 0; i < entry_count; i++)
@@ -102,8 +103,8 @@ hu_error_t hu_persona_style_reanalyze(hu_allocator_t *alloc, hu_provider_t *prov
         ch_buf[channel_len] = '\0';
         ch = ch_buf;
     }
-    err = hu_persona_analyzer_build_prompt((const char **)messages, msg_count, ch,
-                                           prompt_buf, sizeof(prompt_buf), &prompt_len);
+    err = hu_persona_analyzer_build_prompt((const char **)messages, msg_count, ch, prompt_buf,
+                                           sizeof(prompt_buf), &prompt_len);
     for (size_t i = 0; i < msg_count; i++)
         alloc->free(alloc->ctx, messages[i], strlen(messages[i]) + 1);
     alloc->free(alloc->ctx, messages, entry_count * sizeof(char *));
@@ -118,12 +119,9 @@ hu_error_t hu_persona_style_reanalyze(hu_allocator_t *alloc, hu_provider_t *prov
     char *response = NULL;
     size_t response_len = 0;
     hu_error_t llm_err = provider->vtable->chat_with_system(
-        provider->ctx, alloc,
-        HU_STYLE_ANALYST_SYS, (sizeof(HU_STYLE_ANALYST_SYS) - 1),
-        prompt_buf, prompt_len,
-        model && model_len > 0 ? model : "gpt-4o-mini",
-        model && model_len > 0 ? model_len : (size_t)11,
-        0.0, &response, &response_len);
+        provider->ctx, alloc, HU_STYLE_ANALYST_SYS, (sizeof(HU_STYLE_ANALYST_SYS) - 1), prompt_buf,
+        prompt_len, model && model_len > 0 ? model : "gpt-4o-mini",
+        model && model_len > 0 ? model_len : (size_t)11, 0.0, &response, &response_len);
     if (llm_err != HU_OK || !response)
         return HU_OK;
 
@@ -132,8 +130,8 @@ hu_error_t hu_persona_style_reanalyze(hu_allocator_t *alloc, hu_provider_t *prov
     memset(&partial, 0, sizeof(partial));
     size_t ch_len = channel && channel_len > 0 ? channel_len : 3;
     const char *ch_ptr = channel && channel_len > 0 ? channel : "cli";
-    hu_error_t parse_err = hu_persona_analyzer_parse_response(
-        alloc, response, response_len, ch_ptr, ch_len, &partial);
+    hu_error_t parse_err =
+        hu_persona_analyzer_parse_response(alloc, response, response_len, ch_ptr, ch_len, &partial);
     alloc->free(alloc->ctx, response, response_len + 1);
 
     if (parse_err == HU_OK) {
@@ -143,10 +141,11 @@ hu_error_t hu_persona_style_reanalyze(hu_allocator_t *alloc, hu_provider_t *prov
             hu_persona_t merged;
             memset(&merged, 0, sizeof(merged));
             if (hu_persona_creator_synthesize(alloc, (const hu_persona_t[]){current, partial}, 2,
-                                             persona_name, persona_name_len, &merged) == HU_OK) {
+                                              persona_name, persona_name_len, &merged) == HU_OK) {
                 hu_error_t write_err = hu_persona_creator_write(alloc, &merged);
                 if (write_err != HU_OK)
-                    fprintf(stderr, "[style_learner] persona write failed: %s\n", hu_error_string(write_err));
+                    hu_log_error("style_learner", NULL, "persona write failed: %s",
+                                 hu_error_string(write_err));
                 hu_persona_deinit(alloc, &merged);
             }
             hu_persona_deinit(alloc, &current);

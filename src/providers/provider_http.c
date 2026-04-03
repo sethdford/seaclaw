@@ -3,6 +3,7 @@
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,8 +32,8 @@ hu_error_t hu_provider_http_post_json(hu_allocator_t *alloc, const char *url,
     if (hresp.status_code < 200 || hresp.status_code >= 300) {
         if (hresp.body && hresp.body_len > 0) {
             size_t log_len = hresp.body_len < 500 ? hresp.body_len : 500;
-            fprintf(stderr, "[provider_http] HTTP %ld: %.*s\n", hresp.status_code, (int)log_len,
-                    hresp.body);
+            hu_log_error("provider_http", NULL, "HTTP %ld: %.*s", hresp.status_code, (int)log_len,
+                         hresp.body);
         }
         hu_http_response_free(alloc, &hresp);
         if (hresp.status_code == 401)

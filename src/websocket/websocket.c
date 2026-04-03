@@ -1,6 +1,7 @@
 #include "human/websocket/websocket.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -139,26 +140,26 @@ size_t hu_ws_build_upgrade_request(char *buf, size_t buf_cap, const char *host, 
     int n;
     if (!buf || buf_cap == 0) {
         n = snprintf(NULL, 0,
-                       "GET %s HTTP/1.1\r\n"
-                       "Host: %s\r\n"
-                       "Upgrade: websocket\r\n"
-                       "Connection: Upgrade\r\n"
-                       "Sec-WebSocket-Key: %s\r\n"
-                       "Sec-WebSocket-Version: 13\r\n"
-                       "%s"
-                       "\r\n",
-                       path, host, ws_key, xh);
+                     "GET %s HTTP/1.1\r\n"
+                     "Host: %s\r\n"
+                     "Upgrade: websocket\r\n"
+                     "Connection: Upgrade\r\n"
+                     "Sec-WebSocket-Key: %s\r\n"
+                     "Sec-WebSocket-Version: 13\r\n"
+                     "%s"
+                     "\r\n",
+                     path, host, ws_key, xh);
     } else {
         n = snprintf(buf, buf_cap,
-                       "GET %s HTTP/1.1\r\n"
-                       "Host: %s\r\n"
-                       "Upgrade: websocket\r\n"
-                       "Connection: Upgrade\r\n"
-                       "Sec-WebSocket-Key: %s\r\n"
-                       "Sec-WebSocket-Version: 13\r\n"
-                       "%s"
-                       "\r\n",
-                       path, host, ws_key, xh);
+                     "GET %s HTTP/1.1\r\n"
+                     "Host: %s\r\n"
+                     "Upgrade: websocket\r\n"
+                     "Connection: Upgrade\r\n"
+                     "Sec-WebSocket-Key: %s\r\n"
+                     "Sec-WebSocket-Version: 13\r\n"
+                     "%s"
+                     "\r\n",
+                     path, host, ws_key, xh);
     }
     if (n < 0)
         return 0;
@@ -270,9 +271,8 @@ hu_error_t hu_ws_connect_with_headers(hu_allocator_t *alloc, const char *url,
         return HU_ERR_INVALID_ARGUMENT;
 
     if (!use_tls) {
-        fprintf(stderr,
-                "[websocket] warning: connecting via ws:// (unencrypted). Prefer wss:// for "
-                "production.\n");
+        hu_log_error("websocket", NULL,
+                     "warning: connecting via ws:// (unencrypted). Prefer wss:// for production.");
     }
 
     char port_str[8];

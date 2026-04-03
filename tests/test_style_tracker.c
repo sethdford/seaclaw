@@ -98,8 +98,7 @@ static void style_none_memory_returns_not_supported(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_memory_t mem = hu_none_memory_create(&alloc);
 
-    hu_error_t err =
-        hu_style_fingerprint_update(&mem, &alloc, "x", 1, "haha", 4);
+    hu_error_t err = hu_style_fingerprint_update(&mem, &alloc, "x", 1, "haha", 4);
     HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
 
     hu_style_fingerprint_t fp;
@@ -129,6 +128,151 @@ static void style_update_populates_common_phrases(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
+/* ── Self-tracking / drift detection tests ────────────────────────── */
+
+static void style_update_self_stores_fingerprint(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    hu_error_t err = hu_style_fingerprint_update_self(&mem, &alloc, "haha that's great", 17);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Verify it's stored under __self__ */
+    hu_style_fingerprint_t fp;
+    memset(&fp, 0, sizeof(fp));
+    err = hu_style_fingerprint_get(&mem, &alloc, "__self__", 8, &fp);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(fp.uses_lowercase);
+    HU_ASSERT_STR_EQ(fp.laugh_style, "haha");
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void style_update_self_null_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    HU_ASSERT_EQ(hu_style_fingerprint_update_self(NULL, &alloc, "hi", 2), HU_ERR_INVALID_ARGUMENT);
+}
+
+static void style_drift_no_data_returns_zero(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    hu_style_fingerprint_t baseline;
+    memset(&baseline, 0, sizeof(baseline));
+    baseline.uses_lowercase = true;
+
+    hu_style_drift_result_t drift;
+    hu_error_t err = hu_style_drift_check(&mem, &alloc, &baseline, &drift);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_FLOAT_EQ((float)drift.score, 0.0f, 0.01f);
+    HU_ASSERT_FALSE(drift.corrective);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void style_drift_identical_returns_zero(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    /* Feed self messages that match baseline */
+    hu_style_fingerprint_update_self(&mem, &alloc, "haha that's great", 17);
+
+    hu_style_fingerprint_t baseline;
+    memset(&baseline, 0, sizeof(baseline));
+    baseline.uses_lowercase = true;
+    baseline.uses_periods = false;
+    strncpy(baseline.laugh_style, "haha", sizeof(baseline.laugh_style));
+
+    hu_style_drift_result_t drift;
+    hu_error_t err = hu_style_drift_check(&mem, &alloc, &baseline, &drift);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_FLOAT_EQ((float)drift.score, 0.0f, 0.1f);
+    HU_ASSERT_FALSE(drift.corrective);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void style_drift_mismatch_increases_score(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    /* Self uses formal style: periods, uppercase, "lol" */
+    hu_style_fingerprint_update_self(&mem, &alloc, "OK. Sounds good. LOL.", 21);
+
+    /* Baseline expects: lowercase, no periods, "haha" */
+    hu_style_fingerprint_t baseline;
+    memset(&baseline, 0, sizeof(baseline));
+    baseline.uses_lowercase = true;
+    baseline.uses_periods = false;
+    strncpy(baseline.laugh_style, "haha", sizeof(baseline.laugh_style));
+
+    hu_style_drift_result_t drift;
+    hu_error_t err = hu_style_drift_check(&mem, &alloc, &baseline, &drift);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(drift.score > 0.3);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void style_drift_above_threshold_triggers_correction(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    /* Self uses completely opposite style */
+    hu_style_fingerprint_update_self(&mem, &alloc, "OK. Sounds good. LOL.", 21);
+
+    hu_style_fingerprint_t baseline;
+    memset(&baseline, 0, sizeof(baseline));
+    baseline.uses_lowercase = true;
+    baseline.uses_periods = false;
+    strncpy(baseline.laugh_style, "haha", sizeof(baseline.laugh_style));
+    baseline.avg_message_length = 200; /* very different from 21 */
+
+    hu_style_drift_result_t drift;
+    hu_error_t err = hu_style_drift_check(&mem, &alloc, &baseline, &drift);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(drift.score >= 0.5);
+    HU_ASSERT_TRUE(drift.corrective);
+    HU_ASSERT_NOT_NULL(strstr(drift.directive, "DRIFT"));
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void style_drift_check_no_self_data(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    /* No update_self calls — drift_check should return 0.0 */
+    hu_style_fingerprint_t baseline;
+    memset(&baseline, 0, sizeof(baseline));
+
+    hu_style_drift_result_t drift;
+    hu_error_t err = hu_style_drift_check(&mem, &alloc, &baseline, &drift);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_FLOAT_EQ((float)drift.score, 0.0f, 0.01f);
+    HU_ASSERT_FALSE(drift.corrective);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void style_drift_null_result_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    hu_style_fingerprint_t baseline;
+    memset(&baseline, 0, sizeof(baseline));
+    HU_ASSERT_EQ(hu_style_drift_check(&mem, &alloc, &baseline, NULL), HU_ERR_INVALID_ARGUMENT);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
 void run_style_tracker_tests(void) {
     HU_TEST_SUITE("style_tracker");
     HU_RUN_TEST(style_update_haha_sets_laugh_style_and_lowercase);
@@ -138,6 +282,16 @@ void run_style_tracker_tests(void) {
     HU_RUN_TEST(style_get_nonexistent_returns_zeroed);
     HU_RUN_TEST(style_none_memory_returns_not_supported);
     HU_RUN_TEST(style_update_populates_common_phrases);
+
+    HU_TEST_SUITE("style_drift");
+    HU_RUN_TEST(style_update_self_stores_fingerprint);
+    HU_RUN_TEST(style_update_self_null_returns_error);
+    HU_RUN_TEST(style_drift_no_data_returns_zero);
+    HU_RUN_TEST(style_drift_identical_returns_zero);
+    HU_RUN_TEST(style_drift_mismatch_increases_score);
+    HU_RUN_TEST(style_drift_above_threshold_triggers_correction);
+    HU_RUN_TEST(style_drift_check_no_self_data);
+    HU_RUN_TEST(style_drift_null_result_returns_error);
 }
 
 #else

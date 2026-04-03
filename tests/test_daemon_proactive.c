@@ -4,6 +4,9 @@
 #include "test_framework.h"
 #include <string.h>
 
+/* Shared proactive context for all tests — reset before each test group. */
+static hu_proactive_context_t g_test_ctx;
+
 /* ── hu_daemon_channel_list_has_name ─────────────────────────────────── */
 
 static const char *mock_channel_name(void *ctx) {
@@ -45,46 +48,46 @@ static void test_channel_list_has_name_not_found(void) {
 /* ── hu_daemon_contact_activity_record / count / reset ───────────────── */
 
 static void test_contact_activity_record_basic(void) {
-    hu_daemon_contact_activity_reset();
-    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+    hu_proactive_context_reset(&g_test_ctx);
+    HU_ASSERT_EQ(g_test_ctx.count, 0);
 
-    hu_daemon_contact_activity_record("user_a", "imessage", "+1234567890");
-    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 1);
+    hu_daemon_contact_activity_record(&g_test_ctx, "user_a", "imessage", "+1234567890");
+    HU_ASSERT_EQ(g_test_ctx.count, 1);
 
-    hu_daemon_contact_activity_record("user_b", "telegram", "user_b_tg");
-    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 2);
+    hu_daemon_contact_activity_record(&g_test_ctx, "user_b", "telegram", "user_b_tg");
+    HU_ASSERT_EQ(g_test_ctx.count, 2);
 
-    hu_daemon_contact_activity_reset();
-    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+    hu_proactive_context_reset(&g_test_ctx);
+    HU_ASSERT_EQ(g_test_ctx.count, 0);
 }
 
 static void test_contact_activity_record_null(void) {
-    hu_daemon_contact_activity_reset();
-    hu_daemon_contact_activity_record(NULL, "imessage", "+1234567890");
-    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+    hu_proactive_context_reset(&g_test_ctx);
+    hu_daemon_contact_activity_record(&g_test_ctx, NULL, "imessage", "+1234567890");
+    HU_ASSERT_EQ(g_test_ctx.count, 0);
 
-    hu_daemon_contact_activity_record("user_a", NULL, "+1234567890");
-    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+    hu_daemon_contact_activity_record(&g_test_ctx, "user_a", NULL, "+1234567890");
+    HU_ASSERT_EQ(g_test_ctx.count, 0);
 
-    hu_daemon_contact_activity_record("user_a", "imessage", NULL);
-    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+    hu_daemon_contact_activity_record(&g_test_ctx, "user_a", "imessage", NULL);
+    HU_ASSERT_EQ(g_test_ctx.count, 0);
 
-    hu_daemon_contact_activity_record("", "imessage", "+1234567890");
-    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 0);
+    hu_daemon_contact_activity_record(&g_test_ctx, "", "imessage", "+1234567890");
+    HU_ASSERT_EQ(g_test_ctx.count, 0);
 
-    hu_daemon_contact_activity_reset();
+    hu_proactive_context_reset(&g_test_ctx);
 }
 
 static void test_contact_activity_record_update_existing(void) {
-    hu_daemon_contact_activity_reset();
-    hu_daemon_contact_activity_record("user_a", "imessage", "+1234567890");
-    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 1);
+    hu_proactive_context_reset(&g_test_ctx);
+    hu_daemon_contact_activity_record(&g_test_ctx, "user_a", "imessage", "+1234567890");
+    HU_ASSERT_EQ(g_test_ctx.count, 1);
 
     /* Same contact, different channel — should update, not add */
-    hu_daemon_contact_activity_record("user_a", "telegram", "user_a_tg");
-    HU_ASSERT_EQ(hu_daemon_contact_activity_count(), 1);
+    hu_daemon_contact_activity_record(&g_test_ctx, "user_a", "telegram", "user_a_tg");
+    HU_ASSERT_EQ(g_test_ctx.count, 1);
 
-    hu_daemon_contact_activity_reset();
+    hu_proactive_context_reset(&g_test_ctx);
 }
 
 /* ── hu_daemon_proactive_parse_route ─────────────────────────────────── */
@@ -116,25 +119,25 @@ static void test_parse_route_without_colon(void) {
 /* ── hu_daemon_proactive_apply_route ─────────────────────────────────── */
 
 static void test_apply_route_no_activity(void) {
-    hu_daemon_contact_activity_reset();
+    hu_proactive_context_reset(&g_test_ctx);
     char ch[64] = "imessage";
     char target[128] = "+1111111111";
     size_t len = strlen(target);
 
-    hu_daemon_proactive_apply_route("user_x", time(NULL), NULL, 0, ch, target, &len);
+    hu_daemon_proactive_apply_route(&g_test_ctx, "user_x", time(NULL), NULL, 0, ch, target, &len);
 
     /* No activity recorded — should not change route */
     HU_ASSERT_STR_EQ(ch, "imessage");
     HU_ASSERT_STR_EQ(target, "+1111111111");
 
-    hu_daemon_contact_activity_reset();
+    hu_proactive_context_reset(&g_test_ctx);
 }
 
 static void test_apply_route_with_fresh_activity(void) {
-    hu_daemon_contact_activity_reset();
+    hu_proactive_context_reset(&g_test_ctx);
 
     /* Record activity on telegram */
-    hu_daemon_contact_activity_record("user_a", "telegram", "user_a_tg");
+    hu_daemon_contact_activity_record(&g_test_ctx, "user_a", "telegram", "user_a_tg");
 
     /* Set up a channel list that includes telegram */
     hu_channel_vtable_t vt = {0};
@@ -148,13 +151,14 @@ static void test_apply_route_with_fresh_activity(void) {
     char target[128] = "+1111111111";
     size_t len = strlen(target);
 
-    hu_daemon_proactive_apply_route("user_a", time(NULL), channels, 1, ch, target, &len);
+    hu_daemon_proactive_apply_route(&g_test_ctx, "user_a", time(NULL), channels, 1, ch, target,
+                                    &len);
 
     /* Should override to telegram */
     HU_ASSERT_STR_EQ(ch, "telegram");
     HU_ASSERT_STR_EQ(target, "user_a_tg");
 
-    hu_daemon_contact_activity_reset();
+    hu_proactive_context_reset(&g_test_ctx);
 }
 
 /* ── hu_daemon_build_callback_context ────────────────────────────────── */

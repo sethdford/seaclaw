@@ -39,4 +39,13 @@ hu_error_t hu_voice_build_guidance(const hu_voice_profile_t *profile, hu_allocat
 hu_voice_stage_t hu_voice_compute_stage(uint32_t interactions, uint32_t emotional_exchanges,
                                         float warmth);
 
+/* Score vulnerability signals from message content.
+ * Returns 0.0-1.0 based on emotional/personal/vulnerable language. */
+float hu_voice_vulnerability_from_content(const char *text, size_t text_len);
+
+/* Apply time decay to vulnerability between sessions.
+ * hours_elapsed: hours since last interaction.
+ * Decays vulnerability_level toward 0 at a rate proportional to elapsed time. */
+void hu_voice_vulnerability_decay(hu_voice_profile_t *profile, float hours_elapsed);
+
 #endif

@@ -17,10 +17,11 @@ static const size_t LAUGH_COUNT = sizeof(LAUGH_PATTERNS) / sizeof(LAUGH_PATTERNS
 
 /* Minimal stopwords for distinctive-word filtering. */
 static const char *const STOPWORDS[] = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "have", "has", "had",
-    "do", "does", "did", "will", "would", "could", "should", "to", "of", "in", "for",
-    "on", "with", "at", "by", "it", "that", "this", "and", "or", "but", "i", "me",
-    "you", "we", "they", "its", "im", "dont", "cant", "wont", "thats", "what",
+    "the",    "a",    "an",   "is",  "are",  "was",  "were", "be",    "been",
+    "have",   "has",  "had",  "do",  "does", "did",  "will", "would", "could",
+    "should", "to",   "of",   "in",  "for",  "on",   "with", "at",    "by",
+    "it",     "that", "this", "and", "or",   "but",  "i",    "me",    "you",
+    "we",     "they", "its",  "im",  "dont", "cant", "wont", "thats", "what",
 };
 static const size_t STOP_COUNT = sizeof(STOPWORDS) / sizeof(STOPWORDS[0]);
 
@@ -75,8 +76,8 @@ static bool compute_uses_periods(const char *msg, size_t msg_len) {
     if (!msg || msg_len == 0)
         return false;
     for (size_t i = 0; i < msg_len; i++) {
-        if (msg[i] == '.' && (i + 1 >= msg_len || msg[i + 1] == ' ' || msg[i + 1] == '\n' ||
-                              msg[i + 1] == '\0'))
+        if (msg[i] == '.' &&
+            (i + 1 >= msg_len || msg[i + 1] == ' ' || msg[i + 1] == '\n' || msg[i + 1] == '\0'))
             return true;
     }
     return false;
@@ -163,8 +164,8 @@ static void extract_distinctive_words(const char *msg, size_t msg_len, char *buf
 #undef MAX_WORDS
 }
 
-static void merge_distinctive_words(const char *existing, const char *new_words,
-                                    char *out, size_t cap) {
+static void merge_distinctive_words(const char *existing, const char *new_words, char *out,
+                                    size_t cap) {
     out[0] = '\0';
     if (cap < 4)
         return;
@@ -189,9 +190,9 @@ static void merge_distinctive_words(const char *existing, const char *new_words,
         out[cap - 1] = '\0';
 }
 
-#define MAX_PHRASE_LEN 48
+#define MAX_PHRASE_LEN     48
 #define MAX_PHRASE_ENTRIES 32
-#define TOP_PHRASES 10
+#define TOP_PHRASES        10
 
 typedef struct {
     char phrase[MAX_PHRASE_LEN + 1];
@@ -465,8 +466,8 @@ hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *allo
                       laugh[0] ? SQLITE_STATIC : (sqlite3_destructor_type)0);
     sqlite3_bind_int(stmt, 5, new_avg);
     sqlite3_bind_text(stmt, 6, merged_phrases[0] ? merged_phrases : NULL,
-                     merged_phrases[0] ? (int)strlen(merged_phrases) : 0,
-                     merged_phrases[0] ? SQLITE_STATIC : (sqlite3_destructor_type)0);
+                      merged_phrases[0] ? (int)strlen(merged_phrases) : 0,
+                      merged_phrases[0] ? SQLITE_STATIC : (sqlite3_destructor_type)0);
     sqlite3_bind_text(stmt, 7, merged_dist[0] ? merged_dist : NULL,
                       merged_dist[0] ? (int)strlen(merged_dist) : 0,
                       merged_dist[0] ? SQLITE_STATIC : (sqlite3_destructor_type)0);
@@ -539,13 +540,13 @@ hu_error_t hu_style_fingerprint_get(hu_memory_t *memory, hu_allocator_t *alloc,
     return HU_OK;
 }
 
-size_t hu_style_fingerprint_build_directive(const hu_style_fingerprint_t *fp,
-                                            char *buf, size_t cap) {
+size_t hu_style_fingerprint_build_directive(const hu_style_fingerprint_t *fp, char *buf,
+                                            size_t cap) {
     if (!fp || !buf || cap < 32)
         return 0;
 
     bool has_any = fp->uses_lowercase || fp->uses_periods || fp->laugh_style[0] ||
-                  fp->avg_message_length > 0 || fp->distinctive_words[0];
+                   fp->avg_message_length > 0 || fp->distinctive_words[0];
 
     if (!has_any)
         return 0;
@@ -595,6 +596,99 @@ size_t hu_style_fingerprint_build_directive(const hu_style_fingerprint_t *fp,
     return pos;
 }
 
+/* ── Self-tracking for drift detection ────────────────────────────── */
+
+#define HU_SELF_CONTACT_ID     "__self__"
+#define HU_SELF_CONTACT_ID_LEN 8
+
+hu_error_t hu_style_fingerprint_update_self(hu_memory_t *memory, hu_allocator_t *alloc,
+                                            const char *message, size_t message_len) {
+    if (!memory || !message)
+        return HU_ERR_INVALID_ARGUMENT;
+    return hu_style_fingerprint_update(memory, alloc, HU_SELF_CONTACT_ID, HU_SELF_CONTACT_ID_LEN,
+                                       message, message_len);
+}
+
+hu_error_t hu_style_drift_check(hu_memory_t *memory, hu_allocator_t *alloc,
+                                const hu_style_fingerprint_t *baseline,
+                                hu_style_drift_result_t *result) {
+    if (!result)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(result, 0, sizeof(*result));
+
+    if (!memory || !baseline)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* Fetch current self fingerprint */
+    hu_style_fingerprint_t self;
+    hu_error_t err =
+        hu_style_fingerprint_get(memory, alloc, HU_SELF_CONTACT_ID, HU_SELF_CONTACT_ID_LEN, &self);
+    if (err != HU_OK)
+        return err;
+
+    /* If no self data has been tracked yet, we can't measure drift */
+    bool has_self_data = self.uses_lowercase || self.uses_periods || self.laugh_style[0] ||
+                         self.avg_message_length > 0;
+    if (!has_self_data) {
+        result->score = 0.0;
+        return HU_OK;
+    }
+
+    /* Compare dimensions: each mismatch contributes to drift */
+    double drift = 0.0;
+    int dimensions = 0;
+
+    /* Lowercase preference */
+    if (baseline->uses_lowercase || self.uses_lowercase) {
+        dimensions++;
+        if (baseline->uses_lowercase != self.uses_lowercase)
+            drift += 1.0;
+    }
+
+    /* Period usage */
+    if (baseline->uses_periods || self.uses_periods) {
+        dimensions++;
+        if (baseline->uses_periods != self.uses_periods)
+            drift += 1.0;
+    }
+
+    /* Laugh style */
+    if (baseline->laugh_style[0] || self.laugh_style[0]) {
+        dimensions++;
+        if (strcmp(baseline->laugh_style, self.laugh_style) != 0)
+            drift += 1.0;
+    }
+
+    /* Average message length — ratio-based comparison */
+    if (baseline->avg_message_length > 0 && self.avg_message_length > 0) {
+        dimensions++;
+        int bl = baseline->avg_message_length;
+        int sl = self.avg_message_length;
+        double ratio = (bl > sl) ? (double)sl / (double)bl : (double)bl / (double)sl;
+        /* ratio 1.0 = identical, 0.5 = 2x difference */
+        drift += (1.0 - ratio);
+    }
+
+    if (dimensions == 0) {
+        result->score = 0.0;
+        return HU_OK;
+    }
+
+    result->score = drift / (double)dimensions;
+    if (result->score > 1.0)
+        result->score = 1.0;
+
+    if (result->score >= HU_STYLE_DRIFT_THRESHOLD) {
+        result->corrective = true;
+        snprintf(result->directive, sizeof(result->directive),
+                 "[DRIFT: Your voice has drifted from baseline. "
+                 "Maintain your natural voice — check capitalization, "
+                 "punctuation, laugh style, and message length.]");
+    }
+
+    return HU_OK;
+}
+
 #else /* !HU_ENABLE_SQLITE */
 
 #include "human/context/style_tracker.h"
@@ -627,12 +721,32 @@ hu_error_t hu_style_fingerprint_get(hu_memory_t *memory, hu_allocator_t *alloc,
     return HU_ERR_NOT_SUPPORTED;
 }
 
-size_t hu_style_fingerprint_build_directive(const hu_style_fingerprint_t *fp,
-                                            char *buf, size_t cap) {
+size_t hu_style_fingerprint_build_directive(const hu_style_fingerprint_t *fp, char *buf,
+                                            size_t cap) {
     (void)fp;
     (void)buf;
     (void)cap;
     return 0;
+}
+
+hu_error_t hu_style_fingerprint_update_self(hu_memory_t *memory, hu_allocator_t *alloc,
+                                            const char *message, size_t message_len) {
+    (void)memory;
+    (void)alloc;
+    (void)message;
+    (void)message_len;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
+hu_error_t hu_style_drift_check(hu_memory_t *memory, hu_allocator_t *alloc,
+                                const hu_style_fingerprint_t *baseline,
+                                hu_style_drift_result_t *result) {
+    (void)memory;
+    (void)alloc;
+    (void)baseline;
+    if (result)
+        memset(result, 0, sizeof(*result));
+    return HU_ERR_NOT_SUPPORTED;
 }
 
 #endif /* HU_ENABLE_SQLITE */

@@ -56,6 +56,21 @@ hu_error_t hu_mirror_check_identity_bounds(hu_allocator_t *alloc, const char *di
                                            size_t directive_len, const struct hu_persona *persona,
                                            char **out, size_t *out_len);
 
+/* Check if a mirror analysis conflicts with persona identity constraints.
+ * Returns true if mirroring the analyzed style would violate avoided_vocab
+ * or character_invariants (e.g., persona says "never uses abbreviations"
+ * but user uses abbreviations). */
+bool hu_mirror_conflicts_with_identity(const hu_mirror_analysis_t *analysis,
+                                       const struct hu_persona *persona);
+
+/* Build mirror directive with persona identity filtering.
+ * Convenience: builds directive then filters through identity bounds.
+ * Returns filtered directive, or NULL with *out_len=0 if fully filtered. */
+hu_error_t hu_mirror_build_directive_persona(hu_allocator_t *alloc,
+                                             const hu_mirror_analysis_t *analysis,
+                                             const struct hu_persona *persona, char **out,
+                                             size_t *out_len);
+
 /* --- F54: Timezone Awareness --- */
 typedef struct hu_timezone_info {
     int offset_hours;       /* UTC offset, e.g. -5 for EST */

@@ -1,4 +1,5 @@
 #include "human/voice/session.h"
+#include "human/core/log.h"
 #include "human/voice/provider.h"
 #include <math.h>
 #include <stdio.h>
@@ -282,8 +283,8 @@ void hu_voice_session_warn_first_byte_latency_if_needed(const hu_voice_session_t
         return;
     if (session->latency.avg_first_byte_ms <= (double)HU_VOICE_TARGET_FIRST_BYTE_MS)
         return;
-    fprintf(stderr, "[human] voice: average first-byte latency %.0f ms exceeds target %d ms\n",
-            session->latency.avg_first_byte_ms, HU_VOICE_TARGET_FIRST_BYTE_MS);
+    hu_log_error("voice", NULL, "average first-byte latency %.0f ms exceeds target %d ms",
+                 session->latency.avg_first_byte_ms, HU_VOICE_TARGET_FIRST_BYTE_MS);
     s_warned = 1;
 }
 

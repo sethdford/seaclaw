@@ -119,6 +119,7 @@ hu_model_selection_t hu_model_route(const hu_model_router_config_t *cfg,
                                     int hour, size_t history_count) {
     hu_model_selection_t sel;
     memset(&sel, 0, sizeof(sel));
+    sel.source = HU_ROUTE_HEURISTIC;
 
     if (!cfg || !msg || msg_len == 0) {
         sel.model = cfg ? cfg->conversational_model : "gemini-3-flash-preview";
@@ -196,4 +197,239 @@ hu_model_selection_t hu_model_route(const hu_model_router_config_t *cfg,
     }
 
     return sel;
+}
+
+/* ── FNV-1a prompt hash for cache keys ────────────────────────────────── */
+
+uint64_t hu_route_hash_prompt(const char *msg, size_t msg_len) {
+    uint64_t hash = 14695981039346656037ULL;
+    for (size_t i = 0; i < msg_len; i++) {
+        hash ^= (uint64_t)(unsigned char)msg[i];
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+/* ── Route cache ──────────────────────────────────────────────────────── */
+
+void hu_route_cache_init(hu_route_cache_t *cache) {
+    if (!cache)
+        return;
+    memset(cache, 0, sizeof(*cache));
+}
+
+bool hu_route_cache_get(hu_route_cache_t *cache, const char *msg, size_t msg_len,
+                        int64_t now_secs, hu_cognitive_tier_t *tier) {
+    if (!cache || !msg || msg_len == 0 || !tier)
+        return false;
+    uint64_t hash = hu_route_hash_prompt(msg, msg_len);
+    size_t idx = (size_t)(hash % HU_ROUTE_CACHE_SIZE);
+    hu_route_cache_entry_t *e = &cache->entries[idx];
+    if (e->occupied && e->hash == hash &&
+        (now_secs - e->timestamp) < HU_ROUTE_CACHE_TTL_SECS) {
+        *tier = e->tier;
+        return true;
+    }
+    return false;
+}
+
+void hu_route_cache_put(hu_route_cache_t *cache, const char *msg, size_t msg_len,
+                        int64_t now_secs, hu_cognitive_tier_t tier) {
+    if (!cache || !msg || msg_len == 0)
+        return;
+    uint64_t hash = hu_route_hash_prompt(msg, msg_len);
+    size_t idx = (size_t)(hash % HU_ROUTE_CACHE_SIZE);
+    hu_route_cache_entry_t *e = &cache->entries[idx];
+    e->hash = hash;
+    e->tier = tier;
+    e->timestamp = now_secs;
+    e->occupied = true;
+}
+
+/* ── Judge response parser ────────────────────────────────────────────── */
+
+static bool ci_match(const char *a, size_t a_len, const char *b) {
+    size_t b_len = strlen(b);
+    if (a_len != b_len)
+        return false;
+    for (size_t i = 0; i < a_len; i++) {
+        if (tolower((unsigned char)a[i]) != tolower((unsigned char)b[i]))
+            return false;
+    }
+    return true;
+}
+
+bool hu_route_parse_judge_response(const char *response, size_t response_len,
+                                   hu_cognitive_tier_t *tier) {
+    if (!response || response_len == 0 || !tier)
+        return false;
+
+    /* Find "tier" key and extract its string value from JSON-like response */
+    const char *p = response;
+    const char *end = response + response_len;
+
+    while (p < end) {
+        const char *key = "\"tier\"";
+        size_t key_len = 6;
+        if ((size_t)(end - p) >= key_len && memcmp(p, key, key_len) == 0) {
+            p += key_len;
+            while (p < end && (*p == ' ' || *p == ':'))
+                p++;
+            if (p < end && *p == '"') {
+                p++;
+                const char *val_start = p;
+                while (p < end && *p != '"')
+                    p++;
+                size_t val_len = (size_t)(p - val_start);
+                if (ci_match(val_start, val_len, "REFLEXIVE") ||
+                    ci_match(val_start, val_len, "SIMPLE")) {
+                    *tier = HU_TIER_REFLEXIVE;
+                    return true;
+                }
+                if (ci_match(val_start, val_len, "CONVERSATIONAL") ||
+                    ci_match(val_start, val_len, "MEDIUM")) {
+                    *tier = HU_TIER_CONVERSATIONAL;
+                    return true;
+                }
+                if (ci_match(val_start, val_len, "ANALYTICAL") ||
+                    ci_match(val_start, val_len, "COMPLEX") ||
+                    ci_match(val_start, val_len, "RESEARCH")) {
+                    *tier = HU_TIER_ANALYTICAL;
+                    return true;
+                }
+                if (ci_match(val_start, val_len, "DEEP") ||
+                    ci_match(val_start, val_len, "REASONING")) {
+                    *tier = HU_TIER_DEEP;
+                    return true;
+                }
+                return false;
+            }
+        }
+        p++;
+    }
+    return false;
+}
+
+/* ── Judge system prompt (adapted from EdgeClaw token-saver-judge.md) ── */
+
+static const char JUDGE_SYSTEM_PROMPT[] =
+    "You are a task complexity classifier for an AI assistant. "
+    "Classify each task into exactly one of four tiers based on the nature of the work.\n"
+    "\n"
+    "## Tiers\n"
+    "\n"
+    "REFLEXIVE - Pure acknowledgment or backchannel. Greetings, single-word replies, "
+    "simple confirmations, emoji-only messages.\n"
+    "\n"
+    "CONVERSATIONAL - Standard assistant work. Writing emails, simple Q&A, factual lookups, "
+    "translation, formatting, code snippets, scheduling, reminders.\n"
+    "\n"
+    "ANALYTICAL - Multi-step reasoning or emotional depth. Advice-seeking, pros/cons analysis, "
+    "code review, debugging, emotional support, relationship discussions, financial planning.\n"
+    "\n"
+    "DEEP - Complex synthesis or crisis. Multi-source research, system design, mathematical proofs, "
+    "life decisions, mental health crisis, grief support, legal/medical analysis.\n"
+    "\n"
+    "## Disambiguation\n"
+    "\n"
+    "- Short greetings (< 5 words, no question) -> REFLEXIVE\n"
+    "- Data analysis, single-file editing -> CONVERSATIONAL\n"
+    "- Emotional keywords (scared, struggling, overwhelmed) -> ANALYTICAL minimum\n"
+    "- Crisis keywords (suicidal, dying, emergency) -> DEEP\n"
+    "- When unsure, choose CONVERSATIONAL\n"
+    "\n"
+    "CRITICAL: Output ONLY a raw JSON object. No markdown, no explanation.\n"
+    "{\"tier\":\"REFLEXIVE|CONVERSATIONAL|ANALYTICAL|DEEP\"}";
+
+const char *hu_route_judge_system_prompt(void) {
+    return JUDGE_SYSTEM_PROMPT;
+}
+
+/* ── Routing decision log ─────────────────────────────────────────────── */
+
+void hu_route_log_init(hu_route_decision_log_t *log) {
+    if (!log)
+        return;
+    memset(log, 0, sizeof(*log));
+}
+
+void hu_route_log_record(hu_route_decision_log_t *log, const hu_model_selection_t *sel,
+                         int heuristic_score, int64_t timestamp) {
+    if (!log || !sel)
+        return;
+    hu_route_decision_t *entry = &log->entries[log->head];
+    entry->tier = sel->tier;
+    entry->source = sel->source;
+    entry->timestamp = timestamp;
+    entry->heuristic_score = heuristic_score;
+    if (sel->model && sel->model_len > 0) {
+        size_t copy_len = sel->model_len < 63 ? sel->model_len : 63;
+        memcpy(entry->model, sel->model, copy_len);
+        entry->model[copy_len] = '\0';
+    } else {
+        entry->model[0] = '\0';
+    }
+    log->head = (log->head + 1) % HU_ROUTE_LOG_SIZE;
+    if (log->count < HU_ROUTE_LOG_SIZE)
+        log->count++;
+}
+
+size_t hu_route_log_count(const hu_route_decision_log_t *log) {
+    return log ? log->count : 0;
+}
+
+const hu_route_decision_t *hu_route_log_get(const hu_route_decision_log_t *log, size_t index) {
+    if (!log || index >= log->count)
+        return NULL;
+    /* Entries are stored newest-at-head. Index 0 = oldest visible entry. */
+    size_t start;
+    if (log->count < HU_ROUTE_LOG_SIZE)
+        start = 0;
+    else
+        start = log->head; /* oldest is at head (about to be overwritten) */
+    size_t actual = (start + index) % HU_ROUTE_LOG_SIZE;
+    return &log->entries[actual];
+}
+
+void hu_route_log_tier_counts(const hu_route_decision_log_t *log, size_t counts[4]) {
+    memset(counts, 0, sizeof(size_t) * 4);
+    if (!log)
+        return;
+    for (size_t i = 0; i < log->count; i++) {
+        const hu_route_decision_t *d = hu_route_log_get(log, i);
+        if (d && d->tier <= HU_TIER_DEEP)
+            counts[d->tier]++;
+    }
+}
+
+/* ── String conversions ───────────────────────────────────────────────── */
+
+const char *hu_cognitive_tier_str(hu_cognitive_tier_t tier) {
+    switch (tier) {
+    case HU_TIER_REFLEXIVE:
+        return "reflexive";
+    case HU_TIER_CONVERSATIONAL:
+        return "conversational";
+    case HU_TIER_ANALYTICAL:
+        return "analytical";
+    case HU_TIER_DEEP:
+        return "deep";
+    default:
+        return "unknown";
+    }
+}
+
+const char *hu_route_source_str(hu_route_source_t source) {
+    switch (source) {
+    case HU_ROUTE_HEURISTIC:
+        return "heuristic";
+    case HU_ROUTE_JUDGE:
+        return "judge";
+    case HU_ROUTE_JUDGE_CACHED:
+        return "judge_cached";
+    case HU_ROUTE_JUDGE_FALLBACK:
+        return "judge_fallback";
+    default:
+        return "unknown";
+    }
 }

@@ -27,6 +27,7 @@ void run_gateway_tests(void);
 void run_auth_tests(void);
 void run_oauth_tests(void);
 void run_security_tests(void);
+void run_sensitivity_tests(void);
 void run_vault_tests(void);
 void run_provider_tests(void);
 void run_provider_http_tests(void);
@@ -91,6 +92,8 @@ void run_persona_feedback_tests(void);
 void run_persona_cli_tests(void);
 void run_voice_maturity_tests(void);
 void run_style_learner_tests(void);
+void run_temporal_tests(void);
+void run_inner_world_tests(void);
 #endif
 void run_lifecycle_tests(void);
 void run_observer_tests(void);
@@ -194,6 +197,7 @@ void run_deep_extract_tests(void);
 void run_commitment_tests(void);
 void run_pattern_radar_tests(void);
 void run_proactive_tests(void);
+void run_inner_thoughts_tests(void);
 void run_weather_awareness_tests(void);
 void run_timing_tests(void);
 void run_calibration_tests(void);
@@ -456,6 +460,7 @@ int main(int argc, char **argv) {
     run_auth_tests();
     run_oauth_tests();
     run_security_tests();
+    run_sensitivity_tests();
     run_vault_tests();
     run_provider_tests();
     run_provider_http_tests();
@@ -525,6 +530,8 @@ int main(int argc, char **argv) {
     run_persona_cli_tests();
     run_voice_maturity_tests();
     run_style_learner_tests();
+    run_temporal_tests();
+    run_inner_world_tests();
 #endif
     run_lifecycle_tests();
     run_observer_tests();
@@ -623,6 +630,7 @@ int main(int argc, char **argv) {
     run_commitment_tests();
     run_pattern_radar_tests();
     run_proactive_tests();
+    run_inner_thoughts_tests();
     run_weather_awareness_tests();
     run_timing_tests();
     run_calibration_tests();

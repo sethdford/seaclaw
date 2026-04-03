@@ -4,32 +4,32 @@
  * The loop explores the config space, tracking the best result.
  */
 
+#include "human/ml/experiment.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include "human/ml/checkpoint.h"
 #include "human/ml/dataloader.h"
 #include "human/ml/evaluator.h"
-#include "human/ml/experiment.h"
+#include "human/ml/experiment_store.h"
 #include "human/ml/ml.h"
 #include "human/ml/model.h"
 #include "human/ml/optimizer.h"
 #include "human/ml/prepare.h"
 #include "human/ml/tokenizer_ml.h"
 #include "human/ml/train.h"
-#include "human/ml/experiment_store.h"
 #include "human/provider.h"
 #include <math.h>
-#include <stdlib.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
 
-static uint32_t hash_experiment_config(const hu_experiment_config_t *config)
-{
+static uint32_t hash_experiment_config(const hu_experiment_config_t *config) {
     const unsigned char *p = (const unsigned char *)config;
     uint32_t h = 5381u;
     for (size_t i = 0; i < sizeof(hu_experiment_config_t); i++)
@@ -37,8 +37,7 @@ static uint32_t hash_experiment_config(const hu_experiment_config_t *config)
     return h;
 }
 
-static const char *status_string(hu_experiment_status_t status)
-{
+static const char *status_string(hu_experiment_status_t status) {
     switch (status) {
     case HU_EXPERIMENT_KEEP:
         return "keep";
@@ -51,8 +50,7 @@ static const char *status_string(hu_experiment_status_t status)
     }
 }
 
-static double now_seconds(void)
-{
+static double now_seconds(void) {
 #if defined(CLOCK_MONOTONIC)
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -63,8 +61,7 @@ static double now_seconds(void)
 }
 
 /* Simple xorshift32 PRNG for config exploration */
-static uint32_t xorshift32(uint32_t *state)
-{
+static uint32_t xorshift32(uint32_t *state) {
     uint32_t x = *state;
     x ^= x << 13;
     x ^= x >> 17;
@@ -73,63 +70,90 @@ static uint32_t xorshift32(uint32_t *state)
     return x;
 }
 
-
 /* Parse key=value from agent response and apply to config */
-void hu_experiment_apply_agent_kv(hu_experiment_config_t *cfg, const char *key, const char *val)
-{
-    if (!cfg || !key || !val) return;
-    if (strcmp(key, "n_layer") == 0) { int v = atoi(val); if (v > 0 && v <= 64) cfg->gpt.n_layer = (size_t)v; }
-    else if (strcmp(key, "n_embd") == 0) { int v = atoi(val); if (v > 0 && v <= 4096 && (size_t)v % cfg->gpt.head_dim == 0) { cfg->gpt.n_embd = (size_t)v; cfg->gpt.n_head = (size_t)v / cfg->gpt.head_dim; cfg->gpt.n_kv_head = cfg->gpt.n_head; } }
-    else if (strcmp(key, "matrix_lr") == 0) { float v = (float)atof(val); if (v > 0 && v < 1.0f) cfg->optimizer.matrix_lr = v; }
-    else if (strcmp(key, "embedding_lr") == 0) { float v = (float)atof(val); if (v > 0 && v < 10.0f) cfg->optimizer.embedding_lr = v; }
-    else if (strcmp(key, "weight_decay") == 0) { float v = (float)atof(val); if (v >= 0 && v < 1.0f) cfg->optimizer.weight_decay = v; }
-    else if (strcmp(key, "activation") == 0) {
-        if (strcmp(val, "relu_sq") == 0) cfg->gpt.activation = HU_ML_ACT_RELU_SQ;
-        else if (strcmp(val, "gelu") == 0) cfg->gpt.activation = HU_ML_ACT_GELU;
-        else if (strcmp(val, "swiglu") == 0) cfg->gpt.activation = HU_ML_ACT_SWIGLU;
+void hu_experiment_apply_agent_kv(hu_experiment_config_t *cfg, const char *key, const char *val) {
+    if (!cfg || !key || !val)
+        return;
+    if (strcmp(key, "n_layer") == 0) {
+        int v = atoi(val);
+        if (v > 0 && v <= 64)
+            cfg->gpt.n_layer = (size_t)v;
+    } else if (strcmp(key, "n_embd") == 0) {
+        int v = atoi(val);
+        if (v > 0 && v <= 4096 && (size_t)v % cfg->gpt.head_dim == 0) {
+            cfg->gpt.n_embd = (size_t)v;
+            cfg->gpt.n_head = (size_t)v / cfg->gpt.head_dim;
+            cfg->gpt.n_kv_head = cfg->gpt.n_head;
+        }
+    } else if (strcmp(key, "matrix_lr") == 0) {
+        float v = (float)atof(val);
+        if (v > 0 && v < 1.0f)
+            cfg->optimizer.matrix_lr = v;
+    } else if (strcmp(key, "embedding_lr") == 0) {
+        float v = (float)atof(val);
+        if (v > 0 && v < 10.0f)
+            cfg->optimizer.embedding_lr = v;
+    } else if (strcmp(key, "weight_decay") == 0) {
+        float v = (float)atof(val);
+        if (v >= 0 && v < 1.0f)
+            cfg->optimizer.weight_decay = v;
+    } else if (strcmp(key, "activation") == 0) {
+        if (strcmp(val, "relu_sq") == 0)
+            cfg->gpt.activation = HU_ML_ACT_RELU_SQ;
+        else if (strcmp(val, "gelu") == 0)
+            cfg->gpt.activation = HU_ML_ACT_GELU;
+        else if (strcmp(val, "swiglu") == 0)
+            cfg->gpt.activation = HU_ML_ACT_SWIGLU;
     }
 }
 
 /* Ask the provider for a config mutation suggestion */
 static int agent_suggest_mutation(hu_allocator_t *alloc, hu_experiment_config_t *cfg,
                                   void *provider_ptr, const char *persona,
-                                  const hu_experiment_result_t *last_result)
-{
+                                  const hu_experiment_result_t *last_result) {
 #ifdef HU_IS_TEST
-    (void)alloc; (void)cfg; (void)provider_ptr; (void)persona; (void)last_result;
+    (void)alloc;
+    (void)cfg;
+    (void)provider_ptr;
+    (void)persona;
+    (void)last_result;
     return 0;
 #else
-    if (!provider_ptr || !alloc) return 0;
+    if (!provider_ptr || !alloc)
+        return 0;
     hu_provider_t *prov = (hu_provider_t *)provider_ptr;
-    if (!prov->vtable || !prov->vtable->chat_with_system) return 0;
+    if (!prov->vtable || !prov->vtable->chat_with_system)
+        return 0;
 
     char sys_prompt[1024];
     snprintf(sys_prompt, sizeof(sys_prompt),
              "You are %s, an AI research assistant. Suggest ONE config mutation as key=value. "
              "Keys: n_layer, n_embd, matrix_lr, embedding_lr, weight_decay, activation. "
              "Current: n_layer=%zu n_embd=%zu lr=%.4f bpb=%.4f",
-             persona ? persona : "researcher",
-             cfg->gpt.n_layer, cfg->gpt.n_embd,
-             cfg->optimizer.matrix_lr,
-             last_result ? last_result->val_bpb : 0.0);
+             persona ? persona : "researcher", cfg->gpt.n_layer, cfg->gpt.n_embd,
+             cfg->optimizer.matrix_lr, last_result ? last_result->val_bpb : 0.0);
 
     char *response = NULL;
     size_t resp_len = 0;
-    hu_error_t err = prov->vtable->chat_with_system(
-        prov->ctx, alloc, sys_prompt, strlen(sys_prompt),
-        "Suggest a mutation.", 19, NULL, 0, 0.7, &response, &resp_len);
-    if (err != HU_OK || !response) return 0;
+    hu_error_t err = prov->vtable->chat_with_system(prov->ctx, alloc, sys_prompt,
+                                                    strlen(sys_prompt), "Suggest a mutation.", 19,
+                                                    NULL, 0, 0.7, &response, &resp_len);
+    if (err != HU_OK || !response)
+        return 0;
 
     /* Parse key=value from response */
     char *eq = strchr(response, '=');
     if (eq && eq > response) {
         *eq = '\0';
         char *key = response;
-        while (*key == ' ') key++;
+        while (*key == ' ')
+            key++;
         char *val = eq + 1;
-        while (*val == ' ') val++;
+        while (*val == ' ')
+            val++;
         char *end = val + strlen(val) - 1;
-        while (end > val && (*end == '\n' || *end == ' ')) *end-- = '\0';
+        while (end > val && (*end == '\n' || *end == ' '))
+            *end-- = '\0';
         hu_experiment_apply_agent_kv(cfg, key, val);
     }
     alloc->free(alloc->ctx, response, resp_len);
@@ -139,10 +163,10 @@ static int agent_suggest_mutation(hu_allocator_t *alloc, hu_experiment_config_t 
 
 /* Apply a mutation to the config for the next experiment.
  * Uses iteration + config hash to avoid deterministic cycling. */
-static void mutate_config(hu_experiment_config_t *cfg, int iteration)
-{
+static void mutate_config(hu_experiment_config_t *cfg, int iteration) {
     uint32_t seed = hash_experiment_config(cfg) ^ ((uint32_t)iteration * 2654435761u);
-    if (seed == 0) seed = 1;
+    if (seed == 0)
+        seed = 1;
 
     switch (xorshift32(&seed) % 8) {
     case 0:
@@ -175,9 +199,11 @@ static void mutate_config(hu_experiment_config_t *cfg, int iteration)
         break;
     case 5: {
         size_t hd = cfg->gpt.head_dim;
-        if (hd == 0) break;
-        size_t delta = hd;  /* step in multiples of head_dim */
-        size_t new_dim = cfg->gpt.n_embd + ((xorshift32(&seed) % 2) ? delta : (size_t)(-(int64_t)delta));
+        if (hd == 0)
+            break;
+        size_t delta = hd; /* step in multiples of head_dim */
+        size_t new_dim =
+            cfg->gpt.n_embd + ((xorshift32(&seed) % 2) ? delta : (size_t)(-(int64_t)delta));
         if (new_dim >= hd && new_dim <= 2048 && new_dim % hd == 0) {
             cfg->gpt.n_embd = new_dim;
             cfg->gpt.n_head = new_dim / hd;
@@ -195,11 +221,8 @@ static void mutate_config(hu_experiment_config_t *cfg, int iteration)
 }
 
 /* Run a single experiment: create model, train, evaluate. */
-static hu_error_t run_single_experiment(hu_allocator_t *alloc,
-                                        const hu_experiment_config_t *cfg,
-                                        const char *data_dir,
-                                        hu_experiment_result_t *result)
-{
+static hu_error_t run_single_experiment(hu_allocator_t *alloc, const hu_experiment_config_t *cfg,
+                                        const char *data_dir, hu_experiment_result_t *result) {
     hu_error_t err;
     double t_start = now_seconds();
 
@@ -210,8 +233,8 @@ static hu_error_t run_single_experiment(hu_allocator_t *alloc,
     err = hu_gpt_create(alloc, &cfg->gpt, &model);
     if (err != HU_OK) {
         result->status = HU_EXPERIMENT_CRASH;
-        snprintf(result->description, sizeof(result->description),
-                 "model creation failed: %d", (int)err);
+        snprintf(result->description, sizeof(result->description), "model creation failed: %d",
+                 (int)err);
         return HU_OK;
     }
 
@@ -223,8 +246,8 @@ static hu_error_t run_single_experiment(hu_allocator_t *alloc,
     if (err != HU_OK) {
         model.vtable->deinit(model.ctx, alloc);
         result->status = HU_EXPERIMENT_CRASH;
-        snprintf(result->description, sizeof(result->description),
-                 "optimizer creation failed: %d", (int)err);
+        snprintf(result->description, sizeof(result->description), "optimizer creation failed: %d",
+                 (int)err);
         return HU_OK;
     }
 
@@ -235,8 +258,8 @@ static hu_error_t run_single_experiment(hu_allocator_t *alloc,
         optimizer.vtable->deinit(optimizer.ctx, alloc);
         model.vtable->deinit(model.ctx, alloc);
         result->status = HU_EXPERIMENT_CRASH;
-        snprintf(result->description, sizeof(result->description),
-                 "train dataloader failed: %d", (int)err);
+        snprintf(result->description, sizeof(result->description), "train dataloader failed: %d",
+                 (int)err);
         return HU_OK;
     }
 
@@ -248,8 +271,8 @@ static hu_error_t run_single_experiment(hu_allocator_t *alloc,
         optimizer.vtable->deinit(optimizer.ctx, alloc);
         model.vtable->deinit(model.ctx, alloc);
         result->status = HU_EXPERIMENT_CRASH;
-        snprintf(result->description, sizeof(result->description),
-                 "val dataloader failed: %d", (int)err);
+        snprintf(result->description, sizeof(result->description), "val dataloader failed: %d",
+                 (int)err);
         return HU_OK;
     }
 
@@ -261,22 +284,22 @@ static hu_error_t run_single_experiment(hu_allocator_t *alloc,
         optimizer.vtable->deinit(optimizer.ctx, alloc);
         model.vtable->deinit(model.ctx, alloc);
         result->status = HU_EXPERIMENT_CRASH;
-        snprintf(result->description, sizeof(result->description),
-                 "param registration failed: %d", (int)err);
+        snprintf(result->description, sizeof(result->description), "param registration failed: %d",
+                 (int)err);
         return HU_OK;
     }
 
     if (cfg->training.checkpoint_path && cfg->training.checkpoint_path[0]) {
-        hu_error_t ld_err = hu_ml_checkpoint_load(alloc, cfg->training.checkpoint_path,
-                                                   &model, &optimizer);
+        hu_error_t ld_err =
+            hu_ml_checkpoint_load(alloc, cfg->training.checkpoint_path, &model, &optimizer);
         if (ld_err == HU_OK)
-            fprintf(stderr, "[experiment] resumed from checkpoint: %s\n",
-                    cfg->training.checkpoint_path);
+            hu_log_info("experiment", NULL, "resumed from checkpoint: %s",
+                        cfg->training.checkpoint_path);
     }
 
     hu_ml_train_result_t train_result = {0};
-    err = hu_ml_train(alloc, &model, &optimizer, train_dl, val_dl,
-                      &cfg->training, NULL, cfg->gpt.vocab_size, &train_result);
+    err = hu_ml_train(alloc, &model, &optimizer, train_dl, val_dl, &cfg->training, NULL,
+                      cfg->gpt.vocab_size, &train_result);
 
     result->val_bpb = train_result.val_bpb;
     result->peak_memory_mb = train_result.peak_memory_mb;
@@ -284,8 +307,7 @@ static hu_error_t run_single_experiment(hu_allocator_t *alloc,
     if (err != HU_OK || !train_result.converged) {
         result->status = HU_EXPERIMENT_CRASH;
         snprintf(result->description, sizeof(result->description),
-                 "training failed: %d (params=%zuM)",
-                 (int)err, num_params / 1000000);
+                 "training failed: %d (params=%zuM)", (int)err, num_params / 1000000);
     }
 
     hu_ml_dataloader_deinit(val_dl);
@@ -300,11 +322,8 @@ static hu_error_t run_single_experiment(hu_allocator_t *alloc,
 
 /* ─── Public API ─────────────────────────────────────────────────────────── */
 
-hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
-                              const hu_experiment_loop_config_t *config,
-                              hu_experiment_loop_callback_t callback,
-                              void *user_data)
-{
+hu_error_t hu_experiment_loop(hu_allocator_t *alloc, const hu_experiment_loop_config_t *config,
+                              hu_experiment_loop_callback_t callback, void *user_data) {
     if (!alloc || !config)
         return HU_ERR_INVALID_ARGUMENT;
     if (config->max_iterations <= 0)
@@ -341,15 +360,14 @@ hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
         if (i > 0) {
             int used_agent = 0;
             if (config->provider)
-                used_agent = agent_suggest_mutation(alloc, &current_config,
-                    config->provider, config->persona, &prev_result);
+                used_agent = agent_suggest_mutation(alloc, &current_config, config->provider,
+                                                    config->persona, &prev_result);
             if (!used_agent)
                 mutate_config(&current_config, i);
             current_config.optimizer.n_embd = current_config.gpt.n_embd;
         }
 
-        hu_error_t err = run_single_experiment(alloc, &current_config,
-                                               config->data_dir, &result);
+        hu_error_t err = run_single_experiment(alloc, &current_config, config->data_dir, &result);
         if (err != HU_OK) {
             result.status = HU_EXPERIMENT_CRASH;
             snprintf(result.description, sizeof(result.description),
@@ -370,8 +388,7 @@ hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
                 current_config = best_config;
                 if (result.description[0] == '\0')
                     snprintf(result.description, sizeof(result.description),
-                             "no improvement bpb=%.6f vs best=%.6f",
-                             result.val_bpb, best_bpb);
+                             "no improvement bpb=%.6f vs best=%.6f", result.val_bpb, best_bpb);
             }
         }
 
@@ -394,9 +411,8 @@ hu_error_t hu_experiment_loop(hu_allocator_t *alloc,
     return HU_OK;
 }
 
-hu_error_t hu_experiment_result_to_tsv(const hu_experiment_result_t *result,
-                                       char *buf, size_t buf_size)
-{
+hu_error_t hu_experiment_result_to_tsv(const hu_experiment_result_t *result, char *buf,
+                                       size_t buf_size) {
     if (!result || !buf || buf_size == 0)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -404,13 +420,8 @@ hu_error_t hu_experiment_result_to_tsv(const hu_experiment_result_t *result,
     double peak_memory_gb = result->peak_memory_mb / 1024.0;
     const char *status = status_string(result->status);
 
-    int n = snprintf(buf, buf_size,
-                    "%u\t%.6f\t%.1f\t%s\t%s\n",
-                    (unsigned)config_hash,
-                    result->val_bpb,
-                    peak_memory_gb,
-                    status,
-                    result->description);
+    int n = snprintf(buf, buf_size, "%u\t%.6f\t%.1f\t%s\t%s\n", (unsigned)config_hash,
+                     result->val_bpb, peak_memory_gb, status, result->description);
 
     if (n < 0)
         return HU_ERR_INTERNAL;

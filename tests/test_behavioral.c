@@ -1,5 +1,6 @@
 #include "human/context/behavioral.h"
 #include "human/core/allocator.h"
+#include "human/persona.h"
 #include "test_framework.h"
 #include <string.h>
 
@@ -79,6 +80,118 @@ static void timezone_compute_valid_result(void) {
     HU_ASSERT_TRUE(tz.local_hour < 24);
 }
 
+/* --- F28: Mirroring identity boundary tests --- */
+
+static void mirror_conflicts_abbreviations_with_avoided_vocab(void) {
+    hu_mirror_analysis_t analysis = {.uses_abbreviations = true};
+    hu_persona_t p = {0};
+    char *avoided[] = {(char *)"u", (char *)"ur"};
+    p.avoided_vocab = avoided;
+    p.avoided_vocab_count = 2;
+    HU_ASSERT_TRUE(hu_mirror_conflicts_with_identity(&analysis, (const struct hu_persona *)&p));
+}
+
+static void mirror_no_conflict_without_abbreviations(void) {
+    hu_mirror_analysis_t analysis = {.uses_abbreviations = false, .uses_lowercase = true};
+    hu_persona_t p = {0};
+    char *avoided[] = {(char *)"u", (char *)"ur"};
+    p.avoided_vocab = avoided;
+    p.avoided_vocab_count = 2;
+    HU_ASSERT_FALSE(hu_mirror_conflicts_with_identity(&analysis, (const struct hu_persona *)&p));
+}
+
+static void mirror_conflicts_abbreviations_with_invariant(void) {
+    hu_mirror_analysis_t analysis = {.uses_abbreviations = true};
+    hu_persona_t p = {0};
+    char *invariants[] = {(char *)"Never uses abbreviations"};
+    p.character_invariants = invariants;
+    p.character_invariants_count = 1;
+    HU_ASSERT_TRUE(hu_mirror_conflicts_with_identity(&analysis, (const struct hu_persona *)&p));
+}
+
+static void mirror_conflicts_lowercase_with_invariant(void) {
+    hu_mirror_analysis_t analysis = {.uses_lowercase = true};
+    hu_persona_t p = {0};
+    char *invariants[] = {(char *)"Never types in lowercase"};
+    p.character_invariants = invariants;
+    p.character_invariants_count = 1;
+    HU_ASSERT_TRUE(hu_mirror_conflicts_with_identity(&analysis, (const struct hu_persona *)&p));
+}
+
+static void mirror_no_conflict_null_persona(void) {
+    hu_mirror_analysis_t analysis = {.uses_abbreviations = true};
+    HU_ASSERT_FALSE(hu_mirror_conflicts_with_identity(&analysis, NULL));
+}
+
+static void mirror_no_conflict_null_analysis(void) {
+    hu_persona_t p = {0};
+    HU_ASSERT_FALSE(hu_mirror_conflicts_with_identity(NULL, (const struct hu_persona *)&p));
+}
+
+static void mirror_build_directive_persona_filters_abbreviations(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_mirror_analysis_t analysis = {
+        .uses_abbreviations = true,
+        .uses_lowercase = false,
+        .avg_msg_length = 50.0,
+    };
+    hu_persona_t p = {0};
+    char *avoided[] = {(char *)"u", (char *)"rn"};
+    p.avoided_vocab = avoided;
+    p.avoided_vocab_count = 2;
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_mirror_build_directive_persona(
+        &alloc, &analysis, (const struct hu_persona *)&p, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    /* The abbreviation sentence should be filtered out */
+    if (out) {
+        HU_ASSERT_TRUE(strstr(out, "abbreviation") == NULL);
+        /* But message length directive should survive */
+        HU_ASSERT_TRUE(strstr(out, "chars") != NULL);
+        alloc.free(alloc.ctx, out, out_len + 1);
+    }
+}
+
+static void mirror_build_directive_persona_null_persona_passes_through(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_mirror_analysis_t analysis = {
+        .uses_abbreviations = true,
+        .avg_msg_length = 30.0,
+    };
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_mirror_build_directive_persona(&alloc, &analysis, NULL, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "abbreviation") != NULL);
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void mirror_identity_bounds_filters_correctly(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *directive = "[LINGUISTIC MIRROR]: They use abbreviations — ok to use 'u' and 'rn'. "
+                            "Keep messages around 40 chars.";
+    hu_persona_t p = {0};
+    char *invariants[] = {(char *)"Never uses abbreviations"};
+    p.character_invariants = invariants;
+    p.character_invariants_count = 1;
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_mirror_check_identity_bounds(&alloc, directive, strlen(directive),
+                                                     (const struct hu_persona *)&p, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    /* Abbreviation sentence should be removed */
+    HU_ASSERT_TRUE(strstr(out, "abbreviation") == NULL);
+    /* Keep messages sentence should remain */
+    HU_ASSERT_TRUE(strstr(out, "chars") != NULL);
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
 void run_behavioral_tests(void) {
     HU_TEST_SUITE("behavioral");
     HU_RUN_TEST(double_text_default_config_low_closeness);
@@ -90,4 +203,14 @@ void run_behavioral_tests(void) {
     HU_RUN_TEST(bookend_check_already_sent_returns_none);
     HU_RUN_TEST(bookend_type_str_non_null);
     HU_RUN_TEST(timezone_compute_valid_result);
+    /* Mirroring identity boundary */
+    HU_RUN_TEST(mirror_conflicts_abbreviations_with_avoided_vocab);
+    HU_RUN_TEST(mirror_no_conflict_without_abbreviations);
+    HU_RUN_TEST(mirror_conflicts_abbreviations_with_invariant);
+    HU_RUN_TEST(mirror_conflicts_lowercase_with_invariant);
+    HU_RUN_TEST(mirror_no_conflict_null_persona);
+    HU_RUN_TEST(mirror_no_conflict_null_analysis);
+    HU_RUN_TEST(mirror_build_directive_persona_filters_abbreviations);
+    HU_RUN_TEST(mirror_build_directive_persona_null_persona_passes_through);
+    HU_RUN_TEST(mirror_identity_bounds_filters_correctly);
 }

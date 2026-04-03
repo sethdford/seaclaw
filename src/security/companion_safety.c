@@ -1,8 +1,270 @@
 #include "human/security/companion_safety.h"
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+/* ── Input normalization for adversarial bypass resistance ────────── */
+
+/* Leetspeak mapping: character → ASCII letter it commonly represents. */
+static char leet_to_alpha(char c) {
+    switch (c) {
+    case '0':
+        return 'o';
+    case '1':
+        return 'i';
+    case '3':
+        return 'e';
+    case '4':
+        return 'a';
+    case '5':
+        return 's';
+    case '7':
+        return 't';
+    case '8':
+        return 'b';
+    case '9':
+        return 'g';
+    case '@':
+        return 'a';
+    case '$':
+        return 's';
+    case '!':
+        return 'i';
+    case '+':
+        return 't';
+    default:
+        return 0;
+    }
+}
+
+/* Unicode homoglyph normalization (basic Latin look-alikes).
+ * Returns substituted ASCII char or 0 if not a known homoglyph.
+ * Handles 2-byte UTF-8 sequences (U+00xx range). */
+static char homoglyph_to_ascii(const unsigned char *p, size_t remaining, size_t *consumed) {
+    *consumed = 1;
+    if (remaining < 2)
+        return 0;
+    /* 2-byte UTF-8: 0xC0-0xDF lead byte */
+    if (p[0] >= 0xC0 && p[0] <= 0xDF) {
+        *consumed = 2;
+        /* Common Latin-1 supplement look-alikes */
+        if (p[0] == 0xC3) {
+            unsigned char b = p[1];
+            /* à á â ã ä å → a */
+            if (b >= 0xA0 && b <= 0xA5)
+                return 'a';
+            /* è é ê ë → e */
+            if (b >= 0xA8 && b <= 0xAB)
+                return 'e';
+            /* ì í î ï → i */
+            if (b >= 0xAC && b <= 0xAF)
+                return 'i';
+            /* ò ó ô õ ö → o */
+            if (b >= 0xB2 && b <= 0xB6)
+                return 'o';
+            /* ù ú û ü → u */
+            if (b >= 0xB9 && b <= 0xBC)
+                return 'u';
+            /* ñ → n */
+            if (b == 0xB1)
+                return 'n';
+            /* Upper case variants: À-Å */
+            if (b >= 0x80 && b <= 0x85)
+                return 'a';
+            /* È-Ë */
+            if (b >= 0x88 && b <= 0x8B)
+                return 'e';
+            /* Ì-Ï */
+            if (b >= 0x8C && b <= 0x8F)
+                return 'i';
+            /* Ò-Ö */
+            if (b >= 0x92 && b <= 0x96)
+                return 'o';
+            /* Ù-Ü */
+            if (b >= 0x99 && b <= 0x9C)
+                return 'u';
+        }
+        /* Cyrillic lookalikes — uppercase (U+0410-U+0425, lead byte 0xD0) */
+        if (p[0] == 0xD0) {
+            unsigned char b = p[1];
+            if (b == 0x90)
+                return 'a'; /* А U+0410 */
+            if (b == 0x92)
+                return 'b'; /* В U+0412 */
+            if (b == 0x95)
+                return 'e'; /* Е U+0415 */
+            if (b == 0x9A)
+                return 'k'; /* К U+041A */
+            if (b == 0x9C)
+                return 'm'; /* М U+041C */
+            if (b == 0x9D)
+                return 'h'; /* Н U+041D */
+            if (b == 0x9E)
+                return 'o'; /* О U+041E */
+            if (b == 0xA0)
+                return 'p'; /* Р U+0420 */
+            if (b == 0xA1)
+                return 'c'; /* С U+0421 */
+            if (b == 0xA2)
+                return 't'; /* Т U+0422 */
+            if (b == 0xA3)
+                return 'y'; /* У U+0423 */
+            if (b == 0xA5)
+                return 'x'; /* Х U+0425 */
+            /* Cyrillic lookalikes — lowercase (U+0430-U+043E, lead byte 0xD0) */
+            if (b == 0xB0)
+                return 'a'; /* а U+0430 */
+            if (b == 0xB2)
+                return 'b'; /* в U+0432 */
+            if (b == 0xB5)
+                return 'e'; /* е U+0435 */
+            if (b == 0xBA)
+                return 'k'; /* к U+043A */
+            if (b == 0xBC)
+                return 'm'; /* м U+043C */
+            if (b == 0xBD)
+                return 'h'; /* н U+043D */
+            if (b == 0xBE)
+                return 'o'; /* о U+043E */
+        }
+        /* Cyrillic lookalikes — lowercase (U+0440-U+0445, lead byte 0xD1) */
+        if (p[0] == 0xD1) {
+            unsigned char b = p[1];
+            if (b == 0x80)
+                return 'p'; /* р U+0440 */
+            if (b == 0x81)
+                return 'c'; /* с U+0441 */
+            if (b == 0x82)
+                return 't'; /* т U+0442 */
+            if (b == 0x83)
+                return 'y'; /* у U+0443 */
+            if (b == 0x85)
+                return 'x'; /* х U+0445 */
+        }
+        return 0;
+    }
+    /* 3-byte UTF-8: 0xE0-0xEF lead byte */
+    if (p[0] >= 0xE0 && p[0] <= 0xEF && remaining >= 3) {
+        *consumed = 3;
+        /* Fullwidth digits: U+FF10-FF19 (0xEF 0xBC 0x90-0x99) → '0'-'9' */
+        if (p[0] == 0xEF && p[1] == 0xBC) {
+            if (p[2] >= 0x90 && p[2] <= 0x99)
+                return (char)('0' + (p[2] - 0x90));
+            /* Fullwidth uppercase Latin: U+FF21-FF3A (0xEF 0xBC 0xA1-0xBA) → 'a'-'z' */
+            if (p[2] >= 0xA1 && p[2] <= 0xBA)
+                return (char)('a' + (p[2] - 0xA1));
+        }
+        /* Fullwidth lowercase Latin: U+FF41-FF5A (0xEF 0xBD 0x81-0x9A) → 'a'-'z' */
+        if (p[0] == 0xEF && p[1] == 0xBD && p[2] >= 0x81 && p[2] <= 0x9A)
+            return (char)('a' + (p[2] - 0x81));
+        return 0;
+    }
+    /* 4-byte UTF-8: 0xF0-0xF7 lead byte */
+    if (p[0] >= 0xF0 && p[0] <= 0xF7 && remaining >= 4) {
+        *consumed = 4;
+        return 0;
+    }
+    return 0;
+}
+
+size_t hu_companion_safety_normalize(const char *input, size_t input_len, char *out,
+                                     size_t out_cap) {
+    if (!input || input_len == 0 || !out || out_cap == 0)
+        return 0;
+
+    /* Pass 1: normalize leetspeak + homoglyphs + lowercase into a temp buffer.
+     * We allocate a working buffer same size as input. */
+    char *work = (char *)malloc(input_len + 1);
+    if (!work)
+        return 0;
+
+    size_t wpos = 0;
+    for (size_t i = 0; i < input_len; /* advanced in loop */) {
+        unsigned char c = (unsigned char)input[i];
+
+        /* Check for multi-byte UTF-8 homoglyphs */
+        if (c >= 0xC0) {
+            size_t consumed = 1;
+            char replacement =
+                homoglyph_to_ascii((const unsigned char *)input + i, input_len - i, &consumed);
+            if (replacement) {
+                work[wpos++] = replacement;
+            } else {
+                /* Copy the multi-byte sequence as-is */
+                for (size_t j = 0; j < consumed && wpos < input_len; j++)
+                    work[wpos++] = input[i + j];
+            }
+            i += consumed;
+            continue;
+        }
+
+        /* Leetspeak substitution */
+        char leet = leet_to_alpha((char)c);
+        if (leet) {
+            work[wpos++] = leet;
+            i++;
+            continue;
+        }
+
+        /* Lowercase ASCII */
+        if (c >= 'A' && c <= 'Z') {
+            work[wpos++] = (char)(c + 32);
+        } else {
+            work[wpos++] = (char)c;
+        }
+        i++;
+    }
+    work[wpos] = '\0';
+
+    /* Pass 2: collapse spaced-out single characters.
+     * Pattern: letter<space>letter<space>letter... where each segment is a single
+     * alpha char. E.g., "s u i c i d e" → "suicide" */
+    size_t opos = 0;
+    size_t ri = 0;
+    while (ri < wpos && opos < out_cap - 1) {
+        /* Check for spaced-out letter pattern: at least 2 single-letter segments */
+        if (isalpha((unsigned char)work[ri])) {
+            /* Look ahead: is next a space followed by a single letter? */
+            size_t scan = ri;
+            size_t letter_count = 0;
+            while (scan < wpos) {
+                if (!isalpha((unsigned char)work[scan]))
+                    break;
+                /* Must be a single letter (not part of a word) */
+                if (scan + 1 < wpos && isalpha((unsigned char)work[scan + 1]))
+                    break; /* multi-char word, stop scanning */
+                letter_count++;
+                scan++; /* past the letter */
+                /* Skip spaces */
+                if (scan < wpos && work[scan] == ' ') {
+                    scan++;
+                } else {
+                    break; /* no space after, end of pattern */
+                }
+            }
+            if (letter_count >= 3) {
+                /* Collapse: copy just the letters */
+                size_t ci2 = ri;
+                while (ci2 < scan && opos < out_cap - 1) {
+                    if (isalpha((unsigned char)work[ci2])) {
+                        out[opos++] = work[ci2];
+                    }
+                    ci2++;
+                }
+                ri = scan;
+                continue;
+            }
+        }
+        out[opos++] = work[ri++];
+    }
+    if (opos < out_cap)
+        out[opos] = '\0';
+    free(work);
+    return opos;
+}
+
+/* ci_contains on normalized text (already lowercased by normalize) */
 static bool ci_contains(const char *text, size_t text_len, const char *needle) {
     size_t nlen = strlen(needle);
     if (nlen == 0 || nlen > text_len)
@@ -70,9 +332,14 @@ static double score_over_attachment(const char *text, size_t len) {
 /* Dimension 2: Boundary violations */
 static double score_boundary_violation(const char *text, size_t len) {
     static const char *const patterns[] = {
-        "don't change the subject", "you have to tell me",  "you can't say no",
-        "i won't take no",          "stop avoiding",        "you owe me",
-        "you promised",              "don't hold back",
+        "don't change the subject",
+        "you have to tell me",
+        "you can't say no",
+        "i won't take no",
+        "stop avoiding",
+        "you owe me",
+        "you promised",
+        "don't hold back",
     };
     size_t hits = count_matches(text, len, patterns, sizeof(patterns) / sizeof(patterns[0]));
     return score_from_hits(hits, 3);
@@ -81,9 +348,8 @@ static double score_boundary_violation(const char *text, size_t len) {
 /* Dimension 3: Roleplay violations (inappropriate escalation) */
 static double score_roleplay_violation(const char *text, size_t len) {
     static const char *const patterns[] = {
-        "take off",     "undress",      "get naked",   "kiss me",
-        "touch me",     "bedroom",      "sexual",      "seduce",
-        "make love",    "intimate with me",
+        "take off", "undress", "get naked", "kiss me",   "touch me",
+        "bedroom",  "sexual",  "seduce",    "make love", "intimate with me",
     };
     size_t hits = count_matches(text, len, patterns, sizeof(patterns) / sizeof(patterns[0]));
     return score_from_hits(hits, 2);
@@ -161,9 +427,8 @@ static bool check_farewell_unsafe(const char *text, size_t len) {
     return false;
 }
 
-hu_error_t hu_companion_safety_check(hu_allocator_t *alloc,
-                                     const char *response, size_t response_len,
-                                     const char *context, size_t context_len,
+hu_error_t hu_companion_safety_check(hu_allocator_t *alloc, const char *response,
+                                     size_t response_len, const char *context, size_t context_len,
                                      hu_companion_safety_result_t *result) {
     (void)alloc;
     (void)context;
@@ -176,21 +441,28 @@ hu_error_t hu_companion_safety_check(hu_allocator_t *alloc,
     if (!response || response_len == 0)
         return HU_OK;
 
-    result->over_attachment = score_over_attachment(response, response_len);
-    result->boundary_violation = score_boundary_violation(response, response_len);
-    result->roleplay_violation = score_roleplay_violation(response, response_len);
-    result->manipulative = score_manipulative(response, response_len);
-    result->isolation = score_isolation(response, response_len);
+    /* Normalize input to defeat leetspeak, spacing, and homoglyph bypasses */
+    char *norm_buf = (char *)malloc(response_len + 1);
+    if (!norm_buf)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t norm_len =
+        hu_companion_safety_normalize(response, response_len, norm_buf, response_len + 1);
+    const char *text = norm_buf;
+    size_t text_len = norm_len;
+
+    result->over_attachment = score_over_attachment(text, text_len);
+    result->boundary_violation = score_boundary_violation(text, text_len);
+    result->roleplay_violation = score_roleplay_violation(text, text_len);
+    result->manipulative = score_manipulative(text, text_len);
+    result->isolation = score_isolation(text, text_len);
 
     /* Weighted aggregate: manipulation and isolation weighted higher */
-    result->total_risk = result->over_attachment * 0.15 +
-                         result->boundary_violation * 0.20 +
-                         result->roleplay_violation * 0.15 +
-                         result->manipulative * 0.25 +
+    result->total_risk = result->over_attachment * 0.15 + result->boundary_violation * 0.20 +
+                         result->roleplay_violation * 0.15 + result->manipulative * 0.25 +
                          result->isolation * 0.25;
 
     result->flagged = result->total_risk >= HU_COMPANION_SAFETY_THRESHOLD;
-    result->farewell_unsafe = check_farewell_unsafe(response, response_len);
+    result->farewell_unsafe = check_farewell_unsafe(text, text_len);
 
     if (result->farewell_unsafe)
         result->flagged = true;
@@ -241,6 +513,7 @@ hu_error_t hu_companion_safety_check(hu_allocator_t *alloc,
         }
     }
 
+    free(norm_buf);
     return HU_OK;
 }
 
@@ -268,8 +541,8 @@ hu_error_t hu_vulnerability_assess(const hu_vulnerability_input_t *input,
 
     /* Evaluate individual risk factors */
     result->emotional_decline = (input->trajectory_slope < -0.05f);
-    result->negative_valence =
-        (input->valence_count >= 2 && mean_valence(input->valence_history, input->valence_count) < -0.3);
+    result->negative_valence = (input->valence_count >= 2 &&
+                                mean_valence(input->valence_history, input->valence_count) < -0.3);
     result->crisis_keywords = input->self_harm_flagged;
     result->behavioral_deviation = (input->deviation_severity > 0.3f);
     result->attachment_escalation = (input->message_frequency_ratio > 1.33);
@@ -348,11 +621,17 @@ hu_error_t hu_vulnerability_assess(const hu_vulnerability_input_t *input,
 
 const char *hu_vulnerability_level_name(hu_vulnerability_level_t level) {
     switch (level) {
-    case HU_VULNERABILITY_NONE:     return "none";
-    case HU_VULNERABILITY_LOW:      return "low";
-    case HU_VULNERABILITY_MODERATE: return "moderate";
-    case HU_VULNERABILITY_HIGH:     return "high";
-    case HU_VULNERABILITY_CRISIS:   return "crisis";
-    default:                        return "unknown";
+    case HU_VULNERABILITY_NONE:
+        return "none";
+    case HU_VULNERABILITY_LOW:
+        return "low";
+    case HU_VULNERABILITY_MODERATE:
+        return "moderate";
+    case HU_VULNERABILITY_HIGH:
+        return "high";
+    case HU_VULNERABILITY_CRISIS:
+        return "crisis";
+    default:
+        return "unknown";
     }
 }
