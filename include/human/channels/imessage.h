@@ -64,6 +64,12 @@ hu_error_t hu_imessage_lookup_message_by_guid(hu_allocator_t *alloc, const char 
                                               size_t guid_len, char *out_text, size_t out_cap,
                                               size_t *out_len);
 
+/** Extract plain text from an NSAttributedString (NSKeyedArchiver) blob.
+ * macOS 15+ stores iMessage text in attributedBody instead of the text column.
+ * Pure byte parsing — no platform dependencies. Returns extracted length, or 0. */
+size_t hu_imessage_extract_attributed_body(const unsigned char *blob, size_t blob_len, char *out,
+                                           size_t out_cap);
+
 /** Search Tenor for a GIF matching the query and download to a temp file.
  * Returns the local path to the downloaded GIF (caller owns, free with alloc).
  * Returns NULL on failure (no API key, network error, no results).

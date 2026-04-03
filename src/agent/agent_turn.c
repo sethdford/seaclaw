@@ -18,7 +18,6 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
     return HU_OK;
 }
 #endif
-#include "human/core/log.h"
 #include "human/agent/ab_response.h"
 #include "human/agent/approval_gate.h"
 #include "human/agent/awareness.h"
@@ -52,6 +51,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/cognition/dual_process.h"
 #include "human/cognition/emotional.h"
 #include "human/cognition/metacognition.h"
+#include "human/core/log.h"
 #include "human/humanness.h"
 #include "human/memory/evolved_opinions.h"
 #include "human/memory/lifecycle/semantic_cache.h"
@@ -82,9 +82,6 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/agent/agent_comm.h"
 #include "human/agent/kv_cache.h"
 #include "human/agent/prompt_cache.h"
-#include "human/hook.h"
-#include "human/hook_pipeline.h"
-#include "human/permission.h"
 #include "human/context.h"
 #include "human/context/conversation.h"
 #include "human/context_engine.h"
@@ -92,17 +89,20 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/eval/turing_score.h"
+#include "human/hook.h"
+#include "human/hook_pipeline.h"
 #include "human/memory/deep_extract.h"
 #include "human/memory/emotional_moments.h"
 #include "human/memory/fast_capture.h"
 #include "human/memory/stm.h"
 #include "human/memory/superhuman.h"
 #include "human/memory/tiers.h"
+#include "human/permission.h"
 #include "human/security.h"
 #include "human/security/causal_armor.h"
+#include "human/security/companion_safety.h"
 #include "human/security/history_scorer.h"
 #include "human/security/moderation.h"
-#include "human/security/companion_safety.h"
 #include "human/tools/cache_ttl.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
@@ -684,7 +684,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     agent->commitment_store, &commit_result.commitments[i], sess, sess_len);
                 if (cs_err != HU_OK)
                     hu_log_error("agent", NULL, "commitment save failed: %s",
-                            hu_error_string(cs_err));
+                                 hu_error_string(cs_err));
             }
         }
         hu_commitment_detect_result_deinit(&commit_result, agent->alloc);
@@ -772,7 +772,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             hu_preferences_load(agent->memory, agent->alloc, &pref_ctx, &pref_ctx_len);
         if (pref_err != HU_OK)
             hu_log_error("agent_turn", NULL, "preferences load failed: %s",
-                    hu_error_string(pref_err));
+                         hu_error_string(pref_err));
     }
 
     /* Self-RAG gate: decide whether retrieval is needed before loading memory */
@@ -851,7 +851,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         hu_dq_result_t dq_result;
         if (hu_dq_check(&agent->dq_config, &frag, 1, &dq_result) == HU_OK && !dq_result.passed) {
             hu_log_info("agent_turn", NULL, "data quality: %zu issues in memory context",
-                    dq_result.issue_count);
+                        dq_result.issue_count);
         }
     }
 
@@ -969,7 +969,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->memory_session_id_len, &commitments, &commitment_count);
             if (commit_err != HU_OK)
                 hu_log_error("agent_turn", NULL, "commitment list failed: %s",
-                        hu_error_string(commit_err));
+                             hu_error_string(commit_err));
         }
         hu_error_t proactive_err =
             hu_proactive_check_extended(agent->alloc, session_count, hour, commitments,
@@ -2011,19 +2011,18 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
      * Prevents the AI from matching extreme emotional intensity, especially
      * with acquaintances where mirroring high emotion can feel uncanny. */
     if (emotional_ctx && emotional_ctx_len > 0 &&
-        agent->emotional_cognition.state.intensity > 0.1f &&
-        agent->persona && agent->memory_session_id) {
+        agent->emotional_cognition.state.intensity > 0.1f && agent->persona &&
+        agent->memory_session_id) {
         const hu_contact_profile_t *amc_cp = hu_persona_find_contact(
             agent->persona, agent->memory_session_id, agent->memory_session_id_len);
-        const hu_persona_overlay_t *amc_ov = agent->active_channel
-            ? hu_persona_find_overlay(agent->persona, agent->active_channel,
-                                       agent->active_channel_len)
-            : NULL;
+        const hu_persona_overlay_t *amc_ov =
+            agent->active_channel ? hu_persona_find_overlay(agent->persona, agent->active_channel,
+                                                            agent->active_channel_len)
+                                  : NULL;
         float ceiling = hu_affect_mirror_ceiling(amc_cp, amc_ov);
         char dampen_dir[256];
-        float capped = hu_affect_mirror_apply(
-            agent->emotional_cognition.state.intensity, ceiling,
-            dampen_dir, sizeof(dampen_dir));
+        float capped = hu_affect_mirror_apply(agent->emotional_cognition.state.intensity, ceiling,
+                                              dampen_dir, sizeof(dampen_dir));
         (void)capped;
         if (dampen_dir[0] != '\0') {
             size_t dir_len = strlen(dampen_dir);
@@ -2497,12 +2496,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         bool user_asked = (msg_len > 0 && memchr(msg, '?', msg_len) != NULL);
         if (!user_asked && msg && msg_len >= 4) {
             static const char *request_phrases[] = {
-                "help", "can you", "could you", "please", "how do", "what is",
-                "show me", "tell me", "explain", "write", "create", "fix",
-                "find", "search", "give me", "build", "make", "do ",
+                "help",    "can you", "could you", "please", "how do", "what is",
+                "show me", "tell me", "explain",   "write",  "create", "fix",
+                "find",    "search",  "give me",   "build",  "make",   "do ",
             };
-            for (size_t ri = 0;
-                 ri < sizeof(request_phrases) / sizeof(request_phrases[0]); ri++) {
+            for (size_t ri = 0; ri < sizeof(request_phrases) / sizeof(request_phrases[0]); ri++) {
                 size_t rlen = strlen(request_phrases[ri]);
                 if (msg_len >= rlen) {
                     for (size_t p = 0; p + rlen <= msg_len; p++) {
@@ -2523,8 +2521,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
         }
     silence_check:;
-        hu_silence_response_t silence = hu_silence_intuit(
-            msg, msg_len, ew, (uint32_t)agent->history_count, user_asked);
+        hu_silence_response_t silence =
+            hu_silence_intuit(msg, msg_len, ew, (uint32_t)agent->history_count, user_asked);
         if (silence != HU_SILENCE_FULL_RESPONSE) {
             const char *silence_resp = NULL;
             size_t silence_resp_len = 0;
@@ -2532,29 +2530,27 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 silence_resp = "";
                 silence_resp_len = 0;
             } else {
-                char *ack = hu_silence_build_acknowledgment(agent->alloc, silence,
-                                                            &silence_resp_len);
+                char *ack =
+                    hu_silence_build_acknowledgment(agent->alloc, silence, &silence_resp_len);
                 silence_resp = ack;
             }
             if (silence_resp || silence == HU_SILENCE_ACTUAL_SILENCE) {
                 *response_out = silence_resp
-                    ? hu_strndup(agent->alloc, silence_resp, silence_resp_len)
-                    : hu_strndup(agent->alloc, "", 0);
+                                    ? hu_strndup(agent->alloc, silence_resp, silence_resp_len)
+                                    : hu_strndup(agent->alloc, "", 0);
                 if (response_len_out)
                     *response_len_out = silence_resp_len;
                 /* Record this silent turn for learning (don't drop from training) */
 #ifdef HU_ENABLE_SQLITE
                 if (agent->memory) {
                     hu_experience_store_t sil_exp;
-                    if (hu_experience_store_init(agent->alloc, agent->memory, &sil_exp) ==
-                        HU_OK) {
+                    if (hu_experience_store_init(agent->alloc, agent->memory, &sil_exp) == HU_OK) {
                         sqlite3 *sil_db = hu_sqlite_memory_get_db(agent->memory);
                         if (sil_db)
                             sil_exp.db = sil_db;
-                        (void)hu_experience_record(&sil_exp, msg, msg_len,
-                                                    "silence_intuit", 14,
-                                                    silence_resp ? silence_resp : "", silence_resp_len,
-                                                    0.5);
+                        (void)hu_experience_record(&sil_exp, msg, msg_len, "silence_intuit", 14,
+                                                   silence_resp ? silence_resp : "",
+                                                   silence_resp_len, 0.5);
                         hu_experience_store_deinit(&sil_exp);
                     }
                 }
@@ -3008,7 +3004,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     hu_chaos_apply_to_response(&agent->chaos_engine, agent->alloc, fault, &resp);
                 if (chaos_err != HU_OK) {
                     hu_log_info("agent_turn", NULL, "chaos fault injected: %s",
-                            hu_chaos_fault_name(fault));
+                                hu_chaos_fault_name(fault));
                 }
             }
         }
@@ -3239,12 +3235,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                              resp.content_len, NULL, 0, NULL, 0);
                         if (hist_err != HU_OK)
                             hu_log_error("agent_turn", NULL, "history append failed: %s",
-                                    hu_error_string(hist_err));
+                                         hu_error_string(hist_err));
                         hist_err = hu_agent_internal_append_history(agent, HU_ROLE_USER, critique,
                                                                     critique_len, NULL, 0, NULL, 0);
                         if (hist_err != HU_OK)
                             hu_log_error("agent_turn", NULL, "history append failed: %s",
-                                    hu_error_string(hist_err));
+                                         hu_error_string(hist_err));
                         agent->alloc->free(agent->alloc->ctx, critique, critique_len + 1);
 
                         /* DPO: save the rejected response for pairing with the
@@ -3631,7 +3627,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     agent, HU_ROLE_ASSISTANT, final_content, final_len, NULL, 0, NULL, 0);
                 if (hist_err != HU_OK)
                     hu_log_error("agent_turn", NULL, "history append failed: %s",
-                            hu_error_string(hist_err));
+                                 hu_error_string(hist_err));
                 *response_out = hu_strndup(agent->alloc, final_content, final_len);
                 if (ab_owned)
                     agent->alloc->free(agent->alloc->ctx, (void *)final_content, final_len + 1);
@@ -3765,7 +3761,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         strlen(f->object), &cat, sid ? sid : "", sid_len);
                                     if (store_err != HU_OK && store_err != HU_ERR_NOT_SUPPORTED)
                                         hu_log_error("agent", NULL, "memory store failed: %s",
-                                                hu_error_string(store_err));
+                                                     hu_error_string(store_err));
                                 }
                                 if (agent->sota_initialized) {
                                     hu_memory_tier_t assigned;
@@ -3793,7 +3789,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             agent->commitment_store, &cr.commitments[ci], sess, sess_len);
                         if (cs_err != HU_OK)
                             hu_log_error("agent", NULL, "commitment save failed: %s",
-                                    hu_error_string(cs_err));
+                                         hu_error_string(cs_err));
                     }
                 }
                 hu_commitment_detect_result_deinit(&cr, agent->alloc);
@@ -3813,7 +3809,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             &exp_store, msg, msg_len, "agent_turn", 10, resp_text, resp_len, 1.0);
                         if (exp_err != HU_OK)
                             hu_log_error("agent", NULL, "experience record failed: %s",
-                                    hu_error_string(exp_err));
+                                         hu_error_string(exp_err));
                     }
                     hu_experience_store_deinit(&exp_store);
                 }
@@ -4130,12 +4126,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         fb_type_str = "negative";
                     else if (has_q)
                         fb_type_str = "positive";
-                    const char *cid = agent->memory_session_id
-                                          ? agent->memory_session_id
-                                          : "unknown";
-                    size_t cid_len = agent->memory_session_id
-                                         ? agent->memory_session_id_len
-                                         : 7;
+                    const char *cid =
+                        agent->memory_session_id ? agent->memory_session_id : "unknown";
+                    size_t cid_len = agent->memory_session_id ? agent->memory_session_id_len : 7;
                     /* Parameterized insert into behavioral_feedback table */
                     {
                         static const char fb_sql[] =
@@ -4143,12 +4136,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             "(behavior_type, contact_id, signal, context, timestamp) "
                             "VALUES(?1, ?2, ?3, ?4, ?5)";
                         sqlite3_stmt *fb_stmt = NULL;
-                        if (sqlite3_prepare_v2(fb_db, fb_sql, -1, &fb_stmt, NULL) ==
-                            SQLITE_OK) {
+                        if (sqlite3_prepare_v2(fb_db, fb_sql, -1, &fb_stmt, NULL) == SQLITE_OK) {
                             sqlite3_bind_text(fb_stmt, 1, "agent_turn", 10, SQLITE_STATIC);
                             sqlite3_bind_text(fb_stmt, 2, cid, (int)cid_len, SQLITE_STATIC);
-                            sqlite3_bind_text(fb_stmt, 3, fb_type_str,
-                                              (int)strlen(fb_type_str), SQLITE_STATIC);
+                            sqlite3_bind_text(fb_stmt, 3, fb_type_str, (int)strlen(fb_type_str),
+                                              SQLITE_STATIC);
                             size_t ctx_len = msg_len > 256 ? 256 : msg_len;
                             sqlite3_bind_text(fb_stmt, 4, msg, (int)ctx_len, SQLITE_STATIC);
                             sqlite3_bind_int64(fb_stmt, 5, (int64_t)time(NULL));
@@ -4167,8 +4159,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     double total_reward = (turn_tool_results_count > 0)
                                               ? 0.5 + 0.1 * (double)turn_tool_results_count
                                               : 0.3;
-                    (void)hu_training_data_end_trajectory(
-                        traj_db, agent->current_trajectory_id, total_reward);
+                    (void)hu_training_data_end_trajectory(traj_db, agent->current_trajectory_id,
+                                                          total_reward);
                 }
                 agent->current_trajectory_id = 0;
             }
@@ -4196,10 +4188,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 if (hu_moderation_check(agent->alloc, *response_out, *response_len_out,
                                         &mod_result) == HU_OK &&
                     mod_result.flagged) {
-                    hu_log_info("agent_turn", NULL, "moderation flagged response: "
-                            "violence=%.2f self_harm=%.2f hate=%.2f",
-                            mod_result.violence_score, mod_result.self_harm_score,
-                            mod_result.hate_score);
+                    hu_log_info("agent_turn", NULL,
+                                "moderation flagged response: "
+                                "violence=%.2f self_harm=%.2f hate=%.2f",
+                                mod_result.violence_score, mod_result.self_harm_score,
+                                mod_result.hate_score);
                     if (mod_result.self_harm) {
                         /* Crisis escalation: inject crisis resources */
                         static const char crisis[] =
@@ -4208,7 +4201,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             "Crisis Text Line (text HOME to 741741)";
                         size_t orig_len = *response_len_out;
                         size_t new_len = orig_len + sizeof(crisis) - 1;
-                        char *expanded = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
+                        char *expanded =
+                            (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
                         if (expanded) {
                             memcpy(expanded, *response_out, orig_len);
                             memcpy(expanded + orig_len, crisis, sizeof(crisis) - 1);
@@ -4219,36 +4213,35 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         }
                     }
                     if (mod_result.violence) {
-                        hu_log_info("agent_turn", NULL, "violence flagged (score=%.2f), "
-                                "injecting de-escalation\n",
-                                mod_result.violence_score);
+                        hu_log_info("agent_turn", NULL,
+                                    "violence flagged (score=%.2f), "
+                                    "injecting de-escalation\n",
+                                    mod_result.violence_score);
                         /* Inject de-escalation directive */
-                        static const char deesc[] =
-                            "[SAFETY] This response touches on violence. "
-                            "De-escalate: acknowledge feelings without "
-                            "endorsing harm. Redirect toward constructive "
-                            "alternatives.";
+                        static const char deesc[] = "[SAFETY] This response touches on violence. "
+                                                    "De-escalate: acknowledge feelings without "
+                                                    "endorsing harm. Redirect toward constructive "
+                                                    "alternatives.";
                         size_t dir_len = sizeof(deesc) - 1;
                         size_t orig_len = *response_len_out;
                         size_t new_len = dir_len + 2 + orig_len;
-                        char *safe = (char *)agent->alloc->alloc(
-                            agent->alloc->ctx, new_len + 1);
+                        char *safe = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
                         if (safe) {
                             memcpy(safe, deesc, dir_len);
                             safe[dir_len] = '\n';
                             safe[dir_len + 1] = '\n';
                             memcpy(safe + dir_len + 2, *response_out, orig_len);
                             safe[new_len] = '\0';
-                            agent->alloc->free(agent->alloc->ctx, *response_out,
-                                               orig_len + 1);
+                            agent->alloc->free(agent->alloc->ctx, *response_out, orig_len + 1);
                             *response_out = safe;
                             *response_len_out = new_len;
                         }
                     }
                     if (mod_result.hate) {
-                        hu_log_info("agent_turn", NULL, "hate speech flagged (score=%.2f), "
-                                "injecting boundary\n",
-                                mod_result.hate_score);
+                        hu_log_info("agent_turn", NULL,
+                                    "hate speech flagged (score=%.2f), "
+                                    "injecting boundary\n",
+                                    mod_result.hate_score);
                         /* Inject boundary-setting directive */
                         static const char boundary[] =
                             "[SAFETY] This response contains content "
@@ -4259,16 +4252,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         size_t dir_len = sizeof(boundary) - 1;
                         size_t orig_len = *response_len_out;
                         size_t new_len = dir_len + 2 + orig_len;
-                        char *safe = (char *)agent->alloc->alloc(
-                            agent->alloc->ctx, new_len + 1);
+                        char *safe = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
                         if (safe) {
                             memcpy(safe, boundary, dir_len);
                             safe[dir_len] = '\n';
                             safe[dir_len + 1] = '\n';
                             memcpy(safe + dir_len + 2, *response_out, orig_len);
                             safe[new_len] = '\0';
-                            agent->alloc->free(agent->alloc->ctx, *response_out,
-                                               orig_len + 1);
+                            agent->alloc->free(agent->alloc->ctx, *response_out, orig_len + 1);
                             *response_out = safe;
                             *response_len_out = new_len;
                         }
@@ -4279,27 +4270,27 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             /* SHIELD-001: Companion safety check on outbound response */
             if (*response_out && response_len_out && *response_len_out > 0) {
                 hu_companion_safety_result_t cs_result;
-                if (hu_companion_safety_check(agent->alloc, *response_out, *response_len_out,
-                                             NULL, 0, &cs_result) == HU_OK &&
+                if (hu_companion_safety_check(agent->alloc, *response_out, *response_len_out, NULL,
+                                              0, &cs_result) == HU_OK &&
                     cs_result.flagged) {
-                    hu_log_info("agent_turn", NULL, "companion safety flagged: risk=%.2f farewell=%d",
-                            cs_result.total_risk, cs_result.farewell_unsafe);
+                    hu_log_info("agent_turn", NULL,
+                                "companion safety flagged: risk=%.2f farewell=%d",
+                                cs_result.total_risk, cs_result.farewell_unsafe);
                     if (cs_result.requires_mitigation) {
                         /* Inject mitigation directive as prefix to response */
                         size_t dir_len = strlen(cs_result.mitigation_directive);
                         size_t orig_len = *response_len_out;
                         /* Format: "[directive]\n\n[original response]" */
                         size_t new_len = dir_len + 2 + orig_len;
-                        char *mitigated = (char *)agent->alloc->alloc(
-                            agent->alloc->ctx, new_len + 1);
+                        char *mitigated =
+                            (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
                         if (mitigated) {
                             memcpy(mitigated, cs_result.mitigation_directive, dir_len);
                             mitigated[dir_len] = '\n';
                             mitigated[dir_len + 1] = '\n';
                             memcpy(mitigated + dir_len + 2, *response_out, orig_len);
                             mitigated[new_len] = '\0';
-                            agent->alloc->free(agent->alloc->ctx, *response_out,
-                                               orig_len + 1);
+                            agent->alloc->free(agent->alloc->ctx, *response_out, orig_len + 1);
                             *response_out = mitigated;
                             *response_len_out = new_len;
                         }
@@ -4309,7 +4300,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
             /* Auto-save session after successful turn completion */
             if (agent->auto_save && agent->session_id[0] != '\0') {
-                hu_session_persist_save(agent->alloc, agent, "~/.human/sessions", NULL);
+                const char *home = getenv("HOME");
+                char sdir[512];
+                if (home)
+                    snprintf(sdir, sizeof(sdir), "%s/.human/sessions", home);
+                else
+                    snprintf(sdir, sizeof(sdir), ".human/sessions");
+                hu_session_persist_save(agent->alloc, agent, sdir, NULL);
             }
 
             /* Log workflow step completed */
@@ -4372,7 +4369,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         call->name, call->name_len, call->id, call->id_len);
                     if (hist_err != HU_OK)
                         hu_log_error("agent_turn", NULL, "history append failed: %s",
-                                hu_error_string(hist_err));
+                                     hu_error_string(hist_err));
                     if (agent->cancel_requested)
                         break;
                 }
@@ -4563,8 +4560,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                             node->tool_name ? strlen(node->tool_name) : 0, node->id,
                                             node->id ? strlen(node->id) : 0);
                                         if (hist_err != HU_OK)
-                                            hu_log_error("agent_turn", NULL, "history append failed: %s",
-                                                    hu_error_string(hist_err));
+                                            hu_log_error("agent_turn", NULL,
+                                                         "history append failed: %s",
+                                                         hu_error_string(hist_err));
                                     }
                                 }
                             }
@@ -4688,9 +4686,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                         swarm_merged_len, "swarm", 5,
                                                         "swarm_parallel", 14);
                                                 if (hist_err != HU_OK)
-                                                    hu_log_info("agent_turn", NULL, "swarm history append "
-                                                            "failed: %s",
-                                                            hu_error_string(hist_err));
+                                                    hu_log_info("agent_turn", NULL,
+                                                                "swarm history append "
+                                                                "failed: %s",
+                                                                hu_error_string(hist_err));
                                             }
                                             for (size_t s = 0; s < swarm_n; s++) {
                                                 size_t task_idx = 0;
@@ -4776,8 +4775,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         agent, HU_ROLE_TOOL, merged, merged_len, "orchestrator", 12,
                                         "orch_merge", 10);
                                     if (hist_err != HU_OK)
-                                        hu_log_error("agent_turn", NULL, "history append failed: %s",
-                                                hu_error_string(hist_err));
+                                        hu_log_error("agent_turn", NULL,
+                                                     "history append failed: %s",
+                                                     hu_error_string(hist_err));
                                     agent->alloc->free(agent->alloc->ctx, merged, merged_len + 1);
                                 }
                                 hu_observer_event_t ev = {.tag = HU_OBSERVER_EVENT_TOOL_CALL,
@@ -5114,20 +5114,16 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             tn_buf[tn] = '\0';
                             const char *args_str = call->arguments ? call->arguments : "";
 
-                            /* SECURITY FIX: Permission and pre-hook checks are done PRE-dispatch.
-                             * Check the dispatch_allowed array to see if this tool was denied. */
+                            /* SECURITY FIX: Permission and pre-hook checks are done PRE-dispatch. */
                             if (dispatch_allowed && ttl_hit_count == 0 && tc < tc_count) {
-                                /* No TTL filtering: direct index mapping */
                                 if (!dispatch_allowed[tc]) {
                                     hu_tool_result_free(agent->alloc, result);
                                     *result = hu_tool_result_fail("denied by security policy", 25);
                                     goto dispatch_tool_done;
                                 }
                             } else if (dispatch_allowed && ttl_hit_count > 0) {
-                                /* TTL filtering: need to find the tool in the filtered list */
                                 bool found_allowed = false;
                                 if (filtered_map) {
-                                    /* Use the mapping directly */
                                     for (size_t mi = 0; mi < uncached_count; mi++) {
                                         if (filtered_map[mi] == tc) {
                                             if (dispatch_allowed[mi])
@@ -5136,13 +5132,40 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         }
                                     }
                                 } else {
-                                    /* TTL hits existed but no filtered map means uncached_count == tc_count */
                                     if (tc < dispatch_count && dispatch_allowed[tc])
                                         found_allowed = true;
                                 }
                                 if (!found_allowed) {
                                     hu_tool_result_free(agent->alloc, result);
                                     *result = hu_tool_result_fail("denied by security policy", 25);
+                                    goto dispatch_tool_done;
+                                }
+                            }
+
+                            {
+                                hu_permission_level_t required =
+                                    hu_permission_get_tool_level(tn_buf);
+                                if (!hu_permission_check(agent->permission_level, required)) {
+                                    hu_tool_result_free(agent->alloc, result);
+                                    *result = hu_tool_result_fail("denied by security policy", 25);
+                                    goto dispatch_tool_done;
+                                }
+                            }
+
+                            if (agent->hook_registry) {
+                                hu_hook_result_t hook_res;
+                                memset(&hook_res, 0, sizeof(hook_res));
+                                hu_hook_pipeline_pre_tool(agent->hook_registry, agent->alloc,
+                                                          tn_buf, tn, args_str, strlen(args_str),
+                                                          &hook_res);
+                                if (hook_res.decision == HU_HOOK_DENY) {
+                                    hu_tool_result_free(agent->alloc, result);
+                                    const char *deny_msg =
+                                        hook_res.message ? hook_res.message : "denied by hook";
+                                    size_t deny_len = hook_res.message ? hook_res.message_len : 14;
+                                    *result = hu_tool_result_fail(deny_msg, deny_len);
+                                    result->error_msg_owned = false;
+                                    hu_hook_result_free(agent->alloc, &hook_res);
                                     goto dispatch_tool_done;
                                 }
                             }
@@ -5355,8 +5378,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 hu_tool_validator_check(&agent->tool_validator, tn_buf, tn, result,
                                                         &vr);
                                 if (!vr.passed) {
-                                    hu_log_error("agent_turn", NULL, "tool validation failed for %s: %s",
-                                            tn_buf, vr.reason);
+                                    hu_log_error("agent_turn", NULL,
+                                                 "tool validation failed for %s: %s", tn_buf,
+                                                 vr.reason);
                                 }
                             }
 
@@ -5410,8 +5434,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         hu_world_model_init_tables(&wm);
                                         const char *out_text =
                                             result->success ? result->output : result->error_msg;
-                                        size_t out_len =
-                                            result->success ? result->output_len : result->error_msg_len;
+                                        size_t out_len = result->success ? result->output_len
+                                                                         : result->error_msg_len;
                                         double wm_conf = result->success ? 0.8 : 0.3;
                                         if (out_text && out_len > 0)
                                             (void)hu_world_record_outcome(
@@ -5430,8 +5454,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         tool_exp.db = ol_db;
                                         const char *out_text =
                                             result->success ? result->output : result->error_msg;
-                                        size_t out_len =
-                                            result->success ? result->output_len : result->error_msg_len;
+                                        size_t out_len = result->success ? result->output_len
+                                                                         : result->error_msg_len;
                                         const char *act_text =
                                             call->arguments ? call->arguments : "";
                                         size_t act_len =
@@ -5452,8 +5476,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     if (traj_id > 0) {
                                         const char *out_text =
                                             result->success ? result->output : result->error_msg;
-                                        size_t out_len =
-                                            result->success ? result->output_len : result->error_msg_len;
+                                        size_t out_len = result->success ? result->output_len
+                                                                         : result->error_msg_len;
                                         double reward = result->success ? 0.8 : -0.5;
                                         hu_reward_type_t rtype = HU_REWARD_TOOL_SUCCESS;
                                         (void)hu_training_data_record_step(
@@ -5489,15 +5513,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     result->success ? result->output_len : result->error_msg_len;
                                 hu_hook_result_t post_res;
                                 memset(&post_res, 0, sizeof(post_res));
-                                hu_hook_pipeline_post_tool(
-                                    agent->hook_registry, agent->alloc,
-                                    tn_buf, tn, args_str, strlen(args_str),
-                                    tool_output, tool_output_len, result->success,
-                                    &post_res);
+                                hu_hook_pipeline_post_tool(agent->hook_registry, agent->alloc,
+                                                           tn_buf, tn, args_str, strlen(args_str),
+                                                           tool_output, tool_output_len,
+                                                           result->success, &post_res);
                                 hu_hook_result_free(agent->alloc, &post_res);
                             }
 
-                            dispatch_tool_done: (void)0;
+                        dispatch_tool_done:
+                            (void)0;
                             const char *res_content =
                                 result->success ? result->output : result->error_msg;
                             size_t res_len =
@@ -5507,7 +5531,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 call->name_len, call->id, call->id_len);
                             if (hist_err != HU_OK)
                                 hu_log_error("agent_turn", NULL, "history append failed: %s",
-                                        hu_error_string(hist_err));
+                                             hu_error_string(hist_err));
 
                             if (agent->audit_logger) {
                                 hu_audit_event_t aev;
@@ -5579,8 +5603,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         agent, HU_ROLE_TOOL, cached, cached_len, call->name,
                                         call->name_len, call->id, call->id_len);
                                     if (hist_err != HU_OK)
-                                        hu_log_error("agent_turn", NULL, "history append failed: %s",
-                                                hu_error_string(hist_err));
+                                        hu_log_error("agent_turn", NULL,
+                                                     "history append failed: %s",
+                                                     hu_error_string(hist_err));
                                     continue;
                                 }
                             }
@@ -5593,19 +5618,22 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     call->name_len, call->id, call->id_len);
                                 if (hist_err != HU_OK)
                                     hu_log_error("agent_turn", NULL, "history append failed: %s",
-                                            hu_error_string(hist_err));
+                                                 hu_error_string(hist_err));
                                 continue;
                             }
 
                             /* Permission tier check (sequential path) */
                             {
-                                hu_permission_level_t seq_req = hu_permission_get_tool_level(pol_tn);
+                                hu_permission_level_t seq_req =
+                                    hu_permission_get_tool_level(pol_tn);
                                 if (!hu_permission_check(agent->permission_level, seq_req)) {
-                                    hu_tool_result_t perm_fail = hu_tool_result_fail("insufficient permission", 23);
+                                    hu_tool_result_t perm_fail =
+                                        hu_tool_result_fail("insufficient permission", 23);
                                     const char *pf_content = perm_fail.error_msg;
                                     size_t pf_len = perm_fail.error_msg_len;
-                                    hu_agent_internal_append_history(agent, HU_ROLE_TOOL, pf_content, pf_len,
-                                                                    call->name, call->name_len, call->id, call->id_len);
+                                    hu_agent_internal_append_history(
+                                        agent, HU_ROLE_TOOL, pf_content, pf_len, call->name,
+                                        call->name_len, call->id, call->id_len);
                                     hu_permission_reset_escalation(agent);
                                     continue;
                                 }
@@ -5617,13 +5645,16 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 memset(&seq_hook_res, 0, sizeof(seq_hook_res));
                                 const char *pre_hook_args = call->arguments ? call->arguments : "";
                                 hu_hook_pipeline_pre_tool(agent->hook_registry, agent->alloc,
-                                                         pol_tn, pol_tn_len, pre_hook_args, strlen(pre_hook_args),
-                                                         &seq_hook_res);
+                                                          pol_tn, pol_tn_len, pre_hook_args,
+                                                          strlen(pre_hook_args), &seq_hook_res);
                                 if (seq_hook_res.decision == HU_HOOK_DENY) {
-                                    const char *dm = seq_hook_res.message ? seq_hook_res.message : "denied by hook";
-                                    size_t dl = seq_hook_res.message ? seq_hook_res.message_len : 14;
+                                    const char *dm = seq_hook_res.message ? seq_hook_res.message
+                                                                          : "denied by hook";
+                                    size_t dl =
+                                        seq_hook_res.message ? seq_hook_res.message_len : 14;
                                     hu_agent_internal_append_history(agent, HU_ROLE_TOOL, dm, dl,
-                                                                    call->name, call->name_len, call->id, call->id_len);
+                                                                     call->name, call->name_len,
+                                                                     call->id, call->id_len);
                                     hu_hook_result_free(agent->alloc, &seq_hook_res);
                                     continue;
                                 }
@@ -5760,7 +5791,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                             hu_json_parse(agent->alloc, call->arguments,
                                                           call->arguments_len, &retry_args);
                                         if (jerr != HU_OK)
-                                            hu_log_error("agent_turn", NULL, "tool args JSON parse failed");
+                                            hu_log_error("agent_turn", NULL,
+                                                         "tool args JSON parse failed");
                                     }
                                     result = hu_tool_result_fail("invalid arguments", 16);
                                     if (retry_args) {
@@ -5776,15 +5808,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
                             /* Post-hook pipeline (sequential path) */
                             if (agent->hook_registry) {
-                                const char *seq_out = result.success ? result.output : result.error_msg;
-                                size_t seq_out_len = result.success ? result.output_len : result.error_msg_len;
+                                const char *seq_out =
+                                    result.success ? result.output : result.error_msg;
+                                size_t seq_out_len =
+                                    result.success ? result.output_len : result.error_msg_len;
                                 hu_hook_result_t seq_post;
                                 memset(&seq_post, 0, sizeof(seq_post));
                                 const char *seq_args2 = call->arguments ? call->arguments : "";
                                 hu_hook_pipeline_post_tool(agent->hook_registry, agent->alloc,
-                                                          pol_tn, pol_tn_len, seq_args2, strlen(seq_args2),
-                                                          seq_out, seq_out_len, result.success,
-                                                          &seq_post);
+                                                           pol_tn, pol_tn_len, seq_args2,
+                                                           strlen(seq_args2), seq_out, seq_out_len,
+                                                           result.success, &seq_post);
                                 hu_hook_result_free(agent->alloc, &seq_post);
                             }
 
@@ -5809,7 +5843,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 call->name_len, call->id, call->id_len);
                             if (hist_err != HU_OK)
                                 hu_log_error("agent_turn", NULL, "history append failed: %s",
-                                        hu_error_string(hist_err));
+                                             hu_error_string(hist_err));
 
                             if (agent->audit_logger) {
                                 hu_audit_event_t aev;
@@ -5928,7 +5962,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             agent, HU_ROLE_SYSTEM, note, strlen(note), NULL, 0, NULL, 0);
                         if (hist_err != HU_OK)
                             hu_log_error("agent_turn", NULL, "history append failed: %s",
-                                    hu_error_string(hist_err));
+                                         hu_error_string(hist_err));
                         agent->alloc->free(agent->alloc->ctx, note, strlen(note) + 1);
                     }
                     agent->alloc->free(agent->alloc->ctx, mid_ctx, mid_ctx_len + 1);
