@@ -106,6 +106,7 @@ audit_tool_test.log
 audit.log
 
 build2/
+build_clean/
 audit.log
 firebase-debug.log
 human_test_output.txt
