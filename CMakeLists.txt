@@ -372,6 +372,7 @@ set(HU_CORE_SOURCES
     src/security/detect.c
     src/security/exec_env.c
     src/security/adversarial.c
+    src/security/sensitivity.c
     src/security/sandbox.c
     src/observability.c
     src/observability/log_observer.c
@@ -498,6 +499,7 @@ set(HU_CORE_SOURCES
     src/agent/pattern_radar.c
     src/agent/proactive.c
     src/agent/proactive_ext.c
+    src/agent/inner_thoughts.c
     src/agent/weather_awareness.c
     src/agent/weather_fetch.c
     src/agent/timing.c
@@ -832,6 +834,7 @@ if(HU_ENABLE_PERSONA)
         src/persona/feedback.c
         src/persona/replay.c
         src/persona/circadian.c
+        src/persona/temporal.c
         src/persona/relationship.c
         src/persona/auto_profile.c
         src/persona/auto_tune.c
@@ -1904,6 +1907,7 @@ set(HU_TEST_SOURCES
     tests/test_gateway.c
     tests/test_auth.c
     tests/test_security.c
+    tests/test_sensitivity.c
     tests/test_vault.c
     tests/test_provider.c
     tests/test_provider_http.c
@@ -2055,6 +2059,7 @@ set(HU_TEST_SOURCES
     tests/test_commitment.c
     tests/test_pattern_radar.c
     tests/test_proactive.c
+    tests/test_inner_thoughts.c
     tests/test_weather_awareness.c
     tests/test_timing.c
     tests/test_calibration.c
@@ -2149,7 +2154,7 @@ if(HU_ENABLE_FEEDS)
         tests/test_research_feeds.c tests/test_research_executor.c)
 endif()
 if(HU_ENABLE_PERSONA)
-    list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c tests/test_persona_feedback.c tests/test_persona_cli.c tests/test_voice_maturity.c tests/test_style_learner.c)
+    list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c tests/test_persona_feedback.c tests/test_persona_cli.c tests/test_voice_maturity.c tests/test_style_learner.c tests/test_temporal.c tests/test_inner_world.c)
 endif()
 list(APPEND HU_TEST_SOURCES tests/test_cartesia.c)
 list(APPEND HU_TEST_SOURCES tests/test_cartesia_stream.c)

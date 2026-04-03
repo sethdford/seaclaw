@@ -28,6 +28,7 @@
 #include "human/context/conversation.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include "human/cost.h"
 #include "human/cron.h"
 #include "human/crontab.h"
@@ -659,7 +660,7 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
     size_t path_len = 0;
     hu_error_t err = hu_crontab_get_path(alloc, &path, &path_len);
     if (err != HU_OK || !path) {
-        fprintf(stderr, "[%s] cron: failed to get crontab path\n", HU_CODENAME);
+        hu_log_error("cron", NULL, "failed to get crontab path");
         return err;
     }
     path[path_len] = '\0';
@@ -670,7 +671,7 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
         err = hu_crontab_load(alloc, path, &entries, &count);
         alloc->free(alloc->ctx, path, path_len + 1);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] cron list: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("cron", NULL, "cron list: %s", hu_error_string(err));
             return err;
         }
         if (count == 0) {
@@ -719,7 +720,7 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
         alloc->free(alloc->ctx, command, cmd_len + 1);
         alloc->free(alloc->ctx, path, path_len + 1);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] cron add: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("cron", NULL, "cron add: %s", hu_error_string(err));
             return err;
         }
         printf("Added cron job %s\n", new_id ? new_id : "");
@@ -737,7 +738,7 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
         err = hu_crontab_remove(alloc, path, argv[3]);
         alloc->free(alloc->ctx, path, path_len + 1);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] cron remove: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("cron", NULL, "cron remove: %s", hu_error_string(err));
             return err;
         }
         printf("Removed cron job %s\n", argv[3]);
@@ -759,7 +760,7 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
         err = hu_crontab_add(alloc, path, schedule, schedule_len, command, cmd_len, &new_id);
         alloc->free(alloc->ctx, path, path_len + 1);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] cron add-digest: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("cron", NULL, "cron add-digest: %s", hu_error_string(err));
             return err;
         }
         printf("Added PWA digest cron job %s (runs: human pwa digest)\n", new_id ? new_id : "");
@@ -783,7 +784,7 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
         err = hu_crontab_add(alloc, path, schedule, schedule_len, command, cmd_len, &new_id);
         alloc->free(alloc->ctx, path, path_len + 1);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] cron add-learn: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("cron", NULL, "cron add-learn: %s", hu_error_string(err));
             return err;
         }
         printf("Added PWA learn cron job %s (runs: human pwa learn)\n", new_id ? new_id : "");
@@ -816,12 +817,11 @@ static hu_error_t cmd_service(hu_allocator_t *alloc, int argc, char **argv) {
     if (strcmp(sub, "start") == 0) {
         hu_error_t err = hu_daemon_start();
         if (err == HU_ERR_NOT_SUPPORTED)
-            fprintf(stderr, "[%s] daemon not supported on this platform\n", HU_CODENAME);
+            hu_log_error("human", NULL, "daemon not supported on this platform");
         else if (err == HU_OK)
             printf("[%s] service started\n", HU_CODENAME);
         else
-            fprintf(stderr, "[%s] failed to start service: %s\n", HU_CODENAME,
-                    hu_error_string(err));
+            hu_log_error("human", NULL, "failed to start service: %s", hu_error_string(err));
         return err;
     }
 
@@ -830,9 +830,9 @@ static hu_error_t cmd_service(hu_allocator_t *alloc, int argc, char **argv) {
         if (err == HU_OK)
             printf("[%s] service stopped\n", HU_CODENAME);
         else if (err == HU_ERR_NOT_FOUND)
-            fprintf(stderr, "[%s] service is not running\n", HU_CODENAME);
+            hu_log_info("human", NULL, "service is not running");
         else
-            fprintf(stderr, "[%s] failed to stop service: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("human", NULL, "failed to stop service: %s", hu_error_string(err));
         return err;
     }
 
@@ -847,7 +847,7 @@ static hu_error_t cmd_service(hu_allocator_t *alloc, int argc, char **argv) {
         if (err == HU_OK)
             printf("[%s] service installed and started\n", HU_CODENAME);
         else
-            fprintf(stderr, "[%s] install failed: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("human", NULL, "install failed: %s", hu_error_string(err));
         return err;
     }
 
@@ -856,14 +856,14 @@ static hu_error_t cmd_service(hu_allocator_t *alloc, int argc, char **argv) {
         if (err == HU_OK)
             printf("[%s] service uninstalled\n", HU_CODENAME);
         else
-            fprintf(stderr, "[%s] uninstall failed: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("human", NULL, "uninstall failed: %s", hu_error_string(err));
         return err;
     }
 
     if (strcmp(sub, "logs") == 0)
         return hu_daemon_logs();
 
-    fprintf(stderr, "[%s] unknown service subcommand: %s\n", HU_CODENAME, sub);
+    hu_log_error("human", NULL, "unknown service subcommand: %s", sub);
     fprintf(stderr, "Usage: %s service [start|stop|status|install|uninstall|logs]\n",
             argv[0] ? argv[0] : "human");
     return HU_ERR_INVALID_ARGUMENT;
@@ -881,7 +881,7 @@ static void *svc_gateway_thread(void *arg) {
     svc_gw_thread_ctx_t *ctx = (svc_gw_thread_ctx_t *)arg;
     hu_error_t err = hu_gateway_run(ctx->alloc, ctx->host, ctx->port, &ctx->config);
     if (err != HU_OK)
-        fprintf(stderr, "[human] gateway thread error: %s\n", hu_error_string(err));
+        hu_log_error("gateway", NULL, "gateway thread error: %s", hu_error_string(err));
     return NULL;
 }
 
@@ -904,8 +904,8 @@ static bool webhook_dispatcher(const char *channel, const char *body, size_t bod
             hu_error_t err =
                 d->channels[i].webhook_fn(d->channels[i].channel_ctx, d->alloc, body, body_len);
             if (err != HU_OK) {
-                (void)fprintf(stderr, "[%s] webhook handler failed (channel=%s): %s\n", HU_CODENAME,
-                              channel, hu_error_string(err));
+                hu_log_error("human", NULL, "webhook handler failed (channel=%s): %s", channel,
+                             hu_error_string(err));
                 return false;
             }
         }
@@ -925,22 +925,20 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
     }
 
     if (hu_daemon_status()) {
-        fprintf(stderr,
-                "[%s] ERROR: another service-loop is already running. "
-                "Stop it with 'human service stop' before starting a new one.\n",
-                HU_CODENAME);
+        hu_log_error("human", NULL,
+                     "another service-loop is already running. "
+                     "Stop it with 'human service stop' before starting a new one.");
         return HU_ERR_INVALID_ARGUMENT;
     }
 
     hu_daemon_write_pid();
 
-    fprintf(stderr, "[%s] service loop started%s\n", HU_CODENAME,
-            with_gateway ? " (with gateway)" : "");
+    hu_log_info("human", NULL, "service loop started%s", with_gateway ? " (with gateway)" : "");
 
     hu_app_ctx_t app_ctx;
     hu_error_t err = hu_app_bootstrap(&app_ctx, alloc, config_path, true, true);
     if (err != HU_OK) {
-        fprintf(stderr, "[%s] Bootstrap failed: %s\n", HU_CODENAME, hu_error_string(err));
+        hu_log_error("human", NULL, "bootstrap failed: %s", hu_error_string(err));
         return err;
     }
 
@@ -949,19 +947,18 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
     hu_awareness_t svc_awareness = {0};
     hu_error_t init_err = hu_awareness_init(&svc_awareness, &svc_bus);
     if (init_err != HU_OK)
-        fprintf(stderr, "[main] awareness init failed: %s\n", hu_error_string(init_err));
+        hu_log_error("main", NULL, "awareness init failed: %s", hu_error_string(init_err));
     if (svc_awareness.bus && app_ctx.agent)
         hu_agent_set_awareness(app_ctx.agent, (struct hu_awareness *)&svc_awareness);
 
     const char *prov_name =
         app_ctx.cfg->default_provider ? app_ctx.cfg->default_provider : "openai";
     const char *model = app_ctx.cfg->default_model ? app_ctx.cfg->default_model : "";
-    fprintf(stderr, "[%s] agent ready (provider=%s model=%s tools=%zu)\n", HU_CODENAME, prov_name,
-            model[0] ? model : "(default)", app_ctx.tools_count);
+    hu_log_info("human", NULL, "agent ready (provider=%s model=%s tools=%zu)", prov_name,
+                model[0] ? model : "(default)", app_ctx.tools_count);
 
 #ifdef HU_HAS_CRON
-    fprintf(stderr, "[%s] %zu channel(s) active, cron enabled\n", HU_CODENAME,
-            app_ctx.channel_count);
+    hu_log_info("human", NULL, "%zu channel(s) active, cron enabled", app_ctx.channel_count);
 
     /* Register proactive engagement cron jobs from persona contacts */
 #ifdef HU_HAS_PERSONA
@@ -997,9 +994,9 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
                 hu_cron_add_agent_job((hu_cron_scheduler_t *)app_ctx.agent->scheduler, alloc, sched,
                                       prompt, channel_target, job_name, &job_id);
             if (jerr == HU_OK) {
-                fprintf(stderr, "[%s] proactive check-in registered for %s (id=%llu sched=%s)\n",
-                        HU_CODENAME, cp->name ? cp->name : cp->contact_id,
-                        (unsigned long long)job_id, sched);
+                hu_log_info(
+                    "human", NULL, "proactive check-in registered for %s (id=%llu sched=%s)",
+                    cp->name ? cp->name : cp->contact_id, (unsigned long long)job_id, sched);
             }
         }
     }
@@ -1073,9 +1070,8 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
             hu_cron_add_agent_job((hu_cron_scheduler_t *)app_ctx.agent->scheduler, alloc, rc,
                                   prompt_to_use, "cli", "research-agent", &rid);
         if (je == HU_OK)
-            fprintf(stderr, "[%s] research agent registered with %s (id=%llu sched=%s)\n",
-                    HU_CODENAME, full_prompt ? "feed digest" : "base prompt",
-                    (unsigned long long)rid, rc);
+            hu_log_info("human", NULL, "research agent registered with %s (id=%llu sched=%s)",
+                        full_prompt ? "feed digest" : "base prompt", (unsigned long long)rid, rc);
 
         if (digest)
             alloc->free(alloc->ctx, digest, digest_len + 1);
@@ -1094,8 +1090,8 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
             "Use the dpo-train tool if available, or summarize recent feedback quality.",
             "cli", "dpo-train-weekly", &dpo_id);
         if (dpo_err == HU_OK)
-            fprintf(stderr, "[%s] DPO training registered (weekly, id=%llu)\n", HU_CODENAME,
-                    (unsigned long long)dpo_id);
+            hu_log_info("human", NULL, "DPO training registered (weekly, id=%llu)",
+                        (unsigned long long)dpo_id);
 
         /* Nightly experiment loop — runs at 2 AM to search for better model configs */
         uint64_t exp_id = 0;
@@ -1106,13 +1102,13 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
             "Report training loss and bits-per-byte improvement.",
             "cli", "ml-experiment-nightly", &exp_id);
         if (exp_err == HU_OK)
-            fprintf(stderr, "[%s] ML experiment loop registered (nightly, id=%llu)\n", HU_CODENAME,
-                    (unsigned long long)exp_id);
+            hu_log_info("human", NULL, "ML experiment loop registered (nightly, id=%llu)",
+                        (unsigned long long)exp_id);
     }
 #endif
 
 #else
-    fprintf(stderr, "[%s] %zu channel(s) active\n", HU_CODENAME, app_ctx.channel_count);
+    hu_log_info("human", NULL, "%zu channel(s) active", app_ctx.channel_count);
 #endif
 
     /* ── Optional gateway on background thread ─────────────────────────── */
@@ -1137,8 +1133,8 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
                 if (np > 0 && (size_t)np < sizeof(graph_path)) {
                     hu_error_t graph_err = hu_graph_open(alloc, graph_path, (size_t)np, &svc_graph);
                     if (graph_err != HU_OK)
-                        fprintf(stderr, "[main] graph open failed: %s\n",
-                                hu_error_string(graph_err));
+                        hu_log_error("main", NULL, "graph open failed: %s",
+                                     hu_error_string(graph_err));
                 }
             }
         }
@@ -1189,10 +1185,9 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
                          HU_BUS_MESSAGE_RECEIVED);
 
         if (pthread_create(&gw_tid, NULL, svc_gateway_thread, &gw_tctx) == 0) {
-            fprintf(stderr, "[%s] gateway listening on %s:%u\n", HU_CODENAME, gw_tctx.host,
-                    gw_tctx.port);
+            hu_log_info("human", NULL, "gateway listening on %s:%u", gw_tctx.host, gw_tctx.port);
         } else {
-            fprintf(stderr, "[%s] warning: failed to start gateway thread\n", HU_CODENAME);
+            hu_log_error("human", NULL, "failed to start gateway thread");
             gw_tid = 0;
         }
     }
@@ -1260,7 +1255,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         size_t count = 0;
         hu_error_t err = hu_skill_registry_search(alloc, query, &entries, &count);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] skills search: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("skills", NULL, "skills search: %s", hu_error_string(err));
             return err;
         }
         printf("Registry matches: %zu\n", count);
@@ -1284,7 +1279,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         else
             err = hu_skill_registry_install_by_name(alloc, argv[3]);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] skills install: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("skills", NULL, "skills install: %s", hu_error_string(err));
             return err;
         }
         printf("Installed skill from %s\n", argv[3]);
@@ -1298,7 +1293,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         }
         hu_error_t err = hu_skill_registry_uninstall(argv[3]);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] skills uninstall: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("skills", NULL, "skills uninstall: %s", hu_error_string(err));
             return err;
         }
         printf("Uninstalled skill: %s\n", argv[3]);
@@ -1312,7 +1307,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         }
         hu_error_t err = hu_skill_registry_update(alloc, argv[3]);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] skills update: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("skills", NULL, "skills update: %s", hu_error_string(err));
             return err;
         }
         printf("Updated skill from %s\n", argv[3]);
@@ -1323,7 +1318,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         const char *dir = (argc >= 4 && argv[3]) ? argv[3] : ".";
         hu_error_t err = hu_skill_registry_publish(alloc, dir);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] skills publish: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("skills", NULL, "skills publish: %s", hu_error_string(err));
             return err;
         }
         printf("Published skill from %s\n", dir);
@@ -1382,7 +1377,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         }
         if (entries)
             hu_skill_registry_entries_free(alloc, entries, count);
-        fprintf(stderr, "[%s] skill '%s' not found\n", HU_CODENAME, argv[3]);
+        hu_log_error("skills", NULL, "skill '%s' not found", argv[3]);
         return HU_ERR_NOT_FOUND;
     }
 
@@ -1421,7 +1416,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         }
         hu_error_t err = hu_skill_scaffold_init(alloc, &opts);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] skills init: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("skills", NULL, "skills init: %s", hu_error_string(err));
             return err;
         }
         printf("Created skill project: %s/\n", name);
@@ -1454,8 +1449,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
     (void)alloc;
     (void)argc;
     (void)argv;
-    fprintf(stderr, "[%s] skills support not built (compile with HU_ENABLE_SKILLS=ON)\n",
-            HU_CODENAME);
+    hu_log_error("skills", NULL, "skills support not built (compile with HU_ENABLE_SKILLS=ON)");
     return HU_ERR_NOT_SUPPORTED;
 }
 #endif
@@ -1470,7 +1464,7 @@ static hu_error_t cmd_plugins(hu_allocator_t *alloc, int argc, char **argv) {
         size_t count = 0;
         hu_error_t err = hu_plugin_discover_and_load(alloc, NULL, NULL, &results, &count);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] plugins list: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("plugins", NULL, "plugins list: %s", hu_error_string(err));
             return err;
         }
         printf("Discovered plugins: %zu\n", count);
@@ -1495,7 +1489,7 @@ static hu_error_t cmd_plugins(hu_allocator_t *alloc, int argc, char **argv) {
         size_t count = 0;
         hu_error_t err = hu_plugin_discover_and_load(alloc, dir, NULL, &results, &count);
         if (err != HU_OK) {
-            fprintf(stderr, "[%s] plugins scan: %s\n", HU_CODENAME, hu_error_string(err));
+            hu_log_error("plugins", NULL, "plugins scan: %s", hu_error_string(err));
             return err;
         }
         printf("Scanned %s: %zu plugins found\n", dir ? dir : "~/.human/plugins/", count);
@@ -2221,7 +2215,7 @@ static hu_error_t cmd_mcp(hu_allocator_t *alloc, int argc, char **argv) {
     hu_config_t cfg;
     hu_error_t err = hu_config_load(alloc, &cfg);
     if (err != HU_OK) {
-        fprintf(stderr, "[%s] Config error: %s\n", HU_CODENAME, hu_error_string(err));
+        hu_log_error("human", NULL, "config error: %s", hu_error_string(err));
         return err;
     }
 
@@ -2232,7 +2226,7 @@ static hu_error_t cmd_mcp(hu_allocator_t *alloc, int argc, char **argv) {
     err = hu_tools_create_default(alloc, ".", 1, NULL, &cfg, NULL, NULL, mcp_pool, NULL, NULL, NULL,
                                   &tools, &tool_count);
     if (err != HU_OK) {
-        fprintf(stderr, "[%s] Tools init error: %s\n", HU_CODENAME, hu_error_string(err));
+        hu_log_error("human", NULL, "tools init error: %s", hu_error_string(err));
         if (mcp_pool)
             hu_agent_pool_destroy(mcp_pool);
         hu_config_deinit(&cfg);
@@ -2402,7 +2396,7 @@ static bool gw_agent_on_message(hu_bus_event_type_t type, const hu_bus_event_t *
         rev.message[rl] = '\0';
         hu_bus_publish(b->bus, &rev);
     } else if (err != HU_OK) {
-        fprintf(stderr, "[gateway] agent_turn error: %s\n", hu_error_string(err));
+        hu_log_error("gateway", NULL, "agent_turn error: %s", hu_error_string(err));
         hu_bus_event_t eev;
         memset(&eev, 0, sizeof(eev));
         eev.type = HU_BUS_ERROR;
@@ -2439,7 +2433,7 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
     hu_app_ctx_t app;
     hu_error_t err = hu_app_bootstrap(&app, alloc, config_path, with_agent, false);
     if (err != HU_OK) {
-        fprintf(stderr, "[%s] Bootstrap failed: %s\n", HU_CODENAME, hu_error_string(err));
+        hu_log_error("human", NULL, "bootstrap failed: %s", hu_error_string(err));
         return err;
     }
 
@@ -2465,7 +2459,7 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
     memset(&skills, 0, sizeof(skills));
     err = hu_skillforge_create(alloc, &skills);
     if (err != HU_OK)
-        fprintf(stderr, "[%s] Skillforge init failed: %s\n", HU_CODENAME, hu_error_string(err));
+        hu_log_error("human", NULL, "skillforge init failed: %s", hu_error_string(err));
 #endif
 
     /* Load crontab into bootstrap's cron (bootstrap creates cron but does not load file) */
@@ -2507,7 +2501,7 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
             if (np > 0 && (size_t)np < sizeof(graph_path)) {
                 hu_error_t graph_err = hu_graph_open(alloc, graph_path, (size_t)np, &gw_graph);
                 if (graph_err != HU_OK)
-                    fprintf(stderr, "[main] graph open failed: %s\n", hu_error_string(graph_err));
+                    hu_log_error("main", NULL, "graph open failed: %s", hu_error_string(graph_err));
             }
         }
     }
@@ -2580,25 +2574,26 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
         gw_app_ctx.agent = app.agent;
         hu_error_t init_err = hu_awareness_init(&gw_awareness, &bus);
         if (init_err != HU_OK)
-            fprintf(stderr, "[main] awareness init failed: %s\n", hu_error_string(init_err));
+            hu_log_error("main", NULL, "awareness init failed: %s", hu_error_string(init_err));
         if (gw_awareness.bus)
             hu_agent_set_awareness(app.agent, (struct hu_awareness *)&gw_awareness);
         agent_bridge.agent = app.agent;
         agent_bridge.bus = &bus;
         agent_bridge.thread_binding = gw_thread_binding;
         hu_bus_subscribe(&bus, gw_agent_on_message, &agent_bridge, HU_BUS_MESSAGE_RECEIVED);
-        fprintf(stderr, "[%s] gateway+agent mode (provider=%s tools=%zu)\n", HU_CODENAME,
-                app.cfg->default_provider ? app.cfg->default_provider : "openai", app.tools_count);
+        hu_log_info("human", NULL, "gateway+agent mode (provider=%s tools=%zu)",
+                    app.cfg->default_provider ? app.cfg->default_provider : "openai",
+                    app.tools_count);
         if (gw_graph && app.agent && app.agent->retrieval_engine)
             hu_retrieval_set_graph(app.agent->retrieval_engine, gw_graph);
     } else {
-        fprintf(stderr, "[%s] gateway-only mode (use --with-agent for full agent)\n", HU_CODENAME);
+        hu_log_info("human", NULL, "gateway-only mode (use --with-agent for full agent)");
     }
 
     /* ── Run gateway (blocks) ──────────────────────────────────────────── */
     err = hu_gateway_run(alloc, gw_config.host, gw_config.port, &gw_config);
     if (err != HU_OK)
-        fprintf(stderr, "[%s] Gateway error: %s\n", HU_CODENAME, hu_error_string(err));
+        hu_log_error("gateway", NULL, "gateway error: %s", hu_error_string(err));
 
     /* ── Cleanup: gateway-specific first, then bootstrap ───────────────── */
     if (with_agent && app.agent_ok && app.agent) {

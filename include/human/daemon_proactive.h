@@ -34,9 +34,26 @@ typedef struct hu_daemon_contact_activity {
     uint64_t lru_seq;
 } hu_daemon_contact_activity_t;
 
+/**
+ * hu_proactive_context_t — Module state for proactive check-in subsystem.
+ *
+ * Lifecycle:
+ *   - Init:  zero-init with memset or = {0}
+ *   - Clear: hu_proactive_context_reset() zeros all fields
+ *   - Bounds: entries[] is a fixed-size LRU cache (HU_DAEMON_CONTACT_ACTIVITY_CAP)
+ */
+typedef struct hu_proactive_context {
+    hu_daemon_contact_activity_t entries[HU_DAEMON_CONTACT_ACTIVITY_CAP];
+    size_t count;
+    uint64_t seq;
+} hu_proactive_context_t;
+
+/** Zero all fields in the proactive context (reset the LRU cache). */
+void hu_proactive_context_reset(hu_proactive_context_t *ctx);
+
 /** Record inbound activity for a contact on a given channel/session. */
-void hu_daemon_contact_activity_record(const char *contact_id, const char *channel_name,
-                                       const char *session_key);
+void hu_daemon_contact_activity_record(hu_proactive_context_t *ctx, const char *contact_id,
+                                       const char *channel_name, const char *session_key);
 
 /** Check if a channel name exists in the service channel list. */
 bool hu_daemon_channel_list_has_name(const hu_service_channel_t *channels, size_t channel_count,
@@ -47,9 +64,10 @@ void hu_daemon_proactive_parse_route(const struct hu_contact_profile *cp, char *
                                      char *target_buf);
 
 /** Apply recent activity routing override if contact has fresh inbound activity. */
-void hu_daemon_proactive_apply_route(const char *contact_id, time_t now,
-                                     const hu_service_channel_t *channels, size_t channel_count,
-                                     char *ch_buf, char *target_buf, size_t *target_len);
+void hu_daemon_proactive_apply_route(hu_proactive_context_t *ctx, const char *contact_id,
+                                     time_t now, const hu_service_channel_t *channels,
+                                     size_t channel_count, char *ch_buf, char *target_buf,
+                                     size_t *target_len);
 
 /** Build memory callback context for a contact (recalls + degradation + protective filter).
  *  Used by both proactive prompt builder and daemon main loop. */
@@ -62,12 +80,5 @@ char *hu_daemon_build_callback_context(hu_allocator_t *alloc, struct hu_memory *
 char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, struct hu_agent *agent,
                                              struct hu_memory *memory,
                                              const struct hu_contact_profile *cp, size_t *out_len);
-
-#ifdef HU_IS_TEST
-/** Reset the contact activity LRU cache (for tests). */
-void hu_daemon_contact_activity_reset(void);
-/** Get current contact activity count (for tests). */
-size_t hu_daemon_contact_activity_count(void);
-#endif
 
 #endif /* HU_DAEMON_PROACTIVE_H */

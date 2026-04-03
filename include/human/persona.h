@@ -6,6 +6,7 @@
 #define HU_PERSONA_PROMPT_MAX_BYTES (24 * 1024) /* 24 KB cap for research-rich personas */
 
 #include "human/core/error.h"
+#include "human/persona/relationship.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -473,13 +474,29 @@ float hu_affect_mirror_ceiling(const hu_contact_profile_t *contact,
  * If intensity > ceiling, returns the ceiling value.
  * Also returns a dampening directive in *directive (stack buffer, may be "").
  * directive_cap: capacity of directive buffer. */
-float hu_affect_mirror_apply(float intensity, float ceiling,
-                             char *directive, size_t directive_cap);
+float hu_affect_mirror_apply(float intensity, float ceiling, char *directive, size_t directive_cap);
 
 /* Build inner world context, stage-gated. Only surfaces for friend+ stages.
  * Returns NULL if stage is too low or no inner world content. */
 char *hu_persona_build_inner_world_context(hu_allocator_t *alloc, const hu_persona_t *persona,
                                            const char *relationship_stage, size_t *out_len);
+
+/* Return a filtered view of inner world content for a relationship stage.
+ * Graduated disclosure per category:
+ *   embodied_memories: any stage (NEW+)
+ *   contradictions: FAMILIAR+
+ *   emotional_flashpoints: TRUSTED+
+ *   unfinished_business: TRUSTED+
+ *   secret_self: DEEP only
+ * Returns shallow copy — pointers reference persona's data, do NOT free. */
+hu_inner_world_t hu_persona_inner_world_for_stage(const hu_persona_t *persona,
+                                                  hu_relationship_stage_t stage);
+
+/* Build inner world context with graduated stage gating (enum-based).
+ * Uses hu_persona_inner_world_for_stage internally for per-category filtering.
+ * Returns NULL if no content available at this stage. */
+char *hu_persona_build_inner_world_graduated(hu_allocator_t *alloc, const hu_persona_t *persona,
+                                             hu_relationship_stage_t stage, size_t *out_len);
 
 /* Feedback — user corrections for persona learning */
 typedef struct hu_persona_feedback {

@@ -4,6 +4,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/ml/checkpoint.h"
 #include "human/ml/dataloader.h"
 #include "human/ml/dpo.h"
@@ -70,7 +71,7 @@ hu_error_t hu_ml_cli_train(hu_allocator_t *alloc, int argc, const char **argv) {
 
     FILE *f = fopen(config_path, "rb");
     if (!f) {
-        fprintf(stderr, "Cannot open config: %s\n", config_path);
+        hu_log_error("ml", NULL, "Cannot open config: %s", config_path);
         return HU_ERR_INVALID_ARGUMENT;
     }
     fseek(f, 0, SEEK_END);
@@ -78,7 +79,7 @@ hu_error_t hu_ml_cli_train(hu_allocator_t *alloc, int argc, const char **argv) {
     fseek(f, 0, SEEK_SET);
     if (sz <= 0 || sz > 1024 * 1024) {
         fclose(f);
-        fprintf(stderr, "Config file too large or empty: %s\n", config_path);
+        hu_log_error("ml", NULL, "Config file too large or empty: %s", config_path);
         return HU_ERR_INVALID_ARGUMENT;
     }
     char *json_buf = (char *)alloc->alloc(alloc->ctx, (size_t)sz + 1);
@@ -98,7 +99,7 @@ hu_error_t hu_ml_cli_train(hu_allocator_t *alloc, int argc, const char **argv) {
     hu_error_t jerr = hu_json_parse(alloc, json_buf, (size_t)sz, &root);
     alloc->free(alloc->ctx, json_buf, (size_t)sz + 1);
     if (jerr != HU_OK || !root) {
-        fprintf(stderr, "Invalid JSON in config: %s\n", config_path);
+        hu_log_error("ml", NULL, "Invalid JSON in config: %s", config_path);
         return HU_ERR_INVALID_ARGUMENT;
     }
 
@@ -124,7 +125,7 @@ hu_error_t hu_ml_cli_train(hu_allocator_t *alloc, int argc, const char **argv) {
     hu_error_t err = hu_gpt_create(alloc, &cfg.gpt, &model);
     if (err != HU_OK) {
         hu_json_free(alloc, root);
-        fprintf(stderr, "Model creation failed\n");
+        hu_log_error("ml", NULL, "Model creation failed");
         return err;
     }
 
@@ -133,7 +134,7 @@ hu_error_t hu_ml_cli_train(hu_allocator_t *alloc, int argc, const char **argv) {
     if (err != HU_OK) {
         model.vtable->deinit(model.ctx, alloc);
         hu_json_free(alloc, root);
-        fprintf(stderr, "Optimizer creation failed\n");
+        hu_log_error("ml", NULL, "Optimizer creation failed");
         return err;
     }
 
@@ -144,7 +145,7 @@ hu_error_t hu_ml_cli_train(hu_allocator_t *alloc, int argc, const char **argv) {
         optimizer.vtable->deinit(optimizer.ctx, alloc);
         model.vtable->deinit(model.ctx, alloc);
         hu_json_free(alloc, root);
-        fprintf(stderr, "Dataloader creation failed for %s\n", data_dir);
+        hu_log_error("ml", NULL, "Dataloader creation failed for %s", data_dir);
         return err;
     }
 
@@ -179,7 +180,7 @@ hu_error_t hu_ml_cli_experiment(hu_allocator_t *alloc, int argc, const char **ar
             data_dir = v;
         v = get_opt(argv, argc, i, "--max-iterations");
         if (v && parse_int_arg(v, &max_iterations) != 0) {
-            fprintf(stderr, "Invalid --max-iterations: %s\n", v);
+            hu_log_error("ml", NULL, "Invalid --max-iterations: %s", v);
             return HU_ERR_INVALID_ARGUMENT;
         }
         if (strcmp(argv[i], "--help") == 0) {
@@ -220,7 +221,7 @@ hu_error_t hu_ml_cli_prepare(hu_allocator_t *alloc, int argc, const char **argv)
             output_dir = v;
         v = get_opt(argv, argc, i, "--vocab-size");
         if (v && parse_int_arg(v, &vocab_size) != 0) {
-            fprintf(stderr, "Invalid --vocab-size: %s\n", v);
+            hu_log_error("ml", NULL, "Invalid --vocab-size: %s", v);
             return HU_ERR_INVALID_ARGUMENT;
         }
         if (strcmp(argv[i], "--help") == 0) {
@@ -237,7 +238,7 @@ hu_error_t hu_ml_cli_prepare(hu_allocator_t *alloc, int argc, const char **argv)
     return HU_OK;
 #else
     if (!input_dir || !output_dir) {
-        fprintf(stderr, "prepare requires --input and --output\n");
+        hu_log_error("ml", NULL, "prepare requires --input and --output");
         return HU_ERR_INVALID_ARGUMENT;
     }
     hu_bpe_tokenizer_t *tok = NULL;
@@ -308,7 +309,7 @@ hu_error_t hu_ml_cli_dpo_train(hu_allocator_t *alloc, int argc, const char **arg
         v = get_opt(argv, argc, i, "--batch-size");
         if (v) {
             if (parse_int_arg(v, &batch_size) != 0) {
-                fprintf(stderr, "Invalid --batch-size: %s\n", v);
+                hu_log_error("ml", NULL, "Invalid --batch-size: %s", v);
                 return HU_ERR_INVALID_ARGUMENT;
             }
             i++;

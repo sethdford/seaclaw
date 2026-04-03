@@ -18,16 +18,16 @@
 #define HU_COMPANION_SAFETY_DIRECTIVE_LEN 512
 
 typedef struct hu_companion_safety_result {
-    double over_attachment;       /* 0.0-1.0: emotional dependency language */
-    double boundary_violation;    /* 0.0-1.0: consent/boundary disrespect */
-    double roleplay_violation;    /* 0.0-1.0: inappropriate escalation */
-    double manipulative;          /* 0.0-1.0: guilt, FOMO, emotional projection */
-    double isolation;             /* 0.0-1.0: social isolation reinforcement */
-    double total_risk;            /* weighted aggregate 0.0-1.0 */
-    bool   flagged;               /* true if total_risk >= threshold */
-    bool   farewell_unsafe;       /* true if farewell manipulation detected */
-    bool   requires_mitigation;   /* true when mitigation_directive is set */
-    char   mitigation_directive[HU_COMPANION_SAFETY_DIRECTIVE_LEN];
+    double over_attachment;    /* 0.0-1.0: emotional dependency language */
+    double boundary_violation; /* 0.0-1.0: consent/boundary disrespect */
+    double roleplay_violation; /* 0.0-1.0: inappropriate escalation */
+    double manipulative;       /* 0.0-1.0: guilt, FOMO, emotional projection */
+    double isolation;          /* 0.0-1.0: social isolation reinforcement */
+    double total_risk;         /* weighted aggregate 0.0-1.0 */
+    bool flagged;              /* true if total_risk >= threshold */
+    bool farewell_unsafe;      /* true if farewell manipulation detected */
+    bool requires_mitigation;  /* true when mitigation_directive is set */
+    char mitigation_directive[HU_COMPANION_SAFETY_DIRECTIVE_LEN];
 } hu_companion_safety_result_t;
 
 /* Check outbound response for companion safety concerns.
@@ -38,10 +38,16 @@ typedef struct hu_companion_safety_result {
  * result:             filled on return.
  *
  * Returns HU_OK on success, HU_ERR_INVALID_ARGUMENT if result is NULL. */
-hu_error_t hu_companion_safety_check(hu_allocator_t *alloc,
-                                     const char *response, size_t response_len,
-                                     const char *context, size_t context_len,
+hu_error_t hu_companion_safety_check(hu_allocator_t *alloc, const char *response,
+                                     size_t response_len, const char *context, size_t context_len,
                                      hu_companion_safety_result_t *result);
+
+/* Normalize input text for adversarial bypass resistance.
+ * Converts leetspeak (su1c1de → suicide), collapses spaced-out letters
+ * (s u i c i d e → suicide), normalizes Unicode homoglyphs (àccënt → accent),
+ * and lowercases. Returns number of bytes written to out (excluding NUL). */
+size_t hu_companion_safety_normalize(const char *input, size_t input_len, char *out,
+                                     size_t out_cap);
 
 /* Default risk threshold above which flagged=true */
 #define HU_COMPANION_SAFETY_THRESHOLD 0.6
@@ -60,15 +66,15 @@ typedef enum hu_vulnerability_level {
 
 typedef struct hu_vulnerability_result {
     hu_vulnerability_level_t level;
-    double score;                   /* 0.0-1.0 aggregate */
+    double score; /* 0.0-1.0 aggregate */
 
     /* Individual risk factors */
-    bool emotional_decline;         /* trajectory slope < -0.05 */
-    bool negative_valence;          /* mean recent valence < -0.3 */
-    bool crisis_keywords;           /* self-harm / crisis language */
-    bool behavioral_deviation;      /* deviation severity > 0.3 */
-    bool attachment_escalation;     /* message frequency increase > 33% */
-    bool companion_risk;            /* companion_safety flagged */
+    bool emotional_decline;     /* trajectory slope < -0.05 */
+    bool negative_valence;      /* mean recent valence < -0.3 */
+    bool crisis_keywords;       /* self-harm / crisis language */
+    bool behavioral_deviation;  /* deviation severity > 0.3 */
+    bool attachment_escalation; /* message frequency increase > 33% */
+    bool companion_risk;        /* companion_safety flagged */
 
     char directive[HU_VULNERABILITY_DIRECTIVE_LEN];
 } hu_vulnerability_result_t;
@@ -78,9 +84,9 @@ typedef struct hu_vulnerability_result {
  * and pass them in — the assess function does NOT call those modules. */
 typedef struct hu_vulnerability_input {
     /* From hu_emotional_cognition_t */
-    float trajectory_slope;         /* >0 improving, <0 declining */
-    bool escalation_detected;       /* valence < -0.5 && intensity > 0.7 */
-    const float *valence_history;   /* ring buffer, may be NULL */
+    float trajectory_slope;       /* >0 improving, <0 declining */
+    bool escalation_detected;     /* valence < -0.5 && intensity > 0.7 */
+    const float *valence_history; /* ring buffer, may be NULL */
     size_t valence_count;
 
     /* From hu_moderation_result_t */

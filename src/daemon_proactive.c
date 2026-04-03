@@ -46,9 +46,13 @@
 
 /* ── Contact activity LRU cache ─────────────────────────────────────── */
 
-static hu_daemon_contact_activity_t g_contact_activity[HU_DAEMON_CONTACT_ACTIVITY_CAP];
-static size_t g_contact_activity_count;
-static uint64_t g_contact_activity_seq;
+void hu_proactive_context_reset(hu_proactive_context_t *ctx) {
+    if (!ctx)
+        return;
+    memset(ctx->entries, 0, sizeof(ctx->entries));
+    ctx->count = 0;
+    ctx->seq = 0;
+}
 
 bool hu_daemon_channel_list_has_name(const hu_service_channel_t *channels, size_t channel_count,
                                      const char *name) {
@@ -65,27 +69,27 @@ bool hu_daemon_channel_list_has_name(const hu_service_channel_t *channels, size_
     return false;
 }
 
-void hu_daemon_contact_activity_record(const char *contact_id, const char *channel_name,
-                                       const char *session_key) {
-    if (!contact_id || !contact_id[0] || !channel_name || !channel_name[0] || !session_key ||
-        !session_key[0])
+void hu_daemon_contact_activity_record(hu_proactive_context_t *ctx, const char *contact_id,
+                                       const char *channel_name, const char *session_key) {
+    if (!ctx || !contact_id || !contact_id[0] || !channel_name || !channel_name[0] ||
+        !session_key || !session_key[0])
         return;
 
     size_t slot = (size_t)-1;
-    for (size_t i = 0; i < g_contact_activity_count; i++) {
-        if (strcmp(g_contact_activity[i].contact_id, contact_id) == 0) {
+    for (size_t i = 0; i < ctx->count; i++) {
+        if (strcmp(ctx->entries[i].contact_id, contact_id) == 0) {
             slot = i;
             break;
         }
     }
 
     if (slot == (size_t)-1) {
-        if (g_contact_activity_count < HU_DAEMON_CONTACT_ACTIVITY_CAP) {
-            slot = g_contact_activity_count++;
+        if (ctx->count < HU_DAEMON_CONTACT_ACTIVITY_CAP) {
+            slot = ctx->count++;
         } else {
             size_t lru = 0;
             for (size_t j = 1; j < HU_DAEMON_CONTACT_ACTIVITY_CAP; j++) {
-                if (g_contact_activity[j].lru_seq < g_contact_activity[lru].lru_seq)
+                if (ctx->entries[j].lru_seq < ctx->entries[lru].lru_seq)
                     lru = j;
             }
             slot = lru;
@@ -93,25 +97,25 @@ void hu_daemon_contact_activity_record(const char *contact_id, const char *chann
     }
 
     size_t cid_len = strlen(contact_id);
-    if (cid_len >= sizeof(g_contact_activity[slot].contact_id))
-        cid_len = sizeof(g_contact_activity[slot].contact_id) - 1;
-    memcpy(g_contact_activity[slot].contact_id, contact_id, cid_len);
-    g_contact_activity[slot].contact_id[cid_len] = '\0';
+    if (cid_len >= sizeof(ctx->entries[slot].contact_id))
+        cid_len = sizeof(ctx->entries[slot].contact_id) - 1;
+    memcpy(ctx->entries[slot].contact_id, contact_id, cid_len);
+    ctx->entries[slot].contact_id[cid_len] = '\0';
 
     size_t ch_len = strlen(channel_name);
-    if (ch_len >= sizeof(g_contact_activity[slot].last_channel))
-        ch_len = sizeof(g_contact_activity[slot].last_channel) - 1;
-    memcpy(g_contact_activity[slot].last_channel, channel_name, ch_len);
-    g_contact_activity[slot].last_channel[ch_len] = '\0';
+    if (ch_len >= sizeof(ctx->entries[slot].last_channel))
+        ch_len = sizeof(ctx->entries[slot].last_channel) - 1;
+    memcpy(ctx->entries[slot].last_channel, channel_name, ch_len);
+    ctx->entries[slot].last_channel[ch_len] = '\0';
 
     size_t sk_len = strlen(session_key);
-    if (sk_len >= sizeof(g_contact_activity[slot].last_session_key))
-        sk_len = sizeof(g_contact_activity[slot].last_session_key) - 1;
-    memcpy(g_contact_activity[slot].last_session_key, session_key, sk_len);
-    g_contact_activity[slot].last_session_key[sk_len] = '\0';
+    if (sk_len >= sizeof(ctx->entries[slot].last_session_key))
+        sk_len = sizeof(ctx->entries[slot].last_session_key) - 1;
+    memcpy(ctx->entries[slot].last_session_key, session_key, sk_len);
+    ctx->entries[slot].last_session_key[sk_len] = '\0';
 
-    g_contact_activity[slot].last_activity = time(NULL);
-    g_contact_activity[slot].lru_seq = ++g_contact_activity_seq;
+    ctx->entries[slot].last_activity = time(NULL);
+    ctx->entries[slot].lru_seq = ++ctx->seq;
 }
 
 /* ── Proactive route parsing ────────────────────────────────────────── */
@@ -146,31 +150,32 @@ void hu_daemon_proactive_parse_route(const hu_contact_profile_t *cp, char *ch_bu
     }
 }
 
-void hu_daemon_proactive_apply_route(const char *contact_id, time_t now,
-                                     const hu_service_channel_t *channels, size_t channel_count,
-                                     char *ch_buf, char *target_buf, size_t *target_len) {
-    for (size_t i = 0; i < g_contact_activity_count; i++) {
-        if (strcmp(g_contact_activity[i].contact_id, contact_id) != 0)
+void hu_daemon_proactive_apply_route(hu_proactive_context_t *ctx, const char *contact_id,
+                                     time_t now, const hu_service_channel_t *channels,
+                                     size_t channel_count, char *ch_buf, char *target_buf,
+                                     size_t *target_len) {
+    if (!ctx)
+        return;
+    for (size_t i = 0; i < ctx->count; i++) {
+        if (strcmp(ctx->entries[i].contact_id, contact_id) != 0)
             continue;
-        if (g_contact_activity[i].last_session_key[0] == '\0')
+        if (ctx->entries[i].last_session_key[0] == '\0')
             return;
-        if (difftime(now, g_contact_activity[i].last_activity) >
-            (double)HU_DAEMON_ACTIVITY_FRESH_SECS)
+        if (difftime(now, ctx->entries[i].last_activity) > (double)HU_DAEMON_ACTIVITY_FRESH_SECS)
             return;
-        if (!hu_daemon_channel_list_has_name(channels, channel_count,
-                                             g_contact_activity[i].last_channel))
+        if (!hu_daemon_channel_list_has_name(channels, channel_count, ctx->entries[i].last_channel))
             return;
 
-        size_t ch_len = strlen(g_contact_activity[i].last_channel);
+        size_t ch_len = strlen(ctx->entries[i].last_channel);
         if (ch_len >= 64)
             ch_len = 63;
-        memcpy(ch_buf, g_contact_activity[i].last_channel, ch_len);
+        memcpy(ch_buf, ctx->entries[i].last_channel, ch_len);
         ch_buf[ch_len] = '\0';
 
-        size_t sk_len = strlen(g_contact_activity[i].last_session_key);
+        size_t sk_len = strlen(ctx->entries[i].last_session_key);
         if (sk_len >= 128)
             sk_len = 127;
-        memcpy(target_buf, g_contact_activity[i].last_session_key, sk_len);
+        memcpy(target_buf, ctx->entries[i].last_session_key, sk_len);
         target_buf[sk_len] = '\0';
         *target_len = sk_len;
         return;
@@ -524,16 +529,4 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
     return result;
 }
 
-/* ── Test helpers ──────────────────────────────────────────────────── */
-
-#ifdef HU_IS_TEST
-void hu_daemon_contact_activity_reset(void) {
-    memset(g_contact_activity, 0, sizeof(g_contact_activity));
-    g_contact_activity_count = 0;
-    g_contact_activity_seq = 0;
-}
-
-size_t hu_daemon_contact_activity_count(void) {
-    return g_contact_activity_count;
-}
-#endif
+/* Test helpers removed — use hu_proactive_context_reset() and ctx->count directly. */

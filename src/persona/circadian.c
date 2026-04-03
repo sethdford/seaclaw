@@ -252,3 +252,137 @@ hu_error_t hu_circadian_build_prompt_with_routine(hu_allocator_t *alloc, uint8_t
 #undef HU_CIRCADIAN_ROUTINE_BUF_CAP
     return HU_OK;
 }
+
+/* ── Persona-aware circadian prompt ──────────────────────────────── */
+
+const char *hu_circadian_persona_overlay(const struct hu_persona *persona, hu_time_phase_t phase) {
+    if (!persona)
+        return NULL;
+    const hu_persona_t *p = (const hu_persona_t *)persona;
+    switch (phase) {
+    case HU_PHASE_EARLY_MORNING:
+        return (p->time_overlay_early_morning && p->time_overlay_early_morning[0] != '\0')
+                   ? p->time_overlay_early_morning
+                   : NULL;
+    case HU_PHASE_AFTERNOON:
+        return (p->time_overlay_afternoon && p->time_overlay_afternoon[0] != '\0')
+                   ? p->time_overlay_afternoon
+                   : NULL;
+    case HU_PHASE_EVENING:
+    case HU_PHASE_NIGHT:
+        return (p->time_overlay_evening && p->time_overlay_evening[0] != '\0')
+                   ? p->time_overlay_evening
+                   : NULL;
+    case HU_PHASE_LATE_NIGHT:
+        return (p->time_overlay_late_night && p->time_overlay_late_night[0] != '\0')
+                   ? p->time_overlay_late_night
+                   : NULL;
+    case HU_PHASE_MORNING:
+    default:
+        return NULL;
+    }
+}
+
+hu_error_t hu_circadian_build_persona_prompt(hu_allocator_t *alloc, uint8_t hour,
+                                             const struct hu_persona *persona, char **out,
+                                             size_t *out_len) {
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* No persona — fall back to routine-aware or default prompt */
+    if (!persona) {
+        return hu_circadian_build_prompt(alloc, hour, out, out_len);
+    }
+
+    const hu_persona_t *p = (const hu_persona_t *)persona;
+
+    /* Try routine-aware first if persona has a daily routine */
+    if (p->daily_routine.weekday_count > 0) {
+        /* Find routine block for mood_modifier */
+        const hu_routine_block_t *block = find_routine_block_for_hour(
+            p->daily_routine.weekday, p->daily_routine.weekday_count, hour);
+        hu_time_phase_t phase = hu_circadian_phase(hour);
+        const char *name = s_phase_names[(size_t)phase];
+        const char *default_guidance = s_phase_guidance[(size_t)phase];
+        const char *overlay = hu_circadian_persona_overlay(persona, phase);
+        const char *mood = (block && block->mood_modifier[0] != '\0') ? block->mood_modifier : NULL;
+        const char *activity = (block && block->activity[0] != '\0') ? block->activity : NULL;
+
+#define HU_CIRCADIAN_PERSONA_BUF_CAP 768
+        char *buf = (char *)alloc->alloc(alloc->ctx, HU_CIRCADIAN_PERSONA_BUF_CAP);
+        if (!buf)
+            return HU_ERR_OUT_OF_MEMORY;
+
+        int n;
+        if (overlay && mood) {
+            n = snprintf(buf, HU_CIRCADIAN_PERSONA_BUF_CAP,
+                         "\n### Time Awareness\nCurrent phase: %s. "
+                         "Persona energy: %s (activity: %s). "
+                         "Persona guidance: %s. %s\n",
+                         name, mood, activity ? activity : "unknown", overlay, default_guidance);
+        } else if (overlay) {
+            n = snprintf(buf, HU_CIRCADIAN_PERSONA_BUF_CAP,
+                         "\n### Time Awareness\nCurrent phase: %s. "
+                         "Persona guidance: %s. %s\n",
+                         name, overlay, default_guidance);
+        } else if (mood) {
+            n = snprintf(buf, HU_CIRCADIAN_PERSONA_BUF_CAP,
+                         "\n### Time Awareness\nCurrent phase: %s. "
+                         "Persona energy: %s (activity: %s). %s\n",
+                         name, mood, activity ? activity : "unknown", default_guidance);
+        } else {
+            n = snprintf(buf, HU_CIRCADIAN_PERSONA_BUF_CAP,
+                         "\n### Time Awareness\nCurrent phase: %s. %s\n", name, default_guidance);
+        }
+
+        if (n <= 0 || (size_t)n >= HU_CIRCADIAN_PERSONA_BUF_CAP) {
+            alloc->free(alloc->ctx, buf, HU_CIRCADIAN_PERSONA_BUF_CAP);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+
+        size_t need = (size_t)n + 1;
+        char *shrunk = (char *)alloc->realloc(alloc->ctx, buf, HU_CIRCADIAN_PERSONA_BUF_CAP, need);
+        if (!shrunk) {
+            alloc->free(alloc->ctx, buf, HU_CIRCADIAN_PERSONA_BUF_CAP);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        *out = shrunk;
+        *out_len = (size_t)n;
+#undef HU_CIRCADIAN_PERSONA_BUF_CAP
+        return HU_OK;
+    }
+
+    /* No daily routine — check for persona time overlay only */
+    hu_time_phase_t phase = hu_circadian_phase(hour);
+    const char *overlay = hu_circadian_persona_overlay(persona, phase);
+    if (!overlay)
+        return hu_circadian_build_prompt(alloc, hour, out, out_len);
+
+    const char *name = s_phase_names[(size_t)phase];
+    const char *default_guidance = s_phase_guidance[(size_t)phase];
+
+#define HU_CIRCADIAN_OVERLAY_BUF_CAP 512
+    char *buf = (char *)alloc->alloc(alloc->ctx, HU_CIRCADIAN_OVERLAY_BUF_CAP);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    int n = snprintf(buf, HU_CIRCADIAN_OVERLAY_BUF_CAP,
+                     "\n### Time Awareness\nCurrent phase: %s. "
+                     "Persona guidance: %s. %s\n",
+                     name, overlay, default_guidance);
+    if (n <= 0 || (size_t)n >= HU_CIRCADIAN_OVERLAY_BUF_CAP) {
+        alloc->free(alloc->ctx, buf, HU_CIRCADIAN_OVERLAY_BUF_CAP);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    size_t need = (size_t)n + 1;
+    char *shrunk = (char *)alloc->realloc(alloc->ctx, buf, HU_CIRCADIAN_OVERLAY_BUF_CAP, need);
+    if (!shrunk) {
+        alloc->free(alloc->ctx, buf, HU_CIRCADIAN_OVERLAY_BUF_CAP);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    *out = shrunk;
+    *out_len = (size_t)n;
+#undef HU_CIRCADIAN_OVERLAY_BUF_CAP
+    return HU_OK;
+}

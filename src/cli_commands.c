@@ -4,12 +4,14 @@
 #include "human/agent/hula_compiler.h"
 #include "human/agent/hula_emergence.h"
 #include "human/agent/hula_lite.h"
+#include "human/agent/spawn.h"
 #include "human/bootstrap.h"
 #include "human/calibration.h"
 #include "human/calibration/clone.h"
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/process_util.h"
 #include "human/core/string.h"
 #include "human/eval.h"
@@ -18,7 +20,6 @@
 #include "human/memory.h"
 #include "human/memory/factory.h"
 #include "human/providers/factory.h"
-#include "human/agent/spawn.h"
 #include "human/security.h"
 #include "human/security/sandbox.h"
 #include "human/tools/factory.h"
@@ -258,7 +259,7 @@ hu_error_t cmd_memory(hu_allocator_t *alloc, int argc, char **argv) {
     hu_config_t cfg;
     hu_error_t err = hu_config_load(alloc, &cfg);
     if (err != HU_OK) {
-        fprintf(stderr, "Config error: %s\n", hu_error_string(err));
+        hu_log_error("config", NULL, "Config error: %s", hu_error_string(err));
         return err;
     }
     const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
@@ -392,7 +393,7 @@ hu_error_t cmd_workspace(hu_allocator_t *alloc, int argc, char **argv) {
                 if (se == HU_OK)
                     printf("Workspace set to: %s\n", argv[3]);
                 else
-                    fprintf(stderr, "Failed to save config: %s\n", hu_error_string(se));
+                    hu_log_error("config", NULL, "Failed to save config: %s", hu_error_string(se));
             }
             hu_config_deinit(&cfg);
         }
@@ -607,7 +608,7 @@ hu_error_t cmd_sandbox(hu_allocator_t *alloc, int argc, char **argv) {
     hu_config_t cfg;
     hu_error_t err = hu_config_load(alloc, &cfg);
     if (err != HU_OK) {
-        fprintf(stderr, "Failed to load config: %s\n", hu_error_string(err));
+        hu_log_error("config", NULL, "Failed to load config: %s", hu_error_string(err));
         return err;
     }
 
@@ -727,7 +728,7 @@ hu_error_t cmd_update(hu_allocator_t *alloc, int argc, char **argv) {
     (void)alloc;
     (void)argc;
     (void)argv;
-    fprintf(stderr, "[human] update support not built (compile with HU_ENABLE_UPDATE=ON)\n");
+    hu_log_error("update", NULL, "update support not built (compile with HU_ENABLE_UPDATE=ON)");
     return HU_ERR_NOT_SUPPORTED;
 #endif
 }
@@ -784,9 +785,9 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 #endif
         if (err != HU_OK) {
 #ifndef HU_IS_TEST
-            fprintf(stderr, "eval: failed to load %s: %s\n", path, hu_error_string(err));
+            hu_log_error("eval", NULL, "failed to load %s: %s", path, hu_error_string(err));
 #else
-            fprintf(stderr, "eval: failed to load suite: %s\n", hu_error_string(err));
+            hu_log_error("eval", NULL, "failed to load suite: %s", hu_error_string(err));
 #endif
             return err;
         }
@@ -800,7 +801,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             hu_error_t cfg_err = hu_config_load(alloc, &cfg);
             if (cfg_err != HU_OK) {
                 hu_eval_suite_free(alloc, &suite);
-                fprintf(stderr, "eval: config error: %s\n", hu_error_string(cfg_err));
+                hu_log_error("eval", NULL, "config error: %s", hu_error_string(cfg_err));
                 return cfg_err;
             }
             const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
@@ -812,7 +813,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             if (err != HU_OK) {
                 hu_eval_suite_free(alloc, &suite);
                 hu_config_deinit(&cfg);
-                fprintf(stderr, "eval: provider error: %s\n", hu_error_string(err));
+                hu_log_error("eval", NULL, "provider error: %s", hu_error_string(err));
                 return err;
             }
             err = hu_eval_run_suite(alloc, &provider, model, model_len, &suite, HU_EVAL_CONTAINS,
@@ -824,7 +825,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 #endif
         hu_eval_suite_free(alloc, &suite);
         if (err != HU_OK) {
-            fprintf(stderr, "eval: run failed: %s\n", hu_error_string(err));
+            hu_log_error("eval", NULL, "run failed: %s", hu_error_string(err));
             return err;
         }
 
@@ -846,19 +847,19 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 if (db) {
                     hu_error_t tbl_err = hu_eval_init_tables(db);
                     if (tbl_err != HU_OK)
-                        fprintf(stderr, "eval: table init failed\n");
+                        hu_log_error("eval", NULL, "table init failed");
                     if (hu_eval_store_run(alloc, db, &run) == HU_OK)
-                        fprintf(stderr, "eval: stored run to history\n");
+                        hu_log_info("eval", NULL, "stored run to history");
 
                     hu_eval_regression_t reg = {0};
                     if (hu_eval_detect_regression(db, run.suite_name, run.pass_rate, 0.05, &reg) ==
                             HU_OK &&
                         reg.regressed) {
-                        fprintf(stderr,
-                                "WARNING: regression detected! pass_rate %.1f%% vs baseline %.1f%% "
-                                "(delta %.1f%%)\n",
-                                reg.current_pass_rate * 100.0, reg.baseline_pass_rate * 100.0,
-                                reg.delta * 100.0);
+                        hu_log_error("eval", NULL,
+                                     "WARNING: regression detected! pass_rate %.1f%% vs baseline "
+                                     "%.1f%% (delta %.1f%%)",
+                                     reg.current_pass_rate * 100.0, reg.baseline_pass_rate * 100.0,
+                                     reg.delta * 100.0);
                         /* --fail-on-regression: check if flag was passed */
                         bool fail_on_reg = false;
                         for (int fa = 0; fa < argc; fa++) {
@@ -892,7 +893,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             enum { max_json_files = 256 };
             DIR *d = opendir(dir_path);
             if (!d) {
-                fprintf(stderr, "eval: cannot open %s: %s\n", dir_path, strerror(errno));
+                hu_log_error("eval", NULL, "cannot open %s: %s", dir_path, strerror(errno));
                 return HU_ERR_IO;
             }
             char **names = alloc->alloc(alloc->ctx, max_json_files * sizeof(char *));
@@ -929,13 +930,14 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 char path_buf[HU_INIT_MAX_PATH];
                 int plen = snprintf(path_buf, sizeof(path_buf), "%s/%s", dir_path, names[i]);
                 if (plen < 0 || (size_t)plen >= sizeof(path_buf)) {
-                    fprintf(stderr, "eval: path too long for %s/%s\n", dir_path, names[i]);
+                    hu_log_error("eval", NULL, "path too long for %s/%s", dir_path, names[i]);
                     continue;
                 }
                 hu_eval_suite_t suite = {0};
                 hu_error_t le = hu_eval_suite_load_json_path(alloc, path_buf, &suite);
                 if (le != HU_OK) {
-                    fprintf(stderr, "eval: could not load %s: %s\n", path_buf, hu_error_string(le));
+                    hu_log_error("eval", NULL, "could not load %s: %s", path_buf,
+                                 hu_error_string(le));
                     hu_eval_suite_free(alloc, &suite);
                     continue;
                 }
@@ -958,8 +960,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                         hu_config_t cfg;
                         hu_error_t cfg_err = hu_config_load(alloc, &cfg);
                         if (cfg_err != HU_OK) {
-                            fprintf(stderr, "eval: baseline config error: %s\n",
-                                    hu_error_string(cfg_err));
+                            hu_log_error("eval", NULL, "baseline config error: %s",
+                                         hu_error_string(cfg_err));
                             hu_eval_suite_free(alloc, &suite);
                             continue;
                         }
@@ -970,8 +972,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                         hu_provider_t provider = {0};
                         br = hu_provider_create_from_config(alloc, &cfg, prov, prov_len, &provider);
                         if (br != HU_OK) {
-                            fprintf(stderr, "eval: baseline provider error: %s\n",
-                                    hu_error_string(br));
+                            hu_log_error("eval", NULL, "baseline provider error: %s",
+                                         hu_error_string(br));
                             hu_eval_suite_free(alloc, &suite);
                             hu_config_deinit(&cfg);
                             continue;
@@ -1044,7 +1046,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         hu_eval_validate_stats_t st = {0};
         hu_error_t verr = hu_eval_suites_validate_dir(alloc, argv[3], stderr, &st);
         if (verr != HU_OK) {
-            fprintf(stderr, "eval validate: %s\n", hu_error_string(verr));
+            hu_log_error("eval", NULL, "eval validate: %s", hu_error_string(verr));
             return verr;
         }
         printf("Validated %zu suites, %zu tasks, %zu errors\n", st.suites_ok, st.tasks, st.errors);
@@ -1062,7 +1064,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_OK;
 #else
 #ifndef HU_ENABLE_SQLITE
-        fprintf(stderr, "eval check-regression: SQLite is required\n");
+        hu_log_error("eval", NULL, "eval check-regression: SQLite is required");
         return HU_ERR_NOT_SUPPORTED;
 #elif defined(__unix__) || defined(__APPLE__)
         {
@@ -1070,7 +1072,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             enum { max_json_files = 256 };
             DIR *d = opendir(dir_path);
             if (!d) {
-                fprintf(stderr, "eval: cannot open %s: %s\n", dir_path, strerror(errno));
+                hu_log_error("eval", NULL, "cannot open %s: %s", dir_path, strerror(errno));
                 return HU_ERR_IO;
             }
             char **names = alloc->alloc(alloc->ctx, max_json_files * sizeof(char *));
@@ -1121,13 +1123,14 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 char path_buf[HU_INIT_MAX_PATH];
                 int plen = snprintf(path_buf, sizeof(path_buf), "%s/%s", dir_path, names[i]);
                 if (plen < 0 || (size_t)plen >= sizeof(path_buf)) {
-                    fprintf(stderr, "eval: path too long for %s/%s\n", dir_path, names[i]);
+                    hu_log_error("eval", NULL, "path too long for %s/%s", dir_path, names[i]);
                     continue;
                 }
                 hu_eval_suite_t suite = {0};
                 hu_error_t le = hu_eval_suite_load_json_path(alloc, path_buf, &suite);
                 if (le != HU_OK) {
-                    fprintf(stderr, "eval: could not load %s: %s\n", path_buf, hu_error_string(le));
+                    hu_log_error("eval", NULL, "could not load %s: %s", path_buf,
+                                 hu_error_string(le));
                     hu_eval_suite_free(alloc, &suite);
                     continue;
                 }
@@ -1146,8 +1149,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                     hu_config_t cfg;
                     hu_error_t cfg_err = hu_config_load(alloc, &cfg);
                     if (cfg_err != HU_OK) {
-                        fprintf(stderr, "eval: check-regression config error: %s\n",
-                                hu_error_string(cfg_err));
+                        hu_log_error("eval", NULL, "check-regression config error: %s",
+                                     hu_error_string(cfg_err));
                         hu_eval_suite_free(alloc, &suite);
                         continue;
                     }
@@ -1156,8 +1159,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                     hu_error_t br =
                         hu_provider_create_from_config(alloc, &cfg, prov, strlen(prov), &provider);
                     if (br != HU_OK) {
-                        fprintf(stderr, "eval: check-regression provider error: %s\n",
-                                hu_error_string(br));
+                        hu_log_error("eval", NULL, "check-regression provider error: %s",
+                                     hu_error_string(br));
                         hu_eval_suite_free(alloc, &suite);
                         hu_config_deinit(&cfg);
                         continue;
@@ -1189,14 +1192,16 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 
             if (n_ok == 0) {
                 alloc->free(alloc->ctx, rows, max_json_files * sizeof(eval_chk_row_t));
-                fprintf(stderr, "eval check-regression: no suites scored in %s\n", dir_path);
+                hu_log_error("eval", NULL, "eval check-regression: no suites scored in %s",
+                             dir_path);
                 return HU_ERR_IO;
             }
 
             hu_config_t store_cfg;
             if (hu_config_load(alloc, &store_cfg) != HU_OK) {
                 alloc->free(alloc->ctx, rows, max_json_files * sizeof(eval_chk_row_t));
-                fprintf(stderr, "eval check-regression: could not load config for history DB\n");
+                hu_log_error("eval", NULL,
+                             "eval check-regression: could not load config for history DB");
                 return HU_ERR_CONFIG_NOT_FOUND;
             }
             const char *ws = store_cfg.workspace_dir ? store_cfg.workspace_dir : ".";
@@ -1207,7 +1212,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 if (mem.vtable && mem.vtable->deinit)
                     mem.vtable->deinit(mem.ctx);
                 hu_config_deinit(&store_cfg);
-                fprintf(stderr, "eval check-regression: no SQLite memory backend\n");
+                hu_log_error("eval", NULL, "eval check-regression: no SQLite memory backend");
                 return HU_ERR_MEMORY_BACKEND;
             }
 
@@ -1222,7 +1227,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                     if (mem.vtable && mem.vtable->deinit)
                         mem.vtable->deinit(mem.ctx);
                     hu_config_deinit(&store_cfg);
-                    fprintf(stderr, "eval check-regression: %s\n", hu_error_string(re));
+                    hu_log_error("eval", NULL, "eval check-regression: %s", hu_error_string(re));
                     return re;
                 }
                 if (reg) {
@@ -1259,7 +1264,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             enum { max_json_files = 256 };
             DIR *d = opendir(dir_path);
             if (!d) {
-                fprintf(stderr, "eval: cannot open %s: %s\n", dir_path, strerror(errno));
+                hu_log_error("eval", NULL, "cannot open %s: %s", dir_path, strerror(errno));
                 return HU_ERR_IO;
             }
             char **names = alloc->alloc(alloc->ctx, max_json_files * sizeof(char *));
@@ -1294,13 +1299,14 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 char path_buf[HU_INIT_MAX_PATH];
                 int plen = snprintf(path_buf, sizeof(path_buf), "%s/%s", dir_path, names[i]);
                 if (plen < 0 || (size_t)plen >= sizeof(path_buf)) {
-                    fprintf(stderr, "eval: path too long for %s/%s\n", dir_path, names[i]);
+                    hu_log_error("eval", NULL, "path too long for %s/%s", dir_path, names[i]);
                     continue;
                 }
                 hu_eval_suite_t suite = {0};
                 hu_error_t le = hu_eval_suite_load_json_path(alloc, path_buf, &suite);
                 if (le != HU_OK) {
-                    fprintf(stderr, "eval: could not load %s: %s\n", path_buf, hu_error_string(le));
+                    hu_log_error("eval", NULL, "could not load %s: %s", path_buf,
+                                 hu_error_string(le));
                     hu_eval_suite_free(alloc, &suite);
                     continue;
                 }
@@ -1338,7 +1344,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         {
             FILE *f1 = fopen(path1, "rb");
             if (!f1) {
-                fprintf(stderr, "eval: cannot open %s: %s\n", path1, strerror(errno));
+                hu_log_error("eval", NULL, "cannot open %s: %s", path1, strerror(errno));
                 return HU_ERR_IO;
             }
             fseek(f1, 0, SEEK_END);
@@ -1365,7 +1371,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             FILE *f2 = fopen(path2, "rb");
             if (!f2) {
                 alloc->free(alloc->ctx, json1, len1 + 1);
-                fprintf(stderr, "eval: cannot open %s: %s\n", path2, strerror(errno));
+                hu_log_error("eval", NULL, "cannot open %s: %s", path2, strerror(errno));
                 return HU_ERR_IO;
             }
             fseek(f2, 0, SEEK_END);
@@ -1427,7 +1433,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         alloc->free(alloc->ctx, json2, len2 + 1);
         if (err != HU_OK) {
             hu_eval_run_free(alloc, &baseline);
-            fprintf(stderr, "eval: failed to parse run reports\n");
+            hu_log_error("eval", NULL, "failed to parse run reports");
             return err;
         }
 
@@ -1466,7 +1472,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 #else
                 FILE *f = fopen(path, "rb");
                 if (!f) {
-                    fprintf(stderr, "eval: cannot open %s: %s\n", path, strerror(errno));
+                    hu_log_error("eval", NULL, "cannot open %s: %s", path, strerror(errno));
                     err = HU_ERR_IO;
                     break;
                 }
@@ -1528,14 +1534,14 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         hu_config_t cfg;
         hu_error_t cfg_err = hu_config_load(alloc, &cfg);
         if (cfg_err != HU_OK) {
-            fprintf(stderr, "eval history: config error\n");
+            hu_log_error("eval", NULL, "eval history: config error");
             return cfg_err;
         }
         const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
         hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
         sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
         if (!db) {
-            fprintf(stderr, "eval history: no SQLite backend\n");
+            hu_log_error("eval", NULL, "eval history: no SQLite backend");
             if (mem.vtable && mem.vtable->deinit)
                 mem.vtable->deinit(mem.ctx);
             hu_config_deinit(&cfg);
@@ -1543,7 +1549,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         }
         hu_error_t tbl_err = hu_eval_init_tables(db);
         if (tbl_err != HU_OK)
-            fprintf(stderr, "eval: table init failed\n");
+            hu_log_error("eval", NULL, "table init failed");
         hu_eval_run_t *runs = alloc->alloc(alloc->ctx, max_runs * sizeof(hu_eval_run_t));
         if (!runs) {
             if (mem.vtable && mem.vtable->deinit)
@@ -1580,7 +1586,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         hu_config_deinit(&cfg);
         return err;
 #else
-        fprintf(stderr, "eval history: SQLite not enabled\n");
+        hu_log_error("eval", NULL, "eval history: SQLite not enabled");
         return HU_ERR_NOT_SUPPORTED;
 #endif
     }
@@ -1591,7 +1597,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         hu_config_t cfg;
         hu_error_t cfg_err = hu_config_load(alloc, &cfg);
         if (cfg_err != HU_OK) {
-            fprintf(stderr, "eval trend: config error\n");
+            hu_log_error("eval", NULL, "eval trend: config error");
             return cfg_err;
         }
         const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
@@ -1701,8 +1707,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         else if (strcmp(bench_name, "tooluse") == 0)
             bench_type = HU_BENCHMARK_TOOL_USE;
         else {
-            fprintf(stderr, "Unknown benchmark: %s (expected gaia, swebench, tooluse)\n",
-                    bench_name);
+            hu_log_error("eval", NULL, "Unknown benchmark: %s (expected gaia, swebench, tooluse)",
+                         bench_name);
             return HU_ERR_INVALID_ARGUMENT;
         }
 
@@ -1723,7 +1729,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 #else
         FILE *bf = fopen(bench_path, "r");
         if (!bf) {
-            fprintf(stderr, "Cannot open benchmark file: %s\n", bench_path);
+            hu_log_error("eval", NULL, "Cannot open benchmark file: %s", bench_path);
             return HU_ERR_INVALID_ARGUMENT;
         }
         fseek(bf, 0, SEEK_END);
@@ -1754,7 +1760,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             hu_benchmark_load(alloc, bench_type, bench_json, bench_json_len, &bench_suite);
         alloc->free(alloc->ctx, bench_json, bench_json_len + 1);
         if (berr != HU_OK) {
-            fprintf(stderr, "Failed to load benchmark: %s\n", hu_error_string(berr));
+            hu_log_error("eval", NULL, "Failed to load benchmark: %s", hu_error_string(berr));
             return berr;
         }
 
@@ -1776,18 +1782,18 @@ hu_error_t cmd_research(hu_allocator_t *alloc, int argc, char **argv) {
     hu_app_ctx_t app_ctx;
     hu_error_t err = hu_app_bootstrap(&app_ctx, alloc, NULL, true, false);
     if (err != HU_OK) {
-        fprintf(stderr, "Research bootstrap failed: %s\n", hu_error_string(err));
+        hu_log_error("research", NULL, "Research bootstrap failed: %s", hu_error_string(err));
         return err;
     }
     if (!app_ctx.agent_ok || !app_ctx.agent) {
-        fprintf(stderr, "Research requires an agent. Configure a provider first.\n");
+        hu_log_error("research", NULL, "Research requires an agent. Configure a provider first.");
         hu_app_teardown(&app_ctx);
         return HU_ERR_INVALID_ARGUMENT;
     }
     hu_memory_t *mem = app_ctx.memory;
     sqlite3 *db = mem ? hu_sqlite_memory_get_db(mem) : NULL;
     if (!db) {
-        fprintf(stderr, "Research requires SQLite memory backend.\n");
+        hu_log_error("research", NULL, "Research requires SQLite memory backend.");
         hu_app_teardown(&app_ctx);
         return HU_ERR_NOT_SUPPORTED;
     }
@@ -1797,7 +1803,7 @@ hu_error_t cmd_research(hu_allocator_t *alloc, int argc, char **argv) {
     if (err == HU_OK)
         printf("Research complete.\n");
     else
-        fprintf(stderr, "Research failed: %s\n", hu_error_string(err));
+        hu_log_error("research", NULL, "Research failed: %s", hu_error_string(err));
     return err;
 }
 #else
@@ -1805,7 +1811,7 @@ hu_error_t cmd_research(hu_allocator_t *alloc, int argc, char **argv) {
     (void)alloc;
     (void)argc;
     (void)argv;
-    fprintf(stderr, "Research requires --enable-feeds and --enable-sqlite.\n");
+    hu_log_error("research", NULL, "Research requires --enable-feeds and --enable-sqlite.");
     return HU_ERR_NOT_SUPPORTED;
 }
 #endif
@@ -1829,7 +1835,7 @@ hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
         char *recommendations = NULL;
         hu_error_t err = hu_calibrate(alloc, db_path, contact, channel, &recommendations);
         if (err != HU_OK) {
-            fprintf(stderr, "Calibration failed: %s\n", hu_error_string(err));
+            hu_log_error("calibrate", NULL, "Calibration failed: %s", hu_error_string(err));
             return err;
         }
         if (recommendations) {
@@ -1848,7 +1854,7 @@ hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
         memset(&patterns, 0, sizeof(patterns));
         hu_error_t err = hu_behavioral_clone_extract(alloc, db_path, contact, &patterns);
         if (err != HU_OK) {
-            fprintf(stderr, "Clone extraction failed: %s\n", hu_error_string(err));
+            hu_log_error("calibrate", NULL, "Clone extraction failed: %s", hu_error_string(err));
             return err;
         }
 
@@ -1861,7 +1867,7 @@ hu_error_t cmd_calibrate(hu_allocator_t *alloc, int argc, char **argv) {
         if (persona_path) {
             err = hu_behavioral_clone_update_persona(alloc, &patterns, persona_path);
             if (err != HU_OK) {
-                fprintf(stderr, "Persona update failed: %s\n", hu_error_string(err));
+                hu_log_error("calibrate", NULL, "Persona update failed: %s", hu_error_string(err));
                 return err;
             }
             printf("Persona recommendations written to: %s\n", persona_path);
@@ -1884,19 +1890,19 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
     hu_config_t cfg;
     hu_error_t err = hu_config_load(alloc, &cfg);
     if (err != HU_OK) {
-        fprintf(stderr, "Config error: %s\n", hu_error_string(err));
+        hu_log_error("config", NULL, "Config error: %s", hu_error_string(err));
         return err;
     }
     const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
     hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
     if (!mem.vtable) {
-        fprintf(stderr, "[feed] No memory backend configured\n");
+        hu_log_error("feed", NULL, "no memory backend configured");
         hu_config_deinit(&cfg);
         return HU_ERR_NOT_FOUND;
     }
     sqlite3 *db = hu_sqlite_memory_get_db(&mem);
     if (!db) {
-        fprintf(stderr, "[feed] SQLite database not available\n");
+        hu_log_error("feed", NULL, "SQLite database not available");
         if (mem.vtable->deinit)
             mem.vtable->deinit(mem.ctx);
         hu_config_deinit(&cfg);
@@ -1942,14 +1948,14 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         if (err == HU_OK)
             printf("[feed] Poll complete: %zu items ingested\n", ingested);
         else
-            fprintf(stderr, "[feed] Poll error: %s\n", hu_error_string(err));
+            hu_log_error("feed", NULL, "poll error: %s", hu_error_string(err));
     } else if (strcmp(sub, "status") == 0) {
         sqlite3_stmt *stmt = NULL;
         int rc = sqlite3_prepare_v2(
             db, "SELECT source, COUNT(*), MAX(ingested_at) FROM feed_items GROUP BY source", -1,
             &stmt, NULL);
         if (rc != SQLITE_OK) {
-            fprintf(stderr, "[feed] Query error: %s\n", sqlite3_errmsg(db));
+            hu_log_error("feed", NULL, "query error: %s", sqlite3_errmsg(db));
         } else {
             printf("%-20s  %6s  %s\n", "SOURCE", "COUNT", "LAST INGESTED");
             printf("%-20s  %6s  %s\n", "--------------------", "------", "-------------------");
@@ -2013,7 +2019,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
                                "FROM feed_items ORDER BY ingested_at DESC LIMIT 10",
                                -1, &stmt, NULL);
         if (rc != SQLITE_OK) {
-            fprintf(stderr, "[feed] Query error: %s\n", sqlite3_errmsg(db));
+            hu_log_error("feed", NULL, "query error: %s", sqlite3_errmsg(db));
         } else {
             printf("Last 10 feed items:\n\n");
             int idx = 0;
@@ -2080,7 +2086,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         else
             ferr = hu_findings_get_all(alloc, db, 50, &findings, &fcount);
         if (ferr != HU_OK) {
-            fprintf(stderr, "[feed] Findings query error: %s\n", hu_error_string(ferr));
+            hu_log_error("feed", NULL, "findings query error: %s", hu_error_string(ferr));
         } else if (fcount == 0) {
             printf("No research findings yet. Run the research agent first.\n");
         } else {
@@ -2117,7 +2123,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
             hu_error_t serr =
                 hu_feed_search(alloc, db, query, strlen(query), 20, &results, &rcount);
             if (serr != HU_OK) {
-                fprintf(stderr, "[feed] Search error: %s\n", hu_error_string(serr));
+                hu_log_error("feed", NULL, "search error: %s", hu_error_string(serr));
             } else if (rcount == 0) {
                 printf("No results for '%s'\n", query);
             } else {
@@ -2147,7 +2153,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         hu_error_t derr =
             hu_feed_build_daily_digest(alloc, db, since, 8000, &digest_text, &digest_text_len);
         if (derr != HU_OK) {
-            fprintf(stderr, "[feed] Digest error: %s\n", hu_error_string(derr));
+            hu_log_error("feed", NULL, "digest error: %s", hu_error_string(derr));
         } else {
             printf("%.*s", (int)digest_text_len, digest_text);
             alloc->free(alloc->ctx, digest_text, digest_text_len + 1);
@@ -2158,7 +2164,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         if (cerr == HU_OK)
             printf("[feed] Correlation complete\n");
         else
-            fprintf(stderr, "[feed] Correlation error: %s\n", hu_error_string(cerr));
+            hu_log_error("feed", NULL, "correlation error: %s", hu_error_string(cerr));
     } else if (strcmp(sub, "cleanup") == 0) {
         uint32_t days = 30;
         if (argc >= 4) {
@@ -2171,7 +2177,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         if (cerr == HU_OK)
             printf("[feed] Cleanup complete (removed items older than %u days)\n", days);
         else
-            fprintf(stderr, "[feed] Cleanup error: %s\n", hu_error_string(cerr));
+            hu_log_error("feed", NULL, "cleanup error: %s", hu_error_string(cerr));
     } else if (strcmp(sub, "learn") == 0) {
 #if defined(HU_HAS_SKILLS)
         hu_intelligence_cycle_result_t learn_result;
@@ -2186,10 +2192,10 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
             printf("  Causal recorded:   %zu\n", learn_result.causal_recorded);
             printf("  Skills updated:    %zu\n", learn_result.skills_updated);
         } else {
-            fprintf(stderr, "[feed] Intelligence cycle error: %s\n", hu_error_string(lerr));
+            hu_log_error("feed", NULL, "intelligence cycle error: %s", hu_error_string(lerr));
         }
 #else
-        fprintf(stderr, "[feed] Intelligence cycle requires HU_HAS_SKILLS\n");
+        hu_log_error("feed", NULL, "intelligence cycle requires HU_HAS_SKILLS");
 #endif
     } else {
         fprintf(stderr, "Unknown feed subcommand: %s\n", sub);
@@ -2332,8 +2338,9 @@ static void hula_cli_hula_free_tools_bundle(hu_allocator_t *alloc, bool have_cfg
 
 /* Parse, validate, optionally execute; embed program_snapshot in persisted traces when set.
  * With config_path, load ~/.human-style config and register real tools for validate + execute. */
-static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *json, size_t json_len,
-                                            bool json_owned, bool run_after_validate,
+static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *json,
+                                            size_t json_len, bool json_owned,
+                                            bool run_after_validate,
                                             const char *program_snapshot_json,
                                             size_t program_snapshot_len, const char *config_path,
                                             const char *program_source, size_t program_source_len) {
@@ -2341,7 +2348,7 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     hu_hula_program_t prog;
     hu_error_t err = hu_hula_parse_json(alloc, json, json_len, &prog);
     if (err != HU_OK) {
-        fprintf(stderr, "  FAIL: parse error: %s\n", hu_error_string(err));
+        hu_log_error("hula", NULL, "FAIL: parse error: %s", hu_error_string(err));
         if (json_owned)
             hu_str_free(alloc, (char *)json);
         return err;
@@ -2368,9 +2375,10 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     if (config_path && config_path[0]) {
         err = hu_config_load_from(alloc, config_path, &cfg);
         if (err != HU_OK) {
-            fprintf(stderr, "  FAIL: config load: %s\n", hu_error_string(err));
+            hu_log_error("hula", NULL, "FAIL: config load: %s", hu_error_string(err));
             hu_hula_program_deinit(&prog);
-            if (json_owned) hu_str_free(alloc, (char *)json);
+            if (json_owned)
+                hu_str_free(alloc, (char *)json);
             return err;
         }
         have_cfg = true;
@@ -2380,7 +2388,8 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
         if (!agent_pool) {
             hula_cli_hula_free_tools_bundle(alloc, true, &cfg, &cfg_policy, NULL, NULL, 0, NULL);
             hu_hula_program_deinit(&prog);
-            if (json_owned) hu_str_free(alloc, (char *)json);
+            if (json_owned)
+                hu_str_free(alloc, (char *)json);
             return HU_ERR_OUT_OF_MEMORY;
         }
         {
@@ -2390,30 +2399,32 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
             fl.budget_limit_usd = cfg.agent.fleet_budget_usd;
             hu_agent_pool_set_fleet_limits(agent_pool, &fl);
         }
-        err = hu_tools_create_default(alloc, ws, strlen(ws), NULL, &cfg, NULL, NULL, agent_pool, NULL,
-                                      NULL, NULL, &dyn_tools, &dyn_tools_count);
+        err = hu_tools_create_default(alloc, ws, strlen(ws), NULL, &cfg, NULL, NULL, agent_pool,
+                                      NULL, NULL, NULL, &dyn_tools, &dyn_tools_count);
         if (err != HU_OK) {
-            fprintf(stderr, "  FAIL: tools from config: %s\n", hu_error_string(err));
-            hula_cli_hula_free_tools_bundle(alloc, true, &cfg, &cfg_policy, agent_pool, NULL, 0, NULL);
+            hu_log_error("hula", NULL, "FAIL: tools from config: %s", hu_error_string(err));
+            hula_cli_hula_free_tools_bundle(alloc, true, &cfg, &cfg_policy, agent_pool, NULL, 0,
+                                            NULL);
             hu_hula_program_deinit(&prog);
-            if (json_owned) hu_str_free(alloc, (char *)json);
+            if (json_owned)
+                hu_str_free(alloc, (char *)json);
             return err;
         }
         if (dyn_tools_count > 0) {
             heap_validate =
                 (const char **)alloc->alloc(alloc->ctx, dyn_tools_count * sizeof(const char *));
             if (!heap_validate) {
-                hula_cli_hula_free_tools_bundle(alloc, true, &cfg, &cfg_policy, agent_pool, dyn_tools,
-                                                dyn_tools_count, NULL);
+                hula_cli_hula_free_tools_bundle(alloc, true, &cfg, &cfg_policy, agent_pool,
+                                                dyn_tools, dyn_tools_count, NULL);
                 hu_hula_program_deinit(&prog);
-                if (json_owned) hu_str_free(alloc, (char *)json);
+                if (json_owned)
+                    hu_str_free(alloc, (char *)json);
                 return HU_ERR_OUT_OF_MEMORY;
             }
             for (size_t ti = 0; ti < dyn_tools_count; ti++) {
-                heap_validate[ti] =
-                    (dyn_tools[ti].vtable && dyn_tools[ti].vtable->name)
-                        ? dyn_tools[ti].vtable->name(dyn_tools[ti].ctx)
-                        : "";
+                heap_validate[ti] = (dyn_tools[ti].vtable && dyn_tools[ti].vtable->name)
+                                        ? dyn_tools[ti].vtable->name(dyn_tools[ti].ctx)
+                                        : "";
             }
         }
         validate_names = (const char *const *)heap_validate;
@@ -2434,7 +2445,7 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     memset(&v, 0, sizeof(v));
     err = hu_hula_validate(&prog, alloc, validate_names, validate_count, &v);
     if (err != HU_OK) {
-        fprintf(stderr, "  FAIL: validation error: %s\n", hu_error_string(err));
+        hu_log_error("hula", NULL, "FAIL: validation error: %s", hu_error_string(err));
         hu_hula_validation_deinit(alloc, &v);
         hula_cli_hula_free_tools_bundle(alloc, have_cfg, &cfg, &cfg_policy, agent_pool, dyn_tools,
                                         dyn_tools_count, heap_validate);
@@ -2491,9 +2502,10 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
     hu_observer_t obs = hu_observer_log_stderr();
 
     hu_hula_exec_t exec;
-    err = hu_hula_exec_init_full(&exec, *alloc, &prog, exec_tools, exec_tools_count, exec_policy, &obs);
+    err = hu_hula_exec_init_full(&exec, *alloc, &prog, exec_tools, exec_tools_count, exec_policy,
+                                 &obs);
     if (err != HU_OK) {
-        fprintf(stderr, "  FAIL: exec init: %s\n", hu_error_string(err));
+        hu_log_error("hula", NULL, "FAIL: exec init: %s", hu_error_string(err));
         hula_cli_hula_free_tools_bundle(alloc, have_cfg, &cfg, &cfg_policy, agent_pool, dyn_tools,
                                         dyn_tools_count, heap_validate);
         hu_hula_program_deinit(&prog);
@@ -2504,7 +2516,7 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
 
     err = hu_hula_exec_run(&exec);
     if (err != HU_OK) {
-        fprintf(stderr, "  FAIL: exec run: %s\n", hu_error_string(err));
+        hu_log_error("hula", NULL, "FAIL: exec run: %s", hu_error_string(err));
         hu_hula_exec_deinit(&exec);
         hula_cli_hula_free_tools_bundle(alloc, have_cfg, &cfg, &cfg_policy, agent_pool, dyn_tools,
                                         dyn_tools_count, heap_validate);
@@ -2551,12 +2563,11 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
         const char *pn = prog.name;
         size_t pnl = pn ? strlen(pn) : 0;
         bool trace_ok = root_r && root_r->status == HU_HULA_DONE;
-        hu_error_t tr_err =
-            hu_hula_trace_persist(alloc, trace_dir_env, trace, trace_len, pn, pnl, trace_ok, snap,
-                                  snap_len, psrc, psrc_len);
+        hu_error_t tr_err = hu_hula_trace_persist(alloc, trace_dir_env, trace, trace_len, pn, pnl,
+                                                  trace_ok, snap, snap_len, psrc, psrc_len);
         if (tr_err != HU_OK) {
-            fprintf(stderr, "hula: HU_HULA_TRACE_DIR persist failed: %s\n",
-                    hu_error_string(tr_err));
+            hu_log_error("hula", NULL, "HU_HULA_TRACE_DIR persist failed: %s",
+                         hu_error_string(tr_err));
         } else {
             printf("\n── Trace persist ─────────────────────────────────────\n");
             printf("  wrote JSON under %s\n", trace_dir_env);
@@ -2583,13 +2594,16 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         printf("Usage: human hula <schema|expand|compile|replay|run|validate> ...\n\n");
         printf("  schema              Print JSON Schema path and contents (if found)\n");
         printf("  expand <tmpl> <vars.json>   Expand {{keys}} using JSON object vars\n");
-        printf("  compile [--lite] <file>     Print HuLa JSON (lite syntax or JSON file passthrough)\n");
-        printf("  replay [--config path] <trace.json>  Re-run embedded program (optional config for tools)\n");
+        printf("  compile [--lite] <file>     Print HuLa JSON (lite syntax or JSON file "
+               "passthrough)\n");
+        printf("  replay [--config path] <trace.json>  Re-run embedded program (optional config "
+               "for tools)\n");
         printf("  run [--lite] [--config path] <file|'{...}'>  Execute program\n");
         printf("  validate [--lite] [--config path] <file|'{...}'>\n\n");
         printf("Default run uses demo tools: echo, search, write, analyze\n");
         printf("--config loads tools from a human config.json (same as the agent).\n");
-        printf("Optional: HU_HULA_TRACE_DIR=/path/dir persists trace JSON + program (+ program_source).\n");
+        printf("Optional: HU_HULA_TRACE_DIR=/path/dir persists trace JSON + program (+ "
+               "program_source).\n");
         return HU_OK;
     }
 
@@ -2599,8 +2613,8 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         FILE *f = NULL;
         hu_error_t er = hula_try_open_schema(&f, pbuf, sizeof(pbuf));
         if (er != HU_OK || !f) {
-            fprintf(stderr,
-                    "hula: schema file not found (try from repo root or set HUMAN_SOURCE_ROOT)\n");
+            hu_log_error("hula", NULL,
+                         "schema file not found (try from repo root or set HUMAN_SOURCE_ROOT)");
             return er != HU_OK ? er : HU_ERR_NOT_FOUND;
         }
         printf("(schema) %s\n\n", pbuf[0] ? pbuf : "hula-program.schema.json");
@@ -2621,13 +2635,13 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         size_t tl = 0, vl = 0;
         hu_error_t er = hula_read_file(alloc, argv[3], &tmpl, &tl);
         if (er != HU_OK) {
-            fprintf(stderr, "hula: cannot read template: %s\n", hu_error_string(er));
+            hu_log_error("hula", NULL, "cannot read template: %s", hu_error_string(er));
             return er;
         }
         er = hula_read_file(alloc, argv[4], &vars, &vl);
         if (er != HU_OK) {
             hu_str_free(alloc, tmpl);
-            fprintf(stderr, "hula: cannot read vars: %s\n", hu_error_string(er));
+            hu_log_error("hula", NULL, "cannot read vars: %s", hu_error_string(er));
             return er;
         }
         char *out = NULL;
@@ -2636,7 +2650,7 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         hu_str_free(alloc, tmpl);
         hu_str_free(alloc, vars);
         if (er != HU_OK) {
-            fprintf(stderr, "hula: expand failed: %s\n", hu_error_string(er));
+            hu_log_error("hula", NULL, "expand failed: %s", hu_error_string(er));
             return er;
         }
         fwrite(out, 1, ol, stdout);
@@ -2660,7 +2674,7 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         size_t rl = 0;
         hu_error_t err = hula_read_file(alloc, argv[i], &raw, &rl);
         if (err != HU_OK) {
-            fprintf(stderr, "hula: cannot read %s: %s\n", argv[i], hu_error_string(err));
+            hu_log_error("hula", NULL, "cannot read %s: %s", argv[i], hu_error_string(err));
             return err;
         }
         char *json = raw;
@@ -2671,7 +2685,7 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
             err = hu_hula_lite_to_json(alloc, raw, rl, &lite_out, &lite_len);
             hu_str_free(alloc, raw);
             if (err != HU_OK) {
-                fprintf(stderr, "hula: lite parse failed: %s\n", hu_error_string(err));
+                hu_log_error("hula", NULL, "lite parse failed: %s", hu_error_string(err));
                 return err;
             }
             json = lite_out;
@@ -2697,7 +2711,7 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
                 rj += 2;
                 continue;
             }
-            fprintf(stderr, "hula: replay: unknown option: %s\n", argv[rj]);
+            hu_log_error("hula", NULL, "replay: unknown option: %s", argv[rj]);
             return HU_ERR_INVALID_ARGUMENT;
         }
         if (rj >= argc) {
@@ -2708,25 +2722,25 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         size_t rl = 0;
         hu_error_t err = hula_read_file(alloc, argv[rj], &raw, &rl);
         if (err != HU_OK) {
-            fprintf(stderr, "hula: cannot read %s: %s\n", argv[rj], hu_error_string(err));
+            hu_log_error("hula", NULL, "cannot read %s: %s", argv[rj], hu_error_string(err));
             return err;
         }
         hu_json_value_t *wrap = NULL;
         err = hu_json_parse(alloc, raw, rl, &wrap);
         hu_str_free(alloc, raw);
         if (err != HU_OK || !wrap) {
-            fprintf(stderr, "hula: replay: invalid JSON (%s)\n",
-                    err != HU_OK ? hu_error_string(err) : "parse");
+            hu_log_error("hula", NULL, "replay: invalid JSON (%s)",
+                         err != HU_OK ? hu_error_string(err) : "parse");
             if (wrap)
                 hu_json_free(alloc, wrap);
             return err != HU_OK ? err : HU_ERR_PARSE;
         }
         hu_json_value_t *prog_obj = hu_json_object_get(wrap, "program");
         if (!prog_obj || prog_obj->type != HU_JSON_OBJECT) {
-            fprintf(
-                stderr,
-                "hula: replay: missing \"program\" object (only traces written after this change "
-                "embed it; use hula run on your source JSON).\n");
+            hu_log_error(
+                "hula", NULL,
+                "replay: missing \"program\" object (only traces written after this change "
+                "embed it; use hula run on your source JSON).");
             hu_json_free(alloc, wrap);
             return HU_ERR_INVALID_ARGUMENT;
         }
@@ -2735,7 +2749,8 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         err = hu_json_stringify(alloc, prog_obj, &pj, &pjl);
         hu_json_free(alloc, wrap);
         if (err != HU_OK || !pj) {
-            fprintf(stderr, "hula: replay: program serialize failed: %s\n", hu_error_string(err));
+            hu_log_error("hula", NULL, "replay: program serialize failed: %s",
+                         hu_error_string(err));
             if (pj)
                 hu_str_free(alloc, pj);
             return err != HU_OK ? err : HU_ERR_OUT_OF_MEMORY;
@@ -2763,7 +2778,7 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         }
         if (strcmp(argv[argi], "--config") == 0) {
             if (argi + 1 >= argc) {
-                fprintf(stderr, "hula: %s: --config requires a path\n", sub);
+                hu_log_error("hula", NULL, "%s: --config requires a path", sub);
                 return HU_ERR_INVALID_ARGUMENT;
             }
             run_cfg = argv[argi + 1];
@@ -2773,7 +2788,8 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
         break;
     }
     if (argc <= argi) {
-        fprintf(stderr, "Usage: human hula %s [--lite] [--config path] <file.json | '{...}'>\n", sub);
+        fprintf(stderr, "Usage: human hula %s [--lite] [--config path] <file.json | '{...}'>\n",
+                sub);
         return HU_ERR_INVALID_ARGUMENT;
     }
 
@@ -2788,7 +2804,7 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
     } else {
         hu_error_t err = hula_read_file(alloc, input, &json, &json_len);
         if (err != HU_OK) {
-            fprintf(stderr, "hula: cannot read %s: %s\n", input, hu_error_string(err));
+            hu_log_error("hula", NULL, "cannot read %s: %s", input, hu_error_string(err));
             return err;
         }
         json_owned = true;
@@ -2802,7 +2818,7 @@ hu_error_t cmd_hula(hu_allocator_t *alloc, int argc, char **argv) {
             json_len = ll;
             json_owned = true;
             if (err != HU_OK) {
-                fprintf(stderr, "hula: lite parse failed: %s\n", hu_error_string(err));
+                hu_log_error("hula", NULL, "lite parse failed: %s", hu_error_string(err));
                 return err;
             }
         }

@@ -1,14 +1,15 @@
 /* Training loop — forward, loss gradient, backward, optimizer step, evaluation. */
 
+#include "human/ml/train.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include "human/ml/checkpoint.h"
 #include "human/ml/dataloader.h"
 #include "human/ml/evaluator.h"
 #include "human/ml/ml.h"
 #include "human/ml/model.h"
 #include "human/ml/optimizer.h"
-#include "human/ml/train.h"
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -21,8 +22,7 @@
 
 #define LN2 0.69314718055994530942
 
-static double wall_seconds(void)
-{
+static double wall_seconds(void) {
 #if defined(__APPLE__) || (defined(__linux__) && defined(CLOCK_MONOTONIC))
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
@@ -31,14 +31,10 @@ static double wall_seconds(void)
     return 0.0;
 }
 
-hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
-                       hu_ml_optimizer_t *optimizer,
-                       hu_ml_dataloader_t *train_loader,
-                       hu_ml_dataloader_t *val_loader,
-                       const hu_training_config_t *config,
-                       const int32_t *token_bytes, size_t vocab_size,
-                       hu_ml_train_result_t *result)
-{
+hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model, hu_ml_optimizer_t *optimizer,
+                       hu_ml_dataloader_t *train_loader, hu_ml_dataloader_t *val_loader,
+                       const hu_training_config_t *config, const int32_t *token_bytes,
+                       size_t vocab_size, hu_ml_train_result_t *result) {
     if (!alloc || !model || !optimizer || !train_loader || !config || !result)
         return HU_ERR_INVALID_ARGUMENT;
     if (!model->vtable || !model->vtable->forward || !model->vtable->backward)
@@ -68,8 +64,8 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
     for (;;) {
         hu_ml_batch_t batch = {0};
         hu_error_t err = hu_ml_dataloader_next(train_loader, &batch);
-        if (err != HU_OK || !batch.input_ids || !batch.target_ids ||
-            batch.batch_size == 0 || batch.seq_len == 0)
+        if (err != HU_OK || !batch.input_ids || !batch.target_ids || batch.batch_size == 0 ||
+            batch.seq_len == 0)
             break;
 
         size_t batch_tokens = batch.batch_size * batch.seq_len;
@@ -78,16 +74,23 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
         hu_ml_tensor_t input = {
             .data = batch.input_ids,
             .shape = {batch.batch_size, batch.seq_len, 0, 0},
-            .ndim = 2, .dtype = HU_ML_DTYPE_I32,
+            .ndim = 2,
+            .dtype = HU_ML_DTYPE_I32,
             .size_bytes = batch_tokens * sizeof(int32_t),
         };
         hu_ml_tensor_t output = {0};
 
         err = model->vtable->forward(model->ctx, &input, &output);
-        if (err != HU_OK) { hu_ml_batch_free(alloc, &batch); return err; }
+        if (err != HU_OK) {
+            hu_ml_batch_free(alloc, &batch);
+            return err;
+        }
 
         float *logits = (float *)output.data;
-        if (!logits) { hu_ml_batch_free(alloc, &batch); return HU_ERR_INVALID_ARGUMENT; }
+        if (!logits) {
+            hu_ml_batch_free(alloc, &batch);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
 
         /* Compute cross-entropy loss and d_logits (softmax - onehot) */
         float *d_logits = (float *)alloc->alloc(alloc->ctx, logits_size);
@@ -102,18 +105,26 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
         size_t n_valid = 0;
         for (size_t i = 0; i < batch_tokens; i++) {
             int32_t target = batch.target_ids[i];
-            if (target < 0 || (size_t)target >= vocab_size) continue;
-            if (token_bytes && token_bytes[target] == 0) continue;
+            if (target < 0 || (size_t)target >= vocab_size)
+                continue;
+            if (token_bytes && token_bytes[target] == 0)
+                continue;
 
             float *li = logits + i * vocab_size;
             float *di = d_logits + i * vocab_size;
 
             /* Softmax + cross-entropy in one pass */
             float mx = li[0];
-            for (size_t k = 1; k < vocab_size; k++) if (li[k] > mx) mx = li[k];
+            for (size_t k = 1; k < vocab_size; k++)
+                if (li[k] > mx)
+                    mx = li[k];
             double sum = 0.0;
-            for (size_t k = 0; k < vocab_size; k++) { di[k] = expf(li[k] - mx); sum += di[k]; }
-            for (size_t k = 0; k < vocab_size; k++) di[k] /= (float)sum;
+            for (size_t k = 0; k < vocab_size; k++) {
+                di[k] = expf(li[k] - mx);
+                sum += di[k];
+            }
+            for (size_t k = 0; k < vocab_size; k++)
+                di[k] /= (float)sum;
 
             batch_nats += -log((double)di[target]);
             di[target] -= 1.0f;
@@ -138,21 +149,25 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
                 d_logits[i] *= grad_scale;
         }
 
-        if (num_steps == 0) smoothed_loss = batch_loss;
-        else smoothed_loss = 0.99 * smoothed_loss + 0.01 * batch_loss;
+        if (num_steps == 0)
+            smoothed_loss = batch_loss;
+        else
+            smoothed_loss = 0.99 * smoothed_loss + 0.01 * batch_loss;
 
         /* Backward pass — fills gradient buffers */
         hu_ml_tensor_t grad_tensor = {
             .data = d_logits,
             .shape = {batch.batch_size, batch.seq_len, vocab_size, 0},
-            .ndim = 3, .dtype = HU_ML_DTYPE_F32,
+            .ndim = 3,
+            .dtype = HU_ML_DTYPE_F32,
             .size_bytes = logits_size,
         };
         err = model->vtable->backward(model->ctx, &grad_tensor);
         alloc->free(alloc->ctx, d_logits, logits_size);
         alloc->free(alloc->ctx, logits, logits_size);
         hu_ml_batch_free(alloc, &batch);
-        if (err != HU_OK) return err;
+        if (err != HU_OK)
+            return err;
 
         total_tokens += batch_tokens;
         micro_step++;
@@ -167,27 +182,30 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
             } else if (config->max_steps > 0) {
                 progress = (float)(num_steps + 1) / (float)config->max_steps;
             }
-            if (progress > 1.0f) progress = 1.0f;
+            if (progress > 1.0f)
+                progress = 1.0f;
 
             if (optimizer->vtable->set_lr_multiplier && progress > 0.0f) {
-                float mult = hu_ml_lr_schedule(progress,
-                    config->warmup_ratio, config->warmdown_ratio,
-                    config->final_lr_frac);
+                float mult = hu_ml_lr_schedule(progress, config->warmup_ratio,
+                                               config->warmdown_ratio, config->final_lr_frac);
                 optimizer->vtable->set_lr_multiplier(optimizer->ctx, mult);
             }
             if (optimizer->vtable->set_training_progress)
                 optimizer->vtable->set_training_progress(optimizer->ctx, progress);
 
             err = optimizer->vtable->step(optimizer->ctx, NULL, NULL, 0);
-            if (err != HU_OK) return err;
+            if (err != HU_OK)
+                return err;
             optimizer->vtable->zero_grad(optimizer->ctx);
             micro_step = 0;
             num_steps++;
         }
 
         double elapsed = wall_seconds() - t_start;
-        if (t_budget > 0.0 && elapsed >= t_budget) break;
-        if (config->max_steps > 0 && num_steps >= config->max_steps) break;
+        if (t_budget > 0.0 && elapsed >= t_budget)
+            break;
+        if (config->max_steps > 0 && num_steps >= config->max_steps)
+            break;
     }
 
     /* Flush remaining micro-steps */
@@ -201,7 +219,7 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
     if (config->checkpoint_path && config->checkpoint_path[0]) {
         hu_error_t ck_err = hu_ml_checkpoint_save(alloc, config->checkpoint_path, model, optimizer);
         if (ck_err != HU_OK)
-            fprintf(stderr, "[train] checkpoint save failed: %s\n", hu_error_string(ck_err));
+            hu_log_error("train", NULL, "checkpoint save failed: %s", hu_error_string(ck_err));
     }
 
     result->training_seconds = wall_seconds() - t_start;
@@ -212,8 +230,9 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model,
     if (val_loader && token_bytes && config->eval_tokens > 0) {
         hu_ml_eval_result_t eval_result = {0};
         hu_error_t err = hu_ml_evaluate_bpb(alloc, model, val_loader, token_bytes, vocab_size,
-                                             config->eval_tokens, &eval_result);
-        if (err == HU_OK) result->val_bpb = eval_result.val_bpb;
+                                            config->eval_tokens, &eval_result);
+        if (err == HU_OK)
+            result->val_bpb = eval_result.val_bpb;
     }
 
     result->total_seconds = wall_seconds() - t_start;

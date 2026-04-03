@@ -30,4 +30,16 @@ hu_error_t hu_circadian_build_prompt_with_routine(hu_allocator_t *alloc, uint8_t
                                                   const struct hu_daily_routine *routine,
                                                   char **out, size_t *out_len);
 
+/* Build circadian prompt with full persona awareness.
+ * Blends phase guidance + persona time overlays + daily routine mood_modifier.
+ * Falls back through: persona overlay → routine mood_modifier → default guidance. */
+struct hu_persona;
+hu_error_t hu_circadian_build_persona_prompt(hu_allocator_t *alloc, uint8_t hour,
+                                             const struct hu_persona *persona, char **out,
+                                             size_t *out_len);
+
+/* Get persona-specific energy guidance for a given phase.
+ * Returns the persona's time overlay string for the phase, or NULL if none set. */
+const char *hu_circadian_persona_overlay(const struct hu_persona *persona, hu_time_phase_t phase);
+
 #endif

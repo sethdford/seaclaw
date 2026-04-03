@@ -324,3 +324,35 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
 
     return HU_OK;
 }
+
+/* ── Topic-switch consolidation debounce ──────────────────────────────── */
+
+void hu_consolidation_debounce_init(hu_consolidation_debounce_t *d) {
+    if (!d)
+        return;
+    d->last_consolidation_secs = 0;
+    d->entries_since_last = 0;
+}
+
+void hu_consolidation_debounce_tick(hu_consolidation_debounce_t *d) {
+    if (d)
+        d->entries_since_last++;
+}
+
+bool hu_consolidation_should_run(const hu_consolidation_debounce_t *d, int64_t now_secs) {
+    if (!d)
+        return false;
+    if (d->entries_since_last < HU_CONSOLIDATION_MIN_ENTRIES)
+        return false;
+    if (d->last_consolidation_secs > 0 &&
+        (now_secs - d->last_consolidation_secs) < HU_CONSOLIDATION_MIN_INTERVAL_SECS)
+        return false;
+    return true;
+}
+
+void hu_consolidation_debounce_reset(hu_consolidation_debounce_t *d, int64_t now_secs) {
+    if (!d)
+        return;
+    d->last_consolidation_secs = now_secs;
+    d->entries_since_last = 0;
+}

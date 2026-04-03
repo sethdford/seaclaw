@@ -701,10 +701,15 @@ void hu_daemon_trust_reset(void) {
 
 #if defined(HU_HAS_PERSONA) && !defined(HU_IS_TEST)
 
+/* Proactive context — shared LRU cache for contact activity tracking. */
+static hu_proactive_context_t g_proactive_ctx;
+
 /* Compatibility aliases — old static names → public API in daemon_proactive.c */
-#define daemon_contact_activity_record      hu_daemon_contact_activity_record
-#define daemon_proactive_parse_route        hu_daemon_proactive_parse_route
-#define daemon_contact_activity_apply_route hu_daemon_proactive_apply_route
+#define daemon_contact_activity_record(cid, ch, sk) \
+    hu_daemon_contact_activity_record(&g_proactive_ctx, (cid), (ch), (sk))
+#define daemon_proactive_parse_route hu_daemon_proactive_parse_route
+#define daemon_contact_activity_apply_route(cid, now, chs, cnt, cb, tb, tl) \
+    hu_daemon_proactive_apply_route(&g_proactive_ctx, (cid), (now), (chs), (cnt), (cb), (tb), (tl))
 
 /* proactive_prompt_for_contact — now in daemon_proactive.c */
 #define proactive_prompt_for_contact hu_daemon_proactive_prompt_for_contact
@@ -5340,6 +5345,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                     /* F21: Avoidance pattern detection — topic change within same session */
+                    static hu_consolidation_debounce_t topic_consolidation_debounce;
+                    static bool topic_debounce_initialized = false;
+                    if (!topic_debounce_initialized) {
+                        hu_consolidation_debounce_init(&topic_consolidation_debounce);
+                        topic_debounce_initialized = true;
+                    }
+                    hu_consolidation_debounce_tick(&topic_consolidation_debounce);
                     if (agent->memory && ctx_count >= 2) {
                         char topic_before[64], topic_after[64];
                         if (hu_conversation_detect_topic_change(ctx_entries, ctx_count,
@@ -5349,6 +5361,29 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (tb_len > 0)
                                 (void)hu_superhuman_avoidance_record(
                                     agent->memory, batch_key, key_len, topic_before, tb_len, true);
+
+                            /* Topic-switch consolidation (EdgeClaw-inspired):
+                             * trigger memory consolidation on topic change
+                             * with debounce to avoid excessive consolidation. */
+                            if (hu_consolidation_should_run(&topic_consolidation_debounce,
+                                                            (int64_t)(now_ms / 1000))) {
+                                hu_consolidation_config_t tc_cfg = {
+                                    .decay_days = config ? config->behavior.decay_days : 30,
+                                    .decay_factor = 0.5,
+                                    .dedup_threshold = config ? config->behavior.dedup_threshold : 0,
+                                    .max_entries = 5000,
+                                    .provider = &agent->provider,
+                                    .model = agent->model_name,
+                                    .model_len = agent->model_name_len,
+                                };
+                                if (hu_memory_consolidate(alloc, agent->memory, &tc_cfg) == HU_OK) {
+                                    hu_consolidation_debounce_reset(&topic_consolidation_debounce,
+                                                                    (int64_t)(now_ms / 1000));
+                                    hu_log_info("human", agent ? agent->observer : NULL,
+                                                "topic-switch consolidation: '%s' -> '%s'",
+                                                topic_before, topic_after);
+                                }
+                            }
                         }
                     }
                 }

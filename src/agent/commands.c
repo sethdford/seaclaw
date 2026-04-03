@@ -7,6 +7,7 @@
 #include "human/agent/spawn.h"
 #include "human/agent/task_list.h"
 #include "human/agent/undo.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include <ctype.h>
 #include <stdio.h>
@@ -310,14 +311,15 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
                 .custom_instructions = agent->custom_instructions,
                 .custom_instructions_len = agent->custom_instructions_len,
             };
-            hu_error_t prompt_err = hu_prompt_build_static(agent->alloc, &pcfg,
-                &agent->cached_static_prompt, &agent->cached_static_prompt_len);
+            hu_error_t prompt_err =
+                hu_prompt_build_static(agent->alloc, &pcfg, &agent->cached_static_prompt,
+                                       &agent->cached_static_prompt_len);
             if (prompt_err != HU_OK) {
                 agent->cached_static_prompt = NULL;
                 agent->cached_static_prompt_len = 0;
                 agent->cached_static_prompt_cap = 0;
-                fprintf(stderr, "[agent] prompt rebuild after model switch failed: %s\n",
-                        hu_error_string(prompt_err));
+                hu_log_error("agent", NULL, "prompt rebuild after model switch failed: %s",
+                             hu_error_string(prompt_err));
             } else {
                 agent->cached_static_prompt_cap = agent->cached_static_prompt_len;
             }
@@ -489,8 +491,8 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
                                   "  max spawn depth: %u\n"
                                   "  max lifetime spawns: %llu\n"
                                   "  budget cap USD: %.4f (session spend: %.4f)\n",
-                                  st.running, st.slots_used,
-                                  (unsigned long long)st.spawns_started, st.limits.max_spawn_depth,
+                                  st.running, st.slots_used, (unsigned long long)st.spawns_started,
+                                  st.limits.max_spawn_depth,
                                   (unsigned long long)st.limits.max_total_spawns,
                                   st.limits.budget_limit_usd, st.session_spend_usd);
             }
@@ -669,8 +671,8 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             return hu_sprintf(agent->alloc, "Session not found: %.*s", (int)arg_len, arg_buf);
         if (err != HU_OK)
             return hu_sprintf(agent->alloc, "Resume failed: %s", hu_error_string(err));
-        return hu_sprintf(agent->alloc, "Resumed session %.*s (%zu messages)",
-                          (int)arg_len, arg_buf, agent->history_count);
+        return hu_sprintf(agent->alloc, "Resumed session %.*s (%zu messages)", (int)arg_len,
+                          arg_buf, agent->history_count);
     }
 
     if (hu_strncasecmp(cmd_buf, "list-sessions", 13) == 0) {

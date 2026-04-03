@@ -10,8 +10,8 @@
 #define LCG_MUL 1103515245u
 #define LCG_ADD 12345u
 
-static const void *hu_memmem(const void *haystack, size_t haystacklen,
-                             const void *needle, size_t needlelen) {
+static const void *hu_memmem(const void *haystack, size_t haystacklen, const void *needle,
+                             size_t needlelen) {
     if (needlelen == 0)
         return haystack;
     if (needlelen > haystacklen)
@@ -445,6 +445,96 @@ hu_error_t hu_mirror_check_identity_bounds(hu_allocator_t *alloc, const char *di
     *out = dup;
     *out_len = pos;
     return HU_OK;
+}
+
+/* --- F28c: Identity conflict check (boolean) --- */
+
+bool hu_mirror_conflicts_with_identity(const hu_mirror_analysis_t *analysis,
+                                       const struct hu_persona *persona) {
+    if (!analysis || !persona)
+        return false;
+
+    const hu_persona_t *p = (const hu_persona_t *)persona;
+
+    /* Check abbreviations against avoided vocab and character invariants */
+    if (analysis->uses_abbreviations) {
+        /* Check avoided vocab for abbreviation-related words */
+        for (size_t i = 0; i < p->avoided_vocab_count; i++) {
+            if (!p->avoided_vocab[i])
+                continue;
+            /* If any avoided word is "u", "ur", "rn", abbreviations conflict */
+            if (strcmp(p->avoided_vocab[i], "u") == 0 || strcmp(p->avoided_vocab[i], "ur") == 0 ||
+                strcmp(p->avoided_vocab[i], "rn") == 0)
+                return true;
+        }
+        /* Check character invariants for "never...abbreviation" patterns */
+        for (size_t i = 0; i < p->character_invariants_count; i++) {
+            if (!p->character_invariants[i])
+                continue;
+            size_t ilen = strlen(p->character_invariants[i]);
+            bool has_never = (hu_memmem(p->character_invariants[i], ilen, "never", 5) != NULL ||
+                              hu_memmem(p->character_invariants[i], ilen, "Never", 5) != NULL);
+            bool has_no = (hu_memmem(p->character_invariants[i], ilen, "no ", 3) != NULL ||
+                           hu_memmem(p->character_invariants[i], ilen, "No ", 3) != NULL);
+            if ((has_never || has_no) &&
+                hu_memmem(p->character_invariants[i], ilen, "abbrev", 6) != NULL)
+                return true;
+        }
+    }
+
+    /* Check lowercase against character invariants */
+    if (analysis->uses_lowercase) {
+        for (size_t i = 0; i < p->character_invariants_count; i++) {
+            if (!p->character_invariants[i])
+                continue;
+            size_t ilen = strlen(p->character_invariants[i]);
+            bool has_never = (hu_memmem(p->character_invariants[i], ilen, "never", 5) != NULL ||
+                              hu_memmem(p->character_invariants[i], ilen, "Never", 5) != NULL);
+            bool has_no = (hu_memmem(p->character_invariants[i], ilen, "no ", 3) != NULL ||
+                           hu_memmem(p->character_invariants[i], ilen, "No ", 3) != NULL);
+            if ((has_never || has_no) &&
+                hu_memmem(p->character_invariants[i], ilen, "lowercase", 9) != NULL)
+                return true;
+        }
+    }
+
+    return false;
+}
+
+/* --- F28d: Combined build+filter --- */
+
+hu_error_t hu_mirror_build_directive_persona(hu_allocator_t *alloc,
+                                             const hu_mirror_analysis_t *analysis,
+                                             const struct hu_persona *persona, char **out,
+                                             size_t *out_len) {
+    if (!alloc || !analysis || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *out = NULL;
+    *out_len = 0;
+
+    /* Build the raw directive */
+    char *raw = NULL;
+    size_t raw_len = 0;
+    hu_error_t err = hu_mirror_build_directive(alloc, analysis, &raw, &raw_len);
+    if (err != HU_OK)
+        return err;
+
+    /* No directive generated — nothing to filter */
+    if (!raw || raw_len == 0)
+        return HU_OK;
+
+    /* No persona — return raw */
+    if (!persona) {
+        *out = raw;
+        *out_len = raw_len;
+        return HU_OK;
+    }
+
+    /* Filter through identity bounds */
+    err = hu_mirror_check_identity_bounds(alloc, raw, raw_len, persona, out, out_len);
+    alloc->free(alloc->ctx, raw, raw_len + 1);
+    return err;
 }
 
 /* --- F54: Timezone --- */

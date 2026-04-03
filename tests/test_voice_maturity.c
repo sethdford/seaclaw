@@ -242,6 +242,118 @@ static void voice_build_guidance_intimate_returns_ok(void) {
     alloc.free(alloc.ctx, out, out_len + 1);
 }
 
+/* ── Vulnerability tracking tests ─────────────────────────────────── */
+
+static void voice_vulnerability_from_content_null_returns_zero(void) {
+    HU_ASSERT_FLOAT_EQ(hu_voice_vulnerability_from_content(NULL, 0), 0.0f, 0.01f);
+    HU_ASSERT_FLOAT_EQ(hu_voice_vulnerability_from_content("", 0), 0.0f, 0.01f);
+}
+
+static void voice_vulnerability_from_content_neutral_low(void) {
+    const char *msg = "hey what time is the meeting tomorrow?";
+    float score = hu_voice_vulnerability_from_content(msg, strlen(msg));
+    HU_ASSERT_FLOAT_EQ(score, 0.0f, 0.01f);
+}
+
+static void voice_vulnerability_from_content_emotional_scores(void) {
+    const char *msg = "i feel so overwhelmed, i'm scared and struggling";
+    float score = hu_voice_vulnerability_from_content(msg, strlen(msg));
+    HU_ASSERT_TRUE(score >= 0.3f);
+}
+
+static void voice_vulnerability_from_content_multiple_markers(void) {
+    const char *msg = "i feel vulnerable, i trust you, i'm grateful, opened up about my secret";
+    float score = hu_voice_vulnerability_from_content(msg, strlen(msg));
+    HU_ASSERT_TRUE(score >= 0.5f);
+}
+
+static void voice_vulnerability_from_content_caps_at_one(void) {
+    const char *msg = "i feel scared, i'm worried, i'm sad, i'm lonely, i'm hurt, "
+                      "i miss you, i love you, i'm grateful, vulnerable, trust you, "
+                      "opened up, never told anyone, struggling, going through hard time";
+    float score = hu_voice_vulnerability_from_content(msg, strlen(msg));
+    HU_ASSERT_TRUE(score <= 1.0f);
+}
+
+static void voice_profile_update_increases_vulnerability(void) {
+    hu_voice_profile_t profile;
+    hu_voice_profile_init(&profile);
+    HU_ASSERT_FLOAT_EQ(profile.vulnerability_level, 0.0f, 0.01f);
+
+    /* Emotional exchange should increase vulnerability */
+    hu_voice_profile_update(&profile, true, false, false);
+    HU_ASSERT_TRUE(profile.vulnerability_level > 0.0f);
+    HU_ASSERT_FLOAT_EQ(profile.vulnerability_level, 0.05f, 0.01f);
+
+    /* Multiple emotional exchanges accumulate */
+    hu_voice_profile_update(&profile, true, false, false);
+    HU_ASSERT_FLOAT_EQ(profile.vulnerability_level, 0.10f, 0.01f);
+}
+
+static void voice_profile_update_no_emotion_no_vulnerability_change(void) {
+    hu_voice_profile_t profile;
+    hu_voice_profile_init(&profile);
+
+    hu_voice_profile_update(&profile, false, true, true);
+    HU_ASSERT_FLOAT_EQ(profile.vulnerability_level, 0.0f, 0.01f);
+}
+
+static void voice_vulnerability_caps_at_one(void) {
+    hu_voice_profile_t profile;
+    hu_voice_profile_init(&profile);
+    profile.vulnerability_level = 0.98f;
+
+    hu_voice_profile_update(&profile, true, false, false);
+    HU_ASSERT_TRUE(profile.vulnerability_level <= 1.0f);
+}
+
+static void voice_vulnerability_decay_reduces(void) {
+    hu_voice_profile_t profile;
+    hu_voice_profile_init(&profile);
+    profile.vulnerability_level = 0.5f;
+
+    hu_voice_vulnerability_decay(&profile, 2.0f);
+    HU_ASSERT_FLOAT_EQ(profile.vulnerability_level, 0.3f, 0.01f);
+}
+
+static void voice_vulnerability_decay_floors_at_zero(void) {
+    hu_voice_profile_t profile;
+    hu_voice_profile_init(&profile);
+    profile.vulnerability_level = 0.1f;
+
+    hu_voice_vulnerability_decay(&profile, 10.0f);
+    HU_ASSERT_FLOAT_EQ(profile.vulnerability_level, 0.0f, 0.01f);
+}
+
+static void voice_vulnerability_decay_null_safe(void) {
+    hu_voice_vulnerability_decay(NULL, 1.0f);
+}
+
+static void voice_vulnerability_decay_zero_hours_no_change(void) {
+    hu_voice_profile_t profile;
+    hu_voice_profile_init(&profile);
+    profile.vulnerability_level = 0.5f;
+
+    hu_voice_vulnerability_decay(&profile, 0.0f);
+    HU_ASSERT_FLOAT_EQ(profile.vulnerability_level, 0.5f, 0.01f);
+}
+
+static void voice_build_guidance_includes_vulnerability(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_voice_profile_t profile;
+    hu_voice_profile_init(&profile);
+    profile.vulnerability_level = 0.5f;
+    char *out = NULL;
+    size_t out_len = 0;
+
+    hu_error_t err = hu_voice_build_guidance(&profile, &alloc, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_NOT_NULL(strstr(out, "vulnerability: 50%"));
+
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
 void run_voice_maturity_tests(void) {
     HU_TEST_SUITE("VoiceMaturity");
 
@@ -266,10 +378,27 @@ void run_voice_maturity_tests(void) {
     HU_RUN_TEST(voice_build_guidance_warm_returns_ok);
     HU_RUN_TEST(voice_build_guidance_candid_returns_ok);
     HU_RUN_TEST(voice_build_guidance_intimate_returns_ok);
+
+    HU_TEST_SUITE("VoiceVulnerability");
+    HU_RUN_TEST(voice_vulnerability_from_content_null_returns_zero);
+    HU_RUN_TEST(voice_vulnerability_from_content_neutral_low);
+    HU_RUN_TEST(voice_vulnerability_from_content_emotional_scores);
+    HU_RUN_TEST(voice_vulnerability_from_content_multiple_markers);
+    HU_RUN_TEST(voice_vulnerability_from_content_caps_at_one);
+    HU_RUN_TEST(voice_profile_update_increases_vulnerability);
+    HU_RUN_TEST(voice_profile_update_no_emotion_no_vulnerability_change);
+    HU_RUN_TEST(voice_vulnerability_caps_at_one);
+    HU_RUN_TEST(voice_vulnerability_decay_reduces);
+    HU_RUN_TEST(voice_vulnerability_decay_floors_at_zero);
+    HU_RUN_TEST(voice_vulnerability_decay_null_safe);
+    HU_RUN_TEST(voice_vulnerability_decay_zero_hours_no_change);
+    HU_RUN_TEST(voice_build_guidance_includes_vulnerability);
 }
 
 #else
 
-void run_voice_maturity_tests(void) { (void)0; }
+void run_voice_maturity_tests(void) {
+    (void)0;
+}
 
 #endif /* HU_ENABLE_PERSONA */

@@ -1,4 +1,5 @@
 #include "human/pwa/cdp.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -16,8 +17,8 @@ hu_error_t hu_cdp_connect(hu_allocator_t *alloc, const char *host, uint16_t port
     out->next_id = 1;
 
     char url[256];
-    int n = snprintf(url, sizeof(url), "ws://%s:%u/devtools/page/mock",
-                     host ? host : "localhost", port);
+    int n = snprintf(url, sizeof(url), "ws://%s:%u/devtools/page/mock", host ? host : "localhost",
+                     port);
     if (n > 0)
         out->ws_url = hu_strndup(alloc, url, (size_t)n);
     out->ws_url_len = out->ws_url ? (size_t)n : 0;
@@ -93,8 +94,8 @@ hu_error_t hu_cdp_get_title(hu_cdp_session_t *session, char **out, size_t *out_l
 }
 
 hu_error_t hu_cdp_query_elements(hu_cdp_session_t *session, const char *selector,
-                                 size_t selector_len, hu_cdp_element_t *out,
-                                 size_t max_out, size_t *out_count) {
+                                 size_t selector_len, hu_cdp_element_t *out, size_t max_out,
+                                 size_t *out_count) {
     if (!session || !session->connected || !out || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
     (void)selector;
@@ -131,8 +132,8 @@ hu_error_t hu_cdp_connect(hu_allocator_t *alloc, const char *host, uint16_t port
     out->next_id = 1;
 
     char url[256];
-    int n = snprintf(url, sizeof(url), "http://%s:%u/json/version",
-                     host ? host : "localhost", port);
+    int n =
+        snprintf(url, sizeof(url), "http://%s:%u/json/version", host ? host : "localhost", port);
     if (n <= 0)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -167,9 +168,8 @@ hu_error_t hu_cdp_connect(hu_allocator_t *alloc, const char *host, uint16_t port
     return out->connected ? HU_OK : HU_ERR_NOT_FOUND;
 }
 
-static hu_error_t cdp_send_and_recv(hu_cdp_session_t *s, const char *method,
-                                     const char *params, char **result_out,
-                                     size_t *result_len_out) {
+static hu_error_t cdp_send_and_recv(hu_cdp_session_t *s, const char *method, const char *params,
+                                    char **result_out, size_t *result_len_out) {
     if (!s || !s->connected || !s->ws)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -177,7 +177,8 @@ static hu_error_t cdp_send_and_recv(hu_cdp_session_t *s, const char *method,
     char msg[4096];
     int n;
     if (params && params[0])
-        n = snprintf(msg, sizeof(msg), "{\"id\":%d,\"method\":\"%s\",\"params\":%s}", id, method, params);
+        n = snprintf(msg, sizeof(msg), "{\"id\":%d,\"method\":\"%s\",\"params\":%s}", id, method,
+                     params);
     else
         n = snprintf(msg, sizeof(msg), "{\"id\":%d,\"method\":\"%s\"}", id, method);
     if (n <= 0 || (size_t)n >= sizeof(msg))
@@ -201,7 +202,8 @@ static hu_error_t cdp_send_and_recv(hu_cdp_session_t *s, const char *method,
         if (strstr(data, id_pattern)) {
             if (result_out) {
                 *result_out = data;
-                if (result_len_out) *result_len_out = data_len;
+                if (result_len_out)
+                    *result_len_out = data_len;
             } else {
                 s->alloc->free(s->alloc->ctx, data, data_len + 1);
             }
@@ -251,12 +253,13 @@ hu_error_t hu_cdp_navigate(hu_cdp_session_t *s, const char *url, size_t url_len)
     if (!s || !s->connected || !url)
         return HU_ERR_INVALID_ARGUMENT;
     char params[2048];
-    snprintf(params, sizeof(params), "{\"url\":\"%.*s\"}", (int)(url_len < 1900 ? url_len : 1900), url);
+    snprintf(params, sizeof(params), "{\"url\":\"%.*s\"}", (int)(url_len < 1900 ? url_len : 1900),
+             url);
     return cdp_send_and_recv(s, "Page.navigate", params, NULL, NULL);
 }
 
-hu_error_t hu_cdp_evaluate(hu_cdp_session_t *s, const char *expression, size_t expr_len,
-                           char **out, size_t *out_len) {
+hu_error_t hu_cdp_evaluate(hu_cdp_session_t *s, const char *expression, size_t expr_len, char **out,
+                           size_t *out_len) {
     if (!s || !s->connected || !expression || !out)
         return HU_ERR_INVALID_ARGUMENT;
     char params[4096];
@@ -268,7 +271,8 @@ hu_error_t hu_cdp_evaluate(hu_cdp_session_t *s, const char *expression, size_t e
     if (err != HU_OK)
         return err;
     *out = result;
-    if (out_len) *out_len = result_len;
+    if (out_len)
+        *out_len = result_len;
     return HU_OK;
 }
 
@@ -278,7 +282,8 @@ hu_error_t hu_cdp_screenshot(hu_cdp_session_t *s, hu_cdp_screenshot_t *out) {
     memset(out, 0, sizeof(*out));
     char *result = NULL;
     size_t result_len = 0;
-    hu_error_t err = cdp_send_and_recv(s, "Page.captureScreenshot", "{\"format\":\"png\"}", &result, &result_len);
+    hu_error_t err = cdp_send_and_recv(s, "Page.captureScreenshot", "{\"format\":\"png\"}", &result,
+                                       &result_len);
     if (err != HU_OK)
         return err;
     /* Extract "data" field from JSON response */
@@ -303,12 +308,14 @@ hu_error_t hu_cdp_click(hu_cdp_session_t *s, int x, int y) {
         return HU_ERR_INVALID_ARGUMENT;
     char params[128];
     snprintf(params, sizeof(params),
-             "{\"type\":\"mousePressed\",\"x\":%d,\"y\":%d,\"button\":\"left\",\"clickCount\":1}", x, y);
+             "{\"type\":\"mousePressed\",\"x\":%d,\"y\":%d,\"button\":\"left\",\"clickCount\":1}",
+             x, y);
     hu_error_t err = cdp_send_and_recv(s, "Input.dispatchMouseEvent", params, NULL, NULL);
     if (err != HU_OK)
         return err;
     snprintf(params, sizeof(params),
-             "{\"type\":\"mouseReleased\",\"x\":%d,\"y\":%d,\"button\":\"left\",\"clickCount\":1}", x, y);
+             "{\"type\":\"mouseReleased\",\"x\":%d,\"y\":%d,\"button\":\"left\",\"clickCount\":1}",
+             x, y);
     return cdp_send_and_recv(s, "Input.dispatchMouseEvent", params, NULL, NULL);
 }
 
@@ -317,8 +324,7 @@ hu_error_t hu_cdp_type(hu_cdp_session_t *s, const char *text, size_t text_len) {
         return HU_ERR_INVALID_ARGUMENT;
     for (size_t i = 0; i < text_len; i++) {
         char params[128];
-        snprintf(params, sizeof(params),
-                 "{\"type\":\"keyDown\",\"text\":\"%c\"}", text[i]);
+        snprintf(params, sizeof(params), "{\"type\":\"keyDown\",\"text\":\"%c\"}", text[i]);
         hu_error_t err = cdp_send_and_recv(s, "Input.dispatchKeyEvent", params, NULL, NULL);
         if (err != HU_OK)
             return err;
@@ -334,8 +340,8 @@ hu_error_t hu_cdp_get_title(hu_cdp_session_t *s, char **out, size_t *out_len) {
     char *result = NULL;
     size_t result_len = 0;
     hu_error_t err = cdp_send_and_recv(s, "Runtime.evaluate",
-                                        "{\"expression\":\"document.title\",\"returnByValue\":true}",
-                                        &result, &result_len);
+                                       "{\"expression\":\"document.title\",\"returnByValue\":true}",
+                                       &result, &result_len);
     if (err != HU_OK)
         return err;
     /* Extract value from {"result":{"result":{"value":"..."}}} */
@@ -347,7 +353,8 @@ hu_error_t hu_cdp_get_title(hu_cdp_session_t *s, char **out, size_t *out_len) {
         if (end) {
             size_t vlen = (size_t)(end - found);
             *out = hu_strndup(s->alloc, found, vlen);
-            if (out_len) *out_len = vlen;
+            if (out_len)
+                *out_len = vlen;
         }
     }
     if (result)
@@ -355,9 +362,8 @@ hu_error_t hu_cdp_get_title(hu_cdp_session_t *s, char **out, size_t *out_len) {
     return *out ? HU_OK : HU_ERR_NOT_FOUND;
 }
 
-hu_error_t hu_cdp_query_elements(hu_cdp_session_t *s, const char *selector,
-                                 size_t selector_len, hu_cdp_element_t *out,
-                                 size_t max_out, size_t *out_count) {
+hu_error_t hu_cdp_query_elements(hu_cdp_session_t *s, const char *selector, size_t selector_len,
+                                 hu_cdp_element_t *out, size_t max_out, size_t *out_count) {
     if (!s || !s->connected || !out || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
     *out_count = 0;
@@ -382,14 +388,16 @@ hu_error_t hu_cdp_query_elements(hu_cdp_session_t *s, const char *selector,
     if (result) {
         const char *key = "\"value\":\"[";
         const char *arr = strstr(result, key);
-        if (!arr) arr = strstr(result, "\"value\":\"");
+        if (!arr)
+            arr = strstr(result, "\"value\":\"");
         /* For simplicity, count opening braces as element indicators */
         if (arr) {
             const char *p = arr;
             while (*out_count < max_out && *p) {
                 const char *tag_key = "\"tag\":\"";
                 p = strstr(p, tag_key);
-                if (!p) break;
+                if (!p)
+                    break;
                 p += strlen(tag_key);
                 hu_cdp_element_t *e = &out[*out_count];
                 memset(e, 0, sizeof(*e));
@@ -409,8 +417,9 @@ hu_error_t hu_cdp_query_elements(hu_cdp_session_t *s, const char *selector,
 static void cdp_warn_no_curl_once(void) {
     static bool warned = false;
     if (!warned) {
-        fprintf(stderr, "[human] warning: CDP browser automation requires libcurl "
-                        "(build with HU_ENABLE_CURL=ON)\n");
+        hu_log_error("cdp", NULL,
+                     "warning: CDP browser automation requires libcurl "
+                     "(build with HU_ENABLE_CURL=ON)");
         warned = true;
     }
 }
@@ -458,8 +467,8 @@ hu_error_t hu_cdp_get_title(hu_cdp_session_t *s, char **o, size_t *ol) {
     (void)ol;
     return HU_ERR_NOT_SUPPORTED;
 }
-hu_error_t hu_cdp_query_elements(hu_cdp_session_t *s, const char *sel, size_t sl, hu_cdp_element_t *o,
-                                 size_t m, size_t *c) {
+hu_error_t hu_cdp_query_elements(hu_cdp_session_t *s, const char *sel, size_t sl,
+                                 hu_cdp_element_t *o, size_t m, size_t *c) {
     cdp_warn_no_curl_once();
     (void)s;
     (void)sel;

@@ -3,6 +3,7 @@
 #include "human/core/arena.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include <errno.h>
 #include <stdbool.h>
@@ -329,8 +330,8 @@ static hu_error_t config_load_impl(hu_allocator_t *backing, hu_config_t *out,
         workspace_dir[sizeof(workspace_dir) - 1] = '\0';
     } else {
         char path_buf[HU_MAX_PATH];
-        int n = snprintf(path_buf, sizeof(path_buf), "%s/%s/%s", home, HU_CONFIG_DIR,
-                         HU_CONFIG_FILE);
+        int n =
+            snprintf(path_buf, sizeof(path_buf), "%s/%s/%s", home, HU_CONFIG_DIR, HU_CONFIG_FILE);
         if (n <= 0 || (size_t)n >= sizeof(path_buf)) {
             out->config_path = hu_strdup(&a, "");
             out->workspace_dir = hu_strdup(&a, ".");
@@ -354,7 +355,7 @@ static hu_error_t config_load_impl(hu_allocator_t *backing, hu_config_t *out,
 
     hu_error_t err = load_json_file(out, global_path);
     if (err == HU_ERR_CONFIG_NOT_FOUND) {
-        fprintf(stderr, "[config] No config found at %s, using defaults\n", global_path);
+        hu_log_info("config", NULL, "no config found at %s, using defaults", global_path);
         hu_config_apply_env_overrides(out);
         sync_autonomy_level_from_string(out);
         sync_flat_fields(out);

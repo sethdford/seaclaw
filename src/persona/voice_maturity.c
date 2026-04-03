@@ -29,6 +29,69 @@ hu_voice_stage_t hu_voice_compute_stage(uint32_t interactions, uint32_t emotiona
     return HU_VOICE_FORMAL;
 }
 
+/* ── Vulnerability content scoring ────────────────────────────────── */
+
+static bool ci_contains_vm(const char *text, size_t text_len, const char *needle) {
+    size_t nlen = strlen(needle);
+    if (nlen == 0 || nlen > text_len)
+        return false;
+    for (size_t i = 0; i <= text_len - nlen; i++) {
+        bool match = true;
+        for (size_t j = 0; j < nlen; j++) {
+            char t = text[i + j];
+            char n = needle[j];
+            if (t >= 'A' && t <= 'Z')
+                t += 32;
+            if (n >= 'A' && n <= 'Z')
+                n += 32;
+            if (t != n) {
+                match = false;
+                break;
+            }
+        }
+        if (match)
+            return true;
+    }
+    return false;
+}
+
+float hu_voice_vulnerability_from_content(const char *text, size_t text_len) {
+    if (!text || text_len == 0)
+        return 0.0f;
+
+    static const char *const emotional_markers[] = {
+        "i feel",        "i'm feeling",   "i'm scared",  "i'm afraid", "i'm worried",
+        "i'm sad",       "i'm lonely",    "i'm hurt",    "i miss",     "i love",
+        "i'm grateful",  "thank you for", "means a lot", "opened up",  "vulnerable",
+        "trust you",     "honest with",   "never told",  "secret",     "struggling",
+        "going through", "hard time",     "emotional",   "crying",     "broke down",
+        "overwhelmed",   "anxious",       "depressed",
+    };
+    static const size_t marker_count = sizeof(emotional_markers) / sizeof(emotional_markers[0]);
+
+    size_t hits = 0;
+    for (size_t i = 0; i < marker_count; i++) {
+        if (ci_contains_vm(text, text_len, emotional_markers[i]))
+            hits++;
+    }
+
+    /* Score: 1 hit = 0.15, 2 hits = 0.3, saturates at ~0.8 */
+    float score = (float)hits * 0.15f;
+    if (score > 1.0f)
+        score = 1.0f;
+    return score;
+}
+
+void hu_voice_vulnerability_decay(hu_voice_profile_t *profile, float hours_elapsed) {
+    if (!profile || hours_elapsed <= 0.0f)
+        return;
+    /* Decay rate: lose ~10% per hour of inactivity */
+    float decay = hours_elapsed * 0.1f;
+    profile->vulnerability_level -= decay;
+    if (profile->vulnerability_level < 0.0f)
+        profile->vulnerability_level = 0.0f;
+}
+
 void hu_voice_profile_update(hu_voice_profile_t *profile, bool had_emotional_content,
                              bool had_shared_topic, bool had_humor) {
     if (!profile)
@@ -41,6 +104,11 @@ void hu_voice_profile_update(hu_voice_profile_t *profile, bool had_emotional_con
         profile->warmth_score += 0.02f;
         if (profile->warmth_score > 1.0f)
             profile->warmth_score = 1.0f;
+
+        /* Increase vulnerability based on emotional exchanges */
+        profile->vulnerability_level += 0.05f;
+        if (profile->vulnerability_level > 1.0f)
+            profile->vulnerability_level = 1.0f;
     }
     if (had_shared_topic)
         profile->shared_topics++;
@@ -102,10 +170,12 @@ hu_error_t hu_voice_build_guidance(const hu_voice_profile_t *profile, hu_allocat
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
 
+    int vuln_pct = (int)(profile->vulnerability_level * 100.0f);
+
     int n = snprintf(buf, HU_VOICE_BUF_CAP,
-                     "### Voice Calibration\nStage: %s (warmth: %d%%, humor: %d%%)\n"
-                     "Guidance: %s\n",
-                     name, warmth_pct, humor_pct, guidance);
+                     "### Voice Calibration\nStage: %s (warmth: %d%%, humor: %d%%, "
+                     "vulnerability: %d%%)\nGuidance: %s\n",
+                     name, warmth_pct, humor_pct, vuln_pct, guidance);
     if (n <= 0 || (size_t)n >= HU_VOICE_BUF_CAP) {
         alloc->free(alloc->ctx, buf, HU_VOICE_BUF_CAP);
         return HU_ERR_INVALID_ARGUMENT;

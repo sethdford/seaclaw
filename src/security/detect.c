@@ -1,4 +1,5 @@
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include "human/security/sandbox.h"
 #include "human/security/sandbox_internal.h"
 #include <stdio.h>
@@ -10,8 +11,9 @@ static void hu_sandbox_warn_no_backend_resolved_noop_once(void) {
     if (warned)
         return;
     warned = 1;
-    fprintf(stderr, "[human] warning: sandbox auto-detection found no backend; "
-                    "code execution is NOT sandboxed\n");
+    hu_log_error("security", NULL,
+                 "warning: sandbox auto-detection found no backend; "
+                 "code execution is NOT sandboxed");
 }
 
 struct hu_sandbox_storage {

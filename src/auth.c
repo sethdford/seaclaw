@@ -2,6 +2,7 @@
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/platform.h"
 #include "human/security.h"
@@ -117,7 +118,7 @@ hu_error_t hu_auth_save_credential(hu_allocator_t *alloc, const char *provider,
         if (enc_err != HU_OK) {
             enc_access = NULL; /* fall back to plaintext */
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
-            fprintf(stderr, "[auth] encrypt access_token failed: %s\n", hu_error_string(enc_err));
+            hu_log_error("auth", NULL, "encrypt access_token failed: %s", hu_error_string(enc_err));
 #endif
         }
     }
@@ -127,7 +128,8 @@ hu_error_t hu_auth_save_credential(hu_allocator_t *alloc, const char *provider,
         if (enc_err != HU_OK) {
             enc_refresh = NULL; /* fall back to plaintext */
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
-            fprintf(stderr, "[auth] encrypt refresh_token failed: %s\n", hu_error_string(enc_err));
+            hu_log_error("auth", NULL, "encrypt refresh_token failed: %s",
+                         hu_error_string(enc_err));
 #endif
         }
     }

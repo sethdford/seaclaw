@@ -6,6 +6,7 @@
 #include "human/channel.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include <ctype.h>
 #include <stdint.h>
@@ -13,10 +14,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define HU_IMAP_OUTBOX_MAX      32
-#define HU_IMAP_MOCK_QUEUE_MAX  16
-#define HU_IMAP_SESSION_KEY_MAX 127
-#define HU_IMAP_CONTENT_MAX     4095
+#define HU_IMAP_OUTBOX_MAX        32
+#define HU_IMAP_MOCK_QUEUE_MAX    16
+#define HU_IMAP_SESSION_KEY_MAX   127
+#define HU_IMAP_CONTENT_MAX       4095
 #define HU_IMAP_MAX_IMAP_RESPONSE (128u * 1024u)
 #define HU_IMAP_MAILBOX_ENC_MAX   512
 #define HU_IMAP_URL_MAX           768
@@ -364,8 +365,8 @@ static hu_error_t imap_send(void *ctx, const char *target, size_t target_len, co
 #endif
     static bool imap_send_warned;
     if (!imap_send_warned) {
-        fprintf(stderr,
-                "[imap] send: no smtp_host configured; messages stored in local outbox only\n");
+        hu_log_info("imap", NULL,
+                    "send: no smtp_host configured; messages stored in local outbox only");
         imap_send_warned = true;
     }
     return imap_outbox_append(c, target, target_len, message, message_len);
@@ -440,14 +441,14 @@ hu_error_t hu_imap_create(hu_allocator_t *alloc, const hu_imap_config_t *config,
             goto fail;
     }
     if (config && config->imap_username && config->imap_username_len > 0) {
-        err = copy_cfg_str(alloc, config->imap_username, config->imap_username_len, &c->imap_username,
-                           &c->imap_username_len);
+        err = copy_cfg_str(alloc, config->imap_username, config->imap_username_len,
+                           &c->imap_username, &c->imap_username_len);
         if (err != HU_OK)
             goto fail;
     }
     if (config && config->imap_password && config->imap_password_len > 0) {
-        err = copy_cfg_str(alloc, config->imap_password, config->imap_password_len, &c->imap_password,
-                           &c->imap_password_len);
+        err = copy_cfg_str(alloc, config->imap_password, config->imap_password_len,
+                           &c->imap_password, &c->imap_password_len);
         if (err != HU_OK)
             goto fail;
     }
@@ -632,9 +633,9 @@ hu_error_t hu_imap_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_loo
     size_t count = 0;
     for (size_t i = 0; i < uid_count && count < max_msgs; i++) {
         char fetch_url[HU_IMAP_URL_MAX];
-        int fn = snprintf(fetch_url, sizeof(fetch_url),
-                          "%s;UID=%u;SECTION=HEADER.FIELDS%%20(FROM%%20SUBJECT)", base_url,
-                          uids[i]);
+        int fn =
+            snprintf(fetch_url, sizeof(fetch_url),
+                     "%s;UID=%u;SECTION=HEADER.FIELDS%%20(FROM%%20SUBJECT)", base_url, uids[i]);
         if (fn < 0 || (size_t)fn >= sizeof(fetch_url))
             continue;
 
@@ -684,7 +685,8 @@ hu_error_t hu_imap_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_loo
         }
         imap_wr_free(alloc, &hdr_wr);
 
-        int bn = snprintf(fetch_url, sizeof(fetch_url), "%s;UID=%u;SECTION=TEXT", base_url, uids[i]);
+        int bn =
+            snprintf(fetch_url, sizeof(fetch_url), "%s;UID=%u;SECTION=TEXT", base_url, uids[i]);
         if (bn >= 0 && (size_t)bn < sizeof(fetch_url)) {
             imap_wr_t body_wr = {0};
             err = imap_curl_imap(alloc, c, fetch_url, NULL, &body_wr, 60L);
