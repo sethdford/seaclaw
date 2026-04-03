@@ -801,6 +801,21 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
+    /* Check freshness of cached instruction discovery and re-discover if stale */
+    if (agent->instruction_discovery && !hu_instruction_discovery_is_fresh(agent->instruction_discovery)) {
+        hu_instruction_discovery_destroy(agent->alloc, agent->instruction_discovery);
+        agent->instruction_discovery = NULL;
+    }
+
+    /* Re-discover instructions if needed */
+    if (!agent->instruction_discovery && agent->workspace_dir && agent->workspace_dir_len > 0) {
+        hu_error_t disc_err = hu_instruction_discovery_run(
+            agent->alloc, agent->workspace_dir, agent->workspace_dir_len, &agent->instruction_discovery);
+        if (disc_err != HU_OK) {
+            agent->instruction_discovery = NULL;
+        }
+    }
+
     /* Gather instruction context from discovery results */
     char *instruction_ctx = NULL;
     size_t instruction_ctx_len = 0;
@@ -4898,7 +4913,6 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             }
 #endif
 
-<<<<<<< HEAD
                             /* TTL cache: store successful tool results */
                             if (ttl_cache && result->success && result->output &&
                                 result->output_len > 0 && !(ttl_hits && ttl_hits[tc]) &&
@@ -5028,7 +5042,6 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             if (agent->hook_registry) {
                                 hu_hook_result_t seq_hook_res;
                                 memset(&seq_hook_res, 0, sizeof(seq_hook_res));
-                                const char *seq_args = call->arguments ? call->arguments : "";
                                 hu_hook_pipeline_pre_tool(agent->hook_registry, agent->alloc,
                                                          pol_tn, pol_tn_len, seq_args, strlen(seq_args),
                                                          &seq_hook_res);

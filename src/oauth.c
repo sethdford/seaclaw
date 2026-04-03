@@ -2,12 +2,16 @@
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
+#include "human/core/string.h"
 #include <ctype.h>
+#include <errno.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 
 #if HU_ENABLE_TLS
 #include <openssl/sha.h>
@@ -189,8 +193,33 @@ hu_error_t hu_mcp_oauth_exchange_code(hu_allocator_t *alloc, const hu_oauth_conf
 
     memset(out_token, 0, sizeof(*out_token));
 
-    /* Build request body as form data:
-       grant_type=authorization_code&code=...&client_id=...&code_verifier=...&redirect_uri=... */
+#ifndef HU_ENABLE_CURL
+#ifdef HU_IS_TEST
+    /* In test mode without curl: mock the response */
+    const char *access_token = "test_access_token_from_mock";
+    const char *token_type = "Bearer";
+
+    out_token->access_token = (char *)alloc->alloc(alloc->ctx, strlen(access_token) + 1);
+    if (!out_token->access_token)
+        return HU_ERR_OUT_OF_MEMORY;
+    strcpy(out_token->access_token, access_token);
+    out_token->access_token_len = strlen(access_token);
+
+    out_token->token_type = (char *)alloc->alloc(alloc->ctx, strlen(token_type) + 1);
+    if (!out_token->token_type) {
+        alloc->free(alloc->ctx, out_token->access_token, out_token->access_token_len + 1);
+        out_token->access_token = NULL;
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    strcpy(out_token->token_type, token_type);
+    out_token->token_type_len = strlen(token_type);
+    out_token->expires_at = (int64_t)time(NULL) + 3600;  /* 1 hour from now */
+    return HU_OK;
+#else
+    return HU_ERR_NOT_SUPPORTED;  /* libcurl not available */
+#endif
+#else
+    /* Build request body as form data */
     size_t body_size = 512 + config->client_id_len + config->redirect_uri_len + strlen(code) + 128;
     char *body = (char *)alloc->alloc(alloc->ctx, body_size);
     if (!body)
@@ -210,10 +239,81 @@ hu_error_t hu_mcp_oauth_exchange_code(hu_allocator_t *alloc, const hu_oauth_conf
         return HU_ERR_INVALID_ARGUMENT;
     }
 
-    /* TODO: Make HTTP POST request to config->token_url with body
-       For now, stub that returns HU_ERR_NOT_SUPPORTED */
+    /* Make HTTP POST request to token_url with form-encoded body */
+    hu_http_response_t resp;
+    memset(&resp, 0, sizeof(resp));
+
+    hu_error_t err = hu_http_request(alloc, config->token_url, "POST",
+                                     "Content-Type: application/x-www-form-urlencoded\r\n",
+                                     body, (size_t)written, &resp);
     alloc->free(alloc->ctx, body, body_size);
-    return HU_ERR_NOT_SUPPORTED;  /* HTTP client needed */
+
+    if (err != HU_OK) {
+        hu_http_response_free(alloc, &resp);
+        return err;
+    }
+
+    /* Parse JSON response */
+    hu_json_value_t *resp_obj = NULL;
+    err = hu_json_parse(alloc, resp.body, resp.body_len, &resp_obj);
+    hu_http_response_free(alloc, &resp);
+
+    if (err != HU_OK || !resp_obj)
+        return HU_ERR_PARSE;
+
+    if (resp_obj->type != HU_JSON_OBJECT) {
+        hu_json_free(alloc, resp_obj);
+        return HU_ERR_PARSE;
+    }
+
+    /* Extract token fields from response */
+    const char *access_token = hu_json_get_string(resp_obj, "access_token");
+    if (!access_token) {
+        hu_json_free(alloc, resp_obj);
+        return HU_ERR_PARSE;  /* access_token is required */
+    }
+
+    const char *refresh_token = hu_json_get_string(resp_obj, "refresh_token");
+    const char *token_type = hu_json_get_string(resp_obj, "token_type");
+    double expires_in = hu_json_get_number(resp_obj, "expires_in", 0);
+
+    /* Allocate and copy access_token */
+    size_t access_len = strlen(access_token);
+    out_token->access_token = (char *)alloc->alloc(alloc->ctx, access_len + 1);
+    if (!out_token->access_token) {
+        hu_json_free(alloc, resp_obj);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    strcpy(out_token->access_token, access_token);
+    out_token->access_token_len = access_len;
+
+    /* Allocate and copy refresh_token if present */
+    if (refresh_token) {
+        size_t refresh_len = strlen(refresh_token);
+        out_token->refresh_token = (char *)alloc->alloc(alloc->ctx, refresh_len + 1);
+        if (out_token->refresh_token) {
+            strcpy(out_token->refresh_token, refresh_token);
+            out_token->refresh_token_len = refresh_len;
+        }
+    }
+
+    /* Allocate and copy token_type if present, default to "Bearer" */
+    const char *tt = token_type ? token_type : "Bearer";
+    size_t tt_len = strlen(tt);
+    out_token->token_type = (char *)alloc->alloc(alloc->ctx, tt_len + 1);
+    if (out_token->token_type) {
+        strcpy(out_token->token_type, tt);
+        out_token->token_type_len = tt_len;
+    }
+
+    /* Set expires_at if expires_in is present */
+    if (expires_in > 0) {
+        out_token->expires_at = (int64_t)time(NULL) + (int64_t)expires_in;
+    }
+
+    hu_json_free(alloc, resp_obj);
+    return HU_OK;
+#endif
 }
 
 /* ── Token Lifecycle ───────────────────────────────────────────────────── */
@@ -230,10 +330,94 @@ hu_error_t hu_mcp_oauth_token_save(hu_allocator_t *alloc, const char *path,
     if (!alloc || !path || !server_name || !token)
         return HU_ERR_INVALID_ARGUMENT;
 
-    /* TODO: Load existing tokens.json, add/update server_name entry, save back
-       For now, stub */
-    (void)token;
-    return HU_ERR_NOT_SUPPORTED;
+    /* Load existing tokens file if it exists */
+    hu_json_value_t *root = NULL;
+    FILE *f = fopen(path, "rb");
+    if (f) {
+        struct stat st;
+        if (stat(path, &st) == 0 && st.st_size > 0 && (size_t)st.st_size < 1024 * 1024) {
+            size_t file_size = (size_t)st.st_size;
+            char *buf = (char *)alloc->alloc(alloc->ctx, file_size + 1);
+            if (buf) {
+                size_t rd = fread(buf, 1, file_size, f);
+                buf[rd] = '\0';
+                hu_json_parse(alloc, buf, rd, &root);
+                alloc->free(alloc->ctx, buf, file_size + 1);
+            }
+        }
+        fclose(f);
+    }
+
+    /* If no valid root object, create a new one */
+    if (!root || root->type != HU_JSON_OBJECT) {
+        if (root) hu_json_free(alloc, root);
+        root = hu_json_object_new(alloc);
+        if (!root)
+            return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    /* Build token object */
+    hu_json_value_t *token_obj = hu_json_object_new(alloc);
+    if (!token_obj) {
+        hu_json_free(alloc, root);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    /* Add token fields */
+    if (token->access_token) {
+        hu_json_value_t *v = hu_json_string_new(alloc, token->access_token, token->access_token_len);
+        if (v) hu_json_object_set(alloc, token_obj, "access_token", v);
+    }
+    if (token->refresh_token) {
+        hu_json_value_t *v = hu_json_string_new(alloc, token->refresh_token, token->refresh_token_len);
+        if (v) hu_json_object_set(alloc, token_obj, "refresh_token", v);
+    }
+    if (token->expires_at != 0) {
+        hu_json_value_t *v = hu_json_number_new(alloc, (double)token->expires_at);
+        if (v) hu_json_object_set(alloc, token_obj, "expires_at", v);
+    }
+    if (token->token_type) {
+        hu_json_value_t *v = hu_json_string_new(alloc, token->token_type, token->token_type_len);
+        if (v) hu_json_object_set(alloc, token_obj, "token_type", v);
+    }
+
+    /* Set the server entry in root */
+    hu_json_object_set(alloc, root, server_name, token_obj);
+
+    /* Serialize to JSON */
+    char *json_str = NULL;
+    size_t json_len = 0;
+    hu_error_t err = hu_json_stringify(alloc, root, &json_str, &json_len);
+    hu_json_free(alloc, root);
+    if (err != HU_OK)
+        return err;
+
+    /* Atomic write: temp file → rename */
+    char tmp_path[1024];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp_%d", path, (int)getpid());
+
+    FILE *tmp_f = fopen(tmp_path, "wb");
+    if (!tmp_f) {
+        alloc->free(alloc->ctx, json_str, json_len + 1);
+        return HU_ERR_IO;
+    }
+
+    size_t written = fwrite(json_str, 1, json_len, tmp_f);
+    fclose(tmp_f);
+    alloc->free(alloc->ctx, json_str, json_len + 1);
+
+    if (written != json_len) {
+        unlink(tmp_path);
+        return HU_ERR_IO;
+    }
+
+    /* Atomic rename */
+    if (rename(tmp_path, path) != 0) {
+        unlink(tmp_path);
+        return HU_ERR_IO;
+    }
+
+    return HU_OK;
 }
 
 hu_error_t hu_mcp_oauth_token_load(hu_allocator_t *alloc, const char *path,
@@ -243,9 +427,90 @@ hu_error_t hu_mcp_oauth_token_load(hu_allocator_t *alloc, const char *path,
 
     memset(out_token, 0, sizeof(*out_token));
 
-    /* TODO: Load tokens.json, find server_name key, parse token fields
-       For now, stub */
-    return HU_ERR_NOT_FOUND;
+    /* Check if file exists */
+    struct stat st;
+    if (stat(path, &st) != 0)
+        return HU_ERR_NOT_FOUND;
+    if (!S_ISREG(st.st_mode) || st.st_size <= 0)
+        return HU_ERR_NOT_FOUND;
+    if ((size_t)st.st_size > 1024 * 1024)
+        return HU_ERR_IO;
+
+    /* Read file */
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return HU_ERR_IO;
+
+    size_t file_size = (size_t)st.st_size;
+    char *buf = (char *)alloc->alloc(alloc->ctx, file_size + 1);
+    if (!buf) {
+        fclose(f);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+
+    size_t rd = fread(buf, 1, file_size, f);
+    fclose(f);
+    buf[rd] = '\0';
+
+    /* Parse JSON */
+    hu_json_value_t *root = NULL;
+    hu_error_t err = hu_json_parse(alloc, buf, rd, &root);
+    alloc->free(alloc->ctx, buf, file_size + 1);
+    if (err != HU_OK || !root)
+        return HU_ERR_PARSE;
+
+    if (root->type != HU_JSON_OBJECT) {
+        hu_json_free(alloc, root);
+        return HU_ERR_PARSE;
+    }
+
+    /* Find server entry */
+    hu_json_value_t *token_obj = hu_json_object_get(root, server_name);
+    if (!token_obj || token_obj->type != HU_JSON_OBJECT) {
+        hu_json_free(alloc, root);
+        return HU_ERR_NOT_FOUND;
+    }
+
+    /* Extract token fields */
+    const char *access_token = hu_json_get_string(token_obj, "access_token");
+    const char *refresh_token = hu_json_get_string(token_obj, "refresh_token");
+    const char *token_type = hu_json_get_string(token_obj, "token_type");
+    double expires_at_d = hu_json_get_number(token_obj, "expires_at", 0);
+
+    /* Allocate and copy access_token (required) */
+    if (access_token) {
+        size_t len = strlen(access_token);
+        out_token->access_token = (char *)alloc->alloc(alloc->ctx, len + 1);
+        if (out_token->access_token) {
+            strcpy(out_token->access_token, access_token);
+            out_token->access_token_len = len;
+        }
+    }
+
+    /* Allocate and copy refresh_token (optional) */
+    if (refresh_token) {
+        size_t len = strlen(refresh_token);
+        out_token->refresh_token = (char *)alloc->alloc(alloc->ctx, len + 1);
+        if (out_token->refresh_token) {
+            strcpy(out_token->refresh_token, refresh_token);
+            out_token->refresh_token_len = len;
+        }
+    }
+
+    /* Allocate and copy token_type (optional) */
+    if (token_type) {
+        size_t len = strlen(token_type);
+        out_token->token_type = (char *)alloc->alloc(alloc->ctx, len + 1);
+        if (out_token->token_type) {
+            strcpy(out_token->token_type, token_type);
+            out_token->token_type_len = len;
+        }
+    }
+
+    out_token->expires_at = (int64_t)expires_at_d;
+
+    hu_json_free(alloc, root);
+    return HU_OK;
 }
 
 void hu_mcp_oauth_token_free(hu_allocator_t *alloc, hu_oauth_token_t *token) {

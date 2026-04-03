@@ -442,6 +442,15 @@ hu_error_t hu_agent_from_config(
         out->cognition_db = NULL;
 #endif
 
+    /* Initialize instruction discovery from workspace */
+    if (out->workspace_dir && out->workspace_dir_len > 0) {
+        hu_error_t disc_err = hu_instruction_discovery_run(
+            alloc, out->workspace_dir, out->workspace_dir_len, &out->instruction_discovery);
+        if (disc_err != HU_OK) {
+            out->instruction_discovery = NULL;
+        }
+    }
+
     return HU_OK;
 }
 
@@ -713,6 +722,10 @@ void hu_agent_deinit(hu_agent_t *agent) {
         agent->alloc->free(agent->alloc->ctx, agent->speculative_cache,
                            sizeof(hu_speculative_cache_t));
         agent->speculative_cache = NULL;
+    }
+    if (agent->instruction_discovery) {
+        hu_instruction_discovery_destroy(agent->alloc, agent->instruction_discovery);
+        agent->instruction_discovery = NULL;
     }
     agent->skill_route_embedder = NULL;
 }

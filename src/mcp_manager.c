@@ -2,7 +2,9 @@
 #include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/http.h"
 #include "human/mcp.h"
+#include "human/mcp_jsonrpc.h"
 #include "human/mcp_transport.h"
 #include "human/oauth.h"
 #include "human/tool.h"
@@ -274,8 +276,8 @@ static hu_error_t connect_slot(hu_allocator_t *alloc, hu_mcp_mgr_slot_t *slot) {
         if (err != HU_OK)
             return err;
 
-        /* TODO: When hu_mcp_transport_http_create supports auth_header parameter,
-           pass "Authorization: Bearer {token}" if oauth_token.access_token is set */
+        /* Note: OAuth token is passed per-request in mgr_tool_execute() via auth_header.
+           Transport layer passes auth via hu_http_post_json(). */
 
         slot->connected = true;
         return HU_OK;
@@ -294,8 +296,8 @@ static hu_error_t connect_slot(hu_allocator_t *alloc, hu_mcp_mgr_slot_t *slot) {
         if (err != HU_OK)
             return err;
 
-        /* TODO: When hu_mcp_transport_sse_create supports auth_header parameter,
-           pass "Authorization: Bearer {token}" if oauth_token.access_token is set */
+        /* Note: OAuth token is passed per-request in mgr_tool_execute() via auth_header.
+           Transport layer passes auth via hu_http_post_json(). */
 
         slot->connected = true;
         return HU_OK;
@@ -356,12 +358,7 @@ static hu_error_t mgr_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         return HU_OK;
     }
 
-    if (!slot->server) {
-        /* Transport-based execution not yet fully supported */
-        *out = hu_tool_result_fail("Transport-based tool execution not yet supported", 48);
-        return HU_OK;
-    }
-
+    /* Prepare args_json for either transport or stdio */
     char *args_json = NULL;
     size_t args_len = 0;
     bool args_allocated = false;
@@ -375,6 +372,91 @@ static hu_error_t mgr_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_js
     }
     if (!args_json)
         args_json = "{}";
+
+    if (!slot->server) {
+        /* Transport-based (HTTP/SSE) tool execution */
+#if HU_ENABLE_CURL
+        /* Build JSON-RPC request for tools/call */
+        char *request = NULL;
+        size_t request_len = 0;
+        static uint32_t rpc_id_counter = 1;
+        hu_error_t jerr = hu_mcp_jsonrpc_build_tools_call(alloc, rpc_id_counter++,
+            w->original_name, args_json, &request, &request_len);
+        if (jerr != HU_OK) {
+            *out = hu_tool_result_fail("Failed to build JSON-RPC request", 32);
+            return HU_OK;
+        }
+
+        /* Build auth header if OAuth token available and valid */
+        char auth_buf[2048] = {0};
+        const char *auth_header = NULL;
+        if (slot->oauth_token.access_token && !hu_mcp_oauth_token_is_expired(&slot->oauth_token)) {
+            int written = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s",
+                                   slot->oauth_token.access_token);
+            if (written > 0 && (size_t)written < sizeof(auth_buf)) {
+                auth_header = auth_buf;
+            }
+        }
+
+        /* HTTP POST to server URL */
+        hu_http_response_t response = {0};
+        hu_error_t http_err = hu_http_post_json(alloc, slot->url, auth_header,
+                                                request, request_len, &response);
+        alloc->free(alloc->ctx, request, request_len + 1);
+
+        if (http_err != HU_OK) {
+            char errbuf[256];
+            int n = snprintf(errbuf, sizeof(errbuf), "HTTP request to '%s' failed: error %d",
+                           slot->url ? slot->url : "?", (int)http_err);
+            if (n < 0) n = 0;
+            *out = hu_tool_result_fail(errbuf, (size_t)n);
+            return HU_OK;
+        }
+
+        if (response.status_code < 200 || response.status_code >= 300) {
+            char errbuf[512];
+            const char *body = response.body ? response.body : "(empty)";
+            int n = snprintf(errbuf, sizeof(errbuf),
+                           "HTTP %ld from '%s': %.*s",
+                           response.status_code,
+                           slot->url ? slot->url : "?",
+                           (int)(response.body_len > 200 ? 200 : response.body_len),
+                           body);
+            if (n < 0) n = 0;
+            hu_http_response_free(alloc, &response);
+            *out = hu_tool_result_fail(errbuf, (size_t)n);
+            return HU_OK;
+        }
+
+        /* Parse JSON-RPC response */
+        uint32_t resp_id = 0;
+        char *result = NULL;
+        size_t result_len = 0;
+        bool is_error = false;
+        hu_error_t parse_err = hu_mcp_jsonrpc_parse_response(alloc, response.body, response.body_len,
+                                                            &resp_id, &result, &result_len, &is_error);
+        hu_http_response_free(alloc, &response);
+
+        if (parse_err != HU_OK) {
+            *out = hu_tool_result_fail("Failed to parse JSON-RPC response", 32);
+            return HU_OK;
+        }
+
+        if (is_error) {
+            *out = hu_tool_result_fail_owned(result, result_len);
+        } else {
+            *out = hu_tool_result_ok_owned(result, result_len);
+        }
+        if (args_allocated && args_json)
+            alloc->free(alloc->ctx, args_json, args_len + 1);
+        return HU_OK;
+#else
+        *out = hu_tool_result_fail("HTTP transport requires HU_ENABLE_CURL", 38);
+        if (args_allocated && args_json)
+            alloc->free(alloc->ctx, args_json, args_len + 1);
+        return HU_OK;
+#endif
+    }
 
     char *result = NULL;
     size_t result_len = 0;
