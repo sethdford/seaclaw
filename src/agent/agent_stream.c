@@ -811,19 +811,28 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * re-prompt the model with a directive to elaborate in character. */
         if (agent->persona && final_content_len > 0 && final_content_len < 120 && msg_len > 15 &&
             agent->provider.vtable && agent->provider.vtable->chat_with_system) {
-            static const char rethink_sys[] =
-                "The user sent you a message and your draft response was too brief. "
-                "You are in character as a specific persona. Rewrite your response to be "
-                "more engaging, natural, and conversational while staying in character. "
-                "Keep your persona's style (casual, lowercase, slang if appropriate) but "
-                "add more substance — share a thought, ask a follow-up, show personality. "
-                "Do NOT be generic or robotic. Be human.";
+            /* Build rethink prompt with persona context for style fidelity */
+            const char *persona_name = agent->persona ? agent->persona->name : "the persona";
+            const char *persona_identity =
+                (agent->persona && agent->persona->identity) ? agent->persona->identity : "";
+            char rethink_sys[2048];
+            snprintf(rethink_sys, sizeof(rethink_sys),
+                     "You are %s. %.*s\n\n"
+                     "Your draft response was too brief. Rewrite it to be more engaging, "
+                     "natural, and conversational while staying fully in character. "
+                     "Keep your style (casual, lowercase, slang) but add more substance — "
+                     "share a personal thought, ask a follow-up, show personality. "
+                     "Do NOT be generic, formal, or robotic. Write like a real person texting.",
+                     persona_name,
+                     (int)(strlen(persona_identity) < 500 ? strlen(persona_identity) : 500),
+                     persona_identity);
             char rethink_user[4096];
             int rn = snprintf(
                 rethink_user, sizeof(rethink_user),
                 "User said: \"%.*s\"\n\nYour draft response: \"%.*s\"\n\n"
-                "Rewrite this response to be more engaging while staying in character:",
-                (int)(msg_len < 500 ? msg_len : 500), msg, (int)final_content_len, final_content);
+                "Rewrite this as %s would actually text it — in character, with personality:",
+                (int)(msg_len < 500 ? msg_len : 500), msg, (int)final_content_len, final_content,
+                persona_name);
             if (rn > 0 && (size_t)rn < sizeof(rethink_user)) {
                 char *revised = NULL;
                 size_t revised_len = 0;
