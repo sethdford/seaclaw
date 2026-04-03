@@ -26,6 +26,7 @@ typedef struct hu_model_selection {
     double temperature;     /* 0.0 = use default, >0 = override */
     hu_cognitive_tier_t tier;
     hu_route_source_t source;
+    int sensitivity;        /* 0 = not checked, 1 = S1 (safe), 2 = S2, 3 = S3 (local-only) */
 } hu_model_selection_t;
 
 typedef struct hu_model_router_config {
@@ -49,6 +50,10 @@ hu_model_selection_t hu_model_route(const hu_model_router_config_t *cfg,
 
 /* Initialize config with sensible Gemini defaults */
 hu_model_router_config_t hu_model_router_default_config(void);
+
+/* Forward declarations for judge call */
+struct hu_provider;
+struct hu_allocator;
 
 /* ── LLM-as-Judge cost router (inspired by EdgeClaw ClawXRouter) ──────── */
 
@@ -87,6 +92,18 @@ const char *hu_route_judge_system_prompt(void);
 /* FNV-1a hash for prompt caching */
 uint64_t hu_route_hash_prompt(const char *msg, size_t msg_len);
 
+/* Route with an optional LLM judge. Calls judge_provider with the classification
+ * system prompt, caches the result, and falls back to heuristics on failure.
+ * Pass NULL for judge_provider to behave identically to hu_model_route. */
+hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *cfg,
+                                               const char *msg, size_t msg_len,
+                                               const char *relationship, size_t relationship_len,
+                                               int hour, size_t history_count,
+                                               struct hu_provider *judge_provider,
+                                               const char *judge_model, size_t judge_model_len,
+                                               struct hu_allocator *alloc,
+                                               hu_route_cache_t *cache);
+
 /* ── Routing decision log (ring buffer) ───────────────────────────────── */
 
 #define HU_ROUTE_LOG_SIZE 100
@@ -116,5 +133,8 @@ void hu_route_log_tier_counts(const hu_route_decision_log_t *log, size_t counts[
 
 const char *hu_cognitive_tier_str(hu_cognitive_tier_t tier);
 const char *hu_route_source_str(hu_route_source_t source);
+
+/* Global decision log singleton — threadsafe reads from gateway. */
+hu_route_decision_log_t *hu_route_global_log(void);
 
 #endif

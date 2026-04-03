@@ -1,6 +1,9 @@
 #include "test_framework.h"
 #include "human/agent/model_router.h"
+#include "human/provider.h"
+#include "human/core/allocator.h"
 #include <string.h>
+#include <time.h>
 
 static hu_model_router_config_t cfg;
 
@@ -324,6 +327,60 @@ static void judge_system_prompt_not_null(void) {
     HU_ASSERT(strlen(prompt) > 100);
 }
 
+static void route_populates_global_log(void) {
+    hu_route_decision_log_t *log = hu_route_global_log();
+    size_t before = hu_route_log_count(log);
+
+    hu_model_router_config_t c = hu_model_router_default_config();
+    hu_model_route(&c, "hello there", 11, NULL, 0, 12, 0);
+
+    HU_ASSERT(hu_route_log_count(log) > before);
+    const hu_route_decision_t *d = hu_route_log_get(log, hu_route_log_count(log) - 1);
+    HU_ASSERT(d != NULL);
+    HU_ASSERT(d->source == HU_ROUTE_HEURISTIC);
+}
+
+static void route_with_judge_null_provider_falls_through(void) {
+    hu_model_router_config_t c = hu_model_router_default_config();
+    hu_model_selection_t sel = hu_model_route_with_judge(&c, "hello", 5, NULL, 0, 12, 0,
+                                                         NULL, NULL, 0, NULL, NULL);
+    HU_ASSERT(sel.source == HU_ROUTE_HEURISTIC);
+}
+
+static void route_with_judge_test_mode_returns_fallback(void) {
+    hu_model_router_config_t c = hu_model_router_default_config();
+    hu_provider_t dummy;
+    memset(&dummy, 0, sizeof(dummy));
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_route_cache_t cache;
+    hu_route_cache_init(&cache);
+
+    hu_model_selection_t sel = hu_model_route_with_judge(
+        &c, "explain quantum computing", 25, NULL, 0, 12, 0,
+        &dummy, "test-model", 10, &alloc, &cache);
+    HU_ASSERT(sel.source == HU_ROUTE_JUDGE_FALLBACK);
+    HU_ASSERT(sel.model != NULL);
+    HU_ASSERT(sel.model_len > 0);
+}
+
+static void route_with_judge_cache_hit_returns_cached(void) {
+    hu_model_router_config_t c = hu_model_router_default_config();
+    hu_provider_t dummy;
+    memset(&dummy, 0, sizeof(dummy));
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_route_cache_t cache;
+    hu_route_cache_init(&cache);
+
+    int64_t now = (int64_t)time(NULL);
+    hu_route_cache_put(&cache, "cached message", 14, now, HU_TIER_DEEP);
+
+    hu_model_selection_t sel = hu_model_route_with_judge(
+        &c, "cached message", 14, NULL, 0, 12, 0,
+        &dummy, "test-model", 10, &alloc, &cache);
+    HU_ASSERT(sel.source == HU_ROUTE_JUDGE_CACHED);
+    HU_ASSERT(sel.tier == HU_TIER_DEEP);
+}
+
 void run_model_router_tests(void) {
     HU_TEST_SUITE("Model Router");
 
@@ -374,4 +431,12 @@ void run_model_router_tests(void) {
     HU_RUN_TEST(tier_str_all_values);
     HU_RUN_TEST(source_str_all_values);
     HU_RUN_TEST(judge_system_prompt_not_null);
+
+    /* Global log integration */
+    HU_RUN_TEST(route_populates_global_log);
+
+    /* Judge routing */
+    HU_RUN_TEST(route_with_judge_null_provider_falls_through);
+    HU_RUN_TEST(route_with_judge_test_mode_returns_fallback);
+    HU_RUN_TEST(route_with_judge_cache_hit_returns_cached);
 }
