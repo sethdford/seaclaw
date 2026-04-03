@@ -124,6 +124,8 @@ typedef struct hu_agent_config {
     char *mr_conversational_model;       /* model router: standard chat model */
     char *mr_analytical_model;           /* model router: capable reasoning model */
     char *mr_deep_model;                 /* model router: most capable model */
+    bool mr_judge_enabled;               /* model router: enable LLM-as-Judge classification */
+    char *mr_judge_model;                /* model router: model to use for judge (default: reflexive) */
     bool prompt_cache_enabled;           /* enable cross-turn system prompt dedup (default true) */
     bool agent_comm_enabled;             /* enable ACP inter-agent messaging (default false) */
     char *context_engine_type;           /* "legacy" (default) or "rag" */

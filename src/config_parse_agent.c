@@ -317,6 +317,15 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
                 a->free(a->ctx, cfg->agent.mr_deep_model, strlen(cfg->agent.mr_deep_model) + 1);
             cfg->agent.mr_deep_model = hu_strdup(a, mr_deep);
         }
+        cfg->agent.mr_judge_enabled =
+            hu_json_get_bool(mr_obj, "judge_enabled", cfg->agent.mr_judge_enabled);
+        const char *mr_judge_model = hu_json_get_string(mr_obj, "judge_model");
+        if (mr_judge_model) {
+            if (cfg->agent.mr_judge_model)
+                a->free(a->ctx, cfg->agent.mr_judge_model,
+                        strlen(cfg->agent.mr_judge_model) + 1);
+            cfg->agent.mr_judge_model = hu_strdup(a, mr_judge_model);
+        }
     }
 
     return HU_OK;

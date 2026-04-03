@@ -924,10 +924,10 @@ static void test_config_parse_default_model_provider_prefix(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_config_t cfg = {0};
     hu_config_load(&backing, &cfg);
-    const char *j = "{\"default_provider\":\"gemini\",\"default_model\":\"gemini-2.0-flash\"}";
+    const char *j = "{\"default_provider\":\"gemini\",\"default_model\":\"gemini-3.1-flash-lite-preview\"}";
     hu_config_parse_json(&cfg, j, strlen(j));
     HU_ASSERT_STR_EQ(cfg.default_provider, "gemini");
-    HU_ASSERT_STR_EQ(cfg.default_model, "gemini-2.0-flash");
+    HU_ASSERT_STR_EQ(cfg.default_model, "gemini-3.1-flash-lite-preview");
     hu_config_deinit(&cfg);
     if (old_home) {
         setenv("HOME", old_home, 1);
@@ -1282,6 +1282,35 @@ static void test_config_parse_very_long_key_value(void) {
     free_config(cfg);
 }
 
+static void test_config_parse_model_router_judge(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *json =
+        "{\"agent\":{\"model_router\":{\"judge_enabled\":true,"
+        "\"judge_model\":\"gemini-3.1-flash-lite-preview\","
+        "\"reflexive_model\":\"gemini-3.1-flash-lite-preview\","
+        "\"deep_model\":\"gemini-3.1-pro-preview\"}}}";
+    hu_error_t err = hu_config_parse_json(cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(cfg->agent.mr_judge_enabled);
+    HU_ASSERT_NOT_NULL(cfg->agent.mr_judge_model);
+    HU_ASSERT_STR_EQ(cfg->agent.mr_judge_model, "gemini-3.1-flash-lite-preview");
+    HU_ASSERT_NOT_NULL(cfg->agent.mr_reflexive_model);
+    HU_ASSERT_STR_EQ(cfg->agent.mr_reflexive_model, "gemini-3.1-flash-lite-preview");
+    HU_ASSERT_NOT_NULL(cfg->agent.mr_deep_model);
+    HU_ASSERT_STR_EQ(cfg->agent.mr_deep_model, "gemini-3.1-pro-preview");
+    free_config(cfg);
+}
+
+static void test_config_parse_model_router_judge_disabled_by_default(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *json = "{\"agent\":{\"model_router\":{\"reflexive_model\":\"test\"}}}";
+    hu_error_t err = hu_config_parse_json(cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_FALSE(cfg->agent.mr_judge_enabled);
+    HU_ASSERT_NULL(cfg->agent.mr_judge_model);
+    free_config(cfg);
+}
+
 void run_config_extended_tests(void) {
     HU_TEST_SUITE("Config Extended");
     HU_RUN_TEST(test_config_load_from_null_uses_default_path);
@@ -1406,4 +1435,6 @@ void run_config_extended_tests(void) {
     HU_RUN_TEST(test_config_parse_scheduler_poll);
     HU_RUN_TEST(test_config_deinit_idempotent);
     HU_RUN_TEST(test_config_parse_very_long_key_value);
+    HU_RUN_TEST(test_config_parse_model_router_judge);
+    HU_RUN_TEST(test_config_parse_model_router_judge_disabled_by_default);
 }
