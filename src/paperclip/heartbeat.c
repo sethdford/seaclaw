@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/bootstrap.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
@@ -63,12 +64,12 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
     hu_paperclip_client_t client = {0};
     hu_error_t err = hu_paperclip_client_init(&client, alloc);
     if (err != HU_OK) {
-        fprintf(stderr, "[paperclip] Failed to init client. Set PAPERCLIP_API_URL "
-                        "and PAPERCLIP_AGENT_ID.\n");
+        hu_log_error("paperclip", NULL, "Failed to init client. Set PAPERCLIP_API_URL "
+                        "and PAPERCLIP_AGENT_ID.");
         return err;
     }
 
-    fprintf(stderr, "[paperclip] Heartbeat: agent=%s wake=%s\n", client.agent_id,
+    hu_log_info("paperclip", NULL, "Heartbeat: agent=%s wake=%s", client.agent_id,
             client.wake_reason ? client.wake_reason : "timer");
 
     const char *target_task_id = client.task_id;
@@ -78,7 +79,7 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
     if (target_task_id) {
         err = hu_paperclip_get_task(&client, target_task_id, &task);
         if (err != HU_OK) {
-            fprintf(stderr, "[paperclip] Failed to get task %s: %s\n", target_task_id,
+            hu_log_error("paperclip", NULL, "Failed to get task %s: %s", target_task_id,
                     hu_error_string(err));
             hu_paperclip_client_deinit(&client);
             return err;
@@ -86,12 +87,12 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
     } else {
         err = hu_paperclip_list_tasks(&client, &task_list);
         if (err != HU_OK) {
-            fprintf(stderr, "[paperclip] Failed to list tasks: %s\n", hu_error_string(err));
+            hu_log_error("paperclip", NULL, "Failed to list tasks: %s", hu_error_string(err));
             hu_paperclip_client_deinit(&client);
             return err;
         }
         if (task_list.count == 0) {
-            fprintf(stderr, "[paperclip] No assigned tasks. Heartbeat complete.\n");
+            hu_log_info("paperclip", NULL, "No assigned tasks. Heartbeat complete.");
             hu_paperclip_task_list_free(alloc, &task_list);
             hu_paperclip_client_deinit(&client);
             return HU_OK;
@@ -101,19 +102,19 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
         memset(&task_list.tasks[0], 0, sizeof(hu_paperclip_task_t));
     }
 
-    fprintf(stderr, "[paperclip] Working on: %s — %s\n", target_task_id,
+    hu_log_info("paperclip", NULL, "Working on: %s — %s", target_task_id,
             task.title ? task.title : "(untitled)");
 
     err = hu_paperclip_checkout_task(&client, target_task_id);
     if (err == HU_ERR_ALREADY_EXISTS) {
-        fprintf(stderr, "[paperclip] Task already checked out by another agent.\n");
+        hu_log_info("paperclip", NULL, "Task already checked out by another agent.");
         hu_paperclip_task_free(alloc, &task);
         hu_paperclip_task_list_free(alloc, &task_list);
         hu_paperclip_client_deinit(&client);
         return HU_OK;
     }
     if (err != HU_OK) {
-        fprintf(stderr, "[paperclip] Checkout failed: %s\n", hu_error_string(err));
+        hu_log_error("paperclip", NULL, "Checkout failed: %s", hu_error_string(err));
         hu_paperclip_task_free(alloc, &task);
         hu_paperclip_task_list_free(alloc, &task_list);
         hu_paperclip_client_deinit(&client);
@@ -126,13 +127,13 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
     char context[4096];
     size_t ctx_len = build_task_context(context, sizeof(context), &task, &comments, &client);
 
-    fprintf(stderr, "[paperclip] Context built (%zu chars). Bootstrapping agent...\n", ctx_len);
+    hu_log_info("paperclip", NULL, "Context built (%zu chars). Bootstrapping agent...", ctx_len);
 
     hu_app_ctx_t app = {0};
     const char *config_path = getenv("HUMAN_CONFIG_PATH");
     err = hu_app_bootstrap(&app, alloc, config_path, true, false);
     if (err != HU_OK || !app.agent_ok) {
-        fprintf(stderr, "[paperclip] Agent bootstrap failed: %s (agent_ok=%d)\n",
+        hu_log_error("paperclip", NULL, "Agent bootstrap failed: %s (agent_ok=%d)",
                 hu_error_string(err), app.agent_ok);
         if (app.agent_ok)
             hu_app_teardown(&app);
@@ -148,11 +149,11 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
 
     char *response = NULL;
     size_t response_len = 0;
-    fprintf(stderr, "[paperclip] Running agent turn...\n");
+    hu_log_info("paperclip", NULL, "Running agent turn...");
     err = hu_agent_turn(app.agent, context, ctx_len, &response, &response_len);
 
     if (err == HU_OK && response && response_len > 0) {
-        fprintf(stderr, "[paperclip] Agent responded (%zu chars). Posting comment...\n",
+        hu_log_info("paperclip", NULL, "Agent responded (%zu chars). Posting comment...",
                 response_len);
         hu_paperclip_post_comment(&client, target_task_id, response, response_len);
 
@@ -164,9 +165,9 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
 
         const char *new_status = mark_done ? "done" : "in_progress";
         hu_paperclip_update_task(&client, target_task_id, new_status);
-        fprintf(stderr, "[paperclip] Task updated to '%s'\n", new_status);
+        hu_log_info("paperclip", NULL, "Task updated to '%s'", new_status);
     } else {
-        fprintf(stderr, "[paperclip] Agent turn failed: %s\n", hu_error_string(err));
+        hu_log_error("paperclip", NULL, "Agent turn failed: %s", hu_error_string(err));
         hu_paperclip_post_comment(&client, target_task_id,
                                   "Agent encountered an error processing this task.",
                                   strlen("Agent encountered an error processing this task."));
@@ -182,6 +183,6 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
     hu_paperclip_task_list_free(alloc, &task_list);
     hu_paperclip_client_deinit(&client);
 
-    fprintf(stderr, "[paperclip] Heartbeat complete.\n");
+    hu_log_info("paperclip", NULL, "Heartbeat complete.");
     return HU_OK;
 }

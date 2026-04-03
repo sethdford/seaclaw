@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/agent/cli.h"
 #include "human/agent.h"
 #include "human/agent/awareness.h"
@@ -302,8 +303,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     }
 
     if (parsed_args.demo_mode) {
-        fprintf(stderr, "[human] Demo mode — using local Ollama (no API key required)\n");
-        fprintf(stderr, "[human] Make sure Ollama is running: ollama serve\n");
+        hu_log_info("human", NULL, "Demo mode — using local Ollama (no API key required)");
+        hu_log_info("human", NULL, "Make sure Ollama is running: ollama serve");
         cfg.default_provider = "ollama";
         cfg.default_model = "llama3.2";
         cfg.memory.backend = "none";
@@ -410,7 +411,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     if (log_env && log_env[0]) {
         log_fp = fopen(log_env, "a");
         if (!log_fp) {
-            fprintf(stderr, "[warn] could not open log file '%s': %s\n", log_env, strerror(errno));
+            hu_log_error("warn", NULL, "could not open log file '%s': %s", log_env, strerror(errno));
         } else {
             observer = hu_log_observer_create(alloc, log_fp);
         }
@@ -796,9 +797,8 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                     hu_intelligence_cycle_result_t cycle_result;
                     memset(&cycle_result, 0, sizeof(cycle_result));
                     if (hu_intelligence_run_cycle(alloc, findings_db, &cycle_result) == HU_OK) {
-                        fprintf(stderr,
-                                "[intelligence] cycle: %zu actioned, %zu lessons, %zu events, %zu "
-                                "values\n",
+                        hu_log_info("intelligence", NULL, "cycle: %zu actioned, %zu lessons, %zu events, %zu "
+                                "values",
                                 cycle_result.findings_actioned, cycle_result.lessons_extracted,
                                 cycle_result.events_recorded, cycle_result.values_learned);
                     }
@@ -1018,7 +1018,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
 
         pthread_t tid;
         if (pthread_create(&tid, NULL, agent_turn_thread, &tctx) != 0) {
-            fprintf(stderr, "[error] failed to start agent thread\n");
+            hu_log_error("error", NULL, "failed to start agent thread");
             if (line_owned)
                 alloc->free(alloc->ctx, line, line_len + 1);
             continue;
@@ -1045,7 +1045,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             else
                 printf("Turn cancelled by user.\n");
         } else if (err != HU_OK) {
-            fprintf(stderr, "[error] %s\n", hu_error_string(err));
+            hu_log_error("error", NULL, "%s", hu_error_string(err));
         } else if (tctx.response && tctx.response_len > 0) {
             if (!cli_stream_started) {
                 fwrite(tctx.response, 1, tctx.response_len, stdout);
@@ -1073,7 +1073,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         if (err == HU_ERR_CANCELLED) {
             printf("Turn cancelled.\n");
         } else if (err != HU_OK) {
-            fprintf(stderr, "[error] %s\n", hu_error_string(err));
+            hu_log_error("error", NULL, "%s", hu_error_string(err));
         } else if (response && response_len > 0) {
             fputc('\n', stdout);
             fflush(stdout);

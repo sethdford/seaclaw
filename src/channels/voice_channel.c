@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/channels/voice_channel.h"
 #include "human/core/string.h"
 #include "human/voice/realtime.h"
@@ -60,8 +61,7 @@ static hu_error_t voice_start(void *ctx) {
 
     if (v->config.mode == HU_VOICE_MODE_WEBRTC) {
 #if !HU_IS_TEST
-        fprintf(stderr,
-                "voice_channel: WebRTC uses native ICE/DTLS/SRTP; configure STUN/TURN and signaling_endpoint\n");
+        hu_log_info("voice-channel", NULL, "voice_channel: WebRTC uses native ICE/DTLS/SRTP; configure STUN/TURN and signaling_endpoint");
 #endif
 #if HU_IS_TEST
         v->running = true;
@@ -139,7 +139,7 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
     float *audio_buf = (float *)v->alloc->alloc(v->alloc->ctx, buf_bytes);
     if (!audio_buf) {
 #if !HU_IS_TEST
-        fprintf(stderr, "voice_channel: failed to allocate audio buffer (%zu bytes)\n", buf_bytes);
+        hu_log_error("voice-channel", NULL, "voice_channel: failed to allocate audio buffer (%zu bytes)", buf_bytes);
 #endif
         return HU_ERR_OUT_OF_MEMORY;
     }
@@ -151,7 +151,7 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
                              (const uint8_t *)v->config.speaker_id, exag, audio_buf, &audio_len);
     if (err != 0) {
 #if !HU_IS_TEST
-        fprintf(stderr, "voice_channel: sonata_tts failed (err=%d [sonata])\n", (int)err);
+        hu_log_error("voice-channel", NULL, "voice_channel: sonata_tts failed (err=%d [sonata])", (int)err);
 #endif
         v->alloc->free(v->alloc->ctx, audio_buf, buf_bytes);
         return HU_ERR_CHANNEL_SEND;
@@ -174,7 +174,7 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
 #if HU_IS_TEST
     return HU_OK;
 #else
-    fprintf(stderr, "voice_channel: no TTS backend available (Sonata not built, no audio callback)\n");
+    hu_log_info("voice-channel", NULL, "voice_channel: no TTS backend available (Sonata not built, no audio callback)");
     return HU_ERR_NOT_SUPPORTED;
 #endif
 #endif

@@ -1,4 +1,5 @@
 /* Strict config schema validation — unknown keys, type checks, value validation. */
+#include "human/core/log.h"
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
@@ -138,7 +139,7 @@ static void check_unknown_top_keys(const hu_json_value_t *root, bool strict, boo
         if (!p->key)
             continue;
         if (!key_in_list(p->key, hu_config_top_keys, hu_config_top_keys_len)) {
-            fprintf(stderr, "[config] unknown key: '%s' (ignored)\n", p->key);
+            hu_log_error("config", NULL, "unknown key: '%s' (ignored)", p->key);
             if (strict)
                 *has_error = true;
         }
@@ -155,7 +156,7 @@ static void check_unknown_nested_keys(const hu_json_value_t *obj, const char *se
         if (!p->key)
             continue;
         if (!key_in_list(p->key, allowed, allowed_len)) {
-            fprintf(stderr, "[config] unknown key '%s.%s' (ignored)\n", section, p->key);
+            hu_log_error("config", NULL, "unknown key '%s.%s' (ignored)", section, p->key);
             if (strict)
                 *has_error = true;
         }
@@ -172,7 +173,7 @@ static hu_error_t check_type(const hu_json_value_t *obj, const char *key, hu_jso
                            : (expected == HU_JSON_NUMBER) ? "number"
                            : (expected == HU_JSON_BOOL)   ? "boolean"
                                                           : "unknown";
-        fprintf(stderr, "[config] %s: '%s' must be %s\n", ctx, key, want);
+        hu_log_info("config", NULL, "%s: '%s' must be %s", ctx, key, want);
         return strict ? HU_ERR_CONFIG_INVALID : HU_OK;
     }
     return HU_OK;
@@ -226,7 +227,7 @@ static void check_memory_backend_build(const hu_config_t *cfg, bool strict, bool
         return;
     if (memory_backend_ok_for_build(b))
         return;
-    fprintf(stderr, "[config] memory.backend '%s' is unknown or not available in this build\n", b);
+    hu_log_info("config", NULL, "memory.backend '%s' is unknown or not available in this build", b);
     if (strict)
         *has_error = true;
 }
@@ -285,23 +286,23 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
 
     /* Value validation */
     if (cfg->default_model && !cfg->default_model[0]) {
-        fprintf(stderr, "[config] default_model cannot be empty\n");
+        hu_log_info("config", NULL, "default_model cannot be empty");
         if (strict)
             has_error = true;
     }
     if (cfg->default_provider && !is_provider_valid(cfg->default_provider)) {
-        fprintf(stderr, "[config] unknown provider: '%s'\n",
+        hu_log_info("config", NULL, "unknown provider: '%s'",
                 cfg->default_provider ? cfg->default_provider : "(empty)");
         if (strict)
             has_error = true;
     }
     if (cfg->max_tokens != 0 && (cfg->max_tokens < 1 || cfg->max_tokens > 1000000)) {
-        fprintf(stderr, "[config] max_tokens (%u) outside 1–1000000 (warning)\n", cfg->max_tokens);
+        hu_log_error("config", NULL, "max_tokens (%u) outside 1–1000000 (warning)", cfg->max_tokens);
         if (strict)
             has_error = true;
     }
     if (cfg->agent.max_tool_iterations > 10000) {
-        fprintf(stderr, "[config] agent.max_tool_iterations (%u) outside 1–10000 (warning)\n",
+        hu_log_error("config", NULL, "agent.max_tool_iterations (%u) outside 1–10000 (warning)",
                 cfg->agent.max_tool_iterations);
         if (strict)
             has_error = true;
@@ -310,14 +311,14 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
     /* URL validation */
     if (cfg->memory.api_base_url && strlen(cfg->memory.api_base_url) >= 8) {
         if (!starts_with(cfg->memory.api_base_url, "https://")) {
-            fprintf(stderr, "[config] memory.api_base_url must use https://\n");
+            hu_log_info("config", NULL, "memory.api_base_url must use https://");
             if (strict)
                 has_error = true;
         }
     }
     if (cfg->diagnostics.otel_endpoint && strlen(cfg->diagnostics.otel_endpoint) >= 8) {
         if (!starts_with(cfg->diagnostics.otel_endpoint, "https://")) {
-            fprintf(stderr, "[config] diagnostics.otel_endpoint must use https://\n");
+            hu_log_info("config", NULL, "diagnostics.otel_endpoint must use https://");
             if (strict)
                 has_error = true;
         }
@@ -326,7 +327,7 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
         const char *url = cfg->providers[i].base_url;
         if (url && strlen(url) >= 8 && !starts_with(url, "https://") &&
             !starts_with(url, "http://localhost") && !starts_with(url, "http://127.0.0.1")) {
-            fprintf(stderr, "[config] providers[%zu].base_url must use https:// (or localhost)\n",
+            hu_log_info("config", NULL, "providers[%zu].base_url must use https:// (or localhost)",
                     i);
             if (strict)
                 has_error = true;
@@ -335,27 +336,27 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
 
     /* Path traversal */
     if (cfg->workspace_dir && has_path_traversal(cfg->workspace_dir)) {
-        fprintf(stderr, "[config] workspace_dir must not contain '..'\n");
+        hu_log_info("config", NULL, "workspace_dir must not contain '..'");
         if (strict)
             has_error = true;
     }
     if (cfg->dpo_export_dir && has_path_traversal(cfg->dpo_export_dir)) {
-        fprintf(stderr, "[config] dpo_export_dir must not contain '..'\n");
+        hu_log_info("config", NULL, "dpo_export_dir must not contain '..'");
         if (strict)
             has_error = true;
     }
     if (cfg->memory.sqlite_path && has_path_traversal(cfg->memory.sqlite_path)) {
-        fprintf(stderr, "[config] memory.sqlite_path must not contain '..'\n");
+        hu_log_info("config", NULL, "memory.sqlite_path must not contain '..'");
         if (strict)
             has_error = true;
     }
     if (cfg->security.audit.log_path && has_path_traversal(cfg->security.audit.log_path)) {
-        fprintf(stderr, "[config] security.audit.log_path must not contain '..'\n");
+        hu_log_info("config", NULL, "security.audit.log_path must not contain '..'");
         if (strict)
             has_error = true;
     }
     if (cfg->gateway.control_ui_dir && has_path_traversal(cfg->gateway.control_ui_dir)) {
-        fprintf(stderr, "[config] gateway.control_ui_dir must not contain '..'\n");
+        hu_log_info("config", NULL, "gateway.control_ui_dir must not contain '..'");
         if (strict)
             has_error = true;
     }

@@ -2,6 +2,7 @@
  * Self-update: check GitHub releases, download and replace binary.
  * In HU_IS_TEST mode, returns mock data without network calls.
  */
+#include "human/core/log.h"
 #include "human/update.h"
 #include "human/config.h"
 #include "human/core/allocator.h"
@@ -265,7 +266,7 @@ static hu_error_t verify_sha256(hu_allocator_t *alloc, const char *file_path, co
     }
 
     if (strcmp(actual_hex, expected_hex) != 0) {
-        fprintf(stderr, "[update] SHA256 mismatch: expected %s, got %s\n", expected_hex,
+        hu_log_info("update", NULL, "SHA256 mismatch: expected %s, got %s", expected_hex,
                 actual_hex);
         return HU_ERR_INVALID_ARGUMENT;
     }
@@ -413,7 +414,7 @@ hu_error_t hu_update_apply(void) {
 
     err = verify_sha256(&alloc, tmp_path, asset, tmp_dir);
     if (err != HU_OK) {
-        fprintf(stderr, "[update] Integrity check failed — aborting update.\n");
+        hu_log_error("update", NULL, "Integrity check failed — aborting update.");
         (void)remove(tmp_path);
         alloc.free(alloc.ctx, tmp_dir, strlen(tmp_dir) + 1);
         alloc.free(alloc.ctx, exe_path, strlen(exe_path) + 1);
@@ -511,7 +512,7 @@ hu_error_t hu_update_maybe_check(hu_allocator_t *alloc, const hu_config_t *cfg) 
         printf("Update available: %s -> %s. Downloading...\n", current, latest);
         err = hu_update_apply();
         if (err != HU_OK)
-            fprintf(stderr, "[update] Auto-update failed. Run 'human update' manually.\n");
+            hu_log_error("update", NULL, "Auto-update failed. Run 'human update' manually.");
         return HU_OK;
     }
 

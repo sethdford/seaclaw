@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/channels/imessage.h"
 #include "human/channel_loop.h"
 #include "human/core/error.h"
@@ -621,7 +622,7 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
                     hu_error_t ts_err = hu_process_run(c->alloc, ts_argv, NULL, 65536, &ts_result);
                     hu_run_result_free(c->alloc, &ts_result);
                     if (ts_err != HU_OK && getenv("HU_DEBUG"))
-                        fprintf(stderr, "[imessage] typing indicator failed (accessibility?)\n");
+                        hu_log_error("imessage", NULL, "typing indicator failed (accessibility?)");
                 }
             } else {
                 usleep(delay_ms * 1000);
@@ -1227,7 +1228,7 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
     (void)target_len;
     (void)reaction;
     if (getenv("HU_DEBUG"))
-        fprintf(stderr, "[imessage] tapback disabled (HU_IMESSAGE_TAPBACK_ENABLED=OFF)\n");
+        hu_log_info("imessage", NULL, "tapback disabled (HU_IMESSAGE_TAPBACK_ENABLED=OFF)");
     return HU_ERR_NOT_SUPPORTED;
 #else
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
@@ -1438,7 +1439,7 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
     c->alloc->free(c->alloc->ctx, script, script_cap);
     if (err != HU_OK) {
         if (getenv("HU_DEBUG"))
-            fprintf(stderr, "[imessage] tapback osascript failed: hu_process_run err=%s\n",
+            hu_log_error("imessage", NULL, "tapback osascript failed: hu_process_run err=%s",
                     hu_error_string(err));
         hu_run_result_free(c->alloc, &result);
         return HU_ERR_NOT_SUPPORTED;
@@ -1448,8 +1449,7 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
     hu_run_result_free(c->alloc, &result);
     if (!ok) {
         if (getenv("HU_DEBUG"))
-            fprintf(stderr,
-                    "[imessage] tapback JXA failed (exit=%d, accessibility may be denied)\n",
+            hu_log_error("imessage", NULL, "tapback JXA failed (exit=%d, accessibility may be denied)",
                     exit_code);
         return HU_ERR_NOT_SUPPORTED;
     }
@@ -1575,9 +1575,8 @@ hu_error_t hu_imessage_create(hu_allocator_t *alloc, const char *default_target,
                     }
                     if (persisted > 0 && persisted <= db_max) {
                         c->last_rowid = persisted;
-                        fprintf(stderr,
-                                "[imessage] resuming from persisted rowid=%lld (db max=%lld, "
-                                "recovering %lld messages)\n",
+                        hu_log_info("imessage", NULL, "resuming from persisted rowid=%lld (db max=%lld, "
+                                "recovering %lld messages)",
                                 (long long)persisted, (long long)db_max,
                                 (long long)(db_max - persisted));
                     } else {
@@ -1837,7 +1836,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
     sqlite3 *db = NULL;
     int rc = sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL);
     if (rc != SQLITE_OK) {
-        fprintf(stderr, "[imessage] cannot open chat.db: %s (rc=%d) — check Full Disk Access\n",
+        hu_log_info("imessage", NULL, "cannot open chat.db: %s (rc=%d) — check Full Disk Access",
                 db ? sqlite3_errmsg(db) : "unknown", rc);
         if (db)
             sqlite3_close(db);
@@ -1865,8 +1864,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
                 c->last_rowid = sqlite3_column_int64(seed, 0);
             sqlite3_finalize(seed);
         }
-        fprintf(stderr,
-                "[imessage] late-seeded last_rowid=%lld (only new messages will be processed)\n",
+        hu_log_info("imessage", NULL, "late-seeded last_rowid=%lld (only new messages will be processed)",
                 (long long)c->last_rowid);
         sqlite3_close(db);
         *out_count = 0;
@@ -1944,7 +1942,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
     sqlite3_stmt *stmt = NULL;
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        fprintf(stderr, "[imessage] SQL prepare failed: %s\n", sqlite3_errmsg(db));
+        hu_log_error("imessage", NULL, "SQL prepare failed: %s", sqlite3_errmsg(db));
         sqlite3_close(db);
         return HU_ERR_IO;
     }
@@ -2066,7 +2064,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         c->last_rowid = rowid;
         count++;
         if (getenv("HU_DEBUG"))
-            fprintf(stderr, "[imessage] received from %.20s (group=%d): %.*s\n", handle,
+            hu_log_info("imessage", NULL, "received from %.20s (group=%d): %.*s", handle,
                     (int)msgs[count - 1].is_group, (int)(text_len > 80 ? 80 : text_len), text);
     }
 
@@ -2079,7 +2077,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         imessage_save_rowid(c->last_rowid);
 
     if (count == 0 && getenv("HU_DEBUG"))
-        fprintf(stderr, "[imessage] poll: 0 messages (last_rowid=%lld)\n",
+        hu_log_info("imessage", NULL, "poll: 0 messages (last_rowid=%lld)",
                 (long long)c->last_rowid);
 
     *out_count = count;

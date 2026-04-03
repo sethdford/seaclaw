@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/gateway/openai_compat.h"
 #include "../agent/agent_internal.h"
 #include "human/agent.h"
@@ -634,7 +635,7 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                     }
                 }
                 if (has_tell) {
-                    fprintf(stderr, "[openai-compat] ai-tell retry for: %.60s\n", response);
+                    hu_log_info("openai-compat", NULL, "ai-tell retry for: %.60s", response);
                     app_ctx->agent->alloc->free(app_ctx->agent->alloc->ctx, response,
                                                 response_len + 1);
                     response = NULL;

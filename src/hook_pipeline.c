@@ -1,4 +1,5 @@
 /* Hook pipeline: orchestrated execution of hook entries */
+#include "human/core/log.h"
 #include "human/hook_pipeline.h"
 #include "human/hook.h"
 #include <stdio.h>
@@ -77,7 +78,7 @@ hu_error_t hu_hook_pipeline_execute(const hu_hook_registry_t *registry,
                 return HU_OK;
             }
             /* Non-required: log and continue */
-            fprintf(stderr, "[hook_pipeline] hook '%.*s' execution error: %d (continuing)\n",
+            hu_log_error("hook_pipeline", NULL, "hook '%.*s' execution error: %d (continuing)",
                     (int)(entry->name_len ? entry->name_len : 7),
                     entry->name ? entry->name : "unnamed",
                     (int)err);
@@ -90,8 +91,8 @@ hu_error_t hu_hook_pipeline_execute(const hu_hook_registry_t *registry,
 
         /* Handle unknown exit codes */
         if (exit_code != 0 && exit_code != 2 && exit_code != 3) {
-            fprintf(stderr, "[hook_pipeline] hook '%.*s' returned unexpected exit code %d "
-                    "(treating as allow)\n",
+            hu_log_info("hook_pipeline", NULL, "hook '%.*s' returned unexpected exit code %d "
+                    "(treating as allow)",
                     (int)(entry->name_len ? entry->name_len : 7),
                     entry->name ? entry->name : "unnamed",
                     exit_code);
@@ -123,7 +124,7 @@ hu_error_t hu_hook_pipeline_execute(const hu_hook_registry_t *registry,
 
         if (decision == HU_HOOK_WARN) {
             had_warn = true;
-            fprintf(stderr, "[hook_pipeline] hook '%.*s' warns: %.*s\n",
+            hu_log_error("hook_pipeline", NULL, "hook '%.*s' warns: %.*s",
                     (int)(entry->name_len ? entry->name_len : 7),
                     entry->name ? entry->name : "unnamed",
                     (int)(stdout_len > 200 ? 200 : stdout_len),

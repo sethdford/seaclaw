@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/agent.h"
 #include "human/gateway.h"
 #include "human/config.h"
@@ -467,7 +468,7 @@ static bool send_all(int fd, const char *buf, size_t len) {
         if (n < 0 && errno == EINTR)
             continue;
         if (n <= 0) {
-            fprintf(stderr, "[gateway] send_all: write failed after %zu/%zu bytes\n", sent, len);
+            hu_log_error("gateway", NULL, "send_all: write failed after %zu/%zu bytes", sent, len);
             return false;
         }
         sent += (size_t)n;
@@ -769,7 +770,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
                                 const char *cookie_header, const char *auth_header) {
 
     if (gw->config.test_mode) {
-        fprintf(stderr, "[gateway] %s %s %s body=%zu\n", method ? method : "?", path ? path : "/",
+        hu_log_info("gateway", NULL, "%s %s %s body=%zu", method ? method : "?", path ? path : "/",
                 client_ip ? client_ip : "unknown", body_len);
     }
 
@@ -1251,7 +1252,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         char ch_buf[32];
         const char *channel = webhook_path_to_channel(path, ch_buf, sizeof(ch_buf));
         if (gw->config.test_mode)
-            (void)fprintf(stderr, "[gateway] webhook received channel=%s\n", channel);
+            hu_log_info("gateway", NULL, "webhook received channel=%s", channel);
         if (gw && gw->config.on_webhook) {
             bool ok = gw->config.on_webhook(channel, body, body_len, gw->config.on_webhook_ctx);
             if (!ok) {
@@ -1436,8 +1437,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
         if (gw->pairing_guard) {
             const char *code = hu_pairing_guard_pairing_code(gw->pairing_guard);
             if (code)
-                fprintf(stderr,
-                        "[gateway] Pairing code ready (use /pair endpoint or UI to view)\n");
+                hu_log_info("gateway", NULL, "Pairing code ready (use /pair endpoint or UI to view)");
             (void)code;
         }
     }
@@ -1534,7 +1534,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
         goto cleanup;
     }
 
-    fprintf(stderr, "[gateway] listening on %s:%u (ws: enabled, ui: %s)\n", cfg.host,
+    hu_log_info("gateway", NULL, "listening on %s:%u (ws: enabled, ui: %s)", cfg.host,
             (unsigned)cfg.port, cfg.control_ui_dir ? cfg.control_ui_dir : "disabled");
 
     /* Poll-based event loop: listen socket + WebSocket connections */
@@ -1646,7 +1646,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                 } else {
                     if (!gw->config.require_pairing)
                         conn->authenticated = true;
-                    fprintf(stderr, "[gateway] ws connected id=%llu ip=%s\n",
+                    hu_log_info("gateway", NULL, "ws connected id=%llu ip=%s",
                             (unsigned long long)conn->id, client_ip);
                 }
                 continue;
@@ -1819,7 +1819,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
     /* Graceful shutdown: stop accepting, drain in-flight requests */
     if (s_gateway_stop) {
         hu_health_mark_error("gateway", "shutting down");
-        fprintf(stderr, "[gateway] graceful shutdown initiated, draining connections...\n");
+        hu_log_info("gateway", NULL, "graceful shutdown initiated, draining connections...");
         if (fd >= 0) {
             close(fd);
             fd = -1;
@@ -1840,7 +1840,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                 }
             }
         }
-        fprintf(stderr, "[gateway] shutdown complete\n");
+        hu_log_info("gateway", NULL, "shutdown complete");
     }
 
 cleanup:

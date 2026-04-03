@@ -1,5 +1,6 @@
 /* Chat-related control protocol handlers: chat.send, chat.history, chat.abort */
 #include "cp_internal.h"
+#include "human/core/log.h"
 #include "human/bus.h"
 #include "human/security/moderation.h"
 #include "human/session.h"
@@ -44,8 +45,7 @@ hu_error_t cp_chat_send(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn
         memset(&mod, 0, sizeof(mod));
         size_t msg_len = strlen(message);
         if (hu_moderation_check(alloc, message, msg_len, &mod) == HU_OK && mod.self_harm) {
-            fprintf(stderr,
-                    "[cp_chat] inbound self-harm detected (score=%.2f), injecting crisis\n",
+            hu_log_error("cp_chat", NULL, "inbound self-harm detected (score=%.2f), injecting crisis",
                     mod.self_harm_score);
             hu_json_value_t *obj = hu_json_object_new(alloc);
             if (!obj)

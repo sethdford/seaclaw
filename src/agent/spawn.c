@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/agent/spawn.h"
 #include "human/agent.h"
 #include "human/agent/tool_context.h"
@@ -262,7 +263,7 @@ static void *spawn_thread(void *arg) {
             hu_error_t rm_err = hu_worktree_remove(pool->worktree_mgr, s->agent_id);
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
             if (rm_err != HU_OK)
-                fprintf(stderr, "[spawn] worktree cleanup failed: %s\n", hu_error_string(rm_err));
+                hu_log_error("spawn", NULL, "worktree cleanup failed: %s", hu_error_string(rm_err));
 #else
             (void)rm_err;
 #endif
@@ -393,7 +394,7 @@ void hu_agent_pool_destroy(hu_agent_pool_t *pool) {
             hu_error_t rm_err = hu_worktree_remove(pool->worktree_mgr, s->agent_id);
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
             if (rm_err != HU_OK)
-                fprintf(stderr, "[spawn] worktree cleanup failed: %s\n", hu_error_string(rm_err));
+                hu_log_error("spawn", NULL, "worktree cleanup failed: %s", hu_error_string(rm_err));
 #else
             (void)rm_err;
 #endif
@@ -533,7 +534,7 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
         hu_error_t rm_err = hu_worktree_remove(pool->worktree_mgr, s->agent_id);
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
         if (rm_err != HU_OK)
-            fprintf(stderr, "[spawn] worktree cleanup failed: %s\n", hu_error_string(rm_err));
+            hu_log_error("spawn", NULL, "worktree cleanup failed: %s", hu_error_string(rm_err));
 #else
         (void)rm_err;
 #endif
@@ -672,7 +673,7 @@ hu_error_t hu_agent_pool_cancel(hu_agent_pool_t *pool, uint64_t agent_id) {
             hu_error_t rm_err = hu_worktree_remove(pool->worktree_mgr, s->agent_id);
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
             if (rm_err != HU_OK)
-                fprintf(stderr, "[spawn] worktree cleanup failed: %s\n", hu_error_string(rm_err));
+                hu_log_error("spawn", NULL, "worktree cleanup failed: %s", hu_error_string(rm_err));
 #else
             (void)rm_err;
 #endif

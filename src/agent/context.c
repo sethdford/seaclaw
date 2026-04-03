@@ -1,3 +1,4 @@
+#include "human/core/log.h"
 #include "human/context.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
@@ -114,14 +115,14 @@ bool hu_context_check_pressure(hu_context_pressure_t *p, float pressure_warn,
     if (p->pressure >= pressure_warn && !p->warning_85_emitted) {
         p->warning_85_emitted = true;
 #ifndef HU_IS_TEST
-        fprintf(stderr, "[agent] Context pressure at %.0f%% — consider compacting\n",
+        hu_log_info("agent", NULL, "Context pressure at %.0f%% — consider compacting",
                 p->pressure * 100.0f);
 #endif
     }
     if (p->pressure >= pressure_compact && !p->warning_95_emitted) {
         p->warning_95_emitted = true;
 #ifndef HU_IS_TEST
-        fprintf(stderr, "[agent] Context pressure at %.0f%% — auto-compacting oldest messages\n",
+        hu_log_info("agent", NULL, "Context pressure at %.0f%% — auto-compacting oldest messages",
                 p->pressure * 100.0f);
 #endif
         return true;
