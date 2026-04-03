@@ -30,12 +30,12 @@ void hu_boundary_deinit(hu_allocator_t *alloc, hu_boundary_t *b);
 
 /* F69 — Humor Generation */
 typedef enum hu_humor_style {
-    HU_HUMOR_NONE = 0,
-    HU_HUMOR_CALLBACK,        /* reference to previous funny moment */
-    HU_HUMOR_OBSERVATIONAL,   /* noticing something funny about situation */
-    HU_HUMOR_SELF_DEPRECATING,/* making fun of self */
-    HU_HUMOR_ABSURD,          /* unexpected/surreal */
-    HU_HUMOR_DEADPAN          /* dry/understated */
+    HU_HUMOR_STYLE_NONE = 0,
+    HU_HUMOR_STYLE_CALLBACK,        /* reference to previous funny moment */
+    HU_HUMOR_STYLE_OBSERVATIONAL,   /* noticing something funny about situation */
+    HU_HUMOR_STYLE_SELF_DEPRECATING,/* making fun of self */
+    HU_HUMOR_STYLE_ABSURD,          /* unexpected/surreal */
+    HU_HUMOR_STYLE_DEADPAN          /* dry/understated */
 } hu_humor_style_t;
 
 typedef struct hu_humor_config {

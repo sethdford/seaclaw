@@ -89,7 +89,7 @@ static void agent_push_tool_call_msg(hu_allocator_t *alloc, hu_agent_t *agent,
     m->tool_calls_count = 1;
     size_t nlen = strlen(tool_name);
     m->tool_calls[0].name = (char *)alloc->alloc(alloc->ctx, nlen + 1);
-    memcpy(m->tool_calls[0].name, tool_name, nlen + 1);
+    memcpy((char *)m->tool_calls[0].name, tool_name, nlen + 1);
     m->tool_calls[0].name_len = nlen;
 }
 
@@ -106,11 +106,11 @@ static void free_int_history(hu_allocator_t *alloc, hu_agent_t *agent) {
             for (size_t t = 0; t < m->tool_calls_count; t++) {
                 hu_tool_call_t *tc = &m->tool_calls[t];
                 if (tc->id)
-                    alloc->free(alloc->ctx, tc->id, tc->id_len + 1);
+                    alloc->free(alloc->ctx, (void *)tc->id, tc->id_len + 1);
                 if (tc->name)
-                    alloc->free(alloc->ctx, tc->name, tc->name_len + 1);
+                    alloc->free(alloc->ctx, (void *)tc->name, tc->name_len + 1);
                 if (tc->arguments)
-                    alloc->free(alloc->ctx, tc->arguments, tc->arguments_len + 1);
+                    alloc->free(alloc->ctx, (void *)tc->arguments, tc->arguments_len + 1);
             }
             alloc->free(alloc->ctx, m->tool_calls, m->tool_calls_count * sizeof(hu_tool_call_t));
         }
@@ -915,13 +915,7 @@ static void test_hook_output_instruction_injection_blocked(void) {
 /* Test 21: MCP tool masquerading — mcp__evil__file_write still requires WORKSPACE_WRITE permission. */
 static void test_mcp_tool_masquerading_permission_enforced(void) {
     hu_tracking_allocator_t *ta = hu_tracking_allocator_create();
-    hu_allocator_t alloc = hu_tracking_allocator_allocator(ta);
-
-    /* Even though tool name includes "file_write", MCP tools don't get special treatment.
-     * Permission is based on the tool's registered level, not its name pattern. */
-
-    /* Simulate an MCP tool named "mcp__evil__file_write" at READ_ONLY permission
-     * (hypothetically). The permission system should use the tool's configured level. */
+    (void)hu_tracking_allocator_allocator(ta);
 
     hu_permission_level_t agent_level = HU_PERM_READ_ONLY;
     hu_permission_level_t required = hu_permission_get_tool_level("mcp__evil__file_write");

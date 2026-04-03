@@ -26,10 +26,10 @@ static void humor_select_serious_topic_returns_none(void) {
         .humor_probability = 0.5,
         .never_during_crisis = true,
         .never_during_serious = true,
-        .preferred = HU_HUMOR_OBSERVATIONAL
+        .preferred = HU_HUMOR_STYLE_OBSERVATIONAL
     };
     hu_humor_style_t s = hu_humor_select_style(0.8, true, false, &cfg, 42);
-    HU_ASSERT_EQ(s, HU_HUMOR_NONE);
+    HU_ASSERT_EQ(s, HU_HUMOR_STYLE_NONE);
 }
 
 static void protective_topic_null_boundaries_returns_false(void) {
@@ -41,15 +41,15 @@ static void humor_select_casual_returns_valid_style(void) {
         .humor_probability = 1.0,
         .never_during_crisis = true,
         .never_during_serious = true,
-        .preferred = HU_HUMOR_OBSERVATIONAL
+        .preferred = HU_HUMOR_STYLE_OBSERVATIONAL
     };
     hu_humor_style_t s = hu_humor_select_style(0.8, false, false, &cfg, 42);
-    HU_ASSERT_TRUE(s >= HU_HUMOR_NONE && s <= HU_HUMOR_DEADPAN);
+    HU_ASSERT_TRUE(s >= HU_HUMOR_STYLE_NONE && s <= HU_HUMOR_STYLE_DEADPAN);
 }
 
 static void humor_style_str_returns_non_null(void) {
-    HU_ASSERT_NOT_NULL(hu_humor_style_str(HU_HUMOR_OBSERVATIONAL));
-    HU_ASSERT_NOT_NULL(hu_humor_style_str(HU_HUMOR_NONE));
+    HU_ASSERT_NOT_NULL(hu_humor_style_str(HU_HUMOR_STYLE_OBSERVATIONAL));
+    HU_ASSERT_NOT_NULL(hu_humor_style_str(HU_HUMOR_STYLE_NONE));
 }
 
 static void protective_build_prompt_with_boundary(void) {
