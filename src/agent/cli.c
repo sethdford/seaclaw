@@ -1029,8 +1029,27 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             time_t now_rt = time(NULL);
             struct tm *lt = localtime(&now_rt);
             int hour = lt ? lt->tm_hour : 12;
-            hu_model_selection_t sel =
-                hu_model_route(&mr_cfg, line, line_len, NULL, 0, hour, agent.history_count);
+            hu_model_selection_t sel;
+            if (cfg.agent.mr_judge_enabled) {
+                static hu_route_cache_t cli_judge_cache;
+                static bool cli_judge_cache_inited = false;
+                if (!cli_judge_cache_inited) {
+                    hu_route_cache_init(&cli_judge_cache);
+                    cli_judge_cache_inited = true;
+                }
+                const char *jm = mr_cfg.reflexive_model;
+                size_t jm_len = mr_cfg.reflexive_model_len;
+                if (cfg.agent.mr_judge_model) {
+                    jm = cfg.agent.mr_judge_model;
+                    jm_len = strlen(cfg.agent.mr_judge_model);
+                }
+                sel = hu_model_route_with_judge(
+                    &mr_cfg, line, line_len, NULL, 0, hour, agent.history_count,
+                    &agent.provider, jm, jm_len, agent.alloc, &cli_judge_cache);
+            } else {
+                sel = hu_model_route(&mr_cfg, line, line_len, NULL, 0, hour,
+                                     agent.history_count);
+            }
             agent.turn_model = sel.model;
             agent.turn_model_len = sel.model_len;
             agent.turn_temperature = sel.temperature;

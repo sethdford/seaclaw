@@ -7705,8 +7705,28 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 #endif
-                    hu_model_selection_t sel = hu_model_route(&mr_cfg, combined, combined_len, rel,
-                                                              rel_len, bth_hour, history_count);
+                    hu_model_selection_t sel;
+                    if (config && config->agent.mr_judge_enabled) {
+                        static hu_route_cache_t judge_cache;
+                        static bool judge_cache_inited = false;
+                        if (!judge_cache_inited) {
+                            hu_route_cache_init(&judge_cache);
+                            judge_cache_inited = true;
+                        }
+                        const char *jm = mr_cfg.reflexive_model;
+                        size_t jm_len = mr_cfg.reflexive_model_len;
+                        if (config->agent.mr_judge_model) {
+                            jm = config->agent.mr_judge_model;
+                            jm_len = strlen(config->agent.mr_judge_model);
+                        }
+                        sel = hu_model_route_with_judge(
+                            &mr_cfg, combined, combined_len, rel, rel_len, bth_hour,
+                            history_count, &agent->provider, jm, jm_len,
+                            agent->alloc, &judge_cache);
+                    } else {
+                        sel = hu_model_route(&mr_cfg, combined, combined_len, rel,
+                                             rel_len, bth_hour, history_count);
+                    }
                     agent->turn_model = sel.model;
                     agent->turn_model_len = sel.model_len;
                     agent->turn_temperature = sel.temperature;
@@ -7714,9 +7734,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     static const char *tier_names[] = {"reflexive", "conversational", "analytical",
                                                        "deep"};
                     hu_log_info("human", agent ? agent->observer : NULL,
-                                "model route: %.*s (tier=%s, thinking=%d) for %.*s",
+                                "model route: %.*s (tier=%s, src=%s, thinking=%d) for %.*s",
                                 (int)sel.model_len, sel.model,
-                                tier_names[sel.tier < 4 ? sel.tier : 0], sel.thinking_budget,
+                                tier_names[sel.tier < 4 ? sel.tier : 0],
+                                hu_route_source_str(sel.source), sel.thinking_budget,
                                 (int)(key_len > 20 ? 20 : key_len), batch_key);
                 }
 #endif
