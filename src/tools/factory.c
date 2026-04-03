@@ -95,11 +95,14 @@
 #include "human/tools/skill_run.h"
 #endif
 #include "human/tools/lsp.h"
+#include "human/tools/tool_search.h"
 #include "human/tools/skill_write.h"
 #include "human/tools/spawn.h"
 #include "human/tools/voice_clone.h"
 #include "human/tools/web_fetch.h"
 #include "human/tools/web_search.h"
+#include "human/tools/ask_user.h"
+#include "human/tools/task_tools.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -120,9 +123,9 @@
 #else
 #define HU_TOOLS_CARTESIA_COUNT 0
 #endif
-/* Base: 55 (core tools incl. lsp) + cron - 1 (skill_run conditional) + persona + cartesia */
+/* Base: 56 (core tools incl. lsp + tool_search) + 5 (ask_user + 4 task tools) + cron - 1 (skill_run conditional) + persona + cartesia */
 #define HU_TOOLS_COUNT_BASE \
-    (55 + HU_TOOLS_CRON_COUNT - 1 + HU_TOOLS_PERSONA_COUNT + HU_TOOLS_CARTESIA_COUNT)
+    (56 + 5 + HU_TOOLS_CRON_COUNT - 1 + HU_TOOLS_PERSONA_COUNT + HU_TOOLS_CARTESIA_COUNT)
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -586,12 +589,54 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     tools[idx] = hu_lsp_tool_create(alloc);
     idx++;
 
+    /* tool_search: searches available tools by name/keyword.
+     * Note: pass tools array and current idx (doesn't include itself yet) */
+    err = hu_tool_search_create(alloc, tools, idx, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
+
 #ifdef HU_ENABLE_CURL
     err = hu_paperclip_tool_create(alloc, &tools[idx]);
     if (err != HU_OK)
         goto fail;
     idx++;
 #endif
+
+    /* ask_user tool */
+    tools[idx] = hu_tool_ask_user_create(alloc, NULL);
+    if (!tools[idx].ctx || !tools[idx].vtable) {
+        goto fail;
+    }
+    idx++;
+
+    /* task_create tool */
+    tools[idx] = hu_tool_task_create(alloc, NULL);
+    if (!tools[idx].ctx || !tools[idx].vtable) {
+        goto fail;
+    }
+    idx++;
+
+    /* task_update tool */
+    tools[idx] = hu_tool_task_update(alloc, NULL);
+    if (!tools[idx].ctx || !tools[idx].vtable) {
+        goto fail;
+    }
+    idx++;
+
+    /* task_list tool */
+    tools[idx] = hu_tool_task_list(alloc, NULL);
+    if (!tools[idx].ctx || !tools[idx].vtable) {
+        goto fail;
+    }
+    idx++;
+
+    /* task_get tool */
+    tools[idx] = hu_tool_task_get(alloc, NULL);
+    if (!tools[idx].ctx || !tools[idx].vtable) {
+        goto fail;
+    }
+    idx++;
 
     /* Load MCP server tools from config when available */
     hu_tool_t *mcp_tools = NULL;

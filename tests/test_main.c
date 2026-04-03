@@ -77,6 +77,7 @@ void run_net_security_tests(void);
 void run_path_security_tests(void);
 void run_process_util_tests(void);
 void run_prompt_tests(void);
+void run_tool_search_tests(void);
 #ifdef HU_ENABLE_PERSONA
 void run_persona_tests(void);
 void run_circadian_tests(void);
@@ -116,14 +117,20 @@ void run_pairing_tests(void);
 void run_agent_extended_tests(void);
 void run_agent_security_tests(void);
 void run_agent_teams_tests(void);
+void run_diagnostic_commands_tests(void);
 void run_skills_tests(void);
 void run_memory_new_tests(void);
 void run_ported_modules_tests(void);
 void run_cron_tests(void);
+void run_cron_session_tools_tests(void);
 void run_subagent_tests(void);
+void run_task_manager_tests(void);
+void run_task_tools_tests(void);
+void run_tool_ask_user_tests(void);
 void run_mcp_tests(void);
 void run_mcp_jsonrpc_tests(void);
 void run_mcp_manager_tests(void);
+void run_mcp_resource_tools_tests(void);
 void run_mcp_transport_tests(void);
 void run_mcp_transport_sse_tests(void);
 void run_otel_trace_tests(void);
@@ -480,6 +487,7 @@ int main(int argc, char **argv) {
     run_path_security_tests();
     run_process_util_tests();
     run_prompt_tests();
+    run_tool_search_tests();
 #ifdef HU_ENABLE_PERSONA
     run_persona_tests();
     run_circadian_tests();
@@ -519,14 +527,17 @@ int main(int argc, char **argv) {
     run_agent_extended_tests();
     run_agent_security_tests();
     run_agent_teams_tests();
+    run_diagnostic_commands_tests();
     run_skills_tests();
     run_memory_new_tests();
     run_ported_modules_tests();
     run_cron_tests();
+    run_cron_session_tools_tests();
     run_subagent_tests();
     run_mcp_tests();
     run_mcp_jsonrpc_tests();
     run_mcp_manager_tests();
+    run_mcp_resource_tools_tests();
     run_mcp_transport_tests();
     run_mcp_transport_sse_tests();
     run_otel_trace_tests();
@@ -774,6 +785,9 @@ int main(int argc, char **argv) {
     run_adversarial_integration_tests();
     run_config_reload_tests();
     run_plugin_hooks_tests();
+    run_task_manager_tests();
+    run_task_tools_tests();
+    run_tool_ask_user_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

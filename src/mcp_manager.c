@@ -41,6 +41,7 @@ struct hu_mcp_manager {
     hu_allocator_t *alloc;
     hu_mcp_mgr_slot_t slots[HU_MCP_MANAGER_MAX_SERVERS];
     size_t slot_count;
+    uint32_t next_rpc_id;  /* For JSON-RPC request IDs - replaces static variable */
 };
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
@@ -93,6 +94,7 @@ hu_error_t hu_mcp_manager_create(hu_allocator_t *alloc,
         return HU_ERR_OUT_OF_MEMORY;
     memset(mgr, 0, sizeof(*mgr));
     mgr->alloc = alloc;
+    mgr->next_rpc_id = 1;  /* Initialize RPC ID counter */
 
     if (!entries || count == 0) {
         *out = mgr;
@@ -379,8 +381,8 @@ static hu_error_t mgr_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         /* Build JSON-RPC request for tools/call */
         char *request = NULL;
         size_t request_len = 0;
-        static uint32_t rpc_id_counter = 1;
-        hu_error_t jerr = hu_mcp_jsonrpc_build_tools_call(alloc, rpc_id_counter++,
+        uint32_t rpc_id = w->mgr->next_rpc_id++;
+        hu_error_t jerr = hu_mcp_jsonrpc_build_tools_call(alloc, rpc_id,
             w->original_name, args_json, &request, &request_len);
         if (jerr != HU_OK) {
             *out = hu_tool_result_fail("Failed to build JSON-RPC request", 32);
@@ -417,9 +419,8 @@ static hu_error_t mgr_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_js
             char errbuf[512];
             const char *body = response.body ? response.body : "(empty)";
             int n = snprintf(errbuf, sizeof(errbuf),
-                           "HTTP %ld from '%s': %.*s",
+                           "MCP HTTP error (status %ld): %.*s",
                            response.status_code,
-                           slot->url ? slot->url : "?",
                            (int)(response.body_len > 200 ? 200 : response.body_len),
                            body);
             if (n < 0) n = 0;
@@ -438,12 +439,26 @@ static hu_error_t mgr_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         hu_http_response_free(alloc, &response);
 
         if (parse_err != HU_OK) {
-            *out = hu_tool_result_fail("Failed to parse JSON-RPC response", 32);
+            *out = hu_tool_result_fail("MCP response parse error: invalid JSON-RPC", 41);
             return HU_OK;
         }
 
         if (is_error) {
-            *out = hu_tool_result_fail_owned(result, result_len);
+            /* Prefix tool error with context */
+            char errbuf[512];
+            const char *result_cstr = result ? result : "";
+            int n = snprintf(errbuf, sizeof(errbuf), "MCP tool error: %.*s",
+                           (int)(result_len > 400 ? 400 : result_len), result_cstr);
+            if (n < 0) n = 0;
+            if (result)
+                alloc->free(alloc->ctx, result, result_len + 1);
+            char *msg = (char *)alloc->alloc(alloc->ctx, (size_t)n + 1);
+            if (msg) {
+                memcpy(msg, errbuf, (size_t)n + 1);
+                *out = hu_tool_result_fail_owned(msg, (size_t)n);
+            } else {
+                *out = hu_tool_result_fail(errbuf, (size_t)n);
+            }
         } else {
             *out = hu_tool_result_ok_owned(result, result_len);
         }

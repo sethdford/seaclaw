@@ -498,6 +498,7 @@ set(HU_CORE_SOURCES
     src/agent/proactive_ext.c
     src/agent/weather_awareness.c
     src/agent/weather_fetch.c
+    src/agent/workspace_context.c
     src/agent/timing.c
     src/agent/governor.c
     src/agent/relationship_dynamics.c
@@ -633,6 +634,9 @@ set(HU_CORE_SOURCES
     src/tools/memory_forget.c
     src/tools/bff_memory.c
     src/tools/doc_ingest.c
+    src/task_manager.c
+    src/tools/ask_user.c
+    src/tools/task_tools.c
     src/tools/meeting_transcribe.c
     src/tools/message.c
     src/tools/delegate.c
@@ -673,6 +677,8 @@ set(HU_CORE_SOURCES
     src/tools/diff.c
     src/tools/voice_clone.c
     src/tools/factory.c
+    src/tools/mcp_resource_tools.c
+    src/tools/cron_session_tools.c
     src/mcp_server.c
     src/channels/thread_binding.c
     src/channels/format.c
@@ -796,6 +802,7 @@ list(APPEND HU_CORE_SOURCES
     src/tools/browser_use.c
     src/tools/gui_agent.c
     src/tools/lsp.c
+    src/tools/tool_search.c
     src/voice/webrtc.c
     src/voice/webrtc_ice.c
     src/voice/webrtc_dtls.c
@@ -1935,6 +1942,7 @@ set(HU_TEST_SOURCES
     tests/test_path_security.c
     tests/test_process_util.c
     tests/test_cron.c
+    tests/test_cron_session_tools.c
     tests/test_channel_loop.c
     tests/test_rag.c
     tests/test_multimodal.c
@@ -1952,6 +1960,7 @@ set(HU_TEST_SOURCES
     tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c
+    tests/test_tool_search.c
     tests/test_vector.c
     tests/test_vector_full.c
     tests/test_lifecycle.c
@@ -2003,6 +2012,7 @@ set(HU_TEST_SOURCES
     tests/test_plugin.c
     tests/test_tenant.c
     tests/test_agent_teams.c
+    tests/test_diagnostic_commands.c
     tests/test_untested_modules.c
     tests/test_modules_coverage.c
     tests/test_coverage_new.c
@@ -2170,6 +2180,9 @@ list(APPEND HU_TEST_SOURCES
     tests/test_token_budget.c
     tests/test_data_quality.c
     tests/test_tool_validation.c
+    tests/test_tool_ask_user.c
+    tests/test_task_manager.c
+    tests/test_task_tools.c
     tests/test_otlp.c
     tests/test_mar.c
     tests/test_mem_policy.c
@@ -2178,6 +2191,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_checkpoint.c
     tests/test_scratchpad.c
     tests/test_mcp_resources.c
+    tests/test_mcp_resource_tools.c
     tests/test_context_engine.c
     tests/test_exec_env.c
     tests/test_channel_monitor.c

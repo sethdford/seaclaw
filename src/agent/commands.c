@@ -7,11 +7,16 @@
 #include "human/agent/spawn.h"
 #include "human/agent/task_list.h"
 #include "human/agent/undo.h"
+#include "human/agent/instruction_discover.h"
 #include "human/core/string.h"
+#include "human/hook.h"
+#include "human/permission.h"
+#include "human/mcp_manager.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static _Thread_local hu_slash_cmd_t g_parsed;
 static _Thread_local char g_name_buf[64];
@@ -203,7 +208,7 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
                            "  /retry            Remove last response; resend to retry\n"
                            "  /model [name]     Show or switch model\n"
                            "  /provider         Show current provider\n"
-                           "  /tools            List available tools\n"
+                           "  /tools            List available tools with permission tiers\n"
                            "  /plan <json>      Execute a structured plan\n"
                            "  /goal <text>      Generate and execute plan from a goal\n"
                            "  /cost             Show token usage\n"
@@ -221,7 +226,13 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
                            "  /resume <id>      Resume a saved session\n"
                            "  /list-sessions    List saved sessions\n"
                            "  /save-session     Save current session\n"
-                           "  /reload-config    Reload config (hooks, perms, instructions)\n";
+                           "  /reload-config    Reload config (hooks, perms, instructions)\n"
+                           "\nDiagnostic commands:\n"
+                           "  /hooks            Show registered hooks (pre/post tool execute)\n"
+                           "  /mcp              Show MCP server status and tool counts\n"
+                           "  /permissions      Show current permission level and tool classifications\n"
+                           "  /instructions     Show discovered instruction files\n"
+                           "  /sessions         Alias for /list-sessions\n";
         return hu_strndup(agent->alloc, help, strlen(help));
     }
 
@@ -721,6 +732,136 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             return hu_sprintf(agent->alloc, "Config reload failed: %s", hu_error_string(err));
         }
         return summary;
+    }
+
+    /* ── Diagnostic Commands ─────────────────────────────────────────────────── */
+
+    /* /hooks — Show registered hooks */
+    if (hu_strncasecmp(cmd_buf, "hooks", 5) == 0) {
+        if (!agent->hook_registry) {
+            return hu_strndup(agent->alloc, "No hooks registered.", 20);
+        }
+        size_t count = hu_hook_registry_count(agent->hook_registry);
+        if (count == 0) {
+            return hu_strndup(agent->alloc, "No hooks registered.", 20);
+        }
+        char *buf = (char *)agent->alloc->alloc(agent->alloc->ctx, 4096);
+        if (!buf)
+            return NULL;
+        int off = snprintf(buf, 4096, "Hooks:\n");
+        if (off < 0 || (size_t)off >= 4096)
+            off = 0;
+        for (size_t i = 0; i < count && off < 3900; i++) {
+            const hu_hook_entry_t *hook = hu_hook_registry_get(agent->hook_registry, i);
+            if (!hook)
+                continue;
+            const char *event_name = hook->event == HU_HOOK_PRE_TOOL_EXECUTE  ? "pre_tool_execute"
+                                   : hook->event == HU_HOOK_POST_TOOL_EXECUTE ? "post_tool_execute"
+                                                                              : "unknown";
+            int nw = snprintf(buf + off, 4096 - (size_t)off,
+                            "  [%s] %.*s: %.*s (timeout: %us, required: %s)\n",
+                            event_name, (int)hook->name_len, hook->name,
+                            (int)hook->command_len, hook->command,
+                            hook->timeout_sec > 0 ? hook->timeout_sec : 30,
+                            hook->required ? "yes" : "no");
+            if (nw < 0)
+                break;
+            off += nw;
+        }
+        off += snprintf(buf + off, 4096 - (size_t)off, "Total: %zu hooks registered\n", count);
+        return buf;
+    }
+
+    /* /mcp — Show MCP server status */
+    if (hu_strncasecmp(cmd_buf, "mcp", 3) == 0) {
+        /* Check if MCP manager is available in config or agent.
+           For now, return a status message indicating MCP availability. */
+        return hu_strndup(agent->alloc,
+                         "MCP Servers:\n"
+                         "  (MCP manager not available in current agent configuration)\n"
+                         "Total: 0 servers\n"
+                         "Note: Enable MCP in config to discover tools from MCP servers",
+                         134);
+    }
+
+    /* /permissions — Show current permission level and tool classification */
+    if (hu_strncasecmp(cmd_buf, "permissions", 11) == 0) {
+        hu_permission_level_t level = agent->permission_level;
+        const char *level_name = hu_permission_level_name(level);
+        char *buf = (char *)agent->alloc->alloc(agent->alloc->ctx, 4096);
+        if (!buf)
+            return NULL;
+        int off = snprintf(buf, 4096, "Current permission level: %s\n\nTool classification:\n", level_name);
+        if (off < 0 || (size_t)off >= 4096)
+            off = 0;
+
+        /* Count tools by permission tier */
+        size_t readonly_count = 0, workspace_count = 0, danger_count = 0;
+
+        /* Iterate agent tools to count by tier */
+        for (size_t i = 0; i < agent->tools_count && i < 100; i++) {
+            const char *tool_name = agent->tools[i].vtable->name(agent->tools[i].ctx);
+            if (!tool_name)
+                continue;
+            hu_permission_level_t tool_level = hu_permission_get_tool_level(tool_name);
+            if (tool_level == HU_PERM_READ_ONLY) {
+                readonly_count++;
+            } else if (tool_level == HU_PERM_WORKSPACE_WRITE) {
+                workspace_count++;
+            } else {
+                danger_count++;
+            }
+        }
+
+        off += snprintf(buf + off, 4096 - (size_t)off,
+                       "  read_only (%zu): (use /tools for full list)\n"
+                       "  workspace_write (%zu): (use /tools for full list)\n"
+                       "  danger_full_access (%zu): (use /tools for full list)\n",
+                       readonly_count, workspace_count, danger_count);
+        return buf;
+    }
+
+    /* /instructions — Show discovered instruction files */
+    if (hu_strncasecmp(cmd_buf, "instructions", 12) == 0) {
+        if (!agent->instruction_discovery) {
+            return hu_strndup(agent->alloc,
+                             "Instruction discovery not configured.\n"
+                             "Use /reload-config to discover instruction files.",
+                             97);
+        }
+        hu_instruction_discovery_t *disc = agent->instruction_discovery;
+        char *buf = (char *)agent->alloc->alloc(agent->alloc->ctx, 4096);
+        if (!buf)
+            return NULL;
+
+        int off = snprintf(buf, 4096, "Instruction files:\n");
+        if (off < 0 || (size_t)off >= 4096)
+            off = 0;
+
+        size_t total_chars = 0;
+        for (size_t i = 0; i < disc->file_count && off < 3900; i++) {
+            const hu_instruction_file_t *f = &disc->files[i];
+            const char *source_name = f->source == HU_INSTRUCTION_SOURCE_WORKSPACE ? "[workspace]"
+                                    : f->source == HU_INSTRUCTION_SOURCE_PROJECT_ROOT ? "[project]"
+                                                                                      : "[user]";
+            total_chars += f->content_len;
+            int nw = snprintf(buf + off, 4096 - (size_t)off, "  %s %s (%zu chars)%s\n",
+                            source_name, f->path ? f->path : "?", f->content_len,
+                            f->truncated ? " [truncated]" : "");
+            if (nw < 0)
+                break;
+            off += nw;
+        }
+
+        time_t now = time(NULL);
+        int64_t age_sec = now - disc->last_check_time;
+        off += snprintf(buf + off, 4096 - (size_t)off,
+                       "Total: %zu chars (limit: %d)\n"
+                       "Cache: %s (last checked %lld seconds ago)\n",
+                       total_chars, HU_INSTRUCTION_MAX_CHARS_TOTAL,
+                       hu_instruction_discovery_is_fresh(disc) ? "fresh" : "stale",
+                       (long long)age_sec);
+        return buf;
     }
 
     return NULL;

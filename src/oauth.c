@@ -112,11 +112,38 @@ hu_error_t hu_mcp_oauth_pkce_generate(hu_oauth_pkce_t *out) {
     const size_t charset_len = 64;
     const size_t verifier_len = 96;  /* RFC 7636 recommends 43-128; use 96 */
 
+#ifdef HU_IS_TEST
+    /* Test mode: use seeded rand() for deterministic behavior */
     for (size_t i = 0; i < verifier_len; i++) {
         uint32_t rnd = (uint32_t)rand();
         size_t idx = rnd % charset_len;
         out->verifier[i] = charset[idx];
     }
+#else
+    /* Production: use cryptographically secure random */
+    uint8_t random_bytes[96];
+#ifdef __APPLE__
+    /* macOS/BSD: use arc4random_buf */
+    arc4random_buf(random_bytes, verifier_len);
+#else
+    /* POSIX systems: use /dev/urandom */
+    FILE *f = fopen("/dev/urandom", "rb");
+    if (!f)
+        return HU_ERR_IO;
+    if (fread(random_bytes, 1, verifier_len, f) != verifier_len) {
+        fclose(f);
+        return HU_ERR_IO;
+    }
+    fclose(f);
+#endif
+
+    /* Convert random bytes to charset indices */
+    for (size_t i = 0; i < verifier_len; i++) {
+        size_t idx = random_bytes[i] % charset_len;
+        out->verifier[i] = charset[idx];
+    }
+#endif
+
     out->verifier[verifier_len] = '\0';
 
     return HU_OK;

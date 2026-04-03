@@ -18,6 +18,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 #define HU_HOOK_REGISTRY_INITIAL_CAP 8
+#define HU_HOOK_MAX_STDOUT (1024 * 1024)  /* 1MB limit to prevent DoS */
 
 struct hu_hook_registry {
     hu_hook_entry_t *entries;
@@ -407,22 +408,30 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
 
         /* Sanitize dangerous environment variables */
         extern char **environ;
-        for (char **env = environ; env && *env; ) {
+
+        /* Phase 1: collect names of dangerous variables (avoid modifying environ during iteration) */
+        char *to_remove[32];
+        size_t remove_count = 0;
+        for (char **env = environ; env && *env && remove_count < 32; env++) {
             if (hu_hook_is_dangerous_env(*env)) {
-                /* Find the var name (up to '=') and unsetenv */
-                char name_buf[256];
+                /* Extract variable name (up to '=') */
                 const char *eq = strchr(*env, '=');
                 if (eq) {
                     size_t nlen = (size_t)(eq - *env);
-                    if (nlen < sizeof(name_buf)) {
-                        memcpy(name_buf, *env, nlen);
-                        name_buf[nlen] = '\0';
-                        unsetenv(name_buf);
-                        continue; /* environ shifted, don't increment */
+                    char *name_copy = malloc(nlen + 1);
+                    if (name_copy) {
+                        memcpy(name_copy, *env, nlen);
+                        name_copy[nlen] = '\0';
+                        to_remove[remove_count++] = name_copy;
                     }
                 }
             }
-            env++;
+        }
+
+        /* Phase 2: remove collected variable names */
+        for (size_t i = 0; i < remove_count; i++) {
+            unsetenv(to_remove[i]);
+            free(to_remove[i]);
         }
 
         execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
@@ -433,16 +442,30 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
     close(pipefd[1]);
     alloc->free(alloc->ctx, cmd, cmd_len + 1);
 
-    /* Read stdout */
+    /* Declare status early for limit check below */
+    int status = 0;
+
+    /* Read stdout with 1MB limit to prevent DoS */
     size_t buf_cap = 4096;
     char *buf = alloc->alloc(alloc->ctx, buf_cap);
     size_t buf_used = 0;
+    bool stdout_limit_exceeded = false;
     if (buf) {
         ssize_t n;
         while ((n = read(pipefd[0], buf + buf_used, buf_cap - buf_used - 1)) > 0) {
             buf_used += (size_t)n;
+
+            /* Check if we've exceeded the stdout limit */
+            if (buf_used >= HU_HOOK_MAX_STDOUT) {
+                stdout_limit_exceeded = true;
+                break;
+            }
+
             if (buf_used >= buf_cap - 1) {
+                /* Calculate next capacity, but cap it at HU_HOOK_MAX_STDOUT */
                 size_t new_cap = buf_cap * 2;
+                if (new_cap > HU_HOOK_MAX_STDOUT)
+                    new_cap = HU_HOOK_MAX_STDOUT;
                 char *new_buf = alloc->realloc(alloc->ctx, buf, buf_cap, new_cap);
                 if (!new_buf)
                     break;
@@ -454,9 +477,17 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
     }
     close(pipefd[0]);
 
+    /* Kill process if stdout limit was exceeded */
+    if (stdout_limit_exceeded) {
+        kill(pid, SIGKILL);
+        waitpid(pid, &status, 0);
+        if (buf)
+            alloc->free(alloc->ctx, buf, buf_cap);
+        return HU_ERR_IO;
+    }
+
     /* Wait with timeout: SIGTERM after timeout_sec, SIGKILL 2s later */
     uint32_t timeout = hook->timeout_sec ? hook->timeout_sec : 30;
-    int status = 0;
     pid_t waited = 0;
 
     for (uint32_t elapsed = 0; elapsed < timeout; elapsed++) {
