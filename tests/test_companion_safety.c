@@ -1,6 +1,7 @@
 #include "human/core/allocator.h"
 #include "human/security/companion_safety.h"
 #include "test_framework.h"
+#include <math.h>
 #include <string.h>
 
 #define CS_CHECK(msg, len, r) hu_companion_safety_check(NULL, msg, len, NULL, 0, r)
@@ -349,6 +350,18 @@ static void test_vulnerability_moderate_directive(void) {
     HU_ASSERT_TRUE(r.level >= HU_VULNERABILITY_MODERATE || r.level == HU_VULNERABILITY_LOW);
 }
 
+static void test_vulnerability_nan_inputs_treated_as_zero(void) {
+    hu_vulnerability_input_t in = make_safe_input();
+    in.trajectory_slope = NAN;
+    in.deviation_severity = NAN;
+    in.message_frequency_ratio = NAN;
+    in.self_harm_score = NAN;
+    hu_vulnerability_result_t r;
+    HU_ASSERT_EQ(hu_vulnerability_assess(&in, &r), HU_OK);
+    HU_ASSERT_TRUE(isfinite(r.score));
+    HU_ASSERT_EQ(r.level, HU_VULNERABILITY_NONE);
+}
+
 /* ── Normalization unit tests ─────────────────────────────────────── */
 
 static void test_normalize_null_returns_zero(void) {
@@ -480,15 +493,12 @@ static void test_adversarial_unicode_accent_detected(void) {
 
 static void test_adversarial_intensifier_still_matches(void) {
     hu_companion_safety_result_t r;
-    /* "i REALLY need you" — ci_contains should match "i really need you" which
-     * contains "i need you" as a substring after lowercasing */
+    /* "i really need you" — intensifier "really" breaks exact substring match.
+     * ci_contains("i need you") won't match because "really" is inserted.
+     * This is expected: normalization catches leetspeak/spacing, NOT word insertion. */
     const char *msg = "i really need you";
     HU_ASSERT_EQ(CS_CHECK(msg, strlen(msg), &r), HU_OK);
-    /* ci_contains checks substring — "i need you" is NOT a substring of
-     * "i really need you", so this should NOT match over_attachment directly.
-     * The pattern "i need you" requires those exact words adjacent. */
-    /* This is expected behavior: intensifiers break exact substring matching.
-     * The normalization catches leetspeak/spacing but NOT word insertion. */
+    HU_ASSERT_TRUE(r.over_attachment < 0.5);
 }
 
 static void test_adversarial_punctuation_variants(void) {
@@ -742,4 +752,5 @@ void run_companion_safety_tests(void) {
     HU_RUN_TEST(test_vulnerability_level_name_covers_all);
     HU_RUN_TEST(test_vulnerability_directive_contains_988_at_crisis);
     HU_RUN_TEST(test_vulnerability_moderate_directive);
+    HU_RUN_TEST(test_vulnerability_nan_inputs_treated_as_zero);
 }
