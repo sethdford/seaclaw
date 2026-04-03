@@ -26,6 +26,15 @@ hu_error_t hu_mcp_server_call_tool(hu_mcp_server_t *srv, hu_allocator_t *alloc,
                                    size_t *out_result_len);
 void hu_mcp_server_destroy(hu_mcp_server_t *srv);
 
+/* Reconnect to MCP server (kill + restart child process, re-handshake).
+ * Useful when the server process has crashed or become unresponsive. */
+hu_error_t hu_mcp_server_reconnect(hu_mcp_server_t *srv);
+
+/* Re-discover tools from a connected server (hot-reload after server update).
+ * Frees any previously cached tool list and re-issues tools/list. */
+hu_error_t hu_mcp_server_refresh_tools(hu_mcp_server_t *srv, hu_allocator_t *alloc,
+                                       hu_tool_t **out_tools, size_t *out_count);
+
 hu_error_t hu_mcp_init_tools(hu_allocator_t *alloc, const hu_mcp_server_config_t *server_configs,
                              size_t config_count, hu_tool_t **out_tools, size_t *out_count);
 void hu_mcp_free_tools(hu_allocator_t *alloc, hu_tool_t *tools, size_t count);

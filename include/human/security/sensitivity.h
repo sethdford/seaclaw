@@ -20,7 +20,9 @@ typedef enum hu_sensitivity_level {
 
 typedef struct hu_sensitivity_result {
     hu_sensitivity_level_t level;
-    const char *reason; /* static string describing why; NULL if S1 */
+    const char *reason;  /* static string describing why; NULL if S1 */
+    float confidence;    /* 0.0-1.0: how confident we are in the classification */
+    int signal_count;    /* number of independent signals that triggered this level */
 } hu_sensitivity_result_t;
 
 /* Classify a user message for data sensitivity using rule-based detection.

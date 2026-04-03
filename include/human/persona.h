@@ -303,6 +303,7 @@ typedef struct hu_persona_voice_config {
     char default_emotion[32]; /* "content" */
     float default_speed;      /* 0.95 */
     bool nonverbals;          /* true */
+    float vulnerability_level; /* 0.0–1.0, EMA-tracked from content */
 } hu_persona_voice_config_t;
 
 /* Context awareness — calendar, weather, sports, news */
