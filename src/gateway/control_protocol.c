@@ -61,6 +61,7 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"skills.update", cp_admin_skills_update},
 #endif
     {"models.list", cp_admin_models_list},
+    {"models.decisions", cp_admin_models_decisions},
     {"nodes.list", cp_admin_nodes_list},
     {"nodes.action", cp_admin_nodes_action},
     {"agents.list", cp_admin_agents_list},
