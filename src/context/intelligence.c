@@ -251,40 +251,40 @@ hu_humor_style_t hu_humor_select_style(double closeness, bool serious_topic, boo
         cfg.humor_probability = 0.2;
         cfg.never_during_crisis = true;
         cfg.never_during_serious = true;
-        cfg.preferred = HU_HUMOR_OBSERVATIONAL;
+        cfg.preferred = HU_HUMOR_STYLE_OBSERVATIONAL;
     }
 
     if (in_crisis && cfg.never_during_crisis)
-        return HU_HUMOR_NONE;
+        return HU_HUMOR_STYLE_NONE;
     if (serious_topic && cfg.never_during_serious)
-        return HU_HUMOR_NONE;
+        return HU_HUMOR_STYLE_NONE;
 
     uint32_t s = seed;
     if (lcg_next(&s) >= cfg.humor_probability)
-        return HU_HUMOR_NONE;
+        return HU_HUMOR_STYLE_NONE;
 
     /* Close: SELF_DEPRECATING/CALLBACK, distant: OBSERVATIONAL/DEADPAN */
     double r = lcg_next(&s);
     if (closeness >= 0.6) {
-        return (r < 0.5) ? HU_HUMOR_SELF_DEPRECATING : HU_HUMOR_CALLBACK;
+        return (r < 0.5) ? HU_HUMOR_STYLE_SELF_DEPRECATING : HU_HUMOR_STYLE_CALLBACK;
     }
-    return (r < 0.5) ? HU_HUMOR_OBSERVATIONAL : HU_HUMOR_DEADPAN;
+    return (r < 0.5) ? HU_HUMOR_STYLE_OBSERVATIONAL : HU_HUMOR_STYLE_DEADPAN;
 }
 
 const char *hu_humor_style_str(hu_humor_style_t style)
 {
     switch (style) {
-    case HU_HUMOR_NONE:
+    case HU_HUMOR_STYLE_NONE:
         return "none";
-    case HU_HUMOR_CALLBACK:
+    case HU_HUMOR_STYLE_CALLBACK:
         return "callback";
-    case HU_HUMOR_OBSERVATIONAL:
+    case HU_HUMOR_STYLE_OBSERVATIONAL:
         return "observational";
-    case HU_HUMOR_SELF_DEPRECATING:
+    case HU_HUMOR_STYLE_SELF_DEPRECATING:
         return "self_deprecating";
-    case HU_HUMOR_ABSURD:
+    case HU_HUMOR_STYLE_ABSURD:
         return "absurd";
-    case HU_HUMOR_DEADPAN:
+    case HU_HUMOR_STYLE_DEADPAN:
         return "deadpan";
     default:
         return "none";
@@ -299,28 +299,28 @@ hu_error_t hu_humor_build_directive(hu_allocator_t *alloc, hu_humor_style_t styl
     *out = NULL;
     *out_len = 0;
 
-    if (style == HU_HUMOR_NONE)
+    if (style == HU_HUMOR_STYLE_NONE)
         return HU_OK;
 
     const char *directive = NULL;
     switch (style) {
-    case HU_HUMOR_OBSERVATIONAL:
+    case HU_HUMOR_STYLE_OBSERVATIONAL:
         directive = "[HUMOR STYLE: observational] — Notice something funny about the situation. "
                     "Keep it subtle.";
         break;
-    case HU_HUMOR_CALLBACK:
+    case HU_HUMOR_STYLE_CALLBACK:
         directive = "[HUMOR STYLE: callback] — Reference a previous funny moment if relevant. "
                     "Keep it subtle.";
         break;
-    case HU_HUMOR_SELF_DEPRECATING:
+    case HU_HUMOR_STYLE_SELF_DEPRECATING:
         directive = "[HUMOR STYLE: self_deprecating] — Make light fun of yourself if appropriate. "
                     "Keep it subtle.";
         break;
-    case HU_HUMOR_ABSURD:
+    case HU_HUMOR_STYLE_ABSURD:
         directive = "[HUMOR STYLE: absurd] — Use unexpected or surreal humor if it fits. "
                     "Keep it subtle.";
         break;
-    case HU_HUMOR_DEADPAN:
+    case HU_HUMOR_STYLE_DEADPAN:
         directive = "[HUMOR STYLE: deadpan] — Use dry, understated humor. Keep it subtle.";
         break;
     default:

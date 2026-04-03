@@ -1,13 +1,30 @@
 /* Behavioral polish: F9 double-text, F12 bookends, F28 mirroring, F54 timezone */
 #include "human/context/behavioral.h"
 #include "human/core/string.h"
+#include "human/persona.h"
 #include <ctype.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #define LCG_MUL 1103515245u
 #define LCG_ADD 12345u
+
+static const void *hu_memmem(const void *haystack, size_t haystacklen,
+                             const void *needle, size_t needlelen) {
+    if (needlelen == 0)
+        return haystack;
+    if (needlelen > haystacklen)
+        return NULL;
+    const unsigned char *h = (const unsigned char *)haystack;
+    const unsigned char *n = (const unsigned char *)needle;
+    size_t limit = haystacklen - needlelen;
+    for (size_t i = 0; i <= limit; i++) {
+        if (h[i] == n[0] && memcmp(h + i, n, needlelen) == 0)
+            return h + i;
+    }
+    return NULL;
+}
 
 static uint32_t lcg_next(uint32_t *state) {
     *state = *state * LCG_MUL + LCG_ADD;
@@ -53,8 +70,8 @@ hu_error_t hu_double_text_build_prompt(hu_allocator_t *alloc, char **out, size_t
 }
 
 /* --- F12: Bookends --- */
-hu_bookend_type_t hu_bookend_check(uint32_t hour, bool contact_is_close,
-                                   bool already_sent_today, uint32_t seed) {
+hu_bookend_type_t hu_bookend_check(uint32_t hour, bool contact_is_close, bool already_sent_today,
+                                   uint32_t seed) {
     (void)seed;
     if (!contact_is_close || already_sent_today)
         return HU_BOOKEND_NONE;
@@ -84,8 +101,8 @@ const char *hu_bookend_type_str(hu_bookend_type_t t) {
     }
 }
 
-hu_error_t hu_bookend_build_prompt(hu_allocator_t *alloc, hu_bookend_type_t type,
-                                   char **out, size_t *out_len) {
+hu_error_t hu_bookend_build_prompt(hu_allocator_t *alloc, hu_bookend_type_t type, char **out,
+                                   size_t *out_len) {
     if (!alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -160,8 +177,8 @@ static bool has_emoji(const char *msg, size_t len) {
     return false;
 }
 
-hu_error_t hu_mirror_analyze(const char *const *messages, const size_t *msg_lens,
-                             size_t count, hu_mirror_analysis_t *out) {
+hu_error_t hu_mirror_analyze(const char *const *messages, const size_t *msg_lens, size_t count,
+                             hu_mirror_analysis_t *out) {
     if (!messages || !msg_lens || !out)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -230,14 +247,14 @@ hu_error_t hu_mirror_build_directive(hu_allocator_t *alloc, const hu_mirror_anal
         if (!first)
             pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " ");
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                               "They type in lowercase — match their style.");
+                                "They type in lowercase — match their style.");
         first = 0;
     }
     if (analysis->uses_abbreviations) {
         if (!first)
             pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " ");
         pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                               "They use abbreviations — ok to use 'u' and 'rn'.");
+                                "They use abbreviations — ok to use 'u' and 'rn'.");
         first = 0;
     }
     if (analysis->avg_msg_length > 0.0) {
@@ -246,8 +263,7 @@ hu_error_t hu_mirror_build_directive(hu_allocator_t *alloc, const hu_mirror_anal
             n = 1;
         if (!first)
             pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " ");
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                               "Keep messages around %d chars.", n);
+        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Keep messages around %d chars.", n);
         first = 0;
     }
     if (pos >= sizeof(buf))
@@ -259,6 +275,170 @@ hu_error_t hu_mirror_build_directive(hu_allocator_t *alloc, const hu_mirror_anal
         return HU_OK;
     }
 
+    char *dup = hu_strndup(alloc, buf, pos);
+    if (!dup)
+        return HU_ERR_OUT_OF_MEMORY;
+    *out = dup;
+    *out_len = pos;
+    return HU_OK;
+}
+
+/* --- F28b: Mirror identity bounds --- */
+
+/* Check if a directive sentence mentions any avoided vocab word.
+ * A sentence like "ok to use 'u' and 'rn'" conflicts if "u" or "rn" is avoided. */
+static bool sentence_conflicts_with_avoided(const char *sentence, size_t len,
+                                            const char *const *avoided, size_t avoided_count) {
+    if (!avoided || avoided_count == 0)
+        return false;
+    /* Check each avoided word against the sentence */
+    for (size_t i = 0; i < avoided_count; i++) {
+        if (!avoided[i])
+            continue;
+        size_t wlen = strlen(avoided[i]);
+        if (wlen == 0)
+            continue;
+        /* Search for the avoided word in the sentence */
+        for (size_t j = 0; j + wlen <= len; j++) {
+            if (strncasecmp(sentence + j, avoided[i], wlen) == 0) {
+                /* Check word boundaries */
+                bool left_ok = (j == 0 || !isalnum((unsigned char)sentence[j - 1]));
+                bool right_ok = (j + wlen >= len || !isalnum((unsigned char)sentence[j + wlen]));
+                if (left_ok && right_ok)
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* Check if a directive sentence conflicts with character invariants.
+ * Invariants like "never uses abbreviations" should block abbreviation mirroring. */
+static bool sentence_conflicts_with_invariants(const char *sentence, size_t len,
+                                               const char *const *invariants,
+                                               size_t invariant_count) {
+    if (!invariants || invariant_count == 0)
+        return false;
+
+    /* Map: if sentence mentions "abbreviations" and an invariant says "never...abbreviation" */
+    bool sentence_has_abbrev = (len >= 6 && (hu_memmem(sentence, len, "abbrev", 6) != NULL ||
+                                             hu_memmem(sentence, len, "Abbrev", 6) != NULL));
+    bool sentence_has_lowercase = (len >= 9 && (hu_memmem(sentence, len, "lowercase", 9) != NULL ||
+                                                hu_memmem(sentence, len, "Lowercase", 9) != NULL));
+
+    for (size_t i = 0; i < invariant_count; i++) {
+        if (!invariants[i])
+            continue;
+        size_t ilen = strlen(invariants[i]);
+        bool inv_has_never = (hu_memmem(invariants[i], ilen, "never", 5) != NULL ||
+                              hu_memmem(invariants[i], ilen, "Never", 5) != NULL);
+        bool inv_has_no = (hu_memmem(invariants[i], ilen, "no ", 3) != NULL ||
+                           hu_memmem(invariants[i], ilen, "No ", 3) != NULL);
+        if (!inv_has_never && !inv_has_no)
+            continue;
+
+        if (sentence_has_abbrev && hu_memmem(invariants[i], ilen, "abbrev", 6) != NULL)
+            return true;
+        if (sentence_has_lowercase && hu_memmem(invariants[i], ilen, "lowercase", 9) != NULL)
+            return true;
+    }
+    return false;
+}
+
+hu_error_t hu_mirror_check_identity_bounds(hu_allocator_t *alloc, const char *directive,
+                                           size_t directive_len, const struct hu_persona *persona,
+                                           char **out, size_t *out_len) {
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    *out = NULL;
+    *out_len = 0;
+
+    /* No directive or no persona — pass through */
+    if (!directive || directive_len == 0) {
+        return HU_OK;
+    }
+    if (!persona) {
+        char *dup = hu_strndup(alloc, directive, directive_len);
+        if (!dup)
+            return HU_ERR_OUT_OF_MEMORY;
+        *out = dup;
+        *out_len = directive_len;
+        return HU_OK;
+    }
+
+    /* Build filtered output: process sentence by sentence (split on ". ") */
+    char buf[512];
+    size_t pos = 0;
+
+    /* Copy the prefix "[LINGUISTIC MIRROR]: " if present */
+    const char *prefix = "[LINGUISTIC MIRROR]: ";
+    size_t prefix_len = strlen(prefix);
+    const char *body = directive;
+    size_t body_len = directive_len;
+
+    if (directive_len >= prefix_len && memcmp(directive, prefix, prefix_len) == 0) {
+        memcpy(buf, prefix, prefix_len);
+        pos = prefix_len;
+        body = directive + prefix_len;
+        body_len = directive_len - prefix_len;
+    }
+
+    /* Walk sentences separated by ". " or end of string */
+    const char *p = body;
+    const char *end = body + body_len;
+    bool first = true;
+
+    while (p < end) {
+        /* Find end of current sentence */
+        const char *dot = (const char *)hu_memmem(p, (size_t)(end - p), ". ", 2);
+        size_t slen;
+        const char *next;
+        if (dot) {
+            slen = (size_t)(dot - p) + 1; /* include the '.' */
+            next = dot + 2;               /* skip ". " */
+        } else {
+            slen = (size_t)(end - p);
+            next = end;
+        }
+
+        /* Check if this sentence conflicts with identity */
+        bool conflicts = false;
+
+        if (persona->avoided_vocab_count > 0) {
+            conflicts = sentence_conflicts_with_avoided(
+                p, slen, (const char *const *)persona->avoided_vocab, persona->avoided_vocab_count);
+        }
+
+        if (!conflicts && persona->character_invariants_count > 0) {
+            conflicts = sentence_conflicts_with_invariants(
+                p, slen, (const char *const *)persona->character_invariants,
+                persona->character_invariants_count);
+        }
+
+        if (!conflicts) {
+            if (!first && pos < sizeof(buf) - 1) {
+                buf[pos++] = ' ';
+            }
+            size_t copy = slen;
+            if (pos + copy >= sizeof(buf))
+                copy = sizeof(buf) - pos - 1;
+            memcpy(buf + pos, p, copy);
+            pos += copy;
+            first = false;
+        }
+
+        p = next;
+    }
+
+    /* If everything was filtered, return NULL */
+    if (pos == prefix_len || pos == 0) {
+        *out = NULL;
+        *out_len = 0;
+        return HU_OK;
+    }
+
+    buf[pos] = '\0';
     char *dup = hu_strndup(alloc, buf, pos);
     if (!dup)
         return HU_ERR_OUT_OF_MEMORY;
@@ -291,8 +471,8 @@ hu_timezone_info_t hu_timezone_compute(int offset_hours, uint64_t utc_now_ms) {
 }
 
 hu_error_t hu_timezone_build_directive(hu_allocator_t *alloc, const hu_timezone_info_t *tz,
-                                       const char *contact_name, size_t name_len,
-                                       char **out, size_t *out_len) {
+                                       const char *contact_name, size_t name_len, char **out,
+                                       size_t *out_len) {
     if (!alloc || !tz || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
 
