@@ -3,6 +3,7 @@
 #include "cp_internal.h"
 #include "human/agent.h"
 #include "human/agent/awareness.h"
+#include "human/agent/model_router.h"
 #include "human/bus.h"
 #include "human/channel_catalog.h"
 #include "human/config.h"
@@ -570,6 +571,60 @@ hu_error_t cp_admin_models_list(hu_allocator_t *alloc, hu_app_context_t *app, hu
     cp_json_set_str(alloc, obj, "default_model",
                     (app && app->config) ? app->config->default_model : "");
     hu_json_object_set(alloc, obj, "providers", arr);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
+}
+
+/* ── models.decisions ────────────────────────────────────────────────── */
+
+hu_error_t cp_admin_models_decisions(hu_allocator_t *alloc, hu_app_context_t *app,
+                                     hu_ws_conn_t *conn, const hu_control_protocol_t *proto,
+                                     const hu_json_value_t *root, char **out, size_t *out_len) {
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    hu_json_value_t *obj = hu_json_object_new(alloc);
+    if (!obj)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    hu_route_decision_log_t *log = hu_route_global_log();
+    hu_json_value_t *arr = hu_json_array_new(alloc);
+
+    size_t count = hu_route_log_count(log);
+    for (size_t i = 0; i < count; i++) {
+        const hu_route_decision_t *d = hu_route_log_get(log, i);
+        if (!d)
+            continue;
+        hu_json_value_t *entry = hu_json_object_new(alloc);
+        cp_json_set_str(alloc, entry, "tier", hu_cognitive_tier_str(d->tier));
+        cp_json_set_str(alloc, entry, "source", hu_route_source_str(d->source));
+        cp_json_set_str(alloc, entry, "model", d->model);
+        hu_json_object_set(alloc, entry, "heuristic_score",
+                           hu_json_number_new(alloc, (double)d->heuristic_score));
+        hu_json_object_set(alloc, entry, "timestamp",
+                           hu_json_number_new(alloc, (double)d->timestamp));
+        hu_json_array_push(alloc, arr, entry);
+    }
+
+    hu_json_object_set(alloc, obj, "decisions", arr);
+    hu_json_object_set(alloc, obj, "total", hu_json_number_new(alloc, (double)count));
+
+    /* Tier distribution */
+    size_t tier_counts[4];
+    hu_route_log_tier_counts(log, tier_counts);
+    hu_json_value_t *dist = hu_json_object_new(alloc);
+    hu_json_object_set(alloc, dist, "reflexive",
+                       hu_json_number_new(alloc, (double)tier_counts[HU_TIER_REFLEXIVE]));
+    hu_json_object_set(alloc, dist, "conversational",
+                       hu_json_number_new(alloc, (double)tier_counts[HU_TIER_CONVERSATIONAL]));
+    hu_json_object_set(alloc, dist, "analytical",
+                       hu_json_number_new(alloc, (double)tier_counts[HU_TIER_ANALYTICAL]));
+    hu_json_object_set(alloc, dist, "deep",
+                       hu_json_number_new(alloc, (double)tier_counts[HU_TIER_DEEP]));
+    hu_json_object_set(alloc, obj, "tier_distribution", dist);
+
     hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
     hu_json_free(alloc, obj);
     return err;
