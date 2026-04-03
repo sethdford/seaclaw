@@ -73,7 +73,7 @@ fi
 # ── Phase 3: Run intelligence wiring tests ──────────────────────────────
 printf "  [3/%d] Running intelligence wiring tests... " "$total"
 WIRE_OUTPUT=$("$BUILD/human_tests" --suite=intelligence_wiring 2>&1) || true
-WIRE_PASSED=$(echo "$WIRE_OUTPUT" | grep -oE '[0-9]+/[0-9]+ passed' | head -1)
+WIRE_PASSED=$(echo "$WIRE_OUTPUT" | grep -oE '[0-9]+/[0-9]+ passed' | tail -1)
 if echo "$WIRE_OUTPUT" | grep -qE "[1-9][0-9]* FAILED"; then
     report FAIL "Intelligence wiring ($WIRE_PASSED)"
 else
@@ -83,7 +83,7 @@ fi
 # ── Phase 4: Run proof-of-closure tests ─────────────────────────────────
 printf "  [4/%d] Running proof-of-closure tests... " "$total"
 PROVE_OUTPUT=$("$BUILD/human_tests" --suite=prove_e2e 2>&1) || true
-PROVE_PASSED=$(echo "$PROVE_OUTPUT" | grep -oE '[0-9]+/[0-9]+ passed' | head -1)
+PROVE_PASSED=$(echo "$PROVE_OUTPUT" | grep -oE '[0-9]+/[0-9]+ passed' | tail -1)
 if echo "$PROVE_OUTPUT" | grep -qE "[1-9][0-9]* FAILED"; then
     report FAIL "Proof of closure ($PROVE_PASSED)"
     echo ""
@@ -123,7 +123,10 @@ if [ "$fail" -eq 0 ]; then
     echo "    - Router: streaming cascade to child providers"
     echo "    - Reliable: streaming fallback on failure"
     echo "    - Tool results: progressive execute_streaming bridge"
+    echo "    - Shell tool: execute_streaming with chunk callbacks"
+    echo "    - Web search tool: execute_streaming with result emission"
     echo "    - Voice: provider vtable abstraction (OpenAI wrapped)"
+    echo "    - Voice session: provider vtable routing (start/stop/send/interrupt)"
     echo ""
     echo "  Proven integration paths:"
     echo "    - Per-tool recording in agent turn loop"

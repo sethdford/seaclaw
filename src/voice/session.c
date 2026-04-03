@@ -1,4 +1,5 @@
 #include "human/voice/session.h"
+#include "human/voice/provider.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -80,12 +81,16 @@ hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *ses
                                         .api_key = key,
                                         .sample_rate = 24000,
                                         .vad_enabled = true};
-            hu_voice_rt_session_t *rt = NULL;
-            if (hu_voice_rt_session_create(alloc, &rtc, &rt) == HU_OK && rt) {
-                if (hu_voice_rt_connect(rt) == HU_OK)
-                    session->rt = rt;
-                else
-                    hu_voice_rt_session_destroy(rt);
+            /* Use provider vtable abstraction (preferred path). */
+            hu_voice_provider_t vp = {0};
+            if (hu_voice_provider_openai_create(alloc, &rtc, &vp) == HU_OK && vp.vtable) {
+                if (vp.vtable->connect(vp.ctx) == HU_OK) {
+                    session->provider = vp;
+                    /* Keep legacy rt pointer for backwards compat with existing callers */
+                    session->rt = (hu_voice_rt_session_t *)vp.ctx;
+                } else {
+                    vp.vtable->disconnect(vp.ctx, alloc);
+                }
             }
         }
     }
@@ -96,7 +101,12 @@ hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *ses
 hu_error_t hu_voice_session_stop(hu_voice_session_t *session) {
     if (!session)
         return HU_ERR_INVALID_ARGUMENT;
-    if (session->rt) {
+    if (session->provider.vtable) {
+        session->provider.vtable->disconnect(session->provider.ctx, NULL);
+        session->provider.ctx = NULL;
+        session->provider.vtable = NULL;
+        session->rt = NULL;
+    } else if (session->rt) {
         hu_voice_rt_session_destroy(session->rt);
         session->rt = NULL;
     }
@@ -151,6 +161,8 @@ hu_error_t hu_voice_session_send_audio(hu_voice_session_t *session, const uint8_
     session->latency_first_byte_pending = true;
 #endif
 
+    if (session->provider.vtable)
+        return session->provider.vtable->send_audio(session->provider.ctx, pcm16, pcm16_len);
     if (session->rt && session->rt->connected)
         return hu_voice_rt_send_audio(session->rt, pcm16, pcm16_len);
     return HU_OK;
@@ -172,6 +184,8 @@ hu_error_t hu_voice_session_on_interrupt(hu_voice_session_t *session) {
     session->latency_await_interrupt_silence = true;
 #endif
 
+    if (session->provider.vtable)
+        return session->provider.vtable->cancel_response(session->provider.ctx);
     if (session->rt && session->rt->connected)
         return hu_voice_rt_response_cancel(session->rt);
     return HU_OK;

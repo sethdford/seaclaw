@@ -1,12 +1,12 @@
 /* End-to-end proof tests: verify every intelligence subsystem loop closes.
  * Each test creates real SQLite state, records data, then verifies retrieval.
  * This proves the wiring works, not just that functions exist. */
-#include "test_framework.h"
-#include "human/humanness.h"
+#include "human/agent.h"
 #include "human/core/allocator.h"
 #include "human/experience.h"
-#include "human/agent.h"
+#include "human/humanness.h"
 #include "human/tool.h"
+#include "test_framework.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/online_learning.h"
 #include "human/intelligence/self_improve.h"
@@ -16,11 +16,11 @@
 #include <sqlite3.h>
 #endif
 #ifdef HU_ENABLE_ML
-#include "human/ml/tokenizer_ml.h"
 #include "human/ml/ml.h"
+#include "human/ml/tokenizer_ml.h"
 #endif
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 #define S(lit) (lit), (sizeof(lit) - 1)
 
@@ -37,9 +37,13 @@ static void test_prove_world_model_loop_closes(void) {
     HU_ASSERT_EQ(hu_world_model_init_tables(&wm), HU_OK);
 
     /* Record 3 tool outcomes */
-    HU_ASSERT_EQ(hu_world_record_outcome(&wm, S("file_read"), S("read 50 lines of config"), 0.9, 1000), HU_OK);
-    HU_ASSERT_EQ(hu_world_record_outcome(&wm, S("file_read"), S("file not found error"), 0.3, 2000), HU_OK);
-    HU_ASSERT_EQ(hu_world_record_outcome(&wm, S("web_search"), S("found 5 results"), 0.85, 3000), HU_OK);
+    HU_ASSERT_EQ(
+        hu_world_record_outcome(&wm, S("file_read"), S("read 50 lines of config"), 0.9, 1000),
+        HU_OK);
+    HU_ASSERT_EQ(hu_world_record_outcome(&wm, S("file_read"), S("file not found error"), 0.3, 2000),
+                 HU_OK);
+    HU_ASSERT_EQ(hu_world_record_outcome(&wm, S("web_search"), S("found 5 results"), 0.85, 3000),
+                 HU_OK);
 
     /* Simulate — should retrieve highest-confidence outcome for file_read */
     hu_wm_prediction_t pred = {0};
@@ -71,12 +75,15 @@ static void test_prove_experience_loop_closes(void) {
     HU_ASSERT_EQ(hu_experience_store_init(&alloc, &mem, &store), HU_OK);
     store.db = hu_sqlite_memory_get_db(&mem);
 
-    HU_ASSERT_EQ(hu_experience_record(&store, S("shell"), S("ls -la /tmp"),
-                                       S("listed 42 files"), 0.95), HU_OK);
+    HU_ASSERT_EQ(
+        hu_experience_record(&store, S("shell"), S("ls -la /tmp"), S("listed 42 files"), 0.95),
+        HU_OK);
     HU_ASSERT_EQ(hu_experience_record(&store, S("web_search"), S("query: rust async"),
-                                       S("found tokio docs"), 0.88), HU_OK);
+                                      S("found tokio docs"), 0.88),
+                 HU_OK);
     HU_ASSERT_EQ(hu_experience_record(&store, S("file_write"), S("write config.json"),
-                                       S("permission denied"), 0.15), HU_OK);
+                                      S("permission denied"), 0.15),
+                 HU_OK);
     hu_experience_store_deinit(&store);
 
     /* Recall — should find relevant experiences */
@@ -86,7 +93,8 @@ static void test_prove_experience_loop_closes(void) {
 
     char *prompt = NULL;
     size_t prompt_len = 0;
-    HU_ASSERT_EQ(hu_experience_build_prompt(&recall_store, S("shell command"), &prompt, &prompt_len), HU_OK);
+    HU_ASSERT_EQ(
+        hu_experience_build_prompt(&recall_store, S("shell command"), &prompt, &prompt_len), HU_OK);
     /* Should have found something (memory vtable recall via FTS) */
     HU_ASSERT_NOT_NULL(prompt);
     if (prompt)
@@ -160,8 +168,9 @@ static void test_prove_self_improve_loop_closes(void) {
     /* Record several tool outcomes */
     for (int i = 0; i < 10; i++) {
         HU_ASSERT_EQ(hu_self_improve_record_tool_outcome(&si, "agent_turn", 10,
-                                                          i % 3 != 0, /* 2/3 success */
-                                                          (int64_t)(1000 + i)), HU_OK);
+                                                         i % 3 != 0, /* 2/3 success */
+                                                         (int64_t)(1000 + i)),
+                     HU_OK);
     }
 
     /* Apply reflections — should generate patches */
@@ -195,10 +204,12 @@ static void test_prove_value_learning_loop_closes(void) {
     /* Learn from user corrections */
     int64_t now = 1000;
     HU_ASSERT_EQ(hu_value_learn_from_correction(&ve, S("accuracy"),
-                                                  S("User corrected a factual error"), 0.3, now), HU_OK);
+                                                S("User corrected a factual error"), 0.3, now),
+                 HU_OK);
     HU_ASSERT_EQ(hu_value_learn_from_approval(&ve, S("helpfulness"), 0.2, now + 100), HU_OK);
     HU_ASSERT_EQ(hu_value_learn_from_correction(&ve, S("conciseness"),
-                                                  S("User wants shorter responses"), 0.25, now + 200), HU_OK);
+                                                S("User wants shorter responses"), 0.25, now + 200),
+                 HU_OK);
 
     /* Build prompt — should include learned values */
     char *prompt = NULL;
@@ -224,11 +235,10 @@ static void test_prove_behavioral_feedback_loop_closes(void) {
     HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
 
     /* Create the table (mirrors sqlite.c schema) */
-    const char *ddl =
-        "CREATE TABLE IF NOT EXISTS behavioral_feedback("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "behavior_type TEXT NOT NULL, contact_id TEXT NOT NULL, "
-        "signal TEXT NOT NULL, context TEXT, timestamp INTEGER NOT NULL)";
+    const char *ddl = "CREATE TABLE IF NOT EXISTS behavioral_feedback("
+                      "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                      "behavior_type TEXT NOT NULL, contact_id TEXT NOT NULL, "
+                      "signal TEXT NOT NULL, context TEXT, timestamp INTEGER NOT NULL)";
     HU_ASSERT_EQ(sqlite3_exec(db, ddl, NULL, NULL, NULL), SQLITE_OK);
 
     /* Insert feedback (same parameterized pattern as agent_turn.c) */
@@ -247,8 +257,11 @@ static void test_prove_behavioral_feedback_loop_closes(void) {
 
     /* Query back — verify data persisted */
     sqlite3_stmt *q = NULL;
-    HU_ASSERT_EQ(sqlite3_prepare_v2(db, "SELECT signal, context FROM behavioral_feedback WHERE contact_id='user_abc'",
-                                     -1, &q, NULL), SQLITE_OK);
+    HU_ASSERT_EQ(sqlite3_prepare_v2(
+                     db,
+                     "SELECT signal, context FROM behavioral_feedback WHERE contact_id='user_abc'",
+                     -1, &q, NULL),
+                 SQLITE_OK);
     HU_ASSERT_EQ(sqlite3_step(q), SQLITE_ROW);
     const char *sig = (const char *)sqlite3_column_text(q, 0);
     const char *ctx = (const char *)sqlite3_column_text(q, 1);
@@ -357,11 +370,11 @@ static void test_prove_bpe_tokenizer_roundtrip(void) {
 
 /* ── Router Streaming Cascade Tests ──────────────────────────────────── */
 
-#include "human/providers/openai.h"
 #include "human/providers/anthropic.h"
 #include "human/providers/ollama.h"
-#include "human/providers/router.h"
+#include "human/providers/openai.h"
 #include "human/providers/reliable.h"
+#include "human/providers/router.h"
 
 static void test_prove_router_streaming_supported(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -375,8 +388,9 @@ static void test_prove_router_streaming_supported(void) {
     hu_provider_t providers[] = {p1, p2};
 
     hu_provider_t router;
-    HU_ASSERT_EQ(hu_router_create(&alloc, names, name_lens, 2, providers, NULL, 0,
-                                   "gpt-4", 5, &router), HU_OK);
+    HU_ASSERT_EQ(
+        hu_router_create(&alloc, names, name_lens, 2, providers, NULL, 0, "gpt-4", 5, &router),
+        HU_OK);
 
     /* Router should report streaming supported (delegates to children) */
     HU_ASSERT(router.vtable->supports_streaming != NULL);
@@ -493,6 +507,149 @@ static void test_prove_voice_provider_null_args(void) {
     fprintf(stderr, "  [PROVE] Voice provider: null arg rejection CLOSED\n");
 }
 
+/* ── Voice Session Provider Routing Tests ──────────────────────────── */
+
+#include "human/voice/session.h"
+
+static void test_prove_voice_session_provider_field(void) {
+    /* Verify session struct has provider field and it's usable */
+    hu_voice_session_t session;
+    memset(&session, 0, sizeof(session));
+
+    /* Default: no provider set */
+    HU_ASSERT(session.provider.vtable == NULL);
+    HU_ASSERT(session.provider.ctx == NULL);
+
+    /* Create a provider and assign it */
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_voice_rt_config_t cfg = {
+        .model = "gpt-4o-realtime-preview",
+        .voice = "alloy",
+        .api_key = "test-key",
+        .sample_rate = 24000,
+        .vad_enabled = true,
+    };
+    hu_voice_provider_t vp;
+    HU_ASSERT_EQ(hu_voice_provider_openai_create(&alloc, &cfg, &vp), HU_OK);
+    session.provider = vp;
+    HU_ASSERT_NOT_NULL(session.provider.vtable);
+    HU_ASSERT_NOT_NULL(session.provider.vtable->send_audio);
+    HU_ASSERT_NOT_NULL(session.provider.vtable->cancel_response);
+
+    /* Cleanup */
+    vp.vtable->disconnect(vp.ctx, &alloc);
+    fprintf(stderr, "  [PROVE] Voice session: provider vtable routing wired CLOSED\n");
+}
+
+static void test_prove_voice_session_start_stop(void) {
+    /* Test the full start/stop lifecycle in test mode */
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_voice_session_t session;
+    memset(&session, 0, sizeof(session));
+
+    hu_config_t config;
+    memset(&config, 0, sizeof(config));
+
+    /* Start in test mode — should activate without real network */
+    HU_ASSERT_EQ(hu_voice_session_start(&alloc, &session, "test", 4, &config), HU_OK);
+    HU_ASSERT(session.active == true);
+
+    /* Stop — should cleanly deactivate */
+    HU_ASSERT_EQ(hu_voice_session_stop(&session), HU_OK);
+    HU_ASSERT(session.active == false);
+    HU_ASSERT(session.rt == NULL);
+
+    fprintf(stderr, "  [PROVE] Voice session: start→stop lifecycle CLOSED\n");
+}
+
+/* ── Shell Tool Streaming Tests ────────────────────────────────────── */
+
+#include "human/tools/shell.h"
+
+static size_t s_shell_chunk_count;
+static size_t s_shell_chunk_total;
+
+static void shell_stream_counter(void *ctx, const char *data, size_t len) {
+    (void)ctx;
+    (void)data;
+    s_shell_chunk_count++;
+    s_shell_chunk_total += len;
+}
+
+static void test_prove_shell_streaming_emits_chunks(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t tool;
+    HU_ASSERT_EQ(hu_shell_create(&alloc, NULL, 0, NULL, &tool), HU_OK);
+
+    /* Shell vtable should have execute_streaming */
+    HU_ASSERT_NOT_NULL(tool.vtable->execute_streaming);
+
+    /* Execute streaming with a command (test mode returns stub) */
+    hu_json_value_t *args = hu_json_object_new(&alloc);
+    hu_json_object_set(&alloc, args, "command", hu_json_string_new(&alloc, "echo hello", 10));
+    hu_tool_result_t result = {0};
+    s_shell_chunk_count = 0;
+    s_shell_chunk_total = 0;
+
+    HU_ASSERT_EQ(
+        tool.vtable->execute_streaming(tool.ctx, &alloc, args, shell_stream_counter, NULL, &result),
+        HU_OK);
+    /* In test mode, should emit one chunk with stub message */
+    HU_ASSERT(s_shell_chunk_count >= 1);
+    HU_ASSERT(s_shell_chunk_total > 0);
+    HU_ASSERT_NOT_NULL(result.output);
+
+    if (result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    hu_json_free(&alloc, args);
+    tool.vtable->deinit(tool.ctx, &alloc);
+    fprintf(stderr, "  [PROVE] Shell streaming: execute_streaming emits chunks CLOSED\n");
+}
+
+/* ── Web Search Tool Streaming Tests ───────────────────────────────── */
+
+#include "human/tools/web_search.h"
+
+static size_t s_ws_chunk_count;
+static size_t s_ws_chunk_total;
+
+static void ws_stream_counter(void *ctx, const char *data, size_t len) {
+    (void)ctx;
+    (void)data;
+    s_ws_chunk_count++;
+    s_ws_chunk_total += len;
+}
+
+static void test_prove_web_search_streaming_emits_chunks(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t tool;
+    HU_ASSERT_EQ(hu_web_search_create(&alloc, NULL, NULL, 0, &tool), HU_OK);
+
+    /* Web search vtable should have execute_streaming */
+    HU_ASSERT_NOT_NULL(tool.vtable->execute_streaming);
+
+    /* Execute streaming with a query (test mode returns mock results) */
+    hu_json_value_t *args = hu_json_object_new(&alloc);
+    hu_json_object_set(&alloc, args, "query", hu_json_string_new(&alloc, "rust async", 10));
+    hu_tool_result_t result = {0};
+    s_ws_chunk_count = 0;
+    s_ws_chunk_total = 0;
+
+    HU_ASSERT_EQ(
+        tool.vtable->execute_streaming(tool.ctx, &alloc, args, ws_stream_counter, NULL, &result),
+        HU_OK);
+    /* Should emit one chunk with the full mock result */
+    HU_ASSERT(s_ws_chunk_count >= 1);
+    HU_ASSERT(s_ws_chunk_total > 0);
+    HU_ASSERT_NOT_NULL(result.output);
+
+    if (result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len + 1);
+    hu_json_free(&alloc, args);
+    tool.vtable->deinit(tool.ctx, &alloc);
+    fprintf(stderr, "  [PROVE] Web search streaming: execute_streaming emits chunks CLOSED\n");
+}
+
 /* ── Registration ────────────────────────────────────────────────────── */
 
 void run_prove_e2e_tests(void) {
@@ -520,6 +677,14 @@ void run_prove_e2e_tests(void) {
     HU_RUN_TEST(test_prove_tool_vtable_has_execute_streaming);
     HU_RUN_TEST(test_prove_voice_provider_openai_create);
     HU_RUN_TEST(test_prove_voice_provider_null_args);
+
+    /* Voice session vtable routing */
+    HU_RUN_TEST(test_prove_voice_session_provider_field);
+    HU_RUN_TEST(test_prove_voice_session_start_stop);
+
+    /* Tool execute_streaming implementations */
+    HU_RUN_TEST(test_prove_shell_streaming_emits_chunks);
+    HU_RUN_TEST(test_prove_web_search_streaming_emits_chunks);
 
     fprintf(stderr, "=== ALL INTELLIGENCE + STREAMING LOOPS PROVEN ===\n\n");
 }

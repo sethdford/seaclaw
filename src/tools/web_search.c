@@ -227,8 +227,23 @@ static void web_search_deinit(void *ctx, hu_allocator_t *alloc) {
     }
 }
 
+static hu_error_t
+web_search_execute_streaming(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
+                             void (*on_chunk)(void *cb_ctx, const char *data, size_t len),
+                             void *cb_ctx, hu_tool_result_t *out) {
+    /* Execute normally, then emit the full result as a single chunk.
+     * Web search results arrive atomically from providers, so progressive
+     * streaming would require provider-level changes. This still enables
+     * the streaming bridge in agent_stream.c to emit TOOL_RESULT events. */
+    hu_error_t err = web_search_execute(ctx, alloc, args, out);
+    if (err == HU_OK && on_chunk && out->output && out->output_len > 0)
+        on_chunk(cb_ctx, out->output, out->output_len);
+    return err;
+}
+
 static const hu_tool_vtable_t web_search_vtable = {
     .execute = web_search_execute,
+    .execute_streaming = web_search_execute_streaming,
     .name = web_search_name,
     .description = web_search_description,
     .parameters_json = web_search_parameters_json,
