@@ -185,6 +185,8 @@ typedef struct hu_channel_daemon_config {
     int user_response_window_sec; /* 0 = use default (120s) */
     int poll_interval_sec;        /* 0 = use channel-specific default (see bootstrap) */
     bool voice_enabled;           /* enable TTS on this channel */
+    int max_consecutive_replies;  /* 0 = unlimited; default 3; caps bot replies before human steps in */
+    int e2e_max_turns;            /* 0 = no limit; auto-stop daemon after N agent responses (for E2E testing) */
 } hu_channel_daemon_config_t;
 
 typedef struct hu_email_channel_config {
@@ -526,9 +528,11 @@ typedef struct hu_voice_settings {
     char *tts_voice;          /* voice name, NULL = default */
     char *tts_model;          /* model name, NULL = default */
     char *stt_model;          /* model name, NULL = default */
-    char *mode;           /* "sonata", "realtime", "webrtc" — NULL = sonata (default pipeline) */
+    char *mode;           /* "sonata", "realtime", "gemini_live", "webrtc" — NULL = default */
     char *realtime_model; /* OpenAI Realtime model, e.g. "gpt-4o-realtime-preview" */
     char *realtime_voice; /* Voice for Realtime, e.g. "alloy" */
+    char *vertex_region;  /* Vertex AI region for Gemini Live, e.g. "us-central1"; NULL = Google AI */
+    char *vertex_project; /* Vertex AI project ID; required when vertex_region is set */
 } hu_voice_settings_t;
 
 typedef struct hu_identity_config {

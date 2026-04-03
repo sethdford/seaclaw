@@ -22,6 +22,11 @@ static void parse_daemon_object(hu_allocator_t *a, hu_channel_daemon_config_t *d
     dcfg->poll_interval_sec =
         (int)hu_json_get_number(daemon_obj, "poll_interval_sec", (double)dcfg->poll_interval_sec);
     dcfg->voice_enabled = hu_json_get_bool(daemon_obj, "voice_enabled", dcfg->voice_enabled);
+    dcfg->max_consecutive_replies =
+        (int)hu_json_get_number(daemon_obj, "max_consecutive_replies",
+                                (double)dcfg->max_consecutive_replies);
+    dcfg->e2e_max_turns =
+        (int)hu_json_get_number(daemon_obj, "e2e_max_turns", (double)dcfg->e2e_max_turns);
 }
 
 static void parse_daemon_config(hu_allocator_t *a, hu_channel_daemon_config_t *dcfg,

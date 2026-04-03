@@ -7,6 +7,7 @@
 #include "human/agent/spawn.h"
 #include "human/bootstrap.h"
 #include "human/calibration.h"
+#include "human/context/conversation.h"
 #include "human/calibration/clone.h"
 #include "human/config.h"
 #include "human/core/error.h"
@@ -182,6 +183,9 @@ hu_error_t cmd_setup(hu_allocator_t *alloc, int argc, char **argv) {
 }
 
 /* ── channel ─────────────────────────────────────────────────────────────── */
+
+static hu_error_t cmd_channel_e2e_test(hu_allocator_t *alloc, int argc, char **argv);
+
 hu_error_t cmd_channel(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3 || strcmp(argv[2], "list") == 0) {
         hu_config_t cfg;
@@ -200,8 +204,104 @@ hu_error_t cmd_channel(hu_allocator_t *alloc, int argc, char **argv) {
         printf("  cli: ok\n");
         return HU_OK;
     }
+    if (strcmp(argv[2], "e2e-test") == 0)
+        return cmd_channel_e2e_test(alloc, argc, argv);
     fprintf(stderr, "Unknown channel subcommand: %s\n", argv[2]);
     return HU_ERR_INVALID_ARGUMENT;
+}
+
+/* ── channel e2e-test ────────────────────────────────────────────────────── */
+
+static hu_error_t cmd_channel_e2e_test(hu_allocator_t *alloc, int argc, char **argv) {
+    const char *target = NULL;
+    const char *seed = "Hey! Just testing our connection — how's everything going?";
+    int turns = 5;
+
+    for (int i = 3; i < argc && argv[i]; i++) {
+        if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
+            target = argv[++i];
+        } else if (strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
+            seed = argv[++i];
+        } else if (strcmp(argv[i], "--turns") == 0 && i + 1 < argc) {
+            turns = atoi(argv[++i]);
+            if (turns < 1)
+                turns = 1;
+        }
+    }
+
+    hu_app_ctx_t app_ctx;
+    hu_error_t err = hu_app_bootstrap(&app_ctx, alloc, NULL, true, true);
+    if (err != HU_OK) {
+        fprintf(stderr, "bootstrap failed: %s\n", hu_error_string(err));
+        return err;
+    }
+
+    if (!target && app_ctx.cfg->channels.imessage.default_target)
+        target = app_ctx.cfg->channels.imessage.default_target;
+    if (!target) {
+        fprintf(stderr,
+                "No target specified. Use --target <phone/email> or "
+                "configure channels.imessage.default_target.\n");
+        hu_app_teardown(&app_ctx);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    /* Override daemon config for E2E: disable consecutive limiter, set turn cap */
+    app_ctx.cfg->channels.imessage.daemon.max_consecutive_replies = 0;
+    app_ctx.cfg->channels.imessage.daemon.e2e_max_turns = turns;
+    app_ctx.cfg->channels.imessage.daemon.response_mode =
+        hu_strdup(&app_ctx.cfg->allocator, "eager");
+
+    printf("[e2e] iMessage agent-to-agent test\n");
+    printf("[e2e] target:  %s\n", target);
+    printf("[e2e] seed:    %.60s%s\n", seed, strlen(seed) > 60 ? "..." : "");
+    printf("[e2e] turns:   %d\n", turns);
+    printf("[e2e] Sending seed message...\n");
+
+    /* Send the seed message via the iMessage channel */
+    hu_channel_t *imsg_ch = NULL;
+    for (size_t i = 0; i < app_ctx.channel_count; i++) {
+        if (!app_ctx.channels[i].channel || !app_ctx.channels[i].channel->vtable ||
+            !app_ctx.channels[i].channel->vtable->name)
+            continue;
+        const char *name = app_ctx.channels[i].channel->vtable->name(
+            app_ctx.channels[i].channel->ctx);
+        if (name && strcmp(name, "imessage") == 0) {
+            imsg_ch = app_ctx.channels[i].channel;
+            break;
+        }
+    }
+
+    if (!imsg_ch) {
+        fprintf(stderr, "[e2e] iMessage channel not found. Is it configured?\n");
+        hu_app_teardown(&app_ctx);
+        return HU_ERR_NOT_FOUND;
+    }
+
+#ifndef HU_IS_TEST
+    err = imsg_ch->vtable->send(imsg_ch->ctx, target, strlen(target), seed, strlen(seed), NULL, 0);
+    if (err != HU_OK) {
+        fprintf(stderr, "[e2e] Failed to send seed message: %s\n", hu_error_string(err));
+        hu_app_teardown(&app_ctx);
+        return err;
+    }
+    printf("[e2e] Seed sent. Starting service loop (will stop after %d turns)...\n", turns);
+#else
+    (void)err;
+    printf("[e2e] (test mode) Seed message would be sent to %s\n", target);
+    printf("[e2e] (test mode) Service loop skipped.\n");
+    hu_app_teardown(&app_ctx);
+    return HU_OK;
+#endif
+
+    hu_conversation_data_init(alloc);
+
+    err = hu_service_run(alloc, 1000, app_ctx.channels, app_ctx.channel_count, app_ctx.agent,
+                         app_ctx.cfg);
+
+    printf("[e2e] Service loop finished (err=%s).\n", hu_error_string(err));
+    hu_app_teardown(&app_ctx);
+    return err;
 }
 
 /* ── hardware ────────────────────────────────────────────────────────────── */
@@ -766,10 +866,20 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
 
     if (strcmp(sub, "run") == 0) {
         if (argc < 4) {
-            fprintf(stderr, "Usage: human eval run <suite.json>\n");
+            fprintf(stderr, "Usage: human eval run <suite.json> [--trials N]\n");
             return HU_ERR_INVALID_ARGUMENT;
         }
         const char *path = argv[3];
+        size_t trial_count = 1;
+        for (int ti = 4; ti < argc - 1; ti++) {
+            if (strcmp(argv[ti], "--trials") == 0) {
+                trial_count = (size_t)atoi(argv[ti + 1]);
+                if (trial_count < 1)
+                    trial_count = 1;
+                if (trial_count > 100)
+                    trial_count = 100;
+            }
+        }
         hu_eval_suite_t suite = {0};
         hu_error_t err;
 #ifdef HU_IS_TEST
@@ -793,8 +903,13 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         }
 
         hu_eval_run_t run = {0};
+        hu_eval_multi_trial_result_t mt = {0};
 #ifdef HU_IS_TEST
-        err = hu_eval_run_suite(alloc, NULL, "mock", 4, &suite, HU_EVAL_CONTAINS, &run);
+        if (trial_count > 1)
+            err = hu_eval_run_suite_trials(alloc, NULL, "mock", 4, &suite, HU_EVAL_CONTAINS,
+                                           trial_count, &mt, &run);
+        else
+            err = hu_eval_run_suite(alloc, NULL, "mock", 4, &suite, HU_EVAL_CONTAINS, &run);
 #else
         {
             hu_config_t cfg;
@@ -816,8 +931,12 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 hu_log_error("eval", NULL, "provider error: %s", hu_error_string(err));
                 return err;
             }
-            err = hu_eval_run_suite(alloc, &provider, model, model_len, &suite, HU_EVAL_CONTAINS,
-                                    &run);
+            if (trial_count > 1)
+                err = hu_eval_run_suite_trials(alloc, &provider, model, model_len, &suite,
+                                               HU_EVAL_CONTAINS, trial_count, &mt, &run);
+            else
+                err = hu_eval_run_suite(alloc, &provider, model, model_len, &suite,
+                                        HU_EVAL_CONTAINS, &run);
             if (provider.vtable && provider.vtable->deinit)
                 provider.vtable->deinit(provider.ctx, alloc);
             hu_config_deinit(&cfg);
@@ -829,6 +948,14 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             return err;
         }
 
+        if (trial_count > 1) {
+            printf("{\"trials\":%u,\"mean_pass_rate\":%.4f,\"stddev\":%.4f,"
+                   "\"worst\":%.4f,\"best\":%.4f,\"mean_score\":%.4f,"
+                   "\"total_elapsed_ms\":%lld}\n",
+                   (unsigned)mt.trials_run, mt.mean_pass_rate, mt.stddev_pass_rate,
+                   mt.worst_pass_rate, mt.best_pass_rate, mt.mean_score,
+                   (long long)mt.total_elapsed_ms);
+        }
         char *report = NULL;
         size_t report_len = 0;
         err = hu_eval_report_json(alloc, &run, &report, &report_len);

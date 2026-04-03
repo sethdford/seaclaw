@@ -370,6 +370,193 @@ static void test_config_parse_imessage_channel(void) {
     hu_arena_destroy(arena);
 }
 
+static void test_config_parse_imessage_allow_from(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{"
+                       "\"default_target\":\"+15551234567\","
+                       "\"allow_from\":[\"+15559876543\",\"user@icloud.com\"]}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cfg.channels.imessage.allow_from_count, 2u);
+    HU_ASSERT_NOT_NULL(cfg.channels.imessage.allow_from);
+    HU_ASSERT_STR_EQ(cfg.channels.imessage.allow_from[0], "+15559876543");
+    HU_ASSERT_STR_EQ(cfg.channels.imessage.allow_from[1], "user@icloud.com");
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_imessage_use_imsg_cli(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{"
+                       "\"default_target\":\"+15551234567\","
+                       "\"use_imsg_cli\":true}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(cfg.channels.imessage.use_imsg_cli);
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_imessage_use_imsg_cli_default_false(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{\"default_target\":\"+15551234567\"}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_FALSE(cfg.channels.imessage.use_imsg_cli);
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_imessage_poll_interval(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{"
+                       "\"default_target\":\"+15551234567\","
+                       "\"poll_interval_sec\":5}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cfg.channels.imessage.poll_interval_sec, 5);
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_imessage_poll_interval_default(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{\"default_target\":\"+15551234567\"}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cfg.channels.imessage.poll_interval_sec, 30);
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_daemon_max_consecutive_replies(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{"
+                       "\"default_target\":\"+15551234567\","
+                       "\"daemon\":{\"max_consecutive_replies\":0}}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cfg.channels.imessage.daemon.max_consecutive_replies, 0);
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_daemon_max_consecutive_replies_custom(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{"
+                       "\"default_target\":\"+15551234567\","
+                       "\"daemon\":{\"max_consecutive_replies\":10}}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cfg.channels.imessage.daemon.max_consecutive_replies, 10);
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_daemon_e2e_max_turns(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{"
+                       "\"default_target\":\"+15551234567\","
+                       "\"daemon\":{\"e2e_max_turns\":5}}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cfg.channels.imessage.daemon.e2e_max_turns, 5);
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_daemon_e2e_max_turns_default_zero(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{\"default_target\":\"+15551234567\"}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cfg.channels.imessage.daemon.e2e_max_turns, 0);
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_daemon_e2e_with_consecutive_unlimited(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{"
+                       "\"default_target\":\"+15551234567\","
+                       "\"daemon\":{\"max_consecutive_replies\":0,"
+                       "\"e2e_max_turns\":10}}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cfg.channels.imessage.daemon.max_consecutive_replies, 0);
+    HU_ASSERT_EQ(cfg.channels.imessage.daemon.e2e_max_turns, 10);
+    hu_arena_destroy(arena);
+}
+
+static void test_config_parse_daemon_e2e_telegram_channel(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"telegram\":{"
+                       "\"token\":\"test-token\","
+                       "\"daemon\":{\"e2e_max_turns\":3,\"max_consecutive_replies\":0}}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(cfg.channels.telegram.daemon.e2e_max_turns, 3);
+    HU_ASSERT_EQ(cfg.channels.telegram.daemon.max_consecutive_replies, 0);
+    hu_arena_destroy(arena);
+}
+
 static void test_config_parse_response_mode(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_config_t cfg;
@@ -935,6 +1122,17 @@ void run_config_parse_tests(void) {
     HU_RUN_TEST(test_config_parse_email_channel);
     HU_RUN_TEST(test_config_parse_imap_channel_smtp);
     HU_RUN_TEST(test_config_parse_imessage_channel);
+    HU_RUN_TEST(test_config_parse_imessage_allow_from);
+    HU_RUN_TEST(test_config_parse_imessage_use_imsg_cli);
+    HU_RUN_TEST(test_config_parse_imessage_use_imsg_cli_default_false);
+    HU_RUN_TEST(test_config_parse_imessage_poll_interval);
+    HU_RUN_TEST(test_config_parse_imessage_poll_interval_default);
+    HU_RUN_TEST(test_config_parse_daemon_max_consecutive_replies);
+    HU_RUN_TEST(test_config_parse_daemon_max_consecutive_replies_custom);
+    HU_RUN_TEST(test_config_parse_daemon_e2e_max_turns);
+    HU_RUN_TEST(test_config_parse_daemon_e2e_max_turns_default_zero);
+    HU_RUN_TEST(test_config_parse_daemon_e2e_with_consecutive_unlimited);
+    HU_RUN_TEST(test_config_parse_daemon_e2e_telegram_channel);
     HU_RUN_TEST(test_config_parse_response_mode);
     HU_RUN_TEST(test_config_parse_response_mode_selective);
     HU_RUN_TEST(test_config_parse_response_mode_normal);
