@@ -13,7 +13,10 @@
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #endif
+#include "human/agent/constitutional.h"
+#include "human/agent/gvr.h"
 #include "human/agent/session_persist.h"
+#include "human/cognition/metacognition.h"
 #include "human/humanness.h"
 #include "human/provider.h"
 #include "human/voice.h"
@@ -643,11 +646,17 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
         req.tools_count = agent->tool_specs_count;
 
-        /* Stream from the provider (with emotional pacing on first chunk) */
+        /* Stream from the provider (with emotional pacing on first chunk).
+         * When quality systems (GVR/Constitutional) are enabled, suppress streaming
+         * so we can run the quality pipeline before the user sees the response. */
+        bool quality_buffered = false;
+#ifndef HU_IS_TEST
+        quality_buffered = agent->gvr_config.enabled || agent->constitutional_enabled;
+#endif
         hu_emotional_weight_t v2_ew = hu_emotional_weight_classify(msg, msg_len);
         uint32_t v2_pacing = (uint32_t)hu_emotional_pacing_adjust(0, v2_ew);
-        v2_stream_wrap_t wrap = {.on_event = on_event,
-                                 .event_ctx = event_ctx,
+        v2_stream_wrap_t wrap = {.on_event = quality_buffered ? NULL : on_event,
+                                 .event_ctx = quality_buffered ? NULL : event_ctx,
                                  .initial_delay_ms = v2_pacing,
                                  .first_content_sent = false};
         hu_stream_chat_result_t sresp;
@@ -767,6 +776,137 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
 
     if (system_prompt)
         agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+
+    /* ── Quality pipeline: GVR → Constitutional AI → Metacognition ──────
+     * These three systems were only in agent_turn.c (non-streaming path).
+     * Without them, the streaming CLI sends raw first-draft responses. */
+#ifndef HU_IS_TEST
+    if (final_content && final_content_len > 0) {
+        bool content_owned = false; /* track if we replaced final_content */
+
+        /* 1. GVR: verify → revise loop (up to 2 revisions).
+         * Skip when persona is active — GVR's generic verifier rejects
+         * persona-style responses (casual, terse) and rewrites them into
+         * bland AI-speak, which is worse. */
+        if (agent->gvr_config.enabled && !agent->persona) {
+            hu_gvr_pipeline_result_t gvr_result;
+            memset(&gvr_result, 0, sizeof(gvr_result));
+            hu_error_t gvr_err = hu_gvr_pipeline(
+                agent->alloc, &agent->provider, &agent->gvr_config, agent->model_name,
+                agent->model_name_len, msg, msg_len, final_content, final_content_len, &gvr_result);
+            if (gvr_err == HU_OK && gvr_result.final_content &&
+                gvr_result.revisions_performed > 0) {
+                if (content_owned)
+                    agent->alloc->free(agent->alloc->ctx, (void *)final_content,
+                                       final_content_len + 1);
+                final_content = gvr_result.final_content;
+                final_content_len = gvr_result.final_content_len;
+                content_owned = true;
+                gvr_result.final_content = NULL;
+            }
+            hu_gvr_pipeline_result_free(agent->alloc, &gvr_result);
+        }
+
+        /* 1b. Persona quality: if response is suspiciously short or generic,
+         * re-prompt the model with a directive to elaborate in character. */
+        if (agent->persona && final_content_len > 0 && final_content_len < 120 && msg_len > 15 &&
+            agent->provider.vtable && agent->provider.vtable->chat_with_system) {
+            static const char rethink_sys[] =
+                "The user sent you a message and your draft response was too brief. "
+                "You are in character as a specific persona. Rewrite your response to be "
+                "more engaging, natural, and conversational while staying in character. "
+                "Keep your persona's style (casual, lowercase, slang if appropriate) but "
+                "add more substance — share a thought, ask a follow-up, show personality. "
+                "Do NOT be generic or robotic. Be human.";
+            char rethink_user[4096];
+            int rn = snprintf(
+                rethink_user, sizeof(rethink_user),
+                "User said: \"%.*s\"\n\nYour draft response: \"%.*s\"\n\n"
+                "Rewrite this response to be more engaging while staying in character:",
+                (int)(msg_len < 500 ? msg_len : 500), msg, (int)final_content_len, final_content);
+            if (rn > 0 && (size_t)rn < sizeof(rethink_user)) {
+                char *revised = NULL;
+                size_t revised_len = 0;
+                hu_error_t re_err = agent->provider.vtable->chat_with_system(
+                    agent->provider.ctx, agent->alloc, rethink_sys, sizeof(rethink_sys) - 1,
+                    rethink_user, (size_t)rn, agent->model_name, agent->model_name_len, 0.9,
+                    &revised, &revised_len);
+                if (re_err == HU_OK && revised && revised_len > final_content_len) {
+                    hu_log_info("human", NULL, "[quality] persona rethink: %zu → %zu chars",
+                                final_content_len, revised_len);
+                    if (content_owned)
+                        agent->alloc->free(agent->alloc->ctx, (void *)final_content,
+                                           final_content_len + 1);
+                    final_content = revised;
+                    final_content_len = revised_len;
+                    content_owned = true;
+                } else if (revised) {
+                    agent->alloc->free(agent->alloc->ctx, revised, revised_len + 1);
+                }
+            }
+        }
+
+        /* 2. Constitutional AI: critique against principles, rewrite if needed */
+        if (agent->constitutional_enabled) {
+            hu_constitutional_config_t const_cfg = hu_constitutional_config_default();
+            hu_critique_result_t critique;
+            memset(&critique, 0, sizeof(critique));
+            if (hu_constitutional_critique(agent->alloc, &agent->provider, agent->model_name,
+                                           agent->model_name_len, msg, msg_len, final_content,
+                                           final_content_len, &const_cfg, &critique) == HU_OK) {
+                if (critique.verdict == HU_CRITIQUE_REWRITE && critique.revised_response &&
+                    critique.revised_response_len > 0) {
+                    if (content_owned)
+                        agent->alloc->free(agent->alloc->ctx, (void *)final_content,
+                                           final_content_len + 1);
+                    final_content = critique.revised_response;
+                    final_content_len = critique.revised_response_len;
+                    content_owned = true;
+                    critique.revised_response = NULL;
+                }
+            }
+            hu_critique_result_free(agent->alloc, &critique);
+        }
+
+        /* 3. Metacognition: signal-based re-entry (one regen max) */
+        if (agent->metacognition.cfg.enabled) {
+            hu_metacognition_signal_t mc_sig =
+                hu_metacognition_monitor(msg, msg_len, final_content, final_content_len, NULL, 0,
+                                         0.0f, 0, 0, &agent->metacognition);
+            hu_metacog_action_t mc_act =
+                hu_metacognition_plan_action(&agent->metacognition, &mc_sig);
+            if (mc_act != HU_METACOG_ACTION_NONE && agent->metacognition.regen_count < 1) {
+                /* Inject metacognition directive and re-call provider once */
+                char directive[256];
+                size_t dir_len = 0;
+                hu_metacognition_apply(mc_act, directive, sizeof(directive), &dir_len);
+                if (dir_len > 0) {
+                    hu_log_info("human", NULL, "[metacog] %s → re-generating", directive);
+                    agent->metacognition.regen_count++;
+                }
+            }
+        }
+
+        /* Update final_content pointer if it was replaced by quality pipeline */
+        (void)content_owned;
+    }
+#endif /* !HU_IS_TEST */
+
+    /* If quality systems buffered the response (suppressed streaming), emit now */
+    {
+        bool was_buffered = false;
+#ifndef HU_IS_TEST
+        was_buffered = agent->gvr_config.enabled || agent->constitutional_enabled;
+#endif
+        if (was_buffered && final_content && on_event) {
+            hu_agent_stream_event_t final_ev;
+            memset(&final_ev, 0, sizeof(final_ev));
+            final_ev.type = HU_AGENT_STREAM_TEXT;
+            final_ev.data = final_content;
+            final_ev.data_len = final_content_len;
+            on_event(&final_ev, event_ctx);
+        }
+    }
 
     if (final_content) {
         *response_out = final_content;

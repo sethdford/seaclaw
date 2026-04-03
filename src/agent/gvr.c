@@ -9,14 +9,21 @@
 #if !defined(HU_IS_TEST) || !HU_IS_TEST
 static const char GVR_VERIFY_SYS[] =
     "You are a verification assistant. Given the original prompt and a response, "
-    "check for factual errors, hallucinations, tool-output misuse, or incomplete answers. "
+    "check for factual errors, hallucinations, tool-output misuse, or incomplete answers.\n\n"
+    "IMPORTANT: The response may be written in a specific persona style (casual, terse, "
+    "lowercase, slang). This is INTENTIONAL — do NOT flag persona style as an error. "
+    "Only flag genuine factual errors, hallucinations, or completely missing information.\n"
+    "A short, casual response that addresses the question is VALID.\n\n"
     "Reply with exactly one line: PASS or FAIL followed by a brief critique.\n"
     "Format: PASS: <reason> or FAIL: <critique>";
 
 static const char GVR_REVISE_SYS[] =
     "You are a revision assistant. Given the original prompt, a previous response, "
     "and a critique identifying errors, produce a corrected response that addresses "
-    "all issues raised in the critique.";
+    "all issues raised in the critique.\n\n"
+    "IMPORTANT: Preserve the original response's tone, style, and length. If the original "
+    "was casual and short, the revision should be casual and short. Do NOT make it longer "
+    "or more formal unless the critique specifically requires more information.";
 #endif
 
 static char *gvr_dup(hu_allocator_t *alloc, const char *s, size_t len) {
