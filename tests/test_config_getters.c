@@ -396,7 +396,7 @@ static void test_config_get_tool_model_override_found(void) {
     cfg->default_provider = hu_strdup(&cfg->allocator, "openai");
     cfg->default_model = hu_strdup(&cfg->allocator, "gpt-4");
     const char *json = "{\"tools\":{\"tool_model_overrides\":{"
-                       "\"web_search\":{\"provider\":\"gemini\",\"model\":\"gemini-2.5-flash\"},"
+                       "\"web_search\":{\"provider\":\"gemini\",\"model\":\"gemini-3-flash-preview\"},"
                        "\"shell\":{\"provider\":\"anthropic\",\"model\":\"claude-sonnet-4.6\"}"
                        "}}}";
     hu_error_t err = hu_config_parse_json(cfg, json, strlen(json));
@@ -406,7 +406,7 @@ static void test_config_get_tool_model_override_found(void) {
     HU_ASSERT_NOT_NULL(prov);
     HU_ASSERT_NOT_NULL(mod);
     HU_ASSERT_STR_EQ(prov, "gemini");
-    HU_ASSERT_STR_EQ(mod, "gemini-2.5-flash");
+    HU_ASSERT_STR_EQ(mod, "gemini-3-flash-preview");
     prov = NULL;
     mod = NULL;
     HU_ASSERT_TRUE(hu_config_get_tool_model_override(cfg, "shell", &prov, &mod));

@@ -109,7 +109,7 @@ static void test_eval_store_with_provider_and_model(void) {
     hu_eval_run_t run = {0};
     run.suite_name = (char *)"reasoning";
     run.provider = (char *)"gemini";
-    run.model = (char *)"gemini-2.5-pro";
+    run.model = (char *)"gemini-3.1-pro-preview";
     run.passed = 8;
     run.failed = 2;
     run.pass_rate = 0.80;
@@ -123,7 +123,7 @@ static void test_eval_store_with_provider_and_model(void) {
     HU_ASSERT_NOT_NULL(loaded[0].provider);
     HU_ASSERT_STR_EQ(loaded[0].provider, "gemini");
     HU_ASSERT_NOT_NULL(loaded[0].model);
-    HU_ASSERT_STR_EQ(loaded[0].model, "gemini-2.5-pro");
+    HU_ASSERT_STR_EQ(loaded[0].model, "gemini-3.1-pro-preview");
 
     hu_eval_run_free(&alloc, &loaded[0]);
     sqlite3_close(db);

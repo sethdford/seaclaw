@@ -11,7 +11,7 @@ static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n"
            "Channel conversation & chaos tests for human.\n\n"
            "  --binary PATH          Path to human binary (default: ./human)\n"
-           "  --model MODEL          Gemini model (default: gemini-2.5-flash)\n"
+           "  --model MODEL          Gemini model (default: gemini-3-flash-preview)\n"
            "  --port PORT            Gateway port (default: 3198)\n"
            "  --channels LIST        Comma-separated channels or 'all' (default: all)\n"
            "  --count N              Tests per channel (default: 5)\n"
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
     hu_channel_test_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.binary_path = "./human";
-    cfg.gemini_model = "gemini-2.5-flash";
+    cfg.gemini_model = "gemini-3-flash-preview";
     cfg.gateway_port = 3198;
     cfg.tests_per_channel = 5;
     cfg.concurrency = 4;

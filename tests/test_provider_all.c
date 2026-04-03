@@ -698,10 +698,10 @@ static void test_gemini_model_gemini2_flash(void) {
     hu_gemini_create(&alloc, "key", 3, NULL, 0, &prov);
     hu_chat_message_t msgs[1] = {make_user_msg("hi", 2)};
     hu_chat_request_t req = make_simple_request(msgs, 1);
-    req.model = "gemini-2.0-flash";
-    req.model_len = 16;
+    req.model = "gemini-3.1-flash-lite-preview";
+    req.model_len = 30;
     hu_chat_response_t resp = {0};
-    hu_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "gemini-2.0-flash", 16, 0.7, &resp);
+    hu_error_t err = prov.vtable->chat(prov.ctx, &alloc, &req, "gemini-3.1-flash-lite-preview", 30, 0.7, &resp);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(resp.content);
     if (resp.content)

@@ -1417,7 +1417,7 @@ export class DemoGatewayClient extends EventTarget {
               uptime: 86400,
             },
             { name: "researcher", status: "running", model: "gpt-4o", turns: 37, uptime: 3600 },
-            { name: "coder", status: "idle", model: "gemini-2.5-pro", turns: 89, uptime: 7200 },
+            { name: "coder", status: "idle", model: "gemini-3.1-pro-preview", turns: 89, uptime: 7200 },
           ],
         };
       case "models.list":

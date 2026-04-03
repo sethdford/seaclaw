@@ -6,7 +6,7 @@ static const char HU_SYNTH_AGENT_PROMPT[] =
     "Generate %d diverse test cases for /v1/chat/completions.\n\n"
     "Return a JSON array where each element has:\n"
     "- \"name\": test name\n"
-    "- \"model\": \"gemini-2.5-flash\"\n"
+    "- \"model\": \"gemini-3-flash-preview\"\n"
     "- \"messages\": [{\"role\":\"user\",\"content\":\"...\"}]\n"
     "- \"max_tokens\": integer (50-500)\n"
     "- \"expect_success\": boolean\n\n"
@@ -48,7 +48,7 @@ hu_error_t hu_synth_run_agent(hu_allocator_t *alloc, const hu_synth_config_t *cf
         bool exp_ok = hu_json_get_bool(item, "expect_success", true);
         const char *model = hu_json_get_string(item, "model");
         if (!model)
-            model = "gemini-2.5-flash";
+            model = "gemini-3-flash-preview";
         int mt = (int)hu_json_get_number(item, "max_tokens", 100);
         hu_json_value_t *msgs = hu_json_object_get(item, "messages");
         char *msgs_str = NULL;
