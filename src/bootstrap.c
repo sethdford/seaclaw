@@ -36,6 +36,8 @@
 #include "human/permission.h"
 #include "human/mcp_manager.h"
 #include "human/agent/instruction_discover.h"
+#include "human/tools/webhook_tools.h"
+#include "human/webhook.h"
 #ifdef HU_HAS_VOICE_CHANNEL
 #include "human/channels/voice_channel.h"
 #endif
@@ -672,6 +674,45 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         } else if (mcp_err != HU_OK) {
             fprintf(stderr, "[bootstrap] warning: MCP manager creation failed: %s\n",
                     hu_error_string(mcp_err));
+        }
+    }
+
+    /* Webhook tools: create manager and append webhook tools */
+    {
+        hu_webhook_manager_t *webhook_mgr = NULL;
+        hu_error_t webhook_err = hu_webhook_manager_create(alloc, &webhook_mgr);
+        if (webhook_err == HU_OK && webhook_mgr) {
+            /* Merge webhook tools with existing tools */
+            hu_tool_t webhook_tools[3] = {0};
+            size_t webhook_count = 0;
+
+            if (hu_webhook_register_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) == HU_OK) {
+                webhook_count++;
+            }
+            if (hu_webhook_poll_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) == HU_OK) {
+                webhook_count++;
+            }
+            if (hu_webhook_list_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) == HU_OK) {
+                webhook_count++;
+            }
+
+            if (webhook_count > 0) {
+                hu_tool_t *merged = (hu_tool_t *)alloc->alloc(
+                    alloc->ctx, (bi->tools_count + webhook_count) * sizeof(hu_tool_t));
+                if (merged) {
+                    memcpy(merged, bi->tools, bi->tools_count * sizeof(hu_tool_t));
+                    memcpy(merged + bi->tools_count, webhook_tools,
+                           webhook_count * sizeof(hu_tool_t));
+                    alloc->free(alloc->ctx, bi->tools, bi->tools_count * sizeof(hu_tool_t));
+                    bi->tools = merged;
+                    bi->tools_count += webhook_count;
+                    ctx->tools = bi->tools;
+                    ctx->tools_count = bi->tools_count;
+                }
+            }
+        } else if (webhook_err != HU_OK) {
+            fprintf(stderr, "[bootstrap] warning: webhook manager creation failed: %s\n",
+                    hu_error_string(webhook_err));
         }
     }
 

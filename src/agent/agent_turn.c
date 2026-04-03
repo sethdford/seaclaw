@@ -19,6 +19,7 @@ static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *al
 }
 #endif
 #include "human/agent/ab_response.h"
+#include "human/agent/approval_gate.h"
 #include "human/agent/awareness.h"
 #include "human/agent/commands.h"
 #include "human/agent/commitment.h"
@@ -343,6 +344,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (response_len_out)
             *response_len_out = strlen(slash_resp);
         return HU_OK;
+    }
+
+    /* Log workflow step start */
+    if (agent->workflow_log) {
+        hu_workflow_event_t ev = {0};
+        ev.type = HU_WF_EVENT_STEP_STARTED;
+        ev.timestamp = hu_workflow_event_current_timestamp_ms();
+        hu_workflow_event_log_append(agent->workflow_log, agent->alloc, &ev);
     }
 
     /* Prompt injection defense-in-depth */
@@ -3914,6 +3923,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 hu_session_persist_save(agent->alloc, agent, "~/.human/sessions", NULL);
             }
 
+            /* Log workflow step completed */
+            if (agent->workflow_log) {
+                hu_workflow_event_t ev = {0};
+                ev.type = HU_WF_EVENT_STEP_COMPLETED;
+                ev.timestamp = hu_workflow_event_current_timestamp_ms();
+                hu_workflow_event_log_append(agent->workflow_log, agent->alloc, &ev);
+            }
+
             return HU_OK;
         }
 
@@ -4863,6 +4880,30 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             if (result->needs_approval && !agent->approval_cb) {
                                 hu_tool_result_free(agent->alloc, result);
                                 *result = hu_tool_result_fail("requires human approval", 23);
+                            }
+
+                            /* Create approval gate if gate_manager is available */
+                            if (result->needs_approval && agent->gate_manager) {
+                                char gate_desc[256];
+                                int desc_n = snprintf(gate_desc, sizeof(gate_desc),
+                                                     "Approve execution of tool '%.*s'",
+                                                     (int)call->name_len, call->name);
+                                char gate_id[64];
+                                size_t args_len = args_str ? strlen(args_str) : 0;
+                                hu_error_t gate_err = hu_gate_create(
+                                    agent->gate_manager, agent->alloc, gate_desc,
+                                    (size_t)(desc_n > 0 ? desc_n : 0), args_str,
+                                    args_len, 300, gate_id);
+                                if (gate_err == HU_OK && agent->workflow_log) {
+                                    hu_workflow_event_t wf_ev = {0};
+                                    wf_ev.type = HU_WF_EVENT_HUMAN_GATE_WAITING;
+                                    wf_ev.workflow_id = (char *)agent->session_id;
+                                    wf_ev.workflow_id_len = strlen(agent->session_id);
+                                    wf_ev.step_id = gate_id;
+                                    wf_ev.step_id_len = strlen(gate_id);
+                                    hu_workflow_event_log_append(agent->workflow_log, agent->alloc,
+                                                                &wf_ev);
+                                }
                             }
 
                             /* Approval flow: if tool needs approval, ask user and retry */

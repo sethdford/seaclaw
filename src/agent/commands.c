@@ -1,5 +1,6 @@
 #include "human/agent/commands.h"
 #include "human/agent.h"
+#include "human/agent/approval_gate.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/planner.h"
 #include "human/agent/prompt.h"
@@ -8,6 +9,7 @@
 #include "human/agent/task_list.h"
 #include "human/agent/undo.h"
 #include "human/agent/instruction_discover.h"
+#include "human/agent/workflow_event.h"
 #include "human/core/string.h"
 #include "human/hook.h"
 #include "human/permission.h"
@@ -732,6 +734,83 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             return hu_sprintf(agent->alloc, "Config reload failed: %s", hu_error_string(err));
         }
         return summary;
+    }
+
+    /* Workflow commands */
+    if (hu_strncasecmp(cmd_buf, "workflow", 8) == 0) {
+        const char *sub = arg_buf;
+        while (*sub == ' ' || *sub == '\t')
+            sub++;
+
+        if (hu_strncasecmp(sub, "status", 6) == 0) {
+            if (!agent->workflow_log) {
+                return hu_strndup(agent->alloc, "No workflow log active.", 23);
+            }
+            size_t count = hu_workflow_event_log_count(agent->workflow_log);
+            return hu_sprintf(agent->alloc, "Workflow: %zu events logged", count);
+        }
+
+        if (hu_strncasecmp(sub, "gates", 5) == 0) {
+            if (!agent->gate_manager) {
+                return hu_strndup(agent->alloc, "No approval gate manager active.", 32);
+            }
+            hu_approval_gate_t *gates = NULL;
+            size_t gate_count = 0;
+            hu_error_t err = hu_gate_list_pending(agent->gate_manager, agent->alloc, &gates,
+                                                 &gate_count);
+            if (err != HU_OK) {
+                return hu_sprintf(agent->alloc, "Failed to list gates: %s", hu_error_string(err));
+            }
+            if (gate_count == 0) {
+                hu_gate_free_array(agent->alloc, gates, gate_count);
+                return hu_strndup(agent->alloc, "No pending approval gates.", 26);
+            }
+            char *buf = (char *)agent->alloc->alloc(agent->alloc->ctx, 4096);
+            if (!buf) {
+                hu_gate_free_array(agent->alloc, gates, gate_count);
+                return NULL;
+            }
+            int pos = snprintf(buf, 4096, "Pending gates (%zu):\n", gate_count);
+            for (size_t i = 0; i < gate_count && pos < 4000; i++) {
+                pos += snprintf(buf + pos, 4096 - (size_t)pos, "  [%s] %s\n",
+                               gates[i].gate_id, gates[i].description ? gates[i].description : "");
+            }
+            hu_gate_free_array(agent->alloc, gates, gate_count);
+            return buf;
+        }
+
+        if (hu_strncasecmp(sub, "approve", 7) == 0) {
+            const char *gate_id = sub + 7;
+            while (*gate_id == ' ' || *gate_id == '\t')
+                gate_id++;
+            if (!*gate_id || !agent->gate_manager) {
+                return hu_strndup(agent->alloc, "Usage: /workflow approve <gate_id>", 34);
+            }
+            hu_error_t err = hu_gate_resolve(agent->gate_manager, agent->alloc, gate_id,
+                                            HU_GATE_APPROVED, "Approved by user", 16);
+            if (err != HU_OK) {
+                return hu_sprintf(agent->alloc, "Approve failed: %s", hu_error_string(err));
+            }
+            return hu_sprintf(agent->alloc, "Gate %s approved", gate_id);
+        }
+
+        if (hu_strncasecmp(sub, "reject", 6) == 0) {
+            const char *gate_id = sub + 6;
+            while (*gate_id == ' ' || *gate_id == '\t')
+                gate_id++;
+            if (!*gate_id || !agent->gate_manager) {
+                return hu_strndup(agent->alloc, "Usage: /workflow reject <gate_id>", 33);
+            }
+            hu_error_t err = hu_gate_resolve(agent->gate_manager, agent->alloc, gate_id,
+                                            HU_GATE_REJECTED, "Rejected by user", 16);
+            if (err != HU_OK) {
+                return hu_sprintf(agent->alloc, "Reject failed: %s", hu_error_string(err));
+            }
+            return hu_sprintf(agent->alloc, "Gate %s rejected", gate_id);
+        }
+
+        return hu_strndup(agent->alloc,
+                         "Usage: /workflow status|gates|approve <id>|reject <id>", 54);
     }
 
     /* ── Diagnostic Commands ─────────────────────────────────────────────────── */
