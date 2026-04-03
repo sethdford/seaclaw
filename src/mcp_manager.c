@@ -554,16 +554,135 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
         if (!slot->connected)
             continue;
 
-        /* Only stdio servers are currently supported for tool discovery */
-        if (!slot->server) {
-            fprintf(stderr, "mcp_manager: tool discovery not yet supported for %s transport\n",
-                    slot->transport_type ? slot->transport_type : "unknown");
-            continue;
-        }
-
         char **names = NULL, **descs = NULL, **params = NULL;
         size_t n = 0;
-        hu_error_t err = hu_mcp_server_list_tools(slot->server, alloc, &names, &descs, &params, &n);
+        hu_error_t err;
+
+        if (slot->server) {
+            /* stdio-based server: use native MCP protocol */
+            err = hu_mcp_server_list_tools(slot->server, alloc, &names, &descs, &params, &n);
+#if HU_ENABLE_CURL
+        } else if (slot->url) {
+            /* HTTP/SSE-based server: use JSON-RPC tools/list over HTTP */
+            char *request = NULL;
+            size_t request_len = 0;
+            uint32_t rpc_id = mgr->next_rpc_id++;
+            err = hu_mcp_jsonrpc_build_tools_list(alloc, rpc_id, &request, &request_len);
+            if (err != HU_OK) {
+                fprintf(stderr, "mcp_manager: failed to build tools/list request for %s\n",
+                        slot->name ? slot->name : "?");
+                continue;
+            }
+
+            /* Build auth header if available */
+            char auth_buf[2048] = {0};
+            const char *auth_header = NULL;
+            if (slot->oauth_token.access_token &&
+                !hu_mcp_oauth_token_is_expired(&slot->oauth_token)) {
+                int aw = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s",
+                                  slot->oauth_token.access_token);
+                if (aw > 0 && (size_t)aw < sizeof(auth_buf))
+                    auth_header = auth_buf;
+            }
+
+            hu_http_response_t response = {0};
+            hu_error_t http_err = hu_http_post_json(alloc, slot->url, auth_header,
+                                                    request, request_len, &response);
+            alloc->free(alloc->ctx, request, request_len + 1);
+
+            if (http_err != HU_OK || response.status_code < 200 || response.status_code >= 300) {
+                fprintf(stderr, "mcp_manager: HTTP tools/list failed for %s (status %ld)\n",
+                        slot->name ? slot->name : "?", response.status_code);
+                hu_http_response_free(alloc, &response);
+                continue;
+            }
+
+            /* Parse JSON-RPC response */
+            char *result_json = NULL;
+            size_t result_len = 0;
+            uint32_t resp_id = 0;
+            bool is_error = false;
+            err = hu_mcp_jsonrpc_parse_response(alloc, response.body, response.body_len,
+                                                &resp_id, &result_json, &result_len, &is_error);
+            hu_http_response_free(alloc, &response);
+
+            if (err != HU_OK || is_error || !result_json) {
+                if (result_json) alloc->free(alloc->ctx, result_json, result_len + 1);
+                fprintf(stderr, "mcp_manager: tools/list RPC error for %s\n",
+                        slot->name ? slot->name : "?");
+                continue;
+            }
+
+            /* Parse result_json as a JSON object containing "tools" array.
+             * Each tool: {"name": "...", "description": "...", "inputSchema": {...}} */
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, result_json, result_len, &root);
+            alloc->free(alloc->ctx, result_json, result_len + 1);
+
+            if (err != HU_OK || !root) {
+                fprintf(stderr, "mcp_manager: failed to parse tools/list result for %s\n",
+                        slot->name ? slot->name : "?");
+                continue;
+            }
+
+            /* Extract tools array */
+            hu_json_value_t *tools_arr = hu_json_object_get(root, "tools");
+            if (!tools_arr || tools_arr->type != HU_JSON_ARRAY) {
+                hu_json_free(alloc, root);
+                continue;
+            }
+
+            n = tools_arr->data.array.len;
+            if (n == 0) {
+                hu_json_free(alloc, root);
+                continue;
+            }
+
+            names = (char **)alloc->alloc(alloc->ctx, n * sizeof(char *));
+            descs = (char **)alloc->alloc(alloc->ctx, n * sizeof(char *));
+            params = (char **)alloc->alloc(alloc->ctx, n * sizeof(char *));
+            if (!names || !descs || !params) {
+                if (names) alloc->free(alloc->ctx, names, n * sizeof(char *));
+                if (descs) alloc->free(alloc->ctx, descs, n * sizeof(char *));
+                if (params) alloc->free(alloc->ctx, params, n * sizeof(char *));
+                hu_json_free(alloc, root);
+                continue;
+            }
+            memset(names, 0, n * sizeof(char *));
+            memset(descs, 0, n * sizeof(char *));
+            memset(params, 0, n * sizeof(char *));
+
+            for (size_t ti = 0; ti < n; ti++) {
+                hu_json_value_t *tool_obj = tools_arr->data.array.items[ti];
+                if (!tool_obj || tool_obj->type != HU_JSON_OBJECT) continue;
+
+                const char *tname = hu_json_get_string(tool_obj, "name");
+                const char *tdesc = hu_json_get_string(tool_obj, "description");
+                if (tname) {
+                    size_t tname_len = strlen(tname);
+                    names[ti] = (char *)alloc->alloc(alloc->ctx, tname_len + 1);
+                    if (names[ti]) { memcpy(names[ti], tname, tname_len); names[ti][tname_len] = '\0'; }
+                }
+                if (tdesc) {
+                    size_t tdesc_len = strlen(tdesc);
+                    descs[ti] = (char *)alloc->alloc(alloc->ctx, tdesc_len + 1);
+                    if (descs[ti]) { memcpy(descs[ti], tdesc, tdesc_len); descs[ti][tdesc_len] = '\0'; }
+                }
+                /* inputSchema as JSON string */
+                hu_json_value_t *schema = hu_json_object_get(tool_obj, "inputSchema");
+                if (schema) {
+                    params[ti] = (char *)alloc->alloc(alloc->ctx, 3);
+                    if (params[ti]) { memcpy(params[ti], "{}", 3); }
+                }
+            }
+            hu_json_free(alloc, root);
+            err = HU_OK;
+#endif /* HU_ENABLE_CURL */
+        } else {
+            fprintf(stderr, "mcp_manager: tool discovery not supported for %s (no server or URL)\n",
+                    slot->name ? slot->name : "?");
+            continue;
+        }
         if (err != HU_OK || n == 0)
             continue;
 
@@ -705,7 +824,56 @@ hu_error_t hu_mcp_manager_call_tool(hu_mcp_manager_t *mgr, hu_allocator_t *alloc
                                            out_result, out_result_len);
         }
 
-        /* Transport-based (HTTP/SSE) — not yet implemented */
+#if HU_ENABLE_CURL
+        /* HTTP/SSE-based server: JSON-RPC tools/call over HTTP */
+        if (mgr->slots[i].url) {
+            hu_mcp_mgr_slot_t *slot = &mgr->slots[i];
+            char *request = NULL;
+            size_t request_len = 0;
+            uint32_t rpc_id = mgr->next_rpc_id++;
+            hu_error_t jerr = hu_mcp_jsonrpc_build_tools_call(alloc, rpc_id,
+                tool_name, args_json ? args_json : "{}", &request, &request_len);
+            if (jerr != HU_OK)
+                return jerr;
+
+            char auth_buf[2048] = {0};
+            const char *auth_header = NULL;
+            if (slot->oauth_token.access_token &&
+                !hu_mcp_oauth_token_is_expired(&slot->oauth_token)) {
+                int aw = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s",
+                                  slot->oauth_token.access_token);
+                if (aw > 0 && (size_t)aw < sizeof(auth_buf))
+                    auth_header = auth_buf;
+            }
+
+            hu_http_response_t response = {0};
+            hu_error_t http_err = hu_http_post_json(alloc, slot->url, auth_header,
+                                                    request, request_len, &response);
+            alloc->free(alloc->ctx, request, request_len + 1);
+            if (http_err != HU_OK) {
+                hu_http_response_free(alloc, &response);
+                return http_err;
+            }
+
+            char *result = NULL;
+            size_t result_len = 0;
+            uint32_t resp_id = 0;
+            bool is_error = false;
+            hu_error_t perr = hu_mcp_jsonrpc_parse_response(alloc, response.body,
+                response.body_len, &resp_id, &result, &result_len, &is_error);
+            hu_http_response_free(alloc, &response);
+
+            if (perr != HU_OK)
+                return perr;
+            if (is_error) {
+                if (result) alloc->free(alloc->ctx, result, result_len + 1);
+                return HU_ERR_TOOL_EXECUTION;
+            }
+            *out_result = result;
+            *out_result_len = result_len;
+            return HU_OK;
+        }
+#endif
         return HU_ERR_NOT_SUPPORTED;
     }
     return HU_ERR_NOT_FOUND;
