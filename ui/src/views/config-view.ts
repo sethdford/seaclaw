@@ -58,8 +58,9 @@ const COMMON_MODELS: { value: string; label: string }[] = [
   { value: "gpt-4o-mini", label: "GPT-4o Mini" },
   { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
   { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
-  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { value: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
+  { value: "gemini-3-flash-preview", label: "Gemini 3 Flash" },
+  { value: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite" },
   { value: "llama-3.1-70b", label: "Llama 3.1 70B" },
 ];
 

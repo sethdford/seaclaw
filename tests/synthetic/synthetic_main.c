@@ -83,7 +83,7 @@ void hu_synth_gateway_stop(pid_t pid) {
 static void print_usage(const char *p) {
     printf("Usage: %s [OPTIONS]\nGemini-driven synthetic pressure tests for human.\n\n", p);
     printf("  --binary PATH         Path to human binary (default: ./human)\n");
-    printf("  --model MODEL         Gemini model (default: gemini-2.5-flash)\n");
+    printf("  --model MODEL         Gemini model (default: gemini-3-flash-preview)\n");
     printf("  --port PORT           Gateway port (default: 3199)\n");
     printf("  --count N             Tests per category (default: 20)\n");
     printf("  --concurrency N       Pressure workers (default: 4)\n");
@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
     hu_synth_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.binary_path = "./human";
-    cfg.gemini_model = "gemini-2.5-flash";
+    cfg.gemini_model = "gemini-3-flash-preview";
     cfg.gateway_port = 3199;
     cfg.concurrency = 4;
     cfg.duration_secs = 10;

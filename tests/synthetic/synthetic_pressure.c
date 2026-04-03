@@ -37,7 +37,7 @@ static void pressure_worker(hu_allocator_t *alloc, uint16_t port, int dur_s, int
             snprintf(u, sizeof(u), "http://127.0.0.1:%u/api/status", port);
             e = hu_http_get(alloc, u, NULL, &resp);
         } else {
-            static const char cb[] = "{\"model\":\"gemini-2.5-flash\","
+            static const char cb[] = "{\"model\":\"gemini-3-flash-preview\","
                                      "\"messages\":[{\"role\":\"user\",\"content\":\"OK\"}],"
                                      "\"max_tokens\":5}";
             e = hu_http_post_json(alloc, curl, NULL, cb, sizeof(cb) - 1, &resp);

@@ -31,7 +31,7 @@ static const hu_model_pricing_t HU_PRICING_TABLE[] = {
     /* Google Gemini */
     {"gemini-3.1-pro",         1.25,  5.0,   0.0,   0.0},
     {"gemini-3.1-flash",       0.075, 0.3,   0.0,   0.0},
-    {"gemini-2.0-flash",       0.075, 0.3,   0.0,   0.0},
+    {"gemini-3.1-flash-lite",  0.075, 0.3,   0.0,   0.0},
     {"gemini-pro",             0.5,   1.5,   0.0,   0.0},
 
     /* OpenAI Reasoning */
