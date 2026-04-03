@@ -164,7 +164,7 @@ static void matmul_atb(float *out, const float *a, const float *b, int m, int n,
 
 #define RMS_EPS 1e-6f
 
-static void rms_norm(float * restrict out, const float * restrict x, size_t n)
+static void rms_norm(float *out, const float *x, size_t n)
 {
     float sq = hu_sum_sq_f32(x, n);
     float inv = 1.0f / sqrtf(sq / (float)n + RMS_EPS);

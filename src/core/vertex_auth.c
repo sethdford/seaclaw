@@ -86,6 +86,7 @@ hu_error_t hu_vertex_auth_load_adc(hu_vertex_auth_t *auth, hu_allocator_t *alloc
 #endif
 }
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static hu_error_t vertex_auth_refresh(hu_vertex_auth_t *auth, hu_allocator_t *alloc) {
     if (!auth->client_id || !auth->client_secret || !auth->refresh_token)
         return HU_ERR_PROVIDER_AUTH;
@@ -131,6 +132,7 @@ static hu_error_t vertex_auth_refresh(hu_vertex_auth_t *auth, hu_allocator_t *al
     hu_json_free(alloc, root);
     return auth->access_token ? HU_OK : HU_ERR_OUT_OF_MEMORY;
 }
+#endif /* !HU_IS_TEST */
 
 hu_error_t hu_vertex_auth_ensure_token(hu_vertex_auth_t *auth, hu_allocator_t *alloc) {
     if (!auth || !alloc)

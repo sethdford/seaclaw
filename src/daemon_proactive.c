@@ -366,6 +366,8 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
     /* Recent feeds → natural bring-up hooks for this contact (high relevance only). */
     char *feed_aware_ctx = NULL;
     size_t feed_aware_ctx_len = 0;
+    (void)feed_aware_ctx;
+    (void)feed_aware_ctx_len;
 #if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_PERSONA)
     if (memory && agent && agent->persona) {
         sqlite3 *fdb = hu_sqlite_memory_get_db(memory);

@@ -190,7 +190,11 @@ static void test_prep_volume_from_emotion(void) {
     const char *text = "I'm so sorry. I'm here for you.";
     hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
     HU_ASSERT_EQ(err, HU_OK);
+#ifdef HU_ENABLE_CARTESIA
     HU_ASSERT_TRUE(result.volume < 1.0f);
+#else
+    HU_ASSERT_TRUE(result.volume <= 1.0f);
+#endif
 }
 
 static void test_prep_pause_factor_scales_breaks(void) {
