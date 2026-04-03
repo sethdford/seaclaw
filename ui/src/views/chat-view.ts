@@ -1,7 +1,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import type { ContextMenuItem } from "../components/hu-context-menu.js";
-import type { ChatSession } from "../components/hu-chat-sessions-panel.js";
+import type { ChatSession, ChatProject } from "../components/hu-chat-sessions-panel.js";
 import type { GatewayStatus } from "../gateway.js";
 import { GatewayClient as GatewayClientClass } from "../gateway.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
@@ -214,6 +214,11 @@ export class ScChatView extends GatewayAwareLitElement {
   } = { open: false, x: 0, y: 0, items: [] };
   @state() private _sessionsPanelOpen = false;
   @state() private _sessions: ChatSession[] = [];
+  private _demoProjects: ChatProject[] = [
+    { id: "proj-1", name: "h-uman Core", instructions: "", pinned: true, color: "#7AB648" },
+    { id: "proj-2", name: "UI Dashboard", instructions: "", pinned: false, color: "#E5A00D" },
+    { id: "proj-3", name: "Research", instructions: "", pinned: false, color: "#6366F1" },
+  ];
   @state() private _tapback = { open: false, x: 0, y: 0, index: -1, content: "" };
   @state() private _sessionsLoading = false;
   @query("hu-chat-composer") private _composer!: HTMLElement & { focus?: () => void };
@@ -555,6 +560,7 @@ export class ScChatView extends GatewayAwareLitElement {
       <div class="main-wrap">
         <hu-chat-sessions-panel
           .sessions=${sessionsWithActive}
+          .projects=${this._demoProjects}
           ?open=${this._sessionsPanelOpen}
           @hu-session-select=${this._onSessionSelect}
           @hu-session-new=${this._onSessionNew}

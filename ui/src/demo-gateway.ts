@@ -1298,19 +1298,15 @@ export class DemoGatewayClient extends EventTarget {
       afterFirstChunks + 2000,
     );
 
-    /* Emit memory recall/store and web search events so the new components render */
-    if (Math.random() < 0.3) {
-      setTimeout(
-        () => emit("memory.recall", { key: "user_preferences", value: "Prefers concise answers, uses dark mode, timezone PST" }),
-        afterFirstChunks + 600,
-      );
-    }
-    if (Math.random() < 0.2) {
-      setTimeout(
-        () => emit("memory.store", { key: "topic_interest", value: userMessage.slice(0, 80) }),
-        afterFirstChunks + 1200,
-      );
-    }
+    /* Emit memory and web search events so the new components render */
+    setTimeout(
+      () => emit("memory.recall", { key: "user_preferences", value: "Prefers concise answers, uses dark mode, timezone PST" }),
+      afterFirstChunks + 600,
+    );
+    setTimeout(
+      () => emit("memory.store", { key: "topic_interest", value: userMessage.slice(0, 80) }),
+      afterFirstChunks + 1200,
+    );
     if (toolName === "web_search") {
       setTimeout(
         () =>

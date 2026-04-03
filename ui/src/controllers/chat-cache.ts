@@ -13,7 +13,13 @@ function parseCached(raw: string): ChatItem[] {
   return cached
     .map((item: unknown) => {
       const obj = item as Record<string, unknown>;
-      if (obj?.type === "message" || obj?.type === "tool_call" || obj?.type === "thinking") {
+      if (
+        obj?.type === "message" ||
+        obj?.type === "tool_call" ||
+        obj?.type === "thinking" ||
+        obj?.type === "memory" ||
+        obj?.type === "web_search"
+      ) {
         return item as ChatItem;
       }
       if (obj?.role && obj?.content) {
