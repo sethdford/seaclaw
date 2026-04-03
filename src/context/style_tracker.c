@@ -391,8 +391,10 @@ hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *allo
                                 "avg_message_length, common_phrases, distinctive_words "
                                 "FROM style_fingerprints WHERE contact_id=?",
                                 -1, &sel, NULL);
-    if (rc != SQLITE_OK)
+    if (rc != SQLITE_OK) {
+        HU_LEAVE_NOT_REENTRANT(style_update);
         return HU_ERR_MEMORY_BACKEND;
+    }
 
     sqlite3_bind_text(sel, 1, contact_id, (int)contact_id_len, SQLITE_STATIC);
 
