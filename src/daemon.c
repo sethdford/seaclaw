@@ -1053,6 +1053,17 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
             if (!should_checkin)
                 break;
 
+            /* Skip if the real user has been active with this contact recently,
+             * avoiding collisions between agent proactive messages and real
+             * human conversations that are already happening. */
+            if (channels[c].channel->vtable->human_active_recently &&
+                channels[c].channel->vtable->human_active_recently(
+                    channels[c].channel->ctx, target_part, target_len, 900)) {
+                hu_log_info("human", agent ? agent->observer : NULL,
+                            "proactive skip: user active with %s within 15m", cp->contact_id);
+                break;
+            }
+
 #ifndef HU_IS_TEST
             /* Event-triggered follow-ups from recent messages */
             char *event_ctx = NULL;
@@ -1997,6 +2008,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     static uint8_t consec_response_count[HU_CONSEC_MAX_CONTACTS];
     static char consec_contact_keys[HU_CONSEC_MAX_CONTACTS][64];
     static size_t consec_contact_count = 0;
+
+    /* E2E turn counter: tracks total agent responses for e2e_max_turns auto-stop. */
+    static uint32_t e2e_total_turns = 0;
 
 #define HU_LEAVE_ON_READ_MAX 32
     static struct {
@@ -3318,8 +3332,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             batch_key);
 
                 /* Consecutive response limiter: if Human has responded to
-                 * this contact 3+ times in a row without the real user
-                 * stepping in, stay silent so we don't run away. */
+                 * this contact N+ times in a row without the real user
+                 * stepping in, stay silent so we don't run away.
+                 * Default limit is 3; configurable via daemon.max_consecutive_replies.
+                 * 0 = unlimited (for E2E agent-to-agent testing). */
                 size_t consec_idx = SIZE_MAX;
                 for (size_t ci = 0; ci < consec_contact_count; ci++) {
                     if (key_len < sizeof(consec_contact_keys[0]) &&
@@ -3329,13 +3345,28 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         break;
                     }
                 }
-                if (consec_idx != SIZE_MAX && consec_response_count[consec_idx] >= 3 &&
-                    action != HU_RESPONSE_SKIP) {
-                    hu_log_info("human", agent ? agent->observer : NULL,
-                                "consecutive limit (%u) reached for %.*s — staying silent",
-                                (unsigned)consec_response_count[consec_idx],
-                                (int)(key_len > 20 ? 20 : key_len), batch_key);
-                    action = HU_RESPONSE_SKIP;
+                {
+                    const char *chn_consec = ch->channel->vtable->name
+                                                 ? ch->channel->vtable->name(ch->channel->ctx)
+                                                 : NULL;
+                    const hu_channel_daemon_config_t *dcfg_consec =
+                        get_active_daemon_config(config, chn_consec);
+                    int consec_limit = 3;
+                    if (dcfg_consec && dcfg_consec->max_consecutive_replies > 0)
+                        consec_limit = dcfg_consec->max_consecutive_replies;
+                    else if (dcfg_consec && dcfg_consec->max_consecutive_replies == 0 &&
+                             dcfg_consec->e2e_max_turns > 0)
+                        consec_limit = 0; /* unlimited when e2e_max_turns governs */
+
+                    if (consec_limit > 0 && consec_idx != SIZE_MAX &&
+                        consec_response_count[consec_idx] >= (uint8_t)consec_limit &&
+                        action != HU_RESPONSE_SKIP) {
+                        hu_log_info("human", agent ? agent->observer : NULL,
+                                    "consecutive limit (%u/%d) reached for %.*s — staying silent",
+                                    (unsigned)consec_response_count[consec_idx], consec_limit,
+                                    (int)(key_len > 20 ? 20 : key_len), batch_key);
+                        action = HU_RESPONSE_SKIP;
+                    }
                 }
 
                 /* Tapback-skip: for tapback-worthy messages, 70% chance to not respond */
@@ -3948,6 +3979,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 size_t contact_ctx_len = 0;
                 char *convo_ctx = NULL;
                 size_t convo_ctx_len = 0;
+                char *tapback_ctx_for_classifier = NULL;
+                size_t tapback_ctx_for_classifier_len = 0;
                 hu_channel_history_entry_t *history_entries = NULL;
                 size_t history_count = 0;
 #if defined(HU_ENABLE_SQLITE) && !defined(HU_IS_TEST)
@@ -5807,6 +5840,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 ch->channel->ctx, alloc, batch_key, key_len, &tapback_ctx,
                                 &tapback_len) == HU_OK &&
                             tapback_ctx && tapback_len > 0) {
+                            if (!tapback_ctx_for_classifier && tapback_len > 0) {
+                                tapback_ctx_for_classifier =
+                                    (char *)alloc->alloc(alloc->ctx, tapback_len + 1);
+                                if (tapback_ctx_for_classifier) {
+                                    memcpy(tapback_ctx_for_classifier, tapback_ctx, tapback_len);
+                                    tapback_ctx_for_classifier[tapback_len] = '\0';
+                                    tapback_ctx_for_classifier_len = tapback_len;
+                                }
+                            }
                             if (convo_ctx) {
                                 size_t merged_len = convo_ctx_len + tapback_len + 2;
                                 char *merged = (char *)alloc->alloc(alloc->ctx, merged_len + 1);
@@ -7870,7 +7912,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #else
                                                                   NULL,
 #endif
-                                                                  (uint32_t)time(NULL));
+                                                                  (uint32_t)time(NULL),
+                                                                  tapback_ctx_for_classifier,
+                                                                  tapback_ctx_for_classifier_len);
 
                     if (tapback_decision == HU_NO_RESPONSE) {
                         hu_log_info("human", agent ? agent->observer : NULL,
@@ -8977,6 +9021,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 history_entries = NULL;
                 history_count = 0;
 
+                if (tapback_ctx_for_classifier) {
+                    alloc->free(alloc->ctx, tapback_ctx_for_classifier,
+                                tapback_ctx_for_classifier_len + 1);
+                    tapback_ctx_for_classifier = NULL;
+                    tapback_ctx_for_classifier_len = 0;
+                }
+
                 /* Episodic: summarize this interaction (LLM when provider available, else
                  * rule-based) */
                 if (err == HU_OK && response && response_len > 0 && agent->memory) {
@@ -9279,15 +9330,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             get_active_daemon_config(config, chn_voice);
                         bool voice_channel_ok = dcfg_voice && dcfg_voice->voice_enabled;
 
-                        /* Unified duplex + Realtime (`voice.mode`: "realtime" or legacy
-                         * `voice.tts_provider`: "realtime"). */
+                        /* Unified duplex voice session (`voice.mode`: "realtime" or "gemini_live",
+                         * or legacy `voice.tts_provider`: "realtime" / "gemini_live" / "gemini"). */
                         hu_voice_session_t unified_voice = {0};
                         bool unified_voice_active = false;
                         bool cfg_realtime =
                             (config->voice.mode && strcmp(config->voice.mode, "realtime") == 0) ||
                             (config->voice.tts_provider &&
                              strcmp(config->voice.tts_provider, "realtime") == 0);
-                        if (voice_channel_ok && config && chn_voice && cfg_realtime) {
+                        bool cfg_gemini_live =
+                            (config->voice.mode &&
+                             strcmp(config->voice.mode, "gemini_live") == 0) ||
+                            (config->voice.tts_provider &&
+                             (strcmp(config->voice.tts_provider, "gemini_live") == 0 ||
+                              strcmp(config->voice.tts_provider, "gemini") == 0));
+                        if (voice_channel_ok && config && chn_voice &&
+                            (cfg_realtime || cfg_gemini_live)) {
                             size_t chn_len = strlen(chn_voice);
                             if (hu_voice_session_start(alloc, &unified_voice, chn_voice, chn_len,
                                                        config) == HU_OK)
@@ -10159,6 +10217,26 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (consec_idx != SIZE_MAX)
                         consec_response_count[consec_idx]++;
 
+                    /* E2E turn counter: stop daemon after e2e_max_turns responses */
+                    e2e_total_turns++;
+                    {
+                        const char *chn_e2e = ch->channel->vtable->name
+                                                  ? ch->channel->vtable->name(ch->channel->ctx)
+                                                  : NULL;
+                        const hu_channel_daemon_config_t *dcfg_e2e =
+                            get_active_daemon_config(config, chn_e2e);
+                        if (dcfg_e2e && dcfg_e2e->e2e_max_turns > 0 &&
+                            e2e_total_turns >= (uint32_t)dcfg_e2e->e2e_max_turns) {
+                            hu_log_info("human", agent ? agent->observer : NULL,
+                                        "E2E turn limit reached (%u/%d) — stopping daemon",
+                                        e2e_total_turns, dcfg_e2e->e2e_max_turns);
+                            printf("[e2e] Turn limit reached (%u turns). Stopping.\n",
+                                   e2e_total_turns);
+                            agent->alloc->free(agent->alloc->ctx, response, response_alloc_len + 1);
+                            goto e2e_done;
+                        }
+                    }
+
                     agent->alloc->free(agent->alloc->ctx, response, response_alloc_len + 1);
                 }
             }
@@ -10205,6 +10283,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
         struct timespec sleep_ts = {.tv_sec = tick_interval_ms / 1000,
                                     .tv_nsec = (long)(tick_interval_ms % 1000) * 1000000L};
         nanosleep(&sleep_ts, NULL);
+    }
+
+    if (0) {
+    e2e_done:
+        (void)0;
     }
 
 #undef HU_STOP_FLAG
