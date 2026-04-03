@@ -194,4 +194,22 @@ hu_error_t cp_voice_config(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     return err;
 }
 
+#else /* !HU_GATEWAY_POSIX */
+
+hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                               const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                               char **out, size_t *out_len) {
+    (void)alloc; (void)app; (void)conn; (void)proto; (void)root;
+    *out = NULL; *out_len = 0;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
+hu_error_t cp_voice_config(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                           const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                           char **out, size_t *out_len) {
+    (void)alloc; (void)app; (void)conn; (void)proto; (void)root;
+    *out = NULL; *out_len = 0;
+    return HU_ERR_NOT_SUPPORTED;
+}
+
 #endif /* HU_GATEWAY_POSIX */

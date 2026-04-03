@@ -82,9 +82,8 @@ static hu_error_t spi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_va
         }
         hu_json_buf_append_raw(&buf, "]}", 2);
         char *msg = hu_strndup(alloc, buf.ptr, buf.len);
-        size_t len = buf.len;
         hu_json_buf_free(&buf);
-        *out = hu_tool_result_ok_owned(msg, len);
+        *out = hu_tool_result_ok_owned(msg, msg ? strlen(msg) : 0);
         return HU_OK;
     }
     const char *device = hu_json_get_string(args, "device");

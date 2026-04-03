@@ -1197,6 +1197,116 @@ static void test_openai_compat_models_null_config_503(void) {
         alloc.free(alloc.ctx, resp, resp_len + 1);
 }
 
+/* ── Synthetic E2E: full conversation lifecycle via control protocol ─────── */
+
+static int s_e2e_msg_count;
+static char s_e2e_last_message[512];
+
+static bool e2e_bus_listener(hu_bus_event_type_t t, const hu_bus_event_t *e, void *u) {
+    (void)u;
+    if (t == HU_BUS_MESSAGE_RECEIVED && e->message[0]) {
+        s_e2e_msg_count++;
+        snprintf(s_e2e_last_message, sizeof(s_e2e_last_message), "%s", e->message);
+    }
+    return true;
+}
+
+static void test_e2e_gateway_conversation_lifecycle(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+
+    s_e2e_msg_count = 0;
+    s_e2e_last_message[0] = '\0';
+    hu_bus_subscribe(&bus, e2e_bus_listener, NULL, HU_BUS_MESSAGE_RECEIVED);
+    hu_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+
+    /* Step 1: chat.send — message arrives, bus fires, response is "queued" */
+    {
+        hu_json_value_t *root = hu_json_object_new(&alloc);
+        hu_json_value_t *params = hu_json_object_new(&alloc);
+        hu_json_object_set(&alloc, params, "message",
+                           hu_json_string_new(&alloc, "Hello, is anyone there?", 23));
+        hu_json_object_set(&alloc, params, "sessionKey",
+                           hu_json_string_new(&alloc, "e2e-session", 11));
+        hu_json_object_set(&alloc, root, "params", params);
+
+        char *out = NULL;
+        size_t out_len = 0;
+        hu_error_t err = cp_chat_send(&alloc, &app, &conn, &proto, root, &out, &out_len);
+        HU_ASSERT_EQ(err, HU_OK);
+        HU_ASSERT_NOT_NULL(out);
+        HU_ASSERT_NOT_NULL(strstr(out, "queued"));
+        HU_ASSERT_NOT_NULL(strstr(out, "e2e-session"));
+        alloc.free(alloc.ctx, out, out_len + 1);
+        hu_json_free(&alloc, root);
+    }
+    HU_ASSERT_EQ(s_e2e_msg_count, 1);
+    HU_ASSERT_STR_EQ(s_e2e_last_message, "Hello, is anyone there?");
+
+    /* Step 2: Send a second message to prove sequential dispatch */
+    {
+        hu_json_value_t *root = hu_json_object_new(&alloc);
+        hu_json_value_t *params = hu_json_object_new(&alloc);
+        hu_json_object_set(&alloc, params, "message",
+                           hu_json_string_new(&alloc, "Second message", 14));
+        hu_json_object_set(&alloc, root, "params", params);
+
+        char *out = NULL;
+        size_t out_len = 0;
+        hu_error_t err = cp_chat_send(&alloc, &app, &conn, &proto, root, &out, &out_len);
+        HU_ASSERT_EQ(err, HU_OK);
+        HU_ASSERT_NOT_NULL(out);
+        HU_ASSERT_NOT_NULL(strstr(out, "queued"));
+        alloc.free(alloc.ctx, out, out_len + 1);
+        hu_json_free(&alloc, root);
+    }
+    HU_ASSERT_EQ(s_e2e_msg_count, 2);
+    HU_ASSERT_STR_EQ(s_e2e_last_message, "Second message");
+
+    /* Step 3: chat.abort — clean abort without crash */
+    {
+        hu_json_value_t *root = hu_json_object_new(&alloc);
+        char *out = NULL;
+        size_t out_len = 0;
+        hu_error_t err = cp_chat_abort(&alloc, &app, &conn, &proto, root, &out, &out_len);
+        HU_ASSERT_EQ(err, HU_OK);
+        HU_ASSERT_NOT_NULL(out);
+        HU_ASSERT_NOT_NULL(strstr(out, "true"));
+        alloc.free(alloc.ctx, out, out_len + 1);
+        hu_json_free(&alloc, root);
+    }
+
+    /* Step 4: chat.history — returns messages array (empty without session store) */
+    {
+        hu_json_value_t *root = hu_json_object_new(&alloc);
+        char *out = NULL;
+        size_t out_len = 0;
+        hu_error_t err = cp_chat_history(&alloc, &app, &conn, &proto, root, &out, &out_len);
+        HU_ASSERT_EQ(err, HU_OK);
+        HU_ASSERT_NOT_NULL(out);
+        HU_ASSERT_NOT_NULL(strstr(out, "messages"));
+        alloc.free(alloc.ctx, out, out_len + 1);
+        hu_json_free(&alloc, root);
+    }
+
+    /* Step 5: Dispatch via hu_control_on_message (full WS frame path) */
+    {
+        const char *msg = "{\"type\":\"req\",\"id\":\"e2e-5\",\"method\":\"chat.send\","
+                          "\"params\":{\"message\":\"via dispatch\"}}";
+        hu_control_on_message(&conn, msg, strlen(msg), &proto);
+        HU_ASSERT_EQ(s_e2e_msg_count, 3);
+        HU_ASSERT_STR_EQ(s_e2e_last_message, "via dispatch");
+    }
+
+    teardown_proto(&ws, &proto);
+}
+
 void run_gateway_extended_tests(void) {
     HU_TEST_SUITE("Gateway Extended");
     HU_RUN_TEST(test_gateway_webhook_paths);
@@ -1288,6 +1398,9 @@ void run_gateway_extended_tests(void) {
     HU_RUN_TEST(test_rpc_nodes_action_missing_fields_no_crash);
     HU_RUN_TEST(test_cp_admin_nodes_action_restart_returns_mock_json);
     HU_RUN_TEST(test_event_bridge_payload_propagation);
+
+    HU_TEST_SUITE("Gateway E2E Lifecycle");
+    HU_RUN_TEST(test_e2e_gateway_conversation_lifecycle);
 
     HU_TEST_SUITE("WS Server Extended");
     HU_RUN_TEST(test_ws_server_process_null);

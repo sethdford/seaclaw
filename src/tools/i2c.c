@@ -99,13 +99,12 @@ static hu_error_t i2c_execute(void *ctx, hu_allocator_t *alloc, const hu_json_va
         }
         hu_json_buf_append_raw(&buf, "]}", 2);
         char *msg = hu_strndup(alloc, buf.ptr, buf.len);
-        size_t len = buf.len;
         hu_json_buf_free(&buf);
         if (!msg) {
             *out = hu_tool_result_fail("out of memory", 12);
             return HU_ERR_OUT_OF_MEMORY;
         }
-        *out = hu_tool_result_ok_owned(msg, len);
+        *out = hu_tool_result_ok_owned(msg, strlen(msg));
         return HU_OK;
     }
     if (strcmp(action, "scan") == 0) {
@@ -137,9 +136,8 @@ static hu_error_t i2c_execute(void *ctx, hu_allocator_t *alloc, const hu_json_va
         close(fd);
         hu_json_buf_append_raw(&buf, "]}", 2);
         char *msg = hu_strndup(alloc, buf.ptr, buf.len);
-        size_t len = buf.len;
         hu_json_buf_free(&buf);
-        *out = hu_tool_result_ok_owned(msg, len);
+        *out = hu_tool_result_ok_owned(msg, msg ? strlen(msg) : 0);
         return HU_OK;
     }
     if (strcmp(action, "read") == 0) {

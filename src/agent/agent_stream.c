@@ -427,7 +427,7 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
             if (!*response_out)
                 return HU_ERR_OUT_OF_MEMORY;
             if (response_len_out)
-                *response_len_out = sresp.content_len;
+                *response_len_out = strlen(*response_out);
         }
         hu_agent_clear_current_for_tools();
         return HU_OK;
@@ -814,7 +814,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     hu_log_error("agent_stream_v2", NULL, "append_history failed: %s",
                                  hu_error_string(hist_err));
                 final_content = hu_strndup(agent->alloc, sresp.content, sresp.content_len);
-                final_content_len = sresp.content_len;
+                final_content_len = final_content ? strlen(final_content) : 0;
             }
             hu_stream_chat_result_free(agent->alloc, &sresp);
             break;
@@ -866,6 +866,14 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 } else {
                     result = hu_tool_result_fail("invalid arguments", 16);
                 }
+            }
+
+            /* Capture generated media paths (streaming path) */
+            if (result.success && result.media_path && result.media_path_len > 0 &&
+                agent->generated_media_count < 4) {
+                char *mp = hu_strndup(agent->alloc, result.media_path, result.media_path_len);
+                if (mp)
+                    agent->generated_media[agent->generated_media_count++] = mp;
             }
 
             /* Build result text for history */

@@ -338,6 +338,34 @@ export class ScApp extends LitElement {
       background: color-mix(in srgb, var(--hu-on-accent) 35%, transparent);
     }
 
+    .demo-fallback-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--hu-space-sm);
+      padding: var(--hu-space-xs) var(--hu-space-md);
+      background: var(--hu-accent-secondary);
+      color: var(--hu-on-accent);
+      font-size: var(--hu-text-sm);
+      font-weight: var(--hu-weight-medium);
+      animation: hu-slide-down var(--hu-duration-normal) var(--hu-ease-out);
+    }
+    .demo-fallback-banner button {
+      background: color-mix(in srgb, var(--hu-on-accent) 20%, transparent);
+      border: 1px solid color-mix(in srgb, var(--hu-on-accent) 40%, transparent);
+      color: var(--hu-on-accent);
+      min-height: 2.75rem;
+      padding: var(--hu-space-xs) var(--hu-space-md);
+      border-radius: var(--hu-radius-sm);
+      font-size: var(--hu-text-xs);
+      font-family: var(--hu-font);
+      cursor: pointer;
+      transition: background var(--hu-duration-fast);
+    }
+    .demo-fallback-banner button:hover {
+      background: color-mix(in srgb, var(--hu-on-accent) 35%, transparent);
+    }
+
     .mobile-nav {
       display: none;
     }
@@ -517,6 +545,7 @@ export class ScApp extends LitElement {
   @state() private moreSheetOpen = false;
   @state() private _viewError: Error | null = null;
   @state() private _inFallbackWindow = false;
+  @state() private _demoFallback = false;
 
   gateway: GatewayClient | null = null;
   private _keyHandler = this._onGlobalKey.bind(this);
@@ -905,6 +934,7 @@ export class ScApp extends LitElement {
   private _switchToDemo(): void {
     this._fallbackTimer = null;
     this._inFallbackWindow = false;
+    this._demoFallback = true;
     this.gateway?.removeEventListener("status", this._statusHandler);
     this.gateway?.disconnect();
     this._createDemoGateway().then((demo) => {
@@ -1025,6 +1055,12 @@ export class ScApp extends LitElement {
         ? html`<div class="disconnect-banner" role="alert">
             Disconnected from server
             <button @click=${this._reconnect}>Reconnect</button>
+          </div>`
+        : nothing}
+      ${this._demoFallback
+        ? html`<div class="demo-fallback-banner" role="status">
+            Demo mode — gateway not reachable
+            <button @click=${this._reconnect}>Retry</button>
           </div>`
         : nothing}
       <div
@@ -1155,10 +1191,10 @@ export class ScApp extends LitElement {
   }
 
   private _reconnect(): void {
-    if (!this.gateway) return;
-    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${proto}//${window.location.host}/ws`;
-    this.gateway.connect(wsUrl);
+    this._demoFallback = false;
+    this.gateway?.removeEventListener("status", this._statusHandler);
+    this.gateway?.disconnect();
+    this._initGateway();
   }
 
   private _renderView() {

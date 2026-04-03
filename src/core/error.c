@@ -49,6 +49,7 @@ static const char *error_strings[] = {
     [HU_ERR_INTERNAL] = "internal error",
     [HU_ERR_SUBAGENT_TOO_MANY] = "too many concurrent subagents",
     [HU_ERR_CANCELLED] = "cancelled",
+    [HU_ERR_WOULD_BLOCK] = "operation would block",
     [HU_ERR_FLEET_DEPTH_EXCEEDED] = "fleet spawn depth limit exceeded",
     [HU_ERR_FLEET_SPAWN_CAP] = "fleet total spawn limit exceeded",
     [HU_ERR_FLEET_BUDGET_EXCEEDED] = "fleet budget exceeded",

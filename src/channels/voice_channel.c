@@ -1,6 +1,8 @@
 #include "human/core/log.h"
 #include "human/channels/voice_channel.h"
 #include "human/core/string.h"
+#include "human/voice/gemini_live.h"
+#include "human/voice/provider.h"
 #include "human/voice/realtime.h"
 #include "human/voice/webrtc.h"
 #include <stdio.h>
@@ -10,7 +12,8 @@
 /* Voice channel with configurable mode:
  *   HU_VOICE_MODE_SONATA (default) — Sonata TTS/STT pipeline
  *   HU_VOICE_MODE_REALTIME — OpenAI Realtime API (full-duplex WebSocket)
- *   HU_VOICE_MODE_WEBRTC — WebRTC voice (SDP exchange + audio streaming) */
+ *   HU_VOICE_MODE_WEBRTC — WebRTC voice (SDP exchange + audio streaming)
+ *   HU_VOICE_MODE_GEMINI_LIVE — Gemini Live (Multimodal Live API) */
 
 #ifdef HU_HAS_SONATA
 /* FFI declarations for Sonata Rust pipeline.
@@ -33,6 +36,7 @@ typedef struct hu_voice_ctx {
     bool running;
     hu_voice_rt_session_t *rt_session;
     hu_webrtc_session_t *webrtc_session;
+    hu_voice_provider_t gl_provider;
 } hu_voice_ctx_t;
 
 static hu_error_t voice_start(void *ctx) {
@@ -59,6 +63,36 @@ static hu_error_t voice_start(void *ctx) {
         return HU_OK;
     }
 
+    if (v->config.mode == HU_VOICE_MODE_GEMINI_LIVE) {
+#if HU_IS_TEST
+        v->running = true;
+        return HU_OK;
+#else
+        hu_gemini_live_config_t glc = {
+            .api_key = v->config.api_key,
+            .model = v->config.model,
+            .voice = v->config.voice,
+            .transcribe_input = true,
+            .transcribe_output = true,
+            .affective_dialog = true,
+            .manual_vad = true,
+            .enable_session_resumption = true,
+            .thinking_level = HU_GL_THINKING_MINIMAL,
+        };
+        hu_error_t err = hu_voice_provider_gemini_live_create(v->alloc, &glc, &v->gl_provider);
+        if (err != HU_OK)
+            return err;
+        err = v->gl_provider.vtable->connect(v->gl_provider.ctx);
+        if (err != HU_OK) {
+            v->gl_provider.vtable->disconnect(v->gl_provider.ctx, v->alloc);
+            memset(&v->gl_provider, 0, sizeof(v->gl_provider));
+            return err;
+        }
+        v->running = true;
+        return HU_OK;
+#endif
+    }
+
     if (v->config.mode == HU_VOICE_MODE_WEBRTC) {
 #if !HU_IS_TEST
         hu_log_info("voice-channel", NULL, "voice_channel: WebRTC uses native ICE/DTLS/SRTP; configure STUN/TURN and signaling_endpoint");
@@ -69,9 +103,19 @@ static hu_error_t voice_start(void *ctx) {
 #else
         hu_webrtc_config_t wc_cfg = {0};
         wc_cfg.audio_enabled = true;
+        wc_cfg.api_key = (char *)v->config.api_key;
         hu_error_t err = hu_webrtc_session_create(v->alloc, &wc_cfg, &v->webrtc_session);
         if (err != HU_OK)
             return err;
+        err = hu_webrtc_connect(v->webrtc_session, NULL);
+        if (err != HU_OK) {
+            hu_log_error("voice-channel", NULL,
+                         "WebRTC connect failed (configure signaling_endpoint): %s",
+                         hu_error_string(err));
+            hu_webrtc_session_destroy(v->webrtc_session);
+            v->webrtc_session = NULL;
+            return err;
+        }
         v->running = true;
         return HU_OK;
 #endif
@@ -96,6 +140,10 @@ static void voice_stop(void *ctx) {
         return;
     v->running = false;
 
+    if (v->gl_provider.vtable) {
+        v->gl_provider.vtable->disconnect(v->gl_provider.ctx, v->alloc);
+        memset(&v->gl_provider, 0, sizeof(v->gl_provider));
+    }
     if (v->rt_session) {
         hu_voice_rt_session_destroy(v->rt_session);
         v->rt_session = NULL;
@@ -129,6 +177,9 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
     }
     if (v->config.mode == HU_VOICE_MODE_WEBRTC && v->webrtc_session) {
         return hu_webrtc_send_audio(v->webrtc_session, message, message_len);
+    }
+    if (v->config.mode == HU_VOICE_MODE_GEMINI_LIVE && v->gl_provider.vtable) {
+        return v->gl_provider.vtable->send_audio(v->gl_provider.ctx, message, message_len);
     }
 
     (void)message_len;
@@ -211,6 +262,27 @@ hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc,
             memcpy(msgs[0].content, event.transcript, copy_len);
             msgs[0].content[copy_len] = '\0';
             memcpy(msgs[0].session_key, "voice-rt", 8);
+            msgs[0].session_key[8] = '\0';
+            msgs[0].is_group = false;
+            msgs[0].message_id = -1;
+            *out_count = 1;
+        }
+        hu_voice_rt_event_free(alloc, &event);
+        return HU_OK;
+    }
+
+    if (v->config.mode == HU_VOICE_MODE_GEMINI_LIVE && v->gl_provider.vtable) {
+        hu_voice_rt_event_t event = {0};
+        hu_error_t err =
+            v->gl_provider.vtable->recv_event(v->gl_provider.ctx, alloc, &event, 100);
+        if (err == HU_OK && event.transcript && event.transcript_len > 0 && max_msgs > 0) {
+            memset(&msgs[0], 0, sizeof(msgs[0]));
+            size_t copy_len = event.transcript_len;
+            if (copy_len >= sizeof(msgs[0].content))
+                copy_len = sizeof(msgs[0].content) - 1;
+            memcpy(msgs[0].content, event.transcript, copy_len);
+            msgs[0].content[copy_len] = '\0';
+            memcpy(msgs[0].session_key, "voice-gl", 8);
             msgs[0].session_key[8] = '\0';
             msgs[0].is_group = false;
             msgs[0].message_id = -1;

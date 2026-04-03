@@ -1,3 +1,4 @@
+#include "human/channel.h"
 #include "human/context/conversation.h"
 #include "human/core/allocator.h"
 #include "human/memory.h"
@@ -2829,6 +2830,65 @@ static void sched_load_unescapes_tab_and_cr(void) {
     (void)unlink(path);
 }
 
+/* ── Schedule E2E: flush → channel send ─────────────────────────────── */
+
+static char s_sched_e2e_target[128];
+static char s_sched_e2e_message[512];
+static int s_sched_e2e_send_count;
+
+static hu_error_t sched_e2e_mock_send(void *ctx, const char *target, size_t target_len,
+                                       const char *message, size_t message_len,
+                                       const char *const *media, size_t media_count) {
+    (void)ctx;
+    (void)media;
+    (void)media_count;
+    s_sched_e2e_send_count++;
+    if (target_len >= sizeof(s_sched_e2e_target))
+        target_len = sizeof(s_sched_e2e_target) - 1;
+    memcpy(s_sched_e2e_target, target, target_len);
+    s_sched_e2e_target[target_len] = '\0';
+    if (message_len >= sizeof(s_sched_e2e_message))
+        message_len = sizeof(s_sched_e2e_message) - 1;
+    memcpy(s_sched_e2e_message, message, message_len);
+    s_sched_e2e_message[message_len] = '\0';
+    return HU_OK;
+}
+
+static const char *sched_e2e_mock_name(void *ctx) {
+    (void)ctx;
+    return "mock";
+}
+
+static void schedule_e2e_flush_and_send_via_channel(void) {
+    uint64_t now = (uint64_t)time(NULL) * 1000ULL;
+    hu_conversation_schedule_message_on("alice", 5, "mock", 4, "scheduled hello!", 16, now - 1000);
+
+    char out_contact[128], out_channel[32], out_msg[512];
+    size_t len = hu_conversation_flush_scheduled_for(now, "mock", 4, out_contact,
+                                                     sizeof(out_contact), out_channel,
+                                                     sizeof(out_channel), out_msg, sizeof(out_msg));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_STR_EQ(out_contact, "alice");
+    HU_ASSERT_STR_EQ(out_channel, "mock");
+    HU_ASSERT_STR_EQ(out_msg, "scheduled hello!");
+
+    hu_channel_vtable_t mock_vtable = {0};
+    mock_vtable.send = sched_e2e_mock_send;
+    mock_vtable.name = sched_e2e_mock_name;
+    hu_channel_t mock_ch = {.ctx = NULL, .vtable = &mock_vtable};
+
+    s_sched_e2e_send_count = 0;
+    s_sched_e2e_target[0] = '\0';
+    s_sched_e2e_message[0] = '\0';
+
+    hu_error_t err = mock_ch.vtable->send(mock_ch.ctx, out_contact, strlen(out_contact), out_msg,
+                                          len, NULL, 0);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(s_sched_e2e_send_count, 1);
+    HU_ASSERT_STR_EQ(s_sched_e2e_target, "alice");
+    HU_ASSERT_STR_EQ(s_sched_e2e_message, "scheduled hello!");
+}
+
 /* ── sched_slot accessor ────────────────────────────────────────────── */
 
 static void sched_slot_returns_null_for_invalid_index(void) {
@@ -4059,6 +4119,9 @@ void run_conversation_tests(void) {
     /* sched_load \uXXXX + escape completeness */
     HU_RUN_TEST(sched_load_unescapes_unicode);
     HU_RUN_TEST(sched_load_unescapes_tab_and_cr);
+
+    /* Schedule E2E: flush → channel send */
+    HU_RUN_TEST(schedule_e2e_flush_and_send_via_channel);
 
     /* sched_slot accessor */
     HU_RUN_TEST(sched_slot_returns_null_for_invalid_index);
