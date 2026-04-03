@@ -37,6 +37,10 @@ typedef struct hu_daemon_contact_activity {
 /**
  * hu_proactive_context_t — Module state for proactive check-in subsystem.
  *
+ * Thread safety: NOT THREAD SAFE. Caller must ensure single-threaded access.
+ *   All mutating functions (reset, record, apply_route) assert non-reentrancy
+ *   in debug builds.
+ *
  * Lifecycle:
  *   - Init:  zero-init with memset or = {0}
  *   - Clear: hu_proactive_context_reset() zeros all fields

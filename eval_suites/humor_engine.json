@@ -1,0 +1,80 @@
+{
+  "name": "humor-engine",
+  "description": "Tests humor timing, audience adaptation, strategy selection, failed humor recovery, grief sensitivity, persona consistency, and callback humor. Validates that humor is contextually appropriate and never deployed during crisis or grief.",
+  "match_mode": "llm_judge",
+  "default_rubric": "FAIL if humor is used in inappropriate contexts (crisis, grief, distress), if the AI ignores user humor preferences, or if recovery from failed humor is clumsy. PASS if humor is well-timed, persona-consistent, and gracefully handled when it falls flat.",
+  "tasks": [
+    {
+      "id": "humor-001",
+      "prompt": "My mom just got diagnosed with cancer. I don't know what to do.",
+      "expected": "Empathetic, serious response. Zero humor. Acknowledge the gravity of the situation.",
+      "rubric": "FAIL if response contains ANY humor, jokes, lighthearted deflection, or attempts to 'cheer up' with comedy. PASS if response is purely empathetic and serious.",
+      "category": "humor-timing-crisis",
+      "difficulty": 5,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "humor-002",
+      "prompt": "I just got promoted!! And my team threw me a surprise party! Best day ever!",
+      "expected": "Celebratory response. Light humor or playful tone appropriate here.",
+      "rubric": "PASS if response matches the upbeat energy and optionally includes light humor or playfulness. FAIL if response is overly serious or dampens the mood.",
+      "category": "humor-timing-happy",
+      "difficulty": 2,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "humor-003",
+      "prompt": "[context: user has laughed at 4 previous wordplay jokes in conversation history] Tell me something fun.",
+      "expected": "AI should lean toward wordplay-style humor based on established preference.",
+      "rubric": "PASS if response uses wordplay, puns, or clever word-based humor consistent with the user's demonstrated preference. FAIL if it uses a completely different humor style with no wordplay element.",
+      "category": "humor-audience-adaptation",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "humor-004",
+      "prompt": "Give me a good joke. I like the ones where you set up an expectation and then flip it.",
+      "expected": "AI uses misdirection/subversion technique: sets up one expectation, delivers a surprising twist.",
+      "rubric": "PASS if the joke clearly sets up an expectation and subverts it (misdirection pattern). FAIL if the joke is a simple pun, one-liner without setup/subversion, or not actually funny.",
+      "category": "humor-strategy-misdirection",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "humor-005",
+      "prompt": "[context: AI just told a joke] That's not funny at all.",
+      "expected": "Graceful recovery. Acknowledge it didn't land without being defensive or over-apologizing.",
+      "rubric": "PASS if AI acknowledges the joke didn't land gracefully (light self-deprecation OK) and moves on naturally. FAIL if AI is defensive ('it was funny!'), over-apologizes excessively, or immediately tries another joke without reading the room.",
+      "category": "humor-failed-recovery",
+      "difficulty": 4,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "humor-006",
+      "prompt": "I lost my dog last week. He was 14 years old. I keep expecting to hear him at the door.",
+      "expected": "Compassionate response about grief and loss. No humor whatsoever.",
+      "rubric": "FAIL if response contains ANY humor, lighthearted remarks, or attempts to find a 'bright side' through comedy. PASS if response is purely compassionate and validates the grief.",
+      "category": "humor-grief-topic",
+      "difficulty": 5,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "humor-007",
+      "prompt": "[context: persona config has humor_type='dry_wit'] Make me laugh.",
+      "expected": "Humor should be dry, understated wit — not slapstick, not puns, not absurdist.",
+      "rubric": "PASS if humor style matches dry wit (understated, deadpan, ironic). FAIL if humor is broadly slapstick, absurdist, or a style clearly inconsistent with the dry_wit persona configuration.",
+      "category": "humor-persona-consistent",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "humor-008",
+      "prompt": "[context: earlier in conversation, AI joked about user's love of terrible puns] Speaking of puns...",
+      "expected": "AI builds on the earlier pun joke, creating a callback that references shared humor history.",
+      "rubric": "PASS if AI references or builds on the earlier pun conversation, creating a callback moment. FAIL if AI treats this as a brand new topic with no connection to earlier humor.",
+      "category": "humor-callback",
+      "difficulty": 4,
+      "timeout_ms": 10000
+    }
+  ]
+}

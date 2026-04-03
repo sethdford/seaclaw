@@ -1,6 +1,6 @@
 # Eval Suites Manifest
 
-Version: **2026-04-03a** (bump on any task add/remove/reword or judge profile change)
+Version: **2026-04-03b** (bump on any task add/remove/reword or judge profile change)
 
 ## Suites
 
@@ -25,8 +25,12 @@ Version: **2026-04-03a** (bump on any task add/remove/reword or judge profile ch
 | `companion_safety.json` | 12 | SHIELD 5-dimension companion safety | `llm_judge` | 1.0 |
 | `trust_repair.json` | 10 | Trust calibration, memory hallucination, error recovery | `llm_judge` | 1.0 |
 | `longitudinal.json` | 9 | Multi-session consistency, attachment trajectory, sycophancy | `llm_judge` | 1.0 |
+| `humor_engine.json` | 8 | Humor timing, adaptation, recovery, persona consistency | `llm_judge` | 1.0 |
+| `temporal_reasoning.json` | 6 | Season awareness, birthday/anniversary surfacing, life transitions | `llm_judge` | 1.0 |
+| `inner_thoughts.json` | 6 | Thought accumulation, surfacing, suppression, contact isolation | `llm_judge` | 1.0 |
+| `anti_sycophancy.json` | 8 | Opinion maintenance, graceful disagreement, evidence-based change | `llm_judge` | 1.0 |
 
-**Total**: 18 suites, 159 tasks
+**Total**: 22 suites, 187 tasks
 
 Human-facing HuLa documentation (config, CLI, ethics, traces): [`docs/guides/hula.md`](../docs/guides/hula.md).
 
@@ -39,6 +43,7 @@ Human-facing HuLa documentation (config, CLI, ethics, traces): [`docs/guides/hul
 
 ## Changelog
 
+- **2026-04-03b**: Added 4 Phase 2 feature eval suites: `humor_engine.json` (8 tasks — timing, audience adaptation, strategy, failed recovery, grief sensitivity, persona consistency, callbacks), `temporal_reasoning.json` (6 tasks — season awareness, birthday/anniversary surfacing, life transitions, year-boundary edge cases), `inner_thoughts.json` (6 tasks — accumulation, relevant surfacing, suppression, contact isolation, staleness, natural phrasing), `anti_sycophancy.json` (8 tasks — opinion maintenance, multi-turn pressure, graceful disagreement, evidence-based change, contrarian budget, opinion evolution, topic independence).
 - **2026-04-03a**: Added 3 new suites from adversarial assessment: `companion_safety.json` (12 tasks — SHIELD 5 dimensions, farewell manipulation, crisis escalation, vulnerable users, disclosure), `trust_repair.json` (10 tasks — memory hallucination, fabricated shared experiences, error recovery, trust erosion, divergence), `longitudinal.json` (9 tasks — multi-session consistency, attachment trajectory, sycophancy resistance, humor recovery, proactive timing). Research: SHIELD arXiv:2510.15891, EmoAgent arXiv:2504.09689, Emotional Manipulation arXiv:2508.19258, Invisible Failures arXiv:2603.15423, LLMs Get Lost arXiv:2505.06120.
 - **2026-03-22c**: Extended `hula_orchestration.json` with `hula-003` (`$` slot refs in `call` args) and `hula-004` (delegate + `par` shape); task count 4.
 - **2026-03-22b**: Added `hula_orchestration.json` (tasks `hula-001`, `hula-002`) and harness judge profile `hula_structure` for HuLa-shaped JSON plans.

@@ -1,0 +1,62 @@
+{
+  "name": "temporal-reasoning",
+  "description": "Tests temporal awareness: seasonal context, birthday/anniversary surfacing from contact data, life transition detection from conversation, and edge cases like year-boundary events.",
+  "match_mode": "llm_judge",
+  "default_rubric": "FAIL if the AI ignores known temporal context (birthdays, seasons, life events) or fabricates temporal data not in context. PASS if temporal awareness is naturally integrated without being forced.",
+  "tasks": [
+    {
+      "id": "temporal-001",
+      "prompt": "[context: current date is December 15] What time of year is it? Anything fun coming up?",
+      "expected": "AI acknowledges winter/holiday season. References upcoming holidays or end-of-year context.",
+      "rubric": "PASS if response demonstrates awareness of the December timeframe (winter, holidays, end of year). FAIL if response is season-agnostic or references the wrong season.",
+      "category": "temporal-season-awareness",
+      "difficulty": 2,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "temporal-002",
+      "prompt": "[context: contact record shows birthday=March 20, current date is March 17] Hey, what's new?",
+      "expected": "AI naturally mentions the upcoming birthday within the conversation.",
+      "rubric": "PASS if AI mentions the upcoming birthday (3 days away) in a natural way. FAIL if birthday is not mentioned at all or if it's mentioned in a robotic/forced way.",
+      "category": "temporal-birthday-surfacing",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "temporal-003",
+      "prompt": "[context: contact record shows anniversary=June 5, current date is June 3] Just checking in.",
+      "expected": "AI surfaces awareness of the upcoming anniversary.",
+      "rubric": "PASS if AI mentions the upcoming anniversary naturally. FAIL if anniversary is ignored despite being 2 days away.",
+      "category": "temporal-anniversary-detection",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "temporal-004",
+      "prompt": "I just got fired. They let me go this morning, no warning.",
+      "expected": "AI detects a major life transition (job loss). Responds with appropriate support and recognizes this as a significant event.",
+      "rubric": "PASS if AI treats this as a major life event, offers support, and contextualizes it as a significant transition. FAIL if it treats it casually or misses the magnitude of the life change.",
+      "category": "temporal-life-transition-job",
+      "difficulty": 4,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "temporal-005",
+      "prompt": "Big news — we're moving to Seattle next month. Already started packing.",
+      "expected": "AI detects relocation as a life transition. Engages with the logistical and emotional dimensions.",
+      "rubric": "PASS if AI recognizes this as a significant life transition (relocation), engages with both practical and emotional aspects. FAIL if it treats it as trivial small talk.",
+      "category": "temporal-life-transition-move",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "temporal-006",
+      "prompt": "[context: contact record shows birthday=December 28, current date is January 3] How's the new year treating you?",
+      "expected": "AI remembers the recent birthday even though it crossed the year boundary. Mentions it naturally.",
+      "rubric": "PASS if AI references the recent birthday (6 days ago, across year boundary) or acknowledges it naturally. FAIL if the year boundary causes the birthday to be forgotten or if AI only discusses New Year without mentioning the recent birthday.",
+      "category": "temporal-year-wrap",
+      "difficulty": 4,
+      "timeout_ms": 10000
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 #ifdef HU_ENABLE_SQLITE
 
 #include "human/context/style_tracker.h"
+#include "human/core/debug.h"
 #include "human/memory.h"
 #include <ctype.h>
 #include <limits.h>
@@ -365,10 +366,13 @@ hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *allo
     (void)alloc;
     if (!memory || !contact_id || contact_id_len == 0 || !message)
         return HU_ERR_INVALID_ARGUMENT;
+    HU_ASSERT_NOT_REENTRANT(style_update);
 
     sqlite3 *db = hu_sqlite_memory_get_db(memory);
-    if (!db)
+    if (!db) {
+        HU_LEAVE_NOT_REENTRANT(style_update);
         return HU_ERR_NOT_SUPPORTED;
+    }
 
     bool uses_lc = compute_uses_lowercase(message, message_len);
     bool uses_per = compute_uses_periods(message, message_len);
@@ -456,8 +460,10 @@ hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *allo
                             "avg_message_length, common_phrases, distinctive_words, updated_at) "
                             "VALUES(?,?,?,?,?,?,?,?)",
                             -1, &stmt, NULL);
-    if (rc != SQLITE_OK)
+    if (rc != SQLITE_OK) {
+        HU_LEAVE_NOT_REENTRANT(style_update);
         return HU_ERR_MEMORY_BACKEND;
+    }
 
     sqlite3_bind_text(stmt, 1, contact_id, (int)contact_id_len, SQLITE_STATIC);
     sqlite3_bind_int(stmt, 2, new_lc);
@@ -475,6 +481,7 @@ hu_error_t hu_style_fingerprint_update(hu_memory_t *memory, hu_allocator_t *allo
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+    HU_LEAVE_NOT_REENTRANT(style_update);
     return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
 }
 

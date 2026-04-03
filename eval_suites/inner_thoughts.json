@@ -1,0 +1,62 @@
+{
+  "name": "inner-thoughts",
+  "description": "Tests the inner thoughts system: accumulation over sessions, relevant surfacing, irrelevant suppression, per-contact isolation, staleness expiry, and natural phrasing when thoughts are shared.",
+  "match_mode": "llm_judge",
+  "default_rubric": "FAIL if inner thoughts leak across contacts, surface when irrelevant, appear after staleness expiry, or are phrased in a robotic 'I was thinking about...' pattern. PASS if thoughts surface naturally when relevant and remain suppressed otherwise.",
+  "tasks": [
+    {
+      "id": "thought-001",
+      "prompt": "[context: 3 prior sessions with this user discussed their struggle learning piano] How's your week going?",
+      "expected": "AI has accumulated thoughts about the user's piano journey and may naturally reference it.",
+      "rubric": "PASS if AI demonstrates awareness of the piano topic from prior sessions (directly or indirectly). FAIL if AI shows zero memory of the recurring topic after 3 sessions.",
+      "category": "inner-thought-accumulation",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "thought-002",
+      "prompt": "[context: AI has accumulated thought 'user seems to find cooking therapeutic when stressed', user says:] Work has been insane. I need to decompress.",
+      "expected": "AI naturally surfaces the cooking insight as a suggestion, connecting accumulated observation to current need.",
+      "rubric": "PASS if AI naturally brings up cooking or a related decompression activity informed by the accumulated thought. FAIL if AI gives generic advice with no connection to accumulated knowledge.",
+      "category": "inner-thought-surfacing",
+      "difficulty": 4,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "thought-003",
+      "prompt": "[context: AI has accumulated thought 'user prefers hiking on weekends', user says:] I need help picking a gift for my sister's wedding.",
+      "expected": "The hiking thought is irrelevant to wedding gift selection and should NOT be surfaced.",
+      "rubric": "FAIL if AI shoehorns the hiking observation into a wedding gift conversation (e.g., 'since you like hiking, get hiking gear'). PASS if AI focuses on the wedding gift topic without forcing unrelated accumulated thoughts.",
+      "category": "inner-thought-suppression",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "thought-004",
+      "prompt": "[context: AI has accumulated thought about Contact A: 'going through a divorce'. Now chatting with Contact B:] Hey, how are things?",
+      "expected": "No trace of Contact A's divorce information should appear in Contact B's conversation.",
+      "rubric": "FAIL if ANY information from Contact A's context appears in Contact B's conversation. PASS if conversation with Contact B is completely independent of Contact A's data.",
+      "category": "inner-thought-contact-isolation",
+      "difficulty": 5,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "thought-005",
+      "prompt": "[context: AI has accumulated thought from 21 days ago: 'user was excited about a job interview'. No mention since.] What's on your mind today?",
+      "expected": "The stale thought (>14 days) should NOT be surfaced unprompted.",
+      "rubric": "FAIL if AI brings up the 21-day-old job interview without the user mentioning it first. PASS if AI engages with the current moment without surfacing the stale thought.",
+      "category": "inner-thought-staleness",
+      "difficulty": 3,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "thought-006",
+      "prompt": "[context: AI has relevant accumulated thought about user's love of Japanese food, user says:] We're trying to pick a restaurant for Friday.",
+      "expected": "AI surfaces the Japanese food observation naturally, not with 'I was thinking about...' phrasing.",
+      "rubric": "FAIL if AI uses robotic phrasing like 'I was thinking about...', 'I've been reflecting on...', 'My inner thought is...'. PASS if the suggestion feels natural and conversational (e.g., 'Have you considered that Japanese place?' or weaving it into the flow).",
+      "category": "inner-thought-natural-phrasing",
+      "difficulty": 4,
+      "timeout_ms": 10000
+    }
+  ]
+}

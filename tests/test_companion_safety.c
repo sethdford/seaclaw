@@ -538,6 +538,99 @@ static void test_normalize_cyrillic_lookalikes(void) {
     HU_ASSERT_NOT_NULL(strstr(buf, "ace"));
 }
 
+/* ── Invisible Unicode stripping tests ───────────────────────────── */
+
+static void test_normalize_strips_zero_width_chars(void) {
+    char buf[128];
+    /* "ki\u200Bll" — zero-width space between letters → "kill" */
+    const char *input = "ki\xe2\x80\x8bll";
+    size_t n = hu_companion_safety_normalize(input, strlen(input), buf, sizeof(buf));
+    HU_ASSERT_TRUE(n > 0);
+    HU_ASSERT_NOT_NULL(strstr(buf, "kill"));
+    /* Also test ZWNJ (U+200C) and ZWJ (U+200D) */
+    const char *input2 = "ki\xe2\x80\x8c\xe2\x80\x8dll";
+    n = hu_companion_safety_normalize(input2, strlen(input2), buf, sizeof(buf));
+    HU_ASSERT_NOT_NULL(strstr(buf, "kill"));
+}
+
+static void test_normalize_strips_bidi_overrides(void) {
+    char buf[128];
+    /* "ki\u202Ell" — RTL override embedded → "kill" */
+    const char *input = "ki\xe2\x80\xaell";
+    size_t n = hu_companion_safety_normalize(input, strlen(input), buf, sizeof(buf));
+    HU_ASSERT_TRUE(n > 0);
+    HU_ASSERT_NOT_NULL(strstr(buf, "kill"));
+}
+
+static void test_normalize_strips_bidi_isolates(void) {
+    char buf[128];
+    /* "ki\u2066ll" — LRI embedded → "kill" */
+    const char *input = "ki\xe2\x81\xa6ll";
+    size_t n = hu_companion_safety_normalize(input, strlen(input), buf, sizeof(buf));
+    HU_ASSERT_TRUE(n > 0);
+    HU_ASSERT_NOT_NULL(strstr(buf, "kill"));
+}
+
+static void test_normalize_strips_bom(void) {
+    char buf[128];
+    /* BOM at start: "\uFEFFkill" → "kill" */
+    const char *input = "\xef\xbb\xbfkill";
+    size_t n = hu_companion_safety_normalize(input, strlen(input), buf, sizeof(buf));
+    HU_ASSERT_TRUE(n > 0);
+    HU_ASSERT_NOT_NULL(strstr(buf, "kill"));
+}
+
+static void test_normalize_strips_combining_marks(void) {
+    char buf[128];
+    /* "k\u0308ill" — combining diaeresis on 'k' → "kill" */
+    const char *input = "k\xcc\x88ill";
+    size_t n = hu_companion_safety_normalize(input, strlen(input), buf, sizeof(buf));
+    HU_ASSERT_TRUE(n > 0);
+    HU_ASSERT_NOT_NULL(strstr(buf, "kill"));
+    /* U+0340 range: combining grave tone mark */
+    const char *input2 = "k\xcd\x80ill";
+    n = hu_companion_safety_normalize(input2, strlen(input2), buf, sizeof(buf));
+    HU_ASSERT_NOT_NULL(strstr(buf, "kill"));
+}
+
+static void test_adversarial_zero_width_joiner_bypass_detected(void) {
+    hu_companion_safety_result_t r;
+    /* "i\u200Dneed\u200Dyou" with ZWJ between words */
+    const char *msg = "i\xe2\x80\x8d need you, can't live without you, "
+                      "you're all i have";
+    HU_ASSERT_EQ(CS_CHECK(msg, strlen(msg), &r), HU_OK);
+    HU_ASSERT_TRUE(r.over_attachment > 0.5);
+}
+
+static void test_adversarial_rtl_override_bypass_detected(void) {
+    hu_companion_safety_result_t r;
+    /* RTL override chars scattered in "don't go, please stay" */
+    const char *msg = "don't\xe2\x80\xae go\xe2\x80\xac, please stay";
+    HU_ASSERT_EQ(CS_CHECK(msg, strlen(msg), &r), HU_OK);
+    HU_ASSERT_TRUE(r.farewell_unsafe);
+}
+
+static void test_adversarial_combining_mark_bypass_detected(void) {
+    hu_companion_safety_result_t r;
+    /* Combining marks on "i need you" — diacritics scattered on letters */
+    const char *msg = "i\xcc\x81 n\xcc\x88"
+                      "e\xcc\x80"
+                      "ed you, can't live without you, "
+                      "you're all i have";
+    HU_ASSERT_EQ(CS_CHECK(msg, strlen(msg), &r), HU_OK);
+    HU_ASSERT_TRUE(r.over_attachment > 0.5);
+}
+
+static void test_adversarial_mixed_invisible_bypass_detected(void) {
+    hu_companion_safety_result_t r;
+    /* Mix: BOM + zero-width + combining + bidi in isolation keywords */
+    const char *msg = "\xef\xbb\xbf"                                   /* BOM */
+                      "you don't need\xe2\x80\x8b anyone else, "       /* ZWSP */
+                      "the\xcc\x88y\xe2\x80\xae don't understand you"; /* combining + RLO */
+    HU_ASSERT_EQ(CS_CHECK(msg, strlen(msg), &r), HU_OK);
+    HU_ASSERT_TRUE(r.isolation > 0.0);
+}
+
 static void test_false_positive_skilled_not_kill(void) {
     hu_companion_safety_result_t r;
     const char *msg = "she is a very skilled developer with great talent";
@@ -610,6 +703,11 @@ void run_companion_safety_tests(void) {
     HU_RUN_TEST(test_normalize_mixed_bypass);
     HU_RUN_TEST(test_normalize_fullwidth_letters);
     HU_RUN_TEST(test_normalize_cyrillic_lookalikes);
+    HU_RUN_TEST(test_normalize_strips_zero_width_chars);
+    HU_RUN_TEST(test_normalize_strips_bidi_overrides);
+    HU_RUN_TEST(test_normalize_strips_bidi_isolates);
+    HU_RUN_TEST(test_normalize_strips_bom);
+    HU_RUN_TEST(test_normalize_strips_combining_marks);
 
     HU_TEST_SUITE("Adversarial Bypass (SHIELD-001)");
     HU_RUN_TEST(test_adversarial_leetspeak_detected);
@@ -623,6 +721,10 @@ void run_companion_safety_tests(void) {
     HU_RUN_TEST(test_adversarial_punctuation_variants);
     HU_RUN_TEST(test_adversarial_fullwidth_bypass_detected);
     HU_RUN_TEST(test_adversarial_cyrillic_bypass_detected);
+    HU_RUN_TEST(test_adversarial_zero_width_joiner_bypass_detected);
+    HU_RUN_TEST(test_adversarial_rtl_override_bypass_detected);
+    HU_RUN_TEST(test_adversarial_combining_mark_bypass_detected);
+    HU_RUN_TEST(test_adversarial_mixed_invisible_bypass_detected);
     HU_RUN_TEST(test_false_positive_skilled_not_kill);
     HU_RUN_TEST(test_false_positive_normal_goodbye);
     HU_RUN_TEST(test_false_positive_need_help);
