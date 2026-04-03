@@ -86,14 +86,24 @@ if [ "$QUICK" != "--quick" ]; then
     fi
 fi
 
-# ── 5. Install binary ─────────────────────────────────────────────────
+# ── 5. Install binary (inode-preserving to keep FDA grant) ────────────
 [ -f "$INSTALL_PATH" ] && cp "$INSTALL_PATH" "$INSTALL_PATH.bak"
-cp "$BUILD_DIR/human" "$INSTALL_PATH"
+# Use cat > to overwrite in place (preserves inode → keeps macOS FDA).
+# cp creates a new inode which causes macOS to revoke Full Disk Access.
+if [ -f "$INSTALL_PATH" ]; then
+    cat "$BUILD_DIR/human" > "$INSTALL_PATH"
+else
+    cp "$BUILD_DIR/human" "$INSTALL_PATH"
+fi
 chmod +x "$INSTALL_PATH"
 
 APP_BUNDLE="$HOME/Applications/Human.app"
 if [ -d "$APP_BUNDLE" ]; then
-    cp "$BUILD_DIR/human" "$APP_BUNDLE/Contents/MacOS/human-service"
+    if [ -f "$APP_BUNDLE/Contents/MacOS/human-service" ]; then
+        cat "$BUILD_DIR/human" > "$APP_BUNDLE/Contents/MacOS/human-service"
+    else
+        cp "$BUILD_DIR/human" "$APP_BUNDLE/Contents/MacOS/human-service"
+    fi
     chmod +x "$APP_BUNDLE/Contents/MacOS/human-service"
     codesign --force --deep --sign - --identifier ai.human.service "$APP_BUNDLE" 2>/dev/null || true
 fi
