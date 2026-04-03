@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 /* ── test allocator ──────────────────────────────────────────────────────── */
@@ -415,6 +416,59 @@ static void test_validate_path_null_args(void) {
                  HU_ERR_INVALID_ARGUMENT);
 }
 
+/* ── test: injection into prompt ────────────────────────────────────────── */
+
+static void test_discovery_prompt_injection(void) {
+    make_tmpdir();
+
+    /* Create workspace instruction file */
+    const char *instr_content = "Be helpful and concise. Use simple language.";
+    write_file(g_tmpdir, ".human.md", instr_content);
+
+    /* Run discovery */
+    hu_instruction_discovery_t *disc = NULL;
+    hu_error_t err = hu_instruction_discovery_run(&test_allocator, g_tmpdir, strlen(g_tmpdir), &disc);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(disc);
+    HU_ASSERT_NOT_NULL(disc->merged_content);
+    HU_ASSERT_GT(disc->merged_content_len, 0);
+
+    /* Verify instruction content is in merged output */
+    HU_ASSERT_STR_CONTAINS(disc->merged_content, instr_content);
+
+    /* Verify section header is present */
+    HU_ASSERT_STR_CONTAINS(disc->merged_content, "# Workspace instructions");
+
+    hu_instruction_discovery_destroy(&test_allocator, disc);
+    rm_rf(g_tmpdir);
+}
+
+/* ── test: freshness re-discovery simulation ─────────────────────────────── */
+
+static void test_discovery_freshness_trigger(void) {
+    make_tmpdir();
+
+    /* Create initial instruction file */
+    write_file(g_tmpdir, ".human.md", "original instructions");
+
+    /* First discovery */
+    hu_instruction_discovery_t *disc1 = NULL;
+    hu_error_t err = hu_instruction_discovery_run(&test_allocator, g_tmpdir, strlen(g_tmpdir), &disc1);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(disc1);
+    HU_ASSERT_TRUE(hu_instruction_discovery_is_fresh(disc1));
+    HU_ASSERT_STR_CONTAINS(disc1->merged_content, "original instructions");
+
+    /* Simulate TTL expiry by manually advancing last_check_time */
+    disc1->last_check_time = (int64_t)time(NULL) - (HU_INSTRUCTION_CACHE_TTL_SEC + 10);
+
+    /* Should no longer be fresh */
+    HU_ASSERT_FALSE(hu_instruction_discovery_is_fresh(disc1));
+
+    hu_instruction_discovery_destroy(&test_allocator, disc1);
+    rm_rf(g_tmpdir);
+}
+
 /* ── suite runner ────────────────────────────────────────────────────────── */
 
 void run_instruction_discover_tests(void) {
@@ -434,4 +488,6 @@ void run_instruction_discover_tests(void) {
     HU_RUN_TEST(test_freshness_check);
     HU_RUN_TEST(test_null_args);
     HU_RUN_TEST(test_discovery_no_files);
+    HU_RUN_TEST(test_discovery_prompt_injection);
+    HU_RUN_TEST(test_discovery_freshness_trigger);
 }

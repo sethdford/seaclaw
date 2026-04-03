@@ -73,9 +73,76 @@ static void cross_contact_isolation_a_memory_not_in_b_context(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
+static void cross_contact_forget_does_not_affect_other_contact(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CONVERSATION};
+    const char *key_a = "contact_a:item1";
+    const char *key_b = "contact_b:item1";
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, key_a, strlen(key_a), "data-a", 6, &cat, "a", 1),
+                 HU_OK);
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, key_b, strlen(key_b), "data-b", 6, &cat, "b", 1),
+                 HU_OK);
+
+    bool deleted = false;
+    HU_ASSERT_EQ(mem.vtable->forget(mem.ctx, key_a, strlen(key_a), &deleted), HU_OK);
+    HU_ASSERT_TRUE(deleted);
+
+    hu_memory_entry_t entry;
+    bool found = false;
+    HU_ASSERT_EQ(mem.vtable->get(mem.ctx, &alloc, key_b, strlen(key_b), &entry, &found), HU_OK);
+    HU_ASSERT_TRUE(found);
+    hu_memory_entry_free_fields(&alloc, &entry);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void cross_contact_list_shows_only_own_entries(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "k1", 2, "val-a", 5, &cat, "alice", 5), HU_OK);
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "k2", 2, "val-b", 5, &cat, "bob", 3), HU_OK);
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "k3", 2, "val-a2", 6, &cat, "alice", 5), HU_OK);
+
+    hu_memory_entry_t *entries = NULL;
+    size_t count = 0;
+    HU_ASSERT_EQ(mem.vtable->list(mem.ctx, &alloc, NULL, "alice", 5, &entries, &count), HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+    for (size_t i = 0; i < count; i++)
+        hu_memory_entry_free_fields(&alloc, &entries[i]);
+    if (entries)
+        alloc.free(alloc.ctx, entries, count * sizeof(hu_memory_entry_t));
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void cross_contact_count_reflects_all_contacts(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "x1", 2, "v1", 2, &cat, "a", 1), HU_OK);
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, "x2", 2, "v2", 2, &cat, "b", 1), HU_OK);
+
+    size_t total = 0;
+    HU_ASSERT_EQ(mem.vtable->count(mem.ctx, &total), HU_OK);
+    HU_ASSERT_EQ(total, 2u);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
 void run_privacy_audit_tests(void) {
     HU_TEST_SUITE("privacy_audit");
     HU_RUN_TEST(cross_contact_isolation_a_memory_not_in_b_context);
+    HU_RUN_TEST(cross_contact_forget_does_not_affect_other_contact);
+    HU_RUN_TEST(cross_contact_list_shows_only_own_entries);
+    HU_RUN_TEST(cross_contact_count_reflects_all_contacts);
 }
 
 #else

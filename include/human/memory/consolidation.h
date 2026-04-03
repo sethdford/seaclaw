@@ -13,16 +13,20 @@ typedef struct hu_consolidation_config {
     hu_provider_t *provider; /* optional; NULL = skip connection discovery */
     const char *model;       /* model name for LLM calls; NULL uses provider default */
     size_t model_len;
+    bool extract_facts; /* run deep_extract on surviving entries and store as propositions */
+    float fact_confidence_threshold; /* minimum confidence for stored facts (0.0-1.0, default 0.5) */
 } hu_consolidation_config_t;
 
-#define HU_CONSOLIDATION_DEFAULTS \
-    {.decay_days = 30,            \
-     .decay_factor = 0.9,         \
-     .dedup_threshold = 85,       \
-     .max_entries = 10000,        \
-     .provider = NULL,            \
-     .model = NULL,               \
-     .model_len = 0}
+#define HU_CONSOLIDATION_DEFAULTS      \
+    {.decay_days = 30,                 \
+     .decay_factor = 0.9,              \
+     .dedup_threshold = 85,            \
+     .max_entries = 10000,             \
+     .provider = NULL,                 \
+     .model = NULL,                    \
+     .model_len = 0,                   \
+     .extract_facts = false,           \
+     .fact_confidence_threshold = 0.5f}
 
 uint32_t hu_similarity_score(const char *a, size_t a_len, const char *b, size_t b_len);
 hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,

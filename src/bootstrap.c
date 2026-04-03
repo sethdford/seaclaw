@@ -37,6 +37,8 @@
 #include "human/permission.h"
 #include "human/mcp_manager.h"
 #include "human/agent/instruction_discover.h"
+#include "human/tools/webhook_tools.h"
+#include "human/webhook.h"
 #ifdef HU_HAS_VOICE_CHANNEL
 #include "human/channels/voice_channel.h"
 #endif
@@ -676,6 +678,45 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         }
     }
 
+    /* Webhook tools: create manager and append webhook tools */
+    {
+        hu_webhook_manager_t *webhook_mgr = NULL;
+        hu_error_t webhook_err = hu_webhook_manager_create(alloc, &webhook_mgr);
+        if (webhook_err == HU_OK && webhook_mgr) {
+            /* Merge webhook tools with existing tools */
+            hu_tool_t webhook_tools[3] = {0};
+            size_t webhook_count = 0;
+
+            if (hu_webhook_register_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) == HU_OK) {
+                webhook_count++;
+            }
+            if (hu_webhook_poll_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) == HU_OK) {
+                webhook_count++;
+            }
+            if (hu_webhook_list_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) == HU_OK) {
+                webhook_count++;
+            }
+
+            if (webhook_count > 0) {
+                hu_tool_t *merged = (hu_tool_t *)alloc->alloc(
+                    alloc->ctx, (bi->tools_count + webhook_count) * sizeof(hu_tool_t));
+                if (merged) {
+                    memcpy(merged, bi->tools, bi->tools_count * sizeof(hu_tool_t));
+                    memcpy(merged + bi->tools_count, webhook_tools,
+                           webhook_count * sizeof(hu_tool_t));
+                    alloc->free(alloc->ctx, bi->tools, bi->tools_count * sizeof(hu_tool_t));
+                    bi->tools = merged;
+                    bi->tools_count += webhook_count;
+                    ctx->tools = bi->tools;
+                    ctx->tools_count = bi->tools_count;
+                }
+            }
+        } else if (webhook_err != HU_OK) {
+            fprintf(stderr, "[bootstrap] warning: webhook manager creation failed: %s\n",
+                    hu_error_string(webhook_err));
+        }
+    }
+
     {
         hu_error_t reg_err = hu_agent_registry_create(alloc, &bi->agent_registry);
         if (reg_err == HU_OK) {
@@ -944,6 +985,8 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                                      cfg->channels.imessage.allow_from_count,
                                      &bi->channel_slots[ch_count]);
             if (err == HU_OK) {
+                if (cfg->channels.imessage.use_imsg_cli)
+                    hu_imessage_set_use_imsg_cli(&bi->channel_slots[ch_count], true);
                 bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
                 bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
                 bi->channels[ch_count].poll_fn = hu_imessage_poll;
@@ -963,7 +1006,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
 #else
         if (cfg->channels.imessage.default_target)
             hu_log_error("bootstrap", NULL, "WARNING: iMessage configured in config but binary was built "
-                    "without HU_ENABLE_IMESSAGE — rebuild with -DSC_ENABLE_IMESSAGE=ON");
+                    "without HU_ENABLE_IMESSAGE — rebuild with -DHU_ENABLE_IMESSAGE=ON");
 #endif
 
 #if HU_HAS_PWA

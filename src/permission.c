@@ -3,7 +3,7 @@
 #include <string.h>
 
 /* ──────────────────────────────────────────────────────────────────────────
- * Static tool-permission classification table
+ * Static tool-permission classification table (87 tools)
  *
  * Every built-in tool is listed here. Unknown tools (including dynamically
  * loaded MCP tools) default to DANGER_FULL_ACCESS so that new tools are
@@ -96,6 +96,21 @@ static const hu_tool_perm_entry_t HU_TOOL_PERMISSIONS[] = {
     {"gcloud",              HU_PERM_DANGER_FULL_ACCESS},
     {"firebase",            HU_PERM_DANGER_FULL_ACCESS},
     {"workflow",            HU_PERM_DANGER_FULL_ACCESS},
+
+    /* ── Additional tools (previously missing from table) ── */
+    {"agent_query",         HU_PERM_READ_ONLY},
+    {"agent_spawn",         HU_PERM_DANGER_FULL_ACCESS},
+    {"database",            HU_PERM_WORKSPACE_WRITE},
+    {"diff",                HU_PERM_READ_ONLY},
+    {"facebook",            HU_PERM_WORKSPACE_WRITE},
+    {"instagram",           HU_PERM_WORKSPACE_WRITE},
+    {"lsp",                 HU_PERM_READ_ONLY},
+    {"paperclip",           HU_PERM_WORKSPACE_WRITE},
+    {"peripheral_ctrl",     HU_PERM_WORKSPACE_WRITE},
+    {"persona",             HU_PERM_DANGER_FULL_ACCESS},
+    {"pwa",                 HU_PERM_WORKSPACE_WRITE},
+    {"twitter",             HU_PERM_WORKSPACE_WRITE},
+    {"voice_clone",         HU_PERM_WORKSPACE_WRITE},
 };
 
 #define HU_TOOL_PERMISSIONS_COUNT (sizeof(HU_TOOL_PERMISSIONS) / sizeof(HU_TOOL_PERMISSIONS[0]))

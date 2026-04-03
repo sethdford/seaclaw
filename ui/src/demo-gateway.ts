@@ -1778,12 +1778,16 @@ export class DemoGatewayClient extends EventTarget {
       case "voice.transcribe":
         return { text: "Demo transcription of your audio" };
 
-      case "voice.session.start":
+      case "voice.session.start": {
+        const isGeminiLive =
+          (params as Record<string, unknown>)?.mode === "gemini_live";
         return {
           sessionId: `demo-${Date.now()}`,
           sampleRate: 24000,
-          encoding: "pcm_f32le",
+          encoding: isGeminiLive ? "pcm_s16le" : "pcm_f32le",
+          ...(isGeminiLive ? { mode: "gemini_live" } : {}),
         };
+      }
 
       case "voice.session.stop":
         return { ok: true };

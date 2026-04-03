@@ -220,6 +220,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private _speaking = false;
   @state() private _audioLevel = 0;
   @state() private _showClonePanel = false;
+  @state() private _geminiLiveMode = false;
   private _durationTimer: ReturnType<typeof setInterval> | null = null;
   private _recorder = new AudioRecorder();
   readonly #playback = new AudioPlaybackEngine(24000);
@@ -315,6 +316,11 @@ export class ScVoiceView extends GatewayAwareLitElement {
           message: "Audio recording is not supported in this browser",
           variant: "info",
         });
+      }
+      try {
+        this._geminiLiveMode = localStorage.getItem("hu-gemini-live") === "true";
+      } catch {
+        /* ignore */
       }
       this._restoreFromCache();
       this.#playback.setOnPlaybackEnd(() => {
@@ -538,6 +544,25 @@ export class ScVoiceView extends GatewayAwareLitElement {
       return;
     }
 
+    if (detail.event === "voice.assistant.transcript") {
+      const text = (detail.payload?.text as string) ?? "";
+      if (text) {
+        const last = this._messages[this._messages.length - 1];
+        if (last && last.role === "assistant") {
+          last.content += text;
+          this._messages = [...this._messages];
+        } else {
+          this._messages = [
+            ...this._messages,
+            { role: "assistant", content: text, ts: Date.now() },
+          ];
+        }
+      }
+      this._cacheMessages();
+      requestAnimationFrame(() => this.requestUpdate());
+      return;
+    }
+
     if (detail.event === "voice.audio.done") {
       this.#playback.markEndOfStream();
       return;
@@ -615,7 +640,18 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     if (canStream) {
       try {
-        await gw.voiceSessionStart({ sessionKey: SESSION_KEY_VOICE });
+        const startParams: Record<string, unknown> = {
+          sessionKey: SESSION_KEY_VOICE,
+        };
+        if (this._geminiLiveMode) {
+          startParams.mode = "gemini_live";
+        }
+        const result = (await gw.voiceSessionStart(startParams)) as Record<
+          string,
+          unknown
+        >;
+        const isGeminiLive = result?.mode === "gemini_live";
+
         gw.setOnBinaryChunk((ab) => {
           const f32 = new Float32Array(ab);
           if (f32.length > 0) {
@@ -625,21 +661,42 @@ export class ScVoiceView extends GatewayAwareLitElement {
           this.requestUpdate();
         });
         this.#silence.reset();
-        await this._recorder.startStreaming(
-          (data) => {
-            try {
-              gw.sendBinary(data);
-            } catch {
-              /* socket closed */
-            }
-          },
-          {
-            onLevel: (rms) => {
-              this._audioLevel = rms;
-              this.#silence.onLevel(rms);
+
+        if (isGeminiLive) {
+          /* Gemini Live: stream raw PCM16 @ 16kHz directly */
+          await this._recorder.startRawPcmStreaming(
+            (data) => {
+              try {
+                gw.sendBinary(data);
+              } catch {
+                /* socket closed */
+              }
             },
-          },
-        );
+            {
+              onLevel: (rms) => {
+                this._audioLevel = rms;
+                this.#silence.onLevel(rms);
+              },
+            },
+          );
+        } else {
+          /* Standard: stream encoded WebM/Opus to Cartesia pipeline */
+          await this._recorder.startStreaming(
+            (data) => {
+              try {
+                gw.sendBinary(data);
+              } catch {
+                /* socket closed */
+              }
+            },
+            {
+              onLevel: (rms) => {
+                this._audioLevel = rms;
+                this.#silence.onLevel(rms);
+              },
+            },
+          );
+        }
         this.#voiceStreaming = true;
         this.voiceStatus = "listening";
         return;
@@ -655,6 +712,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
           detail = "Reconnect to the gateway, then try again.";
         } else if (low.includes("invalid") || low.includes("argument")) {
           detail = "Voice streaming unavailable (gateway or provider configuration).";
+        } else if (low.includes("gemini") || low.includes("google")) {
+          detail =
+            "Gemini Live session failed: check Google API key in config.";
         }
         ScToast.show({ message: detail, variant: "error" });
         gw.setOnBinaryChunk(null);
@@ -686,8 +746,13 @@ export class ScVoiceView extends GatewayAwareLitElement {
       this.voiceStatus = "processing";
       try {
         await this._recorder.stopStreaming();
-        const mime = this._recorder.streamMimeType || "audio/webm";
-        await gw.voiceAudioEnd({ mimeType: mime, sessionKey: SESSION_KEY_VOICE });
+        if (!this._geminiLiveMode) {
+          const mime = this._recorder.streamMimeType || "audio/webm";
+          await gw.voiceAudioEnd({
+            mimeType: mime,
+            sessionKey: SESSION_KEY_VOICE,
+          });
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Voice stream failed";
         ScToast.show({ message: msg, variant: "error" });
@@ -824,6 +889,25 @@ export class ScVoiceView extends GatewayAwareLitElement {
             aria-label="Export conversation"
           >
             Export
+          </hu-button>
+          <hu-button
+            variant=${this._geminiLiveMode ? "tonal" : "ghost"}
+            size="sm"
+            @click=${() => {
+              this._geminiLiveMode = !this._geminiLiveMode;
+              try {
+                localStorage.setItem(
+                  "hu-gemini-live",
+                  String(this._geminiLiveMode),
+                );
+              } catch {
+                /* ignore */
+              }
+            }}
+            aria-label="Toggle Gemini Live"
+            title="Gemini Live: native real-time voice (no STT/TTS pipeline)"
+          >
+            ${this._geminiLiveMode ? "Gemini Live" : "Standard Voice"}
           </hu-button>
           <hu-button
             variant="ghost"

@@ -64,6 +64,22 @@ hu_error_t hu_imessage_lookup_message_by_guid(hu_allocator_t *alloc, const char 
                                               size_t guid_len, char *out_text, size_t out_cap,
                                               size_t *out_len);
 
+/** Extract plain text from an NSAttributedString (NSKeyedArchiver) blob.
+ * macOS 15+ stores iMessage text in attributedBody instead of the text column.
+ * Pure byte parsing — no platform dependencies. Returns extracted length, or 0. */
+size_t hu_imessage_extract_attributed_body(const unsigned char *blob, size_t blob_len, char *out,
+                                           size_t out_cap);
+
+/** Enable or disable the imsg CLI for send/react (runtime toggle).
+ * When enabled, imsg CLI is tried first with AppleScript fallback.
+ * Default: false. Set via config.json channels.imessage.use_imsg_cli. */
+void hu_imessage_set_use_imsg_cli(hu_channel_t *ch, bool use_imsg);
+
+/** Extract a JSON string value by key from a raw JSON fragment.
+ * Used by the GIF search to parse Tenor API responses. Exposed for testing. */
+size_t hu_imessage_gif_json_extract(const char *json, size_t json_len, const char *key, char *out,
+                                    size_t cap);
+
 /** Search Tenor for a GIF matching the query and download to a temp file.
  * Returns the local path to the downloaded GIF (caller owns, free with alloc).
  * Returns NULL on failure (no API key, network error, no results).

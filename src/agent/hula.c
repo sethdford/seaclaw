@@ -1,4 +1,5 @@
 #include "human/agent/hula.h"
+#include "human/agent/idempotency.h"
 #include "human/agent/planner.h"
 #include "human/agent/dag.h"
 #include "human/agent/registry.h"
@@ -869,6 +870,13 @@ void hu_hula_exec_set_delegate_registry(hu_hula_exec_t *exec, struct hu_agent_re
     exec->delegate_registry = registry;
 }
 
+void hu_hula_exec_set_idempotency_registry(hu_hula_exec_t *exec,
+                                           struct hu_idempotency_registry *registry) {
+    if (!exec)
+        return;
+    exec->idempotency_registry = registry;
+}
+
 void hu_hula_exec_cancel(hu_hula_exec_t *exec, const char *reason, size_t reason_len) {
     if (!exec)
         return;
@@ -1126,33 +1134,83 @@ static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
     hu_tool_result_t tr;
     memset(&tr, 0, sizeof(tr));
 
-    if (exec->observer) {
-        hu_observer_event_t ev = {0};
-        ev.tag = HU_OBSERVER_EVENT_TOOL_CALL_START;
-        ev.trace_id = NULL;
-        ev.data.tool_call_start.tool = n->tool_name;
-        hu_observer_record_event(*exec->observer, &ev);
+    /* Check idempotency registry before executing tool */
+    bool use_cached_result = false;
+    hu_idempotency_entry_t cached_entry;
+    if (exec->idempotency_registry) {
+        if (hu_idempotency_check(exec->idempotency_registry, n->tool_name, n->args_json ? n->args_json : "{}", &cached_entry)) {
+            use_cached_result = true;
+            /* Reconstruct tool result from cached entry */
+            if (cached_entry.is_error) {
+                tr.success = false;
+                tr.error_msg = cached_entry.result_json;
+                tr.error_msg_len = cached_entry.result_json_len;
+                tr.output = "";
+                tr.output_len = 0;
+            } else {
+                tr.success = true;
+                tr.output = cached_entry.result_json;
+                tr.output_len = cached_entry.result_json_len;
+                tr.error_msg = NULL;
+                tr.error_msg_len = 0;
+            }
+            tr.output_owned = false;
+            tr.error_msg_owned = false;
+
+            if (exec->observer) {
+                hu_observer_event_t ev = {0};
+                ev.tag = HU_OBSERVER_EVENT_TOOL_CALL;
+                ev.trace_id = NULL;
+                ev.data.tool_call.tool = n->tool_name;
+                ev.data.tool_call.duration_ms = 0;
+                ev.data.tool_call.success = tr.success;
+                ev.data.tool_call.detail = NULL;
+                hu_observer_record_event(*exec->observer, &ev);
+            }
+        }
     }
 
-    if (exec->budget_enabled && exec->budget_max_tool_calls > 0)
-        exec->budget_tool_calls_used++;
+    if (!use_cached_result) {
+        if (exec->observer) {
+            hu_observer_event_t ev = {0};
+            ev.tag = HU_OBSERVER_EVENT_TOOL_CALL_START;
+            ev.trace_id = NULL;
+            ev.data.tool_call_start.tool = n->tool_name;
+            hu_observer_record_event(*exec->observer, &ev);
+        }
 
-    err = tool->vtable->execute(tool->ctx, &exec->alloc, args, &tr);
+        if (exec->budget_enabled && exec->budget_max_tool_calls > 0)
+            exec->budget_tool_calls_used++;
+
+        err = tool->vtable->execute(tool->ctx, &exec->alloc, args, &tr);
+
+        /* Record result in idempotency registry for future replay */
+        if (exec->idempotency_registry && err == HU_OK) {
+            const char *result_to_cache = tr.success ? tr.output : tr.error_msg;
+            hu_error_t record_err = hu_idempotency_record(exec->idempotency_registry, &exec->alloc,
+                                                           n->tool_name,
+                                                           n->args_json ? n->args_json : "{}",
+                                                           result_to_cache ? result_to_cache : "{}",
+                                                           !tr.success);
+            /* Log but don't fail the tool call if recording fails */
+            (void)record_err;
+        }
+
+        if (exec->observer) {
+            hu_observer_event_t ev = {0};
+            ev.tag = HU_OBSERVER_EVENT_TOOL_CALL;
+            ev.trace_id = NULL;
+            ev.data.tool_call.tool = n->tool_name;
+            ev.data.tool_call.duration_ms = 0;
+            ev.data.tool_call.success = (err == HU_OK && tr.success);
+            ev.data.tool_call.detail = NULL;
+            hu_observer_record_event(*exec->observer, &ev);
+        }
+    }
+
     hu_json_free(&exec->alloc, args);
 
-    bool success = (err == HU_OK && tr.success);
-    if (exec->observer) {
-        hu_observer_event_t ev = {0};
-        ev.tag = HU_OBSERVER_EVENT_TOOL_CALL;
-        ev.trace_id = NULL;
-        ev.data.tool_call.tool = n->tool_name;
-        ev.data.tool_call.duration_ms = 0;
-        ev.data.tool_call.success = success;
-        ev.data.tool_call.detail = NULL;
-        hu_observer_record_event(*exec->observer, &ev);
-    }
-
-    if (err != HU_OK) {
+    if (!use_cached_result && err != HU_OK) {
         set_result(exec, n, HU_HULA_FAILED, NULL, 0, "tool execution error", 20);
         return HU_OK;
     }

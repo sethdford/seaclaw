@@ -1,7 +1,9 @@
 #ifndef HU_AGENT_H
 #define HU_AGENT_H
 
+#include "human/agent/approval_gate.h"
 #include "human/agent/chaos.h"
+#include "human/agent/workflow_event.h"
 #include "human/agent/checkpoint.h"
 #include "human/agent/commitment_store.h"
 #include "human/agent/data_quality.h"
@@ -35,7 +37,9 @@
 #include "human/memory/policy.h"
 #include "human/memory/retrieval.h"
 #include "human/security/escalate.h"
+#include "human/security/delegation.h"
 #include "human/tools/validation.h"
+#include "human/webhook.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/meta_learning.h"
 #endif
@@ -105,6 +109,7 @@ typedef struct hu_agent_context_config {
     bool tool_routing_enabled;
     bool multi_agent;
     bool hula_enabled;
+    bool compaction_use_structured; /* use XML structured summaries in compaction */
 } hu_agent_context_config_t;
 
 /* Called when a tool needs user approval before execution.
@@ -209,6 +214,9 @@ struct hu_agent {
     hu_audit_logger_t *audit_logger;
     struct hu_undo_stack *undo_stack;
 
+    /* Delegation and authorization */
+    char delegation_token_id[64]; /* current delegation token for agent-to-agent authorization */
+
     /* Superhuman intelligence features */
     struct hu_awareness *awareness;      /* optional; bus-based situational awareness */
     struct hu_cron_scheduler *scheduler; /* optional; in-memory cron scheduler for agent jobs */
@@ -246,6 +254,7 @@ struct hu_agent {
     bool tool_routing_enabled;
     bool tree_of_thought_enabled;
     bool hula_enabled;
+    bool compaction_use_structured; /* use XML structured summaries in compaction */
 
     bool constitutional_enabled;
     bool multi_agent_enabled;
@@ -345,6 +354,21 @@ struct hu_agent {
 
     /* SOTA: agent communication protocol inbox for multi-agent coordination */
     struct hu_acp_inbox *acp_inbox; /* owned; NULL until multi_agent enabled */
+
+    /* Idempotency registry for crash-proof tool execution (HuLa replay engine) */
+    struct hu_idempotency_registry *idempotency_registry; /* optional; NULL = no dedup */
+
+    /* Workflow event log for durable execution and audit trail */
+    hu_workflow_event_log_t *workflow_log; /* optional; NULL = no event logging */
+
+    /* Approval gate manager for human-in-the-loop workflow pauses */
+    hu_gate_manager_t *gate_manager; /* optional; NULL = no approval gates */
+
+    /* Delegation token registry for agent-to-agent authorization */
+    hu_delegation_registry_t *delegation_registry; /* optional; NULL = no delegation */
+
+    /* Webhook manager for incoming webhook event handling */
+    hu_webhook_manager_t *webhook_manager; /* optional; NULL = no webhooks */
 };
 
 /* Create agent from minimal config (no full config loader yet).

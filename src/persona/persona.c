@@ -3,6 +3,7 @@
 #include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/persona/persona_fuse.h"
+#include "human/persona/relationship.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

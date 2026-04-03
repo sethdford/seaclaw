@@ -13,4 +13,7 @@ void hu_voice_stream_on_binary(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
 
 void hu_voice_stream_on_conn_close(hu_ws_conn_t *conn);
 
+/* Poll active Gemini Live sessions for audio/events; called from gateway loop. */
+void hu_voice_stream_poll_gemini_live(void);
+
 #endif /* HU_VOICE_STREAM_H */

@@ -215,6 +215,7 @@ typedef struct hu_imessage_channel_config {
     char **allow_from;
     size_t allow_from_count;
     int poll_interval_sec;
+    bool use_imsg_cli;
     int user_response_window_sec; /* DEPRECATED: use daemon.user_response_window_sec */
     char *response_mode;          /* DEPRECATED: use daemon.response_mode */
     hu_channel_daemon_config_t daemon;

@@ -3,6 +3,7 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/persona.h"
+#include "human/channels/imessage.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -919,6 +920,17 @@ hu_error_t hu_persona_cli_run(hu_allocator_t *alloc, const hu_persona_cli_args_t
                     const char *text = (const char *)sqlite3_column_text(stmt, 0);
                     int from_me = sqlite3_column_int(stmt, 1);
                     int64_t date = sqlite3_column_int64(stmt, 2);
+                    char attr_text_buf[4096];
+                    if (!text || text[0] == '\0') {
+                        const unsigned char *ab = sqlite3_column_blob(stmt, 3);
+                        int ab_len = sqlite3_column_bytes(stmt, 3);
+                        if (ab && ab_len > 0) {
+                            size_t extracted = hu_imessage_extract_attributed_body(
+                                ab, (size_t)ab_len, attr_text_buf, sizeof(attr_text_buf));
+                            if (extracted > 0)
+                                text = attr_text_buf;
+                        }
+                    }
                     if (text && text[0]) {
                         text_bufs[raw_count] = hu_strdup(alloc, text);
                         if (!text_bufs[raw_count])
@@ -1039,6 +1051,17 @@ hu_error_t hu_persona_cli_run(hu_allocator_t *alloc, const hu_persona_cli_args_t
             size_t msg_count = 0;
             while (sqlite3_step(stmt) == SQLITE_ROW && msg_count < 500) {
                 const char *text = (const char *)sqlite3_column_text(stmt, 0);
+                char attr_buf[4096];
+                if (!text || text[0] == '\0') {
+                    const unsigned char *ab = sqlite3_column_blob(stmt, 4);
+                    int ab_len = sqlite3_column_bytes(stmt, 4);
+                    if (ab && ab_len > 0) {
+                        size_t extracted = hu_imessage_extract_attributed_body(
+                            ab, (size_t)ab_len, attr_buf, sizeof(attr_buf));
+                        if (extracted > 0)
+                            text = attr_buf;
+                    }
+                }
                 if (text && text[0]) {
                     messages[msg_count] = hu_strdup(alloc, text);
                     if (!messages[msg_count]) {

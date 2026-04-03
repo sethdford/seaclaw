@@ -41,6 +41,7 @@ hu_error_t hu_imessage_feed_fetch(hu_allocator_t *alloc, int64_t since_epoch,
 #else
 
 #if defined(__APPLE__) && defined(HU_ENABLE_SQLITE)
+#include "human/channels/imessage.h"
 #include <sqlite3.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -81,10 +82,12 @@ hu_error_t hu_imessage_feed_fetch(hu_allocator_t *alloc, int64_t since_epoch,
     int64_t since_apple = (since_epoch - IMESSAGE_EPOCH_OFFSET) * IMESSAGE_NS_PER_SEC;
 
     const char *sql =
-        "SELECT m.text, m.date, m.is_from_me, h.id AS handle_id "
+        "SELECT m.text, m.date, m.is_from_me, h.id AS handle_id, m.attributedBody "
         "FROM message m "
         "LEFT JOIN handle h ON m.handle_id = h.ROWID "
-        "WHERE m.text IS NOT NULL AND m.text != '' AND m.date > ? "
+        "WHERE ((m.text IS NOT NULL AND m.text != '') "
+        "    OR (m.attributedBody IS NOT NULL AND LENGTH(m.attributedBody) > 0)) "
+        "AND m.date > ? "
         "ORDER BY m.date DESC LIMIT ?";
 
     sqlite3_stmt *stmt = NULL;
@@ -101,6 +104,18 @@ hu_error_t hu_imessage_feed_fetch(hu_allocator_t *alloc, int64_t since_epoch,
         const char *text = (const char *)sqlite3_column_text(stmt, 0);
         int64_t date_ns = sqlite3_column_int64(stmt, 1);
         const char *handle = (const char *)sqlite3_column_text(stmt, 3);
+
+        char attr_text_buf[4096];
+        if (!text || text[0] == '\0') {
+            const unsigned char *ab = sqlite3_column_blob(stmt, 4);
+            int ab_len = sqlite3_column_bytes(stmt, 4);
+            if (ab && ab_len > 0) {
+                size_t extracted = hu_imessage_extract_attributed_body(
+                    ab, (size_t)ab_len, attr_text_buf, sizeof(attr_text_buf));
+                if (extracted > 0)
+                    text = attr_text_buf;
+            }
+        }
 
         if (!text || text[0] == '\0')
             continue;

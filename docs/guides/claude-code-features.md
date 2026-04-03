@@ -62,9 +62,13 @@ Add MCP servers to `config.json`:
 | `transport_type` | string | No | `"stdio"` (default), `"sse"`, or `"http"` |
 | `command` | string | For stdio | Path to the executable binary |
 | `args` | array | No | Command-line arguments passed to the binary |
-| `url` | string | For sse/http | Endpoint URL |
+| `url` | string | For sse/http | Endpoint URL (requires `HU_ENABLE_CURL=ON`) |
 | `auto_connect` | bool | No | Automatically connect on startup (default: false) |
 | `timeout_ms` | number | No | Request timeout in milliseconds (default: 30000) |
+
+**Transport Requirements:**
+- `"stdio"`: Always available. No build dependencies.
+- `"sse"` or `"http"`: Require `HU_ENABLE_CURL=ON` at build time. Configure CMake with `-DHU_ENABLE_CURL=ON` to enable.
 
 ### Tool Naming Convention
 
@@ -83,9 +87,11 @@ This naming prevents collisions and makes the tool's origin clear.
 
 ### Supported Transports
 
-- **stdio**: Binary runs as subprocess, communicates via JSON-RPC over stdin/stdout. Most common.
-- **sse**: Server-Sent Events over HTTP for streaming responses.
-- **http**: Standard HTTP REST endpoint.
+- **stdio**: Binary runs as subprocess, communicates via JSON-RPC over stdin/stdout. Most common. ✓ Fully supported.
+- **sse**: Server-Sent Events over HTTP for streaming responses. *Requires `HU_ENABLE_CURL=ON` at build time.*
+- **http**: Standard HTTP REST endpoint. *Requires `HU_ENABLE_CURL=ON` at build time.*
+
+> **Note:** HTTP and SSE transport tool execution requires libcurl support. Build with `HU_ENABLE_CURL=ON` to enable these transports. Without it, tool calls over HTTP/SSE will fail with "HTTP/SSE tool execution requires libcurl support."
 
 ### Lifecycle
 

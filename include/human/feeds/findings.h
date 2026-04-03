@@ -20,20 +20,22 @@ typedef struct hu_research_finding {
     int64_t created_at;
 } hu_research_finding_t;
 
-hu_error_t hu_findings_store(hu_allocator_t *alloc, sqlite3 *db,
-                             const char *source, const char *finding,
-                             const char *relevance, const char *priority,
+hu_error_t hu_findings_store(hu_allocator_t *alloc, sqlite3 *db, const char *source,
+                             const char *finding, const char *relevance, const char *priority,
                              const char *suggested_action);
-hu_error_t hu_findings_get_pending(hu_allocator_t *alloc, sqlite3 *db,
-                                   size_t limit,
+hu_error_t hu_findings_get_pending(hu_allocator_t *alloc, sqlite3 *db, size_t limit,
                                    hu_research_finding_t **out, size_t *out_count);
 void hu_findings_free(hu_allocator_t *alloc, hu_research_finding_t *items, size_t count);
 hu_error_t hu_findings_mark_status(sqlite3 *db, int64_t id, const char *status);
-hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db,
-                                       const char *agent_output, size_t output_len);
-hu_error_t hu_findings_get_all(hu_allocator_t *alloc, sqlite3 *db,
-                               size_t limit,
+hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db, const char *agent_output,
+                                       size_t output_len);
+hu_error_t hu_findings_get_all(hu_allocator_t *alloc, sqlite3 *db, size_t limit,
                                hu_research_finding_t **out, size_t *out_count);
+
+/* Build a context string from recent findings for prompt injection.
+ * Returns heap-allocated string (caller frees with alloc->free). */
+hu_error_t hu_findings_build_context(hu_allocator_t *alloc, sqlite3 *db, size_t max_findings,
+                                     char **out, size_t *out_len);
 
 #endif /* HU_ENABLE_SQLITE */
 #endif

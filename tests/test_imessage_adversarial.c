@@ -206,8 +206,9 @@ static void imessage_vtable_has_all_expected_hooks(void) {
     HU_ASSERT_NOT_NULL(ch.vtable->get_latest_attachment_path);
     HU_ASSERT_NOT_NULL(ch.vtable->build_reaction_context);
     HU_ASSERT_NOT_NULL(ch.vtable->build_read_receipt_context);
-    HU_ASSERT_NULL(ch.vtable->start_typing);
-    HU_ASSERT_NULL(ch.vtable->stop_typing);
+    HU_ASSERT_NOT_NULL(ch.vtable->send_event);
+    HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
+    HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
     hu_imessage_destroy(&ch);
 }
 
@@ -364,6 +365,7 @@ static void imessage_tapback_mapping_all_types(void) {
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_HAHA), "laugh");
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_EMPHASIS), "emphasize");
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_QUESTION), "question");
+    HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_CUSTOM_EMOJI), "emoji");
     HU_ASSERT_NULL(hu_imessage_reaction_to_tapback_name((hu_reaction_type_t)99));
 }
 

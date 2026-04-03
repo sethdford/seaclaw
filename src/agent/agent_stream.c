@@ -20,6 +20,7 @@
 #include "human/experience.h"
 #include "human/humanness.h"
 #ifdef HU_ENABLE_SQLITE
+#include "human/feeds/findings.h"
 #include "human/intelligence/online_learning.h"
 #include "human/intelligence/self_improve.h"
 #include "human/intelligence/value_learning.h"
@@ -634,6 +635,20 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     hu_value_engine_deinit(&ve);
                 }
             }
+            /* Feed findings: recent research findings from feed processor */
+#if defined(HU_ENABLE_FEEDS)
+            {
+                char *fctx = NULL;
+                size_t fctx_len = 0;
+                if (hu_findings_build_context(agent->alloc, idb, 5, &fctx, &fctx_len) == HU_OK &&
+                    fctx && fctx_len > 0) {
+                    int n = snprintf(ip + ipo, sizeof(ip) - ipo, "### %.*s\n", (int)fctx_len, fctx);
+                    if (n > 0 && ipo + (size_t)n < sizeof(ip))
+                        ipo += (size_t)n;
+                    agent->alloc->free(agent->alloc->ctx, fctx, fctx_len + 1);
+                }
+            }
+#endif
             if (ipo > 0) {
                 intelligence_ctx = hu_strndup(agent->alloc, ip, ipo);
                 intelligence_ctx_len = ipo;

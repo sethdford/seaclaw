@@ -40,6 +40,10 @@ export class AudioRecorder {
   #levelAnalyser: AnalyserNode | null = null;
   #levelRaf: number | null = null;
   #onLevel: ((rms: number) => void) | null = null;
+  /* Raw PCM16 streaming for Gemini Live (16kHz int16 LE) */
+  #rawPcmContext: AudioContext | null = null;
+  #rawPcmNode: ScriptProcessorNode | null = null;
+  #rawPcmMode = false;
 
   get isRecording(): boolean {
     return this.#recording;
@@ -108,8 +112,94 @@ export class AudioRecorder {
     this.#recording = true;
   }
 
+  /**
+   * Stream raw PCM16 (16kHz, int16 LE) for Gemini Live native voice.
+   * Captures at native rate and downsamples to 16kHz before sending.
+   */
+  async startRawPcmStreaming(
+    onChunk: (data: ArrayBuffer) => void,
+    options?: StreamingOptions,
+  ): Promise<void> {
+    if (this.#recording) return;
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true },
+    });
+    this.#stream = stream;
+    this.#streaming = true;
+    this.#recording = true;
+    this.#rawPcmMode = true;
+    this.#onStreamChunk = onChunk;
+    this.#onLevel = options?.onLevel ?? null;
+
+    const ctx = new AudioContext({ sampleRate: 16000 });
+    this.#rawPcmContext = ctx;
+    const source = ctx.createMediaStreamSource(stream);
+
+    if (this.#onLevel) {
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      this.#levelAnalyser = analyser;
+      const samples = new Uint8Array(analyser.fftSize);
+      const tickLevel = (): void => {
+        if (!this.#levelAnalyser || !this.#onLevel) return;
+        this.#levelAnalyser.getByteTimeDomainData(samples);
+        let sum = 0;
+        for (let i = 0; i < samples.length; i++) {
+          const v = (samples[i]! - 128) / 128;
+          sum += v * v;
+        }
+        this.#onLevel(Math.sqrt(sum / samples.length));
+        this.#levelRaf = requestAnimationFrame(tickLevel);
+      };
+      this.#levelRaf = requestAnimationFrame(tickLevel);
+    }
+
+    /* ScriptProcessorNode: 4096 samples @ 16kHz ≈ 256ms chunks */
+    const processor = ctx.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = (e: AudioProcessingEvent) => {
+      if (!this.#onStreamChunk) return;
+      const float32 = e.inputBuffer.getChannelData(0);
+      const int16 = new Int16Array(float32.length);
+      for (let i = 0; i < float32.length; i++) {
+        const s = Math.max(-1, Math.min(1, float32[i]!));
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      this.#onStreamChunk(int16.buffer);
+    };
+    source.connect(processor);
+    processor.connect(ctx.destination);
+    this.#rawPcmNode = processor;
+    void ctx.resume();
+  }
+
   async stopStreaming(): Promise<void> {
-    if (!this.#recorder || !this.#recording || !this.#streaming) {
+    if (!this.#recording || !this.#streaming) {
+      throw new Error("Not streaming");
+    }
+
+    /* Raw PCM mode: clean up AudioContext + ScriptProcessor */
+    if (this.#rawPcmMode) {
+      this.#stopLevelMonitor();
+      if (this.#rawPcmNode) {
+        this.#rawPcmNode.disconnect();
+        this.#rawPcmNode = null;
+      }
+      if (this.#rawPcmContext && this.#rawPcmContext.state !== "closed") {
+        void this.#rawPcmContext.close();
+      }
+      this.#rawPcmContext = null;
+      this.#rawPcmMode = false;
+      this.#streaming = false;
+      this.#onStreamChunk = null;
+      this.#onLevel = null;
+      this.#recording = false;
+      this.#releaseStream();
+      return;
+    }
+
+    if (!this.#recorder) {
       throw new Error("Not streaming");
     }
     return new Promise((resolve, reject) => {
@@ -201,6 +291,15 @@ export class AudioRecorder {
   }
 
   dispose(): void {
+    if (this.#rawPcmNode) {
+      this.#rawPcmNode.disconnect();
+      this.#rawPcmNode = null;
+    }
+    if (this.#rawPcmContext && this.#rawPcmContext.state !== "closed") {
+      void this.#rawPcmContext.close();
+    }
+    this.#rawPcmContext = null;
+    this.#rawPcmMode = false;
     if (this.#recorder && this.#recording) {
       try {
         this.#recorder.stop();

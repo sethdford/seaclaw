@@ -10,6 +10,7 @@
 #include "human/core/string.h"
 #include "human/providers/factory.h"
 #include "human/security.h"
+#include "human/security/delegation.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,6 +54,8 @@ typedef struct hu_pool_slot {
     uint32_t child_spawn_depth;
     hu_cost_tracker_t *inherit_cost_tracker;
     const hu_metacog_settings_t *inherit_metacognition_policy;
+    void *parent_delegation_registry;
+    uint64_t parent_agent_id;
     volatile bool cancelled;
     void *persistent_agent;
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
@@ -195,6 +198,30 @@ static void *spawn_thread(void *arg) {
             hu_agent_set_cost_tracker(ag, s->inherit_cost_tracker);
         if (s->mailbox)
             hu_agent_set_mailbox(ag, s->mailbox);
+
+        /* Issue delegation token from parent to child if parent has delegation registry */
+        if (s->parent_delegation_registry) {
+            hu_delegation_registry_t *parent_reg = (hu_delegation_registry_t *)s->parent_delegation_registry;
+            char parent_id_str[64];
+            snprintf(parent_id_str, sizeof(parent_id_str), "%llu", (unsigned long long)s->parent_agent_id);
+            char child_id_str[64];
+            snprintf(child_id_str, sizeof(child_id_str), "%llu", (unsigned long long)s->agent_id);
+
+            /* Build tool caveats from parent's tool list if available */
+            hu_delegation_caveat_t caveat = {0};
+            caveat.key = "tool";
+            caveat.key_len = 4;
+            caveat.value = "*"; /* unrestricted tool access by default */
+            caveat.value_len = 1;
+
+            const char *token_id = hu_delegation_issue(parent_reg, a, parent_id_str, child_id_str,
+                                                      3600, &caveat, 1);
+            if (token_id && strlen(token_id) < 64) {
+                strncpy(ag->delegation_token_id, token_id, 63);
+                ag->delegation_token_id[63] = '\0';
+            }
+        }
+
         char *resp = NULL;
         size_t rlen = 0;
         hu_error_t e = hu_agent_turn(ag, task, task_len, &resp, &rlen);
@@ -245,6 +272,29 @@ static void *spawn_thread(void *arg) {
             hu_agent_set_cost_tracker(&ag, s->inherit_cost_tracker);
         if (s->mailbox)
             hu_agent_set_mailbox(&ag, s->mailbox);
+
+        /* Issue delegation token from parent to child if parent has delegation registry */
+        if (s->parent_delegation_registry) {
+            hu_delegation_registry_t *parent_reg = (hu_delegation_registry_t *)s->parent_delegation_registry;
+            char parent_id_str[64];
+            snprintf(parent_id_str, sizeof(parent_id_str), "%llu", (unsigned long long)s->parent_agent_id);
+            char child_id_str[64];
+            snprintf(child_id_str, sizeof(child_id_str), "%llu", (unsigned long long)s->agent_id);
+
+            hu_delegation_caveat_t caveat = {0};
+            caveat.key = "tool";
+            caveat.key_len = 4;
+            caveat.value = "*";
+            caveat.value_len = 1;
+
+            const char *token_id = hu_delegation_issue(parent_reg, a, parent_id_str, child_id_str,
+                                                      3600, &caveat, 1);
+            if (token_id && strlen(token_id) < 64) {
+                strncpy(ag.delegation_token_id, token_id, 63);
+                ag.delegation_token_id[63] = '\0';
+            }
+        }
+
         char *resp = NULL;
         size_t rlen = 0;
         hu_error_t turn_err = hu_agent_turn(&ag, task, task_len, &resp, &rlen);
@@ -522,6 +572,8 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
     s->inherit_cost_tracker = cfg->shared_cost_tracker ? cfg->shared_cost_tracker
                                                        : pool->fleet_cost_tracker;
     s->inherit_metacognition_policy = cfg->metacognition_policy;
+    s->parent_delegation_registry = cfg->parent_delegation_registry;
+    s->parent_agent_id = cfg->parent_agent_id;
     pool->used[si] = true;
     pool->fleet_spawns_started++;
 
@@ -804,6 +856,8 @@ void hu_spawn_config_apply_parent_agent(hu_spawn_config_t *cfg, const hu_agent_t
     cfg->caller_spawn_depth = parent->spawn_depth;
     cfg->shared_cost_tracker = parent->cost_tracker;
     cfg->metacognition_policy = &parent->metacognition.cfg;
+    cfg->parent_delegation_registry = (void *)parent->delegation_registry;
+    cfg->parent_agent_id = parent->agent_id;
 
     if (parent->turn_model && parent->turn_model_len > 0) {
         cfg->model = parent->turn_model;

@@ -185,22 +185,22 @@ static void null_tool_returns_s1(void) {
 /* ── Merge ────────────────────────────────────────────────────────────── */
 
 static void merge_takes_higher_level(void) {
-    hu_sensitivity_result_t a = {HU_SENSITIVITY_S1, NULL};
-    hu_sensitivity_result_t b = {HU_SENSITIVITY_S3, "secret"};
+    hu_sensitivity_result_t a = {HU_SENSITIVITY_S1, NULL, 0.0f, 0};
+    hu_sensitivity_result_t b = {HU_SENSITIVITY_S3, "secret", 1.0f, 1};
     hu_sensitivity_result_t merged = hu_sensitivity_merge(&a, &b);
     HU_ASSERT(merged.level == HU_SENSITIVITY_S3);
     HU_ASSERT(merged.reason != NULL);
 }
 
 static void merge_equal_keeps_first(void) {
-    hu_sensitivity_result_t a = {HU_SENSITIVITY_S2, "pii-a"};
-    hu_sensitivity_result_t b = {HU_SENSITIVITY_S2, "pii-b"};
+    hu_sensitivity_result_t a = {HU_SENSITIVITY_S2, "pii-a", 0.8f, 1};
+    hu_sensitivity_result_t b = {HU_SENSITIVITY_S2, "pii-b", 0.9f, 1};
     hu_sensitivity_result_t merged = hu_sensitivity_merge(&a, &b);
     HU_ASSERT(merged.level == HU_SENSITIVITY_S2);
 }
 
 static void merge_null_safety(void) {
-    hu_sensitivity_result_t a = {HU_SENSITIVITY_S2, "x"};
+    hu_sensitivity_result_t a = {HU_SENSITIVITY_S2, "x", 0.5f, 1};
     HU_ASSERT(hu_sensitivity_merge(&a, NULL).level == HU_SENSITIVITY_S2);
     HU_ASSERT(hu_sensitivity_merge(NULL, &a).level == HU_SENSITIVITY_S2);
     HU_ASSERT(hu_sensitivity_merge(NULL, NULL).level == HU_SENSITIVITY_S1);

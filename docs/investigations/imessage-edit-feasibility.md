@@ -100,3 +100,15 @@ Modifying `~/Library/Messages/chat.db` directly is **not viable** for editing me
 - Location: `src/context/conversation.c`, `src/daemon.c` (BTH typo pipeline).
 
 This pattern is already implemented and tested. No code changes required for F41; investigation complete.
+
+---
+
+## Update (2026-04-03)
+
+Reviewed against current third-party tooling:
+
+- **imsg v0.5.0** (steipete/imsg, 2026-02-16): No edit command. Confirmed — imsg focuses on send, react, watch, and history. Edit remains private-API-only.
+- **BlueBubbles**: Still the only tool implementing edit via private IMCore API. No change.
+- **Conclusion unchanged**: Edit is not feasible via public APIs. The `*correction` pattern remains the recommended approach.
+
+Cross-reference: `imessage-capability-matrix.md`, `imessage-imsg-cli-integration.md`

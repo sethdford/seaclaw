@@ -201,6 +201,7 @@ typedef struct hu_hula_exec {
     uint64_t budget_run_start_ms;
     uint32_t budget_tool_calls_used;
     struct hu_agent_registry *delegate_registry; /* optional; for delegate_agent_id */
+    struct hu_idempotency_registry *idempotency_registry; /* optional; for crash-proof replay */
 } hu_hula_exec_t;
 
 /* Validation diagnostics */
@@ -264,6 +265,10 @@ void hu_hula_exec_set_spawn(hu_hula_exec_t *exec, struct hu_agent_pool *pool,
 
 /* Optional: registry for delegate nodes with delegate_agent_id (spawn_named). */
 void hu_hula_exec_set_delegate_registry(hu_hula_exec_t *exec, struct hu_agent_registry *registry);
+
+/* Optional: idempotency registry for crash-proof tool execution (workflow replay). */
+void hu_hula_exec_set_idempotency_registry(hu_hula_exec_t *exec,
+                                           struct hu_idempotency_registry *registry);
 
 /* Optional: stop execution; in-flight nodes complete as cancelled. */
 void hu_hula_exec_cancel(hu_hula_exec_t *exec, const char *reason, size_t reason_len);

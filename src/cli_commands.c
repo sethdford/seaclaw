@@ -1764,9 +1764,51 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             return berr;
         }
 
-        printf("{\"benchmark\":\"%s\",\"suite\":\"%s\",\"loaded\":true}\n",
-               hu_benchmark_type_name(bench_type), bench_suite.name ? bench_suite.name : "");
+        hu_eval_run_t run = {0};
+#ifdef HU_IS_TEST
+        berr = hu_eval_run_suite(alloc, NULL, "mock", 4, &bench_suite, HU_EVAL_CONTAINS, &run);
+#else
+        {
+            hu_config_t cfg;
+            hu_error_t cfg_err = hu_config_load(alloc, &cfg);
+            if (cfg_err != HU_OK) {
+                hu_eval_suite_free(alloc, &bench_suite);
+                hu_log_error("eval", NULL, "config error: %s", hu_error_string(cfg_err));
+                return cfg_err;
+            }
+            const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
+            size_t prov_len = strlen(prov);
+            const char *mdl = cfg.default_model ? cfg.default_model : "";
+            size_t mdl_len = mdl ? strlen(mdl) : 0;
+            hu_provider_t provider = {0};
+            berr = hu_provider_create_from_config(alloc, &cfg, prov, prov_len, &provider);
+            if (berr != HU_OK) {
+                hu_eval_suite_free(alloc, &bench_suite);
+                hu_config_deinit(&cfg);
+                hu_log_error("eval", NULL, "provider error: %s", hu_error_string(berr));
+                return berr;
+            }
+            berr = hu_eval_run_suite(alloc, &provider, mdl, mdl_len, &bench_suite,
+                                     HU_EVAL_CONTAINS, &run);
+            if (provider.vtable && provider.vtable->deinit)
+                provider.vtable->deinit(provider.ctx, alloc);
+            hu_config_deinit(&cfg);
+        }
+#endif
         hu_eval_suite_free(alloc, &bench_suite);
+        if (berr != HU_OK) {
+            hu_log_error("eval", NULL, "benchmark run failed: %s", hu_error_string(berr));
+            return berr;
+        }
+
+        char *report = NULL;
+        size_t report_len = 0;
+        berr = hu_eval_report_json(alloc, &run, &report, &report_len);
+        if (berr == HU_OK && report) {
+            printf("%.*s\n", (int)report_len, report);
+            alloc->free(alloc->ctx, report, report_len + 1);
+        }
+        hu_eval_run_free(alloc, &run);
         return HU_OK;
     }
 

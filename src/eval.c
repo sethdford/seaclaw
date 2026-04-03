@@ -12,6 +12,16 @@
 #include <errno.h>
 #endif
 #include <time.h>
+
+static int64_t eval_monotonic_ms(void) {
+#if defined(CLOCK_MONOTONIC)
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+        return (int64_t)ts.tv_sec * 1000 + (int64_t)ts.tv_nsec / 1000000;
+#endif
+    return (int64_t)time(NULL) * 1000;
+}
+
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
 #endif
@@ -549,7 +559,7 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
         hu_eval_result_t *res = &out->results[i];
         char *response = NULL;
         size_t response_len = 0;
-        int64_t task_start_ms = (int64_t)time(NULL) * 1000;
+        int64_t task_start_ms = eval_monotonic_ms();
 
 #if defined(HU_IS_TEST) && HU_IS_TEST
         {
@@ -573,7 +583,7 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
                 provider->ctx, alloc, NULL, 0, task->prompt ? task->prompt : "",
                 task->prompt ? task->prompt_len : 0, model ? model : "", model_len, 0.0, &response,
                 &response_len);
-            int64_t task_end_ms = (int64_t)time(NULL) * 1000;
+            int64_t task_end_ms = eval_monotonic_ms();
             int64_t task_elapsed = task_end_ms - task_start_ms;
 
             /* Timeout enforcement: if task exceeded timeout_ms, treat as failure */
@@ -628,17 +638,26 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
         size_t judge_expected_len = expected_str_len;
         char *judge_owned __attribute__((unused)) = NULL;
 #if !defined(HU_IS_TEST) || !HU_IS_TEST
-        if (task_mode == HU_EVAL_LLM_JUDGE && task->rubric && task->rubric_len > 0) {
+        /* Apply per-task rubric, falling back to suite default_rubric */
+        const char *effective_rubric = task->rubric;
+        size_t effective_rubric_len = task->rubric_len;
+        if ((!effective_rubric || effective_rubric_len == 0) && suite->default_rubric &&
+            suite->default_rubric_len > 0) {
+            effective_rubric = suite->default_rubric;
+            effective_rubric_len = suite->default_rubric_len;
+        }
+        if (task_mode == HU_EVAL_LLM_JUDGE && effective_rubric && effective_rubric_len > 0) {
             if (expected_str_len > 0) {
                 size_t gold_cap = expected_str_len < 1200u ? expected_str_len : 1200u;
                 judge_owned =
                     hu_sprintf(alloc,
                                "Rubric:\n%.*s\n\nGold reference (equivalent phrasing counts as "
                                "correct):\n%.*s\n",
-                               (int)task->rubric_len, task->rubric, (int)gold_cap, expected_str);
+                               (int)effective_rubric_len, effective_rubric, (int)gold_cap,
+                               expected_str);
             } else {
-                judge_owned =
-                    hu_sprintf(alloc, "Rubric:\n%.*s\n", (int)task->rubric_len, task->rubric);
+                judge_owned = hu_sprintf(alloc, "Rubric:\n%.*s\n", (int)effective_rubric_len,
+                                         effective_rubric);
             }
             if (judge_owned) {
                 judge_expected = judge_owned;
@@ -664,7 +683,7 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
         res->score = score_val;
         res->actual_output = response;
         res->actual_output_len = response_len;
-        res->elapsed_ms = (int64_t)time(NULL) * 1000 - task_start_ms;
+        res->elapsed_ms = eval_monotonic_ms() - task_start_ms;
         res->tool_calls_made = 0;
         res->tokens_used = 0;
         res->error_msg = NULL;
@@ -688,6 +707,73 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
     }
 #endif
     out->model = (model && model_len > 0) ? hu_strndup(alloc, model, model_len) : NULL;
+
+    return HU_OK;
+}
+
+hu_error_t hu_eval_run_suite_trials(hu_allocator_t *alloc, hu_provider_t *provider,
+                                    const char *model, size_t model_len, hu_eval_suite_t *suite,
+                                    hu_eval_match_mode_t mode, uint32_t trials,
+                                    hu_eval_multi_trial_result_t *out, hu_eval_run_t *best_run) {
+    if (!alloc || !suite || !out || trials == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    if (best_run)
+        memset(best_run, 0, sizeof(*best_run));
+
+    double sum_pass = 0.0, sum_pass_sq = 0.0, sum_score = 0.0;
+    double worst = 1.0, best = 0.0;
+    int64_t total_ms = 0;
+    int total_tok = 0;
+
+    for (uint32_t t = 0; t < trials; t++) {
+        hu_eval_run_t run;
+        hu_error_t err = hu_eval_run_suite(alloc, provider, model, model_len, suite, mode, &run);
+        if (err != HU_OK) {
+            if (best_run && best_run->results)
+                hu_eval_run_free(alloc, best_run);
+            return err;
+        }
+
+        double pr = run.pass_rate;
+        sum_pass += pr;
+        sum_pass_sq += pr * pr;
+        total_ms += run.total_elapsed_ms;
+        total_tok += run.total_tokens;
+        if (pr < worst)
+            worst = pr;
+
+        /* Accumulate mean per-task score */
+        if (run.results_count > 0) {
+            double trial_score = 0.0;
+            for (size_t i = 0; i < run.results_count; i++)
+                trial_score += run.results[i].score;
+            sum_score += trial_score / (double)run.results_count;
+        }
+
+        if (pr > best) {
+            best = pr;
+            if (best_run) {
+                if (best_run->results)
+                    hu_eval_run_free(alloc, best_run);
+                *best_run = run;
+            } else {
+                hu_eval_run_free(alloc, &run);
+            }
+        } else {
+            hu_eval_run_free(alloc, &run);
+        }
+    }
+
+    double n = (double)trials;
+    out->mean_pass_rate = sum_pass / n;
+    out->stddev_pass_rate = (trials > 1) ? sqrt((sum_pass_sq - sum_pass * sum_pass / n) / (n - 1.0))
+                                         : 0.0;
+    out->mean_score = sum_score / n;
+    out->worst_pass_rate = worst;
+    out->trials_run = trials;
+    out->total_elapsed_ms = total_ms;
+    out->total_tokens = total_tok;
 
     return HU_OK;
 }

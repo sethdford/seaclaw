@@ -1,21 +1,20 @@
-#include "human/core/log.h"
 #include "human/feeds/findings.h"
+#include "human/core/log.h"
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
-hu_error_t hu_findings_store(hu_allocator_t *alloc, sqlite3 *db,
-                             const char *source, const char *finding,
-                             const char *relevance, const char *priority,
+hu_error_t hu_findings_store(hu_allocator_t *alloc, sqlite3 *db, const char *source,
+                             const char *finding, const char *relevance, const char *priority,
                              const char *suggested_action) {
     (void)alloc;
-    if (!db || !finding) return HU_ERR_INVALID_ARGUMENT;
+    if (!db || !finding)
+        return HU_ERR_INVALID_ARGUMENT;
 
-    const char *sql =
-        "INSERT INTO research_findings (source, finding, relevance, priority, "
-        "suggested_action, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)";
+    const char *sql = "INSERT INTO research_findings (source, finding, relevance, priority, "
+                      "suggested_action, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return HU_ERR_IO;
@@ -32,10 +31,10 @@ hu_error_t hu_findings_store(hu_allocator_t *alloc, sqlite3 *db,
     return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_IO;
 }
 
-hu_error_t hu_findings_get_pending(hu_allocator_t *alloc, sqlite3 *db,
-                                   size_t limit,
+hu_error_t hu_findings_get_pending(hu_allocator_t *alloc, sqlite3 *db, size_t limit,
                                    hu_research_finding_t **out, size_t *out_count) {
-    if (!alloc || !db || !out || !out_count) return HU_ERR_INVALID_ARGUMENT;
+    if (!alloc || !db || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_count = 0;
 
@@ -56,7 +55,8 @@ hu_error_t hu_findings_get_pending(hu_allocator_t *alloc, sqlite3 *db,
             hu_research_finding_t *tmp = (hu_research_finding_t *)alloc->alloc(
                 alloc->ctx, new_cap * sizeof(hu_research_finding_t));
             if (!tmp) {
-                if (items) alloc->free(alloc->ctx, items, cap * sizeof(hu_research_finding_t));
+                if (items)
+                    alloc->free(alloc->ctx, items, cap * sizeof(hu_research_finding_t));
                 sqlite3_finalize(stmt);
                 return HU_ERR_OUT_OF_MEMORY;
             }
@@ -72,17 +72,23 @@ hu_error_t hu_findings_get_pending(hu_allocator_t *alloc, sqlite3 *db,
         f->id = sqlite3_column_int64(stmt, 0);
         const char *s;
         s = (const char *)sqlite3_column_text(stmt, 1);
-        if (s) snprintf(f->source, sizeof(f->source), "%s", s);
+        if (s)
+            snprintf(f->source, sizeof(f->source), "%s", s);
         s = (const char *)sqlite3_column_text(stmt, 2);
-        if (s) snprintf(f->finding, sizeof(f->finding), "%s", s);
+        if (s)
+            snprintf(f->finding, sizeof(f->finding), "%s", s);
         s = (const char *)sqlite3_column_text(stmt, 3);
-        if (s) snprintf(f->relevance, sizeof(f->relevance), "%s", s);
+        if (s)
+            snprintf(f->relevance, sizeof(f->relevance), "%s", s);
         s = (const char *)sqlite3_column_text(stmt, 4);
-        if (s) snprintf(f->priority, sizeof(f->priority), "%s", s);
+        if (s)
+            snprintf(f->priority, sizeof(f->priority), "%s", s);
         s = (const char *)sqlite3_column_text(stmt, 5);
-        if (s) snprintf(f->suggested_action, sizeof(f->suggested_action), "%s", s);
+        if (s)
+            snprintf(f->suggested_action, sizeof(f->suggested_action), "%s", s);
         s = (const char *)sqlite3_column_text(stmt, 6);
-        if (s) snprintf(f->status, sizeof(f->status), "%s", s);
+        if (s)
+            snprintf(f->status, sizeof(f->status), "%s", s);
         f->created_at = sqlite3_column_int64(stmt, 7);
         count++;
     }
@@ -98,10 +104,12 @@ void hu_findings_free(hu_allocator_t *alloc, hu_research_finding_t *items, size_
 }
 
 hu_error_t hu_findings_mark_status(sqlite3 *db, int64_t id, const char *status) {
-    if (!db || !status) return HU_ERR_INVALID_ARGUMENT;
+    if (!db || !status)
+        return HU_ERR_INVALID_ARGUMENT;
     const char *sql = "UPDATE research_findings SET status = ?, acted_at = ? WHERE id = ?";
     sqlite3_stmt *stmt = NULL;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) return HU_ERR_IO;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+        return HU_ERR_IO;
     sqlite3_bind_text(stmt, 1, status, -1, SQLITE_STATIC);
     sqlite3_bind_int64(stmt, 2, (int64_t)time(NULL));
     sqlite3_bind_int64(stmt, 3, id);
@@ -110,10 +118,10 @@ hu_error_t hu_findings_mark_status(sqlite3 *db, int64_t id, const char *status) 
     return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_IO;
 }
 
-hu_error_t hu_findings_get_all(hu_allocator_t *alloc, sqlite3 *db,
-                               size_t limit,
+hu_error_t hu_findings_get_all(hu_allocator_t *alloc, sqlite3 *db, size_t limit,
                                hu_research_finding_t **out, size_t *out_count) {
-    if (!alloc || !db || !out || !out_count) return HU_ERR_INVALID_ARGUMENT;
+    if (!alloc || !db || !out || !out_count)
+        return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_count = 0;
 
@@ -134,7 +142,8 @@ hu_error_t hu_findings_get_all(hu_allocator_t *alloc, sqlite3 *db,
             hu_research_finding_t *tmp = (hu_research_finding_t *)alloc->alloc(
                 alloc->ctx, new_cap * sizeof(hu_research_finding_t));
             if (!tmp) {
-                if (items) alloc->free(alloc->ctx, items, cap * sizeof(hu_research_finding_t));
+                if (items)
+                    alloc->free(alloc->ctx, items, cap * sizeof(hu_research_finding_t));
                 sqlite3_finalize(stmt);
                 return HU_ERR_OUT_OF_MEMORY;
             }
@@ -150,17 +159,23 @@ hu_error_t hu_findings_get_all(hu_allocator_t *alloc, sqlite3 *db,
         f->id = sqlite3_column_int64(stmt, 0);
         const char *s;
         s = (const char *)sqlite3_column_text(stmt, 1);
-        if (s) snprintf(f->source, sizeof(f->source), "%s", s);
+        if (s)
+            snprintf(f->source, sizeof(f->source), "%s", s);
         s = (const char *)sqlite3_column_text(stmt, 2);
-        if (s) snprintf(f->finding, sizeof(f->finding), "%s", s);
+        if (s)
+            snprintf(f->finding, sizeof(f->finding), "%s", s);
         s = (const char *)sqlite3_column_text(stmt, 3);
-        if (s) snprintf(f->relevance, sizeof(f->relevance), "%s", s);
+        if (s)
+            snprintf(f->relevance, sizeof(f->relevance), "%s", s);
         s = (const char *)sqlite3_column_text(stmt, 4);
-        if (s) snprintf(f->priority, sizeof(f->priority), "%s", s);
+        if (s)
+            snprintf(f->priority, sizeof(f->priority), "%s", s);
         s = (const char *)sqlite3_column_text(stmt, 5);
-        if (s) snprintf(f->suggested_action, sizeof(f->suggested_action), "%s", s);
+        if (s)
+            snprintf(f->suggested_action, sizeof(f->suggested_action), "%s", s);
         s = (const char *)sqlite3_column_text(stmt, 6);
-        if (s) snprintf(f->status, sizeof(f->status), "%s", s);
+        if (s)
+            snprintf(f->status, sizeof(f->status), "%s", s);
         f->created_at = sqlite3_column_int64(stmt, 7);
         count++;
     }
@@ -171,8 +186,8 @@ hu_error_t hu_findings_get_all(hu_allocator_t *alloc, sqlite3 *db,
 }
 
 /* Search for a field marker like "**Source**:" or "**Source:**" and extract the value */
-static const char *find_field_value(const char *start, const char *end,
-                                    const char *field_name, size_t *value_len) {
+static const char *find_field_value(const char *start, const char *end, const char *field_name,
+                                    size_t *value_len) {
     size_t fn_len = strlen(field_name);
     for (const char *s = start; s + fn_len + 4 <= end; s++) {
         /* Match: "**<field>**:" or "**<field>:**" */
@@ -187,7 +202,8 @@ static const char *find_field_value(const char *start, const char *end,
             colon = after + 3;
         else if (after + 3 <= end && after[0] == ':' && after[1] == '*' && after[2] == '*')
             colon = after + 3;
-        else if (after + 4 <= end && after[0] == '*' && after[1] == '*' && after[2] == ':' && after[3] == ' ')
+        else if (after + 4 <= end && after[0] == '*' && after[1] == '*' && after[2] == ':' &&
+                 after[3] == ' ')
             colon = after + 4;
         else
             continue;
@@ -218,21 +234,20 @@ static void copy_field(char *dst, size_t dst_cap, const char *src, size_t src_le
 
 static const char *classify_priority(const char *text, size_t len) {
     for (size_t i = 0; i + 3 <= len; i++) {
-        if ((text[i] == 'H' || text[i] == 'h') &&
-            (text[i+1] == 'I' || text[i+1] == 'i') &&
-            (text[i+2] == 'G' || text[i+2] == 'g'))
+        if ((text[i] == 'H' || text[i] == 'h') && (text[i + 1] == 'I' || text[i + 1] == 'i') &&
+            (text[i + 2] == 'G' || text[i + 2] == 'g'))
             return "HIGH";
-        if ((text[i] == 'L' || text[i] == 'l') &&
-            (text[i+1] == 'O' || text[i+1] == 'o') &&
-            (text[i+2] == 'W' || text[i+2] == 'w'))
+        if ((text[i] == 'L' || text[i] == 'l') && (text[i + 1] == 'O' || text[i + 1] == 'o') &&
+            (text[i + 2] == 'W' || text[i + 2] == 'w'))
             return "LOW";
     }
     return "MEDIUM";
 }
 
-hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db,
-                                       const char *agent_output, size_t output_len) {
-    if (!alloc || !db || !agent_output || output_len == 0) return HU_ERR_INVALID_ARGUMENT;
+hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db, const char *agent_output,
+                                       size_t output_len) {
+    if (!alloc || !db || !agent_output || output_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
 
     const char *p = agent_output;
     const char *end = agent_output + output_len;
@@ -244,9 +259,13 @@ hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db,
         size_t marker_len = 13;
         const char *found = NULL;
         for (const char *s = p; s + marker_len <= end; s++) {
-            if (memcmp(s, marker, marker_len) == 0) { found = s; break; }
+            if (memcmp(s, marker, marker_len) == 0) {
+                found = s;
+                break;
+            }
         }
-        if (!found) break;
+        if (!found)
+            break;
 
         char source[256] = {0}, finding[2048] = {0};
         char relevance[256] = {0}, priority[16] = {0}, action[1024] = {0};
@@ -255,25 +274,40 @@ hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db,
         for (int field = 0; field < 5 && line < end; field++) {
             const char *colon = NULL;
             for (const char *c = line; c < end && *c != '\n'; c++) {
-                if (*c == ':' && c + 1 < end && *(c+1) == ' ') { colon = c + 2; break; }
+                if (*c == ':' && c + 1 < end && *(c + 1) == ' ') {
+                    colon = c + 2;
+                    break;
+                }
             }
             const char *eol = line;
-            while (eol < end && *eol != '\n') eol++;
+            while (eol < end && *eol != '\n')
+                eol++;
             if (colon && colon < eol) {
                 size_t vlen = (size_t)(eol - colon);
                 switch (field) {
-                    case 0: copy_field(source, sizeof(source), colon, vlen); break;
-                    case 1: copy_field(finding, sizeof(finding), colon, vlen); break;
-                    case 2: copy_field(relevance, sizeof(relevance), colon, vlen); break;
-                    case 3: copy_field(priority, sizeof(priority), colon, vlen); break;
-                    case 4: copy_field(action, sizeof(action), colon, vlen); break;
+                case 0:
+                    copy_field(source, sizeof(source), colon, vlen);
+                    break;
+                case 1:
+                    copy_field(finding, sizeof(finding), colon, vlen);
+                    break;
+                case 2:
+                    copy_field(relevance, sizeof(relevance), colon, vlen);
+                    break;
+                case 3:
+                    copy_field(priority, sizeof(priority), colon, vlen);
+                    break;
+                case 4:
+                    copy_field(action, sizeof(action), colon, vlen);
+                    break;
                 }
             }
             line = (eol < end) ? eol + 1 : end;
         }
         {
             const char *f = finding;
-            while (*f == ' ' || *f == '\t' || *f == '\n' || *f == '\r') f++;
+            while (*f == ' ' || *f == '\t' || *f == '\n' || *f == '\r')
+                f++;
             if (*f) {
                 hu_findings_store(alloc, db, source, finding, relevance,
                                   priority[0] ? priority : "MEDIUM", action);
@@ -323,21 +357,68 @@ hu_error_t hu_findings_parse_and_store(hu_allocator_t *alloc, sqlite3 *db,
 
             /* Advance past this block (find next paragraph or bullet) */
             const char *next = NULL;
-            if (pri_v && pri_len > 0) next = pri_v + pri_len;
-            else if (find_v && find_len > 0) next = find_v + find_len;
-            else if (src_v && src_len > 0) next = src_v + src_len;
-            else { p++; continue; }
+            if (pri_v && pri_len > 0)
+                next = pri_v + pri_len;
+            else if (find_v && find_len > 0)
+                next = find_v + find_len;
+            else if (src_v && src_len > 0)
+                next = src_v + src_len;
+            else {
+                p++;
+                continue;
+            }
             if (act_v && act_len > 0 && act_v + act_len > next)
                 next = act_v + act_len;
-            while (next < end && *next != '\n') next++;
-            if (next < end) next++;
-            if (next <= p) next = p + 1;
+            while (next < end && *next != '\n')
+                next++;
+            if (next < end)
+                next++;
+            if (next <= p)
+                next = p + 1;
             p = next;
         }
     }
 
     if (stored > 0)
         hu_log_info("findings", NULL, "parsed and stored %zu findings", stored);
+    return HU_OK;
+}
+
+hu_error_t hu_findings_build_context(hu_allocator_t *alloc, sqlite3 *db, size_t max_findings,
+                                     char **out, size_t *out_len) {
+    if (!alloc || !db || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
+    hu_research_finding_t *items = NULL;
+    size_t count = 0;
+    hu_error_t err = hu_findings_get_pending(alloc, db, max_findings, &items, &count);
+    if (err != HU_OK || count == 0) {
+        if (items)
+            hu_findings_free(alloc, items, count);
+        return err == HU_OK ? HU_ERR_NOT_FOUND : err;
+    }
+    size_t cap = 2048;
+    char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+    if (!buf) {
+        hu_findings_free(alloc, items, count);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    size_t pos = 0;
+    int n = snprintf(buf, cap, "Recent Research Findings\n");
+    if (n > 0)
+        pos = (size_t)n;
+    for (size_t i = 0; i < count && pos < cap - 128; i++) {
+        n = snprintf(buf + pos, cap - pos, "- [%s] %.*s\n", items[i].priority,
+                     (int)(strlen(items[i].finding) < 200 ? strlen(items[i].finding) : 200),
+                     items[i].finding);
+        if (n > 0 && pos + (size_t)n < cap)
+            pos += (size_t)n;
+    }
+    hu_findings_free(alloc, items, count);
+    buf[pos] = '\0';
+    *out = buf;
+    *out_len = pos;
     return HU_OK;
 }
 

@@ -9,7 +9,7 @@ export default defineConfig({
   base: "/",
   compressHTML: true,
   build: {
-    inlineStylesheets: "always",
+    inlineStylesheets: "auto",
   },
   prefetch: {
     prefetchAll: false,

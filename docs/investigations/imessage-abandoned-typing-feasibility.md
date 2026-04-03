@@ -85,3 +85,16 @@ Simulating "started typing then stopped" is **not feasible** using AppleScript, 
 **Mark F43 as aspirational** — revisit only if Apple introduces a public typing-indicator or unsend automation API, or if the project adopts a BlueBubbles-style native helper with explicit acceptance of IMCore risk.
 
 **Cross-reference:** F44 (Unsend) investigation will document unsend feasibility in more detail. If F44 concludes unsend is feasible via IMCore, the send-then-unsend path for F43 would share that dependency and risk profile.
+
+---
+
+## Update (2026-04-03)
+
+New data point from imsg CLI:
+
+- **imsg v0.5.0** (steipete/imsg, 2026-02-16) briefly had typing indicator support via `imsg typing` command.
+- **However, typing is broken on macOS 26 (Tahoe)**: The `imagent` daemon now enforces Apple-private entitlements for the XPC service `com.apple.imagent.desktop.auth`. Third-party binaries cannot access it. See steipete/imsg issue #60.
+- Additional issues: `any;-;` chat GUID prefixes are not recognized by IMCore (issues #54, #56).
+- **Conclusion unchanged**: Typing indicators remain not feasible via any public or third-party approach on current macOS. The IMCore private API path is now even more restricted than when this investigation was written.
+
+Cross-reference: `imessage-capability-matrix.md`, `imessage-imsg-cli-integration.md`

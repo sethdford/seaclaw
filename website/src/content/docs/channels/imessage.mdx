@@ -31,9 +31,12 @@ Add to `~/.human/config.json` under `channels.imessage`:
 
 ### Fields
 
-| Field            | Type   | Description                                                       |
-| ---------------- | ------ | ----------------------------------------------------------------- |
-| `default_target` | string | Phone number or Apple ID used when no explicit target is provided |
+| Field                | Type     | Default | Description                                                           |
+| -------------------- | -------- | ------- | --------------------------------------------------------------------- |
+| `default_target`     | string   | —       | Phone number or Apple ID used when no explicit target is provided     |
+| `allow_from`         | string[] | `[]`    | Restrict inbound to these handles only (`"*"` = allow all)            |
+| `poll_interval_sec`  | number   | `30`    | How often (seconds) to poll chat.db for new messages                  |
+| `use_imsg_cli`       | boolean  | `false` | Use `imsg` CLI for send/react (faster, better error reporting)        |
 
 ### Target format
 
@@ -51,7 +54,7 @@ Add to `~/.human/config.json` under `channels.imessage`:
 
 ### Inbound (receive)
 
-- Polls `~/Library/Messages/chat.db` every 3 seconds
+- Polls `~/Library/Messages/chat.db` every 30 seconds (configurable via `poll_interval_sec`)
 - Queries: `SELECT m.ROWID, m.text, h.id FROM message m JOIN handle h ON m.handle_id = h.ROWID WHERE m.is_from_me = 0 AND m.text IS NOT NULL AND m.ROWID > ?`
 - Uses handle ID (phone/email) as session key; message text as content
 - Tracks `last_rowid` to avoid reprocessing

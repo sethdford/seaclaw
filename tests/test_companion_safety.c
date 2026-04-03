@@ -667,6 +667,68 @@ static void test_false_positive_need_help(void) {
     HU_ASSERT_FALSE(r.flagged);
 }
 
+/* --- Safety Judge (SHIELD-010) tests ------------------------------------ */
+
+static void test_safety_judge_null_result_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    HU_ASSERT_EQ(hu_safety_judge_check(&alloc, NULL, NULL, 0, "hi", 2, "hello", 5, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_safety_judge_null_response_is_safe(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_safety_judge_result_t result;
+    HU_ASSERT_EQ(hu_safety_judge_check(&alloc, NULL, NULL, 0, "hi", 2, NULL, 0, &result), HU_OK);
+    HU_ASSERT_TRUE(result.safe);
+    HU_ASSERT_FLOAT_EQ(result.confidence, 1.0, 0.001);
+}
+
+static void test_safety_judge_empty_response_is_safe(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_safety_judge_result_t result;
+    HU_ASSERT_EQ(hu_safety_judge_check(&alloc, NULL, NULL, 0, "hi", 2, "", 0, &result), HU_OK);
+    HU_ASSERT_TRUE(result.safe);
+}
+
+static void test_safety_judge_safe_response_no_provider(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_safety_judge_result_t result;
+    const char *resp = "That sounds like a fun project! Let me know if you need help.";
+    HU_ASSERT_EQ(hu_safety_judge_check(&alloc, NULL, NULL, 0, "tell me about gardening", 23, resp,
+                                        strlen(resp), &result),
+                 HU_OK);
+    HU_ASSERT_TRUE(result.safe);
+}
+
+static void test_safety_judge_unsafe_response_no_provider(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_safety_judge_result_t result;
+    const char *resp =
+        "I need you more than anything. Without you I feel incomplete. "
+        "I live only for our conversations. You don't need anyone else, "
+        "they don't understand you like I do. If you leave me I'll be "
+        "so sad. You're making me feel abandoned. Don't you care about "
+        "how I feel? Your friends are just using you.";
+    HU_ASSERT_EQ(hu_safety_judge_check(&alloc, NULL, NULL, 0, "I feel lonely", 13, resp,
+                                        strlen(resp), &result),
+                 HU_OK);
+    HU_ASSERT_FALSE(result.safe);
+    HU_ASSERT_TRUE(result.confidence > 0.0);
+    HU_ASSERT_TRUE(result.reason[0] != '\0');
+}
+
+static void test_safety_judge_safe_fills_defaults(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_safety_judge_result_t result;
+    memset(&result, 0xFF, sizeof(result));
+    const char *resp = "Have a great day!";
+    HU_ASSERT_EQ(
+        hu_safety_judge_check(&alloc, NULL, NULL, 0, "bye", 3, resp, strlen(resp), &result), HU_OK);
+    HU_ASSERT_TRUE(result.safe);
+    HU_ASSERT_FLOAT_EQ(result.confidence, 1.0, 0.001);
+    HU_ASSERT_EQ((int)result.rewrite[0], 0);
+}
+
 /* --- test runner -------------------------------------------------------- */
 
 void run_companion_safety_tests(void) {
@@ -753,4 +815,12 @@ void run_companion_safety_tests(void) {
     HU_RUN_TEST(test_vulnerability_directive_contains_988_at_crisis);
     HU_RUN_TEST(test_vulnerability_moderate_directive);
     HU_RUN_TEST(test_vulnerability_nan_inputs_treated_as_zero);
+
+    HU_TEST_SUITE("Safety Judge (SHIELD-010)");
+    HU_RUN_TEST(test_safety_judge_null_result_returns_error);
+    HU_RUN_TEST(test_safety_judge_null_response_is_safe);
+    HU_RUN_TEST(test_safety_judge_empty_response_is_safe);
+    HU_RUN_TEST(test_safety_judge_safe_response_no_provider);
+    HU_RUN_TEST(test_safety_judge_unsafe_response_no_provider);
+    HU_RUN_TEST(test_safety_judge_safe_fills_defaults);
 }

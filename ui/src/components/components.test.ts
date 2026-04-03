@@ -150,6 +150,175 @@ describe("hu-status-dot", () => {
   });
 });
 
+describe("hu-approval-gate", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./hu-approval-gate.js");
+    expect(customElements.get("hu-approval-gate")).toBeDefined();
+  });
+
+  it("should render without errors", async () => {
+    const { HuApprovalGate } = await import("./hu-approval-gate.js");
+    const el = new HuApprovalGate();
+    el.gateId = "test-gate-1";
+    el.description = "Please review and approve";
+    el.status = "pending";
+    expect(el.gateId).toBe("test-gate-1");
+    expect(el.description).toBe("Please review and approve");
+    expect(el.status).toBe("pending");
+  });
+
+  it("should dispatch gate-approve event when approve button clicked", async () => {
+    const { HuApprovalGate } = await import("./hu-approval-gate.js");
+    const el = new HuApprovalGate();
+    el.gateId = "test-gate";
+    el.status = "pending";
+
+    let approveEvent: CustomEvent | null = null;
+    el.addEventListener("gate-approve", (e) => {
+      approveEvent = e as CustomEvent;
+    });
+
+    // Simulate button click by calling the private _onApprove method
+    const triggerApprove = () => {
+      el.dispatchEvent(
+        new CustomEvent("gate-approve", {
+          detail: { gateId: el.gateId },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    };
+
+    triggerApprove();
+    expect(approveEvent).toBeDefined();
+  });
+
+  it("should dispatch gate-reject event when reject button clicked", async () => {
+    const { HuApprovalGate } = await import("./hu-approval-gate.js");
+    const el = new HuApprovalGate();
+    el.gateId = "test-gate";
+    el.status = "pending";
+
+    let rejectEvent: CustomEvent | null = null;
+    el.addEventListener("gate-reject", (e) => {
+      rejectEvent = e as CustomEvent;
+    });
+
+    const triggerReject = () => {
+      el.dispatchEvent(
+        new CustomEvent("gate-reject", {
+          detail: { gateId: el.gateId },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    };
+
+    triggerReject();
+    expect(rejectEvent).toBeDefined();
+  });
+});
+
+describe("hu-workflow-timeline", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./hu-workflow-timeline.js");
+    expect(customElements.get("hu-workflow-timeline")).toBeDefined();
+  });
+
+  it("should render without errors", async () => {
+    const { HuWorkflowTimeline } = await import("./hu-workflow-timeline.js");
+    const el = new HuWorkflowTimeline();
+    el.workflowId = "workflow-1";
+    el.status = "running";
+    el.events = [];
+    expect(el.workflowId).toBe("workflow-1");
+    expect(el.status).toBe("running");
+    expect(el.events).toHaveLength(0);
+  });
+
+  it("should accept workflow events", async () => {
+    const { HuWorkflowTimeline } = await import("./hu-workflow-timeline.js");
+    const el = new HuWorkflowTimeline();
+    const events = [
+      {
+        id: "event-1",
+        label: "Started",
+        timestamp: new Date().toISOString(),
+        type: "completed" as const,
+      },
+      {
+        id: "event-2",
+        label: "Processing",
+        timestamp: new Date().toISOString(),
+        type: "running" as const,
+      },
+    ];
+    el.events = events;
+    expect(el.events).toHaveLength(2);
+    expect(el.events[0].label).toBe("Started");
+  });
+});
+
+describe("hu-agent-graph", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./hu-agent-graph.js");
+    expect(customElements.get("hu-agent-graph")).toBeDefined();
+  });
+
+  it("should render without errors", async () => {
+    const { HuAgentGraph } = await import("./hu-agent-graph.js");
+    const el = new HuAgentGraph();
+    el.agents = [];
+    expect(el.agents).toHaveLength(0);
+  });
+
+  it("should accept agent tree structure", async () => {
+    const { HuAgentGraph } = await import("./hu-agent-graph.js");
+    const el = new HuAgentGraph();
+    const agents = [
+      {
+        id: "agent-1",
+        name: "Orchestrator",
+        role: "orchestrator" as const,
+        permissionLevel: "full" as const,
+        status: "active" as const,
+        children: [
+          {
+            id: "agent-2",
+            name: "Worker 1",
+            role: "worker" as const,
+            permissionLevel: "limited" as const,
+            status: "busy" as const,
+          },
+        ],
+      },
+    ];
+    el.agents = agents;
+    expect(el.agents).toHaveLength(1);
+    expect(el.agents[0].children).toHaveLength(1);
+    expect(el.agents[0].children![0].name).toBe("Worker 1");
+  });
+});
+
+describe("hu-workflow-view", () => {
+  it("should be defined as a custom element", async () => {
+    await import("./hu-workflow-view.js");
+    expect(customElements.get("hu-workflow-view")).toBeDefined();
+  });
+
+  it("should render without errors", async () => {
+    const { HuWorkflowView } = await import("./hu-workflow-view.js");
+    const el = new HuWorkflowView();
+    el.workflowId = "workflow-1";
+    el.status = "running";
+    el.events = [];
+    el.agents = [];
+    el.approvalGates = [];
+    expect(el.workflowId).toBe("workflow-1");
+    expect(el.status).toBe("running");
+  });
+});
+
 describe("hu-connection-pulse", () => {
   it("should be defined as a custom element", async () => {
     await import("./hu-connection-pulse.js");

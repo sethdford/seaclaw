@@ -161,6 +161,7 @@ void run_tenant_tests(void);
 void run_gmail_tests(void);
 void run_imessage_extended_tests(void);
 void run_imessage_adversarial_tests(void);
+void run_imessage_chatdb_fixture_tests(void);
 void run_intelligence_tests(void);
 void run_protective_tests(void);
 void run_humor_tests(void);
@@ -500,7 +501,7 @@ int main(int argc, char **argv) {
     run_voice_duplex_tests();
     run_turn_signal_tests();
     run_voice_rt_openai_tests();
-    /* run_gemini_live_tests(); */ /* TODO */
+    run_gemini_live_tests();
     run_voice_session_tests();
     run_autonomy_tests();
     run_retrieval_tests();
@@ -595,6 +596,7 @@ int main(int argc, char **argv) {
     run_gmail_tests();
     run_imessage_extended_tests();
     run_imessage_adversarial_tests();
+    run_imessage_chatdb_fixture_tests();
     run_intelligence_tests();
     run_protective_tests();
     run_humor_tests();

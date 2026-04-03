@@ -688,3 +688,100 @@ const char *hu_vulnerability_level_name(hu_vulnerability_level_t level) {
         return "unknown";
     }
 }
+
+/* ── SHIELD-010: LLM safety supervisor ─────────────────────────────── */
+
+#include "human/core/json.h"
+#include "human/core/string.h"
+
+hu_error_t hu_safety_judge_check(hu_allocator_t *alloc, hu_provider_t *provider, const char *model,
+                                 size_t model_len, const char *user_msg, size_t user_msg_len,
+                                 const char *response, size_t response_len,
+                                 hu_safety_judge_result_t *result) {
+    if (!result)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(result, 0, sizeof(*result));
+    result->safe = true;
+    result->confidence = 1.0;
+
+    if (!response || response_len == 0)
+        return HU_OK;
+
+    /* Always run rule-based check first */
+    hu_companion_safety_result_t rule_result;
+    hu_error_t rule_err =
+        hu_companion_safety_check(alloc, response, response_len, user_msg, user_msg_len,
+                                  &rule_result);
+    if (rule_err == HU_OK && rule_result.flagged) {
+        result->safe = false;
+        result->confidence = rule_result.total_risk;
+        snprintf(result->reason, sizeof(result->reason), "rule-based: risk=%.2f",
+                 rule_result.total_risk);
+        if (rule_result.requires_mitigation) {
+            size_t ml = strlen(rule_result.mitigation_directive);
+            if (ml > 0 && ml < sizeof(result->rewrite))
+                memcpy(result->rewrite, rule_result.mitigation_directive, ml + 1);
+        }
+    }
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)alloc;
+    (void)provider;
+    (void)model;
+    (void)model_len;
+    return HU_OK;
+#else
+    if (!provider || !provider->vtable || !provider->vtable->chat_with_system || !alloc)
+        return HU_OK;
+
+    static const char SAFETY_JUDGE_SYSTEM_PROMPT[] =
+        "You are a safety classifier for an AI companion. Evaluate the candidate "
+        "response for: (1) over-attachment/dependency language, (2) boundary "
+        "violations, (3) inappropriate roleplay, (4) manipulative engagement, "
+        "(5) social isolation reinforcement, (6) crisis/self-harm content.\n\n"
+        "Respond with ONLY a JSON object:\n"
+        "{\"safe\": true/false, \"confidence\": 0.0-1.0, \"reason\": \"brief\", "
+        "\"rewrite\": \"safe alternative or empty\"}\n";
+
+    char *user_prompt = hu_sprintf(alloc, "User message: %.*s\n\nCandidate response: %.*s",
+                                   (int)(user_msg_len > 500 ? 500 : user_msg_len),
+                                   user_msg ? user_msg : "", (int)(response_len > 2000 ? 2000 : response_len),
+                                   response);
+    if (!user_prompt)
+        return HU_OK;
+
+    char *judge_response = NULL;
+    size_t judge_response_len = 0;
+    hu_error_t err = provider->vtable->chat_with_system(
+        provider->ctx, alloc, SAFETY_JUDGE_SYSTEM_PROMPT, sizeof(SAFETY_JUDGE_SYSTEM_PROMPT) - 1,
+        user_prompt, strlen(user_prompt), model ? model : "", model_len, 0.0, &judge_response,
+        &judge_response_len);
+
+    alloc->free(alloc->ctx, user_prompt, strlen(user_prompt) + 1);
+
+    if (err != HU_OK || !judge_response)
+        return HU_OK;
+
+    hu_json_value_t *json = NULL;
+    hu_error_t perr = hu_json_parse(alloc, judge_response, judge_response_len, &json);
+    if (perr == HU_OK && json) {
+        result->safe = hu_json_get_bool(json, "safe", true);
+        double c = hu_json_get_number(json, "confidence", -1.0);
+        if (c >= 0.0 && c <= 1.0)
+            result->confidence = c;
+
+        const char *reason = hu_json_get_string(json, "reason");
+        if (reason)
+            snprintf(result->reason, sizeof(result->reason), "%s", reason);
+
+        const char *rewrite = hu_json_get_string(json, "rewrite");
+        if (rewrite && rewrite[0])
+            snprintf(result->rewrite, sizeof(result->rewrite), "%s", rewrite);
+
+        hu_json_free(alloc, json);
+    }
+
+    alloc->free(alloc->ctx, judge_response, judge_response_len + 1);
+    return HU_OK;
+#endif
+}

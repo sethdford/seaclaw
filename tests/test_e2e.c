@@ -463,16 +463,17 @@ static void test_agent_turn_simple(void) {
     mock_provider_t mock_ctx;
     hu_provider_t prov = mock_provider_create(&alloc, &mock_ctx);
 
-    hu_agent_t agent;
-    memset(&agent, 0, sizeof(agent));
+    hu_agent_t *agent = (hu_agent_t *)alloc.alloc(alloc.ctx, sizeof(hu_agent_t));
+    HU_ASSERT_NOT_NULL(agent);
+    memset(agent, 0, sizeof(*agent));
     hu_error_t err =
-        hu_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL, "gpt-4o", 6,
+        hu_agent_from_config(agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL, "gpt-4o", 6,
                              "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
     HU_ASSERT_EQ(err, HU_OK);
 
     char *response = NULL;
     size_t response_len = 0;
-    err = hu_agent_turn(&agent, "hello", 5, &response, &response_len);
+    err = hu_agent_turn(agent, "hello", 5, &response, &response_len);
 
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(response);
@@ -481,7 +482,8 @@ static void test_agent_turn_simple(void) {
 
     if (response)
         alloc.free(alloc.ctx, response, response_len + 1);
-    hu_agent_deinit(&agent);
+    hu_agent_deinit(agent);
+    alloc.free(alloc.ctx, agent, sizeof(hu_agent_t));
 }
 
 static void test_agent_turn_stream_v2_basic(void) {

@@ -16,7 +16,7 @@ export default defineConfig({
             "lit/directives/style-map.js",
           ],
           markdown: ["marked", "dompurify"],
-          syntax: ["shiki"],
+          syntax: ["shiki/core", "shiki/engine/oniguruma"],
           math: ["katex"],
         },
       },

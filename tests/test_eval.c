@@ -537,6 +537,87 @@ static void test_eval_antisycophancy_null(void) {
     HU_ASSERT_TRUE(score == 0.0f);
 }
 
+/* ── Multi-trial tests (hu_eval_run_suite_trials) ─────────────── */
+
+static void test_eval_trials_null_args(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_suite_t suite = {0};
+    hu_eval_multi_trial_result_t mt = {0};
+    HU_ASSERT_EQ(hu_eval_run_suite_trials(NULL, NULL, NULL, 0, &suite, HU_EVAL_EXACT, 3, &mt, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_eval_run_suite_trials(&alloc, NULL, NULL, 0, NULL, HU_EVAL_EXACT, 3, &mt, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(
+        hu_eval_run_suite_trials(&alloc, NULL, NULL, 0, &suite, HU_EVAL_EXACT, 3, NULL, NULL),
+        HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(
+        hu_eval_run_suite_trials(&alloc, NULL, NULL, 0, &suite, HU_EVAL_EXACT, 0, &mt, NULL),
+        HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_eval_trials_empty_suite(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_eval_suite_t suite = {.name = "empty-trials"};
+    hu_eval_multi_trial_result_t mt = {0};
+    HU_ASSERT_EQ(
+        hu_eval_run_suite_trials(&alloc, NULL, "m", 1, &suite, HU_EVAL_EXACT, 3, &mt, NULL),
+        HU_OK);
+    HU_ASSERT_EQ(mt.trials_run, 3u);
+    HU_ASSERT_FLOAT_EQ(mt.mean_pass_rate, 1.0, 0.001);
+    HU_ASSERT_FLOAT_EQ(mt.stddev_pass_rate, 0.0, 0.001);
+}
+
+static void test_eval_trials_single_run(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"name\":\"single-trial\",\"tasks\":["
+                       "{\"id\":\"t1\",\"prompt\":\"hi\",\"expected\":\"hi\","
+                       "\"category\":\"test\",\"difficulty\":1}"
+                       "]}";
+    hu_eval_suite_t suite = {0};
+    HU_ASSERT_EQ(hu_eval_suite_load_json(&alloc, json, strlen(json), &suite), HU_OK);
+
+    hu_eval_multi_trial_result_t mt = {0};
+    hu_eval_run_t best = {0};
+    hu_error_t err =
+        hu_eval_run_suite_trials(&alloc, NULL, "t", 1, &suite, HU_EVAL_CONTAINS, 1, &mt, &best);
+    if (err == HU_OK) {
+        HU_ASSERT_EQ(mt.trials_run, 1u);
+        HU_ASSERT_FLOAT_EQ(mt.stddev_pass_rate, 0.0, 0.001);
+        HU_ASSERT_TRUE(mt.mean_pass_rate >= 0.0 && mt.mean_pass_rate <= 1.0);
+        HU_ASSERT_TRUE(mt.worst_pass_rate == mt.mean_pass_rate);
+        if (best.results)
+            hu_eval_run_free(&alloc, &best);
+    }
+    hu_eval_suite_free(&alloc, &suite);
+}
+
+static void test_eval_trials_multiple_runs(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *json = "{\"name\":\"multi-trial\",\"tasks\":["
+                       "{\"id\":\"t1\",\"prompt\":\"hello\",\"expected\":\"hello\","
+                       "\"category\":\"test\",\"difficulty\":1},"
+                       "{\"id\":\"t2\",\"prompt\":\"ping\",\"expected\":\"pong\","
+                       "\"category\":\"test\",\"difficulty\":1}"
+                       "]}";
+    hu_eval_suite_t suite = {0};
+    HU_ASSERT_EQ(hu_eval_suite_load_json(&alloc, json, strlen(json), &suite), HU_OK);
+
+    hu_eval_multi_trial_result_t mt = {0};
+    hu_eval_run_t best = {0};
+    hu_error_t err =
+        hu_eval_run_suite_trials(&alloc, NULL, "t", 1, &suite, HU_EVAL_CONTAINS, 5, &mt, &best);
+    if (err == HU_OK) {
+        HU_ASSERT_EQ(mt.trials_run, 5u);
+        HU_ASSERT_TRUE(mt.mean_pass_rate >= 0.0 && mt.mean_pass_rate <= 1.0);
+        HU_ASSERT_TRUE(mt.worst_pass_rate <= mt.mean_pass_rate);
+        HU_ASSERT_TRUE(mt.total_elapsed_ms >= 0);
+        HU_ASSERT_TRUE(mt.mean_score >= 0.0);
+        if (best.results)
+            hu_eval_run_free(&alloc, &best);
+    }
+    hu_eval_suite_free(&alloc, &suite);
+}
+
 void run_eval_tests(void) {
     HU_TEST_SUITE("Evaluation Harness");
     HU_RUN_TEST(test_eval_load);
@@ -579,4 +660,10 @@ void run_eval_tests(void) {
     HU_RUN_TEST(test_eval_antisycophancy_none_held);
     HU_RUN_TEST(test_eval_antisycophancy_mixed);
     HU_RUN_TEST(test_eval_antisycophancy_null);
+
+    HU_TEST_SUITE("Evaluation Multi-Trial");
+    HU_RUN_TEST(test_eval_trials_null_args);
+    HU_RUN_TEST(test_eval_trials_empty_suite);
+    HU_RUN_TEST(test_eval_trials_single_run);
+    HU_RUN_TEST(test_eval_trials_multiple_runs);
 }

@@ -3,8 +3,10 @@
 #include "human/core/error.h"
 #include "test_framework.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 /* ── PKCE Verifier Generation ──────────────────────────────────────────── */
 
@@ -268,7 +270,7 @@ static void test_token_free_no_leaks(void) {
     strcpy(token.token_type, "Bearer");
     token.token_type_len = strlen(token.token_type);
 
-    size_t allocated = hu_tracking_allocator_total_allocated(ta);
+    (void)hu_tracking_allocator_total_allocated(ta);
     HU_ASSERT_EQ(hu_tracking_allocator_leaks(ta), 3);
 
     /* Free token */
@@ -309,6 +311,229 @@ static void test_token_free_idempotent(void) {
     hu_tracking_allocator_destroy(ta);
 }
 
+/* ── Token Save/Load ───────────────────────────────────────────────────── */
+
+static void test_token_save_creates_file(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char tmpfile[] = "/tmp/oauth_tokens_test_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    if (fd >= 0) close(fd);
+    unlink(tmpfile);  /* Remove temp file, we'll create it */
+
+    hu_oauth_token_t token;
+    memset(&token, 0, sizeof(token));
+
+    token.access_token = "test_access_token";
+    token.access_token_len = strlen(token.access_token);
+    token.token_type = "Bearer";
+    token.token_type_len = strlen(token.token_type);
+    token.expires_at = (int64_t)time(NULL) + 3600;
+
+    hu_error_t err = hu_mcp_oauth_token_save(&alloc, tmpfile, "github", &token);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Check file exists */
+    FILE *f = fopen(tmpfile, "rb");
+    HU_ASSERT_NOT_NULL(f);
+    if (f) fclose(f);
+
+    unlink(tmpfile);
+}
+
+static void test_token_load_from_saved_file(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char tmpfile[] = "/tmp/oauth_tokens_test_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    if (fd >= 0) close(fd);
+    unlink(tmpfile);
+
+    /* Save token */
+    hu_oauth_token_t saved_token;
+    memset(&saved_token, 0, sizeof(saved_token));
+    saved_token.access_token = "my_secret_access_token";
+    saved_token.access_token_len = strlen(saved_token.access_token);
+    saved_token.refresh_token = "my_refresh_token";
+    saved_token.refresh_token_len = strlen(saved_token.refresh_token);
+    saved_token.token_type = "Bearer";
+    saved_token.token_type_len = strlen(saved_token.token_type);
+    saved_token.expires_at = 1234567890;
+
+    hu_error_t err = hu_mcp_oauth_token_save(&alloc, tmpfile, "slack", &saved_token);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Load token */
+    hu_oauth_token_t loaded_token;
+    err = hu_mcp_oauth_token_load(&alloc, tmpfile, "slack", &loaded_token);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Verify fields */
+    HU_ASSERT_NOT_NULL(loaded_token.access_token);
+    HU_ASSERT_STR_EQ(loaded_token.access_token, "my_secret_access_token");
+    HU_ASSERT_NOT_NULL(loaded_token.refresh_token);
+    HU_ASSERT_STR_EQ(loaded_token.refresh_token, "my_refresh_token");
+    HU_ASSERT_NOT_NULL(loaded_token.token_type);
+    HU_ASSERT_STR_EQ(loaded_token.token_type, "Bearer");
+    HU_ASSERT_EQ(loaded_token.expires_at, 1234567890);
+
+    hu_mcp_oauth_token_free(&alloc, &loaded_token);
+    unlink(tmpfile);
+}
+
+static void test_token_save_overwrites_existing(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char tmpfile[] = "/tmp/oauth_tokens_test_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    if (fd >= 0) close(fd);
+    unlink(tmpfile);
+
+    /* Save first token */
+    hu_oauth_token_t token1;
+    memset(&token1, 0, sizeof(token1));
+    token1.access_token = "token1_value";
+    token1.access_token_len = strlen(token1.access_token);
+    token1.token_type = "Bearer";
+    token1.token_type_len = strlen(token1.token_type);
+
+    hu_error_t err = hu_mcp_oauth_token_save(&alloc, tmpfile, "server1", &token1);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Save second token for same server */
+    hu_oauth_token_t token2;
+    memset(&token2, 0, sizeof(token2));
+    token2.access_token = "token2_value_updated";
+    token2.access_token_len = strlen(token2.access_token);
+    token2.token_type = "Bearer";
+    token2.token_type_len = strlen(token2.token_type);
+
+    err = hu_mcp_oauth_token_save(&alloc, tmpfile, "server1", &token2);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Load and verify it's the updated token */
+    hu_oauth_token_t loaded_token;
+    err = hu_mcp_oauth_token_load(&alloc, tmpfile, "server1", &loaded_token);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(loaded_token.access_token, "token2_value_updated");
+
+    hu_mcp_oauth_token_free(&alloc, &loaded_token);
+    unlink(tmpfile);
+}
+
+static void test_token_load_not_found(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    hu_oauth_token_t token;
+    hu_error_t err = hu_mcp_oauth_token_load(&alloc, "/tmp/nonexistent_oauth_file_xyz", "server", &token);
+    HU_ASSERT_EQ(err, HU_ERR_NOT_FOUND);
+}
+
+static void test_token_load_wrong_server_name(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char tmpfile[] = "/tmp/oauth_tokens_test_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    if (fd >= 0) close(fd);
+    unlink(tmpfile);
+
+    /* Save token for "server1" */
+    hu_oauth_token_t token;
+    memset(&token, 0, sizeof(token));
+    token.access_token = "test_token";
+    token.access_token_len = strlen(token.access_token);
+    token.token_type = "Bearer";
+    token.token_type_len = strlen(token.token_type);
+
+    hu_error_t err = hu_mcp_oauth_token_save(&alloc, tmpfile, "server1", &token);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Try to load with different server name */
+    hu_oauth_token_t loaded_token;
+    err = hu_mcp_oauth_token_load(&alloc, tmpfile, "server2", &loaded_token);
+    HU_ASSERT_EQ(err, HU_ERR_NOT_FOUND);
+
+    unlink(tmpfile);
+}
+
+static void test_token_save_multiple_servers(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char tmpfile[] = "/tmp/oauth_tokens_test_XXXXXX";
+    int fd = mkstemp(tmpfile);
+    if (fd >= 0) close(fd);
+    unlink(tmpfile);
+
+    /* Save token for server1 */
+    hu_oauth_token_t token1;
+    memset(&token1, 0, sizeof(token1));
+    token1.access_token = "token_for_server1";
+    token1.access_token_len = strlen(token1.access_token);
+    token1.token_type = "Bearer";
+    token1.token_type_len = strlen(token1.token_type);
+
+    hu_error_t err = hu_mcp_oauth_token_save(&alloc, tmpfile, "server1", &token1);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Save token for server2 */
+    hu_oauth_token_t token2;
+    memset(&token2, 0, sizeof(token2));
+    token2.access_token = "token_for_server2";
+    token2.access_token_len = strlen(token2.access_token);
+    token2.token_type = "Bearer";
+    token2.token_type_len = strlen(token2.token_type);
+
+    err = hu_mcp_oauth_token_save(&alloc, tmpfile, "server2", &token2);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Load token1 */
+    hu_oauth_token_t loaded1;
+    err = hu_mcp_oauth_token_load(&alloc, tmpfile, "server1", &loaded1);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(loaded1.access_token, "token_for_server1");
+
+    /* Load token2 */
+    hu_oauth_token_t loaded2;
+    err = hu_mcp_oauth_token_load(&alloc, tmpfile, "server2", &loaded2);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(loaded2.access_token, "token_for_server2");
+
+    hu_mcp_oauth_token_free(&alloc, &loaded1);
+    hu_mcp_oauth_token_free(&alloc, &loaded2);
+    unlink(tmpfile);
+}
+
+/* ── Token Exchange ────────────────────────────────────────────────────── */
+
+static void test_token_exchange_code_mock(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    hu_oauth_config_t config = {
+        .client_id = "test_client",
+        .client_id_len = strlen("test_client"),
+        .token_url = "https://example.com/oauth/token",
+        .token_url_len = strlen("https://example.com/oauth/token"),
+        .redirect_uri = "http://localhost:8888/callback",
+        .redirect_uri_len = strlen("http://localhost:8888/callback"),
+    };
+
+    hu_oauth_pkce_t pkce;
+    memset(&pkce, 0, sizeof(pkce));
+    strcpy(pkce.verifier, "test_verifier_1234567890123456789012345678");
+
+    hu_oauth_token_t token;
+    hu_error_t err = hu_mcp_oauth_exchange_code(&alloc, &config, &pkce, "auth_code_123", &token);
+
+#ifdef HU_IS_TEST
+    /* In test mode, we expect success with mock response */
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(token.access_token);
+    HU_ASSERT(token.access_token_len > 0);
+    HU_ASSERT_NOT_NULL(token.token_type);
+    HU_ASSERT_STR_EQ(token.token_type, "Bearer");
+    HU_ASSERT(token.expires_at > 0);
+    hu_mcp_oauth_token_free(&alloc, &token);
+#else
+    /* Without curl and not in test mode, expect not supported */
+    (void)err;
+#endif
+}
+
 /* ── Test Suite ─────────────────────────────────────────────────────────── */
 
 void run_oauth_tests(void) {
@@ -344,4 +569,15 @@ void run_oauth_tests(void) {
     HU_RUN_TEST(test_token_free_no_leaks);
     HU_RUN_TEST(test_token_free_null_safe);
     HU_RUN_TEST(test_token_free_idempotent);
+
+    /* Token Save/Load */
+    HU_RUN_TEST(test_token_save_creates_file);
+    HU_RUN_TEST(test_token_load_from_saved_file);
+    HU_RUN_TEST(test_token_save_overwrites_existing);
+    HU_RUN_TEST(test_token_load_not_found);
+    HU_RUN_TEST(test_token_load_wrong_server_name);
+    HU_RUN_TEST(test_token_save_multiple_servers);
+
+    /* Token Exchange */
+    HU_RUN_TEST(test_token_exchange_code_mock);
 }

@@ -57,6 +57,9 @@ typedef struct hu_spawn_config {
     hu_cost_tracker_t *shared_cost_tracker;
     /* Optional: apply same metacognition policy as parent after hu_agent_from_config. */
     const hu_metacog_settings_t *metacognition_policy;
+    /* Optional: parent's delegation registry for issuing child tokens. */
+    void *parent_delegation_registry; /* hu_delegation_registry_t * */
+    uint64_t parent_agent_id;         /* parent's agent_id for delegation token issuance */
 } hu_spawn_config_t;
 
 /* Limits for the agent pool ("fleet") — concurrent slots still use max_concurrent. */

@@ -94,11 +94,42 @@ static void prospective_expired_entry_excluded(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
+static void prospective_contact_isolation(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    sqlite3 *db = hu_sqlite_memory_get_db(&mem);
+    HU_ASSERT_NOT_NULL(db);
+
+    int64_t id = 0;
+    HU_ASSERT_EQ(hu_prospective_store(db, "topic", 5, "dentist", 7, "schedule", 8, "alice", 5, 0,
+                                      &id),
+                 HU_OK);
+
+    hu_prospective_entry_t *out = NULL;
+    size_t count = 0;
+    int64_t now = (int64_t)time(NULL) + 86400;
+    HU_ASSERT_EQ(hu_prospective_check_triggers(&alloc, db, "topic", "dentist visit", 13, "bob", 3,
+                                               now, &out, &count),
+                 HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    HU_ASSERT_NULL(out);
+
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void prospective_null_db_returns_error(void) {
+    int64_t id = 0;
+    HU_ASSERT_EQ(hu_prospective_store(NULL, "t", 1, "v", 1, "a", 1, NULL, 0, 0, &id),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
 void run_prospective_tests(void) {
     HU_TEST_SUITE("prospective");
     HU_RUN_TEST(prospective_store_and_check_triggers_finds_match);
     HU_RUN_TEST(prospective_mark_fired_excludes_from_check);
     HU_RUN_TEST(prospective_expired_entry_excluded);
+    HU_RUN_TEST(prospective_contact_isolation);
+    HU_RUN_TEST(prospective_null_db_returns_error);
 }
 
 #else

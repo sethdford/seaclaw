@@ -80,6 +80,7 @@ typedef enum hu_reaction_type {
     HU_REACTION_HAHA,
     HU_REACTION_EMPHASIS, /* !! */
     HU_REACTION_QUESTION, /* ? */
+    HU_REACTION_CUSTOM_EMOJI, /* iOS 17+ custom emoji tapback (type 2006) */
 } hu_reaction_type_t;
 
 /* ──────────────────────────────────────────────────────────────────────────

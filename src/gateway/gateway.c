@@ -1610,6 +1610,9 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                 continue;
             break;
         }
+        /* Poll Gemini Live sessions regardless of socket activity */
+        hu_voice_stream_poll_gemini_live();
+
         if (ready == 0)
             continue;
 

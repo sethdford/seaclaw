@@ -1,5 +1,6 @@
 /*
  * Streaming voice session: binary mic chunks, STT, bus → agent, Cartesia TTS → binary PCM.
+ * Gemini Live mode: forward raw PCM16 directly, receive native audio responses.
  * Micro-turn duplex FSM drives turn-taking and control-token stripping.
  */
 #include "cp_internal.h"
@@ -13,6 +14,8 @@
 #include "human/voice/audio_emotion.h"
 #include "human/voice/duplex.h"
 #include "human/voice/emotion_voice_map.h"
+#include "human/voice/gemini_live.h"
+#include "human/voice/provider.h"
 #include "human/voice/semantic_eot.h"
 #include "human/voice/turn_signal.h"
 #include <stdio.h>
@@ -47,6 +50,9 @@ typedef struct {
     hu_duplex_session_t duplex;
     hu_voice_emotion_t current_emotion;
     hu_voice_params_t emotion_voice_params;
+    /* Gemini Live native voice mode */
+    bool gemini_live_mode;
+    hu_gemini_live_session_t *gl_session;
 } vs_slot_t;
 
 static vs_slot_t s_vs[VS_MAX_SLOTS];
@@ -119,6 +125,10 @@ static void vs_free_slot(vs_slot_t *sl, hu_allocator_t *alloc) {
         return;
     if (s_active_tts_slot == sl)
         s_active_tts_slot = NULL;
+    if (sl->gl_session) {
+        hu_gemini_live_session_destroy(sl->gl_session);
+        sl->gl_session = NULL;
+    }
     if (sl->tts) {
         hu_cartesia_stream_close(sl->tts, alloc);
         sl->tts = NULL;
@@ -280,6 +290,13 @@ void hu_voice_stream_on_binary(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
     vs_slot_t *sl = vs_find_slot_by_conn(conn);
     if (!sl)
         return;
+
+    /* Gemini Live: forward raw PCM16 directly to the model */
+    if (sl->gemini_live_mode && sl->gl_session) {
+        (void)hu_gemini_live_send_audio(sl->gl_session, data, data_len);
+        return;
+    }
+
     hu_allocator_t *alloc = proto->alloc;
     if (sl->pcm_len + data_len > VS_MAX_AUDIO)
         return;
@@ -323,12 +340,10 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
         return HU_ERR_ALREADY_EXISTS;
 
     const hu_config_t *cfg = (const hu_config_t *)app->config;
-    const char *key = hu_config_get_provider_key(cfg, "cartesia");
-    if (!key || !key[0])
-        return HU_ERR_INVALID_ARGUMENT;
 
     const char *voice_id = NULL;
     const char *model_id = NULL;
+    const char *mode = NULL;
     hu_json_value_t *params = hu_json_object_get((hu_json_value_t *)root, "params");
     if (params) {
         const char *v = hu_json_get_string(params, "voiceId");
@@ -337,11 +352,71 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
         const char *m = hu_json_get_string(params, "modelId");
         if (m)
             model_id = m;
+        const char *md = hu_json_get_string(params, "mode");
+        if (md)
+            mode = md;
     }
     if (!voice_id || !voice_id[0])
         voice_id = cfg->voice.tts_voice;
     if (!model_id || !model_id[0])
         model_id = cfg->voice.tts_model;
+
+    /* Gemini Live mode: native end-to-end voice with no STT/TTS pipeline */
+    bool use_gemini_live = (mode && strcmp(mode, "gemini_live") == 0) ||
+                           (cfg->voice.mode && strcmp(cfg->voice.mode, "gemini_live") == 0);
+
+    if (use_gemini_live) {
+        const char *api_key = hu_config_get_provider_key(cfg, "google");
+        if (!api_key || !api_key[0])
+            api_key = hu_config_get_provider_key(cfg, "gemini");
+
+        const char *gl_model = cfg->voice.realtime_model;
+        const char *gl_voice = cfg->voice.realtime_voice;
+        if (!gl_model || !gl_model[0])
+            gl_model = "gemini-3.1-flash-live-preview";
+        if (!gl_voice || !gl_voice[0])
+            gl_voice = "Puck";
+
+        hu_gemini_live_config_t glc = {
+            .api_key = api_key,
+            .model = gl_model,
+            .voice = gl_voice,
+            .transcribe_input = true,
+            .transcribe_output = true,
+            .affective_dialog = true,
+        };
+
+        hu_gemini_live_session_t *gls = NULL;
+        hu_error_t gerr = hu_gemini_live_session_create(alloc, &glc, &gls);
+        if (gerr != HU_OK)
+            return gerr;
+        gerr = hu_gemini_live_connect(gls);
+        if (gerr != HU_OK) {
+            hu_gemini_live_session_destroy(gls);
+            return gerr;
+        }
+
+        sl->gl_session = gls;
+        sl->gemini_live_mode = true;
+
+        hu_json_value_t *res = hu_json_object_new(alloc);
+        if (!res)
+            return HU_ERR_OUT_OF_MEMORY;
+        cp_json_set_str(alloc, res, "encoding", "pcm_s16le");
+        hu_json_object_set(alloc, res, "sampleRate", hu_json_number_new(alloc, 24000));
+        cp_json_set_str(alloc, res, "mode", "gemini_live");
+        char sid[40];
+        (void)snprintf(sid, sizeof(sid), "%llu", (unsigned long long)conn->id);
+        cp_json_set_str(alloc, res, "sessionId", sid);
+        hu_error_t err = hu_json_stringify(alloc, res, out, out_len);
+        hu_json_free(alloc, res);
+        return err;
+    }
+
+    /* Standard Cartesia STT+TTS mode */
+    const char *key = hu_config_get_provider_key(cfg, "cartesia");
+    if (!key || !key[0])
+        return HU_ERR_INVALID_ARGUMENT;
 
     if (sl->tts) {
         hu_cartesia_stream_close(sl->tts, alloc);
@@ -594,6 +669,84 @@ hu_error_t cp_voice_audio_end(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     return err;
 }
 
+/* ── Gemini Live polling: drain audio events to connected browsers ──── */
+
+void hu_voice_stream_poll_gemini_live(void) {
+    if (!s_proto || !s_proto->alloc || !s_proto->ws)
+        return;
+    hu_allocator_t *a = s_proto->alloc;
+
+    for (int i = 0; i < VS_MAX_SLOTS; i++) {
+        vs_slot_t *sl = &s_vs[i];
+        if (!sl->in_use || !sl->gemini_live_mode || !sl->gl_session || !sl->conn ||
+            !sl->conn->active)
+            continue;
+
+        for (int drain = 0; drain < 16; drain++) {
+            hu_voice_rt_event_t ev = {0};
+            hu_error_t err = hu_gemini_live_recv_event(sl->gl_session, a, &ev, 0);
+            if (err != HU_OK)
+                break;
+
+            /* Audio: decode base64 PCM16 → convert to f32le → send binary */
+            if (ev.audio_base64 && ev.audio_base64_len > 0) {
+                void *pcm16 = NULL;
+                size_t pcm16_len = 0;
+                if (hu_multimodal_decode_base64(a, ev.audio_base64, ev.audio_base64_len, &pcm16,
+                                                &pcm16_len) == HU_OK &&
+                    pcm16 && pcm16_len >= 2) {
+                    size_t n_samples = pcm16_len / 2;
+                    size_t f32_len = n_samples * sizeof(float);
+                    float *f32 = (float *)a->alloc(a->ctx, f32_len);
+                    if (f32) {
+                        const int16_t *src = (const int16_t *)pcm16;
+                        for (size_t s = 0; s < n_samples; s++)
+                            f32[s] = (float)src[s] / 32768.0f;
+                        (void)hu_ws_server_send_binary(s_proto->ws, sl->conn, (const char *)f32,
+                                                       f32_len);
+                        a->free(a->ctx, f32, f32_len);
+                    }
+                    a->free(a->ctx, pcm16, pcm16_len);
+                }
+            }
+
+            /* Transcript: send as JSON event */
+            if (ev.transcript && ev.transcript_len > 0) {
+                bool is_input = (strstr(ev.type, "inputTranscription") != NULL);
+                const char *event_name =
+                    is_input ? "voice.transcript" : "voice.assistant.transcript";
+                hu_json_value_t *tev = hu_json_object_new(a);
+                if (tev) {
+                    cp_json_set_str(a, tev, "text", ev.transcript);
+                    char *payload = NULL;
+                    size_t plen = 0;
+                    if (hu_json_stringify(a, tev, &payload, &plen) == HU_OK && payload) {
+                        hu_control_send_event_to_conn(s_proto, sl->conn, event_name, payload);
+                        a->free(a->ctx, payload, plen + 1);
+                    }
+                    hu_json_free(a, tev);
+                }
+            }
+
+            /* Interrupted — user barged in; tell UI to clear playback queue */
+            if (ev.interrupted) {
+                hu_control_send_event_to_conn(s_proto, sl->conn, "voice.audio.interrupted", "{}");
+            }
+
+            /* Turn complete */
+            if (ev.done) {
+                hu_control_send_event_to_conn(s_proto, sl->conn, "voice.audio.done", "{}");
+            }
+
+            bool is_done = ev.done;
+            hu_voice_rt_event_free(a, &ev);
+
+            if (is_done)
+                break;
+        }
+    }
+}
+
 #else /* !HU_GATEWAY_POSIX */
 
 void hu_voice_stream_attach_bus(hu_bus_t *bus, hu_control_protocol_t *proto) {
@@ -616,5 +769,7 @@ void hu_voice_stream_on_binary(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
 void hu_voice_stream_on_conn_close(hu_ws_conn_t *conn) {
     (void)conn;
 }
+
+void hu_voice_stream_poll_gemini_live(void) {}
 
 #endif /* HU_GATEWAY_POSIX */

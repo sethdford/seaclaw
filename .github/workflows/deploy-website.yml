@@ -46,6 +46,14 @@ jobs:
       - name: Build website
         run: cd website && npm run build
 
+      - name: Lighthouse CI audit
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+          configPath: website/.lighthouserc.json
+        continue-on-error: true
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 

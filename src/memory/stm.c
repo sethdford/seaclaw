@@ -54,6 +54,8 @@ hu_error_t hu_stm_record_turn(hu_stm_buffer_t *buf, const char *role, size_t rol
                               const char *content, size_t content_len, uint64_t timestamp_ms) {
     if (!buf || !role || !content)
         return HU_ERR_INVALID_ARGUMENT;
+    if (!buf->alloc.alloc || !buf->alloc.free)
+        return HU_ERR_INVALID_ARGUMENT;
 
     size_t slot;
     if (buf->turn_count >= HU_STM_MAX_TURNS) {

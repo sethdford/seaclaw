@@ -503,6 +503,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         .speculative_cache = cfg.agent.speculative_cache,
         .tool_routing_enabled = cfg.agent.tool_routing_enabled,
         .multi_agent = cfg.agent.multi_agent,
+        .compaction_use_structured = cfg.agent.compaction_use_structured,
     };
     hu_agent_t agent;
     err = hu_agent_from_config(

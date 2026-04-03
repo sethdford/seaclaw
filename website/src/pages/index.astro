@@ -65,7 +65,7 @@ const tools = [
   "Delegate",
 ];
 
-const chapterCount = 15;
+const chapterCount = 9;
 ---
 
 <html lang="en">
@@ -89,6 +89,13 @@ const chapterCount = 15;
       type="font/woff2"
       crossorigin
       fetchpriority="high"
+    />
+    <link
+      rel="preload"
+      href="/fonts/avenir/Avenir-Book.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
     <title>h-uman — not quite human.</title>
     <meta
@@ -298,8 +305,11 @@ const chapterCount = 15;
       {/* ═══ HERO ═══ */}
 
       <section
-        class="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 overflow-hidden"
+        id="chapter-1"
+        class="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-20 sm:pt-24 overflow-hidden"
+        aria-label="Hero"
       >
+        <span class="hu-chapter-label" aria-hidden="true">01</span>
         <canvas id="hero-webgl" class="hero-webgl-canvas" aria-hidden="true"
         ></canvas>
         <div class="hero-static-constellation" aria-hidden="true"></div>
@@ -320,7 +330,7 @@ const chapterCount = 15;
               width="512"
               height="512"
               loading="eager"
-              decoding="sync"
+              decoding="async"
               fetchpriority="high"
               class="hero-mark w-14 h-14 md:w-20 md:h-20"
               style={`filter: drop-shadow(0 0 40px var(--color-accent-glow));`}
@@ -342,7 +352,7 @@ const chapterCount = 15;
             Bring AI to <span class="text-gradient">every</span> device on Earth.
           </p>
           <div
-            class="hero-proof hero-fade-in flex flex-wrap justify-center gap-x-6 gap-y-2 mb-10"
+            class="hero-proof hero-fade-in flex flex-wrap justify-center gap-x-4 sm:gap-x-6 gap-y-2 mb-8 sm:mb-10"
           >
             <span style="color: var(--color-text-tertiary)"
               ><strong style="color: var(--color-text)">1,696&nbsp;KB</strong> binary</span
@@ -408,16 +418,53 @@ const chapterCount = 15;
             </div>
           </div>
         </div>
-      </section>
 
-      {/* ═══ SOCIAL PROOF (Built for) ═══ */}
-      <section
-        id="chapter-1"
-        class="social-proof relative hu-chapter-reveal py-16 md:py-20 px-6"
-        aria-label="Capabilities"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">01</span>
-        <div class="max-w-5xl mx-auto">
+        <div class="hero-fade-in max-w-5xl mx-auto w-full mt-12 mb-6 relative z-10 numbers-section">
+          <div
+            class="numbers-grid glass glass-enter px-4 md:px-8 py-8 md:py-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-0"
+          >
+            {
+              [
+                { count: 1696, suffix: " KB", label: "Binary" },
+                { count: 30, prefix: "<", suffix: " ms", label: "Startup" },
+                { count: 4980, suffix: "+", label: "Tests" },
+                { count: 50, suffix: "+", label: "Providers" },
+                { count: 34, label: "Channels" },
+                { count: 67, suffix: "+", label: "Tools" },
+              ].map((stat, i, arr) => (
+                <div
+                  class={`number-item text-center py-4 sm:py-6 md:py-0 ${i < arr.length - 1 ? "md:border-r" : ""}`}
+                  data-reveal="scale"
+                  style={`--ri: ${i}; border-color: var(--color-border)`}
+                >
+                  <div
+                    class="hu-metric-counter font-sans font-black text-[clamp(2rem,4vw,3rem)] leading-none"
+                    style="color: var(--color-text)"
+                    data-count={stat.count}
+                    data-prefix={stat.prefix || ""}
+                    data-suffix={stat.suffix || ""}
+                  >
+                    {stat.prefix && (
+                      <span class="count-prefix">{stat.prefix}</span>
+                    )}
+                    <span class="count-value">0</span>
+                    {stat.suffix && (
+                      <span class="count-suffix">{stat.suffix}</span>
+                    )}
+                  </div>
+                  <div
+                    class="text-[11px] font-medium mt-2 uppercase tracking-[0.1em]"
+                    style="color: var(--color-text-tertiary)"
+                  >
+                    {stat.label}
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+
+        <div class="hero-fade-in max-w-5xl mx-auto w-full relative z-10 px-6">
           <p
             class="social-proof-label text-[11px] font-semibold uppercase tracking-[0.15em] mb-8 text-center"
             style="color: var(--color-text-tertiary)"
@@ -427,132 +474,27 @@ const chapterCount = 15;
           <div
             class="proof-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 md:gap-6"
           >
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 0"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">CLI Automation</span
-              >
-            </div>
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 1"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">DevOps</span
-              >
-            </div>
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 2"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">Security</span
-              >
-            </div>
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 3"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">Research</span
-              >
-            </div>
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 4"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">IoT</span
-              >
-            </div>
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 5"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">Enterprise</span
-              >
-            </div>
+            {
+              [
+                { icon: "M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z", label: "CLI Automation" },
+                { icon: "M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z", label: "DevOps" },
+                { icon: "M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z", label: "IoT" },
+                { icon: "M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z", label: "Security" },
+                { icon: "M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z", label: "Research" },
+                { icon: "M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z", label: "Enterprise" },
+              ].map(({ icon, label }, i) => (
+                <div
+                  class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+                  data-reveal="scale"
+                  style={`--ri: ${i}`}
+                >
+                  <svg class="w-8 h-8 shrink-0" viewBox="0 0 256 256" fill="currentColor" style="color: var(--color-accent)" aria-hidden="true">
+                    <path d={icon}></path>
+                  </svg>
+                  <span class="text-[13px] font-medium text-center" style="color: var(--color-text-secondary)">{label}</span>
+                </div>
+              ))
+            }
           </div>
           <div class="github-badge mt-10 flex justify-center">
             <a
@@ -582,6 +524,7 @@ const chapterCount = 15;
         aria-label="Product demo"
       >
         <span class="hu-chapter-label" aria-hidden="true">02</span>
+
         <div class="max-w-4xl mx-auto">
           <h2
             class="font-sans font-extrabold text-[clamp(2rem,5vw,3rem)] mb-8 text-center"
@@ -615,7 +558,7 @@ const chapterCount = 15;
               >
             </div>
             <div
-              class="terminal-body px-6 py-5 font-mono text-[14px] leading-relaxed"
+              class="terminal-body px-4 sm:px-6 py-4 sm:py-5 font-mono text-[12px] sm:text-[14px] leading-relaxed"
               style="color: var(--hu-text);"
             >
               <div class="terminal-line" style="--line-delay: 0">
@@ -638,68 +581,13 @@ const chapterCount = 15;
         </div>
       </section>
 
-      <hr class="section-divider" />
-
-      {/* ═══ THE NUMBERS ═══ */}
+      {/* ═══ THE PROBLEM + CONTRAST ═══ */}
 
       <section
         id="chapter-3"
-        class="relative hu-chapter-reveal py-16 md:py-24 px-6 cv-defer"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">03</span>
-        <div class="max-w-5xl mx-auto numbers-section">
-          <div
-            class="numbers-grid glass glass-enter px-4 md:px-8 py-8 md:py-10 grid grid-cols-3 md:grid-cols-6 gap-0"
-          >
-            {
-              [
-                { count: 1696, suffix: " KB", label: "Binary" },
-                { count: 30, prefix: "<", suffix: " ms", label: "Startup" },
-                { count: 4980, suffix: "+", label: "Tests" },
-                { count: 50, suffix: "+", label: "Providers" },
-                { count: 34, label: "Channels" },
-                { count: 67, suffix: "+", label: "Tools" },
-              ].map((stat, i, arr) => (
-                <div
-                  class={`number-item text-center py-6 md:py-0 ${i < arr.length - 1 ? "md:border-r" : ""}`}
-                  data-reveal="scale"
-                  style={`--ri: ${i}; border-color: var(--color-border)`}
-                >
-                  <div
-                    class="hu-metric-counter font-sans font-black text-[clamp(2rem,4vw,3rem)] leading-none"
-                    style="color: var(--color-text)"
-                    data-count={stat.count}
-                    data-prefix={stat.prefix || ""}
-                    data-suffix={stat.suffix || ""}
-                  >
-                    {stat.prefix && (
-                      <span class="count-prefix">{stat.prefix}</span>
-                    )}
-                    <span class="count-value">0</span>
-                    {stat.suffix && (
-                      <span class="count-suffix">{stat.suffix}</span>
-                    )}
-                  </div>
-                  <div
-                    class="text-[11px] font-medium mt-2 uppercase tracking-[0.1em]"
-                    style="color: var(--color-text-tertiary)"
-                  >
-                    {stat.label}
-                  </div>
-                </div>
-              ))
-            }
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ THE PROBLEM ═══ */}
-
-      <section
-        id="chapter-4"
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">04</span>
+        <span class="hu-chapter-label" aria-hidden="true">03</span>
         <div class="max-w-5xl mx-auto">
           <div class="grid md:grid-cols-2 gap-16 items-center">
             <div>
@@ -1046,22 +934,13 @@ const chapterCount = 15;
             </div>
           </div>
         </div>
-      </section>
-
-      {/* ═══ THE CONTRAST ═══ */}
-
-      <section
-        id="chapter-5"
-        class="relative hu-chapter-reveal py-12 md:py-20 px-6 cv-defer"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">05</span>
-        <div class="max-w-3xl mx-auto">
+        <div class="max-w-3xl mx-auto mt-16">
           <div
-            class="glass glass-enter grid grid-cols-3 gap-0 rounded-2xl overflow-hidden"
+            class="glass glass-enter grid grid-cols-1 sm:grid-cols-3 gap-0 rounded-2xl overflow-hidden"
             data-reveal="scale"
           >
             <div
-              class="text-center py-8 md:py-10 px-4 border-r"
+              class="text-center py-6 sm:py-8 md:py-10 px-4 border-b sm:border-b-0 sm:border-r"
               style="border-color: var(--color-border)"
             >
               <div
@@ -1078,7 +957,7 @@ const chapterCount = 15;
               </div>
             </div>
             <div
-              class="text-center py-8 md:py-10 px-4 border-r"
+              class="text-center py-6 sm:py-8 md:py-10 px-4 border-b sm:border-b-0 sm:border-r"
               style="border-color: var(--color-border)"
             >
               <div
@@ -1094,7 +973,7 @@ const chapterCount = 15;
                 less RAM
               </div>
             </div>
-            <div class="text-center py-8 md:py-10 px-4">
+            <div class="text-center py-6 sm:py-8 md:py-10 px-4">
               <div
                 class="font-black text-[clamp(2rem,4vw,3rem)] leading-none mb-2"
                 style="color: var(--color-accent)"
@@ -1116,15 +995,16 @@ const chapterCount = 15;
             vs. leading AI agent frameworks
           </p>
         </div>
+        </div>
       </section>
 
-      {/* ═══ CRYSTAL GRID — What's inside 1,696 KB ═══ */}
+      {/* ═══ CRYSTAL GRID + ARCHITECTURE ═══ */}
 
       <section
-        id="chapter-6"
+        id="chapter-4"
         class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">06</span>
+        <span class="hu-chapter-label" aria-hidden="true">04</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
             class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
@@ -1165,10 +1045,27 @@ const chapterCount = 15;
               Unused space
             </span>
           </div>
+
+          <div class="mt-24">
+            <span id="architecture" class="sr-only">Architecture</span>
+            <div class="ambient-coral" style="top: 20%; left: 10%;"></div>
+            <div class="ambient-blue" style="bottom: 10%; right: 15%;"></div>
+            <h2
+              class="arch-title hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+              style="color: var(--color-text); letter-spacing: -0.03em;"
+            >
+              Swap anything. Lock in nothing.
+            </h2>
+            <p
+              class="arch-sub hu-scroll-reveal text-lg mb-20"
+              style="color: var(--color-text-secondary)"
+            >
+              Every subsystem is a vtable interface. Change any layer with a
+              config edit.
+            </p>
+          </div>
         </div>
       </section>
-
-      <hr class="section-divider" />
 
       {/* ═══ DEVICE SPECTRUM — SVG Illustrations ═══ */}
 
@@ -1195,7 +1092,7 @@ const chapterCount = 15;
           </p>
 
           <div
-            class="flex flex-wrap justify-center items-end gap-8 md:gap-12 mb-6"
+            class="flex flex-wrap justify-center items-end gap-6 sm:gap-8 md:gap-12 mb-6"
             data-reveal
           >
             <div class="device-item">
@@ -1734,7 +1631,7 @@ const chapterCount = 15;
             viewBox="0 0 600 600"
             width="600"
             height="600"
-            class="hu-scroll-scale w-full max-w-lg mx-auto"
+            class="hu-scroll-scale w-full max-w-xs sm:max-w-md md:max-w-lg mx-auto"
             style="aspect-ratio: 1;"
             xmlns="http://www.w3.org/2000/svg"
             role="img"
@@ -1997,7 +1894,7 @@ const chapterCount = 15;
           </div>
 
           <div
-            class="glass rounded-xl p-6 text-left max-w-xl mx-auto"
+            class="glass rounded-xl p-4 sm:p-6 text-left max-w-xl mx-auto"
             data-reveal
           >
             <div
@@ -2272,7 +2169,7 @@ const chapterCount = 15;
               style="background: var(--color-terminal-bg);"
             >
               <div
-                class="dash-stats-grid grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"
+                class="dash-stats-grid grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6"
               >
                 <div
                   class="text-left p-4 rounded-xl"
@@ -2637,7 +2534,7 @@ const chapterCount = 15;
                   <div class="space-y-2">
                     <div class="flex items-center gap-3">
                       <span
-                        class="comparison-bar-label text-[12px] w-24 text-right font-medium"
+                        class="comparison-bar-label text-[11px] sm:text-[12px] w-16 sm:w-24 text-right font-medium shrink-0"
                         style={`color: var(--color-accent)`}
                       >
                         h-uman
@@ -2663,7 +2560,7 @@ const chapterCount = 15;
                     {row.others.map((other) => (
                       <div class="flex items-center gap-3">
                         <span
-                          class="comparison-bar-label text-[12px] w-24 text-right"
+                          class="comparison-bar-label text-[10px] sm:text-[12px] w-16 sm:w-24 text-right shrink-0"
                           style="color: var(--color-text-tertiary)"
                         >
                           {other.name}
@@ -2741,6 +2638,12 @@ const chapterCount = 15;
         </div>
       </section>
 
+      <div class="mobile-chapter-indicator glass-subtle" id="mobile-chapter-ind" aria-hidden="true">
+        {Array.from({ length: chapterCount }, (_, i) => (
+          <span class={`chapter-pip${i === 0 ? " active" : ""}`} data-pip={i} />
+        ))}
+      </div>
+
       <nav class="chapter-nav" aria-label="Page sections">
         {
           Array.from({ length: chapterCount }, (_, i) => i + 1).map((n) => (
@@ -2757,7 +2660,7 @@ const chapterCount = 15;
     </main>
 
     {/* ── Footer ── */}
-    <footer class="site-footer py-12 px-6" role="contentinfo" data-reveal>
+    <footer class="site-footer py-8 sm:py-12 px-6" role="contentinfo" data-reveal>
       <div
         class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4"
       >
@@ -2809,6 +2712,8 @@ const chapterCount = 15;
             if (el) sections.push(el);
           }
           if (sections.length && dots.length) {
+            var mobileInd = document.getElementById("mobile-chapter-ind");
+            var pips = mobileInd ? Array.from(mobileInd.querySelectorAll(".chapter-pip")) : [];
             var setActive = function (index) {
               dots.forEach(function (d, i) {
                 var on = i === index;
@@ -2816,6 +2721,10 @@ const chapterCount = 15;
                 var inner = d.querySelector(".chapter-dot-inner");
                 if (inner) inner.classList.toggle("active", on);
               });
+              pips.forEach(function (p, i) {
+                p.classList.toggle("active", i === index);
+              });
+              if (mobileInd) mobileInd.classList.add("visible");
             };
             var obs = new IntersectionObserver(
               function (entries) {
@@ -2970,6 +2879,23 @@ const chapterCount = 15;
           onScroll();
         }
 
+        // ═══ Defer all GSAP animation observers until after LCP ═══
+        function afterLcp(fn: () => void) {
+          if (document.documentElement.classList.contains("hu-lcp-done")) {
+            fn();
+            return;
+          }
+          const mo = new MutationObserver(() => {
+            if (document.documentElement.classList.contains("hu-lcp-done")) {
+              mo.disconnect();
+              fn();
+            }
+          });
+          mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+          setTimeout(() => { mo.disconnect(); fn(); }, 3000);
+        }
+
+        afterLcp(() => {
         // ═══ Count-up numbers (lazy GSAP) ═══
         const numbersGrid = document.querySelector(".numbers-grid");
         if (numbersGrid) {
@@ -3272,6 +3198,7 @@ const chapterCount = 15;
           );
           dashObs.observe(dashPreview);
         }
+        }); // end afterLcp
 
         // ═══ Spotlight cards (vanilla JS, no GSAP needed) ═══
         document.querySelectorAll(".card-spotlight").forEach((card) => {
@@ -3563,12 +3490,12 @@ const chapterCount = 15;
         const heroCanvas = document.getElementById(
           "hero-webgl",
         ) as HTMLCanvasElement;
-        if (heroCanvas) {
+        const isDesktop = window.matchMedia("(min-width: 769px)").matches;
+        if (heroCanvas && isDesktop) {
           const heroObs = new IntersectionObserver(
             (entries) => {
               if (!entries[0]?.isIntersecting) return;
               heroObs.disconnect();
-              // Defer 725KB Three.js load until main thread idle — avoids blocking LCP/FCP/TTI
               const ric = (
                 window as unknown as {
                   requestIdleCallback?: (
@@ -3583,6 +3510,10 @@ const chapterCount = 15;
             { threshold: 0.01 },
           );
           heroObs.observe(heroCanvas);
+        } else if (heroCanvas) {
+          heroCanvas.style.display = "none";
+          const fallback = heroCanvas.parentElement?.querySelector(".hero-static-constellation");
+          if (fallback instanceof HTMLElement) fallback.style.display = "block";
         }
 
         async function initHeroWebGL(canvas: HTMLCanvasElement) {
@@ -4070,6 +4001,36 @@ const chapterCount = 15;
           ht = n;
           hv(c);
         });
+      })();
+    </script>
+    <script is:inline>
+      (function () {
+        if (location.hostname === "localhost") return;
+        var s = document.createElement("script");
+        s.src = "https://unpkg.com/web-vitals@4/dist/web-vitals.iife.js";
+        s.onload = function () {
+          var wv = window.webVitals;
+          if (!wv) return;
+          var log = function (m) {
+            if (navigator.sendBeacon) {
+              navigator.sendBeacon(
+                "/api/vitals",
+                JSON.stringify({
+                  name: m.name,
+                  value: Math.round(m.name === "CLS" ? m.value * 1000 : m.value),
+                  rating: m.rating,
+                  path: location.pathname,
+                })
+              );
+            }
+          };
+          wv.onCLS(log);
+          wv.onINP(log);
+          wv.onLCP(log);
+          wv.onFCP(log);
+          wv.onTTFB(log);
+        };
+        document.head.appendChild(s);
       })();
     </script>
   </body>

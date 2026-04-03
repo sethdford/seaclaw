@@ -151,8 +151,61 @@ static void test_imessage_reaction_to_tapback_mapping(void) {
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_HAHA), "laugh");
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_EMPHASIS), "emphasize");
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_QUESTION), "question");
+    HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_CUSTOM_EMOJI), "emoji");
     /* Invalid enum value */
     HU_ASSERT_NULL(hu_imessage_reaction_to_tapback_name((hu_reaction_type_t)99));
+}
+
+static void test_imessage_custom_emoji_react_records(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 11, NULL, 0, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->react);
+
+    hu_error_t err =
+        ch.vtable->react(ch.ctx, "+15551234567", 11, 42, HU_REACTION_CUSTOM_EMOJI);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_reaction_type_t out_reaction = HU_REACTION_NONE;
+    int64_t out_message_id = -1;
+    hu_imessage_test_get_last_reaction(&ch, &out_reaction, &out_message_id);
+    HU_ASSERT_EQ(out_reaction, HU_REACTION_CUSTOM_EMOJI);
+    HU_ASSERT_EQ(out_message_id, 42);
+
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_extract_attributed_body_basic(void) {
+    unsigned char blob[] = {0x00, 0x00, 0x01, 0x2B, 0x05, 'H', 'e', 'l', 'l', 'o'};
+    char out[64];
+    size_t len = hu_imessage_extract_attributed_body(blob, sizeof(blob), out, sizeof(out));
+    HU_ASSERT_EQ(len, 5u);
+    HU_ASSERT_STR_EQ(out, "Hello");
+}
+
+static void test_imessage_extract_attributed_body_null_blob(void) {
+    char out[32];
+    HU_ASSERT_EQ(hu_imessage_extract_attributed_body(NULL, 0, out, sizeof(out)), 0u);
+}
+
+static void test_imessage_extract_attributed_body_small_blob(void) {
+    unsigned char blob[] = {0x01, 0x2B};
+    char out[32];
+    HU_ASSERT_EQ(hu_imessage_extract_attributed_body(blob, sizeof(blob), out, sizeof(out)), 0u);
+}
+
+static void test_imessage_extract_attributed_body_small_output(void) {
+    unsigned char blob[] = {0x01, 0x2B, 0x05, 'H', 'e', 'l', 'l', 'o'};
+    char out[4];
+    size_t len = hu_imessage_extract_attributed_body(blob, sizeof(blob), out, sizeof(out));
+    HU_ASSERT_EQ(len, 3u);
+    HU_ASSERT_EQ(out[3], '\0');
+}
+
+static void test_imessage_extract_attributed_body_no_marker(void) {
+    unsigned char blob[] = {0x00, 0x00, 0x00, 0x00, 0x00};
+    char out[32];
+    HU_ASSERT_EQ(hu_imessage_extract_attributed_body(blob, sizeof(blob), out, sizeof(out)), 0u);
 }
 
 static void test_imessage_loop_msg_reply_to_guid_field(void) {
@@ -235,6 +288,257 @@ static void test_imessage_allow_from_filter_no_crash(void) {
     hu_imessage_destroy(&ch);
 }
 
+static void test_imessage_create_null_out(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_error_t err = hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, NULL);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_imessage_extract_attributed_body_null_out(void) {
+    unsigned char blob[] = {0x00, 0x01, 0x02};
+    size_t len = hu_imessage_extract_attributed_body(blob, sizeof(blob), NULL, 0);
+    HU_ASSERT_EQ(len, 0u);
+}
+
+static void test_imessage_tapback_name_all_standard_types_covered(void) {
+    HU_ASSERT_NOT_NULL(hu_imessage_reaction_to_tapback_name(HU_REACTION_HEART));
+    HU_ASSERT_NOT_NULL(hu_imessage_reaction_to_tapback_name(HU_REACTION_THUMBS_UP));
+    HU_ASSERT_NOT_NULL(hu_imessage_reaction_to_tapback_name(HU_REACTION_THUMBS_DOWN));
+    HU_ASSERT_NOT_NULL(hu_imessage_reaction_to_tapback_name(HU_REACTION_HAHA));
+    HU_ASSERT_NOT_NULL(hu_imessage_reaction_to_tapback_name(HU_REACTION_EMPHASIS));
+    HU_ASSERT_NOT_NULL(hu_imessage_reaction_to_tapback_name(HU_REACTION_QUESTION));
+    HU_ASSERT_NOT_NULL(hu_imessage_reaction_to_tapback_name(HU_REACTION_CUSTOM_EMOJI));
+    HU_ASSERT_NULL(hu_imessage_reaction_to_tapback_name(HU_REACTION_NONE));
+}
+
+static void test_imessage_send_empty_message_and_no_media_rejected(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch);
+    hu_error_t err = ch.vtable->send(ch.ctx, "+15551234567", 12, "", 0, NULL, 0);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_send_null_message_with_len_rejected(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch);
+    hu_error_t err = ch.vtable->send(ch.ctx, "+15551234567", 12, NULL, 5, NULL, 0);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_allow_from_accepts_matching_handle(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    const char *allowed[] = {"+15559999999"};
+    hu_imessage_create(&alloc, "+15551234567", 12, allowed, 1, &ch);
+
+    hu_imessage_test_inject_mock(&ch, "+15559999999", 12, "allowed msg", 11);
+    hu_channel_loop_msg_t msgs[4];
+    size_t count = 0;
+    hu_error_t err = hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_STR_EQ(msgs[0].content, "allowed msg");
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_allow_from_rejects_non_matching_handle(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    const char *allowed[] = {"+15559999999"};
+    hu_imessage_create(&alloc, "+15551234567", 12, allowed, 1, &ch);
+
+    hu_imessage_test_inject_mock(&ch, "+15550000000", 12, "blocked msg", 11);
+    hu_channel_loop_msg_t msgs[4];
+    size_t count = 99;
+    hu_error_t err = hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_allow_from_wildcard_accepts_all(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    const char *allowed[] = {"*"};
+    hu_imessage_create(&alloc, "+15551234567", 12, allowed, 1, &ch);
+
+    hu_imessage_test_inject_mock(&ch, "+15550000000", 12, "any msg", 7);
+    hu_channel_loop_msg_t msgs[4];
+    size_t count = 0;
+    hu_error_t err = hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_allow_from_case_insensitive(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    const char *allowed[] = {"USER@Example.COM"};
+    hu_imessage_create(&alloc, "+15551234567", 12, allowed, 1, &ch);
+
+    hu_imessage_test_inject_mock(&ch, "user@example.com", 16, "case msg", 8);
+    hu_channel_loop_msg_t msgs[4];
+    size_t count = 0;
+    hu_error_t err = hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_echo_suppression_filters_sent_message(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch);
+
+    hu_error_t err = ch.vtable->send(ch.ctx, "+15551234567", 12, "echo this", 9, NULL, 0);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    hu_imessage_test_inject_mock(&ch, "+15551234567", 12, "echo this", 9);
+    hu_channel_loop_msg_t msgs[4];
+    size_t count = 99;
+    err = hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 0u);
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_echo_suppression_allows_different_message(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch);
+
+    ch.vtable->send(ch.ctx, "+15551234567", 12, "sent msg", 8, NULL, 0);
+
+    hu_imessage_test_inject_mock(&ch, "+15551234567", 12, "different msg", 13);
+    hu_channel_loop_msg_t msgs[4];
+    size_t count = 0;
+    hu_error_t err = hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_STR_EQ(msgs[0].content, "different msg");
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_send_event_final_delegates_to_send(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->send_event);
+    hu_error_t err = ch.vtable->send_event(ch.ctx, "+15551234567", 12, "final msg", 9, NULL, 0,
+                                           HU_OUTBOUND_STAGE_FINAL);
+    HU_ASSERT_EQ(err, HU_OK);
+    size_t len = 0;
+    const char *msg = hu_imessage_test_get_last_message(&ch, &len);
+    HU_ASSERT_STR_EQ(msg, "final msg");
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_send_event_chunk_returns_not_supported(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch);
+    hu_error_t err = ch.vtable->send_event(ch.ctx, "+15551234567", 12, "chunk", 5, NULL, 0,
+                                           HU_OUTBOUND_STAGE_CHUNK);
+    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_start_typing_returns_ok(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
+    hu_error_t err = ch.vtable->start_typing(ch.ctx, "+15551234567", 12);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_stop_typing_returns_ok(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch);
+    HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
+    hu_error_t err = ch.vtable->stop_typing(ch.ctx, "+15551234567", 12);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_use_imsg_cli_setter(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch);
+    hu_imessage_set_use_imsg_cli(&ch, true);
+    hu_imessage_set_use_imsg_cli(&ch, false);
+    hu_imessage_set_use_imsg_cli(NULL, true);
+    hu_imessage_destroy(&ch);
+}
+
+static void test_imessage_gif_json_extract_basic(void) {
+    const char *json = "{\"url\":\"https://example.com/test.gif\",\"size\":1234}";
+    char out[256];
+    size_t len = hu_imessage_gif_json_extract(json, strlen(json), "url", out, sizeof(out));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_STR_EQ(out, "https://example.com/test.gif");
+}
+
+static void test_imessage_gif_json_extract_nested(void) {
+    const char *json = "{\"gif\":{\"url\":\"https://media.tenor.com/abc.gif\",\"dims\":[200,200]}}";
+    char out[256];
+    size_t len = hu_imessage_gif_json_extract(json, strlen(json), "url", out, sizeof(out));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_STR_EQ(out, "https://media.tenor.com/abc.gif");
+}
+
+static void test_imessage_gif_json_extract_missing_key(void) {
+    const char *json = "{\"other\":\"value\"}";
+    char out[256];
+    size_t len = hu_imessage_gif_json_extract(json, strlen(json), "url", out, sizeof(out));
+    HU_ASSERT_EQ(len, 0u);
+}
+
+static void test_imessage_gif_json_extract_null_inputs(void) {
+    char out[32];
+    HU_ASSERT_EQ(hu_imessage_gif_json_extract(NULL, 0, "key", out, sizeof(out)), 0u);
+    HU_ASSERT_EQ(hu_imessage_gif_json_extract("{}", 2, NULL, out, sizeof(out)), 0u);
+    HU_ASSERT_EQ(hu_imessage_gif_json_extract("{}", 2, "key", NULL, 0), 0u);
+}
+
+static void test_imessage_gif_json_extract_small_output(void) {
+    const char *json = "{\"url\":\"https://example.com/long-path.gif\"}";
+    char out[8];
+    size_t len = hu_imessage_gif_json_extract(json, strlen(json), "url", out, sizeof(out));
+    HU_ASSERT_EQ(len, 7u);
+    HU_ASSERT_EQ(out[7], '\0');
+}
+
+static void test_imessage_gif_json_extract_tenor_response(void) {
+    const char *json =
+        "{\"results\":[{\"id\":\"123\","
+        "\"media_formats\":{\"gif\":{\"url\":\"https://media.tenor.com/vid.gif\","
+        "\"duration\":0,\"dims\":[400,300],\"size\":52000},"
+        "\"tinygif\":{\"url\":\"https://media.tenor.com/tiny.gif\"}}}]}";
+    /* First, find the "gif" section (not "tinygif") */
+    const char *gif_section = NULL;
+    for (size_t i = 0; i + 6 < strlen(json); i++) {
+        if (json[i] == '"' && memcmp(json + i, "\"gif\"", 5) == 0 &&
+            (i == 0 || (json[i - 1] != 'y' && json[i - 1] != 'o' && json[i - 1] != 'n'))) {
+            gif_section = json + i;
+            break;
+        }
+    }
+    HU_ASSERT_NOT_NULL(gif_section);
+    size_t remaining = strlen(json) - (size_t)(gif_section - json);
+    char url[256];
+    size_t len = hu_imessage_gif_json_extract(gif_section, remaining, "url", url, sizeof(url));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_STR_EQ(url, "https://media.tenor.com/vid.gif");
+}
+
 void run_imessage_extended_tests(void) {
     HU_TEST_SUITE("iMessage Extended");
 
@@ -253,6 +557,28 @@ void run_imessage_extended_tests(void) {
     HU_RUN_TEST(test_imessage_health_check);
     HU_RUN_TEST(test_imessage_gif_tapback_stub_returns_zero);
     HU_RUN_TEST(test_imessage_allow_from_filter_no_crash);
+    HU_RUN_TEST(test_imessage_create_null_out);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_null_out);
+    HU_RUN_TEST(test_imessage_tapback_name_all_standard_types_covered);
+    HU_RUN_TEST(test_imessage_send_empty_message_and_no_media_rejected);
+    HU_RUN_TEST(test_imessage_send_null_message_with_len_rejected);
+    HU_RUN_TEST(test_imessage_allow_from_accepts_matching_handle);
+    HU_RUN_TEST(test_imessage_allow_from_rejects_non_matching_handle);
+    HU_RUN_TEST(test_imessage_allow_from_wildcard_accepts_all);
+    HU_RUN_TEST(test_imessage_allow_from_case_insensitive);
+    HU_RUN_TEST(test_imessage_echo_suppression_filters_sent_message);
+    HU_RUN_TEST(test_imessage_echo_suppression_allows_different_message);
+    HU_RUN_TEST(test_imessage_send_event_final_delegates_to_send);
+    HU_RUN_TEST(test_imessage_send_event_chunk_returns_not_supported);
+    HU_RUN_TEST(test_imessage_start_typing_returns_ok);
+    HU_RUN_TEST(test_imessage_stop_typing_returns_ok);
+    HU_RUN_TEST(test_imessage_use_imsg_cli_setter);
+    HU_RUN_TEST(test_imessage_gif_json_extract_basic);
+    HU_RUN_TEST(test_imessage_gif_json_extract_nested);
+    HU_RUN_TEST(test_imessage_gif_json_extract_missing_key);
+    HU_RUN_TEST(test_imessage_gif_json_extract_null_inputs);
+    HU_RUN_TEST(test_imessage_gif_json_extract_small_output);
+    HU_RUN_TEST(test_imessage_gif_json_extract_tenor_response);
 #if defined(__APPLE__) && defined(__MACH__)
     HU_RUN_TEST(test_imessage_send_test_mode);
     HU_RUN_TEST(test_imessage_send_media_only_no_crash);
@@ -262,9 +588,15 @@ void run_imessage_extended_tests(void) {
     HU_RUN_TEST(test_imessage_loop_msg_reply_to_guid_field);
     HU_RUN_TEST(test_imessage_guid_lookup_stub_returns_not_supported);
     HU_RUN_TEST(test_imessage_loop_msg_unsent_field);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_basic);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_null_blob);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_small_blob);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_small_output);
+    HU_RUN_TEST(test_imessage_extract_attributed_body_no_marker);
 #if HU_IS_TEST
     HU_RUN_TEST(test_imessage_typing_cache_field_exists);
     HU_RUN_TEST(test_imessage_react_test_records);
+    HU_RUN_TEST(test_imessage_custom_emoji_react_records);
 #endif
 }
 #else

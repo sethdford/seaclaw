@@ -287,6 +287,7 @@ static void test_instruction_discovery_empty_dir(void) {
 static void test_mcp_json_proto_key(void) {
     hu_tracking_allocator_t *ta = hu_tracking_allocator_create();
     hu_allocator_t alloc = hu_tracking_allocator_allocator(ta);
+    (void)alloc;
 
     /* Tool name "__proto__" — should not cause prototype pollution */
     bool is_mcp = hu_mcp_tool_is_mcp("__proto__");
@@ -324,6 +325,7 @@ static void test_mcp_json_constructor_key(void) {
 static void test_mcp_nested_json_string(void) {
     hu_tracking_allocator_t *ta = hu_tracking_allocator_create();
     hu_allocator_t alloc = hu_tracking_allocator_allocator(ta);
+    (void)alloc;
 
     /* A tool name with embedded JSON-like content */
     const char *name = "mcp__server__{\"key\":\"value\"}";

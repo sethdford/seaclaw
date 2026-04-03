@@ -318,6 +318,113 @@ static void test_build_summary_xml_escaping(void) {
     free_msg(&alloc, &msgs[0]);
 }
 
+static void test_compaction_with_structured_flag_enabled(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    /* Build a history that exceeds compact threshold */
+    hu_owned_message_t *history = (hu_owned_message_t *)malloc(55 * sizeof(hu_owned_message_t));
+    memset(history, 0, 55 * sizeof(hu_owned_message_t));
+
+    /* System prompt */
+    history[0] = make_msg(HU_ROLE_SYSTEM, "You are helpful.");
+
+    /* Add 54 user/assistant alternating messages to trigger compaction */
+    for (int i = 1; i < 55; i++) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Message %d", i);
+        history[i] = make_msg(i % 2 == 0 ? HU_ROLE_USER : HU_ROLE_ASSISTANT, buf);
+    }
+
+    size_t history_count = 55;
+    size_t history_cap = 55;
+
+    /* Create compaction config with structured flag enabled */
+    hu_compaction_config_t cfg;
+    hu_compaction_config_default(&cfg);
+    cfg.use_structured_summary = true;  /* This is the key flag being tested */
+    cfg.keep_recent = 5;
+    cfg.max_history_messages = 50;
+    cfg.token_limit = 100000;
+
+    /* Perform compaction */
+    hu_error_t err = hu_compact_history(&alloc, history, &history_count, &history_cap, &cfg);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Verify that compaction happened */
+    HU_ASSERT_TRUE(history_count < 55);
+
+    /* Key assertion: the compacted summary should contain XML structure,
+     * not plain text. The structured summary contains <summary> tags. */
+    bool has_summary_tags = false;
+    for (size_t i = 0; i < history_count; i++) {
+        if (history[i].content && strstr(history[i].content, "<summary>")) {
+            has_summary_tags = true;
+            break;
+        }
+    }
+    HU_ASSERT_TRUE(has_summary_tags);
+
+    /* Clean up */
+    for (size_t i = 0; i < history_count; i++) {
+        if (history[i].content)
+            free(history[i].content);
+    }
+    free(history);
+}
+
+static void test_compaction_with_structured_flag_disabled(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    /* Build a history that exceeds compact threshold */
+    hu_owned_message_t *history = (hu_owned_message_t *)malloc(55 * sizeof(hu_owned_message_t));
+    memset(history, 0, 55 * sizeof(hu_owned_message_t));
+
+    /* System prompt */
+    history[0] = make_msg(HU_ROLE_SYSTEM, "You are helpful.");
+
+    /* Add 54 user/assistant alternating messages to trigger compaction */
+    for (int i = 1; i < 55; i++) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "Message %d", i);
+        history[i] = make_msg(i % 2 == 0 ? HU_ROLE_USER : HU_ROLE_ASSISTANT, buf);
+    }
+
+    size_t history_count = 55;
+    size_t history_cap = 55;
+
+    /* Create compaction config with structured flag DISABLED (false) */
+    hu_compaction_config_t cfg;
+    hu_compaction_config_default(&cfg);
+    cfg.use_structured_summary = false;  /* Disabled, should use plain text */
+    cfg.keep_recent = 5;
+    cfg.max_history_messages = 50;
+    cfg.token_limit = 100000;
+
+    /* Perform compaction */
+    hu_error_t err = hu_compact_history(&alloc, history, &history_count, &history_cap, &cfg);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Verify that compaction happened */
+    HU_ASSERT_TRUE(history_count < 55);
+
+    /* With structured flag disabled, summary should NOT contain <summary> tags */
+    bool has_summary_tags = false;
+    for (size_t i = 0; i < history_count; i++) {
+        if (history[i].content && strstr(history[i].content, "<summary>")) {
+            has_summary_tags = true;
+            break;
+        }
+    }
+    HU_ASSERT_FALSE(has_summary_tags);
+
+    /* Clean up */
+    for (size_t i = 0; i < history_count; i++) {
+        if (history[i].content)
+            free(history[i].content);
+    }
+    free(history);
+}
+
 /* ── Test Runner ──────────────────────────────────────────────────────── */
 
 void run_compaction_structured_tests(void) {
@@ -340,4 +447,6 @@ void run_compaction_structured_tests(void) {
     HU_RUN_TEST(test_extract_metadata_null_args);
     HU_RUN_TEST(test_build_summary_null_args);
     HU_RUN_TEST(test_detect_artifacts_empty);
+    HU_RUN_TEST(test_compaction_with_structured_flag_enabled);
+    HU_RUN_TEST(test_compaction_with_structured_flag_disabled);
 }

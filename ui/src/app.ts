@@ -29,6 +29,7 @@ type TabId =
   | "logs"
   | "turing"
   | "hula"
+  | "workflow"
   | "design-system";
 
 const VALID_TABS: TabId[] = [
@@ -51,6 +52,7 @@ const VALID_TABS: TabId[] = [
   "logs",
   "turing",
   "hula",
+  "workflow",
   "design-system",
 ];
 
@@ -79,6 +81,7 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   logs: () => import("./views/logs-view.js"),
   turing: () => import("./views/turing-view.js"),
   hula: () => import("./views/hula-view.js"),
+  workflow: () => import("./views/workflow-view.js"),
   "design-system": () => import("./views/design-system-view.js"),
 };
 
@@ -1198,6 +1201,8 @@ export class ScApp extends LitElement {
         return html`<hu-turing-view></hu-turing-view>`;
       case "hula":
         return html`<hu-hula-view></hu-hula-view>`;
+      case "workflow":
+        return html`<hu-workflow-view></hu-workflow-view>`;
       case "design-system":
         return html`<hu-design-system-view></hu-design-system-view>`;
       default:

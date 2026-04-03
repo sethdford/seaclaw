@@ -2025,6 +2025,7 @@ set(HU_TEST_SOURCES
     tests/test_gmail.c
     tests/test_imessage_extended.c
     tests/test_imessage_adversarial.c
+    tests/test_imessage_chatdb_fixture.c
     tests/test_config_extended.c
     tests/test_config_getters.c
     tests/test_config_validation.c
@@ -2893,6 +2894,14 @@ if(HU_ENABLE_FUZZ)
     target_link_libraries(fuzz_session_deserialization PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
     target_compile_options(fuzz_session_deserialization PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
     target_link_options(fuzz_session_deserialization PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
+
+    add_executable(fuzz_imessage_attributed_body fuzz/fuzz_imessage_attributed_body.c)
+    set_target_properties(fuzz_imessage_attributed_body PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_definitions(fuzz_imessage_attributed_body PRIVATE HU_IS_TEST=1)
+    target_compile_options(fuzz_imessage_attributed_body PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(fuzz_imessage_attributed_body PRIVATE human_core_test ${FUZZ_EXTRA_LIBS})
+    target_compile_options(fuzz_imessage_attributed_body PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME})
+    target_link_options(fuzz_imessage_attributed_body PRIVATE ${FUZZ_SANITIZE} ${FUZZ_FRAME} ${FUZZ_EXTRA_LINK})
 endif()
 
 # Benchmark suite (micro-benchmarks of core operations)

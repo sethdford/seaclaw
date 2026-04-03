@@ -152,6 +152,7 @@ static void parse_imessage_channel(hu_allocator_t *a, hu_config_t *cfg,
     }
     cfg->channels.imessage.poll_interval_sec =
         (int)hu_json_get_number(obj, "poll_interval_sec", 30.0);
+    cfg->channels.imessage.use_imsg_cli = hu_json_get_bool(obj, "use_imsg_cli", false);
     cfg->channels.imessage.user_response_window_sec =
         (int)hu_json_get_number(obj, "user_response_window_sec", 0.0);
 

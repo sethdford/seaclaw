@@ -176,6 +176,65 @@ static void consolidation_eviction_preserves_last_contact_entry(void) {
     if (mem.vtable->deinit)
         mem.vtable->deinit(mem.ctx);
 }
+static void consolidation_extract_facts_lightweight(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+    HU_ASSERT_NOT_NULL(mem.vtable);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    const char *k1 = "fact-test:note1";
+    const char *c1 = "Seth lives in San Francisco and works at Anthropic as an engineer.";
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, k1, strlen(k1), c1, strlen(c1), &cat, NULL, 0), HU_OK);
+
+    const char *k2 = "fact-test:note2";
+    const char *c2 = "Alice enjoys hiking in Yosemite every summer with her dog Max.";
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, k2, strlen(k2), c2, strlen(c2), &cat, NULL, 0), HU_OK);
+
+    hu_consolidation_config_t config = HU_CONSOLIDATION_DEFAULTS;
+    config.dedup_threshold = 100;
+    config.max_entries = 100;
+    config.extract_facts = true;
+    config.fact_confidence_threshold = 0.3f;
+
+    hu_error_t err = hu_memory_consolidate(&alloc, &mem, &config);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    size_t final_count = 0;
+    err = mem.vtable->count(mem.ctx, &final_count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(final_count >= 2);
+
+    if (mem.vtable->deinit)
+        mem.vtable->deinit(mem.ctx);
+}
+
+static void consolidation_extract_facts_disabled_by_default(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_CORE};
+    const char *k = "no-extract:a";
+    const char *c = "Bob is a teacher in Portland.";
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, k, strlen(k), c, strlen(c), &cat, NULL, 0), HU_OK);
+
+    hu_consolidation_config_t config = HU_CONSOLIDATION_DEFAULTS;
+    config.max_entries = 100;
+    config.dedup_threshold = 100;
+    /* extract_facts defaults to false */
+
+    hu_error_t err = hu_memory_consolidate(&alloc, &mem, &config);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    size_t count = 0;
+    err = mem.vtable->count(mem.ctx, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+
+    if (mem.vtable->deinit)
+        mem.vtable->deinit(mem.ctx);
+}
 #endif /* HU_ENABLE_SQLITE */
 
 static void similarity_null_a_returns_0(void) {
@@ -294,6 +353,8 @@ void run_consolidation_tests(void) {
     HU_RUN_TEST(consolidation_removes_duplicates);
     HU_RUN_TEST(consolidation_cross_contact_isolation);
     HU_RUN_TEST(consolidation_eviction_preserves_last_contact_entry);
+    HU_RUN_TEST(consolidation_extract_facts_lightweight);
+    HU_RUN_TEST(consolidation_extract_facts_disabled_by_default);
 #endif
     HU_RUN_TEST(similarity_null_a_returns_0);
     HU_RUN_TEST(similarity_null_b_returns_0);
