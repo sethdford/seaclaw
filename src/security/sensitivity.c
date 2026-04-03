@@ -87,7 +87,26 @@ static bool has_ssn_pattern(const char *msg, size_t len) {
     return false;
 }
 
-/* Credit card: 4 groups of 4 digits separated by spaces or dashes */
+/* Luhn checksum validation for credit card numbers */
+static bool luhn_check(const int *digits, size_t count) {
+    if (count < 13 || count > 19)
+        return false;
+    int sum = 0;
+    bool alt = false;
+    for (size_t i = count; i > 0; i--) {
+        int d = digits[i - 1];
+        if (alt) {
+            d *= 2;
+            if (d > 9)
+                d -= 9;
+        }
+        sum += d;
+        alt = !alt;
+    }
+    return (sum % 10) == 0;
+}
+
+/* Credit card: 4 groups of 4 digits separated by spaces or dashes, Luhn-validated */
 static bool has_credit_card_pattern(const char *msg, size_t len) {
     for (size_t i = 0; i + 18 < len; i++) {
         if (is_digit_run(msg, len, i, 4) &&
@@ -97,7 +116,68 @@ static bool has_credit_card_pattern(const char *msg, size_t len) {
             is_digit_run(msg, len, i + 10, 4) &&
             (msg[i + 14] == '-' || msg[i + 14] == ' ') &&
             is_digit_run(msg, len, i + 15, 4)) {
-            return true;
+            int digits[16];
+            size_t offsets[] = {0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 18};
+            for (size_t k = 0; k < 16; k++)
+                digits[k] = msg[i + offsets[k]] - '0';
+            if (luhn_check(digits, 16))
+                return true;
+        }
+    }
+    /* Also check 16-digit runs without separators */
+    for (size_t i = 0; i + 15 < len; i++) {
+        if (is_digit_run(msg, len, i, 16)) {
+            bool left_ok = (i == 0 || !isdigit((unsigned char)msg[i - 1]));
+            bool right_ok = (i + 16 >= len || !isdigit((unsigned char)msg[i + 16]));
+            if (left_ok && right_ok) {
+                int digits[16];
+                for (size_t k = 0; k < 16; k++)
+                    digits[k] = msg[i + k] - '0';
+                if (luhn_check(digits, 16))
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* Email pattern: word@word.word */
+static bool has_email_pattern(const char *msg, size_t len) {
+    for (size_t i = 1; i + 3 < len; i++) {
+        if (msg[i] != '@')
+            continue;
+        bool left_ok = isalnum((unsigned char)msg[i - 1]) || msg[i - 1] == '.' || msg[i - 1] == '_';
+        if (!left_ok)
+            continue;
+        for (size_t j = i + 1; j < len; j++) {
+            if (msg[j] == '.') {
+                if (j > i + 1 && j + 1 < len && isalpha((unsigned char)msg[j + 1]))
+                    return true;
+            } else if (!isalnum((unsigned char)msg[j]) && msg[j] != '-' && msg[j] != '_') {
+                break;
+            }
+        }
+    }
+    return false;
+}
+
+/* Phone number: 10+ digits with optional country code and separators */
+static bool has_phone_pattern(const char *msg, size_t len) {
+    size_t i = 0;
+    while (i < len) {
+        if (msg[i] == '+' || isdigit((unsigned char)msg[i])) {
+            size_t digit_count = 0;
+            while (i < len && (isdigit((unsigned char)msg[i]) || msg[i] == '-' ||
+                               msg[i] == ' ' || msg[i] == '(' || msg[i] == ')' ||
+                               msg[i] == '+' || msg[i] == '.')) {
+                if (isdigit((unsigned char)msg[i]))
+                    digit_count++;
+                i++;
+            }
+            if (digit_count >= 10 && digit_count <= 15)
+                return true;
+        } else {
+            i++;
         }
     }
     return false;
@@ -134,54 +214,85 @@ static const char *S3_TOOL_SEGMENTS[] = {
 /* ── Public API ───────────────────────────────────────────────────────── */
 
 hu_sensitivity_result_t hu_sensitivity_classify_message(const char *msg, size_t msg_len) {
-    hu_sensitivity_result_t result = {HU_SENSITIVITY_S1, NULL};
+    hu_sensitivity_result_t result;
+    memset(&result, 0, sizeof(result));
+    result.level = HU_SENSITIVITY_S1;
     if (!msg || msg_len == 0)
         return result;
 
-    /* S3: check for secret/key keywords */
+    int s3_signals = 0;
+    int s2_signals = 0;
+    const char *s3_reason = NULL;
+    const char *s2_reason = NULL;
+
     for (size_t i = 0; i < S3_KEYWORD_COUNT; i++) {
         if (ci_contains(msg, msg_len, S3_KEYWORDS[i])) {
-            result.level = HU_SENSITIVITY_S3;
-            result.reason = S3_KEYWORDS[i];
-            return result;
+            s3_signals++;
+            if (!s3_reason)
+                s3_reason = S3_KEYWORDS[i];
         }
     }
 
-    /* S3: check for private key headers */
     if (has_private_key_header(msg, msg_len)) {
-        result.level = HU_SENSITIVITY_S3;
-        result.reason = "private key block detected";
-        return result;
+        s3_signals++;
+        if (!s3_reason)
+            s3_reason = "private key block detected";
     }
 
-    /* S3: SSN pattern */
     if (has_ssn_pattern(msg, msg_len)) {
+        s3_signals++;
+        if (!s3_reason)
+            s3_reason = "SSN pattern detected";
+    }
+
+    if (s3_signals > 0) {
         result.level = HU_SENSITIVITY_S3;
-        result.reason = "SSN pattern detected";
+        result.reason = s3_reason;
+        result.signal_count = s3_signals;
+        result.confidence = s3_signals >= 2 ? 0.95f : 0.80f;
         return result;
     }
 
-    /* S2: PII keywords */
     for (size_t i = 0; i < S2_KEYWORD_COUNT; i++) {
         if (ci_contains(msg, msg_len, S2_KEYWORDS[i])) {
-            result.level = HU_SENSITIVITY_S2;
-            result.reason = S2_KEYWORDS[i];
-            return result;
+            s2_signals++;
+            if (!s2_reason)
+                s2_reason = S2_KEYWORDS[i];
         }
     }
 
-    /* S2: credit card pattern */
     if (has_credit_card_pattern(msg, msg_len)) {
+        s2_signals++;
+        if (!s2_reason)
+            s2_reason = "credit card pattern detected (Luhn valid)";
+    }
+
+    if (has_email_pattern(msg, msg_len)) {
+        s2_signals++;
+        if (!s2_reason)
+            s2_reason = "email address detected";
+    }
+
+    if (has_phone_pattern(msg, msg_len)) {
+        s2_signals++;
+        if (!s2_reason)
+            s2_reason = "phone number detected";
+    }
+
+    if (s2_signals > 0) {
         result.level = HU_SENSITIVITY_S2;
-        result.reason = "credit card pattern detected";
+        result.reason = s2_reason;
+        result.signal_count = s2_signals;
+        result.confidence = s2_signals >= 3 ? 0.90f : (s2_signals >= 2 ? 0.75f : 0.60f);
         return result;
     }
 
+    result.confidence = 0.95f;
     return result;
 }
 
 hu_sensitivity_result_t hu_sensitivity_classify_path(const char *path, size_t path_len) {
-    hu_sensitivity_result_t result = {HU_SENSITIVITY_S1, NULL};
+    hu_sensitivity_result_t result = {HU_SENSITIVITY_S1, NULL, 0.0f, 0};
     if (!path || path_len == 0)
         return result;
 
@@ -205,7 +316,7 @@ hu_sensitivity_result_t hu_sensitivity_classify_path(const char *path, size_t pa
 }
 
 hu_sensitivity_result_t hu_sensitivity_classify_tool(const char *tool_name, size_t tool_len) {
-    hu_sensitivity_result_t result = {HU_SENSITIVITY_S1, NULL};
+    hu_sensitivity_result_t result = {HU_SENSITIVITY_S1, NULL, 0.0f, 0};
     if (!tool_name || tool_len == 0)
         return result;
 
@@ -223,7 +334,7 @@ hu_sensitivity_result_t hu_sensitivity_classify_tool(const char *tool_name, size
 hu_sensitivity_result_t hu_sensitivity_merge(const hu_sensitivity_result_t *a,
                                              const hu_sensitivity_result_t *b) {
     if (!a && !b)
-        return (hu_sensitivity_result_t){HU_SENSITIVITY_S1, NULL};
+        return (hu_sensitivity_result_t){HU_SENSITIVITY_S1, NULL, 0.0f, 0};
     if (!a)
         return *b;
     if (!b)
