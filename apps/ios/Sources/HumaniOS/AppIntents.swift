@@ -16,24 +16,6 @@ private func openHumanDeepLink(_ url: URL) {
     #endif
 }
 
-struct SendMessageIntent: AppIntent {
-    static var title: LocalizedStringResource = "Send Message to h-uman"
-    static var description = IntentDescription("Send a message to your h-uman AI assistant.")
-    static var openAppWhenRun = true
-
-    @Parameter(title: "Message")
-    var message: String
-
-    func perform() async throws -> some IntentResult {
-        var c = URLComponents(string: "human://chat")!
-        c.queryItems = [URLQueryItem(name: "message", value: message)]
-        if let url = c.url {
-            await MainActor.run { openHumanDeepLink(url) }
-        }
-        return .result()
-    }
-}
-
 struct CheckStatusIntent: AppIntent {
     static var title: LocalizedStringResource = "Check h-uman Status"
     static var description = IntentDescription("Open h-uman and jump to Overview to see connection status.")
@@ -47,27 +29,3 @@ struct CheckStatusIntent: AppIntent {
     }
 }
 
-struct HumanShortcuts: AppShortcutsProvider {
-    @AppShortcutsBuilder
-    static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: SendMessageIntent(),
-            phrases: [
-                "Send a message in \(.applicationName)",
-                "Ask \(.applicationName)",
-                "Tell \(.applicationName) something",
-            ],
-            shortTitle: "Send Message",
-            systemImageName: "bubble.left.fill"
-        )
-        AppShortcut(
-            intent: CheckStatusIntent(),
-            phrases: [
-                "Check \(.applicationName) status",
-                "Is \(.applicationName) running",
-            ],
-            shortTitle: "Check Status",
-            systemImageName: "antenna.radiowaves.left.and.right"
-        )
-    }
-}

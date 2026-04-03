@@ -539,6 +539,89 @@ static void test_imessage_gif_json_extract_tenor_response(void) {
     HU_ASSERT_STR_EQ(url, "https://media.tenor.com/vid.gif");
 }
 
+/* ── Attachment path validation ──────────────────────────────────── */
+
+static void test_imessage_validate_attachment_path_basic(void) {
+    HU_ASSERT_TRUE(hu_imessage_validate_attachment_path("/tmp/photo.jpg"));
+    HU_ASSERT_TRUE(hu_imessage_validate_attachment_path("/Users/me/Downloads/file.png"));
+}
+
+static void test_imessage_validate_attachment_path_rejects_relative(void) {
+    HU_ASSERT_FALSE(hu_imessage_validate_attachment_path("relative/path.jpg"));
+    HU_ASSERT_FALSE(hu_imessage_validate_attachment_path("file.jpg"));
+}
+
+static void test_imessage_validate_attachment_path_rejects_null(void) {
+    HU_ASSERT_FALSE(hu_imessage_validate_attachment_path(NULL));
+}
+
+static void test_imessage_validate_attachment_path_rejects_traversal(void) {
+    HU_ASSERT_FALSE(hu_imessage_validate_attachment_path("/tmp/../etc/passwd"));
+    HU_ASSERT_FALSE(hu_imessage_validate_attachment_path("/a/b/../c"));
+}
+
+static void test_imessage_validate_attachment_path_rejects_empty(void) {
+    HU_ASSERT_FALSE(hu_imessage_validate_attachment_path(""));
+    HU_ASSERT_FALSE(hu_imessage_validate_attachment_path("/"));
+}
+
+/* ── Loop message has_audio field ────────────────────────────────── */
+
+static void test_imessage_loop_msg_has_audio_field(void) {
+    hu_channel_loop_msg_t msg;
+    memset(&msg, 0, sizeof(msg));
+    HU_ASSERT_FALSE(msg.has_audio);
+    msg.has_audio = true;
+    HU_ASSERT_TRUE(msg.has_audio);
+}
+
+/* ── Sanitize output ────────────────────────────────────────────── */
+
+static void test_imessage_sanitize_strips_ai_phrases(void) {
+    char buf[256];
+    snprintf(buf, sizeof(buf), "I'd be happy to help you with that.");
+    size_t len = hu_imessage_sanitize_output(buf, strlen(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "I'd be happy to") == NULL);
+    HU_ASSERT_TRUE(strstr(buf, "help you with that") != NULL);
+}
+
+static void test_imessage_sanitize_strips_multiple_phrases(void) {
+    char buf[256];
+    snprintf(buf, sizeof(buf), "Great question! Let me know if you need anything else.");
+    size_t len = hu_imessage_sanitize_output(buf, strlen(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "Great question!") == NULL);
+    HU_ASSERT_TRUE(strstr(buf, "Let me know if") == NULL);
+}
+
+static void test_imessage_sanitize_collapses_double_spaces(void) {
+    char buf[64] = "hello  world";
+    size_t len = hu_imessage_sanitize_output(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "hello world");
+    HU_ASSERT_EQ(len, 11);
+}
+
+static void test_imessage_sanitize_trims_whitespace(void) {
+    char buf[64] = "  hello world  ";
+    size_t len = hu_imessage_sanitize_output(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "hello world");
+    HU_ASSERT_EQ(len, 11);
+}
+
+static void test_imessage_sanitize_empty_input(void) {
+    HU_ASSERT_EQ(hu_imessage_sanitize_output(NULL, 0), 0);
+    char buf[4] = "";
+    HU_ASSERT_EQ(hu_imessage_sanitize_output(buf, 0), 0);
+}
+
+static void test_imessage_sanitize_preserves_normal_text(void) {
+    char buf[64] = "yeah sounds good";
+    size_t len = hu_imessage_sanitize_output(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "yeah sounds good");
+    HU_ASSERT_EQ(len, 16);
+}
+
 void run_imessage_extended_tests(void) {
     HU_TEST_SUITE("iMessage Extended");
 
@@ -598,6 +681,18 @@ void run_imessage_extended_tests(void) {
     HU_RUN_TEST(test_imessage_react_test_records);
     HU_RUN_TEST(test_imessage_custom_emoji_react_records);
 #endif
+    HU_RUN_TEST(test_imessage_validate_attachment_path_basic);
+    HU_RUN_TEST(test_imessage_validate_attachment_path_rejects_relative);
+    HU_RUN_TEST(test_imessage_validate_attachment_path_rejects_null);
+    HU_RUN_TEST(test_imessage_validate_attachment_path_rejects_traversal);
+    HU_RUN_TEST(test_imessage_validate_attachment_path_rejects_empty);
+    HU_RUN_TEST(test_imessage_loop_msg_has_audio_field);
+    HU_RUN_TEST(test_imessage_sanitize_strips_ai_phrases);
+    HU_RUN_TEST(test_imessage_sanitize_strips_multiple_phrases);
+    HU_RUN_TEST(test_imessage_sanitize_collapses_double_spaces);
+    HU_RUN_TEST(test_imessage_sanitize_trims_whitespace);
+    HU_RUN_TEST(test_imessage_sanitize_empty_input);
+    HU_RUN_TEST(test_imessage_sanitize_preserves_normal_text);
 }
 #else
 void run_imessage_extended_tests(void) {

@@ -93,6 +93,9 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"hula.traces.get", cp_hula_traces_get},
     {"hula.traces.delete", cp_hula_traces_delete},
     {"hula.traces.analytics", cp_hula_traces_analytics},
+    {"tasks.list", cp_tasks_list},
+    {"tasks.get", cp_tasks_get},
+    {"tasks.cancel", cp_tasks_cancel},
 #ifdef HU_HAS_PUSH
     {"push.register", cp_admin_push_register},
     {"push.unregister", cp_admin_push_unregister},

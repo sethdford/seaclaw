@@ -1,4 +1,5 @@
 #include "human/eval.h"
+#include "human/eval/consistency.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include <ctype.h>
@@ -1486,8 +1487,11 @@ hu_error_t hu_eval_score_consistency(const float *prompt_sims, size_t prompt_cou
         out->line_to_line = sum / (float)turn_count;
     }
 
-    /* Q&A consistency requires separate evaluation pass; default to 0.0 here */
     out->qa_consistency = 0.0f;
+    if (prompt_count == 0 && turn_count == 0) {
+        out->prompt_to_line = 0.0f;
+        out->line_to_line = 0.0f;
+    }
 
     float weights = 0.0f;
     float weighted_sum = 0.0f;

@@ -10,9 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define HU_CRON_ADD_PARAMS                                                                    \
-    "{\"type\":\"object\",\"properties\":{\"expression\":{\"type\":\"string\"},\"command\":{" \
-    "\"type\":\"string\"},\"name\":{\"type\":\"string\"}},\"required\":[\"command\"]}"
+#define HU_CRON_ADD_PARAMS                                                                       \
+    "{\"type\":\"object\",\"properties\":{\"expression\":{\"type\":\"string\"},\"command\":{"    \
+    "\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"tools\":{\"type\":\"array\",\"items\"" \
+    ":{\"type\":\"string\"}}},\"required\":[\"command\"]}"
 
 typedef struct {
     hu_cron_scheduler_t *sched;

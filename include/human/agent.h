@@ -93,6 +93,7 @@ typedef struct hu_owned_message {
 } hu_owned_message_t;
 
 typedef struct hu_agent hu_agent_t;
+struct hu_bus;
 
 /* Optional context pressure config. Pass to hu_agent_from_config; NULL = use defaults. */
 typedef struct hu_agent_context_config {
@@ -234,6 +235,11 @@ struct hu_agent {
     /* Set by cron dispatch before turn; used for per-automation cost tracking. 0 = interactive. */
     uint64_t active_job_id;
 
+    /* Per-cron-job tool allowlist. When non-NULL, only these tools may execute during the turn.
+     * Borrowed pointers — valid only for the duration of the cron job turn. */
+    const char *const *cron_tool_allowlist;
+    size_t cron_tool_allowlist_count;
+
     char trace_id[37]; /* UUID v4 hex string + NUL, regenerated per conversation turn */
 
     char session_id[64]; /* current session persistence ID; empty = no active session */
@@ -369,6 +375,16 @@ struct hu_agent {
 
     /* Webhook manager for incoming webhook event handling */
     hu_webhook_manager_t *webhook_manager; /* optional; NULL = no webhooks */
+
+    /* Per-turn generated media paths from tool results (media_image, media_video, media_gif).
+     * Populated during tool dispatch; consumed by daemon for channel send() media attachments.
+     * Entries are owned (strdup'd) and freed at end of turn. */
+    char *generated_media[4];
+    size_t generated_media_count;
+
+    /* Optional: gateway UI bus for Live Canvas push to WebSocket clients (cmd_gateway). Not
+     * owned. */
+    struct hu_bus *ui_event_bus;
 };
 
 /* Create agent from minimal config (no full config loader yet).

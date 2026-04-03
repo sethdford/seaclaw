@@ -111,6 +111,7 @@ static const hu_tool_perm_entry_t HU_TOOL_PERMISSIONS[] = {
     {"pwa",                 HU_PERM_WORKSPACE_WRITE},
     {"twitter",             HU_PERM_WORKSPACE_WRITE},
     {"voice_clone",         HU_PERM_WORKSPACE_WRITE},
+    {"send_voice_message",  HU_PERM_WORKSPACE_WRITE},
 };
 
 #define HU_TOOL_PERMISSIONS_COUNT (sizeof(HU_TOOL_PERMISSIONS) / sizeof(HU_TOOL_PERMISSIONS[0]))

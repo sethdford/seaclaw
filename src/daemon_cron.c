@@ -242,6 +242,10 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
             agent->active_channel_len = strlen(target_channel);
         }
         agent->active_job_id = jobs[i].id;
+        if (jobs[i].allowed_tools && jobs[i].allowed_tools_count > 0) {
+            agent->cron_tool_allowlist = (const char *const *)jobs[i].allowed_tools;
+            agent->cron_tool_allowlist_count = jobs[i].allowed_tools_count;
+        }
 
         char *response = NULL;
         size_t response_len = 0;
@@ -255,6 +259,8 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
 #endif
 
         agent->active_job_id = 0;
+        agent->cron_tool_allowlist = NULL;
+        agent->cron_tool_allowlist_count = 0;
         if (err == HU_OK && response && response_len > 0 && target_channel && channels) {
             /* If response is exactly "SKIP", the agent decided not to engage */
             bool skip = (response_len == 4 && memcmp(response, "SKIP", 4) == 0);
@@ -283,6 +289,12 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
                         channels[c].channel->vtable->name(channels[c].channel->ctx);
                     if (ch_name && strcmp(ch_name, ch_part) == 0) {
                         if (channels[c].channel->vtable->send) {
+                            /* Suppress if real user is active on this contact */
+                            if (target_part && target_part_len > 0 &&
+                                channels[c].channel->vtable->human_active_recently &&
+                                channels[c].channel->vtable->human_active_recently(
+                                    channels[c].channel->ctx, target_part, target_part_len, 120))
+                                break;
                             response_len = hu_conversation_strip_ai_phrases(response, response_len);
                             response_len = hu_conversation_vary_complexity(response, response_len,
                                                                            (uint32_t)time(NULL));

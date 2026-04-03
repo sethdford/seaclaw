@@ -225,6 +225,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   private _recorder = new AudioRecorder();
   readonly #playback = new AudioPlaybackEngine(24000);
   #voiceStreaming = false;
+  #activeSessionIsGL = false;
   readonly #silence = createVoiceSilenceController({
     isActive: () => this.voiceStatus === "listening" && this.#voiceStreaming,
     onSilenceEnd: () => {
@@ -444,8 +445,12 @@ export class ScVoiceView extends GatewayAwareLitElement {
       }
     }
     this.#voiceStreaming = false;
+    this.#activeSessionIsGL = false;
     this.#playback.interrupt();
     this._speaking = false;
+    if (this.voiceStatus !== "idle") {
+      this.voiceStatus = "idle";
+    }
   }
 
   async #onGatewayDisconnectedDuringVoice(): Promise<void> {
@@ -460,6 +465,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
       this.#voiceStreaming ||
       this._speaking;
     this.#voiceStreaming = false;
+    this.#activeSessionIsGL = false;
     this.#playback.interrupt();
     this._speaking = false;
     if (this.voiceStatus === "listening" || this.voiceStatus === "processing") {
@@ -523,6 +529,10 @@ export class ScVoiceView extends GatewayAwareLitElement {
     return -1;
   }
 
+  /* Tool execution happens server-side in cp_voice_stream.c — the gateway
+     dispatches tools against the agent's registered tool set and sends
+     results back to Gemini. No client-side response needed. */
+
   private onGatewayEvent(e: Event): void {
     const ev = e as CustomEvent<{
       event: string;
@@ -563,12 +573,61 @@ export class ScVoiceView extends GatewayAwareLitElement {
       return;
     }
 
+    if (detail.event === "voice.tool_call") {
+      const name = (detail.payload?.name as string) ?? "unknown";
+      const callId = (detail.payload?.callId as string) ?? "";
+      const args = (detail.payload?.args as string) ?? "{}";
+      this.dispatchEvent(
+        new CustomEvent("voice-tool-call", {
+          detail: { name, callId, args },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+      return;
+    }
+
     if (detail.event === "voice.audio.done") {
-      this.#playback.markEndOfStream();
+      if (this._speaking) {
+        this.#playback.markEndOfStream();
+      } else if (this.voiceStatus !== "listening") {
+        this.voiceStatus = "idle";
+        this.requestUpdate();
+      }
       return;
     }
 
     if (detail.event === "voice.audio.interrupted") {
+      this.#playback.interrupt();
+      this._speaking = false;
+      this.voiceStatus = "idle";
+      this.requestUpdate();
+      return;
+    }
+
+    if (detail.event === "voice.generation_complete") {
+      if (this._speaking) {
+        this.#playback.markEndOfStream();
+      } else if (this.voiceStatus !== "listening") {
+        this.voiceStatus = "idle";
+        this.requestUpdate();
+      }
+      return;
+    }
+
+    if (detail.event === "voice.tool_cancelled") {
+      return;
+    }
+
+    if (detail.event === "voice.reconnected") {
+      ScToast.show({ message: "Voice session reconnected", variant: "info" });
+      return;
+    }
+
+    if (detail.event === "voice.error") {
+      const msg =
+        (detail.payload?.message as string) ?? "Voice session error";
+      ScToast.show({ message: msg, variant: "error" });
       this.#playback.interrupt();
       this._speaking = false;
       this.voiceStatus = "idle";
@@ -651,12 +710,16 @@ export class ScVoiceView extends GatewayAwareLitElement {
           unknown
         >;
         const isGeminiLive = result?.mode === "gemini_live";
+        this.#activeSessionIsGL = isGeminiLive;
 
         gw.setOnBinaryChunk((ab) => {
+          if (ab.byteLength === 0 || ab.byteLength % 4 !== 0) return;
           const f32 = new Float32Array(ab);
           if (f32.length > 0) {
             this._speaking = true;
-            void this.#playback.pushChunk(f32);
+            void this.#playback.pushChunk(f32).catch(() => {
+              /* AudioContext init failed or was closed */
+            });
           }
           this.requestUpdate();
         });
@@ -719,6 +782,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
         ScToast.show({ message: detail, variant: "error" });
         gw.setOnBinaryChunk(null);
         this.#voiceStreaming = false;
+        if (typeof gw.voiceSessionStop === "function") {
+          void gw.voiceSessionStop().catch(() => {});
+        }
       }
     }
 
@@ -746,7 +812,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
       this.voiceStatus = "processing";
       try {
         await this._recorder.stopStreaming();
-        if (!this._geminiLiveMode) {
+        if (this.#activeSessionIsGL) {
+          await gw.voiceAudioEnd({ sessionKey: SESSION_KEY_VOICE });
+        } else {
           const mime = this._recorder.streamMimeType || "audio/webm";
           await gw.voiceAudioEnd({
             mimeType: mime,
@@ -893,6 +961,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
           <hu-button
             variant=${this._geminiLiveMode ? "tonal" : "ghost"}
             size="sm"
+            ?disabled=${this.voiceStatus !== "idle"}
             @click=${() => {
               this._geminiLiveMode = !this._geminiLiveMode;
               try {

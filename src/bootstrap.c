@@ -1545,6 +1545,14 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                 vcfg.model = cfg->voice.realtime_model;
                 vcfg.voice = cfg->voice.realtime_voice;
                 want = true;
+            } else if (strcmp(cfg->voice.mode, "gemini_live") == 0) {
+                vcfg.mode = HU_VOICE_MODE_GEMINI_LIVE;
+                vcfg.api_key = hu_config_get_provider_key(cfg, "google");
+                if (!vcfg.api_key || !vcfg.api_key[0])
+                    vcfg.api_key = hu_config_get_provider_key(cfg, "gemini");
+                vcfg.model = cfg->voice.realtime_model;
+                vcfg.voice = cfg->voice.realtime_voice;
+                want = true;
             } else if (strcmp(cfg->voice.mode, "webrtc") == 0) {
                 vcfg.mode = HU_VOICE_MODE_WEBRTC;
                 want = true;
@@ -1560,7 +1568,10 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                     bi->channels[ch_count].poll_fn = hu_voice_poll;
                     bi->channels[ch_count].webhook_fn = NULL;
                     bi->channels[ch_count].interval_ms =
-                        vcfg.mode == HU_VOICE_MODE_REALTIME ? 200u : 1000u;
+                        (vcfg.mode == HU_VOICE_MODE_REALTIME ||
+                         vcfg.mode == HU_VOICE_MODE_GEMINI_LIVE)
+                            ? 200u
+                            : 1000u;
                     bi->channels[ch_count].last_poll_ms = 0;
                     bi->channel_destroys[ch_count] = destroy_voice_wrap;
                     ch_count++;

@@ -17,6 +17,13 @@ static bool bus_callback(hu_bus_event_type_t type, const hu_bus_event_t *ev, voi
     if (!bridge || !bridge->proto || !bridge->proto->alloc)
         return true;
 
+    if (type == HU_BUS_CANVAS) {
+        const char *raw = ev->payload ? (const char *)ev->payload : NULL;
+        if (raw && raw[0])
+            hu_control_send_event(bridge->proto, "canvas", raw);
+        return true;
+    }
+
     const char *event_name = NULL;
     hu_json_value_t *payload_obj = hu_json_object_new(bridge->proto->alloc);
     if (!payload_obj)

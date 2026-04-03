@@ -3,6 +3,7 @@
 #include "human/core/http.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/core/vertex_auth.h"
 #include "human/provider.h"
 #include "human/providers/sse.h"
 #include <stdint.h>
@@ -14,8 +15,6 @@
 #define HU_GEMINI_BASE               "https://generativelanguage.googleapis.com/v1beta/models"
 #define HU_GEMINI_BASE_LEN           (sizeof(HU_GEMINI_BASE) - 1)
 #define HU_GEMINI_DEFAULT_MAX_TOKENS 8192
-#define HU_GOOGLE_TOKEN_URL          "https://oauth2.googleapis.com/token"
-#define HU_ADC_REFRESH_MARGIN_SECS   120
 
 typedef struct hu_gemini_ctx {
     char *api_key;
@@ -24,12 +23,10 @@ typedef struct hu_gemini_ctx {
     size_t oauth_token_len;
     char *base_url;
     size_t base_url_len;
-    /* ADC credentials for automatic token refresh (Vertex AI) */
-    char *adc_client_id;
-    char *adc_client_secret;
-    char *adc_refresh_token;
+    /* Shared Vertex ADC auth (replaces private adc_client_id/secret/refresh_token) */
+    hu_vertex_auth_t vauth;
+    bool vauth_loaded;
     hu_allocator_t *alloc;
-    time_t token_expires_at;
 } hu_gemini_ctx_t;
 
 #if !HU_IS_TEST
@@ -42,118 +39,29 @@ static const char *gemini_effective_base(const hu_gemini_ctx_t *gc, size_t *out_
     return HU_GEMINI_BASE;
 }
 
-/* Load ADC credentials from ~/.config/gcloud/application_default_credentials.json */
 static hu_error_t gemini_load_adc(hu_gemini_ctx_t *gc, hu_allocator_t *alloc) {
-    const char *home = getenv("HOME");
-    if (!home)
-        return HU_ERR_CONFIG_NOT_FOUND;
-
-    const char *cred_env = getenv("GOOGLE_APPLICATION_CREDENTIALS");
-    char path[512];
-    if (cred_env && strlen(cred_env) > 0) {
-        snprintf(path, sizeof(path), "%s", cred_env);
-    } else {
-        snprintf(path, sizeof(path), "%s/.config/gcloud/application_default_credentials.json",
-                 home);
+    hu_error_t err = hu_vertex_auth_load_adc(&gc->vauth, alloc);
+    if (err == HU_OK) {
+        gc->vauth_loaded = true;
+        gc->alloc = alloc;
     }
-
-    FILE *f = fopen(path, "r");
-    if (!f)
-        return HU_ERR_CONFIG_NOT_FOUND;
-    char buf[4096];
-    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
-    fclose(f);
-    if (n == 0)
-        return HU_ERR_PARSE;
-    buf[n] = '\0';
-
-    hu_json_value_t *root = NULL;
-    hu_error_t err = hu_json_parse(alloc, buf, n, &root);
-    if (err != HU_OK)
-        return err;
-
-    const char *type_str = hu_json_get_string(root, "type");
-    if (!type_str || strcmp(type_str, "authorized_user") != 0) {
-        hu_json_free(alloc, root);
-        return HU_ERR_NOT_SUPPORTED;
-    }
-
-    const char *cid = hu_json_get_string(root, "client_id");
-    const char *csec = hu_json_get_string(root, "client_secret");
-    const char *rtok = hu_json_get_string(root, "refresh_token");
-    if (!cid || !csec || !rtok) {
-        hu_json_free(alloc, root);
-        return HU_ERR_PARSE;
-    }
-
-    gc->adc_client_id = hu_strndup(alloc, cid, strlen(cid));
-    gc->adc_client_secret = hu_strndup(alloc, csec, strlen(csec));
-    gc->adc_refresh_token = hu_strndup(alloc, rtok, strlen(rtok));
-    hu_json_free(alloc, root);
-
-    if (!gc->adc_client_id || !gc->adc_client_secret || !gc->adc_refresh_token)
-        return HU_ERR_OUT_OF_MEMORY;
-
-    gc->alloc = alloc;
-    return HU_OK;
+    return err;
 }
 
-/* Exchange ADC refresh token for a fresh access token */
-static hu_error_t gemini_refresh_token(hu_gemini_ctx_t *gc, hu_allocator_t *alloc) {
-    if (!gc->adc_client_id || !gc->adc_client_secret || !gc->adc_refresh_token)
-        return HU_ERR_PROVIDER_AUTH;
-
-    char body[2048];
-    int blen = snprintf(body, sizeof(body),
-                        "client_id=%s&client_secret=%s&refresh_token=%s&grant_type=refresh_token",
-                        gc->adc_client_id, gc->adc_client_secret, gc->adc_refresh_token);
-    if (blen <= 0 || (size_t)blen >= sizeof(body))
-        return HU_ERR_INVALID_ARGUMENT;
-
-    hu_http_response_t resp = {0};
-    hu_error_t err = hu_http_request(alloc, HU_GOOGLE_TOKEN_URL, "POST",
-                                     "Content-Type: application/x-www-form-urlencoded", body,
-                                     (size_t)blen, &resp);
-    if (err != HU_OK)
-        return err;
-
-    if (resp.status_code < 200 || resp.status_code >= 300) {
-        hu_http_response_free(alloc, &resp);
-        return HU_ERR_PROVIDER_AUTH;
-    }
-
-    hu_json_value_t *root = NULL;
-    err = hu_json_parse(alloc, resp.body, resp.body_len, &root);
-    hu_http_response_free(alloc, &resp);
-    if (err != HU_OK)
-        return err;
-
-    const char *token = hu_json_get_string(root, "access_token");
-    double expires_in = hu_json_get_number(root, "expires_in", 3600.0);
-    if (!token) {
-        hu_json_free(alloc, root);
-        return HU_ERR_PROVIDER_AUTH;
-    }
-
-    if (gc->oauth_token)
-        alloc->free(alloc->ctx, gc->oauth_token, gc->oauth_token_len + 1);
-    size_t tlen = strlen(token);
-    gc->oauth_token = hu_strndup(alloc, token, tlen);
-    gc->oauth_token_len = tlen;
-    gc->token_expires_at = time(NULL) + (time_t)expires_in;
-    hu_json_free(alloc, root);
-    return gc->oauth_token ? HU_OK : HU_ERR_OUT_OF_MEMORY;
-}
-
-/* Ensure we have a valid OAuth token, refreshing if needed */
 static hu_error_t gemini_ensure_token(hu_gemini_ctx_t *gc, hu_allocator_t *alloc) {
     if (gc->api_key && gc->api_key_len > 0)
         return HU_OK;
-    if (!gc->adc_refresh_token)
+    if (!gc->vauth_loaded)
         return gc->oauth_token ? HU_OK : HU_ERR_PROVIDER_AUTH;
-    if (gc->oauth_token && time(NULL) < gc->token_expires_at - HU_ADC_REFRESH_MARGIN_SECS)
-        return HU_OK;
-    return gemini_refresh_token(gc, alloc);
+    hu_error_t err = hu_vertex_auth_ensure_token(&gc->vauth, alloc);
+    if (err != HU_OK)
+        return err;
+    /* Sync the shared auth token into the ctx for existing code paths */
+    if (gc->oauth_token)
+        alloc->free(alloc->ctx, gc->oauth_token, gc->oauth_token_len + 1);
+    gc->oauth_token = hu_strndup(alloc, gc->vauth.access_token, gc->vauth.access_token_len);
+    gc->oauth_token_len = gc->vauth.access_token_len;
+    return gc->oauth_token ? HU_OK : HU_ERR_OUT_OF_MEMORY;
 }
 
 #endif
@@ -1353,12 +1261,8 @@ static void gemini_deinit(void *ctx, hu_allocator_t *alloc) {
         alloc->free(alloc->ctx, gc->oauth_token, gc->oauth_token_len + 1);
     if (gc->base_url)
         alloc->free(alloc->ctx, gc->base_url, gc->base_url_len + 1);
-    if (gc->adc_client_id)
-        alloc->free(alloc->ctx, gc->adc_client_id, strlen(gc->adc_client_id) + 1);
-    if (gc->adc_client_secret)
-        alloc->free(alloc->ctx, gc->adc_client_secret, strlen(gc->adc_client_secret) + 1);
-    if (gc->adc_refresh_token)
-        alloc->free(alloc->ctx, gc->adc_refresh_token, strlen(gc->adc_refresh_token) + 1);
+    if (gc->vauth_loaded)
+        hu_vertex_auth_free(&gc->vauth);
     alloc->free(alloc->ctx, gc, sizeof(*gc));
 }
 

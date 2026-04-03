@@ -80,10 +80,34 @@ hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *ses
         (tp && strcmp(tp, "gemini_live") == 0) || (tp && strcmp(tp, "gemini") == 0);
 
     if (gemini_live_mode) {
-        /* TODO: Gemini Live voice provider not yet implemented.
-         * hu_voice_provider_gemini_live_create() is declared but not defined.
-         * Fall through to realtime mode or no-op. */
-        (void)gemini_live_mode;
+        const char *key = hu_config_get_provider_key(config, "google");
+        if (!key || !key[0])
+            key = hu_config_get_provider_key(config, "gemini");
+        const char *vtok = config->voice.vertex_access_token;
+        if ((key && key[0]) || (vtok && vtok[0])) {
+            hu_gemini_live_config_t glc = {
+                .api_key = (key && key[0]) ? key : NULL,
+                .access_token = vtok,
+                .model = rt_model,
+                .voice = rt_voice,
+                .region = config->voice.vertex_region,
+                .project_id = config->voice.vertex_project,
+                .transcribe_input = true,
+                .transcribe_output = true,
+                .affective_dialog = true,
+                .manual_vad = true,
+                .enable_session_resumption = true,
+                .thinking_level = HU_GL_THINKING_MINIMAL,
+            };
+            hu_voice_provider_t vp = {0};
+            if (hu_voice_provider_gemini_live_create(alloc, &glc, &vp) == HU_OK && vp.vtable) {
+                if (vp.vtable->connect(vp.ctx) == HU_OK) {
+                    session->provider = vp;
+                    return HU_OK;
+                }
+                vp.vtable->disconnect(vp.ctx, alloc);
+            }
+        }
     }
     if (realtime_mode) {
         const char *key = hu_config_get_provider_key(config, "openai");
@@ -97,7 +121,6 @@ hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *ses
             if (hu_voice_provider_openai_create(alloc, &rtc, &vp) == HU_OK && vp.vtable) {
                 if (vp.vtable->connect(vp.ctx) == HU_OK) {
                     session->provider = vp;
-                    session->rt = (hu_voice_rt_session_t *)vp.ctx;
                 } else {
                     vp.vtable->disconnect(vp.ctx, alloc);
                 }
@@ -115,10 +138,6 @@ hu_error_t hu_voice_session_stop(hu_voice_session_t *session) {
         session->provider.vtable->disconnect(session->provider.ctx, NULL);
         session->provider.ctx = NULL;
         session->provider.vtable = NULL;
-        session->rt = NULL;
-    } else if (session->rt) {
-        hu_voice_rt_session_destroy(session->rt);
-        session->rt = NULL;
     }
     (void)hu_duplex_session_init(&session->duplex);
     session->last_action = HU_TURN_ACTION_NONE;
@@ -173,8 +192,6 @@ hu_error_t hu_voice_session_send_audio(hu_voice_session_t *session, const uint8_
 
     if (session->provider.vtable)
         return session->provider.vtable->send_audio(session->provider.ctx, pcm16, pcm16_len);
-    if (session->rt && session->rt->connected)
-        return hu_voice_rt_send_audio(session->rt, pcm16, pcm16_len);
     return HU_OK;
 }
 
@@ -196,8 +213,6 @@ hu_error_t hu_voice_session_on_interrupt(hu_voice_session_t *session) {
 
     if (session->provider.vtable)
         return session->provider.vtable->cancel_response(session->provider.ctx);
-    if (session->rt && session->rt->connected)
-        return hu_voice_rt_response_cancel(session->rt);
     return HU_OK;
 }
 

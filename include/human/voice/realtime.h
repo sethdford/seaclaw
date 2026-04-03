@@ -32,6 +32,8 @@ typedef struct hu_voice_rt_event {
     size_t transcript_len;
     char *tool_call_id; /* function call ID for sending responses back (caller frees) */
     size_t tool_call_id_len;
+    char *tool_args_json; /* stringified function call arguments JSON (caller frees) */
+    size_t tool_args_json_len;
     bool done; /* true if this is an end-of-response event (turnComplete) */
     bool interrupted; /* model response was interrupted by barge-in */
     bool generation_complete; /* model finished generating (may still be playing back) */

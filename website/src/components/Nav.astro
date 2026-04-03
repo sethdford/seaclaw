@@ -32,10 +32,10 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     <div class="flex items-center gap-8">
       <div class="flex items-center gap-4 md:gap-8">
         <div class="hidden md:flex items-center gap-6">
-          <a href="#use-cases" class="nav-link text-[13px] transition-colors"
+          <a href={`${base}#use-cases`} class="nav-link text-[13px] transition-colors"
             >Use Cases</a
           >
-          <a href="#architecture" class="nav-link text-[13px] transition-colors"
+          <a href={`${base}#architecture`} class="nav-link text-[13px] transition-colors"
             >Architecture</a
           >
           <a
@@ -145,20 +145,21 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         </button>
       </div>
     </div>
-    <nav
+    <div
       id="mobile-menu"
       popover="auto"
-      class="mobile-menu-popover md:hidden"
+      role="dialog"
       aria-label="Mobile navigation"
+      class="mobile-menu-popover md:hidden"
     >
       <div class="mobile-menu-inner">
         <a
-          href="#use-cases"
+          href={`${base}#use-cases`}
           class="mobile-menu-link text-[15px] py-2 transition-colors"
           style="color: var(--hu-text-secondary)">Use Cases</a
         >
         <a
-          href="#architecture"
+          href={`${base}#architecture`}
           class="mobile-menu-link text-[15px] py-2 transition-colors"
           style="color: var(--hu-text-secondary)">Architecture</a
         >
@@ -185,7 +186,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
           style="color: var(--hu-text-secondary)">GitHub</a
         >
       </div>
-    </nav>
+    </div>
   </div>
 
   <style>

@@ -38,6 +38,12 @@ option(HU_ENABLE_SOCIAL "Build social feed ingestion (Facebook, Instagram)" OFF)
 option(HU_ENABLE_EMBEDDED_MODEL "Enable embedded model provider (llama.cpp/llama-cli)" OFF)
 option(HU_ENABLE_COREML "Enable CoreML/MLX provider (macOS only)" OFF)
 option(HU_ENABLE_MCP "Enable MCP client (multi-server tool discovery)" ON)
+option(HU_ENABLE_MEDIA_GEN "Enable media generation tools (Nano Banana, Imagen, Veo)" ON)
+if(APPLE)
+    option(HU_ENABLE_VISION_OCR "Apple Vision OCR for computer_use (screen text, macOS)" ON)
+else()
+    option(HU_ENABLE_VISION_OCR "Apple Vision OCR for computer_use (screen text, macOS)" OFF)
+endif()
 
 # WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
 
@@ -308,6 +314,7 @@ set(HU_CORE_SOURCES
     src/core/string.c
     src/core/json.c
     src/core/http.c
+    src/core/vertex_auth.c
     src/core/process_util.c
     src/sse/sse_client.c
     src/websocket/websocket.c
@@ -397,6 +404,7 @@ set(HU_CORE_SOURCES
     src/gateway/cp_admin.c
     src/gateway/cp_memory.c
     src/gateway/cp_hula.c
+    src/gateway/cp_tasks.c
     src/gateway/cp_voice.c
     src/gateway/cp_voice_clone.c
     src/gateway/cp_voice_stream.c
@@ -435,6 +443,7 @@ set(HU_CORE_SOURCES
     src/agent/team.c
     src/agent/mailbox.c
     src/agent/task_list.c
+    src/agent/task_store.c
     src/agent/profile.c
     src/agent/planner.c
     src/agent/plan_executor.c
@@ -688,6 +697,7 @@ set(HU_CORE_SOURCES
     src/tools/homeassistant.c
     src/tools/diff.c
     src/tools/voice_clone.c
+    src/tools/send_voice_message.c
     src/tools/factory.c
     src/tools/mcp_resource_tools.c
     src/tools/cron_session_tools.c
@@ -813,8 +823,15 @@ list(APPEND HU_CORE_SOURCES
     src/security/escalate.c
     src/security/moderation.c
     src/security/companion_safety.c
+    src/security/sycophancy_guard.c
+    src/memory/hallucination_guard.c
+    src/memory/fact_extract.c
+    src/cognition/trust.c
+    src/eval/consistency.c
+    src/agent/self_improve.c
     src/tools/code_sandbox.c
     src/tools/computer_use.c
+    src/tools/vision_ocr.c
     src/tools/image_gen.c
     src/tools/visual_grounding.c
     src/tools/browser_use.c
@@ -836,6 +853,11 @@ list(APPEND HU_CORE_SOURCES
 
 if(HU_ENABLE_COREML)
     list(APPEND HU_CORE_SOURCES src/providers/coreml.c)
+endif()
+
+if(APPLE AND HU_ENABLE_VISION_OCR)
+    enable_language(OBJC)
+    list(APPEND HU_CORE_SOURCES src/tools/vision_ocr_apple.m)
 endif()
 
 # Persona system (~138 KB; disable for minimal/embedded builds)
@@ -860,6 +882,8 @@ if(HU_ENABLE_PERSONA)
         src/persona/life_sim.c
         src/persona/mood.c
         src/persona/style_learner.c
+        src/persona/humor.c
+        src/persona/markdown_loader.c
         src/tools/persona.c
         src/context/theory_of_mind.c
         src/context/self_awareness.c
@@ -922,6 +946,15 @@ if(HU_ENABLE_CURL)
         src/paperclip/client.c
         src/paperclip/heartbeat.c
         src/tools/paperclip.c
+    )
+endif()
+
+# Media generation tools (Nano Banana, Imagen 4, Veo 3.1)
+if(HU_ENABLE_MEDIA_GEN)
+    list(APPEND HU_CORE_SOURCES
+        src/tools/media_image.c
+        src/tools/media_video.c
+        src/tools/media_gif.c
     )
 endif()
 
@@ -1123,6 +1156,10 @@ if(APPLE)
     target_link_libraries(human_core PRIVATE "-framework ApplicationServices" "-framework ImageIO" "-framework Accelerate")
     # New CBLAS headers; avoids -Wdeprecated-declarations on cblas_sgemm (macOS 13.3+).
     target_compile_definitions(human_core PRIVATE ACCELERATE_NEW_LAPACK=1)
+    if(HU_ENABLE_VISION_OCR)
+        target_compile_definitions(human_core PRIVATE HU_ENABLE_VISION_OCR=1)
+        target_link_libraries(human_core PRIVATE "-framework Vision" "-framework AppKit")
+    endif()
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(X11 QUIET)
@@ -1424,6 +1461,11 @@ if(HU_ENABLE_CURL)
     endif()
 endif()
 
+if(HU_ENABLE_MEDIA_GEN)
+    target_compile_definitions(human_core PRIVATE HU_ENABLE_MEDIA_GEN=1)
+    message(STATUS "Media generation: Nano Banana + Imagen 4 + Veo 3.1 enabled")
+endif()
+
 if(HU_ENABLE_FIPS_CRYPTO)
     find_package(OpenSSL REQUIRED)
     target_link_libraries(human_core PUBLIC OpenSSL::Crypto)
@@ -1719,7 +1761,7 @@ if(NOT HU_ENABLE_PERSONA)
         src/persona/replay.c src/persona/circadian.c src/persona/relationship.c
         src/persona/auto_profile.c src/persona/auto_tune.c src/persona/voice_maturity.c
         src/persona/style_clone.c src/persona/life_sim.c src/persona/mood.c
-        src/persona/style_learner.c src/tools/persona.c
+        src/persona/style_learner.c src/persona/markdown_loader.c src/tools/persona.c
         src/context/theory_of_mind.c src/context/self_awareness.c src/context/anticipatory.c
         src/context/protective.c src/context/humor.c src/context/social_graph.c
         src/context/authentic.c
@@ -1763,6 +1805,10 @@ if(HU_ENABLE_CARTESIA)
 endif()
 if(HU_ENABLE_PERSONA)
     target_compile_definitions(human_core_test PRIVATE HU_ENABLE_PERSONA=1)
+endif()
+if(APPLE AND HU_ENABLE_VISION_OCR)
+    target_compile_definitions(human_core_test PRIVATE HU_ENABLE_VISION_OCR=1)
+    target_link_libraries(human_core_test PRIVATE "-framework Vision" "-framework AppKit")
 endif()
 # Tests always have all module groups available
 target_compile_definitions(human_core_test PRIVATE HU_HAS_PERIPHERALS=1 HU_HAS_TUNNELS=1 HU_HAS_RUNTIME_EXOTIC=1 HU_HAS_TOOLS_BROWSER=1 HU_HAS_TOOLS_ADVANCED=1 HU_HAS_OTEL=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1 HU_ENABLE_ML=1)
@@ -2002,6 +2048,7 @@ set(HU_TEST_SOURCES
     tests/test_sota_wiring.c
     tests/test_sota_live_wiring.c
     tests/test_voice_rt_openai.c
+    tests/test_voice_provider.c
     tests/test_gemini_live.c
     tests/test_voice_session.c
     tests/test_autonomy.c
@@ -2139,6 +2186,7 @@ set(HU_TEST_SOURCES
     tests/test_style_tracker.c
     tests/test_theory_of_mind.c
     tests/test_anticipatory.c
+    tests/test_anticipatory_state.c
     tests/test_visual_content.c
     tests/test_opinions.c
     tests/test_life_chapters.c
@@ -2191,17 +2239,25 @@ set(HU_TEST_SOURCES
     tests/test_skill_routing.c
     tests/test_dual_process.c
     tests/test_repair.c
+    tests/test_hallucination_guard.c
+    tests/test_consistency.c
+    tests/test_sycophancy_guard.c
+    tests/test_trust_calibration.c
+    tests/test_fact_extract.c
+    tests/test_self_improve.c
 )
 if(HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c
         tests/test_research_feeds.c tests/test_research_executor.c)
 endif()
 if(HU_ENABLE_PERSONA)
-    list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c tests/test_persona_feedback.c tests/test_persona_cli.c tests/test_voice_maturity.c tests/test_style_learner.c tests/test_temporal.c tests/test_inner_world.c)
+    list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c tests/test_persona_feedback.c tests/test_persona_cli.c tests/test_voice_maturity.c tests/test_style_learner.c tests/test_temporal.c tests/test_inner_world.c tests/test_humor_fw.c tests/test_markdown_loader.c)
 endif()
 list(APPEND HU_TEST_SOURCES tests/test_cartesia.c)
 list(APPEND HU_TEST_SOURCES tests/test_cartesia_stream.c)
 list(APPEND HU_TEST_SOURCES tests/test_voice_clone.c)
+list(APPEND HU_TEST_SOURCES tests/test_send_voice_message.c)
+list(APPEND HU_TEST_SOURCES tests/test_voice_message_integration.c)
 if(HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_SOURCES tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)
 endif()
@@ -2212,6 +2268,11 @@ endif()
 # Paperclip tests (requires libcurl)
 if(HU_ENABLE_CURL)
     list(APPEND HU_TEST_SOURCES tests/test_paperclip.c)
+endif()
+
+# Media generation tests
+if(HU_ENABLE_MEDIA_GEN)
+    list(APPEND HU_TEST_SOURCES tests/test_media_gen.c)
 endif()
 
 list(APPEND HU_TEST_SOURCES tests/test_memory_features.c)
@@ -2242,6 +2303,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_tool_validation.c
     tests/test_tool_ask_user.c
     tests/test_task_manager.c
+    tests/test_task_store.c
     tests/test_task_tools.c
     tests/test_otlp.c
     tests/test_mar.c
@@ -2280,6 +2342,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_code_sandbox.c
     tests/test_compaction_hierarchical.c
     tests/test_computer_use.c
+    tests/test_vision_ocr.c
     tests/test_image_gen.c
     tests/test_visual_grounding.c
     tests/test_browser_use.c
@@ -2332,6 +2395,9 @@ if(HU_ENABLE_TUI)
 endif()
 if(HU_ENABLE_CURL)
     target_compile_definitions(human_tests PRIVATE HU_ENABLE_CURL=1)
+endif()
+if(HU_ENABLE_MEDIA_GEN)
+    target_compile_definitions(human_tests PRIVATE HU_ENABLE_MEDIA_GEN=1)
 endif()
 if(HU_ENABLE_SQLITE)
     target_compile_definitions(human_tests PRIVATE HU_ENABLE_SQLITE=1)

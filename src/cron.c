@@ -35,6 +35,13 @@ static void free_job(hu_allocator_t *alloc, hu_cron_job_t *job) {
         hu_str_free(alloc, job->channel);
     if (job->last_status)
         hu_str_free(alloc, job->last_status);
+    for (size_t i = 0; i < job->allowed_tools_count; i++) {
+        if (job->allowed_tools[i])
+            hu_str_free(alloc, job->allowed_tools[i]);
+    }
+    if (job->allowed_tools)
+        alloc->free(alloc->ctx, job->allowed_tools,
+                    job->allowed_tools_count * sizeof(char *));
     memset(job, 0, sizeof(*job));
 }
 
@@ -167,6 +174,36 @@ hu_error_t hu_cron_add_agent_job(hu_cron_scheduler_t *sched, hu_allocator_t *all
     job->created_at_s = (int64_t)time(NULL);
 
     sched->jobs_len++;
+    return HU_OK;
+}
+
+hu_error_t hu_cron_add_agent_job_with_tools(hu_cron_scheduler_t *sched, hu_allocator_t *alloc,
+                                             const char *expression, const char *prompt,
+                                             const char *channel, const char *name,
+                                             const char *const *allowed_tools,
+                                             size_t allowed_tools_count, uint64_t *out_id) {
+    hu_error_t err = hu_cron_add_agent_job(sched, alloc, expression, prompt, channel, name, out_id);
+    if (err != HU_OK)
+        return err;
+    if (allowed_tools && allowed_tools_count > 0) {
+        hu_cron_job_t *job = NULL;
+        for (size_t i = 0; i < sched->jobs_len; i++) {
+            if (sched->jobs[i].id == *out_id) {
+                job = &sched->jobs[i];
+                break;
+            }
+        }
+        if (job) {
+            job->allowed_tools =
+                (char **)alloc->alloc(alloc->ctx, allowed_tools_count * sizeof(char *));
+            if (!job->allowed_tools)
+                return HU_ERR_OUT_OF_MEMORY;
+            job->allowed_tools_count = allowed_tools_count;
+            for (size_t i = 0; i < allowed_tools_count; i++)
+                job->allowed_tools[i] =
+                    hu_strndup(alloc, allowed_tools[i], strlen(allowed_tools[i]));
+        }
+    }
     return HU_OK;
 }
 

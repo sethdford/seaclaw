@@ -4,6 +4,7 @@
 #include "human/core/string.h"
 #include "human/memory/connections.h"
 #include "human/memory/deep_extract.h"
+#include "human/memory/fact_extract.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -356,6 +357,31 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
                 }
 
                 hu_deep_extract_result_deinit(&de_result, alloc);
+
+                /* Heuristic fact extraction (PlugMem-style) — runs alongside LLM extract
+                 * to capture structured propositional/prescriptive facts from first-person
+                 * statements that LLM extraction might miss or paraphrase. */
+                hu_fact_extract_result_t fe_result = {0};
+                if (hu_fact_extract(text, pos, &fe_result) == HU_OK && fe_result.fact_count > 0) {
+                    for (size_t f = 0; f < fe_result.fact_count; f++) {
+                        hu_heuristic_fact_t *efact = &fe_result.facts[f];
+                        if (efact->confidence < (double)threshold)
+                            continue;
+                        char *fe_key = NULL;
+                        size_t fe_key_len = 0;
+                        char *fe_val = NULL;
+                        size_t fe_val_len = 0;
+                        if (hu_fact_format_for_store(alloc, efact, &fe_key, &fe_key_len,
+                                                     &fe_val, &fe_val_len) == HU_OK) {
+                            hu_memory_category_t fe_cat = {.tag = HU_MEMORY_CATEGORY_INSIGHT};
+                            (void)memory->vtable->store(memory->ctx, fe_key, fe_key_len,
+                                                        fe_val, fe_val_len, &fe_cat, NULL, 0);
+                            alloc->free(alloc->ctx, fe_key, fe_key_len + 1);
+                            alloc->free(alloc->ctx, fe_val, fe_val_len + 1);
+                        }
+                    }
+                }
+
                 alloc->free(alloc->ctx, text, text_cap + 1);
             }
         }

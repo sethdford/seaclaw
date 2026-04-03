@@ -19,6 +19,7 @@
 #include "human/agent/outcomes.h"
 #include "human/agent/registry.h"
 #include "human/agent/spawn.h"
+#include "human/agent/task_store.h"
 #include "human/bootstrap.h"
 #include "human/bus.h"
 #include "human/channel.h"
@@ -1120,6 +1121,7 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
     hu_app_context_t svc_app_ctx;
     memset(&svc_app_ctx, 0, sizeof(svc_app_ctx));
     hu_graph_t *svc_graph = NULL;
+    hu_task_store_t *svc_task_store = NULL;
     gw_agent_bridge_t svc_agent_bridge = {0};
     if (with_gateway) {
         hu_gateway_config_from_cfg(&app_ctx.cfg->gateway, &gw_config);
@@ -1163,6 +1165,16 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
         }
         svc_app_ctx.mcp_resources = &svc_mcp_resources;
         svc_app_ctx.mcp_prompts = &svc_mcp_prompts;
+
+        if (app_ctx.agent) {
+            void *svc_task_db = NULL;
+#ifdef HU_ENABLE_SQLITE
+            if (app_ctx.memory)
+                svc_task_db = (void *)hu_sqlite_memory_get_db(app_ctx.memory);
+#endif
+            if (hu_task_store_create(alloc, svc_task_db, &svc_task_store) == HU_OK)
+                svc_app_ctx.task_store = svc_task_store;
+        }
 
         gw_config.app_ctx = &svc_app_ctx;
 
@@ -1208,6 +1220,10 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
         hu_bus_unsubscribe(&svc_bus, svc_agent_on_message_locked, &svc_agent_bridge);
         if (gw_tid) {
             pthread_join(gw_tid, NULL);
+        }
+        if (svc_task_store) {
+            hu_task_store_destroy(svc_task_store, alloc);
+            svc_task_store = NULL;
         }
         if (svc_graph) {
             hu_graph_close(svc_graph, alloc);
@@ -2492,6 +2508,7 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
     hu_awareness_t gw_awareness = {0};
 
     hu_graph_t *gw_graph = NULL;
+    hu_task_store_t *gw_task_store = NULL;
 #ifdef HU_ENABLE_SQLITE
     {
         const char *home = getenv("HOME");
@@ -2572,6 +2589,15 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
 
     if (with_agent && app.agent_ok && app.agent) {
         gw_app_ctx.agent = app.agent;
+        {
+            void *gw_task_db = NULL;
+#ifdef HU_ENABLE_SQLITE
+            if (app.agent->memory)
+                gw_task_db = (void *)hu_sqlite_memory_get_db(app.agent->memory);
+#endif
+            if (hu_task_store_create(alloc, gw_task_db, &gw_task_store) == HU_OK)
+                gw_app_ctx.task_store = gw_task_store;
+        }
         hu_error_t init_err = hu_awareness_init(&gw_awareness, &bus);
         if (init_err != HU_OK)
             hu_log_error("main", NULL, "awareness init failed: %s", hu_error_string(init_err));
@@ -2580,6 +2606,7 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
         agent_bridge.agent = app.agent;
         agent_bridge.bus = &bus;
         agent_bridge.thread_binding = gw_thread_binding;
+        app.agent->ui_event_bus = &bus;
         hu_bus_subscribe(&bus, gw_agent_on_message, &agent_bridge, HU_BUS_MESSAGE_RECEIVED);
         hu_log_info("human", NULL, "gateway+agent mode (provider=%s tools=%zu)",
                     app.cfg->default_provider ? app.cfg->default_provider : "openai",
@@ -2597,8 +2624,13 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
 
     /* ── Cleanup: gateway-specific first, then bootstrap ───────────────── */
     if (with_agent && app.agent_ok && app.agent) {
+        app.agent->ui_event_bus = NULL;
         hu_awareness_deinit(&gw_awareness);
         hu_bus_unsubscribe(&bus, gw_agent_on_message, &agent_bridge);
+    }
+    if (gw_task_store) {
+        hu_task_store_destroy(gw_task_store, alloc);
+        gw_task_store = NULL;
     }
     if (gw_graph) {
         hu_graph_close(gw_graph, alloc);

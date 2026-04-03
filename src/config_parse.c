@@ -693,6 +693,9 @@ static hu_error_t parse_voice(hu_allocator_t *a, hu_config_t *cfg, const hu_json
     HU_PARSE_VOICE_STR(mode, "mode");
     HU_PARSE_VOICE_STR(realtime_model, "realtime_model");
     HU_PARSE_VOICE_STR(realtime_voice, "realtime_voice");
+    HU_PARSE_VOICE_STR(vertex_region, "vertex_region");
+    HU_PARSE_VOICE_STR(vertex_project, "vertex_project");
+    HU_PARSE_VOICE_STR(vertex_access_token, "vertex_access_token");
 #undef HU_PARSE_VOICE_STR
     return HU_OK;
 }

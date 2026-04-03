@@ -197,6 +197,9 @@ hu_error_t cp_voice_config(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
 hu_error_t cp_voice_clone(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                           const hu_control_protocol_t *proto, const hu_json_value_t *root,
                           char **out, size_t *out_len);
+hu_error_t cp_voice_tool_response(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                  const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                  char **out, size_t *out_len);
 
 /* Memory handlers */
 hu_error_t cp_memory_status(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -237,6 +240,17 @@ hu_error_t cp_hula_traces_delete(hu_allocator_t *alloc, hu_app_context_t *app, h
 hu_error_t cp_hula_traces_analytics(hu_allocator_t *alloc, hu_app_context_t *app,
                                     hu_ws_conn_t *conn, const hu_control_protocol_t *proto,
                                     const hu_json_value_t *root, char **out, size_t *out_len);
+
+/* HuLa durable task store RPC */
+hu_error_t cp_tasks_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                         const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                         char **out, size_t *out_len);
+hu_error_t cp_tasks_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                        const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                        char **out, size_t *out_len);
+hu_error_t cp_tasks_cancel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                           const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                           char **out, size_t *out_len);
 
 /* Turing score RPC handlers */
 hu_error_t cp_turing_scores(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,

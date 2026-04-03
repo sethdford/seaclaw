@@ -9,7 +9,7 @@ graph TB
     subgraph external [External Interfaces]
         CLI[CLI Terminal]
         Gateway[HTTP/WS Gateway]
-        Channels[38 Messaging Channels]
+        Channels[31 Messaging Channels]
     end
 
     subgraph core [Agent Core]
@@ -28,7 +28,7 @@ graph TB
     end
 
     subgraph execution [Execution Layer]
-        Tools[85 Tools]
+        Tools[87 Tools]
         Runtime[Runtime Adapters]
         Security[Security / Policy]
     end
@@ -125,8 +125,8 @@ graph TD
 
     subgraph implementations [Implementations - src/]
         ProvImpl["providers/ - 50+"]
-        ChanImpl["channels/ - 38"]
-        ToolImpl["tools/ - 85"]
+        ChanImpl["channels/ - 31"]
+        ToolImpl["tools/ - 87"]
         MemImpl["memory/ - 10 engines"]
         RTImpl["runtime/ - 5 adapters"]
         SecImpl["security/ - 11 sandboxes"]
@@ -175,7 +175,7 @@ All extension is done via vtable implementation + factory registration:
 | Extension Point | Vtable            | Factory                   | Guide                  |
 | --------------- | ----------------- | ------------------------- | ---------------------- |
 | AI Provider     | `hu_provider_t`   | `src/providers/factory.c` | `AGENTS.md` 7.1        |
-| Channel         | `hu_channel_t`    | `src/channels/factory.c`  | `AGENTS.md` 7.2        |
+| Channel         | `hu_channel_t`    | `src/channel_catalog.c`   | `AGENTS.md` 7.2        |
 | Tool            | `hu_tool_t`       | `src/tools/factory.c`     | `AGENTS.md` 7.3        |
 | Memory Engine   | `hu_memory_t`     | `src/memory/factory.c`    | `src/memory/CLAUDE.md` |
 | Runtime         | `hu_runtime_t`    | `src/runtime/factory.c`   | `AGENTS.md` 7.5        |
@@ -222,9 +222,9 @@ The loop can **deduplicate system prompts** via a **prompt cache** (`prompt_cach
 ```
 src/
   agent/       Agent loop, planner, DAG, context, prompt assembly
-  channels/    38 messaging channel implementations
+  channels/    31 messaging channel implementations
   providers/   50+ AI provider implementations
-  tools/       85 tool implementations
+  tools/       87 tool implementations
   memory/      Memory engines, retrieval, vector, lifecycle
   ml/          ML training (BPE, GPT, MuonAdamW, experiment loop) — HU_ENABLE_ML
   security/    Policy, pairing, secrets, 11 sandbox backends
@@ -234,8 +234,8 @@ src/
   core/        Allocator, arena, JSON, string, HTTP, error
 
 include/human/  Public C headers (vtable definitions)
-tests/          291 test files, 6858+ tests
-fuzz/           libFuzzer harnesses
+tests/          414 test files, 8,400+ tests
+fuzz/           31 libFuzzer harnesses
 ui/             LitElement web dashboard
 website/        Astro marketing site
 apps/           iOS, macOS, Android native apps + shared HumanKit

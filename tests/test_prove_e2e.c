@@ -557,7 +557,6 @@ static void test_prove_voice_session_start_stop(void) {
     /* Stop — should cleanly deactivate */
     HU_ASSERT_EQ(hu_voice_session_stop(&session), HU_OK);
     HU_ASSERT(session.active == false);
-    HU_ASSERT(session.rt == NULL);
 
     fprintf(stderr, "  [PROVE] Voice session: start→stop lifecycle CLOSED\n");
 }

@@ -6,7 +6,7 @@ const rawBase = import.meta.env.BASE_URL;
 const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
 ---
 
-<html lang="en">
+<html lang="en" class="hu-lcp-done">
   <head>
     <script is:inline>
       (function () {
@@ -19,7 +19,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="canonical" href="https://h-uman.ai/design" />
+    <link rel="canonical" href="https://h-uman.ai/design/" />
     <title>Design System — h-uman</title>
     <meta
       name="description"
@@ -33,7 +33,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       content="The visual language of h-uman. Every color, every motion, every surface — designed to be not quite human."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://h-uman.ai/design" />
+    <meta property="og:url" content="https://h-uman.ai/design/" />
     <style is:global>
       :root {
         --color-bg: var(--hu-bg);
@@ -794,7 +794,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               </svg>
             </a>
             <a
-              href={`${base}brand`}
+              href={`${base}brand/`}
               class="inline-flex items-center gap-2 px-6 py-3 rounded-full font-medium text-[15px] transition-all duration-[var(--hu-duration-normal)] hover:translate-y-[-2px]"
               style="color: var(--color-text); border: 1px solid var(--color-border); font-family: var(--hu-font);"
             >
@@ -896,7 +896,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         });
       }
 
-      // Motion boxes — spring on hover
+      // Motion boxes — spring on hover/focus
       const springMap = {
         micro: "scale(1.02)",
         standard: "scale(1.05) translateY(-4px)",
@@ -904,28 +904,34 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         dramatic: "scale(1.12) translateY(-12px)",
       };
       document.querySelectorAll<HTMLElement>(".motion-box").forEach((box) => {
+        box.setAttribute("tabindex", "0");
+        box.setAttribute("role", "button");
         const spring = box.dataset.spring;
-        box.addEventListener("mouseenter", () => {
+        const activate = () => {
           if (!prefersReducedMotion && spring) {
             box.style.transform =
               springMap[spring as keyof typeof springMap] || "scale(1.05)";
           }
-        });
-        box.addEventListener("mouseleave", () => {
-          box.style.transform = "";
-        });
+        };
+        const deactivate = () => { box.style.transform = ""; };
+        box.addEventListener("mouseenter", activate);
+        box.addEventListener("mouseleave", deactivate);
+        box.addEventListener("focus", activate);
+        box.addEventListener("blur", deactivate);
       });
 
-      // Duration bars — fill on hover
+      // Duration bars — fill on hover/focus
       document.querySelectorAll<HTMLElement>(".duration-bar").forEach((bar) => {
+        bar.setAttribute("tabindex", "0");
+        bar.setAttribute("role", "button");
         const fill = bar.querySelector<HTMLElement>("div");
         if (!fill) return;
-        bar.addEventListener("mouseenter", () => {
-          fill.style.width = "100%";
-        });
-        bar.addEventListener("mouseleave", () => {
-          fill.style.width = "0";
-        });
+        const activate = () => { fill.style.width = "100%"; };
+        const deactivate = () => { fill.style.width = "0"; };
+        bar.addEventListener("mouseenter", activate);
+        bar.addEventListener("mouseleave", deactivate);
+        bar.addEventListener("focus", activate);
+        bar.addEventListener("blur", deactivate);
       });
 
       // Swatch tooltip (optional — show token on hover)

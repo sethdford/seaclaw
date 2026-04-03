@@ -26,6 +26,7 @@ typedef enum hu_bus_event_type {
     HU_BUS_HEALTH_CHANGE,
     HU_BUS_CRON_STARTED,
     HU_BUS_CRON_COMPLETED,
+    HU_BUS_CANVAS, /* Live Canvas / A2UI: payload is JSON string (see canvas tool) */
     HU_BUS_EVENT_COUNT
 } hu_bus_event_type_t;
 

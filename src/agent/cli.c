@@ -562,6 +562,14 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             vcfg.model = cfg.voice.realtime_model;
             vcfg.voice = cfg.voice.realtime_voice;
             want_voice = true;
+        } else if (strcmp(cfg.voice.mode, "gemini_live") == 0) {
+            vcfg.mode = HU_VOICE_MODE_GEMINI_LIVE;
+            vcfg.api_key = hu_config_get_provider_key(&cfg, "google");
+            if (!vcfg.api_key || !vcfg.api_key[0])
+                vcfg.api_key = hu_config_get_provider_key(&cfg, "gemini");
+            vcfg.model = cfg.voice.realtime_model;
+            vcfg.voice = cfg.voice.realtime_voice;
+            want_voice = true;
         } else if (strcmp(cfg.voice.mode, "webrtc") == 0) {
             vcfg.mode = HU_VOICE_MODE_WEBRTC;
             want_voice = true;

@@ -591,6 +591,144 @@ static void test_hook_shell_command_includes_escaped_tool_name(void) {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+ * Before-reply hook tests
+ * ────────────────────────────────────────────────────────────────────────── */
+
+static void test_hook_pipeline_before_reply_allow(void) {
+    hu_tracking_allocator_t *ta = hu_tracking_allocator_create();
+    hu_allocator_t alloc = hu_tracking_allocator_allocator(ta);
+
+    hu_hook_registry_t *reg = NULL;
+    hu_hook_registry_create(&alloc, &reg);
+
+    hu_hook_entry_t entry = {
+        .name = "before-reply-check", .name_len = 18,
+        .event = HU_HOOK_BEFORE_REPLY,
+        .command = "echo ok", .command_len = 7,
+        .timeout_sec = 5, .required = false,
+    };
+    hu_hook_registry_add(reg, &alloc, &entry);
+
+    hu_hook_mock_config_t mock = {.exit_code = 0, .stdout_data = NULL, .stdout_len = 0};
+    hu_hook_mock_set(&mock);
+
+    hu_hook_result_t result;
+    memset(&result, 0, sizeof(result));
+    hu_error_t err = hu_hook_pipeline_before_reply(reg, &alloc, "hello", 5, "cli", 3, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.decision, HU_HOOK_ALLOW);
+    HU_ASSERT_NULL(result.synthetic_response);
+
+    hu_hook_result_free(&alloc, &result);
+    hu_hook_mock_reset();
+    hu_hook_registry_destroy(reg, &alloc);
+    HU_ASSERT_EQ(hu_tracking_allocator_leaks(ta), 0);
+    hu_tracking_allocator_destroy(ta);
+}
+
+static void test_hook_pipeline_before_reply_short_circuit(void) {
+    hu_tracking_allocator_t *ta = hu_tracking_allocator_create();
+    hu_allocator_t alloc = hu_tracking_allocator_allocator(ta);
+
+    hu_hook_registry_t *reg = NULL;
+    hu_hook_registry_create(&alloc, &reg);
+
+    hu_hook_entry_t entry = {
+        .name = "canned-response", .name_len = 15,
+        .event = HU_HOOK_BEFORE_REPLY,
+        .command = "echo canned", .command_len = 11,
+        .timeout_sec = 5, .required = false,
+    };
+    hu_hook_registry_add(reg, &alloc, &entry);
+
+    const char *synthetic = "I am a canned response";
+    hu_hook_mock_config_t mock = {
+        .exit_code = 4,
+        .stdout_data = synthetic,
+        .stdout_len = strlen(synthetic),
+    };
+    hu_hook_mock_set(&mock);
+
+    hu_hook_result_t result;
+    memset(&result, 0, sizeof(result));
+    hu_error_t err = hu_hook_pipeline_before_reply(reg, &alloc, "hello", 5, "cli", 3, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.decision, HU_HOOK_SHORT_CIRCUIT);
+    HU_ASSERT_NOT_NULL(result.synthetic_response);
+    HU_ASSERT_STR_EQ(result.synthetic_response, "I am a canned response");
+
+    hu_hook_result_free(&alloc, &result);
+    hu_hook_mock_reset();
+    hu_hook_registry_destroy(reg, &alloc);
+    HU_ASSERT_EQ(hu_tracking_allocator_leaks(ta), 0);
+    hu_tracking_allocator_destroy(ta);
+}
+
+static void test_hook_pipeline_before_reply_deny(void) {
+    hu_tracking_allocator_t *ta = hu_tracking_allocator_create();
+    hu_allocator_t alloc = hu_tracking_allocator_allocator(ta);
+
+    hu_hook_registry_t *reg = NULL;
+    hu_hook_registry_create(&alloc, &reg);
+
+    hu_hook_entry_t entry = {
+        .name = "rate-limit", .name_len = 10,
+        .event = HU_HOOK_BEFORE_REPLY,
+        .command = "echo denied", .command_len = 11,
+        .timeout_sec = 5, .required = false,
+    };
+    hu_hook_registry_add(reg, &alloc, &entry);
+
+    hu_hook_mock_config_t mock = {.exit_code = 2, .stdout_data = "rate limited", .stdout_len = 12};
+    hu_hook_mock_set(&mock);
+
+    hu_hook_result_t result;
+    memset(&result, 0, sizeof(result));
+    hu_error_t err = hu_hook_pipeline_before_reply(reg, &alloc, "hello", 5, "cli", 3, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.decision, HU_HOOK_DENY);
+    HU_ASSERT_NOT_NULL(result.message);
+    HU_ASSERT_STR_EQ(result.message, "rate limited");
+    HU_ASSERT_NULL(result.synthetic_response);
+
+    hu_hook_result_free(&alloc, &result);
+    hu_hook_mock_reset();
+    hu_hook_registry_destroy(reg, &alloc);
+    HU_ASSERT_EQ(hu_tracking_allocator_leaks(ta), 0);
+    hu_tracking_allocator_destroy(ta);
+}
+
+static void test_hook_pipeline_before_reply_event_filtering(void) {
+    hu_tracking_allocator_t *ta = hu_tracking_allocator_create();
+    hu_allocator_t alloc = hu_tracking_allocator_allocator(ta);
+
+    hu_hook_registry_t *reg = NULL;
+    hu_hook_registry_create(&alloc, &reg);
+
+    /* Register a pre-tool hook only — should NOT fire for before_reply */
+    hu_hook_entry_t entry = {
+        .name = "pre-tool-only", .name_len = 13,
+        .event = HU_HOOK_PRE_TOOL_EXECUTE,
+        .command = "echo should-not-fire", .command_len = 20,
+        .timeout_sec = 5, .required = false,
+    };
+    hu_hook_registry_add(reg, &alloc, &entry);
+
+    hu_hook_result_t result;
+    memset(&result, 0, sizeof(result));
+    hu_error_t err = hu_hook_pipeline_before_reply(reg, &alloc, "hello", 5, "cli", 3, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(result.decision, HU_HOOK_ALLOW);
+    HU_ASSERT_EQ(hu_hook_mock_call_count(), 0);
+
+    hu_hook_result_free(&alloc, &result);
+    hu_hook_mock_reset();
+    hu_hook_registry_destroy(reg, &alloc);
+    HU_ASSERT_EQ(hu_tracking_allocator_leaks(ta), 0);
+    hu_tracking_allocator_destroy(ta);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
  * Suite runner
  * ────────────────────────────────────────────────────────────────────────── */
 
@@ -615,4 +753,8 @@ void run_hook_pipeline_tests(void) {
     HU_RUN_TEST(test_hook_pipeline_post_tool_context);
     HU_RUN_TEST(test_hook_pipeline_multiple_allow_then_warn);
     HU_RUN_TEST(test_hook_shell_command_includes_escaped_tool_name);
+    HU_RUN_TEST(test_hook_pipeline_before_reply_allow);
+    HU_RUN_TEST(test_hook_pipeline_before_reply_short_circuit);
+    HU_RUN_TEST(test_hook_pipeline_before_reply_deny);
+    HU_RUN_TEST(test_hook_pipeline_before_reply_event_filtering);
 }

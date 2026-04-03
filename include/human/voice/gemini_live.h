@@ -35,6 +35,7 @@ typedef struct hu_gemini_live_config {
     const char *system_instruction; /* system prompt; NULL = none */
     const char *region;           /* Vertex AI region; NULL = use Google AI endpoint */
     const char *project_id;       /* Vertex AI project; required when region is set */
+    const char *tools_json;       /* pre-built JSON array of functionDeclarations; NULL = no tools */
     int sample_rate_in;           /* input sample rate; 0 = 16000 */
     int sample_rate_out;          /* output sample rate; 0 = 24000 */
     bool transcribe_input;        /* request input audio transcription */

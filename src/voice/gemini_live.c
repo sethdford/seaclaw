@@ -1,5 +1,6 @@
 #include "human/voice/gemini_live.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/multimodal.h"
 #include "human/voice/provider.h"
@@ -129,6 +130,14 @@ hu_error_t hu_gemini_live_build_setup_json(hu_allocator_t *alloc,
     err = hu_json_buf_append_raw(&buf, "}", 1);
     if (err != HU_OK)
         goto fail;
+
+    /* affective dialog — emotion detection and adaptive responses */
+    if (config->affective_dialog) {
+        static const char ad_str[] = ",\"enableAffectiveDialog\":true";
+        err = hu_json_buf_append_raw(&buf, ad_str, sizeof(ad_str) - 1);
+        if (err != HU_OK)
+            goto fail;
+    }
 
     /* realtimeInputConfig (setup-level, not inside generationConfig) */
     if (config->manual_vad) {
@@ -438,18 +447,21 @@ hu_error_t hu_gemini_live_send_text(hu_gemini_live_session_t *session, const cha
     if (!session->connected || !session->ws_client)
         return HU_ERR_IO;
 
-    size_t json_cap = 64 + text_len * 2;
-    char *json = (char *)session->alloc->alloc(session->alloc->ctx, json_cap);
-    if (!json)
-        return HU_ERR_OUT_OF_MEMORY;
-    int n =
-        snprintf(json, json_cap, "{\"realtimeInput\":{\"text\":\"%.*s\"}}", (int)text_len, text);
-    if (n <= 0 || (size_t)n >= json_cap) {
-        session->alloc->free(session->alloc->ctx, json, json_cap);
-        return HU_ERR_INVALID_ARGUMENT;
+    hu_json_buf_t buf = {0};
+    hu_error_t err = hu_json_buf_init(&buf, session->alloc);
+    if (err != HU_OK)
+        return err;
+    err = hu_json_buf_append_raw(&buf, "{\"realtimeInput\":{\"text\":", 24);
+    if (err == HU_OK)
+        err = hu_json_append_string(&buf, text, text_len);
+    if (err == HU_OK)
+        err = hu_json_buf_append_raw(&buf, "}}", 2);
+    if (err != HU_OK) {
+        hu_json_buf_free(&buf);
+        return err;
     }
-    hu_error_t err = hu_ws_send((hu_ws_client_t *)session->ws_client, json, (size_t)n);
-    session->alloc->free(session->alloc->ctx, json, json_cap);
+    err = hu_ws_send((hu_ws_client_t *)session->ws_client, buf.ptr, buf.len);
+    hu_json_buf_free(&buf);
     return err;
 #else
     (void)text_len;
@@ -710,6 +722,11 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
         gl_copy_event_type("toolCall", out);
         hu_json_value_t *fcs = hu_json_object_get(tc, "functionCalls");
         if (fcs && fcs->type == HU_JSON_ARRAY && fcs->data.array.len > 0) {
+            if (fcs->data.array.len > 1) {
+                hu_log_info("gemini_live", NULL,
+                            "toolCall contains %zu function calls; only processing first",
+                            fcs->data.array.len);
+            }
             hu_json_value_t *fc0 = fcs->data.array.items[0];
             const char *name = hu_json_get_string(fc0, "name");
             if (name) {
@@ -946,8 +963,10 @@ static hu_error_t gl_vp_add_tool(void *ctx, const char *name, const char *descri
 }
 
 static hu_error_t gl_vp_cancel_response(void *ctx) {
-    (void)ctx;
-    return HU_OK;
+    hu_gemini_live_session_t *s = (hu_gemini_live_session_t *)ctx;
+    if (s->activity_active)
+        (void)hu_gemini_live_send_activity_end(s);
+    return hu_gemini_live_send_audio_stream_end(s);
 }
 
 static hu_error_t gl_vp_send_activity_start(void *ctx) {

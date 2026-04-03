@@ -12,9 +12,10 @@
  *
  * Hooks are shell commands triggered before or after tool execution.
  * Exit codes determine the decision:
- *   0 = Allow (HU_HOOK_ALLOW)
- *   2 = Deny  (HU_HOOK_DENY)
- *   3 = Warn  (HU_HOOK_WARN)
+ *   0 = Allow         (HU_HOOK_ALLOW)
+ *   2 = Deny          (HU_HOOK_DENY)
+ *   3 = Warn          (HU_HOOK_WARN)
+ *   4 = Short-circuit (HU_HOOK_SHORT_CIRCUIT) — before_reply only
  *   Other = Error (treated as allow with warning)
  *
  * Hooks run in registration order. First deny stops the pipeline.
@@ -23,18 +24,22 @@
 typedef enum hu_hook_event {
     HU_HOOK_PRE_TOOL_EXECUTE  = 0,
     HU_HOOK_POST_TOOL_EXECUTE = 1,
+    HU_HOOK_BEFORE_REPLY      = 2,
 } hu_hook_event_t;
 
 typedef enum hu_hook_decision {
-    HU_HOOK_ALLOW = 0,
-    HU_HOOK_DENY  = 2,
-    HU_HOOK_WARN  = 3,
+    HU_HOOK_ALLOW        = 0,
+    HU_HOOK_DENY         = 2,
+    HU_HOOK_WARN         = 3,
+    HU_HOOK_SHORT_CIRCUIT = 4,
 } hu_hook_decision_t;
 
 typedef struct hu_hook_result {
     hu_hook_decision_t decision;
     char *message;        /* owned; NULL when no output */
     size_t message_len;
+    char *synthetic_response;  /* owned; non-NULL when short-circuiting the LLM */
+    size_t synthetic_response_len;
 } hu_hook_result_t;
 
 /* Context passed to each hook invocation */
@@ -47,6 +52,10 @@ typedef struct hu_hook_context {
     const char *result_output;   /* post-hook only; NULL for pre-hook */
     size_t result_output_len;
     bool result_success;         /* post-hook only */
+    const char *user_message;    /* before-reply only; NULL otherwise */
+    size_t user_message_len;
+    const char *channel;         /* before-reply only; NULL otherwise */
+    size_t channel_len;
 } hu_hook_context_t;
 
 /* A single hook entry */
@@ -85,6 +94,11 @@ static inline void hu_hook_result_free(hu_allocator_t *alloc, hu_hook_result_t *
         alloc->free(alloc->ctx, r->message, r->message_len + 1);
         r->message = NULL;
         r->message_len = 0;
+    }
+    if (r->synthetic_response) {
+        alloc->free(alloc->ctx, r->synthetic_response, r->synthetic_response_len + 1);
+        r->synthetic_response = NULL;
+        r->synthetic_response_len = 0;
     }
 }
 

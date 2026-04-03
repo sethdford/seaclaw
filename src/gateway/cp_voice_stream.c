@@ -481,8 +481,10 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
         sl->gemini_live_mode = true;
 
         hu_json_value_t *res = hu_json_object_new(alloc);
-        if (!res)
+        if (!res) {
+            vs_free_slot(sl, alloc);
             return HU_ERR_OUT_OF_MEMORY;
+        }
         cp_json_set_str(alloc, res, "encoding", "pcm_f32le");
         hu_json_object_set(alloc, res, "inputSampleRate", hu_json_number_new(alloc, 16000));
         hu_json_object_set(alloc, res, "outputSampleRate", hu_json_number_new(alloc, 24000));
@@ -520,8 +522,10 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
         (void)snprintf(sl->model_id, sizeof(sl->model_id), "%s", model_id);
 
     hu_json_value_t *res = hu_json_object_new(alloc);
-    if (!res)
+    if (!res) {
+        vs_free_slot(sl, alloc);
         return HU_ERR_OUT_OF_MEMORY;
+    }
     cp_json_set_str(alloc, res, "encoding", "pcm_f32le");
     hu_json_object_set(alloc, res, "sampleRate", hu_json_number_new(alloc, 24000));
     char sid[40];

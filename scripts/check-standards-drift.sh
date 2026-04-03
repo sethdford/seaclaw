@@ -21,6 +21,9 @@ stale_patterns=(
 files_to_check=(
   "CLAUDE.md"
   "AGENTS.md"
+  "ARCHITECTURE.md"
+  "README.md"
+  ".github/copilot-instructions.md"
   ".cursor/rules/design-system.mdc"
   ".cursor/rules/design-tokens.mdc"
   ".cursor/rules/view-archetypes.mdc"
@@ -72,6 +75,26 @@ if [ -f "docs/standards/README.md" ]; then
 else
   echo "  MISSING: docs/standards/README.md"
   EXIT_CODE=1
+fi
+
+echo ""
+echo "Checking for broken src/ path references in key docs..."
+broken_paths=0
+src_path_files=("CLAUDE.md" "AGENTS.md" "ARCHITECTURE.md")
+for file in "${src_path_files[@]}"; do
+  if [ ! -f "$file" ]; then continue; fi
+  while IFS= read -r ref; do
+    ref_clean=$(echo "$ref" | sed 's/[`\*]//g' | tr -d ' ')
+    if [ -n "$ref_clean" ] && [ ! -e "$ref_clean" ]; then
+      echo "  BROKEN: $file references $ref_clean (not found on disk)"
+      broken_paths=$((broken_paths + 1))
+      EXIT_CODE=1
+    fi
+  done < <(grep -oE 'src/[a-z_/]+\.(c|h)' "$file" 2>/dev/null | sort -u)
+done
+
+if [ "$broken_paths" -eq 0 ]; then
+  echo "  No broken src/ paths found."
 fi
 
 exit $EXIT_CODE

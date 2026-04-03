@@ -50,12 +50,13 @@ export class AudioRecorder {
   }
 
   get isSupported(): boolean {
-    return (
+    const hasMic =
       typeof navigator !== "undefined" &&
-      typeof navigator.mediaDevices !== "undefined" &&
-      typeof MediaRecorder !== "undefined" &&
-      selectMimeType() !== ""
-    );
+      typeof navigator.mediaDevices !== "undefined";
+    const hasMediaRecorder =
+      typeof MediaRecorder !== "undefined" && selectMimeType() !== "";
+    const hasAudioContext = typeof AudioContext !== "undefined";
+    return hasMic && (hasMediaRecorder || hasAudioContext);
   }
 
   /**
@@ -156,7 +157,9 @@ export class AudioRecorder {
       this.#levelRaf = requestAnimationFrame(tickLevel);
     }
 
-    /* ScriptProcessorNode: 4096 samples @ 16kHz ≈ 256ms chunks */
+    /* ScriptProcessorNode: 4096 samples @ 16kHz ≈ 256ms chunks.
+       A GainNode at 0 prevents mic audio from reaching speakers while
+       keeping the processor alive (it requires a connected destination). */
     const processor = ctx.createScriptProcessor(4096, 1, 1);
     processor.onaudioprocess = (e: AudioProcessingEvent) => {
       if (!this.#onStreamChunk) return;
@@ -169,7 +172,10 @@ export class AudioRecorder {
       this.#onStreamChunk(int16.buffer);
     };
     source.connect(processor);
-    processor.connect(ctx.destination);
+    const silencer = ctx.createGain();
+    silencer.gain.value = 0;
+    processor.connect(silencer);
+    silencer.connect(ctx.destination);
     this.#rawPcmNode = processor;
     void ctx.resume();
   }

@@ -185,8 +185,8 @@ typedef struct hu_channel_daemon_config {
     int user_response_window_sec; /* 0 = use default (120s) */
     int poll_interval_sec;        /* 0 = use channel-specific default (see bootstrap) */
     bool voice_enabled;           /* enable TTS on this channel */
-    int max_consecutive_replies;  /* 0 = unlimited; default 3; caps bot replies before human steps in */
-    int e2e_max_turns;            /* 0 = no limit; auto-stop daemon after N agent responses (for E2E testing) */
+    int max_consecutive_replies;  /* 0 = use default (3) */
+    int e2e_max_turns;            /* 0 = use default (10) */
 } hu_channel_daemon_config_t;
 
 typedef struct hu_email_channel_config {
@@ -528,11 +528,12 @@ typedef struct hu_voice_settings {
     char *tts_voice;          /* voice name, NULL = default */
     char *tts_model;          /* model name, NULL = default */
     char *stt_model;          /* model name, NULL = default */
-    char *mode;           /* "sonata", "realtime", "gemini_live", "webrtc" — NULL = default */
-    char *realtime_model; /* OpenAI Realtime model, e.g. "gpt-4o-realtime-preview" */
-    char *realtime_voice; /* Voice for Realtime, e.g. "alloy" */
-    char *vertex_region;  /* Vertex AI region for Gemini Live, e.g. "us-central1"; NULL = Google AI */
-    char *vertex_project; /* Vertex AI project ID; required when vertex_region is set */
+    char *mode;           /* "sonata", "realtime", "webrtc", "gemini_live" — NULL = sonata */
+    char *realtime_model; /* Model for Realtime/GL, e.g. "gemini-3.1-flash-live-preview" */
+    char *realtime_voice; /* Voice for Realtime/GL, e.g. "Puck", "alloy" */
+    char *vertex_region;        /* Vertex AI region for Gemini Live; NULL = use Google AI endpoint */
+    char *vertex_project;       /* Vertex AI project ID; required when vertex_region is set */
+    char *vertex_access_token;  /* OAuth2 bearer token for Vertex AI; NULL = use api_key */
 } hu_voice_settings_t;
 
 typedef struct hu_identity_config {
@@ -546,6 +547,13 @@ typedef struct hu_cost_config {
     uint8_t warn_at_percent;
     bool allow_override;
 } hu_cost_config_t;
+
+typedef struct hu_media_gen_config {
+    char *default_image_model; /* "nano-banana-2" (default), "imagen-4" */
+    char *default_video_model; /* "veo-3.1" (default), "veo-3.1-lite" */
+    char *vertex_project;      /* Vertex AI project ID; NULL = env GOOGLE_CLOUD_PROJECT */
+    char *vertex_region;       /* Vertex AI region; NULL = env GOOGLE_CLOUD_LOCATION or "us-central1" */
+} hu_media_gen_config_t;
 
 typedef struct hu_peripherals_config {
     bool enabled;
@@ -622,6 +630,7 @@ typedef struct hu_config {
     hu_policy_config_t policy;
     hu_plugins_config_t plugins;
     hu_feeds_config_t feeds;
+    hu_media_gen_config_t media_gen;
     char *auto_update;                    /* "off" (default), "check", or "apply" */
     uint32_t update_check_interval_hours; /* default 24; 0 = use default */
     hu_arena_t *arena;

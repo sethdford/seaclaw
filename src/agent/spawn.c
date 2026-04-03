@@ -388,6 +388,8 @@ void hu_agent_pool_set_fleet_limits(hu_agent_pool_t *pool, const hu_fleet_limits
         pool->fleet_limits.max_spawn_depth = 8;
         pool->fleet_limits.max_total_spawns = 0;
         pool->fleet_limits.budget_limit_usd = 0.0;
+        pool->fleet_limits.depth_model_overrides = NULL;
+        pool->fleet_limits.depth_model_overrides_count = 0;
     } else {
         pool->fleet_limits = *limits;
     }
@@ -475,6 +477,7 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
     if (!pool || !cfg || !out_id)
         return HU_ERR_INVALID_ARGUMENT;
     hu_allocator_t *a = pool->alloc;
+    hu_spawn_config_t eff_cfg = *cfg;
 
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
     pthread_mutex_lock(&pool->mu);
@@ -487,6 +490,24 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
             pthread_mutex_unlock(&pool->mu);
 #endif
             return HU_ERR_FLEET_DEPTH_EXCEEDED;
+        }
+        /* Apply per-depth model tier override (mutable copy; cfg is const). */
+        if (pool->fleet_limits.depth_model_overrides &&
+            pool->fleet_limits.depth_model_overrides_count > 0u) {
+            for (size_t dmi = 0; dmi < pool->fleet_limits.depth_model_overrides_count; dmi++) {
+                hu_depth_model_override_t *dmo = &pool->fleet_limits.depth_model_overrides[dmi];
+                if (child_depth >= dmo->min_depth && child_depth <= dmo->max_depth) {
+                    if (dmo->model) {
+                        eff_cfg.model = dmo->model;
+                        eff_cfg.model_len = strlen(dmo->model);
+                    }
+                    if (dmo->provider) {
+                        eff_cfg.provider = dmo->provider;
+                        eff_cfg.provider_len = strlen(dmo->provider);
+                    }
+                    break;
+                }
+            }
         }
         if (pool->fleet_limits.max_total_spawns > 0u &&
             pool->fleet_spawns_started >= pool->fleet_limits.max_total_spawns) {
@@ -540,10 +561,10 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
     s->temperature = cfg->temperature;
     s->max_iterations = cfg->max_iterations;
     s->policy = cfg->policy;
-    s->provider_name = dup_opt(a, cfg->provider, cfg->provider_len);
+    s->provider_name = dup_opt(a, eff_cfg.provider, eff_cfg.provider_len);
     s->api_key = dup_opt(a, cfg->api_key, cfg->api_key_len);
     s->base_url = dup_opt(a, cfg->base_url, cfg->base_url_len);
-    s->model = dup_opt(a, cfg->model, cfg->model_len);
+    s->model = dup_opt(a, eff_cfg.model, eff_cfg.model_len);
     if (pool->worktree_mgr) {
         const char *wt_path = NULL;
         const char *lbl = (label && label[0]) ? label : "agent";

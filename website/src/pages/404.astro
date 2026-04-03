@@ -4,8 +4,17 @@ const rawBase = import.meta.env.BASE_URL;
 const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
 ---
 
-<html lang="en">
+<html lang="en" class="hu-lcp-done">
   <head>
+    <script is:inline>
+      (function () {
+        var s = localStorage.getItem("hu-theme");
+        var m = window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+        document.documentElement.dataset.theme = s || m;
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>404 — not quite found. | h-uman</title>
@@ -16,7 +25,10 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     style="background: var(--hu-bg); color: var(--hu-text);"
     class="antialiased"
   >
-    <div
+    <a href="#main-content" class="skip-link">Skip to content</a>
+    <main
+      id="main-content"
+      tabindex="-1"
       class="min-h-screen flex flex-col items-center justify-center px-6 text-center"
     >
       <img
@@ -59,6 +71,6 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
           Read the Docs
         </a>
       </div>
-    </div>
+    </main>
   </body>
 </html>

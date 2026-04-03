@@ -1056,6 +1056,7 @@ export class DemoGatewayClient extends EventTarget {
   #interval: ReturnType<typeof setInterval> | null = null;
   #nextId = 100;
   #onBinary: ((data: ArrayBuffer) => void) | null = null;
+  #glMode = false;
 
   private state = {
     sessions: makeSessions(),
@@ -1781,15 +1782,27 @@ export class DemoGatewayClient extends EventTarget {
       case "voice.session.start": {
         const isGeminiLive =
           (params as Record<string, unknown>)?.mode === "gemini_live";
+        this.#glMode = isGeminiLive;
+        if (isGeminiLive) {
+          return {
+            sessionId: `demo-${Date.now()}`,
+            encoding: "pcm_f32le",
+            inputSampleRate: 16000,
+            outputSampleRate: 24000,
+            mode: "gemini_live",
+          };
+        }
         return {
           sessionId: `demo-${Date.now()}`,
           sampleRate: 24000,
-          encoding: isGeminiLive ? "pcm_s16le" : "pcm_f32le",
-          ...(isGeminiLive ? { mode: "gemini_live" } : {}),
+          encoding: "pcm_f32le",
         };
       }
 
       case "voice.session.stop":
+        return { ok: true };
+
+      case "voice.tool_response":
         return { ok: true };
 
       case "voice.session.interrupt":
@@ -1801,7 +1814,13 @@ export class DemoGatewayClient extends EventTarget {
         return { ok: true };
 
       case "voice.audio.end":
-        this.#scheduleDemoVoicePipeline("Demo transcription from streaming mic");
+        if (this.#glMode) {
+          this.#scheduleDemoGeminiLiveResponse();
+        } else {
+          this.#scheduleDemoVoicePipeline(
+            "Demo transcription from streaming mic",
+          );
+        }
         return { ok: true };
 
       case "voice.config":
@@ -1949,6 +1968,80 @@ export class DemoGatewayClient extends EventTarget {
             { source: 4, target: 7, type: "relates_to", weight: 0.3 },
           ],
         };
+
+      case "tasks.list": {
+        const now = Math.floor(Date.now() / 1000);
+        const st =
+          params && typeof (params as { status?: number }).status === "number"
+            ? Math.floor((params as { status: number }).status)
+            : null;
+        const all = [
+          {
+            id: 1,
+            name: "ingest_feed",
+            status: "pending",
+            program_json: '{"name":"ingest","version":1}',
+            trace_json: "[]",
+            created_at: now - 7200,
+            updated_at: now - 7100,
+            parent_task_id: 0,
+          },
+          {
+            id: 2,
+            name: "summarize_digest",
+            status: "running",
+            program_json: '{"name":"digest","version":1}',
+            trace_json: '[{"op":"call","id":"c1"}]',
+            created_at: now - 3600,
+            updated_at: now - 120,
+            parent_task_id: 0,
+          },
+          {
+            id: 3,
+            name: "archive_done",
+            status: "completed",
+            program_json: '{"name":"noop","version":1}',
+            trace_json: "[]",
+            created_at: now - 86400,
+            updated_at: now - 86000,
+            parent_task_id: 2,
+          },
+        ];
+        const tasks =
+          st !== null && st >= 0 && st <= 4
+            ? all.filter((t) => {
+                const map = ["pending", "running", "completed", "failed", "cancelled"] as const;
+                return t.status === map[st];
+              })
+            : all;
+        return { tasks };
+      }
+      case "tasks.get": {
+        const now = Math.floor(Date.now() / 1000);
+        const id =
+          params && typeof (params as { id?: number }).id === "number"
+            ? Math.floor((params as { id: number }).id)
+            : 2;
+        return {
+          task: {
+            id,
+            name: id === 1 ? "ingest_feed" : "summarize_digest",
+            status: id === 1 ? "pending" : "running",
+            program_json: '{"name":"demo","version":1}',
+            trace_json: "[]",
+            created_at: now - 1800,
+            updated_at: now - 60,
+            parent_task_id: 0,
+          },
+        };
+      }
+      case "tasks.cancel": {
+        const id =
+          params && typeof (params as { id?: number }).id === "number"
+            ? Math.floor((params as { id: number }).id)
+            : 3;
+        return { ok: true, id, status: "cancelled" };
+      }
 
       case "hula.traces.list":
         return {
@@ -2306,6 +2399,14 @@ export class DemoGatewayClient extends EventTarget {
     return this.request("voice.audio.end", params);
   }
 
+  voiceToolResponse(params: {
+    name: string;
+    callId: string;
+    result: string;
+  }): Promise<unknown> {
+    return this.request("voice.tool_response", params);
+  }
+
   #emitDemoVoicePcmChunks(): void {
     let pcmCount = 0;
     const sendPcm = (): void => {
@@ -2323,6 +2424,34 @@ export class DemoGatewayClient extends EventTarget {
     sendPcm();
     setTimeout(sendPcm, 90);
     setTimeout(sendPcm, 180);
+  }
+
+  #scheduleDemoGeminiLiveResponse(): void {
+    setTimeout(() => this.#emitDemoVoicePcmChunks(), 100);
+    setTimeout(() => {
+      this.dispatchEvent(
+        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
+          detail: {
+            event: "voice.assistant.transcript",
+            payload: { text: "This is a demo Gemini Live response." },
+          },
+        }),
+      );
+    }, 200);
+    setTimeout(() => {
+      this.dispatchEvent(
+        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
+          detail: { event: "voice.generation_complete", payload: {} },
+        }),
+      );
+    }, 1500);
+    setTimeout(() => {
+      this.dispatchEvent(
+        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
+          detail: { event: "voice.audio.done", payload: {} },
+        }),
+      );
+    }, 2000);
   }
 
   #scheduleDemoVoicePipeline(userText: string): void {

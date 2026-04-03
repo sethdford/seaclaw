@@ -87,6 +87,7 @@ typedef struct hu_eval_multi_trial_result {
     double stddev_pass_rate;
     double mean_score;     /* mean of per-task scores across trials */
     double worst_pass_rate;
+    double best_pass_rate;
     uint32_t trials_run;
     int64_t total_elapsed_ms;
     int total_tokens;

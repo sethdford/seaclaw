@@ -52,4 +52,15 @@ hu_error_t hu_hook_pipeline_post_tool(const hu_hook_registry_t *registry,
                                       bool result_success,
                                       hu_hook_result_t *result);
 
+/**
+ * Execute pipeline for before-reply event. Fires before the LLM provider call.
+ * If a hook returns exit code 4 (short-circuit), result->synthetic_response is
+ * populated from hook stdout and the caller should skip the provider call.
+ */
+hu_error_t hu_hook_pipeline_before_reply(const hu_hook_registry_t *registry,
+                                         hu_allocator_t *alloc,
+                                         const char *user_message, size_t user_message_len,
+                                         const char *channel, size_t channel_len,
+                                         hu_hook_result_t *result);
+
 #endif /* HU_HOOK_PIPELINE_H */

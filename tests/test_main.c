@@ -63,6 +63,7 @@ void run_multimodal_video_tests(void);
 void run_voice_duplex_tests(void);
 void run_turn_signal_tests(void);
 void run_voice_rt_openai_tests(void);
+void run_voice_provider_tests(void);
 void run_gemini_live_tests(void);
 void run_voice_session_tests(void);
 void run_autonomy_tests(void);
@@ -95,6 +96,8 @@ void run_voice_maturity_tests(void);
 void run_style_learner_tests(void);
 void run_temporal_tests(void);
 void run_inner_world_tests(void);
+void run_humor_fw_tests(void);
+void run_markdown_loader_tests(void);
 #endif
 void run_lifecycle_tests(void);
 void run_observer_tests(void);
@@ -133,6 +136,7 @@ void run_cron_tests(void);
 void run_cron_session_tools_tests(void);
 void run_subagent_tests(void);
 void run_task_manager_tests(void);
+void run_task_store_tests(void);
 void run_task_tools_tests(void);
 void run_tool_ask_user_tests(void);
 void run_mcp_tests(void);
@@ -242,6 +246,7 @@ void run_mood_tests(void);
 void run_style_tracker_tests(void);
 void run_theory_of_mind_tests(void);
 void run_anticipatory_tests(void);
+void run_anticipatory_state_tests(void);
 void run_context_engine_tests(void);
 void run_exec_env_tests(void);
 int run_channel_monitor_tests(void);
@@ -309,9 +314,14 @@ void run_pwa_tests(void);
 #ifdef HU_ENABLE_CURL
 void run_paperclip_tests(void);
 #endif
+#ifdef HU_ENABLE_MEDIA_GEN
+void run_media_gen_tests(void);
+#endif
 void run_cartesia_tests(void);
 void run_cartesia_stream_tests(void);
 void register_voice_clone_tests(void);
+void run_send_voice_message_tests(void);
+void run_voice_message_integration_tests(void);
 #ifdef HU_ENABLE_CARTESIA
 void run_audio_pipeline_tests(void);
 void run_voice_decision_tests(void);
@@ -367,6 +377,7 @@ void run_moderation_tests(void);
 void run_companion_safety_tests(void);
 void run_code_sandbox_tests(void);
 void run_computer_use_tests(void);
+void run_vision_ocr_tests(void);
 void run_image_gen_tests(void);
 void run_visual_grounding_tests(void);
 void run_browser_use_tests(void);
@@ -410,6 +421,12 @@ void run_daemon_lifecycle_tests(void);
 void run_daemon_routing_tests(void);
 void run_daemon_proactive_tests(void);
 void run_daemon_trust_tests(void);
+void run_hallucination_guard_tests(void);
+void run_consistency_tests(void);
+void run_sycophancy_guard_tests(void);
+void run_trust_calibration_tests(void);
+void run_fact_extract_tests(void);
+void run_self_improve_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -501,6 +518,7 @@ int main(int argc, char **argv) {
     run_voice_duplex_tests();
     run_turn_signal_tests();
     run_voice_rt_openai_tests();
+    run_voice_provider_tests();
     run_gemini_live_tests();
     run_voice_session_tests();
     run_autonomy_tests();
@@ -535,6 +553,8 @@ int main(int argc, char **argv) {
     run_style_learner_tests();
     run_temporal_tests();
     run_inner_world_tests();
+    run_humor_fw_tests();
+    run_markdown_loader_tests();
 #endif
     run_lifecycle_tests();
     run_observer_tests();
@@ -679,6 +699,7 @@ int main(int argc, char **argv) {
     run_style_tracker_tests();
     run_theory_of_mind_tests();
     run_anticipatory_tests();
+    run_anticipatory_state_tests();
     run_context_engine_tests();
     run_exec_env_tests();
     run_channel_monitor_tests();
@@ -738,9 +759,14 @@ int main(int argc, char **argv) {
 #ifdef HU_ENABLE_CURL
     run_paperclip_tests();
 #endif
+#ifdef HU_ENABLE_MEDIA_GEN
+    run_media_gen_tests();
+#endif
     run_cartesia_tests();
     run_cartesia_stream_tests();
     register_voice_clone_tests();
+    run_send_voice_message_tests();
+    run_voice_message_integration_tests();
 #ifdef HU_ENABLE_CARTESIA
     run_audio_pipeline_tests();
     run_voice_decision_tests();
@@ -795,6 +821,7 @@ int main(int argc, char **argv) {
     run_companion_safety_tests();
     run_code_sandbox_tests();
     run_computer_use_tests();
+    run_vision_ocr_tests();
     run_image_gen_tests();
     run_visual_grounding_tests();
     run_browser_use_tests();
@@ -834,6 +861,7 @@ int main(int argc, char **argv) {
     run_config_reload_tests();
     run_plugin_hooks_tests();
     run_task_manager_tests();
+    run_task_store_tests();
     run_task_tools_tests();
     run_tool_ask_user_tests();
     run_approval_gate_tests();
@@ -844,6 +872,12 @@ int main(int argc, char **argv) {
     run_daemon_routing_tests();
     run_daemon_proactive_tests();
     run_daemon_trust_tests();
+    run_hallucination_guard_tests();
+    run_consistency_tests();
+    run_sycophancy_guard_tests();
+    run_trust_calibration_tests();
+    run_fact_extract_tests();
+    run_self_improve_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

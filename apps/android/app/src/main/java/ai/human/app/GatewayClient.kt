@@ -8,7 +8,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -325,4 +328,34 @@ class GatewayClient {
         send("health", emptyMap())
         send("hula.traces.analytics", emptyMap())
     }
+
+    /** Clears the last gateway event so assistant waits only see new traffic after [send]. */
+    fun clearAssistantEventCapture() {
+        _events.value = null
+    }
+
+    /**
+     * Sends [message] with `chat.send`, then waits for the next assistant text `response` event
+     * (same shape as [ChatScreen]). Used by Google Assistant entry points.
+     */
+    suspend fun sendMessage(url: String, message: String, channel: String? = null): String =
+        withTimeout(120_000L) {
+            connectIfNeeded(url)
+            state.first { it == ConnectionState.CONNECTED }
+            clearAssistantEventCapture()
+            val params = buildMap<String, Any> {
+                put("message", message)
+                if (channel != null) put("channel", channel)
+            }
+            send("chat.send", params)
+            val ev = events.filterNotNull().first { evt ->
+                evt.type == "response" &&
+                    (evt.payload?.optString("content", "")?.isNotBlank() == true ||
+                        evt.payload?.optString("text", "")?.isNotBlank() == true)
+            }
+            ev.payload?.optString("content", "")?.trim()?.takeIf { it.isNotEmpty() }
+                ?: ev.payload?.optString("text", "")?.trim()?.takeIf { it.isNotEmpty() }
+                ?: "Received response with no text."
+        }
+
 }

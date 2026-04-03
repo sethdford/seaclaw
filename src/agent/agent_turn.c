@@ -386,7 +386,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
-    /* Automatic planning + execution for complex tasks */
+    /* Automatic planning + execution for complex tasks.
+     * Plan recovery from history always runs; new plan generation gated by cognition budget. */
+    hu_cognition_budget_t cognition_budget =
+        hu_cognition_get_budget(HU_COGNITION_FAST, agent->max_tool_iterations);
     char *plan_ctx = NULL;
     size_t plan_ctx_len = 0;
 #ifndef HU_IS_TEST
@@ -408,7 +411,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             break;
         }
     }
-    if (msg_len > 200 && agent->tools_count >= 5 && agent->provider.vtable &&
+    if (cognition_budget.enable_planning &&
+        msg_len > 200 && agent->tools_count >= 5 && agent->provider.vtable &&
         agent->provider.vtable->chat) {
         const char *tool_names[32];
         size_t tn_count = 0;
@@ -534,7 +538,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
-    hu_cognition_budget_t cognition_budget =
+    cognition_budget =
         hu_cognition_get_budget(HU_COGNITION_FAST, agent->max_tool_iterations);
     char *emotional_ctx = NULL;
     size_t emotional_ctx_len = 0;
@@ -2629,7 +2633,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
-    while (iter < agent->max_tool_iterations) {
+    uint32_t effective_max_iters = cognition_budget.max_tool_iterations > 0
+                                       ? cognition_budget.max_tool_iterations
+                                       : agent->max_tool_iterations;
+    while (iter < effective_max_iters) {
         if (agent->cancel_requested) {
             if (dpo_rejected_resp)
                 agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp, dpo_rejected_resp_len + 1);
@@ -2852,9 +2859,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 
         /* Extended reasoning: for complex queries on first iteration, run a
-         * structured reasoning phase — ToT exploration + reasoning summary for the prompt. */
+         * structured reasoning phase — ToT exploration + reasoning summary for the prompt.
+         * Gated by both the agent flag and the cognition budget (S2/slow mode enables ToT). */
 #ifndef HU_IS_TEST
-        if (agent->tree_of_thought_enabled && iter == 1 && msg_len > 200) {
+        if (agent->tree_of_thought_enabled && cognition_budget.enable_tree_of_thought &&
+            iter == 1 && msg_len > 200) {
             hu_tot_config_t tot_cfg = hu_tot_config_default();
             hu_tot_result_t tot_result;
             memset(&tot_result, 0, sizeof(tot_result));
@@ -2964,6 +2973,31 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     HU_OBS_SAFE_RECORD_EVENT(agent, &sev);
                 }
             }
+        }
+
+        /* Before-reply hook: allows short-circuiting the LLM with a synthetic response */
+        if (agent->hook_registry) {
+            hu_hook_result_t br_res;
+            memset(&br_res, 0, sizeof(br_res));
+            const char *br_channel = agent->active_channel ? agent->active_channel : "";
+            size_t br_channel_len = agent->active_channel ? strlen(agent->active_channel) : 0;
+            hu_hook_pipeline_before_reply(agent->hook_registry, agent->alloc,
+                                          msg, msg_len, br_channel, br_channel_len, &br_res);
+            if (br_res.decision == HU_HOOK_SHORT_CIRCUIT && br_res.synthetic_response) {
+                *response_out = br_res.synthetic_response;
+                if (response_len_out)
+                    *response_len_out = br_res.synthetic_response_len;
+                br_res.synthetic_response = NULL;
+                br_res.synthetic_response_len = 0;
+                hu_hook_result_free(agent->alloc, &br_res);
+                return HU_OK;
+            }
+            if (br_res.decision == HU_HOOK_DENY) {
+                hu_log_info("agent", agent->observer, "before-reply hook denied: %.*s",
+                            (int)(br_res.message_len > 200 ? 200 : br_res.message_len),
+                            br_res.message ? br_res.message : "(no message)");
+            }
+            hu_hook_result_free(agent->alloc, &br_res);
         }
 
         clock_t llm_start = clock();
@@ -3282,12 +3316,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     prm_turn_score = step_score;
                 }
 
-                /* Reflection: evaluate response quality and retry if needed */
-                hu_reflection_quality_t quality = hu_reflection_evaluate(
-                    msg, msg_len, resp.content, resp.content_len, &agent->reflection);
+                /* Reflection: evaluate response quality and retry if needed.
+                 * Gated by cognition budget — S1/fast mode skips reflection. */
+                hu_reflection_quality_t quality = HU_QUALITY_ACCEPTABLE;
+                if (cognition_budget.enable_reflection) {
+                    quality = hu_reflection_evaluate(
+                        msg, msg_len, resp.content, resp.content_len, &agent->reflection);
+                }
 
                 if (quality == HU_QUALITY_ACCEPTABLE && agent->reflection.use_llm &&
-                    agent->reflection.enabled && reflection_retries_left > 0) {
+                    agent->reflection.enabled && cognition_budget.enable_reflection &&
+                    reflection_retries_left > 0) {
                     quality =
                         hu_reflection_evaluate_llm(agent->alloc, &agent->provider, msg, msg_len,
                                                    resp.content, resp.content_len, quality);
@@ -3301,7 +3340,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
 
                 if (quality == HU_QUALITY_NEEDS_RETRY && agent->reflection.enabled &&
-                    reflection_retries_left > 0 && iter < agent->max_tool_iterations - 1) {
+                    reflection_retries_left > 0 && iter < effective_max_iters - 1) {
                     reflection_retries_left--;
                     char *critique = NULL;
                     size_t critique_len = 0;
@@ -5633,6 +5672,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
                         dispatch_tool_done:
                             (void)0;
+                            /* Capture generated media paths for daemon attachment */
+                            if (result->success && result->media_path && result->media_path_len > 0 &&
+                                agent->generated_media_count < 4) {
+                                char *mp = hu_strndup(agent->alloc, result->media_path, result->media_path_len);
+                                if (mp)
+                                    agent->generated_media[agent->generated_media_count++] = mp;
+                            }
                             const char *res_content =
                                 result->success ? result->output : result->error_msg;
                             size_t res_len =
@@ -5949,6 +5995,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                             ttl);
                             }
 
+                            /* Capture generated media paths (sequential path) */
+                            if (result.success && result.media_path && result.media_path_len > 0 &&
+                                agent->generated_media_count < 4) {
+                                char *mp = hu_strndup(agent->alloc, result.media_path, result.media_path_len);
+                                if (mp)
+                                    agent->generated_media[agent->generated_media_count++] = mp;
+                            }
+
                             hu_error_t hist_err = hu_agent_internal_append_history(
                                 agent, HU_ROLE_TOOL, res_content, res_len, call->name,
                                 call->name_len, call->id, call->id_len);
@@ -6043,8 +6097,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 
         /* Mid-turn retrieval: after tool results, augment context with
-         * memory relevant to both tool output and the evolving conversation */
-        if (agent->memory && agent->memory->vtable && agent->history_count > 1 &&
+         * memory relevant to both tool output and the evolving conversation.
+         * Gated by cognition budget — S1/fast mode skips mid-turn retrieval. */
+        if (cognition_budget.enable_mid_turn_retrieval &&
+            agent->memory && agent->memory->vtable && agent->history_count > 1 &&
             agent->history[agent->history_count - 1].role == HU_ROLE_TOOL &&
             !agent->cancel_requested) {
             const char *last_result = NULL;
@@ -6142,7 +6198,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     {
         hu_observer_event_t ev = {.tag = HU_OBSERVER_EVENT_TOOL_ITERATIONS_EXHAUSTED,
                                   .data = {{0}}};
-        ev.data.tool_iterations_exhausted.iterations = agent->max_tool_iterations;
+        ev.data.tool_iterations_exhausted.iterations = effective_max_iters;
         HU_OBS_SAFE_RECORD_EVENT(agent, &ev);
     }
     {

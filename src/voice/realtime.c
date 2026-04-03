@@ -260,6 +260,8 @@ void hu_voice_rt_event_free(hu_allocator_t *alloc, hu_voice_rt_event_t *event) {
         alloc->free(alloc->ctx, event->transcript, event->transcript_len + 1);
     if (event->tool_call_id)
         alloc->free(alloc->ctx, event->tool_call_id, event->tool_call_id_len + 1);
+    if (event->tool_args_json)
+        alloc->free(alloc->ctx, event->tool_args_json, event->tool_args_json_len + 1);
     memset(event, 0, sizeof(*event));
 }
 

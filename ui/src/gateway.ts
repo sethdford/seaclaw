@@ -157,6 +157,14 @@ export class GatewayClient extends EventTarget {
     return this.request("voice.audio.end", params);
   }
 
+  voiceToolResponse(params: {
+    name: string;
+    callId: string;
+    result: string;
+  }): Promise<unknown> {
+    return this.request("voice.tool_response", params);
+  }
+
   #onMessage(ev: MessageEvent): void {
     if (ev.data instanceof ArrayBuffer) {
       this.#onBinaryChunk?.(ev.data);

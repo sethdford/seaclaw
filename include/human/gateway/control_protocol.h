@@ -19,6 +19,7 @@ struct hu_tool;
 struct hu_push_manager;
 struct hu_pairing_guard;
 struct hu_graph;
+struct hu_task_store;
 
 typedef struct hu_app_context {
     struct hu_config *config;
@@ -35,6 +36,7 @@ typedef struct hu_app_context {
     struct hu_graph *graph; /* knowledge graph for memory.graph RPC; NULL when not opened */
     struct hu_mcp_resource_registry *mcp_resources; /* MCP resources registry; NULL if unused */
     struct hu_mcp_prompt_registry *mcp_prompts;     /* MCP prompts registry; NULL if unused */
+    struct hu_task_store *task_store;               /* HuLa durable task state; NULL if disabled */
 } hu_app_context_t;
 
 typedef struct hu_control_protocol {

@@ -32,6 +32,7 @@ run "standards drift" bash scripts/check-standards-drift.sh
 run "terminology" bash scripts/check-terminology.sh
 run "docs frontmatter" bash scripts/check-docs-frontmatter.sh
 run "human-skills frontmatter" bash scripts/check-human-skills-frontmatter.sh
+run "metrics drift" bash scripts/check-metrics-drift.sh
 if [ "${DOC_FLEET_LINKS_FAST:-0}" = "1" ]; then
   run "markdown relative links" bash scripts/check-docs-relative-links.sh
 else

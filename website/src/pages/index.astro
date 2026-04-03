@@ -84,7 +84,7 @@ const chapterCount = 9;
     <link rel="canonical" href="https://h-uman.ai/" />
     <link
       rel="preload"
-      href="/fonts/avenir/Avenir-Black.woff2"
+      href={`${base}fonts/avenir/Avenir-Black.woff2`}
       as="font"
       type="font/woff2"
       crossorigin
@@ -92,7 +92,7 @@ const chapterCount = 9;
     />
     <link
       rel="preload"
-      href="/fonts/avenir/Avenir-Book.woff2"
+      href={`${base}fonts/avenir/Avenir-Book.woff2`}
       as="font"
       type="font/woff2"
       crossorigin
@@ -100,7 +100,7 @@ const chapterCount = 9;
     <title>h-uman — not quite human.</title>
     <meta
       name="description"
-      content="not quite human. A complete autonomous AI agent runtime in 1,696 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU."
+      content="not quite human. A complete autonomous AI agent runtime in 1,750 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU."
     />
     <link
       rel="preload"
@@ -121,7 +121,7 @@ const chapterCount = 9;
     <meta property="og:title" content="h-uman — not quite human." />
     <meta
       property="og:description"
-      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 34 channels. 67+ tools. Zero dependencies. Pure C."
+      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 31 channels. 87+ tools. Zero dependencies. Pure C."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://h-uman.ai/" />
@@ -135,7 +135,7 @@ const chapterCount = 9;
     <meta name="twitter:title" content="h-uman — not quite human." />
     <meta
       name="twitter:description"
-      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 34 channels. 67+ tools. Zero dependencies. Pure C."
+      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 31 channels. 87+ tools. Zero dependencies. Pure C."
     />
     <meta name="twitter:image" content="https://h-uman.ai/og-image.png" />
 
@@ -151,7 +151,7 @@ const chapterCount = 9;
             name: "h-uman",
             url: "https://h-uman.ai/",
             description:
-              "Autonomous AI agent runtime in 1,696 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers.",
+              "Autonomous AI agent runtime in 1,750 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers.",
             publisher: { "@id": "https://h-uman.ai/#organization" },
           },
           {
@@ -165,7 +165,7 @@ const chapterCount = 9;
             "@type": "SoftwareApplication",
             name: "h-uman",
             description:
-              "not quite human. Autonomous AI agent runtime in 1,696 kilobytes of pure C.",
+              "not quite human. Autonomous AI agent runtime in 1,750 kilobytes of pure C.",
             applicationCategory: "DeveloperApplication",
             operatingSystem: "Cross-platform",
             url: "https://h-uman.ai/",
@@ -296,7 +296,7 @@ const chapterCount = 9;
     class="antialiased overflow-x-hidden hu-film-grain"
   >
     <div class="hu-particles" id="hu-particles" aria-hidden="true"></div>
-    <div class="scroll-progress" id="scroll-progress"></div>
+    <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
     <div id="custom-cursor" class="custom-cursor" aria-hidden="true"></div>
     <a href="#main-content" class="skip-link">Skip to content</a>
     <Nav />
@@ -355,7 +355,7 @@ const chapterCount = 9;
             class="hero-proof hero-fade-in flex flex-wrap justify-center gap-x-4 sm:gap-x-6 gap-y-2 mb-8 sm:mb-10"
           >
             <span style="color: var(--color-text-tertiary)"
-              ><strong style="color: var(--color-text)">1,696&nbsp;KB</strong> binary</span
+              ><strong style="color: var(--color-text)">1,750&nbsp;KB</strong> binary</span
             >
             <span style="color: var(--color-text-tertiary)" aria-hidden="true"
               >&middot;</span
@@ -425,12 +425,12 @@ const chapterCount = 9;
           >
             {
               [
-                { count: 1696, suffix: " KB", label: "Binary" },
+                { count: 1750, suffix: " KB", label: "Binary" },
                 { count: 30, prefix: "<", suffix: " ms", label: "Startup" },
                 { count: 4980, suffix: "+", label: "Tests" },
                 { count: 50, suffix: "+", label: "Providers" },
-                { count: 34, label: "Channels" },
-                { count: 67, suffix: "+", label: "Tools" },
+                { count: 31, label: "Channels" },
+                { count: 87, suffix: "+", label: "Tools" },
               ].map((stat, i, arr) => (
                 <div
                   class={`number-item text-center py-4 sm:py-6 md:py-0 ${i < arr.length - 1 ? "md:border-r" : ""}`}
@@ -928,7 +928,7 @@ const chapterCount = 9;
                   y="396"
                   text-anchor="middle"
                   font-size="9"
-                  data-delay="2200">1,696 KB. That's it.</text
+                  data-delay="2200">1,750 KB. That's it.</text
                 >
               </svg>
             </div>
@@ -995,7 +995,6 @@ const chapterCount = 9;
             vs. leading AI agent frameworks
           </p>
         </div>
-        </div>
       </section>
 
       {/* ═══ CRYSTAL GRID + ARCHITECTURE ═══ */}
@@ -1012,7 +1011,7 @@ const chapterCount = 9;
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
             What's inside <span style="color: var(--color-accent)"
-              >1,696&nbsp;kilobytes?</span
+              >1,750&nbsp;kilobytes?</span
             >
           </h2>
           <p
@@ -1046,35 +1045,17 @@ const chapterCount = 9;
             </span>
           </div>
 
-          <div class="mt-24">
-            <span id="architecture" class="sr-only">Architecture</span>
-            <div class="ambient-coral" style="top: 20%; left: 10%;"></div>
-            <div class="ambient-blue" style="bottom: 10%; right: 15%;"></div>
-            <h2
-              class="arch-title hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
-              style="color: var(--color-text); letter-spacing: -0.03em;"
-            >
-              Swap anything. Lock in nothing.
-            </h2>
-            <p
-              class="arch-sub hu-scroll-reveal text-lg mb-20"
-              style="color: var(--color-text-secondary)"
-            >
-              Every subsystem is a vtable interface. Change any layer with a
-              config edit.
-            </p>
-          </div>
         </div>
       </section>
 
-      {/* ═══ DEVICE SPECTRUM — SVG Illustrations ═══ */}
+      {/* ═══ DEVICE SPECTRUM + ARCHITECTURE ═══ */}
 
       <section
-        id="chapter-7"
+        id="chapter-5"
         class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
       >
         <span id="use-cases" class="sr-only">Use cases</span>
-        <span class="hu-chapter-label" aria-hidden="true">07</span>
+        <span class="hu-chapter-label" aria-hidden="true">05</span>
         <div class="max-w-5xl mx-auto">
           <h2
             class="spectrum-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4 text-center"
@@ -1218,7 +1199,7 @@ const chapterCount = 9;
                 class="text-[11px] font-mono"
                 style="color: var(--color-text-tertiary)"
               >
-                34 channels
+                31 channels
               </div>
             </div>
 
@@ -1559,7 +1540,7 @@ const chapterCount = 9;
                 class="text-[11px] font-mono"
                 style="color: var(--color-text-tertiary)"
               >
-                1,696 KB
+                1,750 KB
               </div>
             </div>
           </div>
@@ -1599,16 +1580,8 @@ const chapterCount = 9;
             <span>Minimum footprint</span>
           </div>
         </div>
-      </section>
-
-      {/* ═══ ARCHITECTURE ═══ */}
-
-      <section
-        id="chapter-8"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
-      >
+      <!-- Architecture -->
         <span id="architecture" class="sr-only">Architecture</span>
-        <span class="hu-chapter-label" aria-hidden="true">08</span>
         <div class="ambient-coral" style="top: 20%; left: 10%;"></div>
         <div class="ambient-blue" style="bottom: 10%; right: 15%;"></div>
         <div class="max-w-4xl mx-auto text-center">
@@ -1716,7 +1689,7 @@ const chapterCount = 9;
                   cx: 441,
                   cy: 159,
                   label: "Channels",
-                  tip: "33 messaging channels: Telegram, Discord, Slack, iMessage",
+                  tip: "31 messaging channels: Telegram, Discord, Slack, iMessage",
                 },
                 {
                   cx: 500,
@@ -1728,7 +1701,7 @@ const chapterCount = 9;
                   cx: 441,
                   cy: 441,
                   label: "Tools",
-                  tip: "67+ tools: shell, files, git, browser, web search, hardware",
+                  tip: "87+ tools: shell, files, git, browser, web search, hardware",
                 },
                 {
                   cx: 300,
@@ -1755,7 +1728,7 @@ const chapterCount = 9;
                   tip: "Arduino, STM32, Raspberry Pi peripherals",
                 },
               ].map(({ cx, cy, label, tip }) => (
-                <g class="arch-node opacity-0" style="cursor: pointer;">
+                <g class="arch-node opacity-0" style="cursor: pointer;" tabindex="0" role="img" aria-label={`${label}: ${tip}`}>
                   <title>{tip}</title>
                   <circle
                     cx={cx}
@@ -1785,13 +1758,13 @@ const chapterCount = 9;
 
       <hr class="section-divider" />
 
-      {/* ═══ HULA — Programs, Not Prompts ═══ */}
+      {/* ═══ HULA + ECOSYSTEM ═══ */}
 
       <section
-        id="chapter-9"
+        id="chapter-6"
         class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">09</span>
+        <span class="hu-chapter-label" aria-hidden="true">06</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
             class="hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
@@ -1916,17 +1889,7 @@ const chapterCount = 9;
             Learn more about HuLa
           </a>
         </div>
-      </section>
-
-      <hr class="section-divider" />
-
-      {/* ═══ ECOSYSTEM — Categorized Cards ═══ */}
-
-      <section
-        id="chapter-10"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">10</span>
+      <!-- Ecosystem -->
         <div class="max-w-4xl mx-auto text-center">
           <h2
             class="providers-title hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
@@ -1981,7 +1944,7 @@ const chapterCount = 9;
 
             <div class="eco-card text-left" data-reveal="scale" style="--ri: 1">
               <div class="eco-card-header flex items-baseline gap-2 flex-wrap">
-                <span class="eco-num">34</span>
+                <span class="eco-num">38</span>
                 <h3
                   class="text-base font-semibold mb-0"
                   style="color: var(--color-text)"
@@ -2017,7 +1980,7 @@ const chapterCount = 9;
 
             <div class="eco-card text-left" data-reveal="scale" style="--ri: 2">
               <div class="eco-card-header flex items-baseline gap-2 flex-wrap">
-                <span class="eco-num">67+</span>
+                <span class="eco-num">87+</span>
                 <h3
                   class="text-base font-semibold mb-0"
                   style="color: var(--color-text)"
@@ -2055,13 +2018,13 @@ const chapterCount = 9;
 
       <hr class="section-divider" />
 
-      {/* ═══ TERMINAL ═══ */}
+      {/* ═══ TERMINAL + DASHBOARD ═══ */}
 
       <section
-        id="chapter-11"
+        id="chapter-7"
         class="section-spacing relative hu-chapter-reveal px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">11</span>
+        <span class="hu-chapter-label" aria-hidden="true">07</span>
         <div class="max-w-3xl mx-auto">
           <h2
             class="terminal-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-6 text-center"
@@ -2109,17 +2072,7 @@ const chapterCount = 9;
             </div>
           </div>
         </div>
-      </section>
-
-      <hr class="section-divider" />
-
-      {/* ═══ DASHBOARD PREVIEW ═══ */}
-
-      <section
-        id="chapter-12"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">12</span>
+      <!-- Dashboard Preview -->
         <div class="max-w-4xl mx-auto text-center">
           <h2
             class="dash-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
@@ -2217,7 +2170,7 @@ const chapterCount = 9;
                     class="hu-metric-counter text-2xl font-bold mb-1"
                     style="color: var(--hu-text);"
                   >
-                    <span class="dash-count" data-target="34">0</span>
+                    <span class="dash-count" data-target="31">0</span>
                   </div>
                   <div
                     class="flex items-center gap-1 text-[11px]"
@@ -2249,7 +2202,7 @@ const chapterCount = 9;
                     class="hu-metric-counter text-2xl font-bold mb-1"
                     style="color: var(--hu-text);"
                   >
-                    <span class="dash-count" data-target="67">0</span>
+                    <span class="dash-count" data-target="87">0</span>
                   </div>
                   <div
                     class="flex items-center gap-1 text-[11px]"
@@ -2322,13 +2275,13 @@ const chapterCount = 9;
         </div>
       </section>
 
-      {/* ═══ QUALITY — Ring Gauges ═══ */}
+      {/* ═══ QUALITY + COMPARISON ═══ */}
 
       <section
-        id="chapter-13"
+        id="chapter-8"
         class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">13</span>
+        <span class="hu-chapter-label" aria-hidden="true">08</span>
         <div class="max-w-4xl mx-auto text-center">
           <h2
             class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
@@ -2435,19 +2388,9 @@ const chapterCount = 9;
             </div>
           </div>
         </div>
-      </section>
-
-      <hr class="section-divider" />
-
-      {/* ═══ COMPARISON — Tufte-inspired direct-label bars ═══ */}
-
-      <section
-        id="chapter-14"
-        class="relative hu-chapter-reveal py-16 md:py-24 cv-defer"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">14</span>
+      <!-- Comparison -->
         <div class="max-w-4xl mx-auto px-4">
-          <h2
+          <h3
             class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] text-center mb-4"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
@@ -2455,7 +2398,7 @@ const chapterCount = 9;
             Orders of magnitude <span style="color: var(--color-accent)"
               >smaller.</span
             >
-          </h2>
+          </h3>
           <p
             class="text-lg mb-14 text-center"
             data-reveal
@@ -2469,7 +2412,7 @@ const chapterCount = 9;
               [
                 {
                   metric: "Binary Size",
-                  human: { val: 1.696, label: "1.7 MB" },
+                  human: { val: 1.75, label: "1.7 MB" },
                   others: [
                     { name: "Claude Code", val: 200, label: "~200 MB" },
                     { name: "OpenAI Codex", val: 50, label: "~50 MB" },
@@ -2510,13 +2453,13 @@ const chapterCount = 9;
                 },
                 {
                   metric: "Channels",
-                  human: { val: 34, label: "34" },
+                  human: { val: 31, label: "31" },
                   others: [
                     { name: "Claude Code", val: 1, label: "1" },
                     { name: "OpenAI Codex", val: 1, label: "1" },
                   ],
                   unit: "",
-                  maxVal: 34,
+                  maxVal: 31,
                   inverted: true,
                 },
               ].map((row, ri) => (
@@ -2602,10 +2545,10 @@ const chapterCount = 9;
       {/* ═══ CTA ═══ */}
 
       <section
-        id="chapter-15"
+        id="chapter-9"
         class="relative hu-chapter-reveal py-20 md:py-40 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">15</span>
+        <span class="hu-chapter-label" aria-hidden="true">09</span>
         <div class="ambient-coral" style="top: 30%; left: 30%;"></div>
         <div class="ambient-blue" style="top: 40%; right: 20%;"></div>
         <div class="max-w-3xl mx-auto text-center">
@@ -2768,7 +2711,7 @@ const chapterCount = 9;
             '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-text)">cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON && cmake --build .</span></div>',
             '<div><span style="color:var(--hu-text-muted)">[100%] Built target human</span></div>',
             '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-text)">ls -lh human</span></div>',
-            '<div><span style="color:var(--hu-text-muted)">-rwxr-xr-x  1 user  staff  </span><span style="color:var(--color-accent)">1696K</span><span style="color:var(--hu-text-muted)">  human</span></div>',
+            '<div><span style="color:var(--hu-text-muted)">-rwxr-xr-x  1 user  staff  </span><span style="color:var(--color-accent)">1750K</span><span style="color:var(--hu-text-muted)">  human</span></div>',
           ].join("");
         }
 
@@ -2885,14 +2828,13 @@ const chapterCount = 9;
             fn();
             return;
           }
+          var fired = false;
+          function once() { if (fired) return; fired = true; mo.disconnect(); clearTimeout(tid); fn(); }
           const mo = new MutationObserver(() => {
-            if (document.documentElement.classList.contains("hu-lcp-done")) {
-              mo.disconnect();
-              fn();
-            }
+            if (document.documentElement.classList.contains("hu-lcp-done")) once();
           });
           mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-          setTimeout(() => { mo.disconnect(); fn(); }, 3000);
+          var tid = setTimeout(once, 3000);
         }
 
         afterLcp(() => {
@@ -2903,6 +2845,7 @@ const chapterCount = 9;
             async (entries) => {
               if (!entries[0]?.isIntersecting) return;
               numbersObs.disconnect();
+              try {
               const { gsap } = await import("gsap");
               document.querySelectorAll(".number-item").forEach((item, i) => {
                 const el = item.querySelector("[data-count]") as HTMLElement;
@@ -2937,6 +2880,13 @@ const chapterCount = 9;
                   },
                 });
               });
+              } catch (e) {
+                console.warn("[gsap] numbers animation failed:", e);
+                document.querySelectorAll(".number-item [data-count]").forEach((el) => {
+                  const valSpan = el.querySelector(".count-value");
+                  if (valSpan) valSpan.textContent = (el as HTMLElement).dataset.count || "0";
+                });
+              }
             },
             { threshold: 0.15 },
           );
@@ -2950,6 +2900,7 @@ const chapterCount = 9;
             async (entries) => {
               if (!entries[0]?.isIntersecting) return;
               archObs.disconnect();
+              try {
               const { gsap } = await import("gsap");
               const archTl = gsap.timeline({
                 defaults: { ease: "power3.out" },
@@ -2979,20 +2930,30 @@ const chapterCount = 9;
                   { opacity: 1, duration: 0.5, stagger: 0.08 },
                   0.6,
                 );
+              } catch (e) {
+                console.warn("[gsap] arch animation failed:", e);
+                document.querySelectorAll("#arch-core, .arch-line, .arch-node").forEach((el) => {
+                  (el as HTMLElement).style.opacity = "1";
+                });
+              }
             },
             { threshold: 0.15 },
           );
           archObs.observe(archDiagram);
 
           document.querySelectorAll(".arch-node").forEach((node) => {
-            node.addEventListener("mouseenter", () => {
+            const highlight = () => {
               const c = node.querySelector("circle");
               if (c) c.setAttribute("stroke", "var(--color-accent)");
-            });
-            node.addEventListener("mouseleave", () => {
+            };
+            const unhighlight = () => {
               const c = node.querySelector("circle");
               if (c) c.setAttribute("stroke", "var(--color-node-stroke)");
-            });
+            };
+            node.addEventListener("mouseenter", highlight);
+            node.addEventListener("mouseleave", unhighlight);
+            node.addEventListener("focusin", highlight);
+            node.addEventListener("focusout", unhighlight);
           });
         }
 
@@ -3004,9 +2965,15 @@ const chapterCount = 9;
             async (entries) => {
               if (!entries[0]?.isIntersecting) return;
               termObs.disconnect();
+              try {
               const { gsap } = await import("gsap");
               gsap.to(terminalEl, { opacity: 1, duration: 0.6 });
               typeTerminal(outputEl, gsap);
+              } catch (e) {
+                console.warn("[gsap] terminal animation failed:", e);
+                terminalEl.style.opacity = "1";
+                outputEl.textContent = "$ ./human agent -m \"Hello\"\nHello! I'm h-uman — a fully autonomous AI assistant.";
+              }
             },
             { threshold: 0.15 },
           );
@@ -3039,8 +3006,8 @@ const chapterCount = 9;
             { prompt: true, text: "ls -lh human" },
             {
               prompt: false,
-              text: "-rwxr-xr-x  1 user  staff  1696K  human",
-              highlights: [{ text: "1696K", cls: accentColor }],
+              text: "-rwxr-xr-x  1 user  staff  1750K  human",
+              highlights: [{ text: "1750K", cls: accentColor }],
             },
             {
               prompt: true,
@@ -3053,7 +3020,7 @@ const chapterCount = 9;
             },
             {
               prompt: false,
-              text: "running in 1,696 kilobytes. How can I help?",
+              text: "running in 1,750 kilobytes. How can I help?",
             },
           ];
 
@@ -3129,6 +3096,7 @@ const chapterCount = 9;
             async (entries) => {
               if (!entries[0]?.isIntersecting) return;
               dashObs.disconnect();
+              try {
               const { gsap } = await import("gsap");
               gsap.to(dashPreview, { opacity: 1, duration: 0.6 });
               document.querySelectorAll(".dash-count").forEach((el, i) => {
@@ -3193,27 +3161,16 @@ const chapterCount = 9;
                   );
                 });
               }
+              } catch (e) {
+                console.warn("[gsap] dashboard animation failed:", e);
+                (dashPreview as HTMLElement).style.opacity = "1";
+              }
             },
             { threshold: 0.15 },
           );
           dashObs.observe(dashPreview);
         }
         }); // end afterLcp
-
-        // ═══ Spotlight cards (vanilla JS, no GSAP needed) ═══
-        document.querySelectorAll(".card-spotlight").forEach((card) => {
-          card.addEventListener("mousemove", (e) => {
-            const rect = (card as HTMLElement).getBoundingClientRect();
-            (card as HTMLElement).style.setProperty(
-              "--mouse-x",
-              (e as MouseEvent).clientX - rect.left + "px",
-            );
-            (card as HTMLElement).style.setProperty(
-              "--mouse-y",
-              (e as MouseEvent).clientY - rect.top + "px",
-            );
-          });
-        });
 
         // ═══ Custom cursor (desktop only, no touch) ═══
         const cursor = document.getElementById("custom-cursor");
@@ -3222,6 +3179,7 @@ const chapterCount = 9;
             cy = 0,
             tx = 0,
             ty = 0;
+          let cursorRaf = 0;
           document.addEventListener("mousemove", (e) => {
             tx = e.clientX;
             ty = e.clientY;
@@ -3230,9 +3188,13 @@ const chapterCount = 9;
             cx += (tx - cx) * 0.15;
             cy += (ty - cy) * 0.15;
             cursor.style.transform = `translate(${cx - 10}px, ${cy - 10}px)`;
-            requestAnimationFrame(tick);
+            cursorRaf = requestAnimationFrame(tick);
           };
           tick();
+          document.addEventListener("visibilitychange", () => {
+            if (document.hidden) cancelAnimationFrame(cursorRaf);
+            else tick();
+          });
           cursor.style.opacity = "1";
           document
             .querySelectorAll(
@@ -3257,12 +3219,10 @@ const chapterCount = 9;
               barObs.disconnect();
               document.querySelectorAll(".comparison-bar").forEach((bar, i) => {
                 const el = bar as HTMLElement;
-                const target = el.dataset.width || "0%";
-                el.style.width = "0%";
+                el.style.transform = "scaleX(0)";
                 setTimeout(
                   () => {
-                    el.style.transition = `width 0.8s cubic-bezier(0.22, 1.2, 0.36, 1)`;
-                    el.style.width = target;
+                    el.style.transform = "scaleX(1)";
                   },
                   100 + i * 60,
                 );
@@ -3517,6 +3477,7 @@ const chapterCount = 9;
         }
 
         async function initHeroWebGL(canvas: HTMLCanvasElement) {
+          try {
           const THREE = await import("three");
           const section = canvas.closest("section")!;
           const w = () => section.clientWidth;
@@ -3857,6 +3818,27 @@ const chapterCount = 9;
             { threshold: 0 },
           );
           cleanObs.observe(canvas);
+
+          const disposeWebGL = () => {
+            cancelAnimationFrame(animId);
+            cleanObs.disconnect();
+            window.removeEventListener("resize", onResize);
+            renderer.dispose();
+            scene.traverse((obj: any) => {
+              if (obj.geometry) obj.geometry.dispose();
+              if (obj.material) {
+                if (Array.isArray(obj.material)) obj.material.forEach((m: any) => m.dispose());
+                else obj.material.dispose();
+              }
+            });
+          };
+          window.addEventListener("pagehide", disposeWebGL, { once: true });
+          } catch (e) {
+            console.warn("[hero-webgl] init failed, falling back:", e);
+            canvas.style.display = "none";
+            const fallback = canvas.parentElement?.querySelector(".hero-static-constellation");
+            if (fallback instanceof HTMLElement) fallback.style.display = "block";
+          }
         }
       }
     </script>
@@ -3992,7 +3974,7 @@ const chapterCount = 9;
           if (!c) return;
           var el = e.target;
           if (!el || typeof el.closest !== "function") return;
-          var card = el.closest(".proof-item, .feature-card");
+          var card = el.closest(".proof-item");
           if (!card) return;
           if (e.relatedTarget instanceof Node && card.contains(e.relatedTarget))
             return;
@@ -4008,21 +3990,19 @@ const chapterCount = 9;
         if (location.hostname === "localhost") return;
         var s = document.createElement("script");
         s.src = "https://unpkg.com/web-vitals@4/dist/web-vitals.iife.js";
+        s.onerror = function () { console.warn("[web-vitals] failed to load"); };
         s.onload = function () {
           var wv = window.webVitals;
           if (!wv) return;
           var log = function (m) {
-            if (navigator.sendBeacon) {
-              navigator.sendBeacon(
-                "/api/vitals",
-                JSON.stringify({
-                  name: m.name,
-                  value: Math.round(m.name === "CLS" ? m.value * 1000 : m.value),
-                  rating: m.rating,
-                  path: location.pathname,
-                })
-              );
-            }
+            var payload = {
+              name: m.name,
+              value: Math.round(m.name === "CLS" ? m.value * 1000 : m.value),
+              rating: m.rating,
+              path: location.pathname,
+            };
+            console.debug("[web-vitals]", payload.name, payload.value, payload.rating);
+            /* sendBeacon to RUM endpoint when deployed */
           };
           wv.onCLS(log);
           wv.onINP(log);

@@ -29,7 +29,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Planner / dispatcher**          | `src/agent/planner.c`, `dispatcher.c`                          | `test_agent_extended.c`                                                      |
 | **DAG / LLMCompiler**             | `src/agent/dag.c`, `dag_executor.c`, `llm_compiler.c`          | `test_dag.c`                                                                 |
 | **HuLa (program IR / emergence)** | `src/agent/hula.c`, `hula_compiler.c`, `hula_emergence.c`, `agent_turn.c` (integration); guide: [`docs/guides/hula.md`](guides/hula.md) | `test_hula.c`                                                                |
-| **Metacognition (loop / policy)** | `src/cognition/metacognition.c`, `agent_turn.c`, `spawn.c` (`hu_spawn_config_apply_current_tool_agent`) | `test_metacognition.c`, `test_config_extended.c`; ops: `docs/operations/metacog-hula-production.md` |
+| **Metacognition (loop / policy)** | `src/cognition/metacognition.c`, `src/agent/agent_turn.c`, `src/agent/spawn.c` (`hu_spawn_config_apply_current_tool_agent`) | `test_metacognition.c`, `test_config_extended.c`; ops: `docs/operations/metacog-hula-production.md` |
 | **Tool router**                   | `src/agent/tool_router.c`                                      | `test_tool_router.c`                                                         |
 | **Prompt building**               | `src/agent/prompt.c`, `context_tokens.c`, `memory_loader.c`    | `test_prompt.c`                                                              |
 | **Proactive / governor**          | `src/agent/proactive.c`, `governor.c`, `arbitrator.c`          | `test_proactive.c`, `test_governor.c`, `test_arbitrator.c`                   |
@@ -84,6 +84,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Voice cloning (Cartesia)**       | `src/tts/voice_clone.c`, `include/human/tts/voice_clone.h`                  | `test_voice_clone.c`                                 |
 | **Voice clone gateway**            | `src/gateway/cp_voice_clone.c`                                               | `test_gateway_voice.c`                               |
 | **Voice clone tool**               | `src/tools/voice_clone.c`, `include/human/tools/voice_clone.h`              | `test_voice_clone.c`                                 |
+| **Send voice message tool**        | `src/tools/send_voice_message.c`, `include/human/tools/send_voice_message.h`| `test_send_voice_message.c`                          |
 | **Voice clone UI**                 | `ui/src/components/hu-voice-clone.ts`                                        | `—`                                                  |
 
 ## Tools
@@ -198,7 +199,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Session**                                            | `src/session.c`                                                                                                                 | `test_session.c`                                                                   |
 | **WebSocket client**                                   | `src/websocket/websocket.c`                                                                                                     | `test_websocket.c`, `test_ws_integration.c`                                        |
 | **Tunnel**                                             | `src/tunnel/ngrok.c`, `cloudflare.c`, `tailscale.c`                                                                             | `test_tunnel.c`                                                                    |
-| **Voice / TTS / WebRTC**                               | `src/voice.c`, `src/voice_config.c`, `src/voice/realtime.c`, `src/voice/webrtc.c`, `src/tts/audio_pipeline.c`, `emotion_map.c`                        | `test_voice.c`, `test_webrtc.c`, `test_audio_pipeline.c`, `test_emotion_map.c`     |
+| **Voice / TTS / WebRTC**                               | `src/voice.c`, `src/voice_config.c`, `src/voice/realtime.c`, `src/voice/webrtc.c`, `src/tts/audio_pipeline.c`, `src/tts/emotion_map.c`                | `test_voice.c`, `test_webrtc.c`, `test_audio_pipeline.c`, `test_emotion_map.c`     |
 | **Paperclip**                                          | `src/paperclip/client.c`, `heartbeat.c`                                                                                         | `test_paperclip.c`                                                                 |
 | **Eval**                                               | `src/eval.c`, `eval_suites/*.json`, `scripts/adversarial-eval-harness.py`, `scripts/redteam-eval-fleet.sh`, `scripts/redteam-live.sh` | `test_eval.c`, `test_adversarial_detect.c`                                         |
 | **A2A**                                                | `src/a2a.c`                                                                                                                     | `test_a2a.c`                                                                       |
