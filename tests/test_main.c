@@ -311,6 +311,9 @@ void run_experience_tests(void);
 void run_experience_engine_tests(void);
 void run_intelligence_wiring_tests(void);
 void run_prove_e2e_tests(void);
+void run_anti_sycophancy_tests(void);
+void run_mutual_tom_tests(void);
+void run_opinion_history_tests(void);
 void run_self_improve_loop_tests(void);
 void run_a2a_tests(void);
 void run_gvr_tests(void);
@@ -385,6 +388,7 @@ void run_repair_tests(void);
 void run_daemon_cron_tests(void);
 void run_daemon_lifecycle_tests(void);
 void run_daemon_routing_tests(void);
+void run_daemon_proactive_tests(void);
 void run_daemon_trust_tests(void);
 
 static void print_usage(const char *prog) {
@@ -718,6 +722,9 @@ int main(int argc, char **argv) {
     run_experience_engine_tests();
     run_intelligence_wiring_tests();
     run_prove_e2e_tests();
+    run_anti_sycophancy_tests();
+    run_mutual_tom_tests();
+    run_opinion_history_tests();
     run_self_improve_loop_tests();
     run_a2a_tests();
     run_gvr_tests();
@@ -795,6 +802,7 @@ int main(int argc, char **argv) {
     run_daemon_cron_tests();
     run_daemon_lifecycle_tests();
     run_daemon_routing_tests();
+    run_daemon_proactive_tests();
     run_daemon_trust_tests();
 
     HU_TEST_REPORT();

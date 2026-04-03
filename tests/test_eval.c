@@ -12,13 +12,14 @@ static const struct eval_suite_expect_row {
     size_t expect_tasks;
 } k_eval_suite_expect[] = {
     {"adversarial.json", 10},       {"capability_edges.json", 10},
-    {"coding_basic.json", 5},       {"fidelity.json", 18},
-    {"hula_orchestration.json", 4}, {"human_likeness.json", 8},
-    {"intelligence.json", 10},      {"memory.json", 8},
+    {"coding_basic.json", 5},       {"companion_safety.json", 12},
+    {"fidelity.json", 18},          {"hula_orchestration.json", 4},
+    {"human_likeness.json", 8},     {"intelligence.json", 10},
+    {"longitudinal.json", 9},       {"memory.json", 8},
     {"multi_turn.json", 6},         {"reasoning.json", 10},
     {"reasoning_basic.json", 10},   {"social.json", 8},
     {"tool_capability.json", 8},    {"tool_use.json", 8},
-    {"tool_use_basic.json", 5},
+    {"tool_use_basic.json", 5},     {"trust_repair.json", 10},
 };
 
 static void test_eval_load(void) {
