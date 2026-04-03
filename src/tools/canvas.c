@@ -6,7 +6,6 @@
 #include "human/core/string.h"
 #include "human/tool.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define TOOL_NAME "canvas"

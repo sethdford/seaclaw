@@ -64,6 +64,10 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
         const char *voice = (session->config.voice && session->config.voice[0])
                                 ? session->config.voice
                                 : "alloy";
+        const char *td = session->config.vad_enabled
+                             ? "\"turn_detection\":{\"type\":\"server_vad\",\"threshold\":0.5,"
+                               "\"prefix_padding_ms\":300,\"silence_duration_ms\":500}"
+                             : "\"turn_detection\":null";
         int su = snprintf(session_update, sizeof(session_update),
                           "{\"type\":\"session.update\",\"session\":{"
                           "\"model\":\"%s\","
@@ -72,12 +76,16 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
                           "\"input_audio_format\":\"pcm16\","
                           "\"output_audio_format\":\"pcm16\","
                           "\"input_audio_transcription\":{\"model\":\"whisper-1\"},"
-                          "\"turn_detection\":{\"type\":\"server_vad\",\"threshold\":0.5,"
-                          "\"prefix_padding_ms\":300,\"silence_duration_ms\":500}"
+                          "%s"
                           "}}",
-                          mdl, voice);
-        if (su > 0 && (size_t)su < sizeof(session_update))
-            (void)hu_ws_send(ws, session_update, (size_t)su);
+                          mdl, voice, td);
+        if (su > 0 && (size_t)su < sizeof(session_update)) {
+            hu_error_t su_err = hu_ws_send(ws, session_update, (size_t)su);
+            if (su_err != HU_OK) {
+                session->connected = false;
+                return su_err;
+            }
+        }
     }
     return HU_OK;
 #else
@@ -239,6 +247,27 @@ hu_error_t hu_voice_rt_recv_event(hu_voice_rt_session_t *session, hu_allocator_t
         if (strcmp(type, "response.audio.done") == 0 || strcmp(type, "response.done") == 0 ||
             strcmp(type, "response.output_audio.done") == 0)
             out->done = true;
+
+        /* Tool / function call events */
+        if (strcmp(type, "response.function_call_arguments.done") == 0) {
+            const char *name = hu_json_get_string(json, "name");
+            const char *call_id = hu_json_get_string(json, "call_id");
+            const char *arguments = hu_json_get_string(json, "arguments");
+            if (name && call_id) {
+                size_t nlen = strlen(name);
+                size_t clen = strlen(call_id);
+                out->transcript = hu_strndup(alloc, name, nlen);
+                out->transcript_len = out->transcript ? nlen : 0;
+                out->tool_call_id = hu_strndup(alloc, call_id, clen);
+                out->tool_call_id_len = out->tool_call_id ? clen : 0;
+                if (arguments) {
+                    size_t alen = strlen(arguments);
+                    out->tool_args_json = hu_strndup(alloc, arguments, alen);
+                    out->tool_args_json_len = out->tool_args_json ? alen : 0;
+                }
+                copy_event_type("response.function_call", out);
+            }
+        }
     }
 
     hu_json_free(alloc, json);

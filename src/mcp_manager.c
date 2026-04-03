@@ -552,12 +552,6 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
         if (!slot->connected)
             continue;
 
-        if (!slot->server) {
-            hu_log_info("mcp-manager", NULL, "mcp_manager: tool discovery not yet supported for %s transport",
-                    slot->transport_type ? slot->transport_type : "unknown");
-            continue;
-        }
-
         char **names = NULL, **descs = NULL, **params = NULL;
         size_t n = 0;
         hu_error_t err;
@@ -675,8 +669,15 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
                 /* inputSchema as JSON string */
                 hu_json_value_t *schema = hu_json_object_get(tool_obj, "inputSchema");
                 if (schema) {
-                    params[ti] = (char *)alloc->alloc(alloc->ctx, 3);
-                    if (params[ti]) { memcpy(params[ti], "{}", 3); }
+                    char *schema_str = NULL;
+                    size_t schema_len = 0;
+                    if (hu_json_stringify(alloc, schema, &schema_str, &schema_len) == HU_OK &&
+                        schema_str) {
+                        params[ti] = schema_str;
+                    } else {
+                        params[ti] = (char *)alloc->alloc(alloc->ctx, 3);
+                        if (params[ti]) { memcpy(params[ti], "{}", 3); }
+                    }
                 }
             }
             hu_json_free(alloc, root);

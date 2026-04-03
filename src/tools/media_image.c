@@ -3,6 +3,9 @@
  * the local path in media_path so the daemon can attach it to a channel send. */
 
 #include "human/tools/media_image.h"
+#include "human/agent.h"
+#include "human/agent/tool_context.h"
+#include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
@@ -136,8 +139,13 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
     }
 
     const char *model = hu_json_get_string(args, "model");
-    if (!model) model = "nano_banana";
-    else if (!mi_model_ok(model)) {
+    if (!model) {
+        hu_agent_t *cfg_agent = hu_agent_get_current_for_tools();
+        if (cfg_agent && cfg_agent->config && cfg_agent->config->media_gen.default_image_model)
+            model = cfg_agent->config->media_gen.default_image_model;
+        else
+            model = "nano_banana";
+    } else if (!mi_model_ok(model)) {
         *out = hu_tool_result_fail("invalid model", 13);
         return HU_OK;
     }
@@ -189,9 +197,16 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
             return HU_OK;
         }
 
-        const char *project = getenv("GOOGLE_CLOUD_PROJECT");
-        const char *region = getenv("GOOGLE_CLOUD_LOCATION");
+        const char *project = NULL;
+        const char *region = NULL;
+        hu_agent_t *mi_agent = hu_agent_get_current_for_tools();
+        if (mi_agent && mi_agent->config) {
+            project = mi_agent->config->media_gen.vertex_project;
+            region = mi_agent->config->media_gen.vertex_region;
+        }
+        if (!project) project = getenv("GOOGLE_CLOUD_PROJECT");
         if (!project) project = getenv("VERTEX_PROJECT");
+        if (!region) region = getenv("GOOGLE_CLOUD_LOCATION");
         if (!region) region = "us-central1";
 
         if (!project || !project[0]) {
@@ -358,9 +373,16 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
             }
             hu_vertex_auth_get_bearer(&vauth, auth_buf, sizeof(auth_buf));
 
-            const char *project = getenv("GOOGLE_CLOUD_PROJECT");
-            const char *region = getenv("GOOGLE_CLOUD_LOCATION");
+            const char *project = NULL;
+            const char *region = NULL;
+            hu_agent_t *nb_agent = hu_agent_get_current_for_tools();
+            if (nb_agent && nb_agent->config) {
+                project = nb_agent->config->media_gen.vertex_project;
+                region = nb_agent->config->media_gen.vertex_region;
+            }
+            if (!project) project = getenv("GOOGLE_CLOUD_PROJECT");
             if (!project) project = getenv("VERTEX_PROJECT");
+            if (!region) region = getenv("GOOGLE_CLOUD_LOCATION");
             if (!region) region = "us-central1";
             if (!project || !project[0]) {
                 hu_vertex_auth_free(&vauth);
@@ -381,7 +403,7 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
             return HU_OK;
         }
 
-        /* Build generateContent request with responseModalities=["IMAGE"] */
+        /* Build generateContent request with responseModalities=["TEXT","IMAGE"] */
         hu_json_value_t *root = hu_json_object_new(alloc);
         hu_json_value_t *contents = hu_json_array_new(alloc);
         hu_json_value_t *msg = hu_json_object_new(alloc);
@@ -402,13 +424,23 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
         hu_json_array_push(alloc, contents, msg);
         hu_json_object_set(alloc, root, "contents", contents);
 
-        /* generationConfig with responseModalities */
+        /* generationConfig: responseModalities + imageConfig */
         hu_json_value_t *gen_cfg = hu_json_object_new(alloc);
         hu_json_value_t *modalities = hu_json_array_new(alloc);
-        hu_json_value_t *img_mod = hu_json_string_new(alloc, "IMAGE", 5);
-        if (gen_cfg && modalities && img_mod) {
-            hu_json_array_push(alloc, modalities, img_mod);
+        if (gen_cfg && modalities) {
+            hu_json_value_t *text_mod = hu_json_string_new(alloc, "TEXT", 4);
+            hu_json_value_t *img_mod = hu_json_string_new(alloc, "IMAGE", 5);
+            if (text_mod) hu_json_array_push(alloc, modalities, text_mod);
+            if (img_mod) hu_json_array_push(alloc, modalities, img_mod);
             hu_json_object_set(alloc, gen_cfg, "responseModalities", modalities);
+            if (aspect) {
+                hu_json_value_t *img_cfg = hu_json_object_new(alloc);
+                hu_json_value_t *ar = hu_json_string_new(alloc, aspect, strlen(aspect));
+                if (img_cfg && ar) {
+                    hu_json_object_set(alloc, img_cfg, "aspectRatio", ar);
+                    hu_json_object_set(alloc, gen_cfg, "imageConfig", img_cfg);
+                }
+            }
             hu_json_object_set(alloc, root, "generationConfig", gen_cfg);
         }
 

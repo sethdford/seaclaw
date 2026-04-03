@@ -2356,7 +2356,7 @@ export class DemoGatewayClient extends EventTarget {
         return { prompts: [] };
 
       default:
-        return {};
+        return { error: "not available in demo mode", method };
     }
   }
 
@@ -2432,12 +2432,26 @@ export class DemoGatewayClient extends EventTarget {
       this.dispatchEvent(
         new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
           detail: {
+            event: "voice.tool_call",
+            payload: {
+              name: "demo_tool",
+              callId: "demo-call-1",
+              args: '{"query":"demo"}',
+            },
+          },
+        }),
+      );
+    }, 150);
+    setTimeout(() => {
+      this.dispatchEvent(
+        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
+          detail: {
             event: "voice.assistant.transcript",
             payload: { text: "This is a demo Gemini Live response." },
           },
         }),
       );
-    }, 200);
+    }, 300);
     setTimeout(() => {
       this.dispatchEvent(
         new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
@@ -2467,6 +2481,13 @@ export class DemoGatewayClient extends EventTarget {
         SESSION_KEY_VOICE,
       );
     }, 200);
+    setTimeout(() => {
+      this.dispatchEvent(
+        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
+          detail: { event: "voice.generation_complete", payload: {} },
+        }),
+      );
+    }, 3200);
     setTimeout(() => {
       this.dispatchEvent(
         new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {

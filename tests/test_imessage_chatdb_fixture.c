@@ -136,7 +136,8 @@ static void test_chatdb_poll_query_returns_inbound(void) {
     sqlite3 *db = open_fixture();
     HU_ASSERT_NOT_NULL(db);
 
-    /* Production poll SQL with COALESCE + attachment classification */
+    /* Exact production poll SQL from imessage.c — kept in sync to catch drift.
+     * COALESCE: voice→[Voice Message], video→[Video], else→[Photo]. */
     const char *sql =
         "SELECT m.ROWID, m.guid, "
         "  COALESCE(m.text, "
@@ -154,17 +155,35 @@ static void test_chatdb_poll_query_returns_inbound(void) {
         "             AND (LOWER(av.filename) LIKE '%.mov' OR LOWER(av.filename) LIKE '%.mp4' "
         "               OR LOWER(av.filename) LIKE '%.m4v')) > 0 "
         "       THEN '[Video]' "
-        "       WHEN (SELECT COUNT(*) FROM message_attachment_join majimg "
-        "             JOIN attachment aimg ON majimg.attachment_id = aimg.ROWID "
-        "             WHERE majimg.message_id = m.ROWID AND aimg.filename IS NOT NULL "
-        "             AND (LOWER(aimg.filename) LIKE '%.jpg' OR LOWER(aimg.filename) LIKE '%.jpeg' "
-        "               OR LOWER(aimg.filename) LIKE '%.png' OR LOWER(aimg.filename) LIKE '%.heic' "
-        "               OR LOWER(aimg.filename) LIKE '%.gif' OR LOWER(aimg.filename) LIKE '%.webp')) > 0 "
-        "       THEN '[Photo]' "
         "       WHEN (SELECT COUNT(*) FROM message_attachment_join "
         "             WHERE message_id = m.ROWID) > 0 "
-        "       THEN '[Attachment]' ELSE NULL END)) AS text, h.id, "
-        "  m.attributedBody, m.balloon_bundle_id "
+        "       THEN '[Photo]' ELSE NULL END)) AS text, h.id, "
+        "  COALESCE("
+        "    (SELECT COUNT(DISTINCT chj2.handle_id) FROM chat_message_join cmj "
+        "     JOIN chat_handle_join chj2 ON chj2.chat_id = cmj.chat_id "
+        "     WHERE cmj.message_id = m.ROWID), 0) AS participant_count, "
+        "  (SELECT COUNT(*) FROM message_attachment_join maj "
+        "   JOIN attachment a ON maj.attachment_id = a.ROWID "
+        "   WHERE maj.message_id = m.ROWID AND a.filename IS NOT NULL "
+        "   AND (LOWER(a.filename) LIKE '%.jpg' OR LOWER(a.filename) LIKE '%.jpeg' "
+        "     OR LOWER(a.filename) LIKE '%.png' OR LOWER(a.filename) LIKE '%.heic' "
+        "     OR LOWER(a.filename) LIKE '%.gif' OR LOWER(a.filename) LIKE '%.webp')) "
+        "   > 0 AS has_image, "
+        "  (SELECT COUNT(*) FROM message_attachment_join maj2 "
+        "   JOIN attachment a2 ON maj2.attachment_id = a2.ROWID "
+        "   WHERE maj2.message_id = m.ROWID AND a2.filename IS NOT NULL "
+        "   AND (LOWER(a2.filename) LIKE '%.mov' OR LOWER(a2.filename) LIKE '%.mp4' "
+        "     OR LOWER(a2.filename) LIKE '%.m4v')) > 0 AS has_video, "
+        "  (SELECT COUNT(*) FROM message_attachment_join maj3 "
+        "   JOIN attachment a3 ON maj3.attachment_id = a3.ROWID "
+        "   WHERE maj3.message_id = m.ROWID AND a3.filename IS NOT NULL "
+        "   AND (LOWER(a3.filename) LIKE '%.caf' OR LOWER(a3.filename) LIKE '%.m4a' "
+        "     OR LOWER(a3.filename) LIKE '%.mp3' OR LOWER(a3.filename) LIKE '%.aac' "
+        "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio, "
+        "  CASE WHEN m.date_edited > 0 THEN 1 ELSE 0 END AS was_edited, "
+        "  m.thread_originator_guid, "
+        "  m.attributedBody, "
+        "  m.balloon_bundle_id "
         "FROM message m "
         "JOIN handle h ON m.handle_id = h.ROWID "
         "WHERE m.is_from_me = 0 AND m.associated_message_type = 0 "
@@ -173,42 +192,62 @@ static void test_chatdb_poll_query_returns_inbound(void) {
         "     OR (m.attributedBody IS NOT NULL AND LENGTH(m.attributedBody) > 0) "
         "     OR (m.balloon_bundle_id IS NOT NULL AND LENGTH(m.balloon_bundle_id) > 0) "
         "     OR (EXISTS (SELECT 1 FROM message_attachment_join maj "
-        "         WHERE maj.message_id = m.ROWID))) "
-        "ORDER BY m.ROWID ASC LIMIT 20";
+        "         JOIN attachment a ON maj.attachment_id = a.ROWID "
+        "         WHERE maj.message_id = m.ROWID AND a.filename IS NOT NULL "
+        "         AND ((LOWER(a.filename) LIKE '%.jpg' OR LOWER(a.filename) LIKE '%.jpeg' "
+        "           OR LOWER(a.filename) LIKE '%.png' OR LOWER(a.filename) LIKE '%.heic' "
+        "           OR LOWER(a.filename) LIKE '%.gif' OR LOWER(a.filename) LIKE '%.webp') "
+        "           OR (LOWER(a.filename) LIKE '%.mov' OR LOWER(a.filename) LIKE '%.mp4' "
+        "             OR LOWER(a.filename) LIKE '%.m4v') "
+        "           OR (LOWER(a.filename) LIKE '%.caf' OR LOWER(a.filename) LIKE '%.m4a' "
+        "             OR LOWER(a.filename) LIKE '%.mp3' OR LOWER(a.filename) LIKE '%.aac' "
+        "             OR LOWER(a.filename) LIKE '%.opus'))))) "
+        "ORDER BY m.ROWID ASC LIMIT ?";
 
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     HU_ASSERT_EQ(rc, SQLITE_OK);
     sqlite3_bind_int64(stmt, 1, 0);
+    sqlite3_bind_int(stmt, 2, 20);
 
     int count = 0;
     bool saw_voice = false, saw_video = false, saw_photo = false;
-    bool saw_attachment = false, saw_text = false, saw_attr = false;
+    bool saw_text = false, saw_attr = false;
+    bool saw_has_image = false, saw_has_video = false, saw_has_audio = false;
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         const char *text = (const char *)sqlite3_column_text(stmt, 2);
+        int has_image = sqlite3_column_int(stmt, 5);
+        int has_video_col = sqlite3_column_int(stmt, 6);
+        int has_audio = sqlite3_column_int(stmt, 7);
         if (text) {
             if (strcmp(text, "[Voice Message]") == 0) saw_voice = true;
             if (strcmp(text, "[Video]") == 0) saw_video = true;
             if (strcmp(text, "[Photo]") == 0) saw_photo = true;
-            if (strcmp(text, "[Attachment]") == 0) saw_attachment = true;
             if (strcmp(text, "Hello there") == 0) saw_text = true;
         }
-        if (!text) {
-            const void *ab = sqlite3_column_blob(stmt, 4);
-            if (ab && sqlite3_column_bytes(stmt, 4) > 0)
+        {
+            const void *ab = sqlite3_column_blob(stmt, 10);
+            if (ab && sqlite3_column_bytes(stmt, 10) > 0)
                 saw_attr = true;
         }
+        if (has_image) saw_has_image = true;
+        if (has_video_col) saw_has_video = true;
+        if (has_audio) saw_has_audio = true;
         count++;
     }
-    /* MSG-001(text), MSG-004(photo), MSG-005(sticker), MSG-006(voice),
-     * MSG-007(video), MSG-008(pdf→attachment), MSG-009(attributedBody) */
-    HU_ASSERT_EQ(count, 7);
+    /* MSG-001(text), MSG-004(photo→[Photo]), MSG-005(sticker/balloon),
+     * MSG-006(voice), MSG-007(video), MSG-009(attributedBody).
+     * MSG-008(doc.pdf) excluded — production EXISTS filter requires
+     * known image/video/audio extensions. */
+    HU_ASSERT_EQ(count, 6);
     HU_ASSERT_TRUE(saw_text);
     HU_ASSERT_TRUE(saw_voice);
     HU_ASSERT_TRUE(saw_video);
     HU_ASSERT_TRUE(saw_photo);
-    HU_ASSERT_TRUE(saw_attachment);
     HU_ASSERT_TRUE(saw_attr);
+    HU_ASSERT_TRUE(saw_has_image);
+    HU_ASSERT_TRUE(saw_has_video);
+    HU_ASSERT_TRUE(saw_has_audio);
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);

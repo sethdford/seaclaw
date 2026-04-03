@@ -1327,6 +1327,8 @@ hu_error_t hu_agent_reload_config(hu_agent_t *agent, char **summary_out, size_t 
                 hu_hook_event_t ev = HU_HOOK_PRE_TOOL_EXECUTE;
                 if (strcmp(hce->event, "post_tool_execute") == 0)
                     ev = HU_HOOK_POST_TOOL_EXECUTE;
+                else if (strcmp(hce->event, "before_reply") == 0)
+                    ev = HU_HOOK_BEFORE_REPLY;
                 hu_hook_entry_t he = {0};
                 he.name = hce->name;
                 he.name_len = hce->name ? strlen(hce->name) : 0;

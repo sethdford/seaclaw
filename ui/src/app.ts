@@ -21,6 +21,7 @@ type TabId =
   | "automations"
   | "skills"
   | "voice"
+  | "canvas"
   | "nodes"
   | "usage"
   | "metrics"
@@ -44,6 +45,7 @@ const VALID_TABS: TabId[] = [
   "automations",
   "skills",
   "voice",
+  "canvas",
   "nodes",
   "usage",
   "metrics",
@@ -59,7 +61,7 @@ const VALID_TABS: TabId[] = [
 const SIDEBAR_KEY = "hu-sidebar-collapsed";
 
 /** Tabs that use list-detail layout (show detail panel at wide breakpoint) */
-const LIST_DETAIL_TABS: TabId[] = ["sessions", "channels", "tools", "nodes"];
+const LIST_DETAIL_TABS: TabId[] = ["sessions", "channels", "tools", "nodes", "canvas"];
 
 const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   overview: () => import("./views/overview-view.js"),
@@ -73,6 +75,7 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   automations: () => import("./views/automations-view.js"),
   skills: () => import("./views/skills-view.js"),
   voice: () => import("./views/voice-view.js"),
+  canvas: () => import("./views/canvas-view.js"),
   nodes: () => import("./views/nodes-view.js"),
   usage: () => import("./views/usage-view.js"),
   metrics: () => import("./views/metrics-view.js"),
@@ -101,6 +104,7 @@ const MORE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] =
   { id: "automations", label: "Automations", icon: icons.timer },
   { id: "skills", label: "Skills", icon: icons.puzzle },
   { id: "voice", label: "Voice", icon: icons.mic },
+  { id: "canvas", label: "Canvas", icon: icons.monitor },
   { id: "nodes", label: "Nodes", icon: icons.server },
   { id: "usage", label: "Usage", icon: icons["bar-chart"] },
   { id: "metrics", label: "Observability", icon: icons["chart-line"] },
@@ -1221,6 +1225,8 @@ export class ScApp extends LitElement {
         return html`<hu-skills-view></hu-skills-view>`;
       case "voice":
         return html`<hu-voice-view></hu-voice-view>`;
+      case "canvas":
+        return html`<canvas-view></canvas-view>`;
       case "nodes":
         return html`<hu-nodes-view></hu-nodes-view>`;
       case "usage":

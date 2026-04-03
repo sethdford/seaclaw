@@ -114,6 +114,7 @@ hu_error_t cp_admin_connect(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
                                           "exec.approval.resolve",
                                           "usage.summary",
                                           "models.list",
+                                          "models.decisions",
                                           "nodes.list",
                                           "activity.recent",
                                           "push.register",

@@ -3,6 +3,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/tool.h"
 #include <stddef.h>
 #include <stdbool.h>
 
@@ -28,5 +29,8 @@ hu_error_t hu_vision_ocr_find_target(hu_allocator_t *alloc, const hu_ocr_result_
                                      double *out_x, double *out_y);
 
 void hu_ocr_results_free(hu_allocator_t *alloc, hu_ocr_result_t *results, size_t count);
+
+/* Tool vtable wrapper for vision_ocr. */
+hu_error_t hu_vision_ocr_tool_create(hu_allocator_t *alloc, hu_tool_t *out);
 
 #endif

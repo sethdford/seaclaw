@@ -21,6 +21,7 @@
 #endif
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #define S(lit) (lit), (sizeof(lit) - 1)
 
@@ -649,6 +650,238 @@ static void test_prove_web_search_streaming_emits_chunks(void) {
     fprintf(stderr, "  [PROVE] Web search streaming: execute_streaming emits chunks CLOSED\n");
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * E2E Proof: Full Pipeline (gateway → schedule → persona → memory → orchestrator)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+#ifdef HU_GATEWAY_POSIX
+#include "human/bus.h"
+#include "human/config.h"
+#include "human/gateway/control_protocol.h"
+#include "human/gateway/ws_server.h"
+#include <sys/socket.h>
+#include <unistd.h>
+
+static void test_prove_gateway_chat_send_dispatches_and_queues_response(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+
+    hu_ws_server_init(&ws, &alloc, NULL, NULL, NULL);
+    hu_control_protocol_init(&proto, &alloc, &ws);
+    memset(&app, 0, sizeof(app));
+    memset(&cfg, 0, sizeof(cfg));
+    hu_bus_init(&bus);
+    app.config = &cfg;
+    app.alloc = &alloc;
+    app.bus = &bus;
+    hu_control_set_app_ctx(&proto, &app);
+
+    int fds[2];
+    HU_ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+    hu_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    conn.active = true;
+    conn.fd = fds[0];
+
+    /* Control protocol expects type "req" (see control_protocol.c); params match chat.send. */
+    const char *msg = "{\"type\":\"req\",\"id\":\"s1\",\"method\":\"chat.send\","
+                      "\"params\":{\"message\":\"hello\",\"sessionKey\":\"test-sess\"}}";
+    hu_control_on_message(&conn, msg, strlen(msg), &proto);
+
+    char rx[4096];
+    ssize_t total = 0;
+    while (total < (ssize_t)sizeof(rx) - 1) {
+        ssize_t n = recv(fds[1], rx + total, sizeof(rx) - 1 - (size_t)total, 0);
+        if (n <= 0)
+            break;
+        total += n;
+        if (total >= 64 && memchr(rx, '}', (size_t)total))
+            break;
+    }
+    size_t got = total > 0 ? (size_t)total : 0;
+    if (got >= sizeof(rx))
+        got = sizeof(rx) - 1;
+    rx[got] = '\0';
+    HU_ASSERT_TRUE(strstr(rx, "queued") != NULL || strstr(rx, "test-sess") != NULL);
+
+    close(fds[0]);
+    close(fds[1]);
+    hu_control_protocol_deinit(&proto);
+    hu_ws_server_deinit(&ws);
+    fprintf(stderr, "  [PROVE] Gateway: chat.send → response payload CLOSED\n");
+}
+#endif /* HU_GATEWAY_POSIX */
+
+#include "human/channel.h"
+#include "human/context/conversation.h"
+
+static char s_prove_sched_target[128];
+static char s_prove_sched_body[512];
+static int s_prove_sched_send_calls;
+
+static hu_error_t prove_sched_mock_send(void *ctx, const char *target, size_t target_len,
+                                        const char *message, size_t message_len,
+                                        const char *const *media, size_t media_count) {
+    (void)ctx;
+    (void)media;
+    (void)media_count;
+    s_prove_sched_send_calls++;
+    if (target_len >= sizeof(s_prove_sched_target))
+        target_len = sizeof(s_prove_sched_target) - 1;
+    memcpy(s_prove_sched_target, target, target_len);
+    s_prove_sched_target[target_len] = '\0';
+    if (message_len >= sizeof(s_prove_sched_body))
+        message_len = sizeof(s_prove_sched_body) - 1;
+    memcpy(s_prove_sched_body, message, message_len);
+    s_prove_sched_body[message_len] = '\0';
+    return HU_OK;
+}
+
+static const char *prove_sched_mock_name(void *ctx) {
+    (void)ctx;
+    return "prove_mock";
+}
+
+static void test_prove_cron_flush_delivers_scheduled_via_mock_channel(void) {
+    uint64_t now = (uint64_t)time(NULL) * 1000ULL;
+    const char *contact = "prove_e2e_contact";
+    const char *body = "prove neutral scheduled text";
+
+    HU_ASSERT_EQ(hu_conversation_schedule_message(contact, strlen(contact), body, strlen(body),
+                                                  now - 1000ULL),
+                 HU_OK);
+
+    char out_contact[128], out_channel[32], out_msg[512];
+    size_t len = hu_conversation_flush_scheduled_for(now, "prove_mock", sizeof("prove_mock") - 1,
+                                                     out_contact,
+                                                     sizeof(out_contact), out_channel,
+                                                     sizeof(out_channel), out_msg, sizeof(out_msg));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_STR_EQ(out_contact, contact);
+    HU_ASSERT_STR_EQ(out_msg, body);
+
+    hu_channel_vtable_t vt = {0};
+    vt.send = prove_sched_mock_send;
+    vt.name = prove_sched_mock_name;
+    hu_channel_t ch = {.ctx = NULL, .vtable = &vt};
+
+    s_prove_sched_send_calls = 0;
+    s_prove_sched_target[0] = '\0';
+    s_prove_sched_body[0] = '\0';
+
+    HU_ASSERT_EQ(ch.vtable->send(ch.ctx, out_contact, strlen(out_contact), out_msg, len, NULL, 0),
+                 HU_OK);
+    HU_ASSERT_EQ(s_prove_sched_send_calls, 1);
+    HU_ASSERT_STR_EQ(s_prove_sched_target, contact);
+    HU_ASSERT_STR_EQ(s_prove_sched_body, body);
+    fprintf(stderr, "  [PROVE] Schedule: flush → mock channel send CLOSED\n");
+}
+
+#include "human/core/string.h"
+#include "human/persona.h"
+
+static void test_prove_persona_identity_flows_into_system_prompt(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p;
+    memset(&p, 0, sizeof(p));
+    p.identity = hu_strndup(&alloc, "You are TestBot", 15);
+    HU_ASSERT_NOT_NULL(p.identity);
+
+    char *prompt = NULL;
+    size_t plen = 0;
+    HU_ASSERT_EQ(hu_persona_build_prompt(&alloc, &p, NULL, 0, NULL, 0, &prompt, &plen), HU_OK);
+    HU_ASSERT_NOT_NULL(prompt);
+    HU_ASSERT_TRUE(plen > 0);
+    HU_ASSERT_NOT_NULL(strstr(prompt, "TestBot"));
+
+    alloc.free(alloc.ctx, prompt, plen + 1);
+    hu_persona_deinit(&alloc, &p);
+    fprintf(stderr, "  [PROVE] Persona: identity → system prompt CLOSED\n");
+}
+
+#ifdef HU_ENABLE_SQLITE
+#include "human/agent/memory_loader.h"
+
+static void test_prove_memory_recall_formats_injection_context(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    static const char topic_cat[] = "conversation";
+    hu_memory_category_t cat = {
+        .tag = HU_MEMORY_CATEGORY_CUSTOM,
+        .data.custom = {.name = topic_cat, .name_len = sizeof(topic_cat) - 1},
+    };
+    const char *key = "prove_e2e_mem_key";
+    const char *content = "neutral prove_e2e_fixture_token for context injection";
+    HU_ASSERT_EQ(mem.vtable->store(mem.ctx, key, strlen(key), content, strlen(content), &cat, "sess_x",
+                 6),
+                 HU_OK);
+
+    hu_memory_loader_t loader;
+    HU_ASSERT_EQ(hu_memory_loader_init(&loader, &alloc, &mem, NULL, 8, 4000), HU_OK);
+
+    char *ctx_out = NULL;
+    size_t ctx_len = 0;
+    HU_ASSERT_EQ(hu_memory_loader_load(&loader, "prove_e2e_fixture_token", 23, "sess_x", 6,
+                                       &ctx_out, &ctx_len),
+                 HU_OK);
+    HU_ASSERT_NOT_NULL(ctx_out);
+    HU_ASSERT_TRUE(ctx_len > 0);
+    HU_ASSERT_NOT_NULL(strstr(ctx_out, "### Memory:"));
+    HU_ASSERT_NOT_NULL(strstr(ctx_out, "prove_e2e_fixture_token"));
+
+    alloc.free(alloc.ctx, ctx_out, ctx_len + 1);
+    if (mem.vtable->deinit)
+        mem.vtable->deinit(mem.ctx);
+    fprintf(stderr, "  [PROVE] Memory: store → loader → context string CLOSED\n");
+}
+#endif /* HU_ENABLE_SQLITE */
+
+#include "human/agent/orchestrator.h"
+#include "human/agent/orchestrator_llm.h"
+
+static void test_prove_orchestrator_decompose_merge_multi_worker_e2e(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_orchestrator_t orch;
+    HU_ASSERT_EQ(hu_orchestrator_create(&alloc, &orch), HU_OK);
+
+    HU_ASSERT_EQ(hu_orchestrator_register_agent(&orch, "worker_r", 8, NULL, 0, "research", 8), HU_OK);
+    HU_ASSERT_EQ(hu_orchestrator_register_agent(&orch, "worker_s", 8, NULL, 0, "synthesize", 10),
+                 HU_OK);
+
+    hu_decomposition_t dec;
+    memset(&dec, 0, sizeof(dec));
+    HU_ASSERT_EQ(hu_orchestrator_decompose_goal(&alloc, NULL, "m", 1, "goal", 4, NULL, 0, &dec),
+                 HU_OK);
+    HU_ASSERT_EQ(dec.task_count, 2u);
+
+    HU_ASSERT_EQ(hu_orchestrator_auto_assign(&orch, &dec), HU_OK);
+
+    HU_ASSERT_EQ(hu_orchestrator_complete_task(&orch, orch.tasks[0].id, "result_alpha_part_one", 21),
+                 HU_OK);
+    HU_ASSERT_EQ(
+        hu_orchestrator_complete_task(&orch, orch.tasks[1].id, "result_beta_part_two", 20), HU_OK);
+
+    char *merged = NULL;
+    size_t merged_len = 0;
+    HU_ASSERT_EQ(hu_orchestrator_merge_results(&orch, &alloc, &merged, &merged_len), HU_OK);
+    HU_ASSERT_NOT_NULL(merged);
+    HU_ASSERT_TRUE(merged_len > 0);
+    HU_ASSERT_NOT_NULL(strstr(merged, "result_alpha_part_one"));
+    HU_ASSERT_NOT_NULL(strstr(merged, "result_beta_part_two"));
+
+    alloc.free(alloc.ctx, merged, merged_len + 1);
+    hu_decomposition_free(&alloc, &dec);
+    hu_orchestrator_deinit(&orch);
+    fprintf(stderr, "  [PROVE] Orchestrator: decompose → assign → merge CLOSED\n");
+}
+
 /* ── Registration ────────────────────────────────────────────────────── */
 
 void run_prove_e2e_tests(void) {
@@ -686,4 +919,15 @@ void run_prove_e2e_tests(void) {
     HU_RUN_TEST(test_prove_web_search_streaming_emits_chunks);
 
     fprintf(stderr, "=== ALL INTELLIGENCE + STREAMING LOOPS PROVEN ===\n\n");
+
+    HU_TEST_SUITE("E2E Proof: Full Pipeline");
+#ifdef HU_GATEWAY_POSIX
+    HU_RUN_TEST(test_prove_gateway_chat_send_dispatches_and_queues_response);
+#endif
+    HU_RUN_TEST(test_prove_cron_flush_delivers_scheduled_via_mock_channel);
+    HU_RUN_TEST(test_prove_persona_identity_flows_into_system_prompt);
+#ifdef HU_ENABLE_SQLITE
+    HU_RUN_TEST(test_prove_memory_recall_formats_injection_context);
+#endif
+    HU_RUN_TEST(test_prove_orchestrator_decompose_merge_multi_worker_e2e);
 }

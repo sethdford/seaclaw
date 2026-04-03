@@ -35,14 +35,36 @@ static hu_error_t cron_add_execute(void *ctx, hu_allocator_t *alloc, const hu_js
     const char *expression = hu_json_get_string(args, "expression");
     const char *name = hu_json_get_string(args, "name");
 
+    /* Parse optional tools allowlist */
+    const char **tools_arr = NULL;
+    size_t tools_count = 0;
+    hu_json_value_t *tools_val = hu_json_object_get(args, "tools");
+    if (tools_val && tools_val->type == HU_JSON_ARRAY && tools_val->data.array.len > 0) {
+        tools_count = tools_val->data.array.len;
+        tools_arr = (const char **)alloc->alloc(alloc->ctx, tools_count * sizeof(const char *));
+        if (tools_arr) {
+            for (size_t ti = 0; ti < tools_count; ti++) {
+                hu_json_value_t *tv = tools_val->data.array.items[ti];
+                tools_arr[ti] = (tv && tv->type == HU_JSON_STRING) ? tv->data.string.ptr : "";
+            }
+        }
+    }
+
 #if HU_IS_TEST
     hu_cron_scheduler_t *sched = hu_cron_create(alloc, 100, true);
     if (!sched) {
+        if (tools_arr)
+            alloc->free(alloc->ctx, (void *)tools_arr, tools_count * sizeof(const char *));
         *out = hu_tool_result_fail("out of memory", 12);
         return HU_ERR_OUT_OF_MEMORY;
     }
     uint64_t id = 0;
-    hu_error_t err = hu_cron_add_job(sched, alloc, expression, command, name, &id);
+    hu_error_t err;
+    if (tools_arr && tools_count > 0)
+        err = hu_cron_add_agent_job_with_tools(sched, alloc, expression, command, NULL, name,
+                                                tools_arr, tools_count, &id);
+    else
+        err = hu_cron_add_job(sched, alloc, expression, command, name, &id);
     if (err != HU_OK) {
         hu_cron_destroy(sched, alloc);
         *out = hu_tool_result_fail("failed to add job", 18);
@@ -78,6 +100,8 @@ static hu_error_t cron_add_execute(void *ctx, hu_allocator_t *alloc, const hu_js
     fail:
         hu_json_buf_free(&buf);
         hu_cron_destroy(sched, alloc);
+        if (tools_arr)
+            alloc->free(alloc->ctx, (void *)tools_arr, tools_count * sizeof(const char *));
         *out = hu_tool_result_fail("out of memory", 12);
         return HU_ERR_OUT_OF_MEMORY;
     }
@@ -86,16 +110,27 @@ static hu_error_t cron_add_execute(void *ctx, hu_allocator_t *alloc, const hu_js
     msg[out_len] = '\0';
     hu_json_buf_free(&buf);
     hu_cron_destroy(sched, alloc);
+    if (tools_arr)
+        alloc->free(alloc->ctx, (void *)tools_arr, tools_count * sizeof(const char *));
     *out = hu_tool_result_ok_owned(msg, out_len);
     return HU_OK;
 #else
     if (!tctx || !tctx->sched) {
+        if (tools_arr)
+            alloc->free(alloc->ctx, (void *)tools_arr, tools_count * sizeof(const char *));
         *out = hu_tool_result_fail("cron_add: scheduler not configured", 35);
         return HU_OK;
     }
     hu_cron_scheduler_t *sched = tctx->sched;
     uint64_t id = 0;
-    hu_error_t err = hu_cron_add_job(sched, alloc, expression, command, name, &id);
+    hu_error_t err;
+    if (tools_arr && tools_count > 0)
+        err = hu_cron_add_agent_job_with_tools(sched, alloc, expression, command, NULL, name,
+                                                tools_arr, tools_count, &id);
+    else
+        err = hu_cron_add_job(sched, alloc, expression, command, name, &id);
+    if (tools_arr)
+        alloc->free(alloc->ctx, (void *)tools_arr, tools_count * sizeof(const char *));
     if (err != HU_OK) {
         *out = hu_tool_result_fail("failed to add job", 18);
         return err;

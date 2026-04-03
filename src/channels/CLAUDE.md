@@ -41,7 +41,7 @@ Generated from designated initializers in each `src/channels/*.c` vtable. **hist
  * google_chat    |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * google_rcs     |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * imap           |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
- * imessage       |  ✓   |    ✓    |   ✓   |      ✓       |   ·    |     ✓
+ * imessage       |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
  * instagram      |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * irc            |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
  * lark           |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
@@ -67,7 +67,7 @@ Generated from designated initializers in each `src/channels/*.c` vtable. **hist
  *
  * **imap**: `hu_imap_poll` uses libcurl IMAP (SEARCH UNSEEN + FETCH) when `HU_HTTP_CURL`; `send` uses libcurl SMTP when `smtp_host` is configured, else in-memory outbox. `health_check` runs IMAP NOOP (non-test, libcurl builds).
  * **imessage platform limitations** (no public API):
- *   - Typing indicators: no AppleScript/JXA API (IMCore private framework only)
+ *   - Typing indicators: simulated via delay timing (no real typing bubble API)
  *   - Inline replies: no AppleScript verb for threaded reply-to-specific-message
  *   - Message editing: no public API (IMCore only; uses *correction pattern instead)
  *   - Unsend: AX/UI automation only, fragile, 2-min window (opt-in via HU_IMESSAGE_TAPBACK_ENABLED)
@@ -91,7 +91,7 @@ Generated from designated initializers in each `src/channels/*.c` vtable. **hist
 | google_chat | · | · | · | · | · |
 | google_rcs | · | · | · | · | · |
 | imap | · | · | · | · | · |
-| imessage | ✓ | ✓ | ✓ | · | ✓ |
+| imessage | ✓ | ✓ | ✓ | ✓ | ✓ |
 | instagram | · | · | · | · | · |
 | irc | ✓ | · | · | · | · |
 | lark | · | · | · | · | · |

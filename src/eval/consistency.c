@@ -68,21 +68,34 @@ hu_error_t hu_consistency_score_prompt_alignment(
 
     float trait_score = 0.0f;
     if (traits && traits_count > 0) {
-        size_t trait_matches = 0;
+        size_t total_words = 0;
+        size_t word_matches = 0;
         for (size_t i = 0; i < traits_count; i++) {
-            if (traits[i]) {
-                const char *rp = response;
-                size_t rlen = response_len;
-                size_t tlen = strlen(traits[i]);
-                for (size_t p = 0; p + tlen <= rlen; p++) {
-                    if (ci_word_eq(rp + p, tlen, traits[i], tlen)) {
-                        trait_matches++;
-                        break;
+            if (!traits[i])
+                continue;
+            /* Split each trait string into words (>=3 chars) and match individually.
+             * This handles both single-word traits ("friendly") and descriptive
+             * traits ("warm and empathetic communicator"). */
+            const char *t = traits[i];
+            size_t tlen = strlen(t);
+            size_t wstart = 0;
+            for (size_t j = 0; j <= tlen; j++) {
+                if (j == tlen || t[j] == ' ' || t[j] == ',' || t[j] == ';') {
+                    size_t wlen = j - wstart;
+                    if (wlen >= 3) {
+                        total_words++;
+                        for (size_t p = 0; p + wlen <= response_len; p++) {
+                            if (ci_word_eq(response + p, wlen, t + wstart, wlen)) {
+                                word_matches++;
+                                break;
+                            }
+                        }
                     }
+                    wstart = j + 1;
                 }
             }
         }
-        trait_score = (float)trait_matches / (float)traits_count;
+        trait_score = total_words > 0 ? (float)word_matches / (float)total_words : 0.0f;
     }
 
     float vocab_score = 0.0f;

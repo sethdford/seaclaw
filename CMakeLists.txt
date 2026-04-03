@@ -962,6 +962,7 @@ endif()
 list(APPEND HU_CORE_SOURCES src/tts/cartesia.c)
 list(APPEND HU_CORE_SOURCES src/tts/cartesia_stream.c)
 list(APPEND HU_CORE_SOURCES src/tts/voice_clone.c)
+list(APPEND HU_CORE_SOURCES src/tts/transcript_prep.c)
 
 # Cartesia full pipeline (requires libcurl for API calls)
 if(HU_ENABLE_CARTESIA)
@@ -1771,7 +1772,7 @@ endif()
 if(NOT HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_EXTRA_MODULES
         src/tts/audio_pipeline.c
-        src/context/voice_decision.c src/tts/emotion_map.c)
+        src/context/voice_decision.c src/tts/emotion_map.c src/tts/transcript_prep.c)
 endif()
 if(NOT HU_ENABLE_ML)
     list(APPEND HU_TEST_EXTRA_MODULES
@@ -2258,6 +2259,7 @@ list(APPEND HU_TEST_SOURCES tests/test_cartesia_stream.c)
 list(APPEND HU_TEST_SOURCES tests/test_voice_clone.c)
 list(APPEND HU_TEST_SOURCES tests/test_send_voice_message.c)
 list(APPEND HU_TEST_SOURCES tests/test_voice_message_integration.c)
+list(APPEND HU_TEST_SOURCES tests/test_transcript_prep.c)
 if(HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_SOURCES tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)
 endif()
@@ -2302,6 +2304,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_data_quality.c
     tests/test_tool_validation.c
     tests/test_tool_ask_user.c
+    tests/test_canvas_tool.c
     tests/test_task_manager.c
     tests/test_task_store.c
     tests/test_task_tools.c

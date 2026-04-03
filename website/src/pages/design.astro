@@ -907,6 +907,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         box.setAttribute("tabindex", "0");
         box.setAttribute("role", "button");
         const spring = box.dataset.spring;
+        box.setAttribute("aria-label", `${spring || "spring"} animation demo`);
         const activate = () => {
           if (!prefersReducedMotion && spring) {
             box.style.transform =
@@ -924,6 +925,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       document.querySelectorAll<HTMLElement>(".duration-bar").forEach((bar) => {
         bar.setAttribute("tabindex", "0");
         bar.setAttribute("role", "button");
+        const label = bar.parentElement?.querySelector("span")?.textContent?.trim() || "duration";
+        bar.setAttribute("aria-label", `${label} animation demo`);
         const fill = bar.querySelector<HTMLElement>("div");
         if (!fill) return;
         const activate = () => { fill.style.width = "100%"; };

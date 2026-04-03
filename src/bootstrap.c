@@ -388,6 +388,8 @@ typedef struct hu_bootstrap_internal {
 
     hu_plugin_hook_ctx_t plugin_hook_ctx;
 
+    hu_mcp_manager_t *mcp_mgr; /* kept alive so MCP tool wrappers can call back */
+
     bool provider_ok;
     bool agent_ok;
 } hu_bootstrap_internal_t;
@@ -576,6 +578,26 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         fl.max_spawn_depth = bi->cfg.agent.fleet_max_spawn_depth;
         fl.max_total_spawns = bi->cfg.agent.fleet_max_total_spawns;
         fl.budget_limit_usd = bi->cfg.agent.fleet_budget_usd;
+        if (bi->cfg.agent.fleet_depth_model_overrides_count > 0 &&
+            bi->cfg.agent.fleet_depth_model_overrides) {
+            size_t n = bi->cfg.agent.fleet_depth_model_overrides_count;
+            fl.depth_model_overrides =
+                (hu_depth_model_override_t *)alloc->alloc(alloc->ctx,
+                    n * sizeof(hu_depth_model_override_t));
+            if (fl.depth_model_overrides) {
+                fl.depth_model_overrides_count = n;
+                for (size_t di = 0; di < n; di++) {
+                    fl.depth_model_overrides[di].min_depth =
+                        bi->cfg.agent.fleet_depth_model_overrides[di].min_depth;
+                    fl.depth_model_overrides[di].max_depth =
+                        bi->cfg.agent.fleet_depth_model_overrides[di].max_depth;
+                    fl.depth_model_overrides[di].model =
+                        bi->cfg.agent.fleet_depth_model_overrides[di].model;
+                    fl.depth_model_overrides[di].provider =
+                        bi->cfg.agent.fleet_depth_model_overrides[di].provider;
+                }
+            }
+        }
         hu_agent_pool_set_fleet_limits(bi->agent_pool, &fl);
     }
     bi->mailbox = hu_mailbox_create(alloc, 64);
@@ -653,7 +675,6 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             hu_error_t load_err = hu_mcp_manager_load_tools(mcp_mgr, alloc, &mcp_tools,
                                                             &mcp_tools_count);
             if (load_err == HU_OK && mcp_tools_count > 0) {
-                /* Merge MCP tools with existing tools */
                 hu_tool_t *merged = (hu_tool_t *)alloc->alloc(
                     alloc->ctx, (bi->tools_count + mcp_tools_count) * sizeof(hu_tool_t));
                 if (merged) {
@@ -665,13 +686,20 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                     bi->tools_count += mcp_tools_count;
                     ctx->tools = bi->tools;
                     ctx->tools_count = bi->tools_count;
+                    /* Tools are now owned by bi->tools; free only the container array.
+                     * Manager stays alive — wrappers reference it via w->mgr. */
+                    alloc->free(alloc->ctx, mcp_tools, mcp_tools_count * sizeof(hu_tool_t));
+                    bi->mcp_mgr = mcp_mgr;
+                    mcp_mgr = NULL; /* prevent destroy below */
+                } else {
+                    hu_mcp_manager_free_tools(alloc, mcp_tools, mcp_tools_count);
                 }
-                hu_mcp_manager_free_tools(alloc, mcp_tools, mcp_tools_count);
             } else if (load_err != HU_OK) {
                 hu_log_error("bootstrap", NULL, "warning: MCP tool loading failed: %s",
                         hu_error_string(load_err));
             }
-            hu_mcp_manager_destroy(mcp_mgr);
+            if (mcp_mgr)
+                hu_mcp_manager_destroy(mcp_mgr);
         } else if (mcp_err != HU_OK) {
             hu_log_error("bootstrap", NULL, "warning: MCP manager creation failed: %s",
                     hu_error_string(mcp_err));
@@ -947,7 +975,8 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         (void)cfg;
 
 #if HU_HAS_EMAIL
-        if (cfg->channels.email.smtp_host && cfg->channels.email.from_address) {
+        if (cfg->channels.email.smtp_host && cfg->channels.email.from_address &&
+            ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
             err = hu_email_create(
                 alloc, cfg->channels.email.smtp_host, strlen(cfg->channels.email.smtp_host),
                 cfg->channels.email.smtp_port ? cfg->channels.email.smtp_port : 587,
@@ -1539,7 +1568,8 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         if (cfg->voice.mode && cfg->voice.mode[0] && ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
             hu_channel_voice_config_t vcfg = {0};
             bool want = false;
-            if (strcmp(cfg->voice.mode, "realtime") == 0) {
+            if (strcmp(cfg->voice.mode, "realtime") == 0 ||
+                strcmp(cfg->voice.mode, "openai_realtime") == 0) {
                 vcfg.mode = HU_VOICE_MODE_REALTIME;
                 vcfg.api_key = hu_config_get_provider_key(cfg, "openai");
                 vcfg.model = cfg->voice.realtime_model;
@@ -1623,6 +1653,8 @@ void hu_app_teardown(hu_app_ctx_t *ctx) {
         bi->provider.ctx = NULL;
     }
     hu_tools_destroy_default(alloc, bi->tools, bi->tools_count);
+    if (bi->mcp_mgr)
+        hu_mcp_manager_destroy(bi->mcp_mgr);
     if (bi->cron)
         hu_cron_destroy(bi->cron, alloc);
     if (bi->observer.vtable && bi->observer.vtable->deinit)

@@ -139,6 +139,7 @@ void run_task_manager_tests(void);
 void run_task_store_tests(void);
 void run_task_tools_tests(void);
 void run_tool_ask_user_tests(void);
+void run_canvas_tool_tests(void);
 void run_mcp_tests(void);
 void run_mcp_jsonrpc_tests(void);
 void run_mcp_manager_tests(void);
@@ -322,6 +323,7 @@ void run_cartesia_stream_tests(void);
 void register_voice_clone_tests(void);
 void run_send_voice_message_tests(void);
 void run_voice_message_integration_tests(void);
+void run_transcript_prep_tests(void);
 #ifdef HU_ENABLE_CARTESIA
 void run_audio_pipeline_tests(void);
 void run_voice_decision_tests(void);
@@ -767,6 +769,7 @@ int main(int argc, char **argv) {
     register_voice_clone_tests();
     run_send_voice_message_tests();
     run_voice_message_integration_tests();
+    run_transcript_prep_tests();
 #ifdef HU_ENABLE_CARTESIA
     run_audio_pipeline_tests();
     run_voice_decision_tests();
@@ -864,6 +867,7 @@ int main(int argc, char **argv) {
     run_task_store_tests();
     run_task_tools_tests();
     run_tool_ask_user_tests();
+    run_canvas_tool_tests();
     run_approval_gate_tests();
     run_workflow_commands_tests();
     run_repair_tests();

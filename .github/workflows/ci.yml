@@ -48,7 +48,7 @@ jobs:
         run: |
           COUNT=$(grep -oE '[0-9]+/[0-9]+ passed' /tmp/human_tests_output.txt | tail -1 | cut -d/ -f1)
           echo "Test count: $COUNT"
-          BASELINE=6858
+          BASELINE=8500
           if [ "$COUNT" -lt "$BASELINE" ]; then
             echo "::error::Test count regression: $COUNT < $BASELINE baseline"
             exit 1
@@ -58,7 +58,6 @@ jobs:
 
   integration-tests:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
@@ -123,6 +122,8 @@ jobs:
             flags: "-DHU_ENABLE_SQLITE=ON -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_SKILLS=OFF"
           - name: kitchen-sink
             flags: "-DHU_ENABLE_SQLITE=ON -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_PERSONA=ON -DHU_ENABLE_SKILLS=ON"
+          - name: feeds-enabled
+            flags: "-DHU_ENABLE_SQLITE=ON -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_FEEDS=ON -DHU_ENABLE_CURL=ON"
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
@@ -134,6 +135,21 @@ jobs:
       - name: Test (${{ matrix.name }})
         run: ./build/human_tests
         continue-on-error: false
+
+  preset-check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [test, release]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libsqlite3-dev libcurl4-openssl-dev
+      - name: Configure (${{ matrix.preset }})
+        run: cmake --preset ${{ matrix.preset }}
+      - name: Build (${{ matrix.preset }})
+        run: cmake --build --preset ${{ matrix.preset }}
 
   release-size:
     runs-on: macos-latest
@@ -524,7 +540,10 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache-dependency-path: |
+            design-tokens/package-lock.json
+            website/package-lock.json
+      - run: cd design-tokens && npm ci --ignore-scripts && npm run build
       - run: cd website && npm ci && npm run build
       - name: Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12

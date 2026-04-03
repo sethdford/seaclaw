@@ -24,18 +24,21 @@
 #define MAX_TRANSCRIPT_LEN 4000
 
 static const char *const VALID_EMOTIONS[] = {
-    "neutral",      "angry",         "excited",       "content",
-    "sad",          "scared",        "happy",         "enthusiastic",
-    "elated",       "triumphant",    "amazed",        "surprised",
-    "flirtatious",  "joking/comedic","curious",       "peaceful",
-    "serene",       "calm",          "grateful",      "affectionate",
-    "trust",        "sympathetic",   "anticipation",  "mysterious",
-    "frustrated",   "disgusted",     "contempt",      "sarcastic",
-    "dejected",     "melancholic",   "disappointed",  "hurt",
-    "guilty",       "bored",        "tired",          "nostalgic",
-    "wistful",      "apologetic",    "hesitant",      "insecure",
-    "confused",     "resigned",      "anxious",       "panicked",
-    "proud",        "confident",     "determined",    "contemplative",
+    "neutral",      "angry",         "mad",           "outraged",
+    "frustrated",   "agitated",      "threatened",    "disgusted",
+    "contempt",     "envious",       "sarcastic",     "ironic",
+    "excited",      "content",       "happy",         "enthusiastic",
+    "elated",       "euphoric",      "triumphant",    "amazed",
+    "surprised",    "flirtatious",   "joking/comedic","curious",
+    "peaceful",     "serene",        "calm",          "grateful",
+    "affectionate", "trust",         "sympathetic",   "anticipation",
+    "mysterious",   "sad",           "dejected",      "melancholic",
+    "disappointed", "hurt",          "guilty",        "bored",
+    "tired",        "rejected",      "nostalgic",     "wistful",
+    "apologetic",   "hesitant",      "insecure",      "confused",
+    "resigned",     "anxious",       "panicked",      "alarmed",
+    "scared",       "proud",         "confident",     "distant",
+    "skeptical",    "contemplative", "determined",
 };
 #define VALID_EMOTIONS_COUNT (sizeof(VALID_EMOTIONS) / sizeof(VALID_EMOTIONS[0]))
 

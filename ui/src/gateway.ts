@@ -141,7 +141,14 @@ export class GatewayClient extends EventTarget {
 
   voiceSessionStart(
     params?: Record<string, unknown>,
-  ): Promise<{ sessionId?: string; sampleRate?: number; encoding?: string }> {
+  ): Promise<{
+    sessionId?: string;
+    sampleRate?: number;
+    inputSampleRate?: number;
+    outputSampleRate?: number;
+    encoding?: string;
+    mode?: string;
+  }> {
     return this.request("voice.session.start", params);
   }
 

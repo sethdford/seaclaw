@@ -3164,6 +3164,9 @@ const chapterCount = 9;
               } catch (e) {
                 console.warn("[gsap] dashboard animation failed:", e);
                 (dashPreview as HTMLElement).style.opacity = "1";
+                document.querySelectorAll(".dash-count").forEach((el) => {
+                  el.textContent = (el as HTMLElement).dataset.target || "0";
+                });
               }
             },
             { threshold: 0.15 },
@@ -3511,7 +3514,6 @@ const chapterCount = 9;
           const layerZ = [-14, -7, 0, 7, 14];
           const layerWidth = 18;
           const nodeBasePos: number[][] = [];
-          let idx = 0;
           for (let L = 0; L < layerSizes.length; L++) {
             const n = layerSizes[L];
             const z = layerZ[L];
@@ -3520,7 +3522,6 @@ const chapterCount = 9;
               const x = (t - 0.5) * layerWidth;
               const y = Math.sin(i * 0.7) * 1.5;
               nodeBasePos.push([x, y, z]);
-              idx++;
             }
           }
           const nodeCount = nodeBasePos.length;
@@ -3631,14 +3632,16 @@ const chapterCount = 9;
           const raycaster = new THREE.Raycaster();
           const plane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
           const intersect = new THREE.Vector3();
-          document.addEventListener("mousemove", (e) => {
+          const onDocMouseMove = (e: MouseEvent) => {
             mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-          });
-          document.addEventListener("mouseleave", () => {
+          };
+          const onDocMouseLeave = () => {
             mouse.x = -10;
             mouse.y = -10;
-          });
+          };
+          document.addEventListener("mousemove", onDocMouseMove);
+          document.addEventListener("mouseleave", onDocMouseLeave);
 
           // Mouse glow sprite
           const glowGeo = new THREE.BufferGeometry();
@@ -3823,6 +3826,8 @@ const chapterCount = 9;
             cancelAnimationFrame(animId);
             cleanObs.disconnect();
             window.removeEventListener("resize", onResize);
+            document.removeEventListener("mousemove", onDocMouseMove);
+            document.removeEventListener("mouseleave", onDocMouseLeave);
             renderer.dispose();
             scene.traverse((obj: any) => {
               if (obj.geometry) obj.geometry.dispose();

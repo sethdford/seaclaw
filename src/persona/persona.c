@@ -2,6 +2,7 @@
 #include "human/core/json.h"
 #include "human/core/log.h"
 #include "human/core/string.h"
+#include "human/persona/markdown_loader.h"
 #include "human/persona/persona_fuse.h"
 #include "human/persona/relationship.h"
 #include <stdio.h>
@@ -2437,8 +2438,13 @@ hu_error_t hu_persona_load(hu_allocator_t *alloc, const char *name, size_t name_
     if (n <= 0 || (size_t)n >= sizeof(path))
         return HU_ERR_INVALID_ARGUMENT;
     FILE *f = fopen(path, "rb");
-    if (!f)
+    if (!f) {
+        /* Fallback: try markdown persona definition */
+        n = snprintf(path, sizeof(path), "%s/%.*s.md", base, (int)name_len, name);
+        if (n > 0 && (size_t)n < sizeof(path))
+            return hu_persona_load_markdown(alloc, path, out);
         return HU_ERR_NOT_FOUND;
+    }
     if (fseek(f, 0, SEEK_END) != 0) {
         fclose(f);
         return HU_ERR_IO;

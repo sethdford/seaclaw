@@ -121,13 +121,16 @@ hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *ses
             if (hu_voice_provider_openai_create(alloc, &rtc, &vp) == HU_OK && vp.vtable) {
                 if (vp.vtable->connect(vp.ctx) == HU_OK) {
                     session->provider = vp;
-                } else {
-                    vp.vtable->disconnect(vp.ctx, alloc);
+                    return HU_OK;
                 }
+                vp.vtable->disconnect(vp.ctx, alloc);
             }
         }
     }
-    return HU_OK;
+
+    /* No provider connected — roll back active state */
+    session->active = false;
+    return HU_ERR_PROVIDER_UNAVAILABLE;
 #endif
 }
 
@@ -135,12 +138,15 @@ hu_error_t hu_voice_session_stop(hu_voice_session_t *session) {
     if (!session)
         return HU_ERR_INVALID_ARGUMENT;
     if (session->provider.vtable) {
+        if (session->gl_vad_active && session->provider.vtable->send_activity_end)
+            (void)session->provider.vtable->send_activity_end(session->provider.ctx);
         session->provider.vtable->disconnect(session->provider.ctx, NULL);
         session->provider.ctx = NULL;
         session->provider.vtable = NULL;
     }
     (void)hu_duplex_session_init(&session->duplex);
     session->last_action = HU_TURN_ACTION_NONE;
+    session->gl_vad_active = false;
     session->active = false;
     session->started_at = 0;
     session->last_audio_ms = 0;
@@ -190,8 +196,13 @@ hu_error_t hu_voice_session_send_audio(hu_voice_session_t *session, const uint8_
     session->latency_first_byte_pending = true;
 #endif
 
-    if (session->provider.vtable)
+    if (session->provider.vtable) {
+        if (!session->gl_vad_active && session->provider.vtable->send_activity_start) {
+            (void)session->provider.vtable->send_activity_start(session->provider.ctx);
+            session->gl_vad_active = true;
+        }
         return session->provider.vtable->send_audio(session->provider.ctx, pcm16, pcm16_len);
+    }
     return HU_OK;
 }
 
@@ -211,8 +222,13 @@ hu_error_t hu_voice_session_on_interrupt(hu_voice_session_t *session) {
     session->latency_await_interrupt_silence = true;
 #endif
 
-    if (session->provider.vtable)
+    if (session->provider.vtable) {
+        if (session->gl_vad_active && session->provider.vtable->send_activity_end) {
+            (void)session->provider.vtable->send_activity_end(session->provider.ctx);
+            session->gl_vad_active = false;
+        }
         return session->provider.vtable->cancel_response(session->provider.ctx);
+    }
     return HU_OK;
 }
 

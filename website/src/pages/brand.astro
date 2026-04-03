@@ -790,19 +790,19 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         document.querySelectorAll("[data-reveal]").forEach((el) => {
           revealObserver.observe(el);
         });
+      }
 
-        const nav = document.getElementById("site-nav");
-        if (nav) {
-          const onScroll = () => {
-            if (window.scrollY > 80) {
-              nav.classList.add("glass-nav");
-            } else {
-              nav.classList.remove("glass-nav");
-            }
-          };
-          window.addEventListener("scroll", onScroll, { passive: true });
-          onScroll();
-        }
+      const nav = document.getElementById("site-nav");
+      if (nav) {
+        const onScroll = () => {
+          if (window.scrollY > 80) {
+            nav.classList.add("glass-nav");
+          } else {
+            nav.classList.remove("glass-nav");
+          }
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
+        onScroll();
       }
     </script>
   </body>

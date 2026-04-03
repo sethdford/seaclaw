@@ -241,6 +241,11 @@ hu_model_selection_t hu_model_route(const hu_model_router_config_t *cfg,
                                         history_count);
     apply_tier_to_selection(&sel, cfg, score);
 
+    /* Hard floor: emotional content must never route to flash-lite (reflexive).
+     * Even moderate emotional cues deserve at least the conversational tier. */
+    if (sel.tier == HU_TIER_REFLEXIVE && emotional_weight(msg, msg_len) > 0)
+        apply_tier_to_selection(&sel, cfg, 1);
+
     /* Record to global decision log for dashboard visibility */
     hu_route_log_record(hu_route_global_log(), &sel, score, (int64_t)time(NULL));
 
@@ -268,11 +273,15 @@ hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *c
 
     int64_t now = (int64_t)time(NULL);
 
+    int emotion = emotional_weight(msg, msg_len);
+
     /* Check cache first */
     hu_cognitive_tier_t cached_tier;
     if (cache && hu_route_cache_get(cache, msg, msg_len, now, &cached_tier)) {
         sel.source = HU_ROUTE_JUDGE_CACHED;
         apply_tier_override(&sel, cfg, cached_tier);
+        if (sel.tier == HU_TIER_REFLEXIVE && emotion > 0)
+            apply_tier_to_selection(&sel, cfg, 1);
         hu_route_log_record(hu_route_global_log(), &sel, score, now);
         return sel;
     }
@@ -283,12 +292,16 @@ hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *c
     (void)judge_model_len;
     sel.source = HU_ROUTE_JUDGE_FALLBACK;
     apply_tier_to_selection(&sel, cfg, score);
+    if (sel.tier == HU_TIER_REFLEXIVE && emotion > 0)
+        apply_tier_to_selection(&sel, cfg, 1);
     hu_route_log_record(hu_route_global_log(), &sel, score, now);
     return sel;
 #else
     if (!judge_provider->vtable || !judge_provider->vtable->chat_with_system) {
         sel.source = HU_ROUTE_JUDGE_FALLBACK;
         apply_tier_to_selection(&sel, cfg, score);
+        if (sel.tier == HU_TIER_REFLEXIVE && emotion > 0)
+            apply_tier_to_selection(&sel, cfg, 1);
         hu_route_log_record(hu_route_global_log(), &sel, score, now);
         return sel;
     }
@@ -305,6 +318,8 @@ hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *c
             alloc->free(alloc->ctx, response, response_len + 1);
         sel.source = HU_ROUTE_JUDGE_FALLBACK;
         apply_tier_to_selection(&sel, cfg, score);
+        if (sel.tier == HU_TIER_REFLEXIVE && emotion > 0)
+            apply_tier_to_selection(&sel, cfg, 1);
         hu_route_log_record(hu_route_global_log(), &sel, score, now);
         return sel;
     }
@@ -319,6 +334,9 @@ hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *c
         sel.source = HU_ROUTE_JUDGE_FALLBACK;
         apply_tier_to_selection(&sel, cfg, score);
     }
+
+    if (sel.tier == HU_TIER_REFLEXIVE && emotion > 0)
+        apply_tier_to_selection(&sel, cfg, 1);
 
     alloc->free(alloc->ctx, response, response_len + 1);
     hu_route_log_record(hu_route_global_log(), &sel, score, now);

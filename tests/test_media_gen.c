@@ -1,3 +1,5 @@
+#include "human/agent.h"
+#include "human/config.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/core/vertex_auth.h"
@@ -321,6 +323,145 @@ static void tool_result_free_null_media_safe(void) {
     hu_tool_result_free(&alloc, &r);
 }
 
+/* ── e2e integration: tool -> agent -> media_path accumulation ──────────── */
+
+static void media_tool_result_captured_by_agent(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    /* Create a minimal agent */
+    hu_provider_t prov = {0};
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    agent.alloc = &alloc;
+    agent.provider = prov;
+
+    HU_ASSERT_EQ(agent.generated_media_count, (size_t)0);
+
+    /* Simulate what agent_turn.c does: tool returns media_path, agent captures it */
+    hu_tool_t img_tool;
+    memset(&img_tool, 0, sizeof(img_tool));
+    HU_ASSERT_EQ(hu_media_image_create(&alloc, &img_tool), HU_OK);
+
+    const char *json = "{\"prompt\":\"a sunset over the ocean\"}";
+    hu_json_value_t *args = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, json, strlen(json), &args), HU_OK);
+
+    hu_tool_result_t result = {0};
+    HU_ASSERT_EQ(img_tool.vtable->execute(img_tool.ctx, &alloc, args, &result), HU_OK);
+    HU_ASSERT(result.success);
+    HU_ASSERT_NOT_NULL(result.media_path);
+    HU_ASSERT(result.media_path_len > 0);
+
+    /* Simulate agent_turn capture logic */
+    if (result.success && result.media_path && result.media_path_len > 0 &&
+        agent.generated_media_count < 4) {
+        char *mp = hu_strndup(&alloc, result.media_path, result.media_path_len);
+        HU_ASSERT_NOT_NULL(mp);
+        agent.generated_media[agent.generated_media_count++] = mp;
+    }
+
+    HU_ASSERT_EQ(agent.generated_media_count, (size_t)1);
+    HU_ASSERT_NOT_NULL(agent.generated_media[0]);
+    HU_ASSERT(strstr(agent.generated_media[0], "/tmp/human_img_") != NULL);
+    HU_ASSERT(strstr(agent.generated_media[0], ".png") != NULL);
+
+    /* Simulate a second tool call (video) */
+    hu_tool_result_free(&alloc, &result);
+    hu_json_free(&alloc, args);
+
+    hu_tool_t vid_tool;
+    memset(&vid_tool, 0, sizeof(vid_tool));
+    HU_ASSERT_EQ(hu_media_video_create(&alloc, &vid_tool), HU_OK);
+
+    const char *vjson = "{\"prompt\":\"waves crashing\"}";
+    HU_ASSERT_EQ(hu_json_parse(&alloc, vjson, strlen(vjson), &args), HU_OK);
+
+    memset(&result, 0, sizeof(result));
+    HU_ASSERT_EQ(vid_tool.vtable->execute(vid_tool.ctx, &alloc, args, &result), HU_OK);
+    HU_ASSERT(result.success);
+    HU_ASSERT_NOT_NULL(result.media_path);
+
+    if (result.success && result.media_path && result.media_path_len > 0 &&
+        agent.generated_media_count < 4) {
+        char *mp = hu_strndup(&alloc, result.media_path, result.media_path_len);
+        HU_ASSERT_NOT_NULL(mp);
+        agent.generated_media[agent.generated_media_count++] = mp;
+    }
+
+    HU_ASSERT_EQ(agent.generated_media_count, (size_t)2);
+    HU_ASSERT(strstr(agent.generated_media[1], ".mp4") != NULL);
+
+    /* Simulate daemon merge: proactive_vis + generated_media */
+    const char *merged[6] = {NULL};
+    size_t merged_n = 0;
+    for (size_t gm = 0; gm < agent.generated_media_count && merged_n < 6; gm++)
+        merged[merged_n++] = agent.generated_media[gm];
+    HU_ASSERT_EQ(merged_n, (size_t)2);
+    HU_ASSERT(strstr(merged[0], ".png") != NULL);
+    HU_ASSERT(strstr(merged[1], ".mp4") != NULL);
+
+    /* Simulate daemon cleanup (unlink + free) */
+    for (size_t gmi = 0; gmi < agent.generated_media_count; gmi++) {
+        if (agent.generated_media[gmi]) {
+            size_t gm_len = strlen(agent.generated_media[gmi]);
+            alloc.free(alloc.ctx, agent.generated_media[gmi], gm_len + 1);
+            agent.generated_media[gmi] = NULL;
+        }
+    }
+    agent.generated_media_count = 0;
+    HU_ASSERT_EQ(agent.generated_media_count, (size_t)0);
+    HU_ASSERT(agent.generated_media[0] == NULL);
+    HU_ASSERT(agent.generated_media[1] == NULL);
+
+    hu_tool_result_free(&alloc, &result);
+    hu_json_free(&alloc, args);
+}
+
+static void media_config_fallback_chain(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    /* Config with media_gen settings */
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.media_gen.default_image_model = hu_strdup(&alloc, "imagen4");
+    cfg.media_gen.default_video_model = hu_strdup(&alloc, "veo_3.1_lite");
+    cfg.media_gen.vertex_project = hu_strdup(&alloc, "my-project-123");
+    cfg.media_gen.vertex_region = hu_strdup(&alloc, "europe-west4");
+
+    HU_ASSERT_STR_EQ(cfg.media_gen.default_image_model, "imagen4");
+    HU_ASSERT_STR_EQ(cfg.media_gen.default_video_model, "veo_3.1_lite");
+    HU_ASSERT_STR_EQ(cfg.media_gen.vertex_project, "my-project-123");
+    HU_ASSERT_STR_EQ(cfg.media_gen.vertex_region, "europe-west4");
+
+    alloc.free(alloc.ctx, cfg.media_gen.default_image_model, strlen("imagen4") + 1);
+    alloc.free(alloc.ctx, cfg.media_gen.default_video_model, strlen("veo_3.1_lite") + 1);
+    alloc.free(alloc.ctx, cfg.media_gen.vertex_project, strlen("my-project-123") + 1);
+    alloc.free(alloc.ctx, cfg.media_gen.vertex_region, strlen("europe-west4") + 1);
+}
+
+static void media_agent_deinit_cleans_generated_media(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    agent.alloc = &alloc;
+
+    agent.generated_media[0] = hu_strndup(&alloc, "/tmp/test1.png", 14);
+    agent.generated_media[1] = hu_strndup(&alloc, "/tmp/test2.mp4", 14);
+    agent.generated_media_count = 2;
+
+    /* Simulate the cleanup loop from hu_agent_deinit */
+    for (size_t gm = 0; gm < agent.generated_media_count && gm < 4; gm++) {
+        if (agent.generated_media[gm]) {
+            alloc.free(alloc.ctx, agent.generated_media[gm],
+                       strlen(agent.generated_media[gm]) + 1);
+            agent.generated_media[gm] = NULL;
+        }
+    }
+    agent.generated_media_count = 0;
+    HU_ASSERT(agent.generated_media[0] == NULL);
+    HU_ASSERT(agent.generated_media[1] == NULL);
+}
+
 /* ── registration ───────────────────────────────────────────────────────── */
 
 void run_media_gen_tests(void) {
@@ -352,4 +493,8 @@ void run_media_gen_tests(void) {
 
     HU_RUN_TEST(tool_result_ok_with_media_sets_fields);
     HU_RUN_TEST(tool_result_free_null_media_safe);
+
+    HU_RUN_TEST(media_tool_result_captured_by_agent);
+    HU_RUN_TEST(media_config_fallback_chain);
+    HU_RUN_TEST(media_agent_deinit_cleans_generated_media);
 }

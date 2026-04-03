@@ -402,7 +402,7 @@ cleanup_gateway
 trap - EXIT
 
 if command -v wscat >/dev/null 2>&1; then
-  echo "  (wscat found — WebSocket tests would go here)"
+  echo "  (wscat found — C-level WS E2E proved in test_prove_e2e.c)"
   pass "gateway_ws_placeholder (wscat available)"
 else
   printf "  \033[33mSKIP\033[0m  gateway_ws_control (requires wscat)\n"

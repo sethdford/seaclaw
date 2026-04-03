@@ -1307,6 +1307,87 @@ static void test_e2e_gateway_conversation_lifecycle(void) {
     teardown_proto(&ws, &proto);
 }
 
+/* ── Tasks RPC tests ──────────────────────────────────────────────── */
+
+static void test_rpc_tasks_list_no_store_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    app.task_store = NULL;
+
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    hu_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_tasks_list(&alloc, &app, &conn, &proto, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT(strstr(out, "tasks") != NULL);
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_tasks_get_no_store_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    app.task_store = NULL;
+
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    hu_json_value_t *params = hu_json_object_new(&alloc);
+    hu_json_object_set(&alloc, params, "id", hu_json_number_new(&alloc, 1));
+    hu_json_object_set(&alloc, root, "params", params);
+    hu_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_tasks_get(&alloc, &app, &conn, &proto, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+    teardown_proto(&ws, &proto);
+}
+
+static void test_rpc_tasks_cancel_no_store_returns_error(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+    app.task_store = NULL;
+
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    hu_json_value_t *params = hu_json_object_new(&alloc);
+    hu_json_object_set(&alloc, params, "id", hu_json_number_new(&alloc, 1));
+    hu_json_object_set(&alloc, root, "params", params);
+    hu_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_tasks_cancel(&alloc, &app, &conn, &proto, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+    teardown_proto(&ws, &proto);
+}
+
 void run_gateway_extended_tests(void) {
     HU_TEST_SUITE("Gateway Extended");
     HU_RUN_TEST(test_gateway_webhook_paths);
@@ -1398,6 +1479,11 @@ void run_gateway_extended_tests(void) {
     HU_RUN_TEST(test_rpc_nodes_action_missing_fields_no_crash);
     HU_RUN_TEST(test_cp_admin_nodes_action_restart_returns_mock_json);
     HU_RUN_TEST(test_event_bridge_payload_propagation);
+
+    HU_TEST_SUITE("Gateway Tasks RPC");
+    HU_RUN_TEST(test_rpc_tasks_list_no_store_returns_error);
+    HU_RUN_TEST(test_rpc_tasks_get_no_store_returns_error);
+    HU_RUN_TEST(test_rpc_tasks_cancel_no_store_returns_error);
 
     HU_TEST_SUITE("Gateway E2E Lifecycle");
     HU_RUN_TEST(test_e2e_gateway_conversation_lifecycle);

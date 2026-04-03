@@ -41,6 +41,7 @@ typedef struct hu_voice_session {
     bool latency_first_byte_pending;
     int64_t latency_interrupt_mark_ms;
     bool latency_await_interrupt_silence;
+    bool gl_vad_active; /* manual VAD activity window open for Gemini Live */
 } hu_voice_session_t;
 
 hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *session,

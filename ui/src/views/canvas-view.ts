@@ -58,9 +58,7 @@ export class CanvasView extends GatewayAwareLitElement {
     }
 
     if (action === "clear") {
-      this.canvases = this.canvases.map((c) =>
-        c.id === canvasId ? { ...c, content: "" } : c,
-      );
+      this.canvases = this.canvases.map((c) => (c.id === canvasId ? { ...c, content: "" } : c));
       return;
     }
 
@@ -123,7 +121,8 @@ export class CanvasView extends GatewayAwareLitElement {
         width: 100%;
         font-family: var(--hu-font);
         color: var(--hu-text);
-        transition: background var(--hu-duration-fast) var(--hu-ease-out),
+        transition:
+          background var(--hu-duration-fast) var(--hu-ease-out),
           border-color var(--hu-duration-fast) var(--hu-ease-out);
       }
 
@@ -246,7 +245,9 @@ export class CanvasView extends GatewayAwareLitElement {
                       >
                         <div>
                           <div class="row-title">${c.title || c.id}</div>
-                          <div class="row-meta">${c.format} · ${c.content ? "has content" : "empty"}</div>
+                          <div class="row-meta">
+                            ${c.format} · ${c.content ? "has content" : "empty"}
+                          </div>
                         </div>
                       </button>
                     `,
@@ -269,7 +270,7 @@ export class CanvasView extends GatewayAwareLitElement {
                 </div>
               </div>
             `
-            : nothing}
+          : nothing}
       </div>
     `;
   }

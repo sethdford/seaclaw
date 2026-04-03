@@ -10,6 +10,7 @@
 #include "human/daemon.h"
 #include "human/agent.h"
 #include "human/agent/anticipatory.h"
+#include "agent/agent_internal.h"
 #include "human/agent/collab_planning.h"
 #include "human/agent/conversation_plan.h"
 #include "human/agent/episodic.h"
@@ -63,6 +64,7 @@
 #include "human/security/sycophancy_guard.h"
 #include "human/tts/audio_pipeline.h"
 #include "human/tts/cartesia.h"
+#include "human/tts/transcript_prep.h"
 #include "human/voice.h"
 #include "human/voice/emotion_voice_map.h"
 #include "human/voice/session.h"
@@ -1933,6 +1935,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     hu_outcome_tracker_init(&daemon_outcomes, true);
     if (agent && !agent->outcomes)
         hu_agent_set_outcomes(agent, &daemon_outcomes);
+    if (agent)
+        agent->config = config;
 
 #ifdef HU_HAS_CRON
     time_t last_cron_minute = 0;
@@ -2833,10 +2837,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     }
                                 }
                                 fid.composite = hu_fidelity_composite(&fid);
-                                if (!fidelity_state.current_baseline.composite)
+                                if (!fidelity_state.current_baseline.composite) {
                                     hu_self_improve_set_baseline(&fidelity_state, &fid);
-                                else
-                                    (void)hu_self_improve_record(&fidelity_state, NULL, 0, &fid);
+                                } else if (!hu_self_improve_budget_exhausted(&fidelity_state)) {
+                                    char *mutation = NULL;
+                                    size_t mutation_len = 0;
+                                    if (hu_self_improve_propose(alloc, &fidelity_state,
+                                                                &mutation, &mutation_len) == HU_OK) {
+                                        (void)hu_self_improve_record(&fidelity_state, mutation,
+                                                                     mutation_len, &fid);
+                                        if (mutation)
+                                            alloc->free(alloc->ctx, mutation, mutation_len + 1);
+                                    }
+                                }
                             }
                         }
 #endif
@@ -3865,7 +3878,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* Burst accumulation: re-poll for messages that arrived during
                  * the read delay. Humans finish their thought in 2-3 messages,
-                 * so we pick up any follow-ups before responding. */
+                 * so we pick up any follow-ups before responding.
+                 * Propagate metadata from burst messages into the batch. */
                 {
                     hu_channel_loop_msg_t burst[16];
                     size_t burst_count = 0;
@@ -3881,6 +3895,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         combined[combined_len++] = '\n';
                         memcpy(combined + combined_len, burst[bi].content, mlen);
                         combined_len += mlen;
+                        batch_end = m > 0 ? m - 1 : 0;
+                        if (burst[bi].has_attachment)
+                            msgs[batch_end].has_attachment = true;
+                        if (burst[bi].has_video)
+                            msgs[batch_end].has_video = true;
+                        if (burst[bi].has_audio)
+                            msgs[batch_end].has_audio = true;
+                        if (burst[bi].was_edited)
+                            msgs[batch_end].was_edited = true;
+                        if (burst[bi].was_unsent)
+                            msgs[batch_end].was_unsent = true;
+                        if (burst[bi].message_id > msgs[batch_end].message_id)
+                            msgs[batch_end].message_id = burst[bi].message_id;
+                        if (burst[bi].reply_to_guid[0] && !msgs[batch_end].reply_to_guid[0])
+                            memcpy(msgs[batch_end].reply_to_guid, burst[bi].reply_to_guid,
+                                   sizeof(msgs[batch_end].reply_to_guid));
                         if (agent->session_store && agent->session_store->vtable &&
                             agent->session_store->vtable->save_message) {
                             agent->session_store->vtable->save_message(agent->session_store->ctx,
@@ -6326,37 +6356,69 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* SOTA: 5-dimension trust calibration — inject calibrated uncertainty language */
+                /* SOTA: 5-dimension trust calibration — per-contact calibrated uncertainty */
                 {
-                    static hu_tcal_state_t tcal_state = {0};
-                    static bool tcal_initialized = false;
-                    if (!tcal_initialized) {
-                        hu_tcal_init(&tcal_state);
-                        tcal_initialized = true;
-                    }
-                    if (tcal_state.interaction_count > 0) {
-                        char *tcal_dir = NULL;
-                        size_t tcal_dir_len = 0;
-                        if (hu_tcal_build_context(alloc, &tcal_state, &tcal_dir, &tcal_dir_len) ==
-                                HU_OK &&
-                            tcal_dir && tcal_dir_len > 0) {
-                            if (convo_ctx) {
-                                size_t total = convo_ctx_len + tcal_dir_len + 2;
-                                char *merged = (char *)alloc->alloc(alloc->ctx, total);
-                                if (merged) {
-                                    memcpy(merged, convo_ctx, convo_ctx_len);
-                                    merged[convo_ctx_len] = '\n';
-                                    memcpy(merged + convo_ctx_len + 1, tcal_dir, tcal_dir_len);
-                                    merged[total - 1] = '\0';
-                                    alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
-                                    convo_ctx = merged;
-                                    convo_ctx_len = total - 1;
-                                }
-                            }
-                            alloc->free(alloc->ctx, tcal_dir, tcal_dir_len + 1);
+                    struct tcal_contact { char id[128]; hu_tcal_state_t st; };
+                    static struct tcal_contact tcal_tab[64];
+                    static size_t tcal_n = 0;
+
+                    hu_tcal_state_t *tcal_st = NULL;
+                    for (size_t ti = 0; ti < tcal_n; ti++) {
+                        if (strlen(tcal_tab[ti].id) == key_len &&
+                            memcmp(tcal_tab[ti].id, batch_key, key_len) == 0) {
+                            tcal_st = &tcal_tab[ti].st;
+                            break;
                         }
                     }
-                    hu_tcal_update(&tcal_state, 0.6f, 0.6f, 0.6f);
+                    if (!tcal_st && tcal_n < 64) {
+                        struct tcal_contact *ent = &tcal_tab[tcal_n++];
+                        size_t ck = key_len < sizeof(ent->id) - 1 ? key_len : sizeof(ent->id) - 1;
+                        memcpy(ent->id, batch_key, ck);
+                        ent->id[ck] = '\0';
+                        hu_tcal_init(&ent->st);
+                        tcal_st = &ent->st;
+                    }
+                    if (tcal_st) {
+                        if (tcal_st->interaction_count > 0) {
+                            char *tcal_dir = NULL;
+                            size_t tcal_dir_len = 0;
+                            if (hu_tcal_build_context(alloc, tcal_st, &tcal_dir, &tcal_dir_len) ==
+                                    HU_OK &&
+                                tcal_dir && tcal_dir_len > 0) {
+                                if (convo_ctx) {
+                                    size_t total = convo_ctx_len + tcal_dir_len + 2;
+                                    char *merged = (char *)alloc->alloc(alloc->ctx, total);
+                                    if (merged) {
+                                        memcpy(merged, convo_ctx, convo_ctx_len);
+                                        merged[convo_ctx_len] = '\n';
+                                        memcpy(merged + convo_ctx_len + 1, tcal_dir, tcal_dir_len);
+                                        merged[total - 1] = '\0';
+                                        alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                        convo_ctx = merged;
+                                        convo_ctx_len = total - 1;
+                                    }
+                                } else {
+                                    convo_ctx = hu_strndup(alloc, tcal_dir, tcal_dir_len);
+                                    if (convo_ctx)
+                                        convo_ctx_len = tcal_dir_len;
+                                }
+                                alloc->free(alloc->ctx, tcal_dir, tcal_dir_len + 1);
+                            }
+                        }
+                        float comp = 0.6f, benev = 0.6f, integ = 0.6f;
+                        hu_trust_state_t *ts = hu_daemon_get_trust_state(batch_key, key_len);
+                        if (ts) {
+                            comp = (float)ts->trust_level;
+                            uint32_t pos = ts->helpful_actions + ts->accurate_recalls;
+                            uint32_t neg = ts->corrections_count + ts->fabrications_count;
+                            uint32_t total_acts = pos + neg;
+                            benev = total_acts > 0 ? (float)pos / (float)total_acts : 0.6f;
+                            integ = ts->fabrications_count == 0 ? 0.9f
+                                    : 1.0f - (float)ts->fabrications_count /
+                                             (float)(ts->accurate_recalls + ts->fabrications_count + 1);
+                        }
+                        hu_tcal_update(tcal_st, comp, benev, integ);
+                    }
                 }
 
                 /* F27: Comfort pattern — when emotion is negative, inject learned preference. */
@@ -8240,6 +8302,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             agent->conversation_context = convo_ctx;
                             agent->conversation_context_len = convo_ctx_len;
                         }
+                        for (size_t gmc = 0; gmc < agent->generated_media_count && gmc < 4; gmc++) {
+                            if (agent->generated_media[gmc]) {
+#ifndef HU_IS_TEST
+                                (void)unlink(agent->generated_media[gmc]);
+#endif
+                                size_t gml = strlen(agent->generated_media[gmc]);
+                                agent->alloc->free(agent->alloc->ctx, agent->generated_media[gmc], gml + 1);
+                                agent->generated_media[gmc] = NULL;
+                            }
+                        }
+                        agent->generated_media_count = 0;
                         goto skip_llm_this_batch;
                     }
                 }
@@ -8752,11 +8825,29 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         response, response_len, pa_traits, pa_traits_n,
                         pa_pref, pa_pref_n, pa_avoid, pa_avoid_n, &pa_score);
                     cm.prompt_alignment = pa_score;
-                    if (combined_len > 0) {
-                        float lc_score = 0.0f;
-                        (void)hu_consistency_score_line(
-                            combined, combined_len, response, response_len, &lc_score);
-                        cm.line_consistency = lc_score;
+                    /* Line consistency: compare this response with the most recent
+                     * assistant response (not the user message) to track cross-turn
+                     * persona stability. */
+                    {
+                        const char *prev_asst = NULL;
+                        size_t prev_asst_len = 0;
+                        if (agent->history_count > 0) {
+                            for (size_t hi = agent->history_count; hi > 0; hi--) {
+                                if (agent->history[hi - 1].role == HU_ROLE_ASSISTANT &&
+                                    agent->history[hi - 1].content &&
+                                    agent->history[hi - 1].content_len > 0) {
+                                    prev_asst = agent->history[hi - 1].content;
+                                    prev_asst_len = agent->history[hi - 1].content_len;
+                                    break;
+                                }
+                            }
+                        }
+                        if (prev_asst && prev_asst_len > 0) {
+                            float lc_score = 0.0f;
+                            (void)hu_consistency_score_line(
+                                prev_asst, prev_asst_len, response, response_len, &lc_score);
+                            cm.line_consistency = lc_score;
+                        }
                     }
                     cm.composite = hu_consistency_composite(&cm);
                     if (!persona_drift.baseline_set)
@@ -9617,24 +9708,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 const char *cartesia_key =
                                     hu_config_get_provider_key(config, "cartesia");
                                 if (cartesia_key && cartesia_key[0]) {
-                                    char voice_transcript[4096];
-                                    size_t vt_len = tts_source_len < sizeof(voice_transcript) - 64
-                                                        ? tts_source_len
-                                                        : sizeof(voice_transcript) - 64;
-                                    memcpy(voice_transcript, tts_source, vt_len);
-                                    voice_transcript[vt_len] = '\0';
-                                    vt_len = hu_conversation_inject_nonverbals(
-                                        voice_transcript, vt_len, sizeof(voice_transcript),
-                                        (uint32_t)time(NULL), agent->persona->voice.nonverbals);
-
-                                    const char *emo_str = pv_emotion
-                                        ? pv_emotion
-                                        : hu_cartesia_emotion_from_context(
-                                              combined, combined_len, response, response_len,
-                                              (uint8_t)bth_hour);
-
-                                    /* Emotion voice map: detect emotion + derive expressive params
-                                     */
                                     hu_voice_emotion_t detected_emotion = HU_VOICE_EMOTION_NEUTRAL;
                                     float emotion_confidence = 0.0f;
                                     hu_emotion_detect_from_text(response, response_len,
@@ -9646,6 +9719,58 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                            ? agent->persona->voice.default_speed
                                                            : 0.95f;
 
+                                    float persona_pause = evo_params.pause_factor;
+                                    if (agent->persona->voice_rhythm.pause_behavior) {
+                                        const char *pb = agent->persona->voice_rhythm.pause_behavior;
+                                        if (strstr(pb, "frequent") || strstr(pb, "long") ||
+                                            strstr(pb, "deliberate"))
+                                            persona_pause *= 1.3f;
+                                        else if (strstr(pb, "minimal") || strstr(pb, "quick") ||
+                                                 strstr(pb, "rapid"))
+                                            persona_pause *= 0.7f;
+                                    }
+                                    float persona_disc = 0.3f;
+                                    if (agent->persona->voice_rhythm.response_tempo) {
+                                        const char *rt = agent->persona->voice_rhythm.response_tempo;
+                                        if (strstr(rt, "casual") || strstr(rt, "conversational"))
+                                            persona_disc = 0.4f;
+                                        else if (strstr(rt, "formal") || strstr(rt, "direct"))
+                                            persona_disc = 0.1f;
+                                    }
+
+                                    hu_prep_config_t prep_cfg = {
+                                        .incoming_msg = combined,
+                                        .incoming_msg_len = combined_len,
+                                        .default_emotion = pv_emotion,
+                                        .base_speed = base_speed * evo_params.rate_factor,
+                                        .pause_factor = persona_pause,
+                                        .discourse_rate = persona_disc,
+                                        .nonverbals_enabled = agent->persona->voice.nonverbals,
+                                        .seed = (uint32_t)time(NULL),
+                                        .hour_local = (uint8_t)bth_hour,
+                                    };
+
+                                    hu_prep_result_t prep = {0};
+                                    hu_error_t prep_err = hu_transcript_prep(
+                                        tts_source, tts_source_len, &prep_cfg, &prep);
+
+                                    const char *voice_transcript = tts_source;
+                                    size_t vt_len = tts_source_len;
+                                    const char *emo_str = pv_emotion
+                                        ? pv_emotion
+                                        : hu_cartesia_emotion_from_context(
+                                              combined, combined_len, response, response_len,
+                                              (uint8_t)bth_hour);
+                                    float tts_volume = 1.0f;
+
+                                    if (prep_err == HU_OK && prep.output_len > 0) {
+                                        voice_transcript = prep.output;
+                                        vt_len = prep.output_len;
+                                        if (prep.dominant_emotion)
+                                            emo_str = prep.dominant_emotion;
+                                        tts_volume = prep.volume;
+                                    }
+
                                     hu_cartesia_tts_config_t tts_cfg = {
                                         .model_id = agent->persona->voice.model[0]
                                                         ? agent->persona->voice.model
@@ -9653,7 +9778,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         .voice_id = agent->persona->voice.voice_id,
                                         .emotion = emo_str,
                                         .speed = base_speed * evo_params.rate_factor,
-                                        .volume = 1.0f,
+                                        .volume = tts_volume,
                                         .nonverbals = agent->persona->voice.nonverbals,
                                     };
 
@@ -9847,7 +9972,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                             }
                         }
-                        /* SOTA-002: Anti-sycophancy guard — detect and add friction */
+                        /* SOTA-002: Anti-sycophancy guard — detect and log for next-turn influence.
+                         * Friction directive is a model instruction (not user-facing), so we
+                         * inject it into agent history for the next turn instead of sending
+                         * it to the channel. Also bump the contrarian counter to increase
+                         * the probability of the existing Phase 3 anti-sycophancy prompt. */
                         {
                             hu_sycophancy_result_t syc_r = {0};
                             if (hu_sycophancy_check(send_ptr, send_len, combined, combined_len,
@@ -9856,30 +9985,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 hu_log_info("human", agent ? agent->observer : NULL,
                                             "sycophancy guard flagged: risk=%.2f patterns=%zu",
                                             syc_r.total_risk, syc_r.pattern_count);
-                                char *friction = NULL;
-                                size_t friction_len = 0;
-                                if (hu_sycophancy_build_friction(alloc, &syc_r, combined,
-                                                                 combined_len, &friction,
-                                                                 &friction_len) == HU_OK &&
-                                    friction && friction_len > 0) {
-                                    size_t new_len = friction_len + 2 + send_len;
-                                    char *prefixed = (char *)alloc->alloc(alloc->ctx, new_len + 1);
-                                    if (prefixed) {
-                                        memcpy(prefixed, friction, friction_len);
-                                        prefixed[friction_len] = '\n';
-                                        prefixed[friction_len + 1] = '\n';
-                                        memcpy(prefixed + friction_len + 2, send_ptr, send_len);
-                                        prefixed[new_len] = '\0';
-                                        if (send_buf_ack) {
-                                            alloc->free(alloc->ctx, send_buf_ack, send_len + 1);
-                                            send_buf_ack = NULL;
-                                        }
-                                        send_buf_ack = prefixed;
-                                        send_ptr = send_buf_ack;
-                                        send_len = new_len;
-                                    }
-                                    alloc->free(alloc->ctx, friction, friction_len + 1);
-                                }
+                                /* Boost contrarian counter to increase the probability that
+                                 * the next turn's Phase 3 anti-sycophancy prompt fires. */
+                                daemon_turn_counter += 3;
                             }
                         }
                         /* SHIELD-004/005: Moderation + crisis escalation before send */
@@ -10281,6 +10389,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
+                const char *_ch_name_for_gate =
+                    ch->channel->vtable->name ? ch->channel->vtable->name(ch->channel->ctx) : NULL;
+                bool is_imessage_ch =
+                    (_ch_name_for_gate && strcmp(_ch_name_for_gate, "imessage") == 0);
+
 #if !defined(HU_IS_TEST) && defined(HU_HAS_PERSONA)
                 /* F9: Double-text — natural afterthought follow-up */
                 if (response && response_len > 0 && agent->persona && ch->channel->vtable->send &&
@@ -10328,8 +10441,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                                 unsigned int dt_delay = 10000u + (dt_seed % 35000u);
                                 usleep((useconds_t)(dt_delay * 1000u));
-                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
-                                                          dt_resp, dt_resp_len, NULL, 0);
+                                bool dt_suppress =
+                                    ch->channel->vtable->human_active_recently &&
+                                    ch->channel->vtable->human_active_recently(
+                                        ch->channel->ctx, batch_key, key_len, 30);
+                                if (!dt_suppress)
+                                    ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                              dt_resp, dt_resp_len, NULL, 0);
                                 if (agent->bth_metrics)
                                     agent->bth_metrics->double_texts++;
                             }
@@ -10339,8 +10457,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* Self-reaction: occasionally haha/emphasize own message (~2%) */
-                if (response && response_len > 0 && ch->channel->vtable->react) {
+                /* Self-reaction: occasionally haha/emphasize own message (~2%).
+                 * Only for channels where we can reliably identify our outbound
+                 * message ID. iMessage ROWIDs are non-deterministic after send,
+                 * so skip self-reaction for iMessage to avoid mis-targeting. */
+                if (response && response_len > 0 && ch->channel->vtable->react && !is_imessage_ch) {
                     hu_reaction_type_t self_r = hu_conversation_classify_self_reaction(
                         response, response_len, (uint32_t)time(NULL));
                     if (self_r != HU_REACTION_NONE) {
@@ -10356,9 +10477,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* GIF calibration + send: iMessage-only (requires chat.db access) */
-                const char *gif_ch_name =
-                    ch->channel->vtable->name ? ch->channel->vtable->name(ch->channel->ctx) : NULL;
-                bool is_imessage_ch = (gif_ch_name && strcmp(gif_ch_name, "imessage") == 0);
 
                 if (is_imessage_ch) {
                     int gif_taps = hu_imessage_count_recent_gif_tapbacks(batch_key, key_len);
@@ -10471,6 +10589,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                               tenor_key, strlen(tenor_key));
                                     if (gif_path) {
                                         usleep(2000000 + (gif_seed % 3000000));
+                                        bool gif_suppress =
+                                            ch->channel->vtable->human_active_recently &&
+                                            ch->channel->vtable->human_active_recently(
+                                                ch->channel->ctx, batch_key, key_len, 30);
+                                        if (!gif_suppress) {
                                         const char *media[] = {gif_path};
                                         ch->channel->vtable->send(ch->channel->ctx, batch_key,
                                                                   key_len, "", 0, media, 1);
@@ -10495,6 +10618,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         hu_log_info("human", agent ? agent->observer : NULL,
                                                     "sent GIF: query=\"%.*s\"", (int)gif_query_len,
                                                     gif_query);
+                                        }
                                         size_t gp_path_len = strlen(gif_path);
                                         alloc->free(alloc->ctx, gif_path, gp_path_len + 1);
                                     }
@@ -10508,8 +10632,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* Sticker-like reaction images: send expressive images for
-                 * emotionally resonant messages (only if GIF wasn't sent) */
-                if (combined_len > 0 && ch->channel->vtable->send && !gif_sent_this_turn) {
+                 * emotionally resonant messages (iMessage only, only if GIF wasn't sent) */
+                if (combined_len > 0 && ch->channel->vtable->send && !gif_sent_this_turn &&
+                    is_imessage_ch) {
                     float sticker_prob = 0.08f;
 #ifdef HU_HAS_PERSONA
                     if (agent->persona && agent->persona->humanization.gif_probability > 0.0f)
@@ -10534,11 +10659,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     stk_path, sizeof(stk_path));
                                 if (sp_len > 0 && access(stk_path, R_OK) == 0) {
                                     usleep(1500000 + (stk_seed % 2000000));
+                                    bool stk_suppress =
+                                        ch->channel->vtable->human_active_recently &&
+                                        ch->channel->vtable->human_active_recently(
+                                            ch->channel->ctx, batch_key, key_len, 30);
+                                    if (!stk_suppress) {
                                     const char *media[] = {stk_path};
                                     ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
                                                               "", 0, media, 1);
                                     hu_log_info("human", agent ? agent->observer : NULL,
                                                 "sent sticker: %s", stk_path);
+                                    }
                                 }
                             }
                         }
@@ -10649,7 +10780,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
     if (0) {
     e2e_done:
-        (void)0;
+        if (agent && agent->generated_media_count > 0) {
+            for (size_t gmi = 0; gmi < agent->generated_media_count; gmi++) {
+                if (agent->generated_media[gmi]) {
+#ifndef HU_IS_TEST
+                    (void)unlink(agent->generated_media[gmi]);
+#endif
+                    size_t gm_len = strlen(agent->generated_media[gmi]);
+                    agent->alloc->free(agent->alloc->ctx, agent->generated_media[gmi], gm_len + 1);
+                    agent->generated_media[gmi] = NULL;
+                }
+            }
+            agent->generated_media_count = 0;
+        }
     }
 
 #undef HU_STOP_FLAG

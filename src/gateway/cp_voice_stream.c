@@ -6,16 +6,16 @@
 #include "cp_internal.h"
 #include "human/bus.h"
 #include "human/config.h"
+#include "human/core/string.h"
 #include "human/gateway/voice_stream.h"
 #include "human/multimodal.h"
 #include "human/platform.h"
+#include "human/tool.h"
 #include "human/tts/cartesia_stream.h"
 #include "human/voice.h"
 #include "human/voice/audio_emotion.h"
 #include "human/voice/duplex.h"
 #include "human/voice/emotion_voice_map.h"
-#include "human/core/string.h"
-#include "human/tool.h"
 #include "human/voice/gemini_live.h"
 #include "human/voice/provider.h"
 #include "human/voice/semantic_eot.h"
@@ -151,6 +151,8 @@ static void vs_drain_tts_to_conn(vs_slot_t *sl) {
         return;
     hu_allocator_t *a = s_proto->alloc;
     for (int iter = 0; iter < 4096; iter++) {
+        if (!sl->conn->active)
+            break;
         void *pcm = NULL;
         size_t n = 0;
         bool done = false;
@@ -313,7 +315,7 @@ void hu_voice_stream_on_binary(hu_control_protocol_t *proto, hu_ws_conn_t *conn,
         return;
 
     /* Provider mode: forward raw PCM16 directly to the voice backend */
-    if (sl->gemini_live_mode && sl->provider.vtable) {
+    if (sl->gemini_live_mode && sl->provider.vtable && sl->provider.vtable->send_audio) {
         if (!sl->vad_active && sl->provider.vtable->send_activity_start) {
             (void)sl->provider.vtable->send_activity_start(sl->provider.ctx);
             sl->vad_active = true;
@@ -362,7 +364,7 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
 
     vs_slot_t *sl = vs_alloc_slot(conn);
     if (!sl)
-        return HU_ERR_ALREADY_EXISTS;
+        return HU_ERR_PROVIDER_UNAVAILABLE;
 
     const hu_config_t *cfg = (const hu_config_t *)app->config;
 
@@ -406,44 +408,59 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
         char *tools_json_str = NULL;
         if (app->tools && app->tools_count > 0) {
             hu_json_buf_t tbuf = {0};
-            if (hu_json_buf_init(&tbuf, alloc) == HU_OK) {
-                hu_json_buf_append_raw(&tbuf, "[", 1);
+            hu_error_t terr = hu_json_buf_init(&tbuf, alloc);
+            if (terr == HU_OK) {
+                terr = hu_json_buf_append_raw(&tbuf, "[", 1);
                 size_t added = 0;
-                for (size_t ti = 0; ti < app->tools_count; ti++) {
+                for (size_t ti = 0; ti < app->tools_count && terr == HU_OK; ti++) {
                     hu_tool_t *t = &app->tools[ti];
                     if (!t->vtable || !t->vtable->name)
                         continue;
                     const char *tn = t->vtable->name(t->ctx);
-                    const char *td =
-                        t->vtable->description ? t->vtable->description(t->ctx) : "";
+                    const char *td = t->vtable->description ? t->vtable->description(t->ctx) : "";
                     const char *tp =
                         t->vtable->parameters_json ? t->vtable->parameters_json(t->ctx) : "{}";
                     if (!tn)
                         continue;
                     if (added > 0)
-                        hu_json_buf_append_raw(&tbuf, ",", 1);
-                    hu_json_buf_append_raw(&tbuf, "{\"name\":", 8);
-                    hu_json_append_string(&tbuf, tn, strlen(tn));
-                    hu_json_buf_append_raw(&tbuf, ",\"description\":", 15);
-                    hu_json_append_string(&tbuf, td ? td : "", td ? strlen(td) : 0);
-                    hu_json_buf_append_raw(&tbuf, ",\"parameters\":", 14);
-                    hu_json_buf_append_raw(&tbuf, tp && tp[0] ? tp : "{}",
-                                           strlen(tp && tp[0] ? tp : "{}"));
-                    hu_json_buf_append_raw(&tbuf, "}", 1);
-                    added++;
+                        terr = hu_json_buf_append_raw(&tbuf, ",", 1);
+                    if (terr == HU_OK)
+                        terr = hu_json_buf_append_raw(&tbuf, "{\"name\":", 8);
+                    if (terr == HU_OK)
+                        terr = hu_json_append_string(&tbuf, tn, strlen(tn));
+                    if (terr == HU_OK)
+                        terr = hu_json_buf_append_raw(&tbuf, ",\"description\":", 15);
+                    if (terr == HU_OK)
+                        terr = hu_json_append_string(&tbuf, td ? td : "", td ? strlen(td) : 0);
+                    if (terr == HU_OK)
+                        terr = hu_json_buf_append_raw(&tbuf, ",\"parameters\":", 14);
+                    if (terr == HU_OK)
+                        terr = hu_json_buf_append_raw(&tbuf, tp && tp[0] ? tp : "{}",
+                                                      strlen(tp && tp[0] ? tp : "{}"));
+                    if (terr == HU_OK)
+                        terr = hu_json_buf_append_raw(&tbuf, "}", 1);
+                    if (terr == HU_OK)
+                        added++;
                 }
-                hu_json_buf_append_raw(&tbuf, "]", 1);
+                if (terr == HU_OK)
+                    terr = hu_json_buf_append_raw(&tbuf, "]", 1);
                 if (tbuf.len > 2)
                     tools_json_str = hu_strndup(alloc, tbuf.ptr, tbuf.len);
                 hu_json_buf_free(&tbuf);
             }
         }
 
+        /* Resolve system instruction from persona config */
+        const char *sys_instr = NULL;
+        if (cfg->agent.persona && cfg->agent.persona[0])
+            sys_instr = cfg->agent.persona;
+
         hu_gemini_live_config_t glc = {
             .api_key = api_key,
             .access_token = cfg->voice.vertex_access_token,
             .model = gl_model,
             .voice = gl_voice,
+            .system_instruction = sys_instr,
             .region = cfg->voice.vertex_region,
             .project_id = cfg->voice.vertex_project,
             .tools_json = tools_json_str,
@@ -494,6 +511,72 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
         cp_json_set_str(alloc, res, "sessionId", sid);
         hu_error_t err = hu_json_stringify(alloc, res, out, out_len);
         hu_json_free(alloc, res);
+        if (err != HU_OK)
+            vs_free_slot(sl, alloc);
+        return err;
+    }
+
+    /* OpenAI Realtime mode: full-duplex voice via OpenAI Realtime API */
+    bool use_openai_rt = (mode && strcmp(mode, "openai_realtime") == 0) ||
+                         (cfg->voice.mode && strcmp(cfg->voice.mode, "openai_realtime") == 0);
+    if (use_openai_rt) {
+        const char *api_key = hu_config_get_provider_key(cfg, "openai");
+        if (!api_key || !api_key[0]) {
+            vs_free_slot(sl, alloc);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+        const char *rt_model = cfg->voice.realtime_model;
+        const char *rt_voice = cfg->voice.realtime_voice;
+        if (!rt_model || !rt_model[0])
+            rt_model = "gpt-4o-realtime-preview";
+        if (!rt_voice || !rt_voice[0])
+            rt_voice = "alloy";
+
+        hu_voice_rt_config_t rtc = {
+            .api_key = api_key,
+            .model = rt_model,
+            .voice = rt_voice,
+            .sample_rate = 24000,
+            .vad_enabled = true,
+        };
+
+        if (sl->provider.vtable) {
+            sl->provider.vtable->disconnect(sl->provider.ctx, alloc);
+            sl->provider.vtable = NULL;
+            sl->provider.ctx = NULL;
+        }
+
+        hu_error_t rerr = hu_voice_provider_openai_create(alloc, &rtc, &sl->provider);
+        if (rerr != HU_OK) {
+            vs_free_slot(sl, alloc);
+            return rerr;
+        }
+        rerr = sl->provider.vtable->connect(sl->provider.ctx);
+        if (rerr != HU_OK) {
+            sl->provider.vtable->disconnect(sl->provider.ctx, alloc);
+            sl->provider.vtable = NULL;
+            sl->provider.ctx = NULL;
+            vs_free_slot(sl, alloc);
+            return rerr;
+        }
+
+        sl->gemini_live_mode = true; /* reuse same provider-based path for polling */
+
+        hu_json_value_t *res = hu_json_object_new(alloc);
+        if (!res) {
+            vs_free_slot(sl, alloc);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        cp_json_set_str(alloc, res, "encoding", "pcm_s16le");
+        hu_json_object_set(alloc, res, "sampleRate", hu_json_number_new(alloc, 24000));
+        cp_json_set_str(alloc, res, "mode", "openai_realtime");
+        char sid[40];
+        (void)snprintf(sid, sizeof(sid), "%llu", (unsigned long long)conn->id);
+        cp_json_set_str(alloc, res, "sessionId", sid);
+        hu_error_t err = hu_json_stringify(alloc, res, out, out_len);
+        hu_json_free(alloc, res);
+        if (err != HU_OK)
+            vs_free_slot(sl, alloc);
         return err;
     }
 
@@ -533,6 +616,8 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
     cp_json_set_str(alloc, res, "sessionId", sid);
     hu_error_t err = hu_json_stringify(alloc, res, out, out_len);
     hu_json_free(alloc, res);
+    if (err != HU_OK)
+        vs_free_slot(sl, alloc);
     return err;
 }
 
@@ -546,12 +631,14 @@ hu_error_t cp_voice_session_stop(hu_allocator_t *alloc, hu_app_context_t *app, h
     if (!alloc || !app || !conn)
         return HU_ERR_INVALID_ARGUMENT;
     vs_slot_t *sl = vs_find_slot_by_conn(conn);
+    bool had_slot = (sl != NULL);
     if (sl)
         vs_free_slot(sl, alloc);
     hu_json_value_t *res = hu_json_object_new(alloc);
     if (!res)
         return HU_ERR_OUT_OF_MEMORY;
     hu_json_object_set(alloc, res, "ok", hu_json_bool_new(alloc, true));
+    hu_json_object_set(alloc, res, "stopped", hu_json_bool_new(alloc, had_slot));
     hu_error_t err = hu_json_stringify(alloc, res, out, out_len);
     hu_json_free(alloc, res);
     return err;
@@ -853,7 +940,15 @@ void hu_voice_stream_poll_gemini_live(void) {
                     }
                     hu_json_free(a, tev);
                 }
-                /* Execute tool from agent registry and send result to Gemini */
+                /* Execute tool from agent registry and send result to Gemini.
+                 * Generate a synthetic ID if the server omitted one so the
+                 * response round-trip can still complete. */
+                if (!ev.tool_call_id) {
+                    static const char synth[] = "synth-0";
+                    ev.tool_call_id = hu_strndup(a, synth, sizeof(synth) - 1);
+                    if (ev.tool_call_id)
+                        ev.tool_call_id_len = sizeof(synth) - 1;
+                }
                 hu_app_context_t *app = s_proto->app_ctx;
                 if (app && app->tools && ev.tool_call_id) {
                     hu_tool_t *match = NULL;
@@ -870,8 +965,7 @@ void hu_voice_stream_poll_gemini_live(void) {
                     if (match && match->vtable->execute) {
                         hu_json_value_t *args = NULL;
                         if (ev.tool_args_json && ev.tool_args_json_len > 0)
-                            (void)hu_json_parse(a, ev.tool_args_json, ev.tool_args_json_len,
-                                                &args);
+                            (void)hu_json_parse(a, ev.tool_args_json, ev.tool_args_json_len, &args);
                         if (!args)
                             args = hu_json_object_new(a);
                         hu_tool_result_t tr = {0};
@@ -923,8 +1017,12 @@ void hu_voice_stream_poll_gemini_live(void) {
                 hu_control_send_event_to_conn(s_proto, sl->conn, "voice.audio.interrupted", "{}");
             }
 
-            /* Turn complete */
+            /* Turn complete: end VAD activity so next mic chunk re-opens it */
             if (ev.done) {
+                if (sl->vad_active && sl->provider.vtable->send_activity_end) {
+                    (void)sl->provider.vtable->send_activity_end(sl->provider.ctx);
+                    sl->vad_active = false;
+                }
                 hu_control_send_event_to_conn(s_proto, sl->conn, "voice.audio.done", "{}");
             }
 
@@ -1015,40 +1113,65 @@ void hu_voice_stream_poll_gemini_live(void) {}
 hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                                   const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                   char **out, size_t *out_len) {
-    (void)alloc; (void)app; (void)conn; (void)proto; (void)root;
-    *out = NULL; *out_len = 0;
+    (void)alloc;
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_voice_session_stop(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                                  const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                  char **out, size_t *out_len) {
-    (void)alloc; (void)app; (void)conn; (void)proto; (void)root;
-    *out = NULL; *out_len = 0;
+    (void)alloc;
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_voice_session_interrupt(hu_allocator_t *alloc, hu_app_context_t *app,
                                       hu_ws_conn_t *conn, const hu_control_protocol_t *proto,
                                       const hu_json_value_t *root, char **out, size_t *out_len) {
-    (void)alloc; (void)app; (void)conn; (void)proto; (void)root;
-    *out = NULL; *out_len = 0;
+    (void)alloc;
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_voice_audio_end(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                               const hu_control_protocol_t *proto, const hu_json_value_t *root,
                               char **out, size_t *out_len) {
-    (void)alloc; (void)app; (void)conn; (void)proto; (void)root;
-    *out = NULL; *out_len = 0;
+    (void)alloc;
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_voice_tool_response(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                                   const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                   char **out, size_t *out_len) {
-    (void)alloc; (void)app; (void)conn; (void)proto; (void)root;
-    *out = NULL; *out_len = 0;
+    (void)alloc;
+    (void)app;
+    (void)conn;
+    (void)proto;
+    (void)root;
+    *out = NULL;
+    *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
 }
 

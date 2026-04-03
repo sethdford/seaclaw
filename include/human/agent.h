@@ -129,6 +129,7 @@ struct hu_agent {
     hu_retrieval_engine_t *retrieval_engine; /* optional; when set, memory_loader uses it */
     hu_session_store_t *session_store;       /* optional, may be NULL */
     hu_observer_t *observer;                 /* optional, may be NULL */
+    const struct hu_config *config;          /* optional; read-only ref to runtime config (not owned) */
     hu_bth_metrics_t *bth_metrics;           /* optional; set by daemon for BTH observability */
     hu_security_policy_t *policy;            /* optional, may be NULL */
     hu_cost_tracker_t *cost_tracker;         /* optional, may be NULL */

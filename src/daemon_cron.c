@@ -306,7 +306,7 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
                                 response[response_len - 1] = '\0';
                                 response_len--;
                             }
-                            /* SHIELD-004: Moderation check before cron send */
+                            /* SHIELD-004: Moderation check before cron send — block if flagged */
                             {
                                 hu_moderation_result_t mod_r;
                                 memset(&mod_r, 0, sizeof(mod_r));
@@ -316,8 +316,10 @@ hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, hu_agent_t *agent,
                                     hu_log_error("human", NULL, "cron moderation check failed: %s",
                                             hu_error_string(mod_err));
                                 } else if (mod_r.flagged) {
-                                    hu_log_info("human", NULL, "cron moderation flagged: v=%.2f sh=%.2f",
+                                    hu_log_info("human", NULL,
+                                            "cron send blocked by moderation: v=%.2f sh=%.2f",
                                             mod_r.violence_score, mod_r.self_harm_score);
+                                    break;
                                 }
                             }
                             hu_error_t send_err = channels[c].channel->vtable->send(

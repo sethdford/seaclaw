@@ -110,6 +110,14 @@ typedef struct hu_agent_config {
     uint32_t fleet_max_spawn_depth;  /* 0 = unlimited; default from merge */
     uint32_t fleet_max_total_spawns; /* 0 = unlimited lifetime spawns per pool */
     double fleet_budget_usd;         /* 0 = unlimited; requires shared cost tracker */
+    /* Per-depth model tier overrides for child agent spawning. */
+    struct hu_config_depth_model_override {
+        uint32_t min_depth;
+        uint32_t max_depth;
+        char *provider; /* may be NULL */
+        char *model;    /* required */
+    } *fleet_depth_model_overrides;
+    size_t fleet_depth_model_overrides_count;
     char *default_profile;
     char *persona;
     hu_persona_channel_entry_t *persona_channels;

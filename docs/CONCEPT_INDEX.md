@@ -240,6 +240,19 @@ Use this to find the right files for a given task without searching the full cod
 | **PWA bridge**              | `src/pwa/bridge.c`, `context.c`, `drivers.c`, `learner.c`                                                | `test_pwa.c`             |
 | **ML subsystem**            | `src/ml/gpt.c`, `train.c`, `prepare.c`, `tokenizer_bpe.c`, `dataloader.c`, `evaluator.c`, `experiment.c`, `dpo.c`, `lora.c`, `cli.c`, `checkpoint.c`, `agent_trainer.c` | `test_ml.c` |
 | **Research feeds**          | `src/feeds/research.c`, `file_ingest.c`, `gmail.c`, `imessage.c`, `twitter.c`                            | `test_research_feeds.c`  |
+| **Fact extraction**         | `src/memory/fact_extract.c`, `include/human/memory/fact_extract.h`                                       | `test_fact_extract.c`    |
+| **Hallucination guard**     | `src/memory/hallucination_guard.c`, `include/human/memory/hallucination_guard.h`                         | `test_hallucination_guard.c` |
+| **Sycophancy guard**        | `src/security/sycophancy_guard.c`, `include/human/security/sycophancy_guard.h`                           | `test_sycophancy_guard.c` |
+| **Trust calibration**       | `src/cognition/trust.c`, `include/human/cognition/trust.h`                                               | `test_trust_calibration.c` |
+| **Consistency eval**        | `src/eval/consistency.c`, `include/human/eval/consistency.h`                                             | `test_consistency.c`     |
+| **Humor framework**         | `src/persona/humor.c`, `include/human/persona/humor.h`                                                   | `test_humor_fw.c`        |
+| **Markdown persona loader** | `src/persona/markdown_loader.c`, `include/human/persona/markdown_loader.h`                               | `test_markdown_loader.c` |
+| **Self-improve (fidelity)** | `src/agent/self_improve.c`, `include/human/agent/self_improve.h`                                         | `test_self_improve.c`    |
+| **Task store**              | `src/agent/task_store.c`, `src/gateway/cp_tasks.c`, `include/human/agent/task_store.h`                   | `test_task_store.c`      |
+| **Vertex auth (ADC)**       | `src/core/vertex_auth.c`, `include/human/core/vertex_auth.h`                                             | `test_media_gen.c`       |
+| **Vision OCR tool**         | `src/tools/vision_ocr.c`, `vision_ocr_apple.m`, `include/human/tools/vision_ocr.h`                      | `test_vision_ocr.c`      |
+| **Media generation**        | `src/tools/media_image.c`, `media_video.c`, `media_gif.c`                                                | `test_media_gen.c`       |
+| **Send voice message**      | `src/tools/send_voice_message.c`, `include/human/tools/send_voice_message.h`                             | `test_send_voice_message.c` |
 
 ## Native client apps (`apps/`)
 

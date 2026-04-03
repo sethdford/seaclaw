@@ -18,6 +18,7 @@
 #include "human/agent/tool_context.h"
 #include "human/context/conversation.h"
 #include "human/core/allocator.h"
+#include "human/tts/transcript_prep.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
 #include "human/persona.h"
@@ -286,6 +287,83 @@ static void test_pipeline_rate_limit_single_voice_per_turn(void) {
     hu_agent_clear_current_for_tools();
 }
 
+/* ── Test: full pipeline with transcript preprocessor ─────────────────── */
+
+static void test_pipeline_with_preprocessor(void) {
+    setup();
+
+    hu_tool_t tool = {0};
+    hu_send_voice_message_create(&alloc, &tool);
+    hu_agent_t fake_agent = {0};
+    hu_agent_set_current_for_tools(&fake_agent);
+    hu_agent_clear_pending_voice();
+
+    /* Multi-sentence transcript with emotional range */
+    const char *json =
+        "{\"transcript\":\"I'm so sorry about what happened. "
+        "But honestly, you handled it with so much grace. "
+        "I'm really proud of you!\"}";
+    hu_json_value_t *parsed = NULL;
+    hu_json_parse(&alloc, json, strlen(json), &parsed);
+    hu_tool_result_t result = {0};
+    tool.vtable->execute(tool.ctx, &alloc, parsed, &result);
+    HU_ASSERT_TRUE(result.success);
+    hu_tool_result_free(&alloc, &result);
+    hu_json_free(&alloc, parsed);
+
+    size_t pv_len = 0;
+    const char *pv_transcript = hu_agent_pending_voice_transcript(&pv_len);
+    HU_ASSERT_NOT_NULL(pv_transcript);
+    HU_ASSERT_TRUE(pv_len > 0);
+
+    /* Run preprocessor (the daemon path now does this) */
+    hu_prep_config_t prep_cfg = {
+        .incoming_msg = "I lost my job today",
+        .incoming_msg_len = 19,
+        .base_speed = 0.95f,
+        .pause_factor = 1.2f,
+        .discourse_rate = 0.3f,
+        .nonverbals_enabled = true,
+        .seed = 42,
+        .hour_local = 14,
+    };
+    hu_prep_result_t prep = {0};
+    hu_error_t err = hu_transcript_prep(pv_transcript, pv_len, &prep_cfg, &prep);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(prep.output_len > 0);
+    HU_ASSERT_TRUE(prep.sentence_count >= 2);
+    HU_ASSERT_NOT_NULL(prep.dominant_emotion);
+    HU_ASSERT_TRUE(prep.volume > 0.0f && prep.volume <= 2.0f);
+
+    /* Verify SSML annotations are present */
+    HU_ASSERT_TRUE(strstr(prep.output, "<break time=") != NULL);
+    HU_ASSERT_TRUE(strstr(prep.output, "<emotion value=") != NULL);
+
+#if HU_ENABLE_CARTESIA
+    /* Feed preprocessed output to TTS */
+    hu_cartesia_tts_config_t tts_cfg = {
+        .model_id = "sonic-3-2026-01-12",
+        .voice_id = "test-voice-uuid",
+        .emotion = prep.dominant_emotion,
+        .speed = 0.95f,
+        .volume = prep.volume,
+        .nonverbals = true,
+    };
+    unsigned char *audio_bytes = NULL;
+    size_t audio_len = 0;
+    hu_error_t tts_err = hu_cartesia_tts_synthesize(
+        &alloc, "test-key", 8, prep.output, prep.output_len, &tts_cfg, "mp3",
+        &audio_bytes, &audio_len);
+    HU_ASSERT_EQ(tts_err, HU_OK);
+    HU_ASSERT_NOT_NULL(audio_bytes);
+    HU_ASSERT_EQ(audio_len, 400u);
+    hu_cartesia_tts_free_bytes(&alloc, audio_bytes, audio_len);
+#endif
+
+    hu_agent_clear_pending_voice();
+    hu_agent_clear_current_for_tools();
+}
+
 /* ── Registration ────────────────────────────────────────────────────── */
 
 void run_voice_message_integration_tests(void) {
@@ -298,4 +376,5 @@ void run_voice_message_integration_tests(void) {
     HU_RUN_TEST(test_pipeline_telegram_selects_ogg);
     HU_RUN_TEST(test_pipeline_slack_selects_mp3);
     HU_RUN_TEST(test_pipeline_rate_limit_single_voice_per_turn);
+    HU_RUN_TEST(test_pipeline_with_preprocessor);
 }

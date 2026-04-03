@@ -3,6 +3,9 @@
  * Falls back to returning the MP4 if ffmpeg is not available. */
 
 #include "human/tools/media_gif.h"
+#include "human/agent.h"
+#include "human/agent/tool_context.h"
+#include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
@@ -133,9 +136,16 @@ static hu_error_t mg_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
         return HU_OK;
     }
 
-    const char *project = getenv("GOOGLE_CLOUD_PROJECT");
-    const char *region = getenv("GOOGLE_CLOUD_LOCATION");
+    const char *project = NULL;
+    const char *region = NULL;
+    hu_agent_t *mg_agent = hu_agent_get_current_for_tools();
+    if (mg_agent && mg_agent->config) {
+        project = mg_agent->config->media_gen.vertex_project;
+        region = mg_agent->config->media_gen.vertex_region;
+    }
+    if (!project) project = getenv("GOOGLE_CLOUD_PROJECT");
     if (!project) project = getenv("VERTEX_PROJECT");
+    if (!region) region = getenv("GOOGLE_CLOUD_LOCATION");
     if (!region) region = "us-central1";
     if (!project || !project[0]) {
         hu_vertex_auth_free(&vauth);

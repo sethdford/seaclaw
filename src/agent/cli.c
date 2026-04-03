@@ -450,6 +450,25 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         fl.max_spawn_depth = cfg.agent.fleet_max_spawn_depth;
         fl.max_total_spawns = cfg.agent.fleet_max_total_spawns;
         fl.budget_limit_usd = cfg.agent.fleet_budget_usd;
+        if (cfg.agent.fleet_depth_model_overrides_count > 0 &&
+            cfg.agent.fleet_depth_model_overrides) {
+            size_t n = cfg.agent.fleet_depth_model_overrides_count;
+            fl.depth_model_overrides = (hu_depth_model_override_t *)alloc->alloc(
+                alloc->ctx, n * sizeof(hu_depth_model_override_t));
+            if (fl.depth_model_overrides) {
+                fl.depth_model_overrides_count = n;
+                for (size_t di = 0; di < n; di++) {
+                    fl.depth_model_overrides[di].min_depth =
+                        cfg.agent.fleet_depth_model_overrides[di].min_depth;
+                    fl.depth_model_overrides[di].max_depth =
+                        cfg.agent.fleet_depth_model_overrides[di].max_depth;
+                    fl.depth_model_overrides[di].model =
+                        cfg.agent.fleet_depth_model_overrides[di].model;
+                    fl.depth_model_overrides[di].provider =
+                        cfg.agent.fleet_depth_model_overrides[di].provider;
+                }
+            }
+        }
         hu_agent_pool_set_fleet_limits(cli_agent_pool, &fl);
     }
     hu_mailbox_t *cli_mailbox = hu_mailbox_create(alloc, 64);

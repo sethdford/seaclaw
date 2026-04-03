@@ -94,6 +94,7 @@
       <a href="#hu-message-branch">hu-message-branch</a>
       <a href="#hu-reasoning-block">hu-reasoning-block</a>
       <a href="#hu-code-block">hu-code-block</a>
+      <a href="#hu-canvas">hu-canvas</a>
       <a href="#hu-latex">hu-latex</a>
       <a href="#hu-shortcut-overlay">hu-shortcut-overlay</a>
       <a href="#hu-context-menu">hu-context-menu</a>
@@ -1079,6 +1080,21 @@
         <div class="code-snippet"><pre><code>&lt;hu-code-block code=&quot;...&quot; language=&quot;javascript&quot;&gt;&lt;/hu-code-block&gt;</code></pre></div>
       </section>
 
+      <section class="component-section" id="hu-canvas">
+        <h2>hu-canvas</h2>
+        <p>Live Canvas / A2UI surface: sanitized HTML or SVG, optional device mockup frame, fullscreen control.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 36rem; min-height: 200px;">
+            <hu-canvas
+              title="Preview"
+              format="html"
+              content="&lt;p style=&quot;color:var(--hu-accent)&quot;&gt;Hello from Live Canvas&lt;/p&gt;"
+            ></hu-canvas>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-canvas .title=${&quot;UI&quot;} .format=${&quot;html&quot;} .content=${htmlString}&gt;&lt;/hu-canvas&gt;</code></pre></div>
+      </section>
+
       <section class="component-section" id="hu-latex">
         <h2>hu-latex</h2>
         <div class="playground">
@@ -1743,6 +1759,7 @@
       import "/src/components/hu-message-stream.js";
       import "/src/components/hu-reasoning-block.js";
       import "/src/components/hu-code-block.js";
+      import "/src/components/hu-canvas.js";
       import "/src/components/hu-latex.js";
       import "/src/components/hu-shortcut-overlay.js";
       import "/src/components/hu-context-menu.js";

@@ -20,7 +20,6 @@ import "../components/hu-status-dot.js";
 import "../components/hu-voice-orb.js";
 import "../components/hu-voice-conversation.js";
 import "../components/hu-voice-clone.js";
-import "../components/hu-empty-state.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
 
@@ -226,6 +225,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   readonly #playback = new AudioPlaybackEngine(24000);
   #voiceStreaming = false;
   #activeSessionIsGL = false;
+  #processingTimer: ReturnType<typeof setTimeout> | null = null;
   readonly #silence = createVoiceSilenceController({
     isActive: () => this.voiceStatus === "listening" && this.#voiceStreaming,
     onSilenceEnd: () => {
@@ -446,10 +446,28 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
     this.#voiceStreaming = false;
     this.#activeSessionIsGL = false;
+    this.#clearProcessingTimeout();
     this.#playback.interrupt();
     this._speaking = false;
     if (this.voiceStatus !== "idle") {
       this.voiceStatus = "idle";
+    }
+  }
+
+  #armProcessingTimeout(): void {
+    this.#clearProcessingTimeout();
+    this.#processingTimer = setTimeout(() => {
+      if (this.voiceStatus === "processing") {
+        this.voiceStatus = "idle";
+        this.requestUpdate();
+      }
+    }, 15_000);
+  }
+
+  #clearProcessingTimeout(): void {
+    if (this.#processingTimer) {
+      clearTimeout(this.#processingTimer);
+      this.#processingTimer = null;
     }
   }
 
@@ -588,6 +606,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
 
     if (detail.event === "voice.audio.done") {
+      this.#clearProcessingTimeout();
       if (this._speaking) {
         this.#playback.markEndOfStream();
       } else if (this.voiceStatus !== "listening") {
@@ -598,6 +617,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
 
     if (detail.event === "voice.audio.interrupted") {
+      this.#clearProcessingTimeout();
       this.#playback.interrupt();
       this._speaking = false;
       this.voiceStatus = "idle";
@@ -606,6 +626,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
 
     if (detail.event === "voice.generation_complete") {
+      this.#clearProcessingTimeout();
       if (this._speaking) {
         this.#playback.markEndOfStream();
       } else if (this.voiceStatus !== "listening") {
@@ -616,6 +637,14 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
 
     if (detail.event === "voice.tool_cancelled") {
+      const ids = (detail.payload?.ids as string[]) ?? [];
+      if (ids.length > 0) {
+        ScToast.show({
+          message: `Tool call${ids.length > 1 ? "s" : ""} cancelled`,
+          variant: "info",
+        });
+      }
+      this.requestUpdate();
       return;
     }
 
@@ -710,7 +739,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
           unknown
         >;
         const isGeminiLive = result?.mode === "gemini_live";
-        this.#activeSessionIsGL = isGeminiLive;
+        const isProviderDuplex =
+          isGeminiLive || result?.mode === "openai_realtime";
+        this.#activeSessionIsGL = isProviderDuplex;
 
         gw.setOnBinaryChunk((ab) => {
           if (ab.byteLength === 0 || ab.byteLength % 4 !== 0) return;
@@ -725,8 +756,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
         });
         this.#silence.reset();
 
-        if (isGeminiLive) {
-          /* Gemini Live: stream raw PCM16 @ 16kHz directly */
+        if (isProviderDuplex) {
+          /* Provider duplex (Gemini Live / OpenAI RT): stream raw PCM16 */
           await this._recorder.startRawPcmStreaming(
             (data) => {
               try {
@@ -810,6 +841,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     if (this.#voiceStreaming) {
       this.voiceStatus = "processing";
+      this.#armProcessingTimeout();
       try {
         await this._recorder.stopStreaming();
         if (this.#activeSessionIsGL) {

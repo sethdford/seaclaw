@@ -45,6 +45,8 @@ size_t hu_imessage_extract_attributed_body(const unsigned char *blob, size_t blo
                     return 0;
                 for (size_t b = 0; b < len_bytes; b++)
                     text_len |= (size_t)blob[i + 3 + b] << (8 * b);
+                if (text_len > blob_len)
+                    text_len = blob_len;
                 text_start = i + 3 + len_bytes;
             }
 
@@ -581,7 +583,11 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
                                                       tgt_buf,     "--file", media[i],
                                                       "--service", "imessage", NULL};
                             hu_run_result_t att_result = {0};
-                            hu_process_run(c->alloc, att_argv, NULL, 4096, &att_result);
+                            hu_error_t att_err =
+                                hu_process_run(c->alloc, att_argv, NULL, 4096, &att_result);
+                            if (att_err != HU_OK || !att_result.success)
+                                hu_log_info("imessage", NULL,
+                                            "imsg attachment send failed for %s", media[i]);
                             hu_run_result_free(c->alloc, &att_result);
                         }
                     }
@@ -1128,28 +1134,35 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *
 
     char buf[256];
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "[REACTIONS on your recent messages:");
+    size_t remain = sizeof(buf);
+#define TAPBACK_APPEND(...)                                                                        \
+    do {                                                                                           \
+        int _n = snprintf(buf + pos, remain, __VA_ARGS__);                                         \
+        if (_n > 0 && (size_t)_n < remain) {                                                       \
+            pos += (size_t)_n;                                                                     \
+            remain -= (size_t)_n;                                                                  \
+        } else if (_n > 0) {                                                                       \
+            pos = sizeof(buf) - 1;                                                                 \
+            remain = 0;                                                                            \
+        }                                                                                          \
+    } while (0)
+    TAPBACK_APPEND("[REACTIONS on your recent messages:");
     if (hearts > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d heart%s", hearts,
-                                hearts > 1 ? "s" : "");
+        TAPBACK_APPEND(" %d heart%s", hearts, hearts > 1 ? "s" : "");
     if (likes > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d like%s", likes,
-                                likes > 1 ? "s" : "");
+        TAPBACK_APPEND(" %d like%s", likes, likes > 1 ? "s" : "");
     if (laughs > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d laugh%s", laughs,
-                                laughs > 1 ? "s" : "");
+        TAPBACK_APPEND(" %d laugh%s", laughs, laughs > 1 ? "s" : "");
     if (emphasis > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d emphasis", emphasis);
+        TAPBACK_APPEND(" %d emphasis", emphasis);
     if (questions > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d question%s", questions,
-                                questions > 1 ? "s" : "");
+        TAPBACK_APPEND(" %d question%s", questions, questions > 1 ? "s" : "");
     if (dislikes > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d dislike%s", dislikes,
-                                dislikes > 1 ? "s" : "");
+        TAPBACK_APPEND(" %d dislike%s", dislikes, dislikes > 1 ? "s" : "");
     if (custom_emoji > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %d emoji reaction%s", custom_emoji,
-                                custom_emoji > 1 ? "s" : "");
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "]");
+        TAPBACK_APPEND(" %d emoji reaction%s", custom_emoji, custom_emoji > 1 ? "s" : "");
+    TAPBACK_APPEND("]");
+#undef TAPBACK_APPEND
 
     *out = hu_strndup(alloc, buf, pos);
     if (!*out)
@@ -1945,11 +1958,10 @@ char *hu_imessage_get_attachment_path(hu_allocator_t *alloc, int64_t message_id)
         char allowed_prefix[512];
         int prefix_len = snprintf(allowed_prefix, sizeof(allowed_prefix),
                                   "%s/Library/Messages/Attachments/", home);
-        if (prefix_len > 0 && (size_t)prefix_len < sizeof(allowed_prefix)) {
-            if (strncmp(path, allowed_prefix, (size_t)prefix_len) != 0) {
-                alloc->free(alloc->ctx, path, strlen(path) + 1);
-                return NULL; /* Path outside allowed directory */
-            }
+        if (prefix_len <= 0 || (size_t)prefix_len >= sizeof(allowed_prefix) ||
+            strncmp(path, allowed_prefix, (size_t)prefix_len) != 0) {
+            alloc->free(alloc->ctx, path, strlen(path) + 1);
+            return NULL;
         }
     }
     return path;
@@ -2031,11 +2043,10 @@ char *hu_imessage_get_latest_attachment_path(hu_allocator_t *alloc, const char *
         char allowed_prefix[512];
         int prefix_len = snprintf(allowed_prefix, sizeof(allowed_prefix),
                                   "%s/Library/Messages/Attachments/", home);
-        if (prefix_len > 0 && (size_t)prefix_len < sizeof(allowed_prefix)) {
-            if (strncmp(path, allowed_prefix, (size_t)prefix_len) != 0) {
-                alloc->free(alloc->ctx, path, strlen(path) + 1);
-                return NULL; /* Path outside allowed directory */
-            }
+        if (prefix_len <= 0 || (size_t)prefix_len >= sizeof(allowed_prefix) ||
+            strncmp(path, allowed_prefix, (size_t)prefix_len) != 0) {
+            alloc->free(alloc->ctx, path, strlen(path) + 1);
+            return NULL;
         }
     }
     return path;
@@ -2191,7 +2202,10 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "             WHERE majv.message_id = m.ROWID AND av.filename IS NOT NULL "
         "             AND (LOWER(av.filename) LIKE '%.mov' OR LOWER(av.filename) LIKE '%.mp4' "
         "               OR LOWER(av.filename) LIKE '%.m4v')) > 0 "
-        "       THEN '[Video]' ELSE '[Photo]' END)) AS text, h.id, "
+        "       THEN '[Video]' "
+        "       WHEN (SELECT COUNT(*) FROM message_attachment_join "
+        "             WHERE message_id = m.ROWID) > 0 "
+        "       THEN '[Photo]' ELSE NULL END)) AS text, h.id, "
         "  COALESCE("
         "    (SELECT COUNT(DISTINCT chj2.handle_id) FROM chat_message_join cmj "
         "     JOIN chat_handle_join chj2 ON chj2.chat_id = cmj.chat_id "
@@ -2259,7 +2273,8 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
     }
 
     size_t count = 0;
-    while (sqlite3_step(stmt) == SQLITE_ROW && count < max_msgs) {
+    int step_rc;
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW && count < max_msgs) {
         int64_t rowid = sqlite3_column_int64(stmt, 0);
         const char *guid = (const char *)sqlite3_column_text(stmt, 1);
         const char *text = (const char *)sqlite3_column_text(stmt, 2);
@@ -2380,6 +2395,9 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
                     (int)msgs[count - 1].is_group, (int)(text_len > 80 ? 80 : text_len), text);
     }
 
+    if (step_rc != SQLITE_DONE && step_rc != SQLITE_ROW)
+        hu_log_error("imessage", NULL, "poll sqlite3_step error: %s", sqlite3_errmsg(db));
+
     sqlite3_finalize(stmt);
     if (retract_stmt)
         sqlite3_finalize(retract_stmt);
@@ -2450,16 +2468,22 @@ char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t que
     if (!alloc || !query || query_len == 0 || !api_key || api_key_len == 0)
         return NULL;
 
-    /* URL-encode the query (simple: replace spaces with +, skip unsafe chars) */
-    char encoded[256];
+    /* URL-encode the query with proper percent-encoding for unsafe chars */
+    static const char hex[] = "0123456789ABCDEF";
+    char encoded[768];
     size_t eidx = 0;
     for (size_t i = 0; i < query_len && eidx + 3 < sizeof(encoded); i++) {
-        if (query[i] == ' ') {
+        unsigned char ch = (unsigned char)query[i];
+        if (ch == ' ') {
             encoded[eidx++] = '+';
-        } else if ((query[i] >= 'a' && query[i] <= 'z') || (query[i] >= 'A' && query[i] <= 'Z') ||
-                   (query[i] >= '0' && query[i] <= '9') || query[i] == '-' || query[i] == '_' ||
-                   query[i] == '.') {
-            encoded[eidx++] = query[i];
+        } else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                   (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '.' ||
+                   ch == '~') {
+            encoded[eidx++] = (char)ch;
+        } else {
+            encoded[eidx++] = '%';
+            encoded[eidx++] = hex[ch >> 4];
+            encoded[eidx++] = hex[ch & 0x0F];
         }
     }
     encoded[eidx] = '\0';
@@ -2505,6 +2529,13 @@ char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t que
     hu_http_response_free(alloc, &resp);
 
     if (gif_url_len == 0)
+        return NULL;
+
+    /* Validate URL scheme and host — only allow HTTPS from known Tenor domains */
+    if (strncmp(gif_url, "https://", 8) != 0)
+        return NULL;
+    if (strstr(gif_url, "tenor.com") == NULL && strstr(gif_url, "googleapis.com") == NULL &&
+        strstr(gif_url, "gstatic.com") == NULL)
         return NULL;
 
     /* Download the GIF to a temp file */

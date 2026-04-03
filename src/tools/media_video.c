@@ -3,6 +3,9 @@
  * resulting MP4 from the GCS URI, and writes it to a temp file. */
 
 #include "human/tools/media_video.h"
+#include "human/agent.h"
+#include "human/agent/tool_context.h"
+#include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
@@ -78,8 +81,13 @@ static hu_error_t mv_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
     }
 
     const char *model = hu_json_get_string(args, "model");
-    if (!model) model = "veo_3.1";
-    else if (!mv_model_ok(model)) {
+    if (!model) {
+        hu_agent_t *cfg_agent = hu_agent_get_current_for_tools();
+        if (cfg_agent && cfg_agent->config && cfg_agent->config->media_gen.default_video_model)
+            model = cfg_agent->config->media_gen.default_video_model;
+        else
+            model = "veo_3.1";
+    } else if (!mv_model_ok(model)) {
         *out = hu_tool_result_fail("invalid model", 13);
         return HU_OK;
     }
@@ -129,9 +137,16 @@ static hu_error_t mv_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
         return HU_OK;
     }
 
-    const char *project = getenv("GOOGLE_CLOUD_PROJECT");
-    const char *region = getenv("GOOGLE_CLOUD_LOCATION");
+    const char *project = NULL;
+    const char *region = NULL;
+    hu_agent_t *mv_agent = hu_agent_get_current_for_tools();
+    if (mv_agent && mv_agent->config) {
+        project = mv_agent->config->media_gen.vertex_project;
+        region = mv_agent->config->media_gen.vertex_region;
+    }
+    if (!project) project = getenv("GOOGLE_CLOUD_PROJECT");
     if (!project) project = getenv("VERTEX_PROJECT");
+    if (!region) region = getenv("GOOGLE_CLOUD_LOCATION");
     if (!region) region = "us-central1";
     if (!project || !project[0]) {
         hu_vertex_auth_free(&vauth);

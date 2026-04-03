@@ -731,8 +731,16 @@ hu_error_t hu_safety_judge_check(hu_allocator_t *alloc, hu_provider_t *provider,
     (void)model_len;
     return HU_OK;
 #else
-    if (!provider || !provider->vtable || !provider->vtable->chat_with_system || !alloc)
+    if (!provider || !provider->vtable || !provider->vtable->chat_with_system || !alloc) {
+        /* No judge available — fail closed: mark as unsafe with low confidence
+         * so rule-based pass-through still works but unvetted content is flagged */
+        if (!result->safe)
+            return HU_OK; /* already flagged by rule-based check */
+        result->safe = false;
+        result->confidence = 0.3;
+        snprintf(result->reason, sizeof(result->reason), "safety judge unavailable");
         return HU_OK;
+    }
 
     static const char SAFETY_JUDGE_SYSTEM_PROMPT[] =
         "You are a safety classifier for an AI companion. Evaluate the candidate "
@@ -759,8 +767,14 @@ hu_error_t hu_safety_judge_check(hu_allocator_t *alloc, hu_provider_t *provider,
 
     alloc->free(alloc->ctx, user_prompt, strlen(user_prompt) + 1);
 
-    if (err != HU_OK || !judge_response)
+    if (err != HU_OK || !judge_response) {
+        if (!result->safe)
+            return HU_OK; /* already flagged by rule-based check */
+        result->safe = false;
+        result->confidence = 0.3;
+        snprintf(result->reason, sizeof(result->reason), "safety judge LLM call failed");
         return HU_OK;
+    }
 
     hu_json_value_t *json = NULL;
     hu_error_t perr = hu_json_parse(alloc, judge_response, judge_response_len, &json);
