@@ -49,8 +49,11 @@ reference/
 # MCP config (local build paths)
 .mcp.json
 
-# Claude Code local settings (not shared)
+# Claude Code local settings and session artifacts (not shared)
 .claude/settings.local.json
+.claude/daemon-config.json
+.claude/*-audit.md
+.claude/*AUDIT*.md
 
 # Worktrees
 .worktrees
