@@ -233,15 +233,15 @@ static void integration_graph_rag_context_building(void) {
     HU_ASSERT_NOT_NULL(g);
 
     int64_t alice = 0, bob = 0, acme = 0;
-    hu_graph_upsert_entity(g, "alice", 5, HU_ENTITY_PERSON, NULL, &alice);
-    hu_graph_upsert_entity(g, "bob", 3, HU_ENTITY_PERSON, NULL, &bob);
-    hu_graph_upsert_entity(g, "acme", 4, HU_ENTITY_ORGANIZATION, NULL, &acme);
-    hu_graph_upsert_relation(g, alice, acme, HU_REL_WORKS_AT, 1.0f, NULL, 0);
-    hu_graph_upsert_relation(g, alice, bob, HU_REL_KNOWS, 0.9f, "colleague", 9);
+    hu_graph_upsert_entity(g, "", 0, "alice", 5, HU_ENTITY_PERSON, NULL, &alice);
+    hu_graph_upsert_entity(g, "", 0, "bob", 3, HU_ENTITY_PERSON, NULL, &bob);
+    hu_graph_upsert_entity(g, "", 0, "acme", 4, HU_ENTITY_ORGANIZATION, NULL, &acme);
+    hu_graph_upsert_relation(g, "", 0, alice, acme, HU_REL_WORKS_AT, 1.0f, NULL, 0);
+    hu_graph_upsert_relation(g, "", 0, alice, bob, HU_REL_KNOWS, 0.9f, "colleague", 9);
 
     char *out = NULL;
     size_t out_len = 0;
-    HU_ASSERT_EQ(hu_graph_build_context(g, &alloc, "alice bob acme", 14, 2, 4096, &out, &out_len),
+    HU_ASSERT_EQ(hu_graph_build_context(g, &alloc, "", 0, "alice bob acme", 14, 2, 4096, &out, &out_len),
                  HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(out_len > 0);

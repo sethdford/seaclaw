@@ -1,7 +1,7 @@
 JOBS ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 BUILD ?= build
 
-.PHONY: all configure build test clean release asan check fmt format-check fuzz bench setup install hooks lint tidy coverage validate ci
+.PHONY: all configure build test clean release asan check fmt format-check fuzz bench setup install hooks lint tidy coverage validate ci prove
 
 all: build test
 
@@ -92,6 +92,9 @@ setup:
 hooks:
 	git config core.hooksPath .githooks
 	@echo "Git hooks activated (.githooks/)"
+
+prove:
+	@bash scripts/prove-intelligence.sh
 
 validate: format-check build test
 	@echo "Validation passed."

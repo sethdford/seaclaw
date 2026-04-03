@@ -3627,6 +3627,109 @@ static void test_persona_immersive_fallback_when_no_reinforcement(void) {
     hu_persona_deinit(&alloc, &p);
 }
 
+/* ── Affect mirror ceiling (PERSONA-001) ─────────────────────────── */
+
+static void test_affect_ceiling_default_acquaintance(void) {
+    hu_contact_profile_t cp;
+    memset(&cp, 0, sizeof(cp));
+    cp.relationship_stage = "acquaintance";
+    float c = hu_affect_mirror_ceiling(&cp, NULL);
+    HU_ASSERT_TRUE(c >= 0.69f && c <= 0.71f); /* 0.7 */
+}
+
+static void test_affect_ceiling_default_friend(void) {
+    hu_contact_profile_t cp;
+    memset(&cp, 0, sizeof(cp));
+    cp.relationship_stage = "friend";
+    float c = hu_affect_mirror_ceiling(&cp, NULL);
+    HU_ASSERT_TRUE(c >= 0.84f && c <= 0.86f); /* 0.85 */
+}
+
+static void test_affect_ceiling_default_close(void) {
+    hu_contact_profile_t cp;
+    memset(&cp, 0, sizeof(cp));
+    cp.relationship_stage = "close_family";
+    float c = hu_affect_mirror_ceiling(&cp, NULL);
+    HU_ASSERT_TRUE(c >= 0.89f && c <= 0.91f); /* 0.9 */
+}
+
+static void test_affect_ceiling_default_no_stage(void) {
+    float c = hu_affect_mirror_ceiling(NULL, NULL);
+    HU_ASSERT_TRUE(c >= 0.69f && c <= 0.71f); /* 0.7 default */
+}
+
+static void test_affect_ceiling_contact_override(void) {
+    hu_contact_profile_t cp;
+    memset(&cp, 0, sizeof(cp));
+    cp.relationship_stage = "acquaintance"; /* would be 0.7 */
+    cp.affect_mirror_ceiling = 0.5f;        /* override */
+    float c = hu_affect_mirror_ceiling(&cp, NULL);
+    HU_ASSERT_TRUE(c >= 0.49f && c <= 0.51f);
+}
+
+static void test_affect_ceiling_overlay_override(void) {
+    hu_persona_overlay_t ov;
+    memset(&ov, 0, sizeof(ov));
+    ov.affect_mirror_ceiling = 0.6f;
+    float c = hu_affect_mirror_ceiling(NULL, &ov);
+    HU_ASSERT_TRUE(c >= 0.59f && c <= 0.61f);
+}
+
+static void test_affect_ceiling_contact_beats_overlay(void) {
+    hu_contact_profile_t cp;
+    memset(&cp, 0, sizeof(cp));
+    cp.affect_mirror_ceiling = 0.5f;
+    hu_persona_overlay_t ov;
+    memset(&ov, 0, sizeof(ov));
+    ov.affect_mirror_ceiling = 0.8f;
+    float c = hu_affect_mirror_ceiling(&cp, &ov);
+    HU_ASSERT_TRUE(c >= 0.49f && c <= 0.51f); /* contact wins */
+}
+
+static void test_affect_apply_below_ceiling_passthrough(void) {
+    char dir[256];
+    float out = hu_affect_mirror_apply(0.5f, 0.7f, dir, sizeof(dir));
+    HU_ASSERT_TRUE(out >= 0.49f && out <= 0.51f);
+    HU_ASSERT_EQ((int)dir[0], 0); /* no directive */
+}
+
+static void test_affect_apply_above_ceiling_capped(void) {
+    char dir[256];
+    float out = hu_affect_mirror_apply(0.95f, 0.7f, dir, sizeof(dir));
+    HU_ASSERT_TRUE(out >= 0.69f && out <= 0.71f); /* capped */
+    HU_ASSERT_TRUE(strlen(dir) > 0);              /* directive set */
+    HU_ASSERT_NOT_NULL(strstr(dir, "ceiling"));
+}
+
+static void test_affect_apply_null_directive_safe(void) {
+    float out = hu_affect_mirror_apply(0.9f, 0.7f, NULL, 0);
+    HU_ASSERT_TRUE(out >= 0.69f && out <= 0.71f);
+}
+
+static void test_affect_ceiling_trusted_confidant(void) {
+    hu_contact_profile_t cp;
+    memset(&cp, 0, sizeof(cp));
+    cp.relationship_stage = "trusted_confidant";
+    float c = hu_affect_mirror_ceiling(&cp, NULL);
+    HU_ASSERT_TRUE(c >= 0.89f && c <= 0.91f); /* 0.9 */
+}
+
+static void test_affect_ceiling_inner_circle(void) {
+    hu_contact_profile_t cp;
+    memset(&cp, 0, sizeof(cp));
+    cp.relationship_stage = "inner_circle";
+    float c = hu_affect_mirror_ceiling(&cp, NULL);
+    HU_ASSERT_TRUE(c >= 0.89f && c <= 0.91f); /* 0.9 */
+}
+
+static void test_affect_ceiling_stranger(void) {
+    hu_contact_profile_t cp;
+    memset(&cp, 0, sizeof(cp));
+    cp.relationship_stage = "stranger";
+    float c = hu_affect_mirror_ceiling(&cp, NULL);
+    HU_ASSERT_TRUE(c >= 0.69f && c <= 0.71f); /* 0.7 */
+}
+
 void run_persona_tests(void) {
     HU_TEST_SUITE("Persona");
 
@@ -3832,4 +3935,19 @@ void run_persona_tests(void) {
 
     /* E2E dry run */
     HU_RUN_TEST(test_e2e_mindy_message_full_pipeline);
+
+    HU_TEST_SUITE("Affect Mirror Ceiling (PERSONA-001)");
+    HU_RUN_TEST(test_affect_ceiling_default_acquaintance);
+    HU_RUN_TEST(test_affect_ceiling_default_friend);
+    HU_RUN_TEST(test_affect_ceiling_default_close);
+    HU_RUN_TEST(test_affect_ceiling_default_no_stage);
+    HU_RUN_TEST(test_affect_ceiling_contact_override);
+    HU_RUN_TEST(test_affect_ceiling_overlay_override);
+    HU_RUN_TEST(test_affect_ceiling_contact_beats_overlay);
+    HU_RUN_TEST(test_affect_apply_below_ceiling_passthrough);
+    HU_RUN_TEST(test_affect_apply_above_ceiling_capped);
+    HU_RUN_TEST(test_affect_apply_null_directive_safe);
+    HU_RUN_TEST(test_affect_ceiling_trusted_confidant);
+    HU_RUN_TEST(test_affect_ceiling_inner_circle);
+    HU_RUN_TEST(test_affect_ceiling_stranger);
 }

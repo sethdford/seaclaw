@@ -1,6 +1,7 @@
 /* Chat-related control protocol handlers: chat.send, chat.history, chat.abort */
 #include "cp_internal.h"
 #include "human/bus.h"
+#include "human/security/moderation.h"
 #include "human/session.h"
 #include <stdio.h>
 #include <string.h>
@@ -34,6 +35,46 @@ hu_error_t cp_chat_send(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn
         hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
         hu_json_free(alloc, obj);
         return err;
+    }
+
+    /* SHIELD-004: Inbound moderation gate — check user message before processing.
+     * If self-harm content detected, immediately return crisis resources. */
+    {
+        hu_moderation_result_t mod;
+        memset(&mod, 0, sizeof(mod));
+        size_t msg_len = strlen(message);
+        if (hu_moderation_check(alloc, message, msg_len, &mod) == HU_OK && mod.self_harm) {
+            fprintf(stderr,
+                    "[cp_chat] inbound self-harm detected (score=%.2f), injecting crisis\n",
+                    mod.self_harm_score);
+            hu_json_value_t *obj = hu_json_object_new(alloc);
+            if (!obj)
+                return HU_ERR_OUT_OF_MEMORY;
+            cp_json_set_str(alloc, obj, "status", "crisis");
+            cp_json_set_str(alloc, obj, "crisis_resources",
+                            "If you're in crisis, please reach out: "
+                            "988 Suicide & Crisis Lifeline (call/text 988), "
+                            "Crisis Text Line (text HOME to 741741)");
+            cp_json_set_str(alloc, obj, "sessionKey", session_key);
+            hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+            hu_json_free(alloc, obj);
+            /* Still publish the message so the agent can respond supportively */
+            if (app && app->bus) {
+                hu_bus_event_t ev;
+                memset(&ev, 0, sizeof(ev));
+                ev.type = HU_BUS_MESSAGE_RECEIVED;
+                snprintf(ev.channel, HU_BUS_CHANNEL_LEN, "control-ui");
+                snprintf(ev.id, HU_BUS_ID_LEN, "%s", session_key);
+                ev.payload = (void *)message;
+                size_t ml = msg_len;
+                if (ml >= HU_BUS_MSG_LEN)
+                    ml = HU_BUS_MSG_LEN - 1;
+                memcpy(ev.message, message, ml);
+                ev.message[ml] = '\0';
+                hu_bus_publish(app->bus, &ev);
+            }
+            return err;
+        }
     }
 
     if (app && app->bus) {

@@ -5,6 +5,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/voice/duplex.h"
+#include "human/voice/provider.h"
 #include "human/voice/realtime.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -17,7 +18,8 @@
 /** Unified duplex FSM + optional OpenAI Realtime WebSocket session. */
 typedef struct hu_voice_session {
     hu_duplex_session_t duplex;
-    hu_voice_rt_session_t *rt;
+    hu_voice_rt_session_t *rt;       /* legacy direct pointer (NULL when using provider) */
+    hu_voice_provider_t provider;    /* vtable-based voice backend (preferred) */
     hu_turn_action_t last_action;
     bool active;
     int64_t started_at;

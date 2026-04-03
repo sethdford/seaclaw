@@ -177,7 +177,7 @@ hu_error_t hu_anticipatory_analyze(hu_graph_t *graph, hu_allocator_t *alloc, con
     char *temporal_out = NULL;
     size_t temporal_len = 0;
     hu_error_t err =
-        hu_graph_query_temporal(graph, alloc, now_ts, to_ts, 20, &temporal_out, &temporal_len);
+        hu_graph_query_temporal(graph, alloc, contact_id ? contact_id : "", contact_id ? contact_id_len : 0, now_ts, to_ts, 20, &temporal_out, &temporal_len);
     if (err == HU_OK && temporal_out && temporal_len > 0) {
         parse_temporal_lines(temporal_out, temporal_len, result, alloc, now_ts);
         alloc->free(alloc->ctx, temporal_out, temporal_len + 1);
@@ -190,12 +190,12 @@ hu_error_t hu_anticipatory_analyze(hu_graph_t *graph, hu_allocator_t *alloc, con
     if (contact_id && contact_id_len > 0 && result->action_count < HU_ANTICIPATORY_MAX_ACTIONS) {
         hu_graph_entity_t ent;
         memset(&ent, 0, sizeof(ent));
-        err = hu_graph_find_entity(graph, contact_id, contact_id_len, &ent);
+        err = hu_graph_find_entity(graph, contact_id, contact_id_len, contact_id, contact_id_len, &ent);
         if (err == HU_OK && ent.id > 0) {
             char *causal_out = NULL;
             size_t causal_len = 0;
             hu_error_t c_err =
-                hu_graph_query_causal(graph, alloc, ent.id, 10, &causal_out, &causal_len);
+                hu_graph_query_causal(graph, alloc, contact_id, contact_id_len, ent.id, 10, &causal_out, &causal_len);
             if (c_err == HU_OK && causal_out && causal_len > 0) {
                 parse_causal_lines(causal_out, causal_len, result, alloc);
                 alloc->free(alloc->ctx, causal_out, causal_len + 1);

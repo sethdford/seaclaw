@@ -407,6 +407,47 @@ static void reliable_warmup(void *ctx) {
     }
 }
 
+static bool reliable_supports_streaming(void *ctx) {
+    hu_reliable_ctx_t *r = (hu_reliable_ctx_t *)ctx;
+    if (r->inner.vtable && r->inner.vtable->supports_streaming &&
+        r->inner.vtable->supports_streaming(r->inner.ctx))
+        return true;
+    for (size_t i = 0; i < r->extras_count; i++) {
+        const hu_provider_vtable_t *vt = r->extras[i].provider.vtable;
+        if (vt && vt->supports_streaming && vt->supports_streaming(r->extras[i].provider.ctx))
+            return true;
+    }
+    return false;
+}
+
+static hu_error_t reliable_stream_chat(void *ctx, hu_allocator_t *alloc,
+                                       const hu_chat_request_t *request, const char *model,
+                                       size_t model_len, double temperature,
+                                       hu_stream_callback_t callback, void *callback_ctx,
+                                       hu_stream_chat_result_t *out) {
+    hu_reliable_ctx_t *r = (hu_reliable_ctx_t *)ctx;
+    /* Try inner provider first (fail-fast: no partial-stream replay) */
+    if (r->inner.vtable && r->inner.vtable->stream_chat) {
+        hu_error_t err = r->inner.vtable->stream_chat(r->inner.ctx, alloc, request, model,
+                                                       model_len, temperature, callback,
+                                                       callback_ctx, out);
+        if (err == HU_OK)
+            return HU_OK;
+    }
+    /* Cascade to extras on failure */
+    for (size_t e = 0; e < r->extras_count; e++) {
+        hu_provider_t *ep = &r->extras[e].provider;
+        if (ep->vtable && ep->vtable->stream_chat) {
+            hu_error_t err = ep->vtable->stream_chat(ep->ctx, alloc, request, model,
+                                                      model_len, temperature, callback,
+                                                      callback_ctx, out);
+            if (err == HU_OK)
+                return HU_OK;
+        }
+    }
+    return HU_ERR_NOT_SUPPORTED;
+}
+
 static const hu_provider_vtable_t reliable_vtable = {
     .chat_with_system = reliable_chat_with_system,
     .chat = reliable_chat,
@@ -415,10 +456,10 @@ static const hu_provider_vtable_t reliable_vtable = {
     .deinit = reliable_deinit,
     .warmup = reliable_warmup,
     .chat_with_tools = NULL,
-    .supports_streaming = NULL,
+    .supports_streaming = reliable_supports_streaming,
     .supports_vision = reliable_supports_vision,
     .supports_vision_for_model = reliable_supports_vision_for_model,
-    .stream_chat = NULL,
+    .stream_chat = reliable_stream_chat,
 };
 
 hu_error_t hu_reliable_provider_create(hu_allocator_t *alloc, const hu_reliable_config_t *config,

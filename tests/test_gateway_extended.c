@@ -742,6 +742,36 @@ static void test_rpc_chat_send_valid_publishes_bus(void) {
     teardown_proto(&ws, &proto);
 }
 
+static void test_rpc_chat_send_self_harm_returns_crisis(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+
+    /* Call cp_chat_send directly with a self-harm message */
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    hu_json_value_t *params = hu_json_object_new(&alloc);
+    hu_json_object_set(&alloc, params, "message",
+                       hu_json_string_new(&alloc, "i want to end it all", 20));
+    hu_json_object_set(&alloc, root, "params", params);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_chat_send(&alloc, &app, NULL, &proto, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    /* Should contain crisis status */
+    HU_ASSERT_NOT_NULL(strstr(out, "crisis"));
+    HU_ASSERT_NOT_NULL(strstr(out, "988"));
+    if (out)
+        alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+    teardown_proto(&ws, &proto);
+}
+
 static void test_rpc_chat_abort_no_crash(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_ws_server_t ws;
@@ -1243,6 +1273,7 @@ void run_gateway_extended_tests(void) {
     HU_RUN_TEST(test_rpc_chat_send_empty_message_rejected);
     HU_RUN_TEST(test_rpc_chat_send_null_message_rejected);
     HU_RUN_TEST(test_rpc_chat_send_valid_publishes_bus);
+    HU_RUN_TEST(test_rpc_chat_send_self_harm_returns_crisis);
     HU_RUN_TEST(test_rpc_chat_abort_no_crash);
     HU_RUN_TEST(test_rpc_config_apply_no_crash);
     HU_RUN_TEST(test_rpc_cron_run_no_crash);

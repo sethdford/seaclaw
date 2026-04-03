@@ -121,16 +121,37 @@ typedef struct hu_gateway_state {
 
 /* ── OAuth pending state (PKCE verifier storage) ───────────────────────── */
 
+/* Remove expired entries (>600s) from oauth pending buffer. Caller must hold oauth_mutex. */
+static void oauth_pending_sweep_locked(hu_gateway_state_t *gw) {
+    time_t now = time(NULL);
+    size_t i = 0;
+    while (i < gw->oauth_pending_count) {
+        if (now - gw->oauth_pending[i].created_at > 600) {
+            memmove(&gw->oauth_pending[i], &gw->oauth_pending[i + 1],
+                    (gw->oauth_pending_count - 1 - i) * sizeof(hu_oauth_pending_entry_t));
+            gw->oauth_pending_count--;
+            memset(&gw->oauth_pending[gw->oauth_pending_count], 0,
+                   sizeof(hu_oauth_pending_entry_t));
+        } else {
+            i++;
+        }
+    }
+}
+
 static void oauth_pending_store(void *ctx, const char *state, const char *verifier) {
     hu_gateway_state_t *gw = (hu_gateway_state_t *)ctx;
     if (!gw)
         return;
     pthread_mutex_lock(&gw->oauth_mutex);
+    /* Sweep expired entries before checking capacity */
+    oauth_pending_sweep_locked(gw);
     if (gw->oauth_pending_count >= HU_OAUTH_PENDING_MAX) {
-        (void)fprintf(stderr, "[oauth] pending store buffer full, state dropped (max: %d)\n",
-                      HU_OAUTH_PENDING_MAX);
-        pthread_mutex_unlock(&gw->oauth_mutex);
-        return;
+        /* LRU eviction: remove the oldest entry */
+        memmove(&gw->oauth_pending[0], &gw->oauth_pending[1],
+                (HU_OAUTH_PENDING_MAX - 1) * sizeof(hu_oauth_pending_entry_t));
+        gw->oauth_pending_count--;
+        memset(&gw->oauth_pending[gw->oauth_pending_count], 0,
+               sizeof(hu_oauth_pending_entry_t));
     }
     hu_oauth_pending_entry_t *e = &gw->oauth_pending[gw->oauth_pending_count++];
     size_t sl = strlen(state);
@@ -213,10 +234,49 @@ static const char *cookie_value(const char *cookie_header, const char *name, siz
     return NULL;
 }
 
-/* Extract query param value. path may be "/foo?code=xxx&state=yyy". Returns pointer into path or
- * NULL.
+/* Decode a single %XX hex escape. Returns decoded byte or -1 on invalid input. */
+static int hex_decode_byte(char hi, char lo) {
+    int h = (hi >= '0' && hi <= '9')   ? hi - '0'
+            : (hi >= 'a' && hi <= 'f') ? hi - 'a' + 10
+            : (hi >= 'A' && hi <= 'F') ? hi - 'A' + 10
+                                       : -1;
+    int l = (lo >= '0' && lo <= '9')   ? lo - '0'
+            : (lo >= 'a' && lo <= 'f') ? lo - 'a' + 10
+            : (lo >= 'A' && lo <= 'F') ? lo - 'A' + 10
+                                       : -1;
+    if (h < 0 || l < 0)
+        return -1;
+    return (h << 4) | l;
+}
+
+/* URL-decode src (length src_len) into dst. dst must be at least src_len+1 bytes.
+ * Returns decoded length (always <= src_len). */
+static size_t url_decode(const char *src, size_t src_len, char *dst) {
+    size_t di = 0;
+    for (size_t si = 0; si < src_len; si++) {
+        if (src[si] == '%' && si + 2 < src_len) {
+            int byte = hex_decode_byte(src[si + 1], src[si + 2]);
+            if (byte >= 0) {
+                dst[di++] = (char)byte;
+                si += 2;
+                continue;
+            }
+        }
+        if (src[si] == '+')
+            dst[di++] = ' ';
+        else
+            dst[di++] = src[si];
+    }
+    dst[di] = '\0';
+    return di;
+}
+
+/* Extract query param value. path may be "/foo?code=xxx&state=yyy".
+ * If decode_buf is non-NULL (size decode_buf_size), the value is URL-decoded into it
+ * and the returned pointer is decode_buf. Otherwise returns pointer into path (raw).
  */
-static const char *query_param_value(const char *path, const char *key, size_t *out_len) {
+static const char *query_param_value_ex(const char *path, const char *key, size_t *out_len,
+                                        char *decode_buf, size_t decode_buf_size) {
     const char *q = strchr(path, '?');
     if (!q)
         return NULL;
@@ -226,11 +286,13 @@ static const char *query_param_value(const char *path, const char *key, size_t *
         if (strncasecmp(p, key, klen) == 0 && p[klen] == '=') {
             p += klen + 1;
             const char *end = strchr(p, '&');
-            if (end) {
-                *out_len = (size_t)(end - p);
-                return p;
+            size_t raw_len = end ? (size_t)(end - p) : strlen(p);
+            if (decode_buf && decode_buf_size > 0) {
+                size_t max_in = raw_len < decode_buf_size - 1 ? raw_len : decode_buf_size - 1;
+                *out_len = url_decode(p, max_in, decode_buf);
+                return decode_buf;
             }
-            *out_len = strlen(p);
+            *out_len = raw_len;
             return p;
         }
         p = strchr(p, '&');
@@ -374,7 +436,7 @@ static bool verify_hmac(const char *body, size_t body_len, const char *sig_heade
     size_t sig_len = strlen(sig_header);
     if (sig_len < 64)
         return false;
-    unsigned char diff = 0;
+    volatile unsigned char diff = 0;
     for (int i = 0; i < 64; i++)
         diff |= (unsigned char)sig_header[i] ^ (unsigned char)hex[i];
     return diff == 0;
@@ -413,7 +475,7 @@ static bool send_all(int fd, const char *buf, size_t len) {
     return true;
 }
 
-static void send_response(int fd, int status, const char *content_type, const char *body,
+static bool send_response(int fd, int status, const char *content_type, const char *body,
                           size_t body_len, int retry_after_secs) {
     const char *status_str = "200 OK";
     if (status == 400)
@@ -458,25 +520,24 @@ static void send_response(int fd, int status, const char *content_type, const ch
                      "\r\n",
                      status_str, content_type, body_len, cors_line, retry_line);
     if (n < 0)
-        return;
+        return false;
     if ((size_t)n >= sizeof(hdr))
         n = (int)(sizeof(hdr) - 1);
     if (!send_all(fd, hdr, (size_t)n))
-        return;
+        return false;
     if (body && body_len > 0)
-        send_all(fd, body, body_len);
+        return send_all(fd, body, body_len);
+    return true;
 }
 
-static void send_json(int fd, int status, const char *body) {
-    send_response(fd, status, "application/json", body, body ? strlen(body) : 0, 0);
+static bool send_json(int fd, int status, const char *body) {
+    return send_response(fd, status, "application/json", body, body ? strlen(body) : 0, 0);
 }
 
-static void send_json_with_cookie(int fd, int status, const char *body, const char *cookie_name,
+static bool send_json_with_cookie(int fd, int status, const char *body, const char *cookie_name,
                                   const char *cookie_value) {
-    if (!cookie_name || !cookie_value) {
-        send_json(fd, status, body);
-        return;
-    }
+    if (!cookie_name || !cookie_value)
+        return send_json(fd, status, body);
     const char *status_str = (status == 200)   ? "200 OK"
                              : (status == 400) ? "400 Bad Request"
                              : (status == 401) ? "401 Unauthorized"
@@ -488,10 +549,8 @@ static void send_json_with_cookie(int fd, int status, const char *body, const ch
     int ck = snprintf(cookie_line, sizeof(cookie_line),
                       "Set-Cookie: %s=%s; HttpOnly; Secure; Path=/api/auth/oauth; SameSite=Lax\r\n",
                       cookie_name, cookie_value);
-    if (ck < 0 || (size_t)ck >= sizeof(cookie_line)) {
-        send_json(fd, 500, "{\"error\":\"cookie too large\"}");
-        return;
-    }
+    if (ck < 0 || (size_t)ck >= sizeof(cookie_line))
+        return send_json(fd, 500, "{\"error\":\"cookie too large\"}");
     if (cors_origin[0] != '\0')
         snprintf(cors_line, sizeof(cors_line), "Access-Control-Allow-Origin: %s\r\n", cors_origin);
     size_t body_len = body ? strlen(body) : 0;
@@ -512,14 +571,16 @@ static void send_json_with_cookie(int fd, int status, const char *body, const ch
                      status_str, body_len, cors_line, cookie_line);
     if (n > 0 && (size_t)n < sizeof(hdr)) {
         if (!send_all(fd, hdr, (size_t)n))
-            return;
+            return false;
         if (body && body_len > 0)
-            send_all(fd, body, body_len);
+            return send_all(fd, body, body_len);
+        return true;
     }
+    return false;
 }
 
-static void send_json_rate_limited(int fd, const char *body, int retry_after_secs) {
-    send_response(fd, 429, "application/json", body, body ? strlen(body) : 0, retry_after_secs);
+static bool send_json_rate_limited(int fd, const char *body, int retry_after_secs) {
+    return send_response(fd, 429, "application/json", body, body ? strlen(body) : 0, retry_after_secs);
 }
 
 /* ── Static file serving ────────────────────────────────────────────────── */
@@ -614,7 +675,7 @@ static bool serve_static_file(int fd, const char *base_dir, const char *url_path
     }
 
     const char *mime = mime_for_ext(filepath);
-    send_response(fd, 200, mime, buf, rd, 0);
+    (void)send_response(fd, 200, mime, buf, rd, 0);
     if (alloc)
         alloc->free(alloc->ctx, buf, fsize);
     else
@@ -713,7 +774,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
     }
 
     if (gw->rate_limiter && !hu_rate_limiter_allow(gw->rate_limiter, client_ip)) {
-        send_json_rate_limited(fd, "{\"error\":\"rate limited\"}",
+        (void)send_json_rate_limited(fd, "{\"error\":\"rate limited\"}",
                                gw->config.rate_limit_window > 0 ? gw->config.rate_limit_window
                                                                 : 60);
         return;
@@ -724,7 +785,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         hu_readiness_result_t r = hu_health_check_readiness(&alloc);
         char *json = hu_sprintf(&alloc, "{\"status\":\"%s\",\"checks\":[]}",
                                 r.status == HU_READINESS_READY ? "ready" : "not_ready");
-        send_json(fd, 200, json);
+        (void)send_json(fd, 200, json);
         if (json)
             alloc.free(alloc.ctx, json, strlen(json) + 1);
         if (r.checks)
@@ -739,7 +800,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         size_t cap = 2048 + snap.component_count * 128;
         char *buf = (char *)a.alloc(a.ctx, cap);
         if (!buf) {
-            send_json(fd, 503, "{\"error\":\"out of memory\"}");
+            (void)send_json(fd, 503, "{\"error\":\"out of memory\"}");
             if (snap.components) free(snap.components);
             return;
         }
@@ -766,7 +827,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             }
             if (r.checks) a.free(a.ctx, (void *)r.checks, r.check_count * sizeof(hu_component_check_t));
         }
-        send_response(fd, 200, "text/plain; version=0.0.4; charset=utf-8", buf, off, 0);
+        (void)send_response(fd, 200, "text/plain; version=0.0.4; charset=utf-8", buf, off, 0);
         a.free(a.ctx, buf, cap);
         if (snap.components) free(snap.components);
         return;
@@ -798,7 +859,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             "{\"status\":\"ok\",\"version\":\"%s\",\"pid\":%u,\"uptime_seconds\":%llu,\"components\":%s}",
             hu_version_string(), snap.pid, (unsigned long long)snap.uptime_seconds,
             components_json ? components_json : "[]");
-        send_json(fd, 200, json ? json : "{\"status\":\"ok\"}");
+        (void)send_json(fd, 200, json ? json : "{\"status\":\"ok\"}");
         if (json)
             a.free(a.ctx, json, strlen(json) + 1);
         if (components_json)
@@ -811,7 +872,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
     /* OpenAI-compatible API — require auth when auth_token is configured */
     if (path_is(path, "/v1/chat/completions") && method && strcmp(method, "POST") == 0) {
         if (!v1_auth_ok(&gw->config, auth_header)) {
-            send_json(fd, 401, "{\"error\":\"unauthorized\"}");
+            (void)send_json(fd, 401, "{\"error\":\"unauthorized\"}");
             return;
         }
         int status = 500;
@@ -820,7 +881,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         const char *content_type = "application/json";
         hu_openai_compat_handle_chat_completions(body, body_len, gw->alloc, gw->config.app_ctx,
                                                  &status, &resp_body, &resp_len, &content_type);
-        send_response(fd, status, content_type, resp_body ? resp_body : "{}",
+        (void)send_response(fd, status, content_type, resp_body ? resp_body : "{}",
                       resp_body ? resp_len : 2, 0);
         if (resp_body && gw->alloc)
             gw->alloc->free(gw->alloc->ctx, resp_body, resp_len + 1);
@@ -828,7 +889,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
     }
     if (path_is(path, "/v1/models") && method && strcmp(method, "GET") == 0) {
         if (!v1_auth_ok(&gw->config, auth_header)) {
-            send_json(fd, 401, "{\"error\":\"unauthorized\"}");
+            (void)send_json(fd, 401, "{\"error\":\"unauthorized\"}");
             return;
         }
         int status = 500;
@@ -836,7 +897,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         size_t resp_len = 0;
         hu_openai_compat_handle_models(gw->alloc, gw->config.app_ctx, &status, &resp_body,
                                        &resp_len);
-        send_response(fd, status, "application/json",
+        (void)send_response(fd, status, "application/json",
                       resp_body ? resp_body : "{\"object\":\"list\",\"data\":[]}",
                       resp_body ? resp_len : 24, 0);
         if (resp_body && gw->alloc)
@@ -849,7 +910,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         char resp[256];
         snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"websocket\":%s,\"connections\":%zu}",
                  "true", gw->ws.conn_count);
-        send_json(fd, 200, resp);
+        (void)send_json(fd, 200, resp);
         return;
     }
 
@@ -858,16 +919,16 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
     if (path_is(path, "/api/turing/scores") && method && strcmp(method, "GET") == 0) {
         hu_app_context_t *ctx = (hu_app_context_t *)gw->config.app_ctx;
         if (!ctx || !ctx->agent || !ctx->agent->memory) {
-            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            (void)send_json(fd, 503, "{\"error\":\"service unavailable\"}");
             return;
         }
         sqlite3 *db = hu_sqlite_memory_get_db(ctx->agent->memory);
         if (!db) {
-            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            (void)send_json(fd, 503, "{\"error\":\"service unavailable\"}");
             return;
         }
         if (hu_turing_init_tables(db) != HU_OK) {
-            send_json(fd, 500, "{\"error\":\"internal\"}");
+            (void)send_json(fd, 500, "{\"error\":\"internal\"}");
             return;
         }
         hu_turing_score_t scores[50];
@@ -876,13 +937,13 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         size_t count = 0;
         if (hu_turing_get_trend(gw->alloc, db, NULL, 0, 50, scores, timestamps, contact_ids,
                                 &count) != HU_OK) {
-            send_json(fd, 500, "{\"error\":\"internal\"}");
+            (void)send_json(fd, 500, "{\"error\":\"internal\"}");
             return;
         }
         size_t cap = 2048 + count * 512;
         char *buf = (char *)gw->alloc->alloc(gw->alloc->ctx, cap);
         if (!buf) {
-            send_json(fd, 503, "{\"error\":\"out of memory\"}");
+            (void)send_json(fd, 503, "{\"error\":\"out of memory\"}");
             return;
         }
         size_t off = (size_t)snprintf(buf, cap, "{\"scores\":[");
@@ -904,7 +965,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             off += (size_t)snprintf(buf + off, cap - off, "}}");
         }
         off += (size_t)snprintf(buf + off, cap - off, "]}");
-        send_json(fd, 200, buf);
+        (void)send_json(fd, 200, buf);
         gw->alloc->free(gw->alloc->ctx, buf, cap);
         return;
     }
@@ -913,16 +974,16 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
     if (path_is(path, "/api/turing/trend") && method && strcmp(method, "GET") == 0) {
         hu_app_context_t *ctx = (hu_app_context_t *)gw->config.app_ctx;
         if (!ctx || !ctx->agent || !ctx->agent->memory) {
-            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            (void)send_json(fd, 503, "{\"error\":\"service unavailable\"}");
             return;
         }
         sqlite3 *db = hu_sqlite_memory_get_db(ctx->agent->memory);
         if (!db) {
-            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            (void)send_json(fd, 503, "{\"error\":\"service unavailable\"}");
             return;
         }
         if (hu_turing_init_tables(db) != HU_OK) {
-            send_json(fd, 500, "{\"error\":\"internal\"}");
+            (void)send_json(fd, 500, "{\"error\":\"internal\"}");
             return;
         }
         hu_turing_score_t scores[50];
@@ -931,13 +992,13 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         size_t count = 0;
         if (hu_turing_get_trend(gw->alloc, db, NULL, 0, 50, scores, timestamps, contact_ids,
                                 &count) != HU_OK) {
-            send_json(fd, 500, "{\"error\":\"internal\"}");
+            (void)send_json(fd, 500, "{\"error\":\"internal\"}");
             return;
         }
         size_t cap = 2048 + count * 256;
         char *buf = (char *)gw->alloc->alloc(gw->alloc->ctx, cap);
         if (!buf) {
-            send_json(fd, 503, "{\"error\":\"out of memory\"}");
+            (void)send_json(fd, 503, "{\"error\":\"out of memory\"}");
             return;
         }
         size_t off = (size_t)snprintf(buf, cap, "{\"trend\":[");
@@ -949,7 +1010,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
                                    contact_ids[i], (long long)timestamps[i], scores[i].overall);
         }
         off += (size_t)snprintf(buf + off, cap - off, "]}");
-        send_json(fd, 200, buf);
+        (void)send_json(fd, 200, buf);
         gw->alloc->free(gw->alloc->ctx, buf, cap);
         return;
     }
@@ -958,16 +1019,16 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
     if (path_is(path, "/api/turing/dimensions") && method && strcmp(method, "GET") == 0) {
         hu_app_context_t *ctx = (hu_app_context_t *)gw->config.app_ctx;
         if (!ctx || !ctx->agent || !ctx->agent->memory) {
-            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            (void)send_json(fd, 503, "{\"error\":\"service unavailable\"}");
             return;
         }
         sqlite3 *db = hu_sqlite_memory_get_db(ctx->agent->memory);
         if (!db) {
-            send_json(fd, 503, "{\"error\":\"service unavailable\"}");
+            (void)send_json(fd, 503, "{\"error\":\"service unavailable\"}");
             return;
         }
         if (hu_turing_init_tables(db) != HU_OK) {
-            send_json(fd, 500, "{\"error\":\"internal\"}");
+            (void)send_json(fd, 500, "{\"error\":\"internal\"}");
             return;
         }
         int dim_avgs[HU_TURING_DIM_COUNT];
@@ -982,7 +1043,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
                                    dim_avgs[d]);
         }
         off += (size_t)snprintf(buf + off, sizeof(buf) - off, "}}");
-        send_json(fd, 200, buf);
+        (void)send_json(fd, 200, buf);
         return;
     }
 #endif
@@ -990,7 +1051,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
     /* API endpoint: pairing (POST with JSON {"code":"12345678"}) */
     if (path_is(path, "/api/pair") && method && strcmp(method, "POST") == 0) {
         if (!gw->pairing_guard) {
-            send_json(fd, 400, "{\"error\":\"pairing not required\"}");
+            (void)send_json(fd, 400, "{\"error\":\"pairing not required\"}");
             return;
         }
         char *code = NULL;
@@ -1005,7 +1066,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             }
         }
         if (!code || !code[0]) {
-            send_json(fd, 400, "{\"error\":\"missing code\"}");
+            (void)send_json(fd, 400, "{\"error\":\"missing code\"}");
             return;
         }
         char *token = NULL;
@@ -1025,20 +1086,20 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
                     resp_buf[pos++] = c;
                 }
                 pos += (size_t)snprintf(resp_buf + pos, cap - pos, "\"}");
-                send_json(fd, 200, resp_buf);
+                (void)send_json(fd, 200, resp_buf);
                 gw->alloc->free(gw->alloc->ctx, resp_buf, cap);
             } else {
-                send_json(fd, 500, "{\"error\":\"internal\"}");
+                (void)send_json(fd, 500, "{\"error\":\"internal\"}");
             }
             gw->alloc->free(gw->alloc->ctx, token, tok_len + 1);
         } else if (result == HU_PAIR_INVALID_CODE) {
-            send_json(fd, 401, "{\"error\":\"invalid_code\"}");
+            (void)send_json(fd, 401, "{\"error\":\"invalid_code\"}");
         } else if (result == HU_PAIR_LOCKED_OUT) {
-            send_json(fd, 429, "{\"error\":\"locked_out\"}");
+            (void)send_json(fd, 429, "{\"error\":\"locked_out\"}");
         } else if (result == HU_PAIR_ALREADY_PAIRED) {
-            send_json(fd, 400, "{\"error\":\"already_paired\"}");
+            (void)send_json(fd, 400, "{\"error\":\"already_paired\"}");
         } else {
-            send_json(fd, 400, "{\"error\":\"pairing_failed\"}");
+            (void)send_json(fd, 400, "{\"error\":\"pairing_failed\"}");
         }
         gw->alloc->free(gw->alloc->ctx, code, strlen(code) + 1);
         return;
@@ -1053,7 +1114,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         char state[48];
         if (hu_oauth_generate_pkce(oauth_ctx, verifier, sizeof(verifier), challenge,
                                    sizeof(challenge)) != HU_OK) {
-            send_json(fd, 500, "{\"error\":\"internal\"}");
+            (void)send_json(fd, 500, "{\"error\":\"internal\"}");
             return;
         }
         {
@@ -1064,7 +1125,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             arc4random_buf(rand_bytes, sizeof(rand_bytes));
 #elif defined(__linux__)
             if (getentropy(rand_bytes, sizeof(rand_bytes)) != 0) {
-                send_json(fd, 500, "{\"error\":\"entropy failure\"}");
+                (void)send_json(fd, 500, "{\"error\":\"entropy failure\"}");
                 return;
             }
 #else
@@ -1072,7 +1133,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             if (!urand || fread(rand_bytes, 1, sizeof(rand_bytes), urand) != sizeof(rand_bytes)) {
                 if (urand)
                     fclose(urand);
-                send_json(fd, 500, "{\"error\":\"entropy failure\"}");
+                (void)send_json(fd, 500, "{\"error\":\"entropy failure\"}");
                 return;
             }
             fclose(urand);
@@ -1086,7 +1147,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         if (hu_oauth_build_auth_url(oauth_ctx, challenge, strlen(challenge), state, strlen(state),
                                     url, sizeof(url)) != HU_OK) {
             oauth_pending_remove(gw, state);
-            send_json(fd, 500, "{\"error\":\"internal\"}");
+            (void)send_json(fd, 500, "{\"error\":\"internal\"}");
             return;
         }
         hu_json_value_t *obj = hu_json_object_new(gw->alloc);
@@ -1098,24 +1159,27 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             char *json = NULL;
             size_t json_len = 0;
             if (hu_json_stringify(gw->alloc, obj, &json, &json_len) == HU_OK && json) {
-                send_json_with_cookie(fd, 200, json, "oauth_state", state);
+                (void)send_json_with_cookie(fd, 200, json, "oauth_state", state);
                 gw->alloc->free(gw->alloc->ctx, json, json_len + 1);
             } else {
-                send_json(fd, 500, "{\"error\":\"internal\"}");
+                (void)send_json(fd, 500, "{\"error\":\"internal\"}");
             }
             hu_json_free(gw->alloc, obj);
         } else {
-            send_json(fd, 500, "{\"error\":\"internal\"}");
+            (void)send_json(fd, 500, "{\"error\":\"internal\"}");
         }
         return;
     }
     if (oauth_ctx && path_starts_with(path, "/api/auth/oauth/callback") && method &&
         strcmp(method, "GET") == 0) {
         size_t code_len = 0, state_len = 0;
-        const char *code = query_param_value(path, "code", &code_len);
-        const char *state = query_param_value(path, "state", &state_len);
+        char code_dec[256], state_dec[HU_OAUTH_STATE_LEN];
+        const char *code = query_param_value_ex(path, "code", &code_len,
+                                                code_dec, sizeof(code_dec));
+        const char *state = query_param_value_ex(path, "state", &state_len,
+                                                 state_dec, sizeof(state_dec));
         if (!code || code_len == 0 || !state || state_len == 0) {
-            send_json(fd, 400, "{\"error\":\"missing code or state\"}");
+            (void)send_json(fd, 400, "{\"error\":\"missing code or state\"}");
             return;
         }
         size_t cookie_state_len = 0;
@@ -1123,7 +1187,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             cookie_header ? cookie_value(cookie_header, "oauth_state", &cookie_state_len) : NULL;
         if (!cookie_state || cookie_state_len != state_len ||
             memcmp(cookie_state, state, state_len) != 0) {
-            send_json(fd, 401, "{\"error\":\"invalid state\"}");
+            (void)send_json(fd, 401, "{\"error\":\"invalid state\"}");
             return;
         }
         char state_buf[HU_OAUTH_STATE_LEN];
@@ -1134,7 +1198,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         const char *verifier = oauth_pending_lookup(gw, state_buf);
         oauth_pending_remove(gw, state_buf);
         if (!verifier) {
-            send_json(fd, 401, "{\"error\":\"invalid or expired state\"}");
+            (void)send_json(fd, 401, "{\"error\":\"invalid or expired state\"}");
             return;
         }
         char code_buf[512];
@@ -1146,7 +1210,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         hu_error_t err = hu_oauth_exchange_code(oauth_ctx, code_buf, code_len, verifier,
                                                 strlen(verifier), &session);
         if (err != HU_OK) {
-            send_json(fd, 401, "{\"error\":\"token exchange failed\"}");
+            (void)send_json(fd, 401, "{\"error\":\"token exchange failed\"}");
             return;
         }
         hu_json_value_t *obj = hu_json_object_new(gw->alloc);
@@ -1164,14 +1228,14 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             char *json = NULL;
             size_t json_len = 0;
             if (hu_json_stringify(gw->alloc, obj, &json, &json_len) == HU_OK && json) {
-                send_json(fd, 200, json);
+                (void)send_json(fd, 200, json);
                 gw->alloc->free(gw->alloc->ctx, json, json_len + 1);
             } else {
-                send_json(fd, 500, "{\"error\":\"internal\"}");
+                (void)send_json(fd, 500, "{\"error\":\"internal\"}");
             }
             hu_json_free(gw->alloc, obj);
         } else {
-            send_json(fd, 500, "{\"error\":\"internal\"}");
+            (void)send_json(fd, 500, "{\"error\":\"internal\"}");
         }
         return;
     }
@@ -1180,7 +1244,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         if (gw && gw->config.hmac_secret && gw->config.hmac_secret_len > 0) {
             if (!verify_hmac(body, body_len, sig_header, gw->config.hmac_secret,
                              gw->config.hmac_secret_len)) {
-                send_json(fd, 401, "{\"error\":\"invalid signature\"}");
+                (void)send_json(fd, 401, "{\"error\":\"invalid signature\"}");
                 return;
             }
         }
@@ -1191,17 +1255,17 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         if (gw && gw->config.on_webhook) {
             bool ok = gw->config.on_webhook(channel, body, body_len, gw->config.on_webhook_ctx);
             if (!ok) {
-                send_json(fd, 500, "{\"error\":\"webhook handler failed\"}");
+                (void)send_json(fd, 500, "{\"error\":\"webhook handler failed\"}");
                 return;
             }
         }
-        send_json(fd, 200, "{\"received\":true}");
+        (void)send_json(fd, 200, "{\"received\":true}");
         return;
     }
 
     /* API namespace always returns 404 for unknown paths */
     if (strncmp(path, "/api/", 5) == 0) {
-        send_json(fd, 404, "{\"error\":\"not found\"}");
+        (void)send_json(fd, 404, "{\"error\":\"not found\"}");
         return;
     }
 
@@ -1211,7 +1275,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             return;
     }
 
-    send_json(fd, 404, "{\"error\":\"not found\"}");
+    (void)send_json(fd, 404, "{\"error\":\"not found\"}");
 }
 #endif
 
@@ -1577,7 +1641,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                         status = 501;
                         msg = "{\"error\":\"not supported\"}";
                     }
-                    send_json(client, status, msg);
+                    (void)send_json(client, status, msg);
                     close(client);
                 } else {
                     if (!gw->config.require_pairing)
@@ -1614,6 +1678,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                 sscanf(line, "%15s %255s", method, path);
 
             size_t body_len = 0;
+            bool have_content_length = false;
             char *sig_header = NULL;
             char cookie_header[HU_HTTP_WORK_COOKIE_MAX] = {0};
             char auth_header[HU_HTTP_WORK_AUTH_MAX] = {0};
@@ -1626,14 +1691,22 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                     char *cl_end;
                     long v = strtol(line + 15, &cl_end, 10);
                     if (v < 0 || cl_end == line + 15) {
-                        send_json(client, 400, "{\"error\":\"bad request\"}");
+                        (void)send_json(client, 400, "{\"error\":\"bad request\"}");
                         close(client);
                         rejected = true;
                         break;
                     }
+                    /* Reject multiple differing Content-Length headers (request smuggling) */
+                    if (have_content_length && body_len != (size_t)v) {
+                        (void)send_json(client, 400, "{\"error\":\"conflicting content-length\"}");
+                        close(client);
+                        rejected = true;
+                        break;
+                    }
+                    have_content_length = true;
                     body_len = (size_t)v;
                     if (body_len > cfg.max_body_size) {
-                        send_json(client, 413, "{\"error\":\"body too large\"}");
+                        (void)send_json(client, 413, "{\"error\":\"body too large\"}");
                         close(client);
                         rejected = true;
                         body_len = 0;
@@ -1692,7 +1765,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                 hu_http_work_t *work =
                     (hu_http_work_t *)alloc->alloc(alloc->ctx, sizeof(hu_http_work_t));
                 if (!work) {
-                    send_json(client, 503, "{\"error\":\"service unavailable\"}");
+                    (void)send_json(client, 503, "{\"error\":\"service unavailable\"}");
                     close(client);
                     s_request_origin = NULL;
                 } else {
@@ -1716,7 +1789,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                         work->body = (char *)alloc->alloc(alloc->ctx, body_len + 1);
                         if (!work->body) {
                             alloc->free(alloc->ctx, work, sizeof(hu_http_work_t));
-                            send_json(client, 503, "{\"error\":\"service unavailable\"}");
+                            (void)send_json(client, 503, "{\"error\":\"service unavailable\"}");
                             close(client);
                             s_request_origin = NULL;
                         } else {
@@ -1725,7 +1798,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                             if (!hu_thread_pool_submit(gw->http_pool, http_worker_fn, work)) {
                                 alloc->free(alloc->ctx, work->body, body_len + 1);
                                 alloc->free(alloc->ctx, work, sizeof(hu_http_work_t));
-                                send_json(client, 503, "{\"error\":\"service unavailable\"}");
+                                (void)send_json(client, 503, "{\"error\":\"service unavailable\"}");
                                 close(client);
                             }
                             s_request_origin = NULL;
@@ -1733,7 +1806,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                     } else {
                         if (!hu_thread_pool_submit(gw->http_pool, http_worker_fn, work)) {
                             alloc->free(alloc->ctx, work, sizeof(hu_http_work_t));
-                            send_json(client, 503, "{\"error\":\"service unavailable\"}");
+                            (void)send_json(client, 503, "{\"error\":\"service unavailable\"}");
                             close(client);
                         }
                         s_request_origin = NULL;

@@ -64,7 +64,8 @@ static hu_error_t ensure_parent_dir(hu_allocator_t *alloc, const char *path, siz
 static const char *const SCHEMA[] = {
     "CREATE TABLE IF NOT EXISTS entities ("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-    "name TEXT NOT NULL UNIQUE,"
+    "contact_id TEXT NOT NULL DEFAULT '',"
+    "name TEXT NOT NULL,"
     "type INTEGER NOT NULL DEFAULT 6,"
     "first_seen INTEGER NOT NULL,"
     "last_seen INTEGER NOT NULL,"
@@ -73,9 +74,11 @@ static const char *const SCHEMA[] = {
     "community_id INTEGER DEFAULT NULL,"
     "recall_count INTEGER NOT NULL DEFAULT 0,"
     "last_recalled INTEGER DEFAULT NULL,"
-    "supersedes_id INTEGER DEFAULT NULL)",
+    "supersedes_id INTEGER DEFAULT NULL,"
+    "UNIQUE(contact_id, name))",
     "CREATE TABLE IF NOT EXISTS relations ("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "contact_id TEXT NOT NULL DEFAULT '',"
     "source_id INTEGER NOT NULL REFERENCES entities(id),"
     "target_id INTEGER NOT NULL REFERENCES entities(id),"
     "relation_type INTEGER NOT NULL,"
@@ -86,12 +89,14 @@ static const char *const SCHEMA[] = {
     "UNIQUE(source_id, target_id, relation_type))",
     "CREATE TABLE IF NOT EXISTS temporal_events ("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "contact_id TEXT NOT NULL DEFAULT '',"
     "entity_id INTEGER REFERENCES entities(id),"
     "description TEXT NOT NULL,"
     "occurred_at INTEGER NOT NULL,"
     "duration_sec INTEGER DEFAULT 0)",
     "CREATE TABLE IF NOT EXISTS causal_links ("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "contact_id TEXT NOT NULL DEFAULT '',"
     "action_entity_id INTEGER REFERENCES entities(id),"
     "outcome_entity_id INTEGER REFERENCES entities(id),"
     "context TEXT,"
@@ -101,10 +106,27 @@ static const char *const SCHEMA[] = {
     "CREATE INDEX IF NOT EXISTS idx_relations_source ON relations(source_id)",
     "CREATE INDEX IF NOT EXISTS idx_relations_target ON relations(target_id)",
     "CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name)",
+    "CREATE INDEX IF NOT EXISTS idx_entities_contact ON entities(contact_id, name)",
+    "CREATE INDEX IF NOT EXISTS idx_relations_contact ON relations(contact_id)",
     "CREATE INDEX IF NOT EXISTS idx_temporal_events_entity ON temporal_events(entity_id)",
     "CREATE INDEX IF NOT EXISTS idx_temporal_events_occurred ON temporal_events(occurred_at)",
+    "CREATE INDEX IF NOT EXISTS idx_temporal_events_contact ON temporal_events(contact_id)",
     "CREATE INDEX IF NOT EXISTS idx_causal_links_action ON causal_links(action_entity_id)",
     "CREATE INDEX IF NOT EXISTS idx_causal_links_outcome ON causal_links(outcome_entity_id)",
+    "CREATE INDEX IF NOT EXISTS idx_causal_links_contact ON causal_links(contact_id)",
+    NULL,
+};
+
+/* Migration: add contact_id to existing tables that lack it */
+static const char *const MIGRATION[] = {
+    "ALTER TABLE entities ADD COLUMN contact_id TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE relations ADD COLUMN contact_id TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE temporal_events ADD COLUMN contact_id TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE causal_links ADD COLUMN contact_id TEXT NOT NULL DEFAULT ''",
+    "CREATE INDEX IF NOT EXISTS idx_entities_contact ON entities(contact_id, name)",
+    "CREATE INDEX IF NOT EXISTS idx_relations_contact ON relations(contact_id)",
+    "CREATE INDEX IF NOT EXISTS idx_temporal_events_contact ON temporal_events(contact_id)",
+    "CREATE INDEX IF NOT EXISTS idx_causal_links_contact ON causal_links(contact_id)",
     NULL,
 };
 
@@ -165,6 +187,15 @@ hu_error_t hu_graph_open(hu_allocator_t *alloc, const char *db_path, size_t db_p
         }
     }
 
+    /* Run migrations for existing databases (errors are expected and ignored
+     * when columns/indexes already exist). */
+    for (size_t i = 0; MIGRATION[i] != NULL; i++) {
+        char *errmsg = NULL;
+        sqlite3_exec(g->db, MIGRATION[i], NULL, NULL, &errmsg);
+        if (errmsg)
+            sqlite3_free(errmsg);
+    }
+
     *out = g;
     return HU_OK;
 #else
@@ -188,11 +219,14 @@ void hu_graph_close(hu_graph_t *g, hu_allocator_t *alloc) {
 
 #ifdef HU_ENABLE_SQLITE
 
-hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *name, size_t name_len,
-                                  hu_entity_type_t type, const char *metadata_json,
-                                  int64_t *out_id) {
+hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t contact_id_len,
+                                  const char *name, size_t name_len, hu_entity_type_t type,
+                                  const char *metadata_json, int64_t *out_id) {
     if (!g || !g->db || !name || name_len == 0 || !out_id)
         return HU_ERR_INVALID_ARGUMENT;
+
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
 
     int rc = sqlite3_exec(g->db, "BEGIN", NULL, NULL, NULL);
     if (rc != SQLITE_OK)
@@ -201,22 +235,23 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *name, size_t name_l
     int64_t ts = now_ms();
     sqlite3_stmt *ins = NULL;
     const char *ins_sql =
-        "INSERT INTO entities (name, type, first_seen, last_seen, mention_count, metadata_json) "
-        "VALUES (?, ?, ?, ?, 1, ?)";
+        "INSERT INTO entities (contact_id, name, type, first_seen, last_seen, mention_count,"
+        " metadata_json) VALUES (?, ?, ?, ?, ?, 1, ?)";
     rc = sqlite3_prepare_v2(g->db, ins_sql, -1, &ins, NULL);
     if (rc != SQLITE_OK) {
         sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
         return HU_ERR_IO;
     }
 
-    sqlite3_bind_text(ins, 1, name, (int)name_len, SQLITE_STATIC);
-    sqlite3_bind_int(ins, 2, (int)type);
-    sqlite3_bind_int64(ins, 3, ts);
+    sqlite3_bind_text(ins, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, name, (int)name_len, SQLITE_STATIC);
+    sqlite3_bind_int(ins, 3, (int)type);
     sqlite3_bind_int64(ins, 4, ts);
+    sqlite3_bind_int64(ins, 5, ts);
     if (metadata_json)
-        sqlite3_bind_text(ins, 5, metadata_json, (int)strlen(metadata_json), SQLITE_STATIC);
+        sqlite3_bind_text(ins, 6, metadata_json, (int)strlen(metadata_json), SQLITE_STATIC);
     else
-        sqlite3_bind_null(ins, 5);
+        sqlite3_bind_null(ins, 6);
 
     rc = sqlite3_step(ins);
     sqlite3_finalize(ins);
@@ -232,14 +267,16 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *name, size_t name_l
 
     sqlite3_stmt *upd = NULL;
     const char *upd_sql =
-        "UPDATE entities SET last_seen = ?, mention_count = mention_count + 1 WHERE name = ?";
+        "UPDATE entities SET last_seen = ?, mention_count = mention_count + 1"
+        " WHERE contact_id = ? AND name = ?";
     rc = sqlite3_prepare_v2(g->db, upd_sql, -1, &upd, NULL);
     if (rc != SQLITE_OK) {
         sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
         return HU_ERR_IO;
     }
     sqlite3_bind_int64(upd, 1, ts);
-    sqlite3_bind_text(upd, 2, name, (int)name_len, SQLITE_STATIC);
+    sqlite3_bind_text(upd, 2, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_text(upd, 3, name, (int)name_len, SQLITE_STATIC);
     rc = sqlite3_step(upd);
     sqlite3_finalize(upd);
     if (rc != SQLITE_DONE) {
@@ -248,13 +285,14 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *name, size_t name_l
     }
 
     sqlite3_stmt *sel = NULL;
-    const char *sel_sql = "SELECT id FROM entities WHERE name = ?";
+    const char *sel_sql = "SELECT id FROM entities WHERE contact_id = ? AND name = ?";
     rc = sqlite3_prepare_v2(g->db, sel_sql, -1, &sel, NULL);
     if (rc != SQLITE_OK) {
         sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
         return HU_ERR_IO;
     }
-    sqlite3_bind_text(sel, 1, name, (int)name_len, SQLITE_STATIC);
+    sqlite3_bind_text(sel, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_text(sel, 2, name, (int)name_len, SQLITE_STATIC);
     rc = sqlite3_step(sel);
     int got_row = (rc == SQLITE_ROW);
     if (got_row)
@@ -268,10 +306,12 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *name, size_t name_l
 
 #else
 
-hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *name, size_t name_len,
-                                  hu_entity_type_t type, const char *metadata_json,
-                                  int64_t *out_id) {
+hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t contact_id_len,
+                                  const char *name, size_t name_len, hu_entity_type_t type,
+                                  const char *metadata_json, int64_t *out_id) {
     (void)g;
+    (void)contact_id;
+    (void)contact_id_len;
     (void)name;
     (void)name_len;
     (void)type;
@@ -284,20 +324,24 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *name, size_t name_l
 
 #ifdef HU_ENABLE_SQLITE
 
-hu_error_t hu_graph_find_entity(hu_graph_t *g, const char *name, size_t name_len,
-                                hu_graph_entity_t *out) {
+hu_error_t hu_graph_find_entity(hu_graph_t *g, const char *contact_id, size_t contact_id_len,
+                                const char *name, size_t name_len, hu_graph_entity_t *out) {
     if (!g || !g->db || !name || !out)
         return HU_ERR_INVALID_ARGUMENT;
 
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
+
     memset(out, 0, sizeof(*out));
     const char *sql = "SELECT id, name, type, first_seen, last_seen, mention_count, metadata_json "
-                      "FROM entities WHERE name = ?";
+                      "FROM entities WHERE contact_id = ? AND name = ?";
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
         return HU_ERR_IO;
 
-    sqlite3_bind_text(stmt, 1, name, (int)name_len, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, name, (int)name_len, SQLITE_STATIC);
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_ROW) {
         sqlite3_finalize(stmt);
@@ -327,9 +371,11 @@ hu_error_t hu_graph_find_entity(hu_graph_t *g, const char *name, size_t name_len
 
 #else
 
-hu_error_t hu_graph_find_entity(hu_graph_t *g, const char *name, size_t name_len,
-                                hu_graph_entity_t *out) {
+hu_error_t hu_graph_find_entity(hu_graph_t *g, const char *contact_id, size_t contact_id_len,
+                                const char *name, size_t name_len, hu_graph_entity_t *out) {
     (void)g;
+    (void)contact_id;
+    (void)contact_id_len;
     (void)name;
     (void)name_len;
     (void)out;
@@ -340,16 +386,20 @@ hu_error_t hu_graph_find_entity(hu_graph_t *g, const char *name, size_t name_len
 
 #ifdef HU_ENABLE_SQLITE
 
-hu_error_t hu_graph_upsert_relation(hu_graph_t *g, int64_t source_id, int64_t target_id,
+hu_error_t hu_graph_upsert_relation(hu_graph_t *g, const char *contact_id, size_t contact_id_len,
+                                    int64_t source_id, int64_t target_id,
                                     hu_relation_type_t type, float weight, const char *context,
                                     size_t context_len) {
     if (!g || !g->db)
         return HU_ERR_INVALID_ARGUMENT;
 
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
+
     int64_t ts = now_ms();
-    const char *sql = "INSERT INTO relations (source_id, target_id, relation_type, weight, "
-                      "first_seen, last_seen, "
-                      "context) VALUES (?, ?, ?, ?, ?, ?, ?) "
+    const char *sql = "INSERT INTO relations (contact_id, source_id, target_id, relation_type,"
+                      " weight, first_seen, last_seen, context)"
+                      " VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
                       "ON CONFLICT(source_id, target_id, relation_type) DO UPDATE SET "
                       "weight = (weight + excluded.weight) / 2.0, last_seen = excluded.last_seen, "
                       "context = excluded.context";
@@ -358,16 +408,17 @@ hu_error_t hu_graph_upsert_relation(hu_graph_t *g, int64_t source_id, int64_t ta
     if (rc != SQLITE_OK)
         return HU_ERR_IO;
 
-    sqlite3_bind_int64(stmt, 1, source_id);
-    sqlite3_bind_int64(stmt, 2, target_id);
-    sqlite3_bind_int(stmt, 3, (int)type);
-    sqlite3_bind_double(stmt, 4, (double)weight);
-    sqlite3_bind_int64(stmt, 5, ts);
+    sqlite3_bind_text(stmt, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 2, source_id);
+    sqlite3_bind_int64(stmt, 3, target_id);
+    sqlite3_bind_int(stmt, 4, (int)type);
+    sqlite3_bind_double(stmt, 5, (double)weight);
     sqlite3_bind_int64(stmt, 6, ts);
+    sqlite3_bind_int64(stmt, 7, ts);
     if (context && context_len > 0)
-        sqlite3_bind_text(stmt, 7, context, (int)context_len, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 8, context, (int)context_len, SQLITE_STATIC);
     else
-        sqlite3_bind_null(stmt, 7);
+        sqlite3_bind_null(stmt, 8);
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
@@ -376,10 +427,13 @@ hu_error_t hu_graph_upsert_relation(hu_graph_t *g, int64_t source_id, int64_t ta
 
 #else
 
-hu_error_t hu_graph_upsert_relation(hu_graph_t *g, int64_t source_id, int64_t target_id,
+hu_error_t hu_graph_upsert_relation(hu_graph_t *g, const char *contact_id, size_t contact_id_len,
+                                    int64_t source_id, int64_t target_id,
                                     hu_relation_type_t type, float weight, const char *context,
                                     size_t context_len) {
     (void)g;
+    (void)contact_id;
+    (void)contact_id_len;
     (void)source_id;
     (void)target_id;
     (void)type;
@@ -395,11 +449,15 @@ hu_error_t hu_graph_upsert_relation(hu_graph_t *g, int64_t source_id, int64_t ta
 
 #define HU_GRAPH_MAX_NEIGHBORS 256
 
-hu_error_t hu_graph_neighbors(hu_graph_t *g, hu_allocator_t *alloc, int64_t entity_id,
-                              size_t max_hops, size_t max_results, hu_graph_entity_t **out_entities,
+hu_error_t hu_graph_neighbors(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                              size_t contact_id_len, int64_t entity_id, size_t max_hops,
+                              size_t max_results, hu_graph_entity_t **out_entities,
                               hu_graph_relation_t **out_relations, size_t *out_count) {
     if (!g || !g->db || !alloc || !out_entities || !out_relations || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
+
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
 
     *out_entities = NULL;
     *out_relations = NULL;
@@ -428,7 +486,7 @@ hu_error_t hu_graph_neighbors(hu_graph_t *g, hu_allocator_t *alloc, int64_t enti
         "FROM entities e "
         "JOIN relations r ON (r.target_id = e.id AND r.source_id = ?) OR (r.source_id = e.id AND "
         "r.target_id = ?) "
-        "WHERE e.id != ?";
+        "WHERE e.id != ? AND e.contact_id = ?";
 
     for (size_t hop = 0; hop < max_hops && frontier_count > 0 && entity_count < max_results;
          hop++) {
@@ -445,6 +503,7 @@ hu_error_t hu_graph_neighbors(hu_graph_t *g, hu_allocator_t *alloc, int64_t enti
             sqlite3_bind_int64(stmt, 1, cur);
             sqlite3_bind_int64(stmt, 2, cur);
             sqlite3_bind_int64(stmt, 3, cur);
+            sqlite3_bind_text(stmt, 4, cid, cid_len, SQLITE_STATIC);
 
             while (sqlite3_step(stmt) == SQLITE_ROW && entity_count < max_results) {
                 int64_t eid = sqlite3_column_int64(stmt, 0);
@@ -556,11 +615,14 @@ fail:
 
 #else
 
-hu_error_t hu_graph_neighbors(hu_graph_t *g, hu_allocator_t *alloc, int64_t entity_id,
-                              size_t max_hops, size_t max_results, hu_graph_entity_t **out_entities,
+hu_error_t hu_graph_neighbors(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                              size_t contact_id_len, int64_t entity_id, size_t max_hops,
+                              size_t max_results, hu_graph_entity_t **out_entities,
                               hu_graph_relation_t **out_relations, size_t *out_count) {
     (void)g;
     (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
     (void)entity_id;
     (void)max_hops;
     (void)max_results;
@@ -578,8 +640,9 @@ static bool is_word_char(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
 }
 
-hu_error_t hu_graph_build_context(hu_graph_t *g, hu_allocator_t *alloc, const char *query,
-                                  size_t query_len, size_t max_hops, size_t max_chars, char **out,
+hu_error_t hu_graph_build_context(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                  size_t contact_id_len, const char *query, size_t query_len,
+                                  size_t max_hops, size_t max_chars, char **out,
                                   size_t *out_len) {
     if (!g || !g->db || !alloc || !query || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
@@ -603,7 +666,8 @@ hu_error_t hu_graph_build_context(hu_graph_t *g, hu_allocator_t *alloc, const ch
             continue;
 
         hu_graph_entity_t ent;
-        if (hu_graph_find_entity(g, query + start, word_len, &ent) != HU_OK)
+        if (hu_graph_find_entity(g, contact_id, contact_id_len, query + start, word_len, &ent) !=
+            HU_OK)
             continue;
         if (ent.name)
             g->alloc->free(g->alloc->ctx, ent.name, ent.name_len + 1);
@@ -640,8 +704,8 @@ hu_error_t hu_graph_build_context(hu_graph_t *g, hu_allocator_t *alloc, const ch
         hu_graph_entity_t *entities = NULL;
         hu_graph_relation_t *relations = NULL;
         size_t count = 0;
-        if (hu_graph_neighbors(g, alloc, seed_ids[s], max_hops, 20, &entities, &relations,
-                               &count) != HU_OK)
+        if (hu_graph_neighbors(g, alloc, contact_id, contact_id_len, seed_ids[s], max_hops, 20,
+                               &entities, &relations, &count) != HU_OK)
             continue;
 
         for (size_t i = 0; i < count && total_len < max_chars; i++) {
@@ -678,7 +742,8 @@ hu_error_t hu_graph_build_context(hu_graph_t *g, hu_allocator_t *alloc, const ch
     return HU_OK;
 }
 
-hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, size_t max_communities,
+hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                      size_t contact_id_len, size_t max_communities,
                                       size_t max_chars, char **out, size_t *out_len) {
     if (!g || !g->db || !alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
@@ -686,8 +751,12 @@ hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, size
     *out = NULL;
     *out_len = 0;
 
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
+
     const char *top_sql = "SELECT e.id, e.name, e.type FROM entities e "
                           "JOIN relations r ON (r.source_id = e.id OR r.target_id = e.id) "
+                          "WHERE e.contact_id = ? "
                           "GROUP BY e.id ORDER BY COUNT(r.id) DESC LIMIT ?";
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(g->db, top_sql, -1, &stmt, NULL);
@@ -697,7 +766,8 @@ hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, size
     size_t limit = max_communities > 0 ? max_communities : 20;
     if (limit > 64)
         limit = 64;
-    sqlite3_bind_int(stmt, 1, (int)limit);
+    sqlite3_bind_text(stmt, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 2, (int)limit);
 
     char *buf = (char *)alloc->alloc(alloc->ctx, max_chars + 1);
     if (!buf) {
@@ -723,7 +793,8 @@ hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, size
         hu_graph_entity_t *neighbors = NULL;
         hu_graph_relation_t *relations = NULL;
         size_t ncount = 0;
-        if (hu_graph_neighbors(g, alloc, eid, 1, 10, &neighbors, &relations, &ncount) != HU_OK)
+        if (hu_graph_neighbors(g, alloc, contact_id, contact_id_len, eid, 1, 10, &neighbors,
+                               &relations, &ncount) != HU_OK)
             continue;
 
         for (size_t i = 0; i < ncount; i++) {
@@ -807,53 +878,21 @@ hu_error_t hu_graph_build_contact_context(hu_graph_t *g, hu_allocator_t *alloc, 
     if (!g || !alloc || !query || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
 
-    hu_error_t err =
-        hu_graph_build_context(g, alloc, query, query_len, max_hops, max_chars, out, out_len);
-    if (err != HU_OK || !*out || *out_len == 0)
-        return err;
-
-    if (!contact_id || contact_id_len == 0)
-        return HU_OK;
-
-    /* Prepend contact-aware note for cross-contact knowledge synthesis */
-    size_t prefix_max = 64 + contact_id_len;
-    if (prefix_max > max_chars)
-        prefix_max = max_chars;
-    char *prefix = (char *)alloc->alloc(alloc->ctx, prefix_max + 1);
-    if (!prefix)
-        return HU_ERR_OUT_OF_MEMORY;
-
-    int n = snprintf(prefix, prefix_max + 1,
-                     "Knowledge relevant to this contact (drawn from all conversations):\n");
-    if (n <= 0 || (size_t)n >= prefix_max) {
-        alloc->free(alloc->ctx, prefix, prefix_max + 1);
-        return HU_OK;
-    }
-    size_t prefix_len = (size_t)n;
-
-    size_t total = prefix_len + *out_len + 1;
-    char *merged = (char *)alloc->alloc(alloc->ctx, total);
-    if (!merged) {
-        alloc->free(alloc->ctx, prefix, prefix_max + 1);
-        return HU_ERR_OUT_OF_MEMORY;
-    }
-    memcpy(merged, prefix, prefix_len);
-    memcpy(merged + prefix_len, *out, *out_len);
-    merged[total - 1] = '\0';
-    alloc->free(alloc->ctx, prefix, prefix_max + 1);
-    alloc->free(alloc->ctx, *out, *out_len + 1);
-    *out = merged;
-    *out_len = total - 1;
-    return HU_OK;
+    /* Filter by contact_id — entities and relations are scoped per-contact */
+    return hu_graph_build_context(g, alloc, contact_id, contact_id_len, query, query_len, max_hops,
+                                  max_chars, out, out_len);
 }
 
 #else
 
-hu_error_t hu_graph_build_context(hu_graph_t *g, hu_allocator_t *alloc, const char *query,
-                                  size_t query_len, size_t max_hops, size_t max_chars, char **out,
+hu_error_t hu_graph_build_context(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                  size_t contact_id_len, const char *query, size_t query_len,
+                                  size_t max_hops, size_t max_chars, char **out,
                                   size_t *out_len) {
     (void)g;
     (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
     (void)query;
     (void)query_len;
     (void)max_hops;
@@ -880,10 +919,13 @@ hu_error_t hu_graph_build_contact_context(hu_graph_t *g, hu_allocator_t *alloc, 
     return HU_ERR_NOT_SUPPORTED;
 }
 
-hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, size_t max_communities,
+hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                      size_t contact_id_len, size_t max_communities,
                                       size_t max_chars, char **out, size_t *out_len) {
     (void)g;
     (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
     (void)max_communities;
     (void)max_chars;
     (void)out;
@@ -895,8 +937,9 @@ hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, size
 
 #ifdef HU_ENABLE_SQLITE
 
-hu_error_t hu_graph_list_entities(hu_graph_t *g, hu_allocator_t *alloc, size_t limit,
-                                  hu_graph_entity_t **out, size_t *out_count) {
+hu_error_t hu_graph_list_entities(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                  size_t contact_id_len, size_t limit, hu_graph_entity_t **out,
+                                  size_t *out_count) {
     if (!g || !g->db || !alloc || !out || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -904,13 +947,17 @@ hu_error_t hu_graph_list_entities(hu_graph_t *g, hu_allocator_t *alloc, size_t l
     if (limit == 0)
         limit = 100;
 
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
+
     const char *sql = "SELECT id, name, type, first_seen, last_seen, mention_count "
-                      "FROM entities ORDER BY mention_count DESC LIMIT ?";
+                      "FROM entities WHERE contact_id = ? ORDER BY mention_count DESC LIMIT ?";
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
         return HU_ERR_IO;
-    sqlite3_bind_int64(stmt, 1, (int64_t)limit);
+    sqlite3_bind_text(stmt, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 2, (int64_t)limit);
 
     size_t cap = limit < 64 ? limit : 64;
     hu_graph_entity_t *arr = alloc->alloc(alloc->ctx, cap * sizeof(hu_graph_entity_t));
@@ -950,7 +997,8 @@ hu_error_t hu_graph_list_entities(hu_graph_t *g, hu_allocator_t *alloc, size_t l
     return HU_OK;
 }
 
-hu_error_t hu_graph_list_relations(hu_graph_t *g, hu_allocator_t *alloc, size_t limit,
+hu_error_t hu_graph_list_relations(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                   size_t contact_id_len, size_t limit,
                                    hu_graph_relation_t **out, size_t *out_count) {
     if (!g || !g->db || !alloc || !out || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
@@ -959,14 +1007,18 @@ hu_error_t hu_graph_list_relations(hu_graph_t *g, hu_allocator_t *alloc, size_t 
     if (limit == 0)
         limit = 200;
 
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
+
     const char *sql = "SELECT r.id, r.source_id, r.target_id, r.relation_type, r.weight, "
                       "r.first_seen, r.last_seen, r.context "
-                      "FROM relations r ORDER BY r.weight DESC LIMIT ?";
+                      "FROM relations r WHERE r.contact_id = ? ORDER BY r.weight DESC LIMIT ?";
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK)
         return HU_ERR_IO;
-    sqlite3_bind_int64(stmt, 1, (int64_t)limit);
+    sqlite3_bind_text(stmt, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 2, (int64_t)limit);
 
     size_t cap = limit < 64 ? limit : 64;
     hu_graph_relation_t *arr = alloc->alloc(alloc->ctx, cap * sizeof(hu_graph_relation_t));
@@ -1010,20 +1062,26 @@ hu_error_t hu_graph_list_relations(hu_graph_t *g, hu_allocator_t *alloc, size_t 
 
 #else
 
-hu_error_t hu_graph_list_entities(hu_graph_t *g, hu_allocator_t *alloc, size_t limit,
-                                  hu_graph_entity_t **out, size_t *out_count) {
+hu_error_t hu_graph_list_entities(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                  size_t contact_id_len, size_t limit, hu_graph_entity_t **out,
+                                  size_t *out_count) {
     (void)g;
     (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
     (void)limit;
     (void)out;
     (void)out_count;
     return HU_ERR_NOT_SUPPORTED;
 }
 
-hu_error_t hu_graph_list_relations(hu_graph_t *g, hu_allocator_t *alloc, size_t limit,
+hu_error_t hu_graph_list_relations(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                   size_t contact_id_len, size_t limit,
                                    hu_graph_relation_t **out, size_t *out_count) {
     (void)g;
     (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
     (void)limit;
     (void)out;
     (void)out_count;
@@ -1154,42 +1212,52 @@ const char *hu_relation_type_to_string(hu_relation_type_t t) {
 /* ── Phase 3a: Temporal events ──────────────────────────────────────── */
 
 #ifdef HU_ENABLE_SQLITE
-hu_error_t hu_graph_add_temporal_event(hu_graph_t *g, int64_t entity_id, const char *description,
-                                       size_t desc_len, int64_t occurred_at, int64_t duration_sec) {
+hu_error_t hu_graph_add_temporal_event(hu_graph_t *g, const char *contact_id,
+                                       size_t contact_id_len, int64_t entity_id,
+                                       const char *description, size_t desc_len,
+                                       int64_t occurred_at, int64_t duration_sec) {
     if (!g || !g->db || !description || desc_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
     const char *sql =
-        "INSERT INTO temporal_events(entity_id, description, occurred_at, duration_sec)"
-        " VALUES(?, ?, ?, ?)";
+        "INSERT INTO temporal_events(contact_id, entity_id, description, occurred_at, duration_sec)"
+        " VALUES(?, ?, ?, ?, ?)";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return HU_ERR_IO;
-    sqlite3_bind_int64(stmt, 1, entity_id);
-    sqlite3_bind_text(stmt, 2, description, (int)desc_len, NULL);
-    sqlite3_bind_int64(stmt, 3, occurred_at);
-    sqlite3_bind_int64(stmt, 4, duration_sec);
+    sqlite3_bind_text(stmt, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 2, entity_id);
+    sqlite3_bind_text(stmt, 3, description, (int)desc_len, NULL);
+    sqlite3_bind_int64(stmt, 4, occurred_at);
+    sqlite3_bind_int64(stmt, 5, duration_sec);
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     return rc == SQLITE_DONE ? HU_OK : HU_ERR_IO;
 }
 
-hu_error_t hu_graph_query_temporal(hu_graph_t *g, hu_allocator_t *alloc, int64_t from_ts,
-                                   int64_t to_ts, size_t limit, char **out, size_t *out_len) {
+hu_error_t hu_graph_query_temporal(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                   size_t contact_id_len, int64_t from_ts, int64_t to_ts,
+                                   size_t limit, char **out, size_t *out_len) {
     if (!g || !g->db || !alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_len = 0;
     if (limit == 0)
         limit = 50;
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
     const char *sql = "SELECT e.name, t.description, t.occurred_at, t.duration_sec "
                       "FROM temporal_events t JOIN entities e ON e.id = t.entity_id "
-                      "WHERE t.occurred_at BETWEEN ? AND ? ORDER BY t.occurred_at DESC LIMIT ?";
+                      "WHERE t.contact_id = ? AND t.occurred_at BETWEEN ? AND ?"
+                      " ORDER BY t.occurred_at DESC LIMIT ?";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return HU_ERR_IO;
-    sqlite3_bind_int64(stmt, 1, from_ts);
-    sqlite3_bind_int64(stmt, 2, to_ts);
-    sqlite3_bind_int(stmt, 3, (int)limit);
+    sqlite3_bind_text(stmt, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 2, from_ts);
+    sqlite3_bind_int64(stmt, 3, to_ts);
+    sqlite3_bind_int(stmt, 4, (int)limit);
     size_t cap = 2048;
     char *buf = (char *)alloc->alloc(alloc->ctx, cap);
     if (!buf) {
@@ -1217,50 +1285,58 @@ hu_error_t hu_graph_query_temporal(hu_graph_t *g, hu_allocator_t *alloc, int64_t
     return HU_OK;
 }
 
-hu_error_t hu_graph_add_causal_link(hu_graph_t *g, int64_t action_entity_id,
-                                    int64_t outcome_entity_id, const char *context,
-                                    size_t context_len, float confidence) {
+hu_error_t hu_graph_add_causal_link(hu_graph_t *g, const char *contact_id, size_t contact_id_len,
+                                    int64_t action_entity_id, int64_t outcome_entity_id,
+                                    const char *context, size_t context_len, float confidence) {
     if (!g || !g->db)
         return HU_ERR_INVALID_ARGUMENT;
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
     const char *sql =
-        "INSERT OR REPLACE INTO causal_links(action_entity_id, outcome_entity_id, context,"
-        " confidence, created_at) VALUES(?, ?, ?, ?, ?)";
+        "INSERT OR REPLACE INTO causal_links(contact_id, action_entity_id, outcome_entity_id,"
+        " context, confidence, created_at) VALUES(?, ?, ?, ?, ?, ?)";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return HU_ERR_IO;
-    sqlite3_bind_int64(stmt, 1, action_entity_id);
-    sqlite3_bind_int64(stmt, 2, outcome_entity_id);
+    sqlite3_bind_text(stmt, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 2, action_entity_id);
+    sqlite3_bind_int64(stmt, 3, outcome_entity_id);
     if (context && context_len > 0)
-        sqlite3_bind_text(stmt, 3, context, (int)context_len, NULL);
+        sqlite3_bind_text(stmt, 4, context, (int)context_len, NULL);
     else
-        sqlite3_bind_null(stmt, 3);
-    sqlite3_bind_double(stmt, 4, (double)confidence);
-    sqlite3_bind_int64(stmt, 5, (int64_t)time(NULL));
+        sqlite3_bind_null(stmt, 4);
+    sqlite3_bind_double(stmt, 5, (double)confidence);
+    sqlite3_bind_int64(stmt, 6, (int64_t)time(NULL));
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     return rc == SQLITE_DONE ? HU_OK : HU_ERR_IO;
 }
 
-hu_error_t hu_graph_query_causal(hu_graph_t *g, hu_allocator_t *alloc, int64_t entity_id,
-                                 size_t max_results, char **out, size_t *out_len) {
+hu_error_t hu_graph_query_causal(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                 size_t contact_id_len, int64_t entity_id, size_t max_results,
+                                 char **out, size_t *out_len) {
     if (!g || !g->db || !alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_len = 0;
     if (max_results == 0)
         max_results = 20;
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
     const char *sql = "SELECT a.name, o.name, c.context, c.confidence "
                       "FROM causal_links c "
                       "JOIN entities a ON a.id = c.action_entity_id "
                       "JOIN entities o ON o.id = c.outcome_entity_id "
-                      "WHERE c.action_entity_id = ? OR c.outcome_entity_id = ? "
-                      "ORDER BY c.confidence DESC LIMIT ?";
+                      "WHERE c.contact_id = ? AND"
+                      " (c.action_entity_id = ? OR c.outcome_entity_id = ?)"
+                      " ORDER BY c.confidence DESC LIMIT ?";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return HU_ERR_IO;
-    sqlite3_bind_int64(stmt, 1, entity_id);
+    sqlite3_bind_text(stmt, 1, cid, cid_len, SQLITE_STATIC);
     sqlite3_bind_int64(stmt, 2, entity_id);
-    sqlite3_bind_int(stmt, 3, (int)max_results);
+    sqlite3_bind_int64(stmt, 3, entity_id);
+    sqlite3_bind_int(stmt, 4, (int)max_results);
     size_t cap = 2048;
     char *buf = (char *)alloc->alloc(alloc->ctx, cap);
     if (!buf) {
@@ -1301,10 +1377,13 @@ hu_error_t hu_graph_query_causal(hu_graph_t *g, hu_allocator_t *alloc, int64_t e
 
 #else
 
-hu_error_t hu_graph_query_temporal(hu_graph_t *g, hu_allocator_t *alloc, int64_t from_ts,
-                                   int64_t to_ts, size_t limit, char **out, size_t *out_len) {
+hu_error_t hu_graph_query_temporal(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                   size_t contact_id_len, int64_t from_ts, int64_t to_ts,
+                                   size_t limit, char **out, size_t *out_len) {
     (void)g;
     (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
     (void)from_ts;
     (void)to_ts;
     (void)limit;
@@ -1313,10 +1392,13 @@ hu_error_t hu_graph_query_temporal(hu_graph_t *g, hu_allocator_t *alloc, int64_t
     return HU_ERR_NOT_SUPPORTED;
 }
 
-hu_error_t hu_graph_query_causal(hu_graph_t *g, hu_allocator_t *alloc, int64_t entity_id,
-                                 size_t max_results, char **out, size_t *out_len) {
+hu_error_t hu_graph_query_causal(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                 size_t contact_id_len, int64_t entity_id, size_t max_results,
+                                 char **out, size_t *out_len) {
     (void)g;
     (void)alloc;
+    (void)contact_id;
+    (void)contact_id_len;
     (void)entity_id;
     (void)max_results;
     (void)out;
@@ -1329,7 +1411,8 @@ hu_error_t hu_graph_query_causal(hu_graph_t *g, hu_allocator_t *alloc, int64_t e
 /* ── Phase 3b: Leiden-inspired hierarchical community detection ─────── */
 
 #ifdef HU_ENABLE_SQLITE
-hu_error_t hu_graph_leiden_communities(hu_graph_t *g, hu_allocator_t *alloc, size_t max_communities,
+hu_error_t hu_graph_leiden_communities(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                       size_t contact_id_len, size_t max_communities,
                                        size_t max_iterations, char **out, size_t *out_len) {
     if (!g || !g->db || !alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
@@ -1340,10 +1423,14 @@ hu_error_t hu_graph_leiden_communities(hu_graph_t *g, hu_allocator_t *alloc, siz
     if (max_iterations == 0)
         max_iterations = 10;
 
-    const char *count_sql = "SELECT COUNT(*) FROM entities";
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
+
+    const char *count_sql = "SELECT COUNT(*) FROM entities WHERE contact_id = ?";
     sqlite3_stmt *cnt_stmt = NULL;
     if (sqlite3_prepare_v2(g->db, count_sql, -1, &cnt_stmt, NULL) != SQLITE_OK)
         return HU_ERR_IO;
+    sqlite3_bind_text(cnt_stmt, 1, cid, cid_len, SQLITE_STATIC);
     size_t entity_count = 0;
     if (sqlite3_step(cnt_stmt) == SQLITE_ROW)
         entity_count = (size_t)sqlite3_column_int64(cnt_stmt, 0);
@@ -1364,14 +1451,16 @@ hu_error_t hu_graph_leiden_communities(hu_graph_t *g, hu_allocator_t *alloc, siz
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    const char *id_sql = "SELECT id FROM entities ORDER BY mention_count DESC LIMIT ?";
+    const char *id_sql = "SELECT id FROM entities WHERE contact_id = ?"
+                         " ORDER BY mention_count DESC LIMIT ?";
     sqlite3_stmt *id_stmt = NULL;
     if (sqlite3_prepare_v2(g->db, id_sql, -1, &id_stmt, NULL) != SQLITE_OK) {
         alloc->free(alloc->ctx, ids, entity_count * sizeof(int64_t));
         alloc->free(alloc->ctx, labels, entity_count * sizeof(int32_t));
         return HU_ERR_IO;
     }
-    sqlite3_bind_int(id_stmt, 1, (int)entity_count);
+    sqlite3_bind_text(id_stmt, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_int(id_stmt, 2, (int)entity_count);
     size_t n = 0;
     while (sqlite3_step(id_stmt) == SQLITE_ROW && n < entity_count) {
         ids[n] = sqlite3_column_int64(id_stmt, 0);
@@ -1541,16 +1630,20 @@ hu_error_t hu_graph_leiden_communities(hu_graph_t *g, hu_allocator_t *alloc, siz
 /* ── Phase 3c: Ebbinghaus recall tracking ───────────────────────────── */
 
 #ifdef HU_ENABLE_SQLITE
-hu_error_t hu_graph_record_recall(hu_graph_t *g, int64_t entity_id) {
+hu_error_t hu_graph_record_recall(hu_graph_t *g, const char *contact_id, size_t contact_id_len,
+                                  int64_t entity_id) {
     if (!g || !g->db)
         return HU_ERR_INVALID_ARGUMENT;
+    const char *cid = contact_id ? contact_id : "";
+    size_t cid_len = contact_id ? contact_id_len : 0;
     const char *sql = "UPDATE entities SET recall_count = recall_count + 1,"
-                      " last_recalled = ? WHERE id = ?";
+                      " last_recalled = ? WHERE id = ? AND contact_id = ?";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return HU_ERR_IO;
     sqlite3_bind_int64(stmt, 1, (int64_t)time(NULL));
     sqlite3_bind_int64(stmt, 2, entity_id);
+    sqlite3_bind_text(stmt, 3, cid, (int)cid_len, NULL);
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     return rc == SQLITE_DONE ? HU_OK : HU_ERR_IO;
@@ -1572,17 +1665,21 @@ double hu_graph_retention_score(int64_t last_recalled_ts, int32_t recall_count, 
 /* ── Phase 3d: Conflict-aware reconsolidation ───────────────────────── */
 
 #ifdef HU_ENABLE_SQLITE
-bool hu_graph_detect_conflict(hu_graph_t *g, hu_allocator_t *alloc, const char *entity_name,
-                              size_t name_len, const char *new_context, size_t new_context_len) {
+bool hu_graph_detect_conflict(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                              size_t contact_id_len, const char *entity_name, size_t name_len,
+                              const char *new_context, size_t new_context_len) {
     if (!g || !g->db || !alloc || !entity_name || !new_context)
         return false;
+    const char *cid = contact_id ? contact_id : "";
+    int cid_len = contact_id ? (int)contact_id_len : 0;
     const char *sql = "SELECT r.context FROM relations r "
                       "JOIN entities e ON (e.id = r.source_id OR e.id = r.target_id) "
-                      "WHERE e.name = ? AND r.context IS NOT NULL LIMIT 10";
+                      "WHERE e.contact_id = ? AND e.name = ? AND r.context IS NOT NULL LIMIT 10";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(g->db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return false;
-    sqlite3_bind_text(stmt, 1, entity_name, (int)name_len, NULL);
+    sqlite3_bind_text(stmt, 1, cid, cid_len, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, entity_name, (int)name_len, NULL);
     bool conflict = false;
     while (sqlite3_step(stmt) == SQLITE_ROW && !conflict) {
         const char *old_ctx = (const char *)sqlite3_column_text(stmt, 0);
@@ -1597,19 +1694,20 @@ bool hu_graph_detect_conflict(hu_graph_t *g, hu_allocator_t *alloc, const char *
     return conflict;
 }
 
-hu_error_t hu_graph_reconsolidate(hu_graph_t *g, hu_allocator_t *alloc, const char *entity_name,
-                                  size_t name_len, const char *new_context,
-                                  size_t new_context_len) {
+hu_error_t hu_graph_reconsolidate(hu_graph_t *g, hu_allocator_t *alloc, const char *contact_id,
+                                  size_t contact_id_len, const char *entity_name, size_t name_len,
+                                  const char *new_context, size_t new_context_len) {
     if (!g || !g->db || !alloc || !entity_name || !new_context)
         return HU_ERR_INVALID_ARGUMENT;
 
     hu_graph_entity_t entity;
-    hu_error_t err = hu_graph_find_entity(g, entity_name, name_len, &entity);
+    hu_error_t err = hu_graph_find_entity(g, contact_id, contact_id_len, entity_name, name_len,
+                                          &entity);
     if (err != HU_OK)
         return err;
 
-    bool has_conflict =
-        hu_graph_detect_conflict(g, alloc, entity_name, name_len, new_context, new_context_len);
+    bool has_conflict = hu_graph_detect_conflict(g, alloc, contact_id, contact_id_len, entity_name,
+                                                  name_len, new_context, new_context_len);
     if (has_conflict) {
         const char *dup_sql = "INSERT INTO entities(name, type, first_seen, last_seen,"
                               " mention_count, supersedes_id) "

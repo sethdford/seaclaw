@@ -302,11 +302,46 @@ hu_error_t hu_ws_server_upgrade(hu_ws_server_t *srv, int fd, const char *req, si
         }
     }
 
-    /* Validate Origin header — only allow localhost origins */
+    /* Validate Origin header — only allow localhost origins (exact hostname match) */
     char origin[256] = {0};
     if (extract_header(req, req_len, "Origin", origin, sizeof(origin))) {
-        if (!strstr(origin, "://localhost") && !strstr(origin, "://127.0.0.1") &&
-            !strstr(origin, "://[::1]")) {
+        /* Extract hostname from Origin: skip scheme (e.g. "http://") */
+        const char *host = strstr(origin, "://");
+        if (!host) {
+            const char *r403 = "HTTP/1.1 403 Forbidden\r\n\r\n";
+            send(fd, r403, strlen(r403), 0);
+            return HU_ERR_PERMISSION_DENIED;
+        }
+        host += 3; /* skip "://" */
+        /* Isolate hostname by stripping port (e.g. ":8080") and path */
+        char hostname[128] = {0};
+        size_t hlen = 0;
+        if (host[0] == '[') {
+            /* IPv6 literal: [::1]:port */
+            const char *bracket = strchr(host, ']');
+            if (bracket) {
+                hlen = (size_t)(bracket - host + 1);
+                if (hlen >= sizeof(hostname))
+                    hlen = sizeof(hostname) - 1;
+                memcpy(hostname, host, hlen);
+            }
+        } else {
+            const char *colon = strchr(host, ':');
+            const char *slash = strchr(host, '/');
+            const char *end = host + strlen(host);
+            if (colon && (!slash || colon < slash))
+                end = colon;
+            else if (slash)
+                end = slash;
+            hlen = (size_t)(end - host);
+            if (hlen >= sizeof(hostname))
+                hlen = sizeof(hostname) - 1;
+            memcpy(hostname, host, hlen);
+        }
+        hostname[hlen] = '\0';
+        if (strcmp(hostname, "localhost") != 0 &&
+            strcmp(hostname, "127.0.0.1") != 0 &&
+            strcmp(hostname, "[::1]") != 0) {
             const char *r403 = "HTTP/1.1 403 Forbidden\r\n\r\n";
             send(fd, r403, strlen(r403), 0);
             return HU_ERR_PERMISSION_DENIED;

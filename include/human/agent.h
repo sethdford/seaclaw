@@ -276,6 +276,7 @@ struct hu_agent {
     hu_tier_manager_t tier_manager;
     hu_prm_config_t prm_config;
     hu_dpo_collector_t dpo_collector;
+    int64_t current_trajectory_id; /* ML trajectory for RL training (0 = inactive) */
     bool sota_initialized;
 
     /* GVR (Generator-Verifier-Reviser) pipeline config */

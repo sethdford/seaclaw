@@ -102,7 +102,7 @@ hu_error_t hu_hybrid_retrieve(hu_allocator_t *alloc, hu_memory_t *backend, hu_em
     if (graph) {
         char *graph_ctx = NULL;
         size_t graph_ctx_len = 0;
-        if (hu_graph_build_context(graph, alloc, query, query_len, 2, 2048, &graph_ctx,
+        if (hu_graph_build_context(graph, alloc, "", 0, query, query_len, 2, 2048, &graph_ctx,
                                   &graph_ctx_len) == HU_OK &&
             graph_ctx && graph_ctx_len > 0) {
             graph_result.entries =

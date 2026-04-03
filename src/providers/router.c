@@ -163,6 +163,34 @@ static bool router_supports_vision_for_model(void *ctx, const char *model, size_
            vt->supports_vision_for_model(r->providers[res.provider_index].ctx, model, model_len);
 }
 
+static bool router_supports_streaming(void *ctx) {
+    hu_router_ctx_t *r = (hu_router_ctx_t *)ctx;
+    for (size_t i = 0; i < r->provider_count; i++) {
+        const hu_provider_vtable_t *vt = r->providers[i].vtable;
+        if (vt && vt->supports_streaming && vt->supports_streaming(r->providers[i].ctx))
+            return true;
+    }
+    return false;
+}
+
+static hu_error_t router_stream_chat(void *ctx, hu_allocator_t *alloc,
+                                     const hu_chat_request_t *request, const char *model,
+                                     size_t model_len, double temperature,
+                                     hu_stream_callback_t callback, void *callback_ctx,
+                                     hu_stream_chat_result_t *out) {
+    hu_router_ctx_t *r = (hu_router_ctx_t *)ctx;
+    hu_router_resolved_t res;
+    resolve_model(r, model, model_len, &res);
+    auto_select_model(r, request, &res);
+    if (res.provider_index >= r->provider_count)
+        return HU_ERR_PROVIDER_RESPONSE;
+    hu_provider_t *p = &r->providers[res.provider_index];
+    if (!p->vtable || !p->vtable->stream_chat)
+        return HU_ERR_NOT_SUPPORTED;
+    return p->vtable->stream_chat(p->ctx, alloc, request, res.model, res.model_len,
+                                   temperature, callback, callback_ctx, out);
+}
+
 static const char *router_get_name(void *ctx) {
     (void)ctx;
     return "router";
@@ -193,10 +221,10 @@ static const hu_provider_vtable_t router_vtable = {
     .deinit = router_deinit,
     .warmup = NULL,
     .chat_with_tools = NULL,
-    .supports_streaming = NULL,
+    .supports_streaming = router_supports_streaming,
     .supports_vision = router_supports_vision,
     .supports_vision_for_model = router_supports_vision_for_model,
-    .stream_chat = NULL,
+    .stream_chat = router_stream_chat,
 };
 
 hu_error_t hu_router_create(hu_allocator_t *alloc, const char *const *provider_names,
