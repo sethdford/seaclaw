@@ -30,11 +30,11 @@ hu_error_t hu_status_run(hu_allocator_t *alloc, char *buf, size_t buf_size) {
     if (pos >= cap)
         pos = cap - 1;
     pos += (size_t)snprintf(buf + pos, cap - pos, "Workspace:   %s\n",
-                            cfg.workspace_dir ? cfg.workspace_dir : "");
+                            cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : "");
     if (pos >= cap)
         pos = cap - 1;
     pos += (size_t)snprintf(buf + pos, cap - pos, "Config:      %s\n\n",
-                            cfg.config_path ? cfg.config_path : "");
+                            cfg.runtime_paths.config_path ? cfg.runtime_paths.config_path : "");
     if (pos >= cap)
         pos = cap - 1;
     pos += (size_t)snprintf(buf + pos, cap - pos, "Provider:    %s\n",
@@ -45,8 +45,7 @@ hu_error_t hu_status_run(hu_allocator_t *alloc, char *buf, size_t buf_size) {
                             cfg.default_model ? cfg.default_model : "(default)");
     if (pos >= cap)
         pos = cap - 1;
-    pos += (size_t)snprintf(buf + pos, cap - pos, "Temperature: %.1f\n\n",
-                            cfg.default_temperature);
+    pos += (size_t)snprintf(buf + pos, cap - pos, "Temperature: %.1f\n\n", cfg.default_temperature);
     if (pos >= cap)
         pos = cap - 1;
     pos += (size_t)snprintf(buf + pos, cap - pos, "Memory:      %s (auto-save: %s)\n",

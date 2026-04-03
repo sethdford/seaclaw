@@ -927,10 +927,22 @@ hu_error_t hu_eval_check_with_provider(hu_allocator_t *alloc, const char *actual
                     alloc->free(alloc->ctx, response, response_len + 1);
                 return HU_OK;
             }
-            const char *obj_start = response;
-            const char *obj_end = response + response_len;
-            bool parsed_pass = extract_bool(obj_start, obj_end, "\"pass\"");
-            double parsed_score = extract_double(obj_start, obj_end, "\"score\"");
+            hu_json_value_t *judge_json = NULL;
+            bool parsed_pass = false;
+            double parsed_score = 0.0;
+            hu_error_t perr = hu_json_parse(alloc, response, response_len, &judge_json);
+            if (perr == HU_OK && judge_json) {
+                hu_json_value_t *pass_val = hu_json_object_get(judge_json, "pass");
+                if (pass_val && pass_val->type == HU_JSON_BOOL && pass_val->data.boolean)
+                    parsed_pass = true;
+                hu_json_value_t *score_val = hu_json_object_get(judge_json, "score");
+                if (score_val && score_val->type == HU_JSON_NUMBER)
+                    parsed_score = score_val->data.number;
+                hu_json_free(alloc, judge_json);
+            } else {
+                parsed_pass = extract_bool(response, response + response_len, "\"pass\"");
+                parsed_score = extract_double(response, response + response_len, "\"score\"");
+            }
             if (parsed_score < 0.0)
                 parsed_score = 0.0;
             if (parsed_score > 1.0)

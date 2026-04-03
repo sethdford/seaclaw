@@ -97,7 +97,7 @@ static void test_config_validate_strict_path_traversal_rejected(void) {
     cfg.default_model = "gpt-4";
     cfg.gateway.port = 3000;
     char path[] = "/home/../etc/passwd";
-    cfg.workspace_dir = path;
+    cfg.runtime_paths.workspace_dir = path;
     hu_error_t verr = hu_config_validate_strict(&cfg, NULL, true);
     HU_ASSERT_EQ(verr, HU_ERR_CONFIG_INVALID);
 }

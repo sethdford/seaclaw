@@ -578,10 +578,16 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                     <li>Double-blink (randomized, 10–23s interval)</li>
                     <li>Eye gaze tracking with 3D tilt on mouse hover</li>
                     <li>Ambient eye drift (subtle, 15s cycle)</li>
-                    <li>Micro-saccades (50ms random eye jumps)</li>
+                    <li>
+                      Micro-saccades (50ms random eye jumps, 30% trigger a quick
+                      blink)
+                    </li>
                     <li>Glow pulse + glow lag (follows gaze at 0.15x)</li>
                     <li>Ring breathing with staggered parallax</li>
-                    <li>Ambient expanding pulse ring (4s, fade out)</li>
+                    <li>
+                      Dual ambient pulse rings (4s, staggered 2s apart, fade
+                      out)
+                    </li>
                     <li>Idle drift (figure-8 translate + micro-rotate)</li>
                     <li>Spring entry animation (scale 0.6 → 1)</li>
                     <li>Hover scale (1.03x) with spring easing</li>

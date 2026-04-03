@@ -412,11 +412,14 @@ static const char *openai_vp_get_name(void *ctx) {
     return "openai_realtime";
 }
 
-/* No-op stubs for optional vtable slots OpenAI Realtime doesn't support.
- * Filling these eliminates scattered NULL checks at every call site. */
 static hu_error_t openai_vp_noop(void *ctx) {
     (void)ctx;
     return HU_OK;
+}
+
+static hu_error_t openai_vp_reconnect(void *ctx) {
+    (void)ctx;
+    return HU_ERR_NOT_SUPPORTED;
 }
 
 static hu_error_t openai_vp_send_tool_response(void *ctx, const char *name, const char *call_id,
@@ -472,7 +475,7 @@ static const hu_voice_provider_vtable_t openai_voice_vtable = {
     .send_activity_start = openai_vp_noop,
     .send_activity_end = openai_vp_noop,
     .send_audio_stream_end = openai_vp_noop,
-    .reconnect = openai_vp_noop,
+    .reconnect = openai_vp_reconnect,
     .send_tool_response = openai_vp_send_tool_response,
 };
 

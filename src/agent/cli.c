@@ -333,7 +333,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     }
 
     const char *model = cfg.default_model ? cfg.default_model : "";
-    const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
+    const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
     double temp = cfg.temperature > 0.0 ? cfg.temperature : 0.7;
     uint32_t max_iters = cfg.agent.max_tool_iterations > 0 ? cfg.agent.max_tool_iterations : 25;
     uint32_t max_hist = cfg.agent.max_history_messages > 0 ? cfg.agent.max_history_messages : 100;
@@ -1070,12 +1070,11 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                     jm = cfg.agent.mr_judge_model;
                     jm_len = strlen(cfg.agent.mr_judge_model);
                 }
-                sel = hu_model_route_with_judge(
-                    &mr_cfg, line, line_len, NULL, 0, hour, agent.history_count,
-                    &agent.provider, jm, jm_len, agent.alloc, &cli_judge_cache);
+                sel = hu_model_route_with_judge(&mr_cfg, line, line_len, NULL, 0, hour,
+                                                agent.history_count, &agent.provider, jm, jm_len,
+                                                agent.alloc, &cli_judge_cache);
             } else {
-                sel = hu_model_route(&mr_cfg, line, line_len, NULL, 0, hour,
-                                     agent.history_count);
+                sel = hu_model_route(&mr_cfg, line, line_len, NULL, 0, hour, agent.history_count);
             }
             agent.turn_model = sel.model;
             agent.turn_model_len = sel.model_len;

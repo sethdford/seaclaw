@@ -268,8 +268,9 @@ static int timed_join(pthread_t thread, uint32_t timeout_secs, volatile int *don
         clock_gettime(CLOCK_REALTIME, &now);
         if (now.tv_sec > deadline.tv_sec ||
             (now.tv_sec == deadline.tv_sec && now.tv_nsec >= deadline.tv_nsec)) {
-            pthread_cancel(thread);
-            pthread_join(thread, NULL);
+            /* Detach instead of pthread_cancel to avoid corrupting state.
+             * The worker thread will finish naturally; we just stop waiting. */
+            pthread_detach(thread);
             return -1;
         }
         struct timespec sleep_ts = {.tv_sec = 0, .tv_nsec = 50000000};

@@ -31,9 +31,8 @@ hu_error_t hu_provider_http_post_json(hu_allocator_t *alloc, const char *url,
 
     if (hresp.status_code < 200 || hresp.status_code >= 300) {
         if (hresp.body && hresp.body_len > 0) {
-            size_t log_len = hresp.body_len < 120 ? hresp.body_len : 120;
-            hu_log_error("provider_http", NULL, "HTTP %ld: %.*s%s", hresp.status_code,
-                         (int)log_len, hresp.body, hresp.body_len > 120 ? "..." : "");
+            hu_log_error("provider_http", NULL, "HTTP %ld (%zu bytes)", hresp.status_code,
+                         hresp.body_len);
         }
         hu_http_response_free(alloc, &hresp);
         if (hresp.status_code == 401)

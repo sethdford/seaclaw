@@ -362,7 +362,7 @@ hu_error_t cmd_memory(hu_allocator_t *alloc, int argc, char **argv) {
         hu_log_error("config", NULL, "Config error: %s", hu_error_string(err));
         return err;
     }
-    const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
+    const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
     hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
     if (!mem.vtable) {
         printf("Memory backend: none (not configured)\n");
@@ -461,7 +461,7 @@ done:
 hu_error_t cmd_workspace(hu_allocator_t *alloc, int argc, char **argv) {
     hu_config_t cfg;
     hu_error_t err = hu_config_load(alloc, &cfg);
-    const char *ws = (err == HU_OK && cfg.workspace_dir) ? cfg.workspace_dir : ".";
+    const char *ws = (err == HU_OK && cfg.runtime_paths.workspace_dir) ? cfg.runtime_paths.workspace_dir : ".";
 
     if (argc < 3 || strcmp(argv[2], "show") == 0) {
         printf("Current workspace: %s\n", ws);
@@ -712,7 +712,7 @@ hu_error_t cmd_sandbox(hu_allocator_t *alloc, int argc, char **argv) {
         return err;
     }
 
-    const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
+    const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
     hu_sandbox_backend_t backend = cfg.security.sandbox_config.backend;
 
     printf("Sandbox Configuration\n");
@@ -968,7 +968,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         {
             hu_config_t store_cfg;
             if (hu_config_load(alloc, &store_cfg) == HU_OK) {
-                const char *ws = store_cfg.workspace_dir ? store_cfg.workspace_dir : ".";
+                const char *ws = store_cfg.runtime_paths.workspace_dir ? store_cfg.runtime_paths.workspace_dir : ".";
                 hu_memory_t mem = hu_memory_create_from_config(alloc, &store_cfg, ws);
                 sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
                 if (db) {
@@ -1130,7 +1130,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 {
                     hu_config_t store_cfg;
                     if (hu_config_load(alloc, &store_cfg) == HU_OK) {
-                        const char *ws = store_cfg.workspace_dir ? store_cfg.workspace_dir : ".";
+                        const char *ws = store_cfg.runtime_paths.workspace_dir ? store_cfg.runtime_paths.workspace_dir : ".";
                         hu_memory_t mem = hu_memory_create_from_config(alloc, &store_cfg, ws);
                         sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
                         if (db && hu_eval_init_tables(db) == HU_OK)
@@ -1331,7 +1331,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                              "eval check-regression: could not load config for history DB");
                 return HU_ERR_CONFIG_NOT_FOUND;
             }
-            const char *ws = store_cfg.workspace_dir ? store_cfg.workspace_dir : ".";
+            const char *ws = store_cfg.runtime_paths.workspace_dir ? store_cfg.runtime_paths.workspace_dir : ".";
             hu_memory_t mem = hu_memory_create_from_config(alloc, &store_cfg, ws);
             sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
             if (!db || hu_eval_init_tables(db) != HU_OK) {
@@ -1664,7 +1664,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             hu_log_error("eval", NULL, "eval history: config error");
             return cfg_err;
         }
-        const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
+        const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
         hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
         sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
         if (!db) {
@@ -1727,7 +1727,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             hu_log_error("eval", NULL, "eval trend: config error");
             return cfg_err;
         }
-        const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
+        const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
         hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
         sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
         if (!db) {
@@ -2062,7 +2062,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         hu_log_error("config", NULL, "Config error: %s", hu_error_string(err));
         return err;
     }
-    const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
+    const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
     hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
     if (!mem.vtable) {
         hu_log_error("feed", NULL, "no memory backend configured");
@@ -2551,7 +2551,7 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
             return err;
         }
         have_cfg = true;
-        const char *ws = (cfg.workspace_dir && cfg.workspace_dir[0]) ? cfg.workspace_dir : ".";
+        const char *ws = (cfg.runtime_paths.workspace_dir && cfg.runtime_paths.workspace_dir[0]) ? cfg.runtime_paths.workspace_dir : ".";
         uint32_t pool_n = cfg.agent.pool_max_concurrent ? cfg.agent.pool_max_concurrent : 8u;
         agent_pool = hu_agent_pool_create(alloc, pool_n);
         if (!agent_pool) {

@@ -3,7 +3,6 @@
 #include "human/core/string.h"
 #include "human/voice/gemini_live.h"
 #include "human/voice/provider.h"
-#include "human/voice/realtime.h"
 #include "human/voice/webrtc.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,41 +43,20 @@ static hu_error_t voice_start(void *ctx) {
     if (!v)
         return HU_ERR_INVALID_ARGUMENT;
 
-    if (v->config.mode == HU_VOICE_MODE_REALTIME) {
-        hu_voice_rt_config_t rt_cfg = {0};
-        rt_cfg.sample_rate = (int)v->config.sample_rate;
-        rt_cfg.api_key = v->config.api_key ? v->config.api_key : NULL;
-        rt_cfg.model = v->config.model ? v->config.model : NULL;
-        rt_cfg.voice = v->config.voice ? v->config.voice : NULL;
-        hu_error_t err = hu_voice_provider_openai_create(v->alloc, &rt_cfg, &v->provider);
-        if (err != HU_OK)
-            return err;
-        err = v->provider.vtable->connect(v->provider.ctx);
-        if (err != HU_OK) {
-            v->provider.vtable->disconnect(v->provider.ctx, v->alloc);
-            memset(&v->provider, 0, sizeof(v->provider));
-            return err;
-        }
-        v->running = true;
-        return HU_OK;
-    }
-
-    if (v->config.mode == HU_VOICE_MODE_GEMINI_LIVE) {
-        hu_gemini_live_config_t glc = {
+    if (v->config.mode == HU_VOICE_MODE_REALTIME || v->config.mode == HU_VOICE_MODE_GEMINI_LIVE) {
+        const char *mode =
+            v->config.mode == HU_VOICE_MODE_REALTIME ? "openai_realtime" : "gemini_live";
+        hu_voice_provider_extras_t extras = {
             .api_key = v->config.api_key,
-            .access_token = v->config.vertex_access_token,
-            .model = v->config.model,
-            .voice = v->config.voice,
-            .region = v->config.vertex_region,
-            .project_id = v->config.vertex_project,
-            .transcribe_input = true,
-            .transcribe_output = true,
-            .affective_dialog = true,
-            .manual_vad = true,
-            .enable_session_resumption = true,
-            .thinking_level = HU_GL_THINKING_MINIMAL,
+            .model_id = v->config.model,
+            .voice_id = v->config.voice,
+            .vertex_region = v->config.vertex_region,
+            .vertex_project = v->config.vertex_project,
+            .vertex_access_token = v->config.vertex_access_token,
+            .sample_rate = (int)v->config.sample_rate,
         };
-        hu_error_t err = hu_voice_provider_gemini_live_create(v->alloc, &glc, &v->provider);
+        hu_error_t err =
+            hu_voice_provider_create_from_extras(v->alloc, mode, &extras, &v->provider);
         if (err != HU_OK)
             return err;
         err = v->provider.vtable->connect(v->provider.ctx);
@@ -264,9 +242,12 @@ hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_lo
         if (err != HU_OK && err != HU_ERR_TIMEOUT)
             hu_log_warn("voice-channel", NULL, "recv_event error: %s", hu_error_string(err));
         if (err == HU_OK) {
-            /* Forward model audio to the on_audio_ready callback if registered.
-             * Audio is base64-encoded PCM; decode is deferred to the callback consumer. */
-            if (event.audio_base64 && event.audio_base64_len > 0 && v->config.on_text_ready) {
+            /* Audio data from provider is base64-encoded PCM; only forward as
+             * text when an audio-ready callback is not registered (cloud fallback
+             * path where external TTS handles raw data). When on_audio_ready is
+             * registered the daemon should decode and play — not yet wired. */
+            if (event.audio_base64 && event.audio_base64_len > 0 &&
+                !v->config.on_audio_ready && v->config.on_text_ready) {
                 v->config.on_text_ready(event.audio_base64, event.audio_base64_len,
                                         v->config.callback_user_data);
             }

@@ -831,11 +831,6 @@
       min-height: 48px;
     }
 
-    a[class*="chapter-dot"] {
-      min-width: 44px;
-      min-height: 44px;
-    }
-
     .audio-toggle,
     .theme-toggle,
     [aria-label="Copy to clipboard"],
@@ -1155,10 +1150,6 @@
     transform: scaleX(var(--hu-scroll-depth, 0));
   }
 
-  .hu-chapter-label {
-    animation: none !important;
-  }
-
   .hu-chapter-reveal {
     animation: none !important;
     opacity: 1 !important;
@@ -1302,8 +1293,6 @@ body.hu-ambient-ready {
 @media print {
   nav,
   .scroll-progress,
-  .chapter-nav,
-  .mobile-chapter-indicator,
   .hu-film-grain,
   .hu-particles,
   .custom-cursor,
@@ -1368,14 +1357,6 @@ figcaption {
   }
   .hu-chapter-reveal:has(.dep-tree-svg) {
     overflow: visible;
-  }
-
-  /* Chapter nav: parent scales when the inner dot is active */
-  .chapter-dot {
-    transition: transform var(--hu-duration-normal) var(--hu-ease-out);
-  }
-  .chapter-dot:has(> .chapter-dot-inner.active) {
-    transform: scale(1.2);
   }
 }
 
@@ -1761,23 +1742,6 @@ h3 {
 /* ─── Quiet Mastery: Scroll Narrative ──────────────────────────── */
 
 @supports (animation-timeline: scroll()) {
-  .hu-chapter-label {
-    animation: hu-chapter-parallax auto linear;
-    animation-timeline: scroll();
-    animation-range: entry 0% exit 100%;
-  }
-
-  @keyframes hu-chapter-parallax {
-    from {
-      transform: translateY(40px);
-      opacity: 0.3;
-    }
-    to {
-      transform: translateY(-40px);
-      opacity: 0.8;
-    }
-  }
-
   .hu-chapter-reveal {
     animation: hu-chapter-entrance auto linear;
     animation-timeline: view();
@@ -1796,107 +1760,12 @@ h3 {
   }
 }
 
-.chapter-nav {
-  position: fixed;
-  right: var(--hu-space-md);
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: var(--hu-space-xs);
-  z-index: 90;
-}
-
-.chapter-dot {
-  width: var(--hu-space-legend-gap);
-  height: var(--hu-space-legend-gap);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border-radius: var(--hu-radius-full);
-  text-decoration: none;
-}
-
-.chapter-dot-inner {
-  width: 50%;
-  height: 50%;
-  border-radius: var(--hu-radius-full);
-  background: color-mix(in srgb, var(--hu-text) 30%, transparent);
-  transition:
-    transform var(--hu-duration-normal) var(--hu-ease-out),
-    background var(--hu-duration-normal) var(--hu-ease-out);
-}
-
-.chapter-dot:hover .chapter-dot-inner,
-.chapter-dot.active .chapter-dot-inner {
-  background: var(--hu-accent);
-  transform: scale(1.35);
-}
-
-@media (max-width: 768px) {
-  /* --hu-breakpoint-lg */
-  .chapter-nav {
-    display: none;
-  }
-
-  .mobile-chapter-indicator {
-    display: flex;
-  }
-}
-
-.mobile-chapter-indicator {
-  display: none;
-  position: fixed;
-  bottom: var(--hu-space-md);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  align-items: center;
-  gap: var(--hu-space-xs);
-  padding: var(--hu-space-xs) var(--hu-space-md);
-  border-radius: var(--hu-radius-full);
-  font-size: 11px;
-  font-weight: 600;
-  font-family: var(--hu-font);
-  color: var(--hu-text-secondary);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--hu-duration-normal) var(--hu-ease-out);
-}
-
-.mobile-chapter-indicator.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.mobile-chapter-indicator .chapter-pip {
-  width: 4px;
-  height: 4px;
-  border-radius: var(--hu-radius-full);
-  background: color-mix(in srgb, var(--hu-text) 25%, transparent);
-  transition:
-    transform var(--hu-duration-normal) var(--hu-ease-out),
-    background var(--hu-duration-normal) var(--hu-ease-out);
-}
-
-.mobile-chapter-indicator .chapter-pip.active {
-  transform: scaleX(4);
-  background: var(--hu-accent);
-}
-
 /* ═══════════════════════════════════════════════════════════════
-   RESPONSIVE: Mobile-first breakpoints for homepage chapters
+   RESPONSIVE: Mobile-first breakpoints for homepage sections
    ═══════════════════════════════════════════════════════════════ */
 
 @media (max-width: 480px) {
   /* --hu-breakpoint-sm */
-
-  .hu-chapter-label {
-    font-size: clamp(2rem, 6vw, 3rem);
-    top: var(--hu-space-md);
-    left: var(--hu-space-md);
-  }
 
   .numbers-grid {
     grid-template-columns: repeat(2, 1fr) !important;
@@ -1992,20 +1861,6 @@ h3 {
   .device-spectrum-line {
     max-width: 320px;
   }
-}
-
-.hu-chapter-label {
-  font-size: clamp(3rem, 8vw, 6rem);
-  font-weight: 800;
-  opacity: 0.06;
-  letter-spacing: 0.04em;
-  font-family: var(--hu-font, "Avenir", "Avenir Next", system-ui);
-  pointer-events: none;
-  user-select: none;
-  position: absolute;
-  top: var(--hu-space-xl);
-  left: var(--hu-space-xl);
-  line-height: 1;
 }
 
 /* Metric counter animation */

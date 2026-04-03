@@ -60,7 +60,7 @@ static void test_config_parse_all_sections(void) {
         "}";
     hu_error_t err = hu_config_parse_json(&cfg_local, json, strlen(json));
     HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_STR_EQ(cfg_local.workspace_dir, "/tmp");
+    HU_ASSERT_STR_EQ(cfg_local.runtime_paths.workspace_dir, "/tmp");
     HU_ASSERT_STR_EQ(cfg_local.default_model, "gpt-4");
     HU_ASSERT_STR_EQ(cfg_local.autonomy.level, "readonly");
     HU_ASSERT_EQ(cfg_local.gateway.port, 8080);
@@ -651,12 +651,11 @@ static void test_config_parse_signal_mattermost_maixcam_channels(void) {
     HU_ASSERT_NOT_NULL(arena);
     cfg.arena = arena;
     cfg.allocator = hu_arena_allocator(arena);
-    const char *json =
-        "{\"channels\":{\"signal\":{\"http_url\":\"http://127.0.0.1:8080\","
-        "\"account\":\"+15551234567\",\"daemon\":{\"poll_interval_sec\":5}},"
-        "\"mattermost\":{\"url\":\"https://chat.example.com\",\"token\":\"tok\","
-        "\"daemon\":{\"response_mode\":\"always\"}},"
-        "\"maixcam\":{\"host\":\"/dev/ttyUSB0\",\"port\":0}}}";
+    const char *json = "{\"channels\":{\"signal\":{\"http_url\":\"http://127.0.0.1:8080\","
+                       "\"account\":\"+15551234567\",\"daemon\":{\"poll_interval_sec\":5}},"
+                       "\"mattermost\":{\"url\":\"https://chat.example.com\",\"token\":\"tok\","
+                       "\"daemon\":{\"response_mode\":\"always\"}},"
+                       "\"maixcam\":{\"host\":\"/dev/ttyUSB0\",\"port\":0}}}";
     hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_STR_EQ(cfg.channels.signal.http_url, "http://127.0.0.1:8080");
@@ -680,23 +679,19 @@ static void test_daemon_active_config_known_channels_match_structs(void) {
     memset(&cfg, 0, sizeof(cfg));
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "discord") ==
               &cfg.channels.discord.daemon);
-    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "email") ==
-              &cfg.channels.email.daemon);
-    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "gmail") ==
-              &cfg.channels.gmail.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "email") == &cfg.channels.email.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "gmail") == &cfg.channels.gmail.daemon);
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "imessage") ==
               &cfg.channels.imessage.daemon);
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "irc") == &cfg.channels.irc.daemon);
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "matrix") ==
               &cfg.channels.matrix.daemon);
-    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "nostr") ==
-              &cfg.channels.nostr.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "nostr") == &cfg.channels.nostr.daemon);
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "signal") ==
               &cfg.channels.signal.daemon);
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "mattermost") ==
               &cfg.channels.mattermost.daemon);
-    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "slack") ==
-              &cfg.channels.slack.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "slack") == &cfg.channels.slack.daemon);
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "telegram") ==
               &cfg.channels.telegram.daemon);
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "whatsapp") ==
@@ -713,8 +708,7 @@ static void test_daemon_active_config_unknown_channel_returns_default_daemon(voi
 static void test_daemon_active_config_null_channel_name_returns_default_daemon(void) {
     hu_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, NULL) ==
-              &cfg.channels.default_daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, NULL) == &cfg.channels.default_daemon);
 }
 
 static void test_config_parse_mcp_servers(void) {
@@ -859,7 +853,7 @@ static void test_config_save_null_path_returns_error(void) {
     cfg.default_provider = hu_strdup(&cfg.allocator, "ollama");
     cfg.default_model = hu_strdup(&cfg.allocator, "llama2");
     cfg.gateway.port = 3000;
-    cfg.config_path = NULL;
+    cfg.runtime_paths.config_path = NULL;
     hu_error_t err = hu_config_save(&cfg);
     HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
     hu_arena_destroy(arena);
@@ -873,7 +867,7 @@ static void test_config_save_roundtrip_key_fields(void) {
     HU_ASSERT_NOT_NULL(arena);
     cfg.allocator = hu_arena_allocator(arena);
     cfg.arena = arena;
-    cfg.workspace_dir = hu_strdup(&cfg.allocator, "/tmp/test-workspace");
+    cfg.runtime_paths.workspace_dir = hu_strdup(&cfg.allocator, "/tmp/test-workspace");
     cfg.default_provider = hu_strdup(&cfg.allocator, "ollama");
     cfg.default_model = hu_strdup(&cfg.allocator, "llama3");
     cfg.gateway.port = 3000;
@@ -882,7 +876,7 @@ static void test_config_save_roundtrip_key_fields(void) {
     int fd = mkstemp(tmp_path);
     HU_ASSERT(fd >= 0);
     close(fd);
-    cfg.config_path = tmp_path;
+    cfg.runtime_paths.config_path = tmp_path;
 
     hu_error_t err = hu_config_save(&cfg);
     HU_ASSERT_EQ(err, HU_OK);
@@ -904,7 +898,7 @@ static void test_config_save_roundtrip_key_fields(void) {
     err = hu_config_parse_json(&cfg2, buf, n);
     HU_ASSERT_EQ(err, HU_OK);
 
-    HU_ASSERT_STR_EQ(cfg2.workspace_dir, "/tmp/test-workspace");
+    HU_ASSERT_STR_EQ(cfg2.runtime_paths.workspace_dir, "/tmp/test-workspace");
     HU_ASSERT_STR_EQ(cfg2.default_provider, "ollama");
     HU_ASSERT_STR_EQ(cfg2.default_model, "llama3");
     HU_ASSERT_EQ(cfg2.gateway.port, 3000);
@@ -936,7 +930,7 @@ static void test_config_sandbox_save_roundtrip(void) {
     int fd = mkstemp(tmp_path);
     HU_ASSERT(fd >= 0);
     close(fd);
-    cfg.config_path = tmp_path;
+    cfg.runtime_paths.config_path = tmp_path;
 
     err = hu_config_save(&cfg);
     HU_ASSERT_EQ(err, HU_OK);
@@ -983,16 +977,15 @@ static void test_config_parse_behavior_thresholds(void) {
     cfg_local.arena = arena;
     cfg_local.allocator = hu_arena_allocator(arena);
 
-    const char *json =
-        "{\"behavior\":{"
-        "\"consecutive_limit\":2,"
-        "\"participation_pct\":35,"
-        "\"max_response_chars\":250,"
-        "\"min_response_chars\":20,"
-        "\"decay_days\":14,"
-        "\"dedup_threshold\":65,"
-        "\"missed_msg_threshold_sec\":3600"
-        "}}";
+    const char *json = "{\"behavior\":{"
+                       "\"consecutive_limit\":2,"
+                       "\"participation_pct\":35,"
+                       "\"max_response_chars\":250,"
+                       "\"min_response_chars\":20,"
+                       "\"decay_days\":14,"
+                       "\"dedup_threshold\":65,"
+                       "\"missed_msg_threshold_sec\":3600"
+                       "}}";
 
     hu_error_t err = hu_config_parse_json(&cfg_local, json, strlen(json));
     HU_ASSERT_EQ(err, HU_OK);
@@ -1115,10 +1108,15 @@ static void test_config_parse_voice_stt_tts_providers(void) {
 
 static void test_config_parse_feeds_section(void) {
     hu_allocator_t backing = hu_system_allocator();
-    hu_config_t cfg_local; memset(&cfg_local, 0, sizeof(cfg_local));
-    hu_arena_t *arena = hu_arena_create(backing); HU_ASSERT_NOT_NULL(arena);
-    cfg_local.arena = arena; cfg_local.allocator = hu_arena_allocator(arena);
-    const char *json = "{ \"feeds\": { \"enabled\": true, \"interests\": \"AI LLM GPT\", \"relevance_threshold\": 0.3, \"poll_interval_rss\": 120, \"max_items_per_poll\": 50 } }";
+    hu_config_t cfg_local;
+    memset(&cfg_local, 0, sizeof(cfg_local));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg_local.arena = arena;
+    cfg_local.allocator = hu_arena_allocator(arena);
+    const char *json =
+        "{ \"feeds\": { \"enabled\": true, \"interests\": \"AI LLM GPT\", \"relevance_threshold\": "
+        "0.3, \"poll_interval_rss\": 120, \"max_items_per_poll\": 50 } }";
     hu_error_t err = hu_config_parse_json(&cfg_local, json, strlen(json));
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(cfg_local.feeds.enabled, true);

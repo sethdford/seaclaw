@@ -240,6 +240,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
   @state() private rawConfig: Record<string, unknown> | null = null;
   @state() private loading = false;
   @state() private error = "";
+  @state() private cotEntries: { tool: string; verdict: string; reason: string }[] = [];
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
@@ -257,6 +258,16 @@ export class ScSecurityView extends GatewayAwareLitElement {
         this.config = res.security as SecurityConfig;
       } else {
         this.config = {};
+      }
+      /* Load CoT audit summary if available */
+      try {
+        const cot = await gw.request<{ entries?: { tool: string; verdict: string; reason: string }[] }>(
+          "security.cot.summary",
+          {},
+        );
+        this.cotEntries = Array.isArray(cot?.entries) ? cot.entries : [];
+      } catch {
+        this.cotEntries = [];
       }
     } catch (e) {
       this.error = friendlyError(e);
@@ -606,6 +617,26 @@ export class ScSecurityView extends GatewayAwareLitElement {
     `;
   }
 
+  private _renderCotAudit() {
+    if (this.cotEntries.length === 0) return nothing;
+    return html`
+      <hu-section-header heading="Chain-of-Thought Audit" description="Recent tool safety reviews"></hu-section-header>
+      <div class="grid hu-stagger-motion9">
+        ${this.cotEntries.map(
+          (e) => html`
+            <hu-card surface="default">
+              <div class="card-inner">
+                <div class="card-title">${e.tool}</div>
+                <hu-badge variant=${e.verdict === "allow" ? "success" : e.verdict === "deny" ? "error" : "info"}>${e.verdict}</hu-badge>
+                <p style="color:var(--hu-text-secondary);font-size:var(--hu-text-sm);margin-top:var(--hu-space-xs)">${e.reason}</p>
+              </div>
+            </hu-card>
+          `,
+        )}
+      </div>
+    `;
+  }
+
   override render() {
     const hero = html`
       <hu-page-hero role="region" aria-label="Security">
@@ -673,7 +704,7 @@ export class ScSecurityView extends GatewayAwareLitElement {
         ${this._renderAutonomy()} ${this._renderSandbox()} ${this._renderNetwork()}
         ${this._renderPairing()}
       </div>
-      ${this._renderDefaults()}
+      ${this._renderCotAudit()} ${this._renderDefaults()}
     `;
   }
 }

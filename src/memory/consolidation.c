@@ -118,7 +118,17 @@ static time_t parse_iso_timestamp(const char *ts, size_t ts_len) {
         tm_buf.tm_hour = (int)strtol(ts + 11, NULL, 10);
         tm_buf.tm_min = (int)strtol(ts + 14, NULL, 10);
         tm_buf.tm_sec = (int)strtol(ts + 17, NULL, 10);
+        /* ISO strings with 'Z' suffix or '+' offset are UTC; use timegm to
+         * avoid local-timezone skew. Fall back to mktime for ambiguous input. */
+        bool is_utc = false;
+        if (ts_len >= 20 && (ts[19] == 'Z' || ts[19] == '+' || ts[19] == '-'))
+            is_utc = true;
+#if defined(__APPLE__) || defined(__unix__)
+        return is_utc ? timegm(&tm_buf) : mktime(&tm_buf);
+#else
+        (void)is_utc;
         return mktime(&tm_buf);
+#endif
     }
     long raw = strtol(ts, NULL, 10);
     return raw > 0 ? (time_t)raw : 0;

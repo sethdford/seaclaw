@@ -301,6 +301,32 @@ export class ChatController implements ReactiveController {
       this._handleWebSearch(payload, sessionKey);
       return;
     }
+
+    /* Derive enrichment events from agent.tool when the server does not
+     * emit dedicated memory / web_search / artifact event names. */
+    if (event === "agent.tool") {
+      const toolName = (payload.message as string) ?? (payload.name as string) ?? "";
+      const state = (payload.state as string) ?? "";
+      if (
+        toolName === "memory_recall" ||
+        toolName === "memory_store" ||
+        toolName === "memory_forget"
+      ) {
+        const action = toolName.replace("memory_", "") as "recall" | "store" | "forget";
+        this._handleMemory(`memory.${action}`, payload, sessionKey);
+        return;
+      }
+      if (toolName === "web_search" && state === "result") {
+        this._handleWebSearch(payload, sessionKey);
+        return;
+      }
+      if (toolName === "canvas" && state === "result") {
+        this._handleArtifact(payload, sessionKey);
+        return;
+      }
+      this._handleToolCall(payload, sessionKey);
+      return;
+    }
   }
 
   private _handleMemory(event: string, payload: Record<string, unknown>, sessionKey: string): void {

@@ -162,12 +162,17 @@ hu_error_t hu_mcp_manager_create(hu_allocator_t *alloc,
         slot->connected = false;
         slot->tool_count = 0;
 
-        /* Copy OAuth2 config (if present) */
+        /* Copy OAuth2 config (if present). Fail if any required field alloc fails. */
         slot->oauth_client_id = dup_str(alloc, e->oauth_client_id);
         slot->oauth_auth_url = dup_str(alloc, e->oauth_auth_url);
         slot->oauth_token_url = dup_str(alloc, e->oauth_token_url);
         slot->oauth_scopes = dup_str(alloc, e->oauth_scopes);
         slot->oauth_redirect_uri = dup_str(alloc, e->oauth_redirect_uri);
+        if ((e->oauth_client_id && !slot->oauth_client_id) ||
+            (e->oauth_token_url && !slot->oauth_token_url)) {
+            mgr->slot_count++;
+            goto fail;
+        }
         memset(&slot->oauth_token, 0, sizeof(slot->oauth_token));
 
         mgr->slot_count++;

@@ -56,6 +56,7 @@ static hu_error_t oauth_sha256(const uint8_t *input, size_t input_len, uint8_t *
     (void)input;
     (void)input_len;
     (void)out32;
+    hu_log_error("oauth", NULL, "SHA-256 unavailable: build with HU_ENABLE_TLS for OAuth/PKCE");
     return HU_ERR_NOT_SUPPORTED;
 }
 #endif

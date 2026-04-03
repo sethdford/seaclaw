@@ -78,8 +78,13 @@ hu_error_t cp_canvas_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_con
 #else
     {
     hu_json_value_t *params = root ? hu_json_object_get(root, "params") : NULL;
-    const hu_json_value_t *src = params ? (const hu_json_value_t *)params : root;
-    const char *canvas_id = hu_json_get_string(src, "canvas_id");
+    if (!params) {
+        static const char err[] = "{\"error\":\"params required\"}";
+        *out = hu_strndup(alloc, err, sizeof(err) - 1);
+        *out_len = sizeof(err) - 1;
+        return HU_OK;
+    }
+    const char *canvas_id = hu_json_get_string(params, "canvas_id");
     if (!canvas_id) {
         static const char err[] = "{\"error\":\"canvas_id required\"}";
         *out = hu_strndup(alloc, err, sizeof(err) - 1);
@@ -149,9 +154,14 @@ hu_error_t cp_canvas_edit(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
 #else
     {
     hu_json_value_t *params = root ? hu_json_object_get(root, "params") : NULL;
-    const hu_json_value_t *src = params ? (const hu_json_value_t *)params : root;
-    const char *canvas_id = hu_json_get_string(src, "canvas_id");
-    const char *content = hu_json_get_string(src, "content");
+    if (!params) {
+        static const char err[] = "{\"error\":\"params required\"}";
+        *out = hu_strndup(alloc, err, sizeof(err) - 1);
+        *out_len = sizeof(err) - 1;
+        return HU_OK;
+    }
+    const char *canvas_id = hu_json_get_string(params, "canvas_id");
+    const char *content = hu_json_get_string(params, "content");
     if (!canvas_id || !content) {
         static const char err[] = "{\"error\":\"canvas_id and content required\"}";
         *out = hu_strndup(alloc, err, sizeof(err) - 1);
@@ -203,8 +213,13 @@ hu_error_t cp_canvas_undo(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
 #else
     {
     hu_json_value_t *params = root ? hu_json_object_get(root, "params") : NULL;
-    const hu_json_value_t *src = params ? (const hu_json_value_t *)params : root;
-    const char *canvas_id = hu_json_get_string(src, "canvas_id");
+    if (!params) {
+        static const char err[] = "{\"error\":\"params required\"}";
+        *out = hu_strndup(alloc, err, sizeof(err) - 1);
+        *out_len = sizeof(err) - 1;
+        return HU_OK;
+    }
+    const char *canvas_id = hu_json_get_string(params, "canvas_id");
     if (!canvas_id) {
         static const char err[] = "{\"error\":\"canvas_id required\"}";
         *out = hu_strndup(alloc, err, sizeof(err) - 1);
@@ -261,8 +276,13 @@ hu_error_t cp_canvas_redo(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
 #else
     {
     hu_json_value_t *params = root ? hu_json_object_get(root, "params") : NULL;
-    const hu_json_value_t *src = params ? (const hu_json_value_t *)params : root;
-    const char *canvas_id = hu_json_get_string(src, "canvas_id");
+    if (!params) {
+        static const char err[] = "{\"error\":\"params required\"}";
+        *out = hu_strndup(alloc, err, sizeof(err) - 1);
+        *out_len = sizeof(err) - 1;
+        return HU_OK;
+    }
+    const char *canvas_id = hu_json_get_string(params, "canvas_id");
     if (!canvas_id) {
         static const char err[] = "{\"error\":\"canvas_id required\"}";
         *out = hu_strndup(alloc, err, sizeof(err) - 1);

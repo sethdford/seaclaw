@@ -935,43 +935,24 @@ static hu_error_t parse_peripherals(hu_allocator_t *a, hu_config_t *cfg,
                                     const hu_json_value_t *obj) {
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
-    cfg->peripherals.enabled = hu_json_get_bool(obj, "enabled", cfg->peripherals.enabled);
-    const char *dd = hu_json_get_string(obj, "datasheet_dir");
-    if (dd) {
-        if (cfg->peripherals.datasheet_dir)
-            a->free(a->ctx, cfg->peripherals.datasheet_dir,
-                    strlen(cfg->peripherals.datasheet_dir) + 1);
-        cfg->peripherals.datasheet_dir = hu_strdup(a, dd);
-    }
-    return HU_OK;
+    static const hu_config_field_t schema[] = {
+        {"enabled", HU_CFG_BOOL, offsetof(hu_peripherals_config_t, enabled), 0, 0},
+        {"datasheet_dir", HU_CFG_STRING, offsetof(hu_peripherals_config_t, datasheet_dir), 0, 0},
+    };
+    return hu_config_parse_fields(a, &cfg->peripherals, schema, 2, obj);
 }
 
 static hu_error_t parse_hardware(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
-    cfg->hardware.enabled = hu_json_get_bool(obj, "enabled", cfg->hardware.enabled);
-    const char *transport = hu_json_get_string(obj, "transport");
-    if (transport) {
-        if (cfg->hardware.transport)
-            a->free(a->ctx, cfg->hardware.transport, strlen(cfg->hardware.transport) + 1);
-        cfg->hardware.transport = hu_strdup(a, transport);
-    }
-    const char *serial_port = hu_json_get_string(obj, "serial_port");
-    if (serial_port) {
-        if (cfg->hardware.serial_port)
-            a->free(a->ctx, cfg->hardware.serial_port, strlen(cfg->hardware.serial_port) + 1);
-        cfg->hardware.serial_port = hu_strdup(a, serial_port);
-    }
-    double br = hu_json_get_number(obj, "baud_rate", cfg->hardware.baud_rate);
-    if (br >= 0 && br <= 4000000)
-        cfg->hardware.baud_rate = (uint32_t)br;
-    const char *probe_target = hu_json_get_string(obj, "probe_target");
-    if (probe_target) {
-        if (cfg->hardware.probe_target)
-            a->free(a->ctx, cfg->hardware.probe_target, strlen(cfg->hardware.probe_target) + 1);
-        cfg->hardware.probe_target = hu_strdup(a, probe_target);
-    }
-    return HU_OK;
+    static const hu_config_field_t schema[] = {
+        {"enabled", HU_CFG_BOOL, offsetof(hu_hardware_config_t, enabled), 0, 0},
+        {"transport", HU_CFG_STRING, offsetof(hu_hardware_config_t, transport), 0, 0},
+        {"serial_port", HU_CFG_STRING, offsetof(hu_hardware_config_t, serial_port), 0, 0},
+        {"baud_rate", HU_CFG_UINT32, offsetof(hu_hardware_config_t, baud_rate), 0, 4000000},
+        {"probe_target", HU_CFG_STRING, offsetof(hu_hardware_config_t, probe_target), 0, 0},
+    };
+    return hu_config_parse_fields(a, &cfg->hardware, schema, 5, obj);
 }
 
 static hu_error_t parse_browser(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -1005,112 +986,60 @@ static hu_error_t parse_diagnostics(hu_allocator_t *a, hu_config_t *cfg,
                                     const hu_json_value_t *obj) {
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
-    const char *backend = hu_json_get_string(obj, "backend");
-    if (backend) {
-        if (cfg->diagnostics.backend)
-            a->free(a->ctx, cfg->diagnostics.backend, strlen(cfg->diagnostics.backend) + 1);
-        cfg->diagnostics.backend = hu_strdup(a, backend);
-    }
-    const char *ote = hu_json_get_string(obj, "otel_endpoint");
-    if (ote) {
-        if (cfg->diagnostics.otel_endpoint)
-            a->free(a->ctx, cfg->diagnostics.otel_endpoint,
-                    strlen(cfg->diagnostics.otel_endpoint) + 1);
-        cfg->diagnostics.otel_endpoint = hu_strdup(a, ote);
-    }
-    const char *ots = hu_json_get_string(obj, "otel_service_name");
-    if (ots) {
-        if (cfg->diagnostics.otel_service_name)
-            a->free(a->ctx, cfg->diagnostics.otel_service_name,
-                    strlen(cfg->diagnostics.otel_service_name) + 1);
-        cfg->diagnostics.otel_service_name = hu_strdup(a, ots);
-    }
-    cfg->diagnostics.log_tool_calls =
-        hu_json_get_bool(obj, "log_tool_calls", cfg->diagnostics.log_tool_calls);
-    cfg->diagnostics.log_message_receipts =
-        hu_json_get_bool(obj, "log_message_receipts", cfg->diagnostics.log_message_receipts);
-    cfg->diagnostics.log_message_payloads =
-        hu_json_get_bool(obj, "log_message_payloads", cfg->diagnostics.log_message_payloads);
-    cfg->diagnostics.log_llm_io = hu_json_get_bool(obj, "log_llm_io", cfg->diagnostics.log_llm_io);
-    if (cfg->diagnostics.log_llm_io || cfg->diagnostics.log_message_payloads) {
+    static const hu_config_field_t schema[] = {
+        {"backend", HU_CFG_STRING, offsetof(hu_diagnostics_config_t, backend), 0, 0},
+        {"otel_endpoint", HU_CFG_STRING, offsetof(hu_diagnostics_config_t, otel_endpoint), 0, 0},
+        {"otel_service_name", HU_CFG_STRING, offsetof(hu_diagnostics_config_t, otel_service_name),
+         0, 0},
+        {"log_tool_calls", HU_CFG_BOOL, offsetof(hu_diagnostics_config_t, log_tool_calls), 0, 0},
+        {"log_message_receipts", HU_CFG_BOOL,
+         offsetof(hu_diagnostics_config_t, log_message_receipts), 0, 0},
+        {"log_message_payloads", HU_CFG_BOOL,
+         offsetof(hu_diagnostics_config_t, log_message_payloads), 0, 0},
+        {"log_llm_io", HU_CFG_BOOL, offsetof(hu_diagnostics_config_t, log_llm_io), 0, 0},
+    };
+    hu_error_t err = hu_config_parse_fields(a, &cfg->diagnostics, schema, 7, obj);
+    if (err == HU_OK && (cfg->diagnostics.log_llm_io || cfg->diagnostics.log_message_payloads)) {
         hu_log_error("config", NULL,
                      "SECURITY WARNING: diagnostic logging of payloads is enabled. "
                      "Logs may contain sensitive data (PII, API keys). "
                      "Do not use in production.");
     }
-    return HU_OK;
+    return err;
 }
 
 static hu_error_t parse_feeds(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
-    cfg->feeds.enabled = hu_json_get_bool(obj, "enabled", cfg->feeds.enabled);
-    const char *s;
-    s = hu_json_get_string(obj, "gmail_client_id");
-    if (s) {
-        if (cfg->feeds.gmail_client_id)
-            a->free(a->ctx, cfg->feeds.gmail_client_id, strlen(cfg->feeds.gmail_client_id) + 1);
-        cfg->feeds.gmail_client_id = hu_strdup(a, s);
-    }
-    s = hu_json_get_string(obj, "gmail_client_secret");
-    if (s) {
-        if (cfg->feeds.gmail_client_secret)
-            a->free(a->ctx, cfg->feeds.gmail_client_secret,
-                    strlen(cfg->feeds.gmail_client_secret) + 1);
-        cfg->feeds.gmail_client_secret = hu_strdup(a, s);
-    }
-    s = hu_json_get_string(obj, "gmail_refresh_token");
-    if (s) {
-        if (cfg->feeds.gmail_refresh_token)
-            a->free(a->ctx, cfg->feeds.gmail_refresh_token,
-                    strlen(cfg->feeds.gmail_refresh_token) + 1);
-        cfg->feeds.gmail_refresh_token = hu_strdup(a, s);
-    }
-    s = hu_json_get_string(obj, "twitter_bearer_token");
-    if (s) {
-        if (cfg->feeds.twitter_bearer_token)
-            a->free(a->ctx, cfg->feeds.twitter_bearer_token,
-                    strlen(cfg->feeds.twitter_bearer_token) + 1);
-        cfg->feeds.twitter_bearer_token = hu_strdup(a, s);
-    }
-    s = hu_json_get_string(obj, "google_photos_access_token");
-    if (s) {
-        if (cfg->feeds.google_photos_access_token)
-            a->free(a->ctx, cfg->feeds.google_photos_access_token,
-                    strlen(cfg->feeds.google_photos_access_token) + 1);
-        cfg->feeds.google_photos_access_token = hu_strdup(a, s);
-    }
-    s = hu_json_get_string(obj, "interests");
-    if (s) {
-        if (cfg->feeds.interests)
-            a->free(a->ctx, cfg->feeds.interests, strlen(cfg->feeds.interests) + 1);
-        cfg->feeds.interests = hu_strdup(a, s);
-    }
-    double v = hu_json_get_number(obj, "relevance_threshold", cfg->feeds.relevance_threshold);
-    if (v >= 0.0 && v <= 1.0)
-        cfg->feeds.relevance_threshold = v;
-    v = hu_json_get_number(obj, "poll_interval_rss", cfg->feeds.poll_interval_rss);
-    if (v >= 1 && v <= 10080)
-        cfg->feeds.poll_interval_rss = (uint32_t)v;
-    v = hu_json_get_number(obj, "poll_interval_gmail", cfg->feeds.poll_interval_gmail);
-    if (v >= 1 && v <= 10080)
-        cfg->feeds.poll_interval_gmail = (uint32_t)v;
-    v = hu_json_get_number(obj, "poll_interval_imessage", cfg->feeds.poll_interval_imessage);
-    if (v >= 1 && v <= 10080)
-        cfg->feeds.poll_interval_imessage = (uint32_t)v;
-    v = hu_json_get_number(obj, "poll_interval_twitter", cfg->feeds.poll_interval_twitter);
-    if (v >= 1 && v <= 10080)
-        cfg->feeds.poll_interval_twitter = (uint32_t)v;
-    v = hu_json_get_number(obj, "poll_interval_file_ingest", cfg->feeds.poll_interval_file_ingest);
-    if (v >= 1 && v <= 10080)
-        cfg->feeds.poll_interval_file_ingest = (uint32_t)v;
-    v = hu_json_get_number(obj, "max_items_per_poll", cfg->feeds.max_items_per_poll);
-    if (v >= 1 && v <= 1000)
-        cfg->feeds.max_items_per_poll = (uint32_t)v;
-    v = hu_json_get_number(obj, "retention_days", cfg->feeds.retention_days);
-    if (v >= 1 && v <= 365)
-        cfg->feeds.retention_days = (uint32_t)v;
-    return HU_OK;
+    static const hu_config_field_t schema[] = {
+        {"enabled", HU_CFG_BOOL, offsetof(hu_feeds_config_t, enabled), 0, 0},
+        {"gmail_client_id", HU_CFG_STRING, offsetof(hu_feeds_config_t, gmail_client_id), 0, 0},
+        {"gmail_client_secret", HU_CFG_STRING, offsetof(hu_feeds_config_t, gmail_client_secret), 0,
+         0},
+        {"gmail_refresh_token", HU_CFG_STRING, offsetof(hu_feeds_config_t, gmail_refresh_token), 0,
+         0},
+        {"twitter_bearer_token", HU_CFG_STRING, offsetof(hu_feeds_config_t, twitter_bearer_token),
+         0, 0},
+        {"google_photos_access_token", HU_CFG_STRING,
+         offsetof(hu_feeds_config_t, google_photos_access_token), 0, 0},
+        {"interests", HU_CFG_STRING, offsetof(hu_feeds_config_t, interests), 0, 0},
+        {"relevance_threshold", HU_CFG_DOUBLE, offsetof(hu_feeds_config_t, relevance_threshold), 0,
+         1},
+        {"poll_interval_rss", HU_CFG_UINT32, offsetof(hu_feeds_config_t, poll_interval_rss), 1,
+         10080},
+        {"poll_interval_gmail", HU_CFG_UINT32, offsetof(hu_feeds_config_t, poll_interval_gmail), 1,
+         10080},
+        {"poll_interval_imessage", HU_CFG_UINT32,
+         offsetof(hu_feeds_config_t, poll_interval_imessage), 1, 10080},
+        {"poll_interval_twitter", HU_CFG_UINT32, offsetof(hu_feeds_config_t, poll_interval_twitter),
+         1, 10080},
+        {"poll_interval_file_ingest", HU_CFG_UINT32,
+         offsetof(hu_feeds_config_t, poll_interval_file_ingest), 1, 10080},
+        {"max_items_per_poll", HU_CFG_UINT32, offsetof(hu_feeds_config_t, max_items_per_poll), 1,
+         1000},
+        {"retention_days", HU_CFG_UINT32, offsetof(hu_feeds_config_t, retention_days), 1, 365},
+    };
+    return hu_config_parse_fields(a, &cfg->feeds, schema, 15, obj);
 }
 
 hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t len) {
@@ -1140,37 +1069,40 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
     if (workspace && strstr(workspace, "..")) {
         workspace = NULL; /* Reject path traversal */
     }
-    if (workspace && cfg->workspace_dir_override) {
-        a->free(a->ctx, cfg->workspace_dir_override, strlen(cfg->workspace_dir_override) + 1);
+    if (workspace && cfg->runtime_paths.workspace_dir_override) {
+        a->free(a->ctx, cfg->runtime_paths.workspace_dir_override,
+                strlen(cfg->runtime_paths.workspace_dir_override) + 1);
     }
     if (workspace) {
-        cfg->workspace_dir_override = hu_strdup(a, workspace);
-        if (cfg->workspace_dir)
-            a->free(a->ctx, cfg->workspace_dir, strlen(cfg->workspace_dir) + 1);
-        cfg->workspace_dir = hu_strdup(a, workspace);
+        cfg->runtime_paths.workspace_dir_override = hu_strdup(a, workspace);
+        if (cfg->runtime_paths.workspace_dir)
+            a->free(a->ctx, cfg->runtime_paths.workspace_dir,
+                    strlen(cfg->runtime_paths.workspace_dir) + 1);
+        cfg->runtime_paths.workspace_dir = hu_strdup(a, workspace);
     }
 
     const char *dpo_dir = hu_json_get_string(root, "dpo_export_dir");
     if (dpo_dir && strstr(dpo_dir, ".."))
         dpo_dir = NULL;
     if (dpo_dir && dpo_dir[0]) {
-        if (cfg->dpo_export_dir)
-            a->free(a->ctx, cfg->dpo_export_dir, strlen(cfg->dpo_export_dir) + 1);
-        cfg->dpo_export_dir = hu_strdup(a, dpo_dir);
+        if (cfg->runtime_paths.dpo_export_dir)
+            a->free(a->ctx, cfg->runtime_paths.dpo_export_dir,
+                    strlen(cfg->runtime_paths.dpo_export_dir) + 1);
+        cfg->runtime_paths.dpo_export_dir = hu_strdup(a, dpo_dir);
     }
 
     const char *data_dir = hu_json_get_string(root, "data_dir");
     if (data_dir && !strstr(data_dir, "..")) {
-        if (cfg->data_dir)
-            a->free(a->ctx, cfg->data_dir, strlen(cfg->data_dir) + 1);
-        cfg->data_dir = hu_strdup(a, data_dir);
+        if (cfg->runtime_paths.data_dir)
+            a->free(a->ctx, cfg->runtime_paths.data_dir, strlen(cfg->runtime_paths.data_dir) + 1);
+        cfg->runtime_paths.data_dir = hu_strdup(a, data_dir);
     }
 
     const char *temp_dir = hu_json_get_string(root, "temp_dir");
     if (temp_dir && !strstr(temp_dir, "..")) {
-        if (cfg->temp_dir)
-            a->free(a->ctx, cfg->temp_dir, strlen(cfg->temp_dir) + 1);
-        cfg->temp_dir = hu_strdup(a, temp_dir);
+        if (cfg->runtime_paths.temp_dir)
+            a->free(a->ctx, cfg->runtime_paths.temp_dir, strlen(cfg->runtime_paths.temp_dir) + 1);
+        cfg->runtime_paths.temp_dir = hu_strdup(a, temp_dir);
     }
 
     const char *prov = hu_json_get_string(root, "default_provider");
@@ -1433,6 +1365,9 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
                             strlen(cfg->security.audit.log_path) + 1);
                 cfg->security.audit.log_path = hu_strdup(a, lp);
             }
+            double msm = hu_json_get_number(aud, "max_size_mb", cfg->security.audit.max_size_mb);
+            if (msm >= 0 && msm <= UINT32_MAX)
+                cfg->security.audit.max_size_mb = (uint32_t)msm;
         }
     }
 

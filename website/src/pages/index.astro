@@ -65,8 +65,6 @@ const tools = [
   "Hardware",
   "Delegate",
 ];
-
-const chapterCount = 10;
 ---
 
 <html lang="en">
@@ -174,11 +172,14 @@ const chapterCount = 10;
     <style is:global>
       /* Critical hero CSS — inline for fast LCP (paint before external CSS) */
       :root {
-        --color-bg-inline: #fafaf9;
+        --color-bg-inline: var(--hu-bg, #fafaf9);
+      }
+      [data-theme="dark"] {
+        --color-bg-inline: var(--hu-bg, #0a0a0a);
       }
       @media (prefers-color-scheme: dark) {
-        :root {
-          --color-bg-inline: #0a0a0a;
+        :root:not([data-theme="light"]) {
+          --color-bg-inline: var(--hu-bg, #0a0a0a);
         }
       }
       body {
@@ -304,7 +305,6 @@ const chapterCount = 10;
       >
         <div class="hu-particles" id="hu-particles" aria-hidden="true"></div>
         <div id="custom-cursor" class="custom-cursor" aria-hidden="true"></div>
-        <span class="hu-chapter-label" aria-hidden="true">01</span>
         <canvas id="hero-webgl" class="hero-webgl-canvas" aria-hidden="true"
         ></canvas>
         <div class="hero-content text-center max-w-4xl mx-auto relative z-10">
@@ -534,8 +534,6 @@ const chapterCount = 10;
         class="demo-section relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
         aria-label="Product demo"
       >
-        <span class="hu-chapter-label" aria-hidden="true">02</span>
-
         <div class="max-w-5xl mx-auto">
           <h2
             class="font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-8 text-center"
@@ -598,7 +596,6 @@ const chapterCount = 10;
         id="chapter-3"
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">03</span>
         <div class="max-w-5xl mx-auto">
           <div class="grid md:grid-cols-2 gap-16 items-center">
             <div>
@@ -1014,7 +1011,6 @@ const chapterCount = 10;
         id="chapter-4"
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">04</span>
         <div class="max-w-5xl mx-auto text-center">
           <h2
             class="font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
@@ -1065,7 +1061,6 @@ const chapterCount = 10;
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
         <span id="use-cases" class="sr-only">Use cases</span>
-        <span class="hu-chapter-label" aria-hidden="true">05</span>
         <div class="max-w-5xl mx-auto">
           <h2
             class="spectrum-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4 text-center"
@@ -1779,7 +1774,6 @@ const chapterCount = 10;
         id="chapter-6"
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">06</span>
         <div class="max-w-5xl mx-auto text-center">
           <h2
             class="hu-scroll-reveal font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
@@ -1914,7 +1908,6 @@ const chapterCount = 10;
         id="chapter-7"
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">07</span>
         <div class="max-w-5xl mx-auto text-center">
           <h2
             class="providers-title hu-scroll-reveal font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
@@ -2049,7 +2042,6 @@ const chapterCount = 10;
         id="chapter-8"
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">08</span>
         <div class="max-w-5xl mx-auto">
           <h2
             class="terminal-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-6 text-center"
@@ -2306,7 +2298,6 @@ const chapterCount = 10;
         id="chapter-9"
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">09</span>
         <div class="max-w-5xl mx-auto text-center">
           <h2
             class="font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
@@ -2573,7 +2564,6 @@ const chapterCount = 10;
         id="chapter-10"
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">10</span>
         <div class="max-w-3xl mx-auto text-center">
           <h2
             class="cta-title hu-scroll-reveal font-sans font-black text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.05] mb-6"
@@ -2603,35 +2593,6 @@ const chapterCount = 10;
           </div>
         </div>
       </section>
-
-      <div
-        class="mobile-chapter-indicator glass-subtle"
-        id="mobile-chapter-ind"
-        aria-hidden="true"
-      >
-        {
-          Array.from({ length: chapterCount }, (_, i) => (
-            <span
-              class={`chapter-pip${i === 0 ? " active" : ""}`}
-              data-pip={i}
-            />
-          ))
-        }
-      </div>
-
-      <nav class="chapter-nav" aria-label="Page sections">
-        {
-          Array.from({ length: chapterCount }, (_, i) => i + 1).map((n) => (
-            <a
-              href={`#chapter-${n}`}
-              class="chapter-dot"
-              aria-label={`Section ${n}`}
-            >
-              <span class="chapter-dot-inner" />
-            </a>
-          ))
-        }
-      </nav>
     </main>
 
     {/* ── Footer ── */}
@@ -2680,51 +2641,6 @@ const chapterCount = 10;
       </div>
     </footer>
 
-    <script is:inline define:vars={{ chapterCount }}>
-      {
-        var chapterNav = document.querySelector(".chapter-nav");
-        if (chapterNav) {
-          var dots = Array.from(chapterNav.querySelectorAll(".chapter-dot"));
-          var sections = [];
-          for (var i = 1; i <= chapterCount; i++) {
-            var el = document.getElementById("chapter-" + i);
-            if (el) sections.push(el);
-          }
-          if (sections.length && dots.length) {
-            var mobileInd = document.getElementById("mobile-chapter-ind");
-            var pips = mobileInd
-              ? Array.from(mobileInd.querySelectorAll(".chapter-pip"))
-              : [];
-            var setActive = function (index) {
-              dots.forEach(function (d, i) {
-                var on = i === index;
-                d.classList.toggle("active", on);
-                var inner = d.querySelector(".chapter-dot-inner");
-                if (inner) inner.classList.toggle("active", on);
-              });
-              pips.forEach(function (p, i) {
-                p.classList.toggle("active", i === index);
-              });
-              if (mobileInd) mobileInd.classList.add("visible");
-            };
-            var obs = new IntersectionObserver(
-              function (entries) {
-                entries.forEach(function (entry) {
-                  if (!entry.isIntersecting) return;
-                  var idx = sections.indexOf(entry.target);
-                  if (idx >= 0) setActive(idx);
-                });
-              },
-              { threshold: 0, rootMargin: "-42% 0px -42% 0px" },
-            );
-            sections.forEach(function (s) {
-              obs.observe(s);
-            });
-            setActive(0);
-          }
-        }
-      }
-    </script>
     <script>
       const prefersReducedMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
@@ -4062,40 +3978,29 @@ const chapterCount = 10;
         });
       })();
     </script>
+    <!-- Web Vitals RUM: uncomment and configure sendBeacon endpoint when ready
     <script is:inline>
       (function () {
         if (location.hostname === "localhost") return;
         var s = document.createElement("script");
         s.src = "https://unpkg.com/web-vitals@4/dist/web-vitals.iife.js";
-        s.onerror = function () {
-          console.warn("[web-vitals] failed to load");
-        };
         s.onload = function () {
           var wv = window.webVitals;
           if (!wv) return;
-          var log = function (m) {
-            var payload = {
+          var send = function (m) {
+            navigator.sendBeacon("/api/vitals", JSON.stringify({
               name: m.name,
               value: Math.round(m.name === "CLS" ? m.value * 1000 : m.value),
               rating: m.rating,
               path: location.pathname,
-            };
-            console.debug(
-              "[web-vitals]",
-              payload.name,
-              payload.value,
-              payload.rating,
-            );
-            /* sendBeacon to RUM endpoint when deployed */
+            }));
           };
-          wv.onCLS(log);
-          wv.onINP(log);
-          wv.onLCP(log);
-          wv.onFCP(log);
-          wv.onTTFB(log);
+          wv.onCLS(send); wv.onINP(send); wv.onLCP(send);
+          wv.onFCP(send); wv.onTTFB(send);
         };
         document.head.appendChild(s);
       })();
     </script>
+    -->
   </body>
 </html>

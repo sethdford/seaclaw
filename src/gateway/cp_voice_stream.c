@@ -492,7 +492,8 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
             return HU_ERR_OUT_OF_MEMORY;
         }
         hu_json_object_set(alloc, res, "ok", hu_json_bool_new(alloc, true));
-        cp_json_set_str(alloc, res, "encoding", "pcm_f32le");
+        cp_json_set_str(alloc, res, "input_encoding", "pcm_s16le");
+        cp_json_set_str(alloc, res, "output_encoding", "pcm_f32le");
         hu_json_object_set(alloc, res, "input_sample_rate", hu_json_number_new(alloc, 16000));
         hu_json_object_set(alloc, res, "output_sample_rate", hu_json_number_new(alloc, 24000));
         cp_json_set_str(alloc, res, "mode", "gemini_live");
@@ -530,7 +531,23 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
             return rerr;
         }
 
-        sl->provider_mode = true; /* reuse same provider-based path for polling */
+        /* Register agent tools with OpenAI Realtime session */
+        if (app && app->tools && sl->provider.vtable->add_tool) {
+            for (size_t ti = 0; ti < app->tools_count; ti++) {
+                hu_tool_t *t = &app->tools[ti];
+                if (!t->vtable || !t->vtable->name)
+                    continue;
+                const char *tn = t->vtable->name(t->ctx);
+                if (!tn)
+                    continue;
+                const char *td = t->vtable->description ? t->vtable->description(t->ctx) : "";
+                const char *tp =
+                    t->vtable->parameters_json ? t->vtable->parameters_json(t->ctx) : "{}";
+                (void)sl->provider.vtable->add_tool(sl->provider.ctx, tn, td, tp);
+            }
+        }
+
+        sl->provider_mode = true;
 
         hu_json_value_t *res = hu_json_object_new(alloc);
         if (!res) {
@@ -538,7 +555,8 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
             return HU_ERR_OUT_OF_MEMORY;
         }
         hu_json_object_set(alloc, res, "ok", hu_json_bool_new(alloc, true));
-        cp_json_set_str(alloc, res, "encoding", "pcm_f32le");
+        cp_json_set_str(alloc, res, "input_encoding", "pcm_s16le");
+        cp_json_set_str(alloc, res, "output_encoding", "pcm_f32le");
         hu_json_object_set(alloc, res, "input_sample_rate", hu_json_number_new(alloc, 24000));
         hu_json_object_set(alloc, res, "output_sample_rate", hu_json_number_new(alloc, 24000));
         cp_json_set_str(alloc, res, "mode", "openai_realtime");
@@ -635,6 +653,8 @@ hu_error_t cp_voice_session_interrupt(hu_allocator_t *alloc, hu_app_context_t *a
         (void)hu_cartesia_stream_cancel_context(sl->tts, alloc, sl->tts_context);
     /* Provider mode: signal the backend to stop its current response */
     if (sl && sl->provider_mode && sl->provider.vtable) {
+        if (sl->provider.vtable->cancel_response)
+            (void)sl->provider.vtable->cancel_response(sl->provider.ctx);
         if (sl->vad_active)
             (void)sl->provider.vtable->send_activity_end(sl->provider.ctx);
         sl->vad_active = false;
@@ -946,8 +966,18 @@ void hu_voice_stream_poll_gemini_live(void) {
                         continue;
                     }
                 }
-                hu_app_context_t *app = s_proto->app_ctx;
-                if (app && app->tools && ev.tool_call_id) {
+                hu_app_context_t *app = s_proto ? s_proto->app_ctx : NULL;
+                if (!app || !app->tools) {
+                    /* No tool registry — send error so provider doesn't wait */
+                    if (sl->provider.vtable && sl->provider.vtable->send_tool_response &&
+                        ev.tool_call_id)
+                        (void)sl->provider.vtable->send_tool_response(
+                            sl->provider.ctx, ev.transcript, ev.tool_call_id,
+                            "{\"error\":\"no tool registry\"}");
+                    hu_voice_rt_event_free(a, &ev);
+                    continue;
+                }
+                if (ev.tool_call_id) {
                     hu_tool_t *match = NULL;
                     for (size_t ti = 0; ti < app->tools_count; ti++) {
                         hu_tool_t *t = &app->tools[ti];

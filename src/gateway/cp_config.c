@@ -16,7 +16,7 @@ hu_error_t cp_config_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_con
 
     if (app && app->config) {
         hu_json_object_set(alloc, obj, "exists", hu_json_bool_new(alloc, true));
-        cp_json_set_str(alloc, obj, "workspace_dir", app->config->workspace_dir);
+        cp_json_set_str(alloc, obj, "workspace_dir", app->config->runtime_paths.workspace_dir);
         cp_json_set_str(alloc, obj, "default_provider", app->config->default_provider);
         cp_json_set_str(alloc, obj, "default_model", app->config->default_model);
         hu_json_object_set(alloc, obj, "max_tokens",

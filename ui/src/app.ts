@@ -105,6 +105,9 @@ const MORE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] =
   { id: "skills", label: "Skills", icon: icons.puzzle },
   { id: "voice", label: "Voice", icon: icons.mic },
   { id: "canvas", label: "Canvas", icon: icons.monitor },
+  { id: "memory", label: "Memory", icon: icons.brain },
+  { id: "hula", label: "HuLa", icon: icons.zap },
+  { id: "workflow", label: "Workflow", icon: icons.clock },
   { id: "nodes", label: "Nodes", icon: icons.server },
   { id: "usage", label: "Usage", icon: icons["bar-chart"] },
   { id: "metrics", label: "Observability", icon: icons["chart-line"] },
@@ -553,6 +556,12 @@ export class ScApp extends LitElement {
 
   gateway: GatewayClient | null = null;
   private _keyHandler = this._onGlobalKey.bind(this);
+  private _paletteEscapeCapture = ((e: KeyboardEvent) => {
+    if (e.key === "Escape" && this.commandPaletteOpen) {
+      e.stopPropagation();
+      this.commandPaletteOpen = false;
+    }
+  }).bind(this) as EventListener;
   private _hashHandler = this._onHashChange.bind(this);
   private _resizeHandler = this._onResize.bind(this);
   private _pendingGKey = false;

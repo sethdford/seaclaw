@@ -133,17 +133,18 @@ typedef struct hu_agent_config {
     char *mr_analytical_model;           /* model router: capable reasoning model */
     char *mr_deep_model;                 /* model router: most capable model */
     bool mr_judge_enabled;               /* model router: enable LLM-as-Judge classification */
-    char *mr_judge_model;                /* model router: model to use for judge (default: reflexive) */
-    char *s3_local_model;                /* dedicated model for S3 (private) content; NULL = use degradation fallback */
-    bool prompt_cache_enabled;           /* enable cross-turn system prompt dedup (default true) */
-    bool agent_comm_enabled;             /* enable ACP inter-agent messaging (default false) */
-    char *context_engine_type;           /* "legacy" (default) or "rag" */
+    char *mr_judge_model;      /* model router: model to use for judge (default: reflexive) */
+    char *s3_local_model;      /* dedicated model for S3 (private) content; NULL = use degradation
+                                  fallback */
+    bool prompt_cache_enabled; /* enable cross-turn system prompt dedup (default true) */
+    bool agent_comm_enabled;   /* enable ACP inter-agent messaging (default false) */
+    char *context_engine_type; /* "legacy" (default) or "rag" */
     /* Claude Code feature integration */
-    uint8_t permission_level;          /* 0=ReadOnly, 1=WorkspaceWrite, 2=DangerFullAccess */
-    bool session_auto_save;            /* auto-save session after each turn */
-    char *session_dir;                 /* directory for session JSON files */
-    bool discover_instructions;        /* discover .human.md/HUMAN.md files */
-    bool compaction_use_structured;    /* use XML structured summaries */
+    uint8_t permission_level;       /* 0=ReadOnly, 1=WorkspaceWrite, 2=DangerFullAccess */
+    bool session_auto_save;         /* auto-save session after each turn */
+    char *session_dir;              /* directory for session JSON files */
+    bool discover_instructions;     /* discover .human.md/HUMAN.md files */
+    bool compaction_use_structured; /* use XML structured summaries */
 } hu_agent_config_t;
 
 typedef struct hu_policy_config {
@@ -274,9 +275,9 @@ typedef struct hu_mcp_server_entry {
     char *command;        /* stdio: binary path */
     char *args[HU_MCP_SERVER_ARGS_MAX];
     size_t args_count;
-    char *url;            /* sse/http: endpoint URL */
+    char *url; /* sse/http: endpoint URL */
     bool auto_connect;
-    uint32_t timeout_ms;  /* 0 = use default (30s) */
+    uint32_t timeout_ms; /* 0 = use default (30s) */
     /* OAuth2 PKCE authentication (optional, for HTTP/SSE servers) */
     char *oauth_client_id;
     char *oauth_auth_url;
@@ -555,19 +556,19 @@ typedef struct hu_tools_config {
 } hu_tools_config_t;
 
 typedef struct hu_voice_settings {
-    char *local_stt_endpoint; /* e.g. "http://localhost:8000/v1/audio/transcriptions" */
-    char *local_tts_endpoint; /* e.g. "http://localhost:8880/v1/audio/speech" */
-    char *stt_provider;       /* "gemini", "groq", "local" — NULL = auto */
-    char *tts_provider;       /* "openai", "cartesia", "local" — NULL = auto */
-    char *tts_voice;          /* voice name, NULL = default */
-    char *tts_model;          /* model name, NULL = default */
-    char *stt_model;          /* model name, NULL = default */
-    char *mode;           /* "sonata", "realtime", "webrtc", "gemini_live" — NULL = sonata */
-    char *realtime_model; /* Model for Realtime/GL, e.g. "gemini-3.1-flash-live-preview" */
-    char *realtime_voice; /* Voice for Realtime/GL, e.g. "Puck", "alloy" */
-    char *vertex_region;        /* Vertex AI region for Gemini Live; NULL = use Google AI endpoint */
-    char *vertex_project;       /* Vertex AI project ID; required when vertex_region is set */
-    char *vertex_access_token;  /* OAuth2 bearer token for Vertex AI; NULL = use api_key */
+    char *local_stt_endpoint;  /* e.g. "http://localhost:8000/v1/audio/transcriptions" */
+    char *local_tts_endpoint;  /* e.g. "http://localhost:8880/v1/audio/speech" */
+    char *stt_provider;        /* "gemini", "groq", "local" — NULL = auto */
+    char *tts_provider;        /* "openai", "cartesia", "local" — NULL = auto */
+    char *tts_voice;           /* voice name, NULL = default */
+    char *tts_model;           /* model name, NULL = default */
+    char *stt_model;           /* model name, NULL = default */
+    char *mode;                /* "sonata", "realtime", "webrtc", "gemini_live" — NULL = sonata */
+    char *realtime_model;      /* Model for Realtime/GL, e.g. "gemini-3.1-flash-live-preview" */
+    char *realtime_voice;      /* Voice for Realtime/GL, e.g. "Puck", "alloy" */
+    char *vertex_region;       /* Vertex AI region for Gemini Live; NULL = use Google AI endpoint */
+    char *vertex_project;      /* Vertex AI project ID; required when vertex_region is set */
+    char *vertex_access_token; /* OAuth2 bearer token for Vertex AI; NULL = use api_key */
 } hu_voice_settings_t;
 
 typedef struct hu_identity_config {
@@ -586,8 +587,9 @@ typedef struct hu_media_gen_config {
     char *default_image_model; /* "gemini" (default), "imagen4", "imagen4_fast", "imagen4_ultra" */
     char *default_video_model; /* "veo_3.1" (default), "veo_3.1_fast", "veo_3.1_lite" */
     char *vertex_project;      /* Vertex AI project ID; NULL = env GOOGLE_CLOUD_PROJECT */
-    char *vertex_region;       /* Vertex AI region; NULL = env GOOGLE_CLOUD_LOCATION or "us-central1" */
-    char *veo_storage_uri;     /* GCS URI for Veo output; NULL = env HU_VEO_STORAGE_URI or gs://{project}-human-media/veo/ */
+    char *vertex_region;   /* Vertex AI region; NULL = env GOOGLE_CLOUD_LOCATION or "us-central1" */
+    char *veo_storage_uri; /* GCS URI for Veo output; NULL = env HU_VEO_STORAGE_URI or
+                              gs://{project}-human-media/veo/ */
 } hu_media_gen_config_t;
 
 typedef struct hu_peripherals_config {
@@ -605,8 +607,7 @@ typedef struct hu_hardware_config {
 
 #define HU_CONFIG_VERSION_CURRENT 2
 
-typedef struct hu_config {
-    int config_version; /* schema version for migration; default 1 */
+typedef struct hu_config_runtime_paths {
     char *workspace_dir;
     char *config_path;
     char *workspace_dir_override;
@@ -614,6 +615,11 @@ typedef struct hu_config {
     char *dpo_export_dir;
     char *data_dir; /* overrides ~/.human/data/ for hu_data_load() */
     char *temp_dir; /* overrides platform temp dir */
+} hu_config_runtime_paths_t;
+
+typedef struct hu_config {
+    int config_version; /* schema version for migration; default 1 */
+    hu_config_runtime_paths_t runtime_paths;
     char *api_key;
     hu_provider_entry_t *providers;
     size_t providers_len;

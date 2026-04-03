@@ -484,10 +484,11 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         goto fail;
     ctx->cfg = &bi->cfg;
 
-    if (bi->cfg.data_dir && bi->cfg.data_dir[0])
-        hu_data_set_dir(bi->cfg.data_dir);
+    if (bi->cfg.runtime_paths.data_dir && bi->cfg.runtime_paths.data_dir[0])
+        hu_data_set_dir(bi->cfg.runtime_paths.data_dir);
 
-    const char *ws = bi->cfg.workspace_dir ? bi->cfg.workspace_dir : ".";
+    const char *ws =
+        bi->cfg.runtime_paths.workspace_dir ? bi->cfg.runtime_paths.workspace_dir : ".";
 
     bi->plugin_reg = hu_plugin_registry_create(alloc, 16);
     ctx->plugin_reg = bi->plugin_reg;
@@ -910,6 +911,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             .speculative_cache = bi->cfg.agent.speculative_cache,
             .tool_routing_enabled = bi->cfg.agent.tool_routing_enabled,
             .multi_agent = bi->cfg.agent.multi_agent,
+            .compaction_use_structured = bi->cfg.agent.compaction_use_structured,
         };
         hu_observer_t *obs = bi->observer.vtable ? &bi->observer : NULL;
         err = hu_agent_from_config(
@@ -917,10 +919,12 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             bi->memory.vtable ? &bi->memory : NULL,
             bi->session_store.vtable ? &bi->session_store : NULL, obs, &bi->policy, model,
             strlen(model), prov_name, prov_name_len, temp, ws, strlen(ws), max_iters, max_hist,
-            bi->cfg.memory.auto_save, 2, NULL, 0, bi->cfg.agent.persona,
-            bi->cfg.agent.persona ? strlen(bi->cfg.agent.persona) : 0, &ctx_cfg);
+            bi->cfg.memory.auto_save, bi->cfg.security.autonomy_level, NULL, 0,
+            bi->cfg.agent.persona, bi->cfg.agent.persona ? strlen(bi->cfg.agent.persona) : 0,
+            &ctx_cfg);
         if (err != HU_OK)
             goto fail;
+        bi->agent.config = &bi->cfg;
         hu_metacognition_apply_config(&bi->agent.metacognition, &bi->cfg.agent.metacognition);
         memset(&bi->voice_cfg, 0, sizeof(bi->voice_cfg));
         (void)hu_voice_config_from_settings(&bi->cfg, &bi->voice_cfg);

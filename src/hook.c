@@ -402,40 +402,30 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
     }
 
     if (pid == 0) {
-        /* Child: redirect stdout to pipe, sanitize env, exec */
+        /* Child: redirect stdout to pipe, sanitize env, exec.
+         * Only async-signal-safe functions may be used between fork and exec. */
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
         close(pipefd[1]);
 
-        /* Sanitize dangerous environment variables */
+        /* Build a sanitized copy of environ without dangerous variables.
+         * Uses stack-allocated pointer array to avoid malloc (not async-signal-safe). */
         extern char **environ;
-
-        /* Phase 1: collect names of dangerous variables (avoid modifying environ during iteration) */
-        char *to_remove[32];
-        size_t remove_count = 0;
-        for (char **env = environ; env && *env && remove_count < 32; env++) {
-            if (hu_hook_is_dangerous_env(*env)) {
-                /* Extract variable name (up to '=') */
-                const char *eq = strchr(*env, '=');
-                if (eq) {
-                    size_t nlen = (size_t)(eq - *env);
-                    char *name_copy = malloc(nlen + 1);
-                    if (name_copy) {
-                        memcpy(name_copy, *env, nlen);
-                        name_copy[nlen] = '\0';
-                        to_remove[remove_count++] = name_copy;
-                    }
-                }
-            }
+        size_t env_count = 0;
+        for (char **e = environ; e && *e; e++)
+            env_count++;
+        /* VLA: bounded by environment size. If env is huge, cap to 512. */
+        size_t cap = env_count < 512 ? env_count : 512;
+        char *clean_env[cap + 1];
+        size_t ci = 0;
+        for (size_t i = 0; i < env_count && ci < cap; i++) {
+            if (!hu_hook_is_dangerous_env(environ[i]))
+                clean_env[ci++] = environ[i];
         }
+        clean_env[ci] = NULL;
 
-        /* Phase 2: remove collected variable names */
-        for (size_t i = 0; i < remove_count; i++) {
-            unsetenv(to_remove[i]);
-            free(to_remove[i]);
-        }
-
-        execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+        char *argv[] = {"sh", "-c", cmd, NULL};
+        execve("/bin/sh", argv, clean_env);
         _exit(127);
     }
 

@@ -120,7 +120,7 @@ static void test_gateway_voice_session_start_returns_pcm_meta(void) {
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(strstr(out, "pcm_f32le") != NULL);
     HU_ASSERT_TRUE(strstr(out, "24000") != NULL);
-    HU_ASSERT_TRUE(strstr(out, "sessionId") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "session_id") != NULL);
     backing.free(backing.ctx, out, out_len);
     hu_json_free(&backing, root);
 
@@ -579,8 +579,8 @@ static void test_gl_session_start_returns_mode(void) {
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(strstr(out, "gemini_live") != NULL);
     HU_ASSERT_TRUE(strstr(out, "pcm_f32le") != NULL);
-    HU_ASSERT_TRUE(strstr(out, "inputSampleRate") != NULL);
-    HU_ASSERT_TRUE(strstr(out, "outputSampleRate") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "input_sample_rate") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "output_sample_rate") != NULL);
     b.free(b.ctx, out, out_len);
     hu_json_free(&b, root);
     hu_voice_stream_on_conn_close(&conn);
@@ -656,7 +656,7 @@ static void test_gl_tool_response_ok(void) {
     if (out)
         b.free(b.ctx, out, out_len);
     hu_json_free(&b, root);
-    const char *req2 = "{\"params\":{\"callId\":\"c1\",\"name\":\"weather\",\"result\":\"{}\"}}";
+    const char *req2 = "{\"params\":{\"call_id\":\"c1\",\"name\":\"weather\",\"result\":\"{}\"}}";
     HU_ASSERT_EQ(hu_json_parse(&b, req2, strlen(req2), &root), HU_OK);
     out = NULL;
     out_len = 0;

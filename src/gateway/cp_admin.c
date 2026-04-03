@@ -53,6 +53,10 @@ hu_error_t cp_admin_connect(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -196,6 +200,10 @@ hu_error_t cp_admin_health(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -241,6 +249,10 @@ hu_error_t cp_admin_capabilities(hu_allocator_t *alloc, hu_app_context_t *app, h
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -277,6 +289,10 @@ hu_error_t cp_admin_sessions_list(hu_allocator_t *alloc, hu_app_context_t *app, 
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -315,6 +331,10 @@ hu_error_t cp_admin_sessions_patch(hu_allocator_t *alloc, hu_app_context_t *app,
                                    char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool patched = false;
 
     if (root && app && app->sessions) {
@@ -353,6 +373,10 @@ hu_error_t cp_admin_sessions_delete(hu_allocator_t *alloc, hu_app_context_t *app
                                     const hu_json_value_t *root, char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool deleted = false;
 
     if (root && app && app->sessions) {
@@ -380,6 +404,10 @@ hu_error_t cp_admin_persona_set(hu_allocator_t *alloc, hu_app_context_t *app, hu
                                 char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -440,6 +468,10 @@ hu_error_t cp_admin_tools_catalog(hu_allocator_t *alloc, hu_app_context_t *app, 
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -487,6 +519,10 @@ hu_error_t cp_admin_channels_status(hu_allocator_t *alloc, hu_app_context_t *app
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -532,6 +568,10 @@ hu_error_t cp_admin_models_list(hu_allocator_t *alloc, hu_app_context_t *app, hu
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -570,6 +610,10 @@ hu_error_t cp_admin_models_decisions(hu_allocator_t *alloc, hu_app_context_t *ap
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -697,6 +741,10 @@ hu_error_t cp_admin_nodes_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -911,6 +959,10 @@ hu_error_t cp_admin_usage_summary(hu_allocator_t *alloc, hu_app_context_t *app, 
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -949,6 +1001,10 @@ hu_error_t cp_admin_metrics_snapshot(hu_allocator_t *alloc, hu_app_context_t *ap
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -1077,6 +1133,10 @@ hu_error_t cp_admin_activity_recent(hu_allocator_t *alloc, hu_app_context_t *app
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -1153,6 +1213,10 @@ hu_error_t cp_admin_exec_approval(hu_allocator_t *alloc, hu_app_context_t *app, 
                                   char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool resolved = false;
     bool approved = false;
 
@@ -1183,6 +1247,10 @@ hu_error_t cp_admin_auth_token(hu_allocator_t *alloc, hu_app_context_t *app, hu_
                                const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                char **out, size_t *out_len) {
     (void)app;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     const char *token = NULL;
     if (root) {
         hu_json_value_t *params = hu_json_object_get(root, "params");
@@ -1210,9 +1278,6 @@ hu_error_t cp_admin_auth_token(hu_allocator_t *alloc, hu_app_context_t *app, hu_
         cp_json_set_str(alloc, obj, "result", "authenticated");
         return cp_respond_json(alloc, obj, out, out_len);
     }
-    (void)alloc;
-    (void)out;
-    (void)out_len;
     return HU_ERR_GATEWAY_AUTH;
 }
 
@@ -1223,6 +1288,10 @@ hu_error_t cp_admin_oauth_start(hu_allocator_t *alloc, hu_app_context_t *app, hu
                                 char **out, size_t *out_len) {
     (void)app;
     (void)conn;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_oauth_ctx_t *ctx = (hu_oauth_ctx_t *)proto->oauth_ctx;
     if (!ctx || !proto->oauth_pending_store || !proto->oauth_pending_lookup ||
         !proto->oauth_pending_remove) {
@@ -1296,6 +1365,10 @@ hu_error_t cp_admin_oauth_callback(hu_allocator_t *alloc, hu_app_context_t *app,
                                    char **out, size_t *out_len) {
     (void)app;
     (void)conn;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_oauth_ctx_t *ctx = (hu_oauth_ctx_t *)proto->oauth_ctx;
     if (!ctx || !proto->oauth_pending_lookup || !proto->oauth_pending_remove) {
         hu_json_value_t *obj = hu_json_object_new(alloc);
@@ -1358,6 +1431,10 @@ hu_error_t cp_admin_oauth_refresh(hu_allocator_t *alloc, hu_app_context_t *app, 
                                   char **out, size_t *out_len) {
     (void)app;
     (void)conn;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_oauth_ctx_t *ctx = (hu_oauth_ctx_t *)proto->oauth_ctx;
     if (!ctx) {
         hu_json_value_t *obj = hu_json_object_new(alloc);
@@ -1413,6 +1490,10 @@ hu_error_t cp_admin_cron_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -1456,6 +1537,10 @@ hu_error_t cp_admin_cron_add(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws
                              char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool added = false;
     uint64_t new_id = 0;
 
@@ -1513,6 +1598,10 @@ hu_error_t cp_admin_cron_remove(hu_allocator_t *alloc, hu_app_context_t *app, hu
                                 char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool removed = false;
 
     if (root && app && app->cron) {
@@ -1626,6 +1715,10 @@ hu_error_t cp_admin_cron_run(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws
                              char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool started = false;
     const char *status_msg = "no cron scheduler";
 
@@ -1753,6 +1846,10 @@ hu_error_t cp_admin_cron_update(hu_allocator_t *alloc, hu_app_context_t *app, hu
                                 char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool updated = false;
 
     if (root && app && app->cron && app->alloc) {
@@ -1790,6 +1887,10 @@ hu_error_t cp_admin_cron_runs(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
                               char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -1831,6 +1932,10 @@ hu_error_t cp_admin_skills_list(hu_allocator_t *alloc, hu_app_context_t *app, hu
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -1888,6 +1993,10 @@ hu_error_t cp_admin_skills_enable(hu_allocator_t *alloc, hu_app_context_t *app, 
                                   char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     return cp_admin_skill_toggle(alloc, app, root, true, out, out_len);
 }
 
@@ -1896,6 +2005,10 @@ hu_error_t cp_admin_skills_disable(hu_allocator_t *alloc, hu_app_context_t *app,
                                    char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     return cp_admin_skill_toggle(alloc, app, root, false, out, out_len);
 }
 
@@ -1907,6 +2020,10 @@ hu_error_t cp_admin_skills_install(hu_allocator_t *alloc, hu_app_context_t *app,
     (void)app;
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool installed = false;
     const char *error_msg = NULL;
 
@@ -1945,6 +2062,10 @@ hu_error_t cp_admin_skills_search(hu_allocator_t *alloc, hu_app_context_t *app, 
     (void)app;
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     const char *query = NULL;
     if (root) {
         hu_json_value_t *params = hu_json_object_get(root, "params");
@@ -1994,6 +2115,10 @@ hu_error_t cp_admin_skills_uninstall(hu_allocator_t *alloc, hu_app_context_t *ap
                                      const hu_json_value_t *root, char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool success = false;
 
     if (root && app && app->skills) {
@@ -2022,6 +2147,10 @@ hu_error_t cp_admin_skills_update(hu_allocator_t *alloc, hu_app_context_t *app, 
     (void)app;
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool success = false;
     const char *path = NULL;
     if (root) {
@@ -2053,6 +2182,10 @@ hu_error_t cp_admin_update_check(hu_allocator_t *alloc, hu_app_context_t *app, h
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -2082,6 +2215,10 @@ hu_error_t cp_admin_update_run(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
@@ -2105,6 +2242,10 @@ hu_error_t cp_admin_push_register(hu_allocator_t *alloc, hu_app_context_t *app, 
                                   char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool registered = false;
     const char *error_msg = NULL;
 
@@ -2153,6 +2294,10 @@ hu_error_t cp_admin_push_unregister(hu_allocator_t *alloc, hu_app_context_t *app
                                     const hu_json_value_t *root, char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     bool unregistered = false;
     const char *error_msg = NULL;
 

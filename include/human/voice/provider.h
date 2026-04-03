@@ -49,12 +49,17 @@ hu_error_t hu_voice_provider_gemini_live_create(hu_allocator_t *alloc,
                                                 const struct hu_gemini_live_config *config,
                                                 hu_voice_provider_t *out);
 
-/* Optional extras for the voice provider factory (all fields may be NULL). */
+/* Optional extras for the voice provider factory (all fields may be NULL/0). */
 typedef struct hu_voice_provider_extras {
-    const char *system_instruction; /* persona/system prompt for Gemini Live */
-    const char *tools_json;         /* JSON array of tool declarations for Gemini Live setup */
-    const char *voice_id;           /* override voice for this session (NULL = use config default) */
-    const char *model_id;           /* override model for this session (NULL = use config default) */
+    const char *system_instruction;  /* persona/system prompt for Gemini Live */
+    const char *tools_json;          /* JSON array of tool declarations for Gemini Live setup */
+    const char *voice_id;            /* override voice (NULL = use config default) */
+    const char *model_id;            /* override model (NULL = use config default) */
+    const char *api_key;             /* override API key (NULL = use config lookup) */
+    const char *vertex_region;       /* Vertex AI region (NULL = use config default) */
+    const char *vertex_project;      /* Vertex AI project (NULL = use config default) */
+    const char *vertex_access_token; /* Vertex AI access token (NULL = use config default) */
+    int sample_rate;                 /* audio sample rate (0 = use default 24000) */
 } hu_voice_provider_extras_t;
 
 /*
@@ -66,6 +71,15 @@ typedef struct hu_voice_provider_extras {
 struct hu_config;
 hu_error_t hu_voice_provider_create_from_config(hu_allocator_t *alloc,
                                                 const struct hu_config *config, const char *mode,
+                                                const hu_voice_provider_extras_t *extras,
+                                                hu_voice_provider_t *out);
+
+/*
+ * Lightweight factory: create a voice provider from mode string + extras only.
+ * Does not require hu_config_t — gets api_key, model, voice from extras fields.
+ * For use by channels/modules that don't have access to the global config.
+ */
+hu_error_t hu_voice_provider_create_from_extras(hu_allocator_t *alloc, const char *mode,
                                                 const hu_voice_provider_extras_t *extras,
                                                 hu_voice_provider_t *out);
 

@@ -1,4 +1,5 @@
 /* Gateway edge cases + control protocol + event bridge tests. */
+#include "cp_internal.h"
 #include "human/agent.h"
 #include "human/bus.h"
 #include "human/config.h"
@@ -16,7 +17,6 @@
 #include "human/provider.h"
 #include "human/tool.h"
 #include "test_framework.h"
-#include "cp_internal.h"
 #include <string.h>
 #include <time.h>
 
@@ -27,8 +27,8 @@ typedef struct gw_e2e_mock_provider_ctx {
 static hu_error_t gw_e2e_mock_chat_with_system(void *ctx, hu_allocator_t *alloc,
                                                const char *system_prompt, size_t system_prompt_len,
                                                const char *message, size_t message_len,
-                                               const char *model, size_t model_len, double temperature,
-                                               char **out, size_t *out_len) {
+                                               const char *model, size_t model_len,
+                                               double temperature, char **out, size_t *out_len) {
     (void)ctx;
     (void)system_prompt;
     (void)system_prompt_len;
@@ -43,9 +43,9 @@ static hu_error_t gw_e2e_mock_chat_with_system(void *ctx, hu_allocator_t *alloc,
     return *out ? HU_OK : HU_ERR_OUT_OF_MEMORY;
 }
 
-static hu_error_t gw_e2e_mock_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_request_t *request,
-                                   const char *model, size_t model_len, double temperature,
-                                   hu_chat_response_t *out) {
+static hu_error_t gw_e2e_mock_chat(void *ctx, hu_allocator_t *alloc,
+                                   const hu_chat_request_t *request, const char *model,
+                                   size_t model_len, double temperature, hu_chat_response_t *out) {
     (void)ctx;
     (void)request;
     (void)model;
@@ -130,15 +130,13 @@ static bool gw_e2e_on_message_received(hu_bus_event_type_t type, const hu_bus_ev
     size_t reply_len = 0;
     b->agent->active_channel = "gateway";
     b->agent->active_channel_len = 8;
-    hu_error_t err =
-        hu_agent_turn_stream_v2(b->agent, msg, strlen(msg), gw_e2e_noop_stream_cb, NULL, &reply,
-                                &reply_len);
+    hu_error_t err = hu_agent_turn_stream_v2(b->agent, msg, strlen(msg), gw_e2e_noop_stream_cb,
+                                             NULL, &reply, &reply_len);
     if (err == HU_OK && reply && reply_len > 0 && b->bus) {
         hu_bus_event_t rev;
         memset(&rev, 0, sizeof(rev));
         rev.type = HU_BUS_MESSAGE_SENT;
-        snprintf(rev.channel, HU_BUS_CHANNEL_LEN, "%s",
-                 ev->channel[0] ? ev->channel : "gateway");
+        snprintf(rev.channel, HU_BUS_CHANNEL_LEN, "%s", ev->channel[0] ? ev->channel : "gateway");
         snprintf(rev.id, HU_BUS_ID_LEN, "%s", ev->id);
         rev.payload = reply;
         size_t rl = reply_len;
@@ -1530,7 +1528,7 @@ static void test_cp_config_get_returns_populated_fields(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
-    cfg.workspace_dir = "/tmp/human_ws";
+    cfg.runtime_paths.workspace_dir = "/tmp/human_ws";
     cfg.default_provider = "openai";
     cfg.default_model = "gpt-4o";
     cfg.max_tokens = 4096;
@@ -1567,6 +1565,7 @@ static void test_cp_config_set_reports_saved_false_when_raw_invalid(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
+    cfg.allocator = alloc;
 
     hu_app_context_t app;
     memset(&app, 0, sizeof(app));
@@ -1634,8 +1633,8 @@ static void test_cp_memory_recall_and_store_round_trip_json(void) {
     hu_agent_t agent;
     memset(&agent, 0, sizeof(agent));
     HU_ASSERT_EQ(hu_agent_from_config(&agent, &alloc, prov, NULL, 0, &mem, NULL, NULL, NULL,
-                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0,
-                                      NULL, 0, NULL, 0, NULL),
+                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL,
+                                      0, NULL, 0, NULL),
                  HU_OK);
 
     hu_app_context_t app;
@@ -1665,8 +1664,7 @@ static void test_cp_memory_recall_and_store_round_trip_json(void) {
     /* memory.recall (semantic / keyword search over stored content) */
     {
         hu_json_value_t *root = NULL;
-        const char *req =
-            "{\"params\":{\"query\":\"gateway_rpc_unique_alpha_token\",\"limit\":5}}";
+        const char *req = "{\"params\":{\"query\":\"gateway_rpc_unique_alpha_token\",\"limit\":5}}";
         HU_ASSERT_EQ(hu_json_parse(&alloc, req, strlen(req), &root), HU_OK);
         char *out = NULL;
         size_t out_len = 0;
@@ -1726,8 +1724,8 @@ static void test_cp_turing_scores_returns_scores_array_json(void) {
     hu_agent_t agent;
     memset(&agent, 0, sizeof(agent));
     HU_ASSERT_EQ(hu_agent_from_config(&agent, &alloc, prov, NULL, 0, &mem, NULL, NULL, NULL,
-                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0,
-                                      NULL, 0, NULL, 0, NULL),
+                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL,
+                                      0, NULL, 0, NULL),
                  HU_OK);
 
     hu_app_context_t app;
@@ -1753,7 +1751,58 @@ static void test_cp_turing_scores_returns_scores_array_json(void) {
     mem.vtable->deinit(mem.ctx);
 }
 
+static void test_cp_memory_null_guard_returns_invalid_argument(void) {
+    HU_ASSERT_EQ(cp_memory_status(NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    hu_allocator_t alloc = hu_system_allocator();
+    char *out = NULL;
+    size_t out_len = 0;
+    HU_ASSERT_EQ(cp_memory_list(NULL, NULL, NULL, NULL, NULL, &out, &out_len),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_memory_recall(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_memory_store(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_memory_forget(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_memory_ingest(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_memory_graph(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_memory_consolidate(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_cp_turing_null_guard_returns_invalid_argument(void) {
+    HU_ASSERT_EQ(cp_turing_scores(NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    hu_allocator_t alloc = hu_system_allocator();
+    HU_ASSERT_EQ(cp_turing_trend(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_turing_dimensions(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_turing_contact(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_turing_trajectory(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_turing_ab_tests(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_turing_channel(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+
 #endif /* HU_GATEWAY_POSIX && HU_ENABLE_SQLITE */
+
+static void test_cp_canvas_null_guard_returns_invalid_argument(void) {
+    HU_ASSERT_EQ(cp_canvas_get(NULL, NULL, NULL, NULL, NULL, NULL, NULL), HU_ERR_INVALID_ARGUMENT);
+    hu_allocator_t alloc = hu_system_allocator();
+    HU_ASSERT_EQ(cp_canvas_edit(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_canvas_undo(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(cp_canvas_redo(&alloc, NULL, NULL, NULL, NULL, NULL, NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+}
 
 static void test_e2e_chat_send_bus_agent_turn_produces_assistant_reply(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -1769,8 +1818,8 @@ static void test_e2e_chat_send_bus_agent_turn_produces_assistant_reply(void) {
     hu_agent_t agent;
     memset(&agent, 0, sizeof(agent));
     HU_ASSERT_EQ(hu_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL,
-                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0,
-                                      NULL, 0, NULL, 0, NULL),
+                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL,
+                                      0, NULL, 0, NULL),
                  HU_OK);
 
     app.agent = &agent;
@@ -1923,7 +1972,10 @@ void run_gateway_extended_tests(void) {
     HU_RUN_TEST(test_cp_memory_recall_and_store_round_trip_json);
     HU_RUN_TEST(test_cp_mcp_resources_and_prompts_list_json_shape);
     HU_RUN_TEST(test_cp_turing_scores_returns_scores_array_json);
+    HU_RUN_TEST(test_cp_memory_null_guard_returns_invalid_argument);
+    HU_RUN_TEST(test_cp_turing_null_guard_returns_invalid_argument);
 #endif
+    HU_RUN_TEST(test_cp_canvas_null_guard_returns_invalid_argument);
     HU_RUN_TEST(test_e2e_chat_send_bus_agent_turn_produces_assistant_reply);
     HU_RUN_TEST(test_connect_handshake_advertises_critical_methods);
     HU_RUN_TEST(test_event_bridge_payload_propagation);

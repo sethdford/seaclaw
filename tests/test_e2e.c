@@ -645,7 +645,7 @@ static void test_agent_stream_tool_chunk_bridge_emits_chunk_and_final_results(vo
     memset(&coll, 0, sizeof(coll));
     char *response = NULL;
     size_t response_len = 0;
-    err = hu_agent_turn_stream_v2(&agent, "run streaming tool", 20, stream_v2_collect_events,
+    err = hu_agent_turn_stream_v2(&agent, "run streaming tool", 18, stream_v2_collect_events,
                                   &coll, &response, &response_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(response);

@@ -20,7 +20,6 @@
 #include "human/agent/registry.h"
 #include "human/agent/spawn.h"
 #include "human/agent/task_store.h"
-#include "human/tools/canvas.h"
 #include "human/bootstrap.h"
 #include "human/bus.h"
 #include "human/channel.h"
@@ -62,6 +61,7 @@
 #include "human/session.h"
 #include "human/skill_registry.h"
 #include "human/skill_scaffold.h"
+#include "human/tools/canvas.h"
 #ifdef HU_HAS_SKILLS
 #include "human/skillforge.h"
 #endif
@@ -592,7 +592,9 @@ static hu_error_t cmd_doctor(hu_allocator_t *alloc, int argc, char **argv) {
     }
 
     printf("  config        ok       loaded from %s\n",
-           cfg.config_path && cfg.config_path[0] ? cfg.config_path : "defaults");
+           cfg.runtime_paths.config_path && cfg.runtime_paths.config_path[0]
+               ? cfg.runtime_paths.config_path
+               : "defaults");
 
     const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
     if (hu_config_provider_requires_api_key(prov)) {
@@ -1185,8 +1187,7 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
             hu_tool_t *ct = &app_ctx.tools[ci];
             if (ct->vtable && ct->vtable->name &&
                 strcmp(ct->vtable->name(ct->ctx), "canvas") == 0) {
-                svc_app_ctx.canvas_store =
-                    (struct hu_canvas_store *)hu_canvas_store_from_tool(ct);
+                svc_app_ctx.canvas_store = (struct hu_canvas_store *)hu_canvas_store_from_tool(ct);
                 break;
             }
         }
@@ -2468,7 +2469,8 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
         return err;
     }
 
-    const char *ws = app.cfg->workspace_dir ? app.cfg->workspace_dir : ".";
+    const char *ws =
+        app.cfg->runtime_paths.workspace_dir ? app.cfg->runtime_paths.workspace_dir : ".";
 
     /* ── Gateway-specific subsystems (not in bootstrap) ──────────────────── */
     hu_session_manager_t sessions;
@@ -2602,10 +2604,8 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
     hu_gateway_config_from_cfg(&app.cfg->gateway, &gw_config);
     for (size_t ci = 0; ci < app.tools_count && app.tools; ci++) {
         hu_tool_t *ct = &app.tools[ci];
-        if (ct->vtable && ct->vtable->name &&
-            strcmp(ct->vtable->name(ct->ctx), "canvas") == 0) {
-            gw_app_ctx.canvas_store =
-                (struct hu_canvas_store *)hu_canvas_store_from_tool(ct);
+        if (ct->vtable && ct->vtable->name && strcmp(ct->vtable->name(ct->ctx), "canvas") == 0) {
+            gw_app_ctx.canvas_store = (struct hu_canvas_store *)hu_canvas_store_from_tool(ct);
             break;
         }
     }
