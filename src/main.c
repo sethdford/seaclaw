@@ -20,6 +20,7 @@
 #include "human/agent/registry.h"
 #include "human/agent/spawn.h"
 #include "human/agent/task_store.h"
+#include "human/tools/canvas.h"
 #include "human/bootstrap.h"
 #include "human/bus.h"
 #include "human/channel.h"
@@ -232,6 +233,7 @@ static hu_error_t cmd_ml(hu_allocator_t *alloc, int argc, char **argv) {
                         "  dpo-train               Run DPO preference training step\n"
                         "  lora-persona            Train LoRA adapter from persona examples\n"
                         "  train-feed-predictor    Train topic/trend predictor from feed data\n"
+                        "  train-agent             Run agent trajectory training step\n"
                         "  status                  Show experiment results\n");
         return HU_ERR_INVALID_ARGUMENT;
     }
@@ -252,6 +254,8 @@ static hu_error_t cmd_ml(hu_allocator_t *alloc, int argc, char **argv) {
         return hu_ml_cli_lora_persona(alloc, argc - 2, (const char **)(argv + 2));
     if (strcmp(sub, "train-feed-predictor") == 0)
         return hu_ml_cli_train_feed_predictor(alloc, argc - 2, (const char **)(argv + 2));
+    if (strcmp(sub, "train-agent") == 0)
+        return hu_ml_cli_train_agent(alloc, argc - 2, (const char **)(argv + 2));
     if (strcmp(sub, "--help") == 0 || strcmp(sub, "help") == 0) {
         printf("Usage: human ml <subcommand>\n\n"
                "Subcommands:\n"
@@ -262,6 +266,7 @@ static hu_error_t cmd_ml(hu_allocator_t *alloc, int argc, char **argv) {
                "  dpo-train               Run DPO preference training step\n"
                "  lora-persona            Train LoRA adapter from persona examples\n"
                "  train-feed-predictor    Train topic/trend predictor from feed data\n"
+               "  train-agent             Run agent trajectory training step\n"
                "  status                  Show experiment results\n");
         return HU_OK;
     }
@@ -1174,6 +1179,16 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
 #endif
             if (hu_task_store_create(alloc, svc_task_db, &svc_task_store) == HU_OK)
                 svc_app_ctx.task_store = svc_task_store;
+        }
+
+        for (size_t ci = 0; ci < app_ctx.tools_count && app_ctx.tools; ci++) {
+            hu_tool_t *ct = &app_ctx.tools[ci];
+            if (ct->vtable && ct->vtable->name &&
+                strcmp(ct->vtable->name(ct->ctx), "canvas") == 0) {
+                svc_app_ctx.canvas_store =
+                    (struct hu_canvas_store *)hu_canvas_store_from_tool(ct);
+                break;
+            }
         }
 
         gw_config.app_ctx = &svc_app_ctx;
@@ -2585,6 +2600,16 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
 
     hu_gateway_config_t gw_config;
     hu_gateway_config_from_cfg(&app.cfg->gateway, &gw_config);
+    for (size_t ci = 0; ci < app.tools_count && app.tools; ci++) {
+        hu_tool_t *ct = &app.tools[ci];
+        if (ct->vtable && ct->vtable->name &&
+            strcmp(ct->vtable->name(ct->ctx), "canvas") == 0) {
+            gw_app_ctx.canvas_store =
+                (struct hu_canvas_store *)hu_canvas_store_from_tool(ct);
+            break;
+        }
+    }
+
     gw_config.app_ctx = &gw_app_ctx;
 
     if (with_agent && app.agent_ok && app.agent) {

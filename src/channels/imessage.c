@@ -1785,11 +1785,11 @@ static hu_error_t imessage_start_typing(void *ctx, const char *recipient, size_t
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
     if (!c || !recipient || recipient_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
-    if (recipient_len < sizeof(c->typing_last_target)) {
-        memcpy(c->typing_last_target, recipient, recipient_len);
-        c->typing_last_target[recipient_len] = '\0';
-        c->typing_last_target_len = recipient_len;
-    }
+    if (recipient_len >= sizeof(c->typing_last_target))
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(c->typing_last_target, recipient, recipient_len);
+    c->typing_last_target[recipient_len] = '\0';
+    c->typing_last_target_len = recipient_len;
     struct timeval tv;
     gettimeofday(&tv, NULL);
     c->typing_started_ms = (uint64_t)tv.tv_sec * 1000ULL + (uint64_t)tv.tv_usec / 1000ULL;
@@ -1798,11 +1798,14 @@ static hu_error_t imessage_start_typing(void *ctx, const char *recipient, size_t
 }
 
 static hu_error_t imessage_stop_typing(void *ctx, const char *recipient, size_t recipient_len) {
-    (void)recipient;
-    (void)recipient_len;
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
-    if (c)
+    if (!c)
+        return HU_OK;
+    if (!recipient || recipient_len == 0 ||
+        (recipient_len == c->typing_last_target_len &&
+         memcmp(recipient, c->typing_last_target, recipient_len) == 0)) {
         c->typing_started_ms = 0;
+    }
     return HU_OK;
 }
 
@@ -1972,7 +1975,10 @@ char *hu_imessage_get_attachment_path(hu_allocator_t *alloc, int64_t message_id)
     }
     sqlite3_finalize(stmt);
     sqlite3_close(db);
-    /* Validate path is within Messages attachments directory */
+    if (path && !hu_imessage_validate_attachment_path(path)) {
+        alloc->free(alloc->ctx, path, strlen(path) + 1);
+        return NULL;
+    }
     if (path && home) {
         char allowed_prefix[512];
         int prefix_len = snprintf(allowed_prefix, sizeof(allowed_prefix),
@@ -2057,7 +2063,10 @@ char *hu_imessage_get_latest_attachment_path(hu_allocator_t *alloc, const char *
     }
     sqlite3_finalize(stmt);
     sqlite3_close(db);
-    /* Validate path is within Messages attachments directory */
+    if (path && !hu_imessage_validate_attachment_path(path)) {
+        alloc->free(alloc->ctx, path, strlen(path) + 1);
+        return NULL;
+    }
     if (path && home) {
         char allowed_prefix[512];
         int prefix_len = snprintf(allowed_prefix, sizeof(allowed_prefix),
@@ -2399,6 +2408,9 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
             if (sqlite3_step(retract_stmt) == SQLITE_ROW)
                 msgs[count].was_unsent = (sqlite3_column_int(retract_stmt, 0) != 0);
         }
+        if (msgs[count].was_unsent) {
+            msgs[count].content[0] = '\0';
+        }
         if (reply_to && reply_to[0]) {
             size_t rt_len = strlen(reply_to);
             if (rt_len >= sizeof(msgs[count].reply_to_guid))
@@ -2467,7 +2479,7 @@ size_t hu_imessage_gif_json_extract(const char *json, size_t json_len, const cha
             if (j < json_len && json[j] == '"') {
                 j++;
                 size_t start = j;
-                while (j < json_len && json[j] != '"')
+                while (j < json_len && !(json[j] == '"' && (j == 0 || json[j - 1] != '\\')))
                     j++;
                 size_t vlen = j - start;
                 if (vlen >= cap)
@@ -2493,8 +2505,9 @@ char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t que
     static const char hex[] = "0123456789ABCDEF";
     char encoded[768];
     size_t eidx = 0;
-    for (size_t i = 0; i < query_len && eidx + 3 < sizeof(encoded); i++) {
-        unsigned char ch = (unsigned char)query[i];
+    size_t qi;
+    for (qi = 0; qi < query_len && eidx + 3 < sizeof(encoded); qi++) {
+        unsigned char ch = (unsigned char)query[qi];
         if (ch == ' ') {
             encoded[eidx++] = '+';
         } else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
@@ -2507,6 +2520,8 @@ char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t que
             encoded[eidx++] = hex[ch & 0x0F];
         }
     }
+    if (qi < query_len)
+        return NULL;
     encoded[eidx] = '\0';
 
     char url[512];
@@ -2681,6 +2696,8 @@ hu_error_t hu_imessage_lookup_message_by_guid(hu_allocator_t *alloc, const char 
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);
+    if (*out_len == 0)
+        return HU_ERR_NOT_FOUND;
     return HU_OK;
 }
 #else

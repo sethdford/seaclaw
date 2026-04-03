@@ -46,9 +46,12 @@ static int days_in_month(int year, int m) {
     return DAYS[m];
 }
 
-/* Day of year (1-based, leap-year aware). Returns 0 for invalid month. */
+/* Day of year (1-based, leap-year aware). Returns 0 for invalid input. */
 static int day_of_year(int year, int month, int day) {
-    if (month < 1)
+    if (month < 1 || month > 12)
+        return 0;
+    int max_day = days_in_month(year, month);
+    if (day < 1 || day > max_day)
         return 0;
     int doy = 0;
     for (int m = 1; m < month; m++)
@@ -89,7 +92,7 @@ size_t hu_temporal_check_anniversaries(const hu_date_entry_t *dates, size_t date
 
         int dist = days_until(current_year, current_month, current_day, ann_month, ann_day);
         if (dist <= window_days) {
-            out[found].label = (char *)dates[i].label; /* borrowed pointer */
+            out[found].label = dates[i].label;
             out[found].label_len = dates[i].label_len;
             out[found].month = dates[i].month;
             out[found].day = dates[i].day;

@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
 import Nav from "../components/Nav.astro";
+import AnimatedLogo from "../components/AnimatedLogo.astro";
 
 const rawBase = import.meta.env.BASE_URL;
 const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
@@ -65,7 +66,7 @@ const tools = [
   "Delegate",
 ];
 
-const chapterCount = 9;
+const chapterCount = 10;
 ---
 
 <html lang="en">
@@ -101,12 +102,6 @@ const chapterCount = 9;
     <meta
       name="description"
       content="not quite human. A complete autonomous AI agent runtime in 1,750 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU."
-    />
-    <link
-      rel="preload"
-      href={`${base}human.svg`}
-      as="image"
-      fetchpriority="high"
     />
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
     <link
@@ -293,11 +288,9 @@ const chapterCount = 9;
   </head>
   <body
     style="background: var(--color-bg); color: var(--color-text);"
-    class="antialiased overflow-x-hidden hu-film-grain"
+    class="antialiased overflow-x-hidden"
   >
-    <div class="hu-particles" id="hu-particles" aria-hidden="true"></div>
     <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
-    <div id="custom-cursor" class="custom-cursor" aria-hidden="true"></div>
     <a href="#main-content" class="skip-link">Skip to content</a>
     <Nav />
 
@@ -306,35 +299,21 @@ const chapterCount = 9;
 
       <section
         id="chapter-1"
-        class="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-20 sm:pt-24 overflow-hidden"
+        class="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-20 sm:pt-24 overflow-hidden hu-film-grain"
         aria-label="Hero"
       >
+        <div class="hu-particles" id="hu-particles" aria-hidden="true"></div>
+        <div id="custom-cursor" class="custom-cursor" aria-hidden="true"></div>
         <span class="hu-chapter-label" aria-hidden="true">01</span>
         <canvas id="hero-webgl" class="hero-webgl-canvas" aria-hidden="true"
         ></canvas>
-        <div class="hero-static-constellation" aria-hidden="true"></div>
-        <div class="hero-gradient noise-overlay"></div>
-        <div
-          class="ambient-teal"
-          style="top: 15%; left: 50%; transform: translateX(-50%);"
-        >
-        </div>
-        <div class="ambient-steel" style="top: 30%; right: 10%;"></div>
         <div class="hero-content text-center max-w-4xl mx-auto relative z-10">
+          <div class="hero-orb-wrapper mb-6 md:mb-8">
+            <AnimatedLogo size={220} interactive />
+          </div>
           <div
-            class="hero-wordmark-row hero-logo flex items-center justify-center gap-5 md:gap-7 mb-8"
+            class="hero-wordmark-row hero-logo flex items-center justify-center mb-8"
           >
-            <img
-              src={`${base}human.svg`}
-              alt="human"
-              width="512"
-              height="512"
-              loading="eager"
-              decoding="async"
-              fetchpriority="high"
-              class="hero-mark w-14 h-14 md:w-20 md:h-20"
-              style={`filter: drop-shadow(0 0 40px var(--color-accent-glow));`}
-            />
             <span
               class="hero-wordmark font-sans"
               style="color: var(--color-text); view-transition-name: page-heading;"
@@ -395,7 +374,7 @@ const chapterCount = 9;
           </div>
           <div class="hero-fade-in mt-8 max-w-lg mx-auto">
             <div
-              class="glass glass-enter flex items-center gap-3 pl-5 pr-3 py-3 rounded-xl font-mono text-[13px]"
+              class="glass glass-enter flex items-center gap-3 pl-5 pr-3 py-3 rounded-xl font-mono text-sm"
             >
               <span style="color: var(--color-accent)">$</span>
               <code
@@ -456,7 +435,7 @@ const chapterCount = 9;
                     )}
                   </div>
                   <div
-                    class="text-[11px] font-medium mt-2 uppercase tracking-[0.1em]"
+                    class="text-xs font-medium mt-2 uppercase tracking-[0.1em]"
                     style="color: var(--color-text-tertiary)"
                   >
                     {stat.label}
@@ -469,7 +448,7 @@ const chapterCount = 9;
 
         <div class="hero-fade-in max-w-5xl mx-auto w-full relative z-10 px-6">
           <p
-            class="social-proof-label text-[11px] font-semibold uppercase tracking-[0.15em] mb-8 text-center"
+            class="social-proof-label text-xs font-semibold uppercase tracking-[0.15em] mb-8 text-center"
             style="color: var(--color-text-tertiary)"
           >
             Built for
@@ -519,7 +498,7 @@ const chapterCount = 9;
                     <path d={icon} />
                   </svg>
                   <span
-                    class="text-[13px] font-medium text-center"
+                    class="text-sm font-medium text-center"
                     style="color: var(--color-text-secondary)"
                   >
                     {label}
@@ -552,14 +531,14 @@ const chapterCount = 9;
       {/* ═══ INTERACTIVE DEMO (Terminal replay) ═══ */}
       <section
         id="chapter-2"
-        class="demo-section relative hu-chapter-reveal py-20 md:py-28 px-6 cv-defer"
+        class="demo-section relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
         aria-label="Product demo"
       >
         <span class="hu-chapter-label" aria-hidden="true">02</span>
 
-        <div class="max-w-4xl mx-auto">
+        <div class="max-w-5xl mx-auto">
           <h2
-            class="font-sans font-extrabold text-[clamp(2rem,5vw,3rem)] mb-8 text-center"
+            class="font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-8 text-center"
             style="color: var(--color-text); letter-spacing: -0.03em;"
             data-reveal
           >
@@ -585,12 +564,12 @@ const chapterCount = 9;
                 class="terminal-dot green w-3 h-3 rounded-full shrink-0"
                 style="background: var(--hu-terminal-maximize)"></span>
               <span
-                class="terminal-title ml-2 text-[13px] font-medium"
+                class="terminal-title ml-2 text-sm font-medium"
                 style="color: var(--hu-text-muted)">human</span
               >
             </div>
             <div
-              class="terminal-body px-4 sm:px-6 py-4 sm:py-5 font-mono text-[12px] sm:text-[14px] leading-relaxed"
+              class="terminal-body px-4 sm:px-6 py-4 sm:py-5 font-mono text-xs sm:text-base leading-relaxed"
               style="color: var(--hu-text);"
             >
               <div class="terminal-line" style="--line-delay: 0">
@@ -624,7 +603,7 @@ const chapterCount = 9;
           <div class="grid md:grid-cols-2 gap-16 items-center">
             <div>
               <h2
-                class="bloat-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-6"
+                class="bloat-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-6"
                 data-reveal
                 style="color: var(--color-text); letter-spacing: -0.03em;"
               >
@@ -982,7 +961,7 @@ const chapterCount = 9;
                 118&times;
               </div>
               <div
-                class="text-[11px] uppercase tracking-widest font-medium"
+                class="text-xs uppercase tracking-widest font-medium"
                 style="color: var(--color-text-tertiary)"
               >
                 smaller
@@ -999,7 +978,7 @@ const chapterCount = 9;
                 50&times;
               </div>
               <div
-                class="text-[11px] uppercase tracking-widest font-medium"
+                class="text-xs uppercase tracking-widest font-medium"
                 style="color: var(--color-text-tertiary)"
               >
                 less RAM
@@ -1013,7 +992,7 @@ const chapterCount = 9;
                 Zero
               </div>
               <div
-                class="text-[11px] uppercase tracking-widest font-medium"
+                class="text-xs uppercase tracking-widest font-medium"
                 style="color: var(--color-text-tertiary)"
               >
                 dependencies
@@ -1021,7 +1000,7 @@ const chapterCount = 9;
             </div>
           </div>
           <p
-            class="text-center text-[12px] mt-4"
+            class="text-center text-xs mt-4"
             style="color: var(--color-text-tertiary)"
           >
             vs. leading AI agent frameworks
@@ -1033,12 +1012,12 @@ const chapterCount = 9;
 
       <section
         id="chapter-4"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
         <span class="hu-chapter-label" aria-hidden="true">04</span>
-        <div class="max-w-4xl mx-auto text-center">
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
@@ -1057,7 +1036,7 @@ const chapterCount = 9;
           <div class="crystal-grid mb-8" id="crystalGrid" data-reveal="scale">
           </div>
           <div
-            class="flex gap-6 justify-center text-[12px]"
+            class="flex gap-6 justify-center text-xs"
             data-reveal
             style="color: var(--color-text-secondary)"
           >
@@ -1083,13 +1062,13 @@ const chapterCount = 9;
 
       <section
         id="chapter-5"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
         <span id="use-cases" class="sr-only">Use cases</span>
         <span class="hu-chapter-label" aria-hidden="true">05</span>
         <div class="max-w-5xl mx-auto">
           <h2
-            class="spectrum-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4 text-center"
+            class="spectrum-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4 text-center"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
@@ -1221,13 +1200,13 @@ const chapterCount = 9;
                   opacity=".2"></rect>
               </svg>
               <div
-                class="text-[13px] font-semibold"
+                class="text-sm font-semibold"
                 style="color: var(--color-text)"
               >
                 Cloud
               </div>
               <div
-                class="text-[11px] font-mono"
+                class="text-xs font-mono"
                 style="color: var(--color-text-tertiary)"
               >
                 31 channels
@@ -1285,13 +1264,13 @@ const chapterCount = 9;
                   opacity=".3"></rect>
               </svg>
               <div
-                class="text-[13px] font-semibold"
+                class="text-sm font-semibold"
                 style="color: var(--color-text)"
               >
                 Workstation
               </div>
               <div
-                class="text-[11px] font-mono"
+                class="text-xs font-mono"
                 style="color: var(--color-text-tertiary)"
               >
                 &lt;6 MB RAM
@@ -1404,13 +1383,13 @@ const chapterCount = 9;
                   stroke-width="1.5"></line>
               </svg>
               <div
-                class="text-[13px] font-semibold"
+                class="text-sm font-semibold"
                 style="color: var(--color-text)"
               >
                 Edge
               </div>
               <div
-                class="text-[11px] font-mono"
+                class="text-xs font-mono"
                 style="color: var(--color-text-tertiary)"
               >
                 &lt;30 ms boot
@@ -1562,13 +1541,13 @@ const chapterCount = 9;
                 >
               </svg>
               <div
-                class="text-[13px] font-semibold"
+                class="text-sm font-semibold"
                 style="color: var(--color-text)"
               >
                 Embedded
               </div>
               <div
-                class="text-[11px] font-mono"
+                class="text-xs font-mono"
                 style="color: var(--color-text-tertiary)"
               >
                 1,750 KB
@@ -1603,7 +1582,7 @@ const chapterCount = 9;
             </div>
           </div>
           <div
-            class="flex justify-between max-w-[800px] mx-auto mt-5 text-[11px] uppercase tracking-[0.05em] font-medium"
+            class="flex justify-between max-w-[800px] mx-auto mt-5 text-xs uppercase tracking-[0.05em] font-medium"
             data-reveal
             style="color: var(--color-text-tertiary)"
           >
@@ -1613,11 +1592,9 @@ const chapterCount = 9;
         </div>
         <!-- Architecture -->
         <span id="architecture" class="sr-only">Architecture</span>
-        <div class="ambient-coral" style="top: 20%; left: 10%;"></div>
-        <div class="ambient-blue" style="bottom: 10%; right: 15%;"></div>
-        <div class="max-w-4xl mx-auto text-center">
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="arch-title hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="arch-title hu-scroll-reveal font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
             Swap anything. Lock in nothing.
@@ -1800,12 +1777,12 @@ const chapterCount = 9;
 
       <section
         id="chapter-6"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
         <span class="hu-chapter-label" aria-hidden="true">06</span>
-        <div class="max-w-4xl mx-auto text-center">
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="hu-scroll-reveal font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
             Programs, not prompts.
@@ -1927,10 +1904,20 @@ const chapterCount = 9;
             Learn more about HuLa
           </a>
         </div>
-        <!-- Ecosystem -->
-        <div class="max-w-4xl mx-auto text-center">
+      </section>
+
+      <hr class="section-divider" />
+
+      {/* ═══ ECOSYSTEM ═══ */}
+
+      <section
+        id="chapter-7"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
+      >
+        <span class="hu-chapter-label" aria-hidden="true">07</span>
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="providers-title hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="providers-title hu-scroll-reveal font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
             An ecosystem, not a walled garden.
@@ -1956,7 +1943,7 @@ const chapterCount = 9;
                 </h3>
               </div>
               <p
-                class="text-[13px] leading-relaxed mb-5"
+                class="text-sm leading-relaxed mb-5"
                 style="color: var(--color-text-secondary)"
               >
                 Cloud APIs and local models. Switch with one line of config.
@@ -1965,7 +1952,7 @@ const chapterCount = 9;
                 {
                   providers.slice(0, 8).map((name) => (
                     <span
-                      class="provider-pill px-3 py-1 rounded-md text-[11px] font-medium"
+                      class="provider-pill px-3 py-1 rounded-md text-xs font-medium"
                       style="color: var(--color-pill-provider); background: var(--color-pill-provider-bg); border: 1px solid var(--color-pill-provider-border)"
                     >
                       {name}
@@ -1973,7 +1960,7 @@ const chapterCount = 9;
                   ))
                 }
                 <span
-                  class="px-3 py-1 rounded-md text-[11px] italic"
+                  class="px-3 py-1 rounded-md text-xs italic"
                   style="color: var(--color-text-tertiary); border: 1px solid var(--color-border)"
                   >+42 more</span
                 >
@@ -1991,7 +1978,7 @@ const chapterCount = 9;
                 </h3>
               </div>
               <p
-                class="text-[13px] leading-relaxed mb-3"
+                class="text-sm leading-relaxed mb-3"
                 style="color: var(--color-text-secondary)"
               >
                 One agent, every platform. Users message you where they already
@@ -2001,7 +1988,7 @@ const chapterCount = 9;
                 {
                   channels.slice(0, 8).map((name) => (
                     <span
-                      class="provider-pill px-3 py-1 rounded-md text-[11px] font-medium"
+                      class="provider-pill px-3 py-1 rounded-md text-xs font-medium"
                       style="color: var(--color-pill-channel); background: var(--color-pill-channel-bg); border: 1px solid var(--color-pill-channel-border)"
                     >
                       {name}
@@ -2009,7 +1996,7 @@ const chapterCount = 9;
                   ))
                 }
                 <span
-                  class="px-3 py-1 rounded-md text-[11px] italic"
+                  class="px-3 py-1 rounded-md text-xs italic"
                   style="color: var(--color-text-tertiary); border: 1px solid var(--color-border)"
                   >+26 more</span
                 >
@@ -2027,7 +2014,7 @@ const chapterCount = 9;
                 </h3>
               </div>
               <p
-                class="text-[13px] leading-relaxed mb-3"
+                class="text-sm leading-relaxed mb-3"
                 style="color: var(--color-text-secondary)"
               >
                 Not a chatbot — an agent. Real access to your system.
@@ -2036,7 +2023,7 @@ const chapterCount = 9;
                 {
                   tools.map((name) => (
                     <span
-                      class="provider-pill px-3 py-1 rounded-md text-[11px] font-medium"
+                      class="provider-pill px-3 py-1 rounded-md text-xs font-medium"
                       style="color: var(--color-pill-tool); background: var(--color-pill-tool-bg); border: 1px solid var(--color-pill-tool-border)"
                     >
                       {name}
@@ -2044,7 +2031,7 @@ const chapterCount = 9;
                   ))
                 }
                 <span
-                  class="px-3 py-1 rounded-md text-[11px] italic"
+                  class="px-3 py-1 rounded-md text-xs italic"
                   style="color: var(--color-text-tertiary); border: 1px solid var(--color-border)"
                   >+57 more</span
                 >
@@ -2059,13 +2046,13 @@ const chapterCount = 9;
       {/* ═══ TERMINAL + DASHBOARD ═══ */}
 
       <section
-        id="chapter-7"
-        class="section-spacing relative hu-chapter-reveal px-6 cv-defer"
+        id="chapter-8"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">07</span>
-        <div class="max-w-3xl mx-auto">
+        <span class="hu-chapter-label" aria-hidden="true">08</span>
+        <div class="max-w-5xl mx-auto">
           <h2
-            class="terminal-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-6 text-center"
+            class="terminal-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-6 text-center"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
@@ -2099,21 +2086,21 @@ const chapterCount = 9;
                 class="w-3 h-3 rounded-full"
                 style="background: var(--hu-terminal-maximize)"></span>
               <span
-                class="text-[11px] ml-2 font-mono"
+                class="text-xs ml-2 font-mono"
                 style="color: var(--hu-text-muted)">terminal</span
               >
             </div>
             <div
               id="terminal-output"
-              class="p-4 md:p-6 font-mono text-[12px] md:text-sm leading-[1.8] min-h-[240px] md:min-h-[280px] overflow-x-auto"
+              class="p-4 md:p-6 font-mono text-xs md:text-sm leading-[1.8] min-h-[240px] md:min-h-[280px] overflow-x-auto"
             >
             </div>
           </div>
         </div>
         <!-- Dashboard Preview -->
-        <div class="max-w-4xl mx-auto text-center">
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="dash-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="dash-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
@@ -2146,11 +2133,11 @@ const chapterCount = 9;
                 class="w-3 h-3 rounded-full"
                 style="background: var(--hu-terminal-maximize)"></span>
               <span
-                class="text-[11px] ml-2 font-mono"
+                class="text-xs ml-2 font-mono"
                 style="color: var(--hu-text-muted)">h-uman Dashboard</span
               >
               <span
-                class="ml-auto text-[11px] px-2 py-0.5 rounded-full"
+                class="ml-auto text-xs px-2 py-0.5 rounded-full"
                 style="background: var(--hu-success-dim); color: var(--hu-success);"
                 >Live</span
               >
@@ -2167,7 +2154,7 @@ const chapterCount = 9;
                   style="background: color-mix(in srgb, white 4%, transparent); border: 1px solid color-mix(in srgb, white 6%, transparent);"
                 >
                   <div
-                    class="text-[10px] uppercase tracking-wider mb-2"
+                    class="text-2xs uppercase tracking-wider mb-2"
                     style="color: var(--hu-text-muted);"
                   >
                     Providers
@@ -2179,7 +2166,7 @@ const chapterCount = 9;
                     <span class="dash-count" data-target="50">0</span>
                   </div>
                   <div
-                    class="flex items-center gap-1 text-[11px]"
+                    class="flex items-center gap-1 text-xs"
                     style="color: var(--hu-accent);"
                   >
                     <svg
@@ -2199,7 +2186,7 @@ const chapterCount = 9;
                   style="background: color-mix(in srgb, white 4%, transparent); border: 1px solid color-mix(in srgb, white 6%, transparent);"
                 >
                   <div
-                    class="text-[10px] uppercase tracking-wider mb-2"
+                    class="text-2xs uppercase tracking-wider mb-2"
                     style="color: var(--hu-text-muted);"
                   >
                     Channels
@@ -2211,7 +2198,7 @@ const chapterCount = 9;
                     <span class="dash-count" data-target="31">0</span>
                   </div>
                   <div
-                    class="flex items-center gap-1 text-[11px]"
+                    class="flex items-center gap-1 text-xs"
                     style="color: var(--hu-accent);"
                   >
                     <svg
@@ -2231,7 +2218,7 @@ const chapterCount = 9;
                   style="background: color-mix(in srgb, white 4%, transparent); border: 1px solid color-mix(in srgb, white 6%, transparent);"
                 >
                   <div
-                    class="text-[10px] uppercase tracking-wider mb-2"
+                    class="text-2xs uppercase tracking-wider mb-2"
                     style="color: var(--hu-text-muted);"
                   >
                     Tools
@@ -2243,7 +2230,7 @@ const chapterCount = 9;
                     <span class="dash-count" data-target="87">0</span>
                   </div>
                   <div
-                    class="flex items-center gap-1 text-[11px]"
+                    class="flex items-center gap-1 text-xs"
                     style="color: var(--hu-text-muted);"
                   >
                     <svg
@@ -2263,7 +2250,7 @@ const chapterCount = 9;
                   style="background: color-mix(in srgb, white 4%, transparent); border: 1px solid color-mix(in srgb, white 6%, transparent);"
                 >
                   <div
-                    class="text-[10px] uppercase tracking-wider mb-2"
+                    class="text-2xs uppercase tracking-wider mb-2"
                     style="color: var(--hu-text-muted);"
                   >
                     Sessions
@@ -2275,7 +2262,7 @@ const chapterCount = 9;
                     <span class="dash-count" data-target="5">0</span>
                   </div>
                   <div
-                    class="flex items-center gap-1 text-[11px]"
+                    class="flex items-center gap-1 text-xs"
                     style="color: var(--hu-accent);"
                   >
                     <svg
@@ -2293,7 +2280,7 @@ const chapterCount = 9;
               </div>
               <div
                 id="dash-activity"
-                class="text-left text-[13px] space-y-2"
+                class="text-left text-sm space-y-2"
                 style="color: var(--hu-text-secondary);"
               >
               </div>
@@ -2316,13 +2303,13 @@ const chapterCount = 9;
       {/* ═══ QUALITY + COMPARISON ═══ */}
 
       <section
-        id="chapter-8"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+        id="chapter-9"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">08</span>
-        <div class="max-w-4xl mx-auto text-center">
+        <span class="hu-chapter-label" aria-hidden="true">09</span>
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
@@ -2358,7 +2345,7 @@ const chapterCount = 9;
                 Tests
               </h3>
               <p
-                class="text-[13px] leading-relaxed"
+                class="text-sm leading-relaxed"
                 style="color: var(--color-text-secondary)"
               >
                 Unit, integration, and fuzz tests. Full suite runs in under 7
@@ -2385,7 +2372,7 @@ const chapterCount = 9;
                 Memory Leaks
               </h3>
               <p
-                class="text-[13px] leading-relaxed"
+                class="text-sm leading-relaxed"
                 style="color: var(--color-text-secondary)"
               >
                 AddressSanitizer on every build. Every allocation tracked. Every
@@ -2417,7 +2404,7 @@ const chapterCount = 9;
                 Accessibility Score
               </h3>
               <p
-                class="text-[13px] leading-relaxed"
+                class="text-sm leading-relaxed"
                 style="color: var(--color-text-secondary)"
               >
                 WCAG 2.1 AA. Lighthouse 98+. Focus rings, keyboard nav, reduced
@@ -2427,9 +2414,9 @@ const chapterCount = 9;
           </div>
         </div>
         <!-- Comparison -->
-        <div class="max-w-4xl mx-auto px-4">
+        <div class="max-w-5xl mx-auto">
           <h3
-            class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] text-center mb-4"
+            class="font-sans font-black text-[clamp(2rem,4vw,3rem)] text-center mb-4"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
@@ -2515,7 +2502,7 @@ const chapterCount = 9;
                   <div class="space-y-2">
                     <div class="flex items-center gap-3">
                       <span
-                        class="comparison-bar-label text-[11px] sm:text-[12px] w-16 sm:w-24 text-right font-medium shrink-0"
+                        class="comparison-bar-label text-xs sm:text-xs w-16 sm:w-24 text-right font-medium shrink-0"
                         style={`color: var(--color-accent)`}
                       >
                         h-uman
@@ -2530,7 +2517,7 @@ const chapterCount = 9;
                           data-width={`${Math.max(2, (row.human.val / row.maxVal) * 100)}%`}
                         >
                           <span
-                            class="text-[11px] font-bold"
+                            class="text-xs font-bold"
                             style="color: var(--hu-on-accent)"
                           >
                             {row.human.label}
@@ -2541,7 +2528,7 @@ const chapterCount = 9;
                     {row.others.map((other) => (
                       <div class="flex items-center gap-3">
                         <span
-                          class="comparison-bar-label text-[10px] sm:text-[12px] w-16 sm:w-24 text-right shrink-0"
+                          class="comparison-bar-label text-2xs sm:text-xs w-16 sm:w-24 text-right shrink-0"
                           style="color: var(--color-text-tertiary)"
                         >
                           {other.name}
@@ -2556,7 +2543,7 @@ const chapterCount = 9;
                             data-width={`${Math.max(2, (other.val / row.maxVal) * 100)}%`}
                           >
                             <span
-                              class="text-[10px]"
+                              class="text-2xs"
                               style="color: var(--color-text-tertiary)"
                             >
                               {other.label}
@@ -2571,7 +2558,7 @@ const chapterCount = 9;
             }
           </div>
           <p
-            class="text-center text-[12px] mt-8"
+            class="text-center text-xs mt-8"
             style="color: var(--color-text-tertiary);"
           >
             Smaller bars = better for size/memory/dependencies. Larger bars =
@@ -2583,12 +2570,10 @@ const chapterCount = 9;
       {/* ═══ CTA ═══ */}
 
       <section
-        id="chapter-9"
-        class="relative hu-chapter-reveal py-20 md:py-40 px-6 cv-defer"
+        id="chapter-10"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">09</span>
-        <div class="ambient-coral" style="top: 30%; left: 30%;"></div>
-        <div class="ambient-blue" style="top: 40%; right: 20%;"></div>
+        <span class="hu-chapter-label" aria-hidden="true">10</span>
         <div class="max-w-3xl mx-auto text-center">
           <h2
             class="cta-title hu-scroll-reveal font-sans font-black text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.05] mb-6"
@@ -2669,18 +2654,18 @@ const chapterCount = 9;
             decoding="async"
             fetchpriority="low"
           />
-          <span class="text-[13px]" style="color: var(--color-text-tertiary)"
+          <span class="text-sm" style="color: var(--color-text-tertiary)"
             >h-uman</span
           >
         </div>
         <p
-          class="text-[13px] hidden md:block"
+          class="text-sm hidden md:block"
           style="color: var(--color-text-tertiary)"
         >
           not quite human.
         </p>
         <div
-          class="flex items-center gap-6 text-[13px]"
+          class="flex items-center gap-6 text-sm"
           style="color: var(--color-text-tertiary)"
         >
           <span>MIT License</span>
@@ -3226,7 +3211,7 @@ const chapterCount = 9;
                           const div = document.createElement("div");
                           div.className = "flex items-center gap-2";
                           div.style.opacity = "0";
-                          div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-[11px]" style="color: var(--hu-text-muted)">${act.time}</span>`;
+                          div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-xs" style="color: var(--hu-text-muted)">${act.time}</span>`;
                           actContainer.appendChild(div);
                           requestAnimationFrame(() => {
                             div.style.transition = "opacity 0.4s ease-out";
@@ -3251,17 +3236,34 @@ const chapterCount = 9;
           }
         }); // end afterLcp
 
-        // ═══ Custom cursor (desktop only, no touch) ═══
+        // ═══ Custom cursor (hero-only, desktop, no touch) ═══
+        const heroSection = document.getElementById("chapter-1");
         const cursor = document.getElementById("custom-cursor");
-        if (cursor && window.matchMedia("(pointer: fine)").matches) {
+        if (
+          cursor &&
+          heroSection &&
+          window.matchMedia("(pointer: fine)").matches
+        ) {
           let cx = 0,
             cy = 0,
             tx = 0,
             ty = 0;
           let cursorRaf = 0;
-          document.addEventListener("mousemove", (e) => {
+          let cursorActive = false;
+          heroSection.addEventListener("mousemove", (e) => {
             tx = e.clientX;
             ty = e.clientY;
+          });
+          heroSection.addEventListener("mouseenter", () => {
+            cursorActive = true;
+            cursor.style.opacity = "1";
+            if (!cursorRaf) tick();
+          });
+          heroSection.addEventListener("mouseleave", () => {
+            cursorActive = false;
+            cursor.style.opacity = "0";
+            cancelAnimationFrame(cursorRaf);
+            cursorRaf = 0;
           });
           const tick = () => {
             cx += (tx - cx) * 0.15;
@@ -3269,24 +3271,20 @@ const chapterCount = 9;
             cursor.style.transform = `translate(${cx - 10}px, ${cy - 10}px)`;
             cursorRaf = requestAnimationFrame(tick);
           };
-          tick();
           document.addEventListener("visibilitychange", () => {
-            if (document.hidden) cancelAnimationFrame(cursorRaf);
-            else tick();
+            if (document.hidden) {
+              cancelAnimationFrame(cursorRaf);
+              cursorRaf = 0;
+            } else if (cursorActive) tick();
           });
-          cursor.style.opacity = "1";
-          document
-            .querySelectorAll(
-              "a, button, .provider-pill, .arch-node, .comparison-bar",
-            )
-            .forEach((el) => {
-              el.addEventListener("mouseenter", () =>
-                cursor.classList.add("cursor-hover"),
-              );
-              el.addEventListener("mouseleave", () =>
-                cursor.classList.remove("cursor-hover"),
-              );
-            });
+          heroSection.querySelectorAll("a, button").forEach((el) => {
+            el.addEventListener("mouseenter", () =>
+              cursor.classList.add("cursor-hover"),
+            );
+            el.addEventListener("mouseleave", () =>
+              cursor.classList.remove("cursor-hover"),
+            );
+          });
         }
 
         // ═══ Comparison bar animation ═══
@@ -3551,10 +3549,6 @@ const chapterCount = 9;
           heroObs.observe(heroCanvas);
         } else if (heroCanvas) {
           heroCanvas.style.display = "none";
-          const fallback = heroCanvas.parentElement?.querySelector(
-            ".hero-static-constellation",
-          );
-          if (fallback instanceof HTMLElement) fallback.style.display = "block";
         }
 
         async function initHeroWebGL(canvas: HTMLCanvasElement) {
@@ -3921,11 +3915,6 @@ const chapterCount = 9;
           } catch (e) {
             console.warn("[hero-webgl] init failed, falling back:", e);
             canvas.style.display = "none";
-            const fallback = canvas.parentElement?.querySelector(
-              ".hero-static-constellation",
-            );
-            if (fallback instanceof HTMLElement)
-              fallback.style.display = "block";
           }
         }
       }

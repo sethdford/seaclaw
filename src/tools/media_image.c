@@ -143,7 +143,8 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
     const char *model = hu_json_get_string(args, "model");
     if (!model) {
         hu_agent_t *cfg_agent = hu_agent_get_current_for_tools();
-        if (cfg_agent && cfg_agent->config && cfg_agent->config->media_gen.default_image_model)
+        if (cfg_agent && cfg_agent->config && cfg_agent->config->media_gen.default_image_model &&
+            mi_model_ok(cfg_agent->config->media_gen.default_image_model))
             model = cfg_agent->config->media_gen.default_image_model;
         else
             model = "gemini";
@@ -466,12 +467,12 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
 
         if (err != HU_OK) {
             hu_http_response_free(alloc, &resp);
-            *out = hu_tool_result_fail("Nano Banana API request failed", 30);
+            *out = hu_tool_result_fail("Gemini image API request failed", 31);
             return HU_OK;
         }
         if (resp.status_code < 200 || resp.status_code >= 300) {
             hu_http_response_free(alloc, &resp);
-            *out = hu_tool_result_fail("Nano Banana API error", 21);
+            *out = hu_tool_result_fail("Gemini image API error", 22);
             return HU_OK;
         }
 

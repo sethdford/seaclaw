@@ -164,6 +164,7 @@ typedef struct hu_feeds_config {
     char *gmail_client_secret;
     char *gmail_refresh_token;
     char *twitter_bearer_token;
+    char *google_photos_access_token;
     char *interests;
     double relevance_threshold;
     uint32_t poll_interval_rss;
@@ -300,8 +301,21 @@ typedef struct hu_whatsapp_channel_config {
 } hu_whatsapp_channel_config_t;
 
 typedef struct hu_signal_channel_config {
+    char *http_url;
+    char *account;
     hu_channel_daemon_config_t daemon;
 } hu_signal_channel_config_t;
+
+typedef struct hu_mattermost_channel_config {
+    char *url;
+    char *token;
+    hu_channel_daemon_config_t daemon;
+} hu_mattermost_channel_config_t;
+
+typedef struct hu_maixcam_channel_config {
+    char *host;
+    uint16_t port;
+} hu_maixcam_channel_config_t;
 
 typedef struct hu_line_channel_config {
     char *channel_token;
@@ -427,6 +441,8 @@ typedef struct hu_channels_config {
     hu_telegram_channel_config_t telegram;
     hu_slack_channel_config_t slack;
     hu_signal_channel_config_t signal;
+    hu_mattermost_channel_config_t mattermost;
+    hu_maixcam_channel_config_t maixcam;
     hu_whatsapp_channel_config_t whatsapp;
     hu_line_channel_config_t line;
     hu_google_chat_channel_config_t google_chat;
@@ -469,6 +485,16 @@ typedef struct hu_memory_config {
     char *api_base_url;
     char *api_key;
     uint32_t api_timeout_ms;
+    /* Hybrid retrieval: vector store for semantic search ("mem", "qdrant", "pgvector"). */
+    char *vector_store;
+    char *vector_qdrant_url;
+    char *vector_qdrant_api_key;
+    char *vector_qdrant_collection;
+    char *vector_pgvector_table;
+    uint32_t vector_dimensions; /* 0 = match embedder default */
+    /* Embedder: "local", "gemini", or NULL (GEMINI_API_KEY env then local). */
+    char *embedding_provider;
+    char *embedding_api_key;
 } hu_memory_config_t;
 
 typedef struct hu_tunnel_config {

@@ -223,6 +223,11 @@ void hu_dag_deinit(hu_dag_t *dag) {
             n->result = NULL;
             n->result_len = 0;
         }
+        if (n->media_path) {
+            alloc->free(alloc->ctx, n->media_path, n->media_path_len + 1);
+            n->media_path = NULL;
+            n->media_path_len = 0;
+        }
     }
     dag->node_count = 0;
 }

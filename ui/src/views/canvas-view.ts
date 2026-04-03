@@ -4,16 +4,37 @@ import { scrollEntranceStyles } from "../styles/scroll-entrance.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { GatewayClient } from "../gateway.js";
 import { icons } from "../icons.js";
+import type { CanvasFormat } from "../components/hu-canvas.js";
 import "../components/hu-button.js";
 import "../components/hu-card.js";
 import "../components/hu-empty-state.js";
 import "../components/hu-canvas.js";
+import "../components/hu-canvas-editor.js";
+
+const VALID_FORMATS: CanvasFormat[] = [
+  "html",
+  "svg",
+  "mockup",
+  "react",
+  "mermaid",
+  "markdown",
+  "code",
+];
+
+function resolveFormat(raw: unknown): CanvasFormat {
+  if (typeof raw === "string" && VALID_FORMATS.includes(raw as CanvasFormat))
+    return raw as CanvasFormat;
+  return "html";
+}
 
 interface CanvasEntry {
   id: string;
   title: string;
-  format: "html" | "svg" | "mockup";
+  format: CanvasFormat;
   content: string;
+  imports: Record<string, string>;
+  language: string;
+  versionSeq: number;
   status: "active" | "closed";
 }
 
@@ -21,6 +42,9 @@ interface CanvasEntry {
 export class CanvasView extends GatewayAwareLitElement {
   @state() private canvases: CanvasEntry[] = [];
   @state() private selectedId: string | null = null;
+  @state() private _viewMode: "preview" | "code" | "split" = "preview";
+  @state() private _loading = false;
+  private _editTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _onGateway = ((e: Event) => {
     const ev = e as CustomEvent<{ event: string; payload: Record<string, unknown> }>;
@@ -32,10 +56,21 @@ export class CanvasView extends GatewayAwareLitElement {
 
     if (action === "create") {
       const title = typeof p.title === "string" ? p.title : canvasId;
-      const format =
-        p.format === "svg" || p.format === "mockup" || p.format === "html" ? p.format : "html";
+      const format = resolveFormat(p.format);
+      const imports =
+        p.imports && typeof p.imports === "object" ? (p.imports as Record<string, string>) : {};
+      const language = typeof p.language === "string" ? p.language : "";
       const next = this.canvases.filter((c) => c.id !== canvasId);
-      next.push({ id: canvasId, title, format, content: "", status: "active" });
+      next.push({
+        id: canvasId,
+        title,
+        format,
+        content: "",
+        imports,
+        language,
+        versionSeq: 0,
+        status: "active",
+      });
       this.canvases = next;
       this.selectedId = canvasId;
       return;
@@ -43,14 +78,22 @@ export class CanvasView extends GatewayAwareLitElement {
 
     if (action === "update") {
       const content = typeof p.content === "string" ? p.content : "";
-      const format =
-        p.format === "svg" || p.format === "mockup" || p.format === "html" ? p.format : undefined;
+      const format = resolveFormat(p.format);
+      const imports =
+        p.imports && typeof p.imports === "object"
+          ? (p.imports as Record<string, string>)
+          : undefined;
+      const language = typeof p.language === "string" ? p.language : undefined;
+      const versionSeq = typeof p.version_seq === "number" ? p.version_seq : undefined;
       this.canvases = this.canvases.map((c) => {
         if (c.id !== canvasId) return c;
         return {
           ...c,
           content,
-          ...(format ? { format } : {}),
+          format: p.format !== undefined ? format : c.format,
+          ...(imports !== undefined ? { imports } : {}),
+          ...(language !== undefined ? { language } : {}),
+          ...(versionSeq !== undefined ? { versionSeq } : {}),
         };
       });
       if (!this.selectedId) this.selectedId = canvasId;
@@ -77,7 +120,7 @@ export class CanvasView extends GatewayAwareLitElement {
         view-transition-name: view-canvas;
         display: block;
         color: var(--hu-text);
-        max-width: 75rem;
+        max-width: 90rem;
         contain: layout style;
         container-type: inline-size;
         padding: var(--hu-space-lg) var(--hu-space-xl);
@@ -90,7 +133,7 @@ export class CanvasView extends GatewayAwareLitElement {
       @media (min-width: 1240px) /* --hu-breakpoint-wide */ {
         .layout.has-detail {
           display: grid;
-          grid-template-columns: minmax(14rem, 1fr) minmax(0, 2fr);
+          grid-template-columns: minmax(14rem, 1fr) minmax(0, 3fr);
           gap: var(--hu-space-lg);
           align-items: start;
         }
@@ -160,7 +203,7 @@ export class CanvasView extends GatewayAwareLitElement {
       }
 
       .detail-header {
-        padding: var(--hu-space-md);
+        padding: var(--hu-space-sm) var(--hu-space-md);
         border-bottom: 1px solid var(--hu-border-subtle);
         display: flex;
         align-items: center;
@@ -171,6 +214,50 @@ export class CanvasView extends GatewayAwareLitElement {
       .detail-header h2 {
         margin: 0;
         font-size: var(--hu-text-lg);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .detail-controls {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-xs);
+        flex-shrink: 0;
+      }
+
+      .mode-toggle {
+        display: inline-flex;
+        border-radius: var(--hu-radius-md);
+        border: 1px solid var(--hu-border-subtle);
+        overflow: hidden;
+      }
+
+      .mode-toggle button {
+        padding: var(--hu-space-xs) var(--hu-space-sm);
+        border: none;
+        background: transparent;
+        color: var(--hu-text-secondary);
+        font-family: var(--hu-font);
+        font-size: var(--hu-text-xs);
+        cursor: pointer;
+        transition: background var(--hu-duration-fast) var(--hu-ease-out);
+      }
+
+      .mode-toggle button:hover {
+        background: var(--hu-hover-overlay);
+      }
+
+      .mode-toggle button.active {
+        background: color-mix(in srgb, var(--hu-accent) 15%, transparent);
+        color: var(--hu-accent);
+        font-weight: var(--hu-weight-semibold);
+      }
+
+      .version-info {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-secondary);
+        padding: 0 var(--hu-space-xs);
       }
 
       .detail-body {
@@ -178,6 +265,33 @@ export class CanvasView extends GatewayAwareLitElement {
         min-height: 0;
         display: flex;
         flex-direction: column;
+      }
+
+      .split-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        min-height: 0;
+        flex: 1;
+      }
+
+      @media (max-width: 768px) /* --hu-breakpoint-lg */ {
+        .split-body {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .split-body > * {
+        min-height: 20rem;
+        overflow: auto;
+      }
+
+      .split-divider {
+        width: 1px;
+        background: var(--hu-border-subtle);
+      }
+
+      hu-canvas-editor {
+        border-right: 1px solid var(--hu-border-subtle);
       }
 
       hu-canvas {
@@ -212,7 +326,104 @@ export class CanvasView extends GatewayAwareLitElement {
   }
 
   protected override async load(): Promise<void> {
+    this._loading = true;
+    try {
+      const res = await this.gateway?.request<{
+        canvases?: Array<{
+          canvas_id: string;
+          title: string;
+          format: string;
+          content: string;
+          imports?: Record<string, string>;
+          language?: string;
+          version_seq?: number;
+        }>;
+      }>("canvas.list");
+
+      if (res?.canvases && Array.isArray(res.canvases)) {
+        this.canvases = res.canvases.map((c) => ({
+          id: c.canvas_id,
+          title: c.title || c.canvas_id,
+          format: resolveFormat(c.format),
+          content: c.content || "",
+          imports: c.imports || {},
+          language: c.language || "",
+          versionSeq: c.version_seq ?? 0,
+          status: "active" as const,
+        }));
+        if (this.canvases.length > 0 && !this.selectedId) {
+          this.selectedId = this.canvases[0].id;
+        }
+      }
+    } catch {
+      /* canvas.list not available yet — rely on push events */
+    }
+    this._loading = false;
     this.lastLoadedAt = Date.now();
+  }
+
+  private _onEditorChanged(e: CustomEvent<{ content: string }>, canvasId: string): void {
+    const content = e.detail.content;
+    this.canvases = this.canvases.map((c) => (c.id === canvasId ? { ...c, content } : c));
+    if (this._editTimer) clearTimeout(this._editTimer);
+    this._editTimer = setTimeout(() => {
+      void this.gateway?.request("canvas.edit", {
+        canvas_id: canvasId,
+        content,
+      });
+    }, 300);
+  }
+
+  private async _onUndo(): Promise<void> {
+    const sel = this.selectedId;
+    if (!sel) return;
+    try {
+      const res = await this.gateway?.request<{
+        ok: boolean;
+        canvas_id: string;
+        content?: string;
+        version_seq?: number;
+      }>("canvas.undo", { canvas_id: sel });
+      if (res?.ok && res.content !== undefined) {
+        this.canvases = this.canvases.map((c) =>
+          c.id === sel
+            ? {
+                ...c,
+                content: res.content!,
+                versionSeq: res.version_seq ?? c.versionSeq,
+              }
+            : c,
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private async _onRedo(): Promise<void> {
+    const sel = this.selectedId;
+    if (!sel) return;
+    try {
+      const res = await this.gateway?.request<{
+        ok: boolean;
+        canvas_id: string;
+        content?: string;
+        version_seq?: number;
+      }>("canvas.redo", { canvas_id: sel });
+      if (res?.ok && res.content !== undefined) {
+        this.canvases = this.canvases.map((c) =>
+          c.id === sel
+            ? {
+                ...c,
+                content: res.content!,
+                versionSeq: res.version_seq ?? c.versionSeq,
+              }
+            : c,
+        );
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   override render() {
@@ -241,12 +452,14 @@ export class CanvasView extends GatewayAwareLitElement {
                         role="listitem"
                         @click=${() => {
                           this.selectedId = c.id;
+                          this._viewMode = "preview";
                         }}
                       >
                         <div>
                           <div class="row-title">${c.title || c.id}</div>
                           <div class="row-meta">
-                            ${c.format} · ${c.content ? "has content" : "empty"}
+                            ${c.format}${c.versionSeq > 0 ? ` · v${c.versionSeq}` : ""} ·
+                            ${c.content ? "has content" : "empty"}
                           </div>
                         </div>
                       </button>
@@ -255,22 +468,91 @@ export class CanvasView extends GatewayAwareLitElement {
                 </div>
               `}
         </div>
-        ${selected
-          ? html`
-              <div class="detail">
-                <div class="detail-header">
-                  <h2>${selected.title || selected.id}</h2>
-                </div>
-                <div class="detail-body">
-                  <hu-canvas
-                    .title=${selected.title || selected.id}
-                    .content=${selected.content}
-                    .format=${selected.format}
-                  ></hu-canvas>
-                </div>
-              </div>
-            `
-          : nothing}
+        ${selected ? this._renderDetail(selected) : nothing}
+      </div>
+    `;
+  }
+
+  private _renderPreview(c: CanvasEntry) {
+    return html`
+      <hu-canvas
+        .title=${c.title || c.id}
+        .content=${c.content}
+        .format=${c.format}
+        .imports=${c.imports}
+        .language=${c.language}
+      ></hu-canvas>
+    `;
+  }
+
+  private _renderEditor(c: CanvasEntry) {
+    return html`
+      <hu-canvas-editor
+        .content=${c.content}
+        .format=${c.format}
+        @canvas-content-changed=${(e: CustomEvent<{ content: string }>) =>
+          this._onEditorChanged(e, c.id)}
+      ></hu-canvas-editor>
+    `;
+  }
+
+  private _renderDetail(c: CanvasEntry) {
+    return html`
+      <div class="detail">
+        <div class="detail-header">
+          <h2>${c.title || c.id}</h2>
+          <div class="detail-controls">
+            <div class="mode-toggle">
+              <button
+                type="button"
+                class=${this._viewMode === "preview" ? "active" : ""}
+                @click=${() => {
+                  this._viewMode = "preview";
+                }}
+              >
+                Preview
+              </button>
+              <button
+                type="button"
+                class=${this._viewMode === "code" ? "active" : ""}
+                @click=${() => {
+                  this._viewMode = "code";
+                }}
+              >
+                Code
+              </button>
+              <button
+                type="button"
+                class=${this._viewMode === "split" ? "active" : ""}
+                @click=${() => {
+                  this._viewMode = "split";
+                }}
+              >
+                Split
+              </button>
+            </div>
+            ${c.versionSeq > 0
+              ? html`
+                  <span class="version-info">v${c.versionSeq}</span>
+                  <hu-button variant="tonal" size="sm" @click=${() => this._onUndo()}>
+                    Undo
+                  </hu-button>
+                  <hu-button variant="tonal" size="sm" @click=${() => this._onRedo()}>
+                    Redo
+                  </hu-button>
+                `
+              : nothing}
+          </div>
+        </div>
+        <div class="detail-body">
+          ${this._viewMode === "preview"
+            ? this._renderPreview(c)
+            : this._viewMode === "code"
+              ? this._renderEditor(c)
+              : html`
+                  <div class="split-body">${this._renderEditor(c)} ${this._renderPreview(c)}</div>
+                `}
+        </div>
       </div>
     `;
   }

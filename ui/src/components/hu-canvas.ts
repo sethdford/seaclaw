@@ -3,14 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import "./hu-button.js";
 import "./hu-canvas-sandbox.js";
 
-export type CanvasFormat =
-  | "html"
-  | "svg"
-  | "mockup"
-  | "react"
-  | "mermaid"
-  | "markdown"
-  | "code";
+export type CanvasFormat = "html" | "svg" | "mockup" | "react" | "mermaid" | "markdown" | "code";
 
 /**
  * Renders Live Canvas / A2UI content in a sandboxed iframe.

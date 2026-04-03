@@ -22,7 +22,7 @@ Response: `{ "id": "uuid", ...result }` or `{ "id": "uuid", "error": "message" }
 
 All methods follow `noun.verb` convention (e.g., `chat.send`, `sessions.list`).
 
-## Method Catalog (49 methods)
+## Method Catalog (54 methods)
 
 | Namespace    | Methods |
 |-------------|---------|
@@ -46,6 +46,7 @@ All methods follow `noun.verb` convention (e.g., `chat.send`, `sessions.list`).
 | `memory`    | `status`, `list`, `recall`, `store`, `forget`, `ingest`, `consolidate` |
 | `hula`      | `traces.list`, `traces.get` (+ optional `trace_offset` / `trace_limit`), `traces.delete`, `traces.analytics` (POSIX trace dir) |
 | `metrics`   | `snapshot` |
+| `canvas`    | `list`, `get`, `edit`, `undo`, `redo` |
 | `turing`    | `dimensions` |
 | Singletons  | `connect`, `health`, `capabilities` |
 

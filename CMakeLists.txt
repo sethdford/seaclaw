@@ -38,7 +38,7 @@ option(HU_ENABLE_SOCIAL "Build social feed ingestion (Facebook, Instagram)" OFF)
 option(HU_ENABLE_EMBEDDED_MODEL "Enable embedded model provider (llama.cpp/llama-cli)" OFF)
 option(HU_ENABLE_COREML "Enable CoreML/MLX provider (macOS only)" OFF)
 option(HU_ENABLE_MCP "Enable MCP client (multi-server tool discovery)" ON)
-option(HU_ENABLE_MEDIA_GEN "Enable media generation tools (Nano Banana, Imagen, Veo)" ON)
+option(HU_ENABLE_MEDIA_GEN "Enable media generation tools (Gemini, Imagen, Veo)" ON)
 if(APPLE)
     option(HU_ENABLE_VISION_OCR "Apple Vision OCR for computer_use (screen text, macOS)" ON)
 else()
@@ -95,8 +95,9 @@ option(HU_ENABLE_MQTT "Build MQTT channel" OFF)
 option(HU_ENABLE_ALL_CHANNELS "Build all channels" OFF)
 
 # --- Per-engine build options ---
-option(HU_ENABLE_NONE_ENGINE "Build no-op memory engine" ON)
-option(HU_ENABLE_MARKDOWN_ENGINE "Build markdown memory engine" ON)
+# Note: none and markdown engines are always built (core requirements).
+# Removed HU_ENABLE_NONE_ENGINE and HU_ENABLE_MARKDOWN_ENGINE — they were
+# declared but never conditionally checked.
 option(HU_ENABLE_MEMORY_LRU_ENGINE "Build in-memory LRU memory engine" ON)
 option(HU_ENABLE_API_ENGINE "Build HTTP API memory engine" OFF)
 option(HU_ENABLE_LUCID_ENGINE "Build Lucid memory engine" ON)
@@ -170,7 +171,7 @@ if(HU_ENABLE_TELEGRAM)
     list(APPEND CHANNEL_SOURCES src/channels/telegram.c)
 endif()
 if(HU_ENABLE_DISCORD)
-    list(APPEND CHANNEL_SOURCES src/channels/discord.c)
+    list(APPEND CHANNEL_SOURCES src/channels/discord.c src/channels/channel_http.c)
 endif()
 if(HU_ENABLE_SLACK)
     list(APPEND CHANNEL_SOURCES src/channels/slack.c)
@@ -405,6 +406,7 @@ set(HU_CORE_SOURCES
     src/gateway/cp_memory.c
     src/gateway/cp_hula.c
     src/gateway/cp_tasks.c
+    src/gateway/cp_canvas.c
     src/gateway/cp_voice.c
     src/gateway/cp_voice_clone.c
     src/gateway/cp_voice_stream.c
@@ -745,6 +747,7 @@ set(HU_CORE_SOURCES
     src/memory/vector/store.c
     src/memory/vector/store_pgvector.c
     src/memory/vector/store_qdrant.c
+    src/memory/vector/vector_retrieval_remote.c
     src/memory/lifecycle/semantic_cache.c
 )
 
@@ -950,7 +953,7 @@ if(HU_ENABLE_CURL)
     )
 endif()
 
-# Media generation tools (Nano Banana, Imagen 4, Veo 3.1)
+# Media generation tools (Gemini image gen, Imagen 4, Veo 3.1)
 if(HU_ENABLE_MEDIA_GEN)
     list(APPEND HU_CORE_SOURCES
         src/tools/media_image.c
@@ -1465,7 +1468,7 @@ endif()
 
 if(HU_ENABLE_MEDIA_GEN)
     target_compile_definitions(human_core PRIVATE HU_ENABLE_MEDIA_GEN=1)
-    message(STATUS "Media generation: Nano Banana + Imagen 4 + Veo 3.1 enabled")
+    message(STATUS "Media generation: Gemini + Imagen 4 + Veo 3.1 enabled")
 endif()
 
 if(HU_ENABLE_FIPS_CRYPTO)
@@ -2306,6 +2309,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_tool_validation.c
     tests/test_tool_ask_user.c
     tests/test_canvas_tool.c
+    tests/test_canvas_e2e.c
     tests/test_sota_e2e.c
     tests/test_task_manager.c
     tests/test_task_store.c
@@ -3008,7 +3012,7 @@ add_custom_target(benchmark
 message(STATUS "Human v0.5.0")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Channels: ${CHANNEL_SOURCES}")
-message(STATUS "Engines: none=${HU_ENABLE_NONE_ENGINE} markdown=${HU_ENABLE_MARKDOWN_ENGINE} sqlite=${HU_ENABLE_SQLITE} postgres=${HU_ENABLE_POSTGRES}")
+message(STATUS "Engines: none=ON markdown=ON sqlite=${HU_ENABLE_SQLITE} postgres=${HU_ENABLE_POSTGRES}")
 message(STATUS "ASan: ${HU_ENABLE_ASAN}")
 
 message(STATUS "ASan: ${HU_ENABLE_ASAN}")

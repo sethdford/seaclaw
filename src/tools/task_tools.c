@@ -47,21 +47,19 @@ static hu_error_t task_create_execute(void *ctx, hu_allocator_t *alloc,
         return HU_OK;
     }
 
-    char *response = (char *)alloc->alloc(alloc->ctx, 256);
-    if (!response) {
-        *out = hu_tool_result_fail("out of memory", 13);
-        return HU_ERR_OUT_OF_MEMORY;
-    }
-
-    int wrote = snprintf(response, 256, "{\"id\":%u,\"subject\":\"%s\",\"status\":\"pending\"}", task_id,
-                         subject);
-    if (wrote < 0) {
-        alloc->free(alloc->ctx, response, 256);
-        *out = hu_tool_result_fail("failed to format response", 25);
-        return HU_OK;
-    }
-
-    *out = hu_tool_result_ok_owned(response, (size_t)wrote);
+    hu_json_buf_t jb = {0};
+    hu_error_t jerr = hu_json_buf_init(&jb, alloc);
+    if (jerr != HU_OK)
+        return jerr;
+    char id_prefix[32];
+    int pn = snprintf(id_prefix, sizeof(id_prefix), "{\"id\":%u,\"subject\":", task_id);
+    if (pn > 0)
+        hu_json_buf_append_raw(&jb, id_prefix, (size_t)pn);
+    hu_json_append_string(&jb, subject, strlen(subject));
+    hu_json_buf_append_raw(&jb, ",\"status\":\"pending\"}", 20);
+    char *response = jb.ptr;
+    size_t response_len = jb.len;
+    *out = hu_tool_result_ok_owned(response, response_len);
     return HU_OK;
 }
 
@@ -145,21 +143,19 @@ static hu_error_t task_update_execute(void *ctx, hu_allocator_t *alloc,
     const hu_task_t *task = NULL;
     hu_task_manager_get(c->task_manager, task_id, &task);
 
-    char *response = (char *)alloc->alloc(alloc->ctx, 256);
-    if (!response) {
-        *out = hu_tool_result_fail("out of memory", 13);
-        return HU_ERR_OUT_OF_MEMORY;
-    }
-
-    int wrote =
-        snprintf(response, 256, "{\"id\":%u,\"status\":\"%s\",\"updated\":true}", task_id, status_str);
-    if (wrote < 0) {
-        alloc->free(alloc->ctx, response, 256);
-        *out = hu_tool_result_fail("failed to format response", 25);
-        return HU_OK;
-    }
-
-    *out = hu_tool_result_ok_owned(response, (size_t)wrote);
+    hu_json_buf_t jb = {0};
+    hu_error_t jerr = hu_json_buf_init(&jb, alloc);
+    if (jerr != HU_OK)
+        return jerr;
+    char id_prefix[32];
+    int pn = snprintf(id_prefix, sizeof(id_prefix), "{\"id\":%u,\"status\":", task_id);
+    if (pn > 0)
+        hu_json_buf_append_raw(&jb, id_prefix, (size_t)pn);
+    hu_json_append_string(&jb, status_str, strlen(status_str));
+    hu_json_buf_append_raw(&jb, ",\"updated\":true}", 16);
+    char *response = jb.ptr;
+    size_t response_len = jb.len;
+    *out = hu_tool_result_ok_owned(response, response_len);
     return HU_OK;
 }
 
@@ -301,25 +297,27 @@ static hu_error_t task_get_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         status_str = "unknown";
     }
 
-    char *response = (char *)alloc->alloc(alloc->ctx, 512);
-    if (!response) {
+    hu_json_buf_t jb = {0};
+    hu_error_t jerr = hu_json_buf_init(&jb, alloc);
+    if (jerr != HU_OK) {
         *out = hu_tool_result_fail("out of memory", 13);
         return HU_ERR_OUT_OF_MEMORY;
     }
-
-    int wrote = snprintf(response, 512,
-                         "{\"id\":%u,\"subject\":\"%.*s\",\"description\":\"%.*s\","
-                         "\"status\":\"%s\"}",
-                         task->id, (int)task->subject_len, task->subject,
-                         (int)task->description_len, task->description, status_str);
-
-    if (wrote < 0) {
-        alloc->free(alloc->ctx, response, 512);
-        *out = hu_tool_result_fail("failed to format response", 25);
-        return HU_OK;
-    }
-
-    *out = hu_tool_result_ok_owned(response, (size_t)wrote);
+    char id_prefix[32];
+    int pn = snprintf(id_prefix, sizeof(id_prefix), "{\"id\":%u,\"subject\":", task->id);
+    if (pn > 0)
+        hu_json_buf_append_raw(&jb, id_prefix, (size_t)pn);
+    const char *subj = task->subject ? task->subject : "";
+    size_t subj_len = task->subject ? task->subject_len : 0;
+    hu_json_append_string(&jb, subj, subj_len);
+    hu_json_buf_append_raw(&jb, ",\"description\":", 15);
+    const char *desc = task->description ? task->description : "";
+    size_t desc_len = task->description ? task->description_len : 0;
+    hu_json_append_string(&jb, desc, desc_len);
+    hu_json_buf_append_raw(&jb, ",\"status\":", 10);
+    hu_json_append_string(&jb, status_str, strlen(status_str));
+    hu_json_buf_append_raw(&jb, "}", 1);
+    *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
     return HU_OK;
 }
 

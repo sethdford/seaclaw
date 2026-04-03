@@ -3,6 +3,19 @@
 @import "tailwindcss";
 @import "@fontsource-variable/geist-mono";
 
+@theme {
+  --font-sans: var(--hu-font);
+  --font-mono: var(--hu-font-mono);
+  --text-2xs: var(--hu-text-2xs);
+  --text-xs: var(--hu-text-xs);
+  --text-sm: var(--hu-text-sm);
+  --text-base: var(--hu-text-base);
+  --text-lg: var(--hu-text-lg);
+  --text-xl: var(--hu-text-xl);
+  --text-2xl: var(--hu-text-2xl);
+  --text-3xl: var(--hu-text-3xl);
+}
+
 @font-face {
   font-family: "Avenir";
   src: url("/fonts/avenir/Avenir-Light.woff2") format("woff2");
@@ -304,75 +317,6 @@
       inset 0 -1px 0 color-mix(in srgb, white 3%, transparent);
   }
 
-  /* ── Hero mesh gradient ── */
-  .hero-gradient {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    z-index: 0;
-  }
-
-  .hero-gradient::before {
-    content: "";
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background:
-      conic-gradient(
-        from 0deg at 50% 50%,
-        color-mix(in srgb, var(--hu-accent) 18%, transparent) 0deg,
-        transparent 60deg,
-        color-mix(in srgb, var(--hu-accent-tertiary) 14%, transparent) 120deg,
-        transparent 180deg,
-        color-mix(in srgb, var(--hu-accent-secondary) 12%, transparent) 240deg,
-        transparent 300deg,
-        color-mix(in srgb, var(--hu-accent-tertiary) 10%, transparent) 340deg,
-        color-mix(in srgb, var(--hu-accent) 18%, transparent) 360deg
-      ),
-      radial-gradient(
-        ellipse at 20% 50%,
-        color-mix(in srgb, var(--hu-accent) 12%, transparent) 0%,
-        transparent 50%
-      ),
-      radial-gradient(
-        ellipse at 80% 20%,
-        color-mix(in srgb, var(--hu-accent-tertiary) 10%, transparent) 0%,
-        transparent 50%
-      );
-    animation: none;
-  }
-  .hu-lcp-done .hero-gradient::before {
-    animation: hu-mesh-drift 25s ease-in-out infinite alternate;
-  }
-
-  @keyframes hu-mesh-drift {
-    0% {
-      transform: translate(0, 0) rotate(0deg);
-    }
-    33% {
-      transform: translate(2%, -2%) rotate(1deg);
-    }
-    66% {
-      transform: translate(-1%, 3%) rotate(-1deg);
-    }
-    100% {
-      transform: translate(1%, -1%) rotate(0.5deg);
-    }
-  }
-
-  /* ── Noise overlay ── */
-  .noise-overlay::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    opacity: 0.03;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 1;
-  }
-
   /* ── Gradient text shimmer ── */
   .text-gradient {
     background: linear-gradient(
@@ -610,22 +554,6 @@
       }
     }
   }
-  @supports (animation-timeline: scroll()) {
-    .hero-gradient {
-      animation: hu-parallax-drift linear both;
-      animation-timeline: scroll();
-      animation-range: 0% 50%;
-    }
-    @keyframes hu-parallax-drift {
-      from {
-        transform: translateY(0) scale(1);
-      }
-      to {
-        transform: translateY(-15%) scale(1.05);
-      }
-    }
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .hu-scroll-reveal,
     .hu-scroll-scale {
@@ -633,71 +561,6 @@
       opacity: 1 !important;
       transform: none !important;
     }
-  }
-
-  /* ── Ambient gradients ── */
-  .ambient-teal {
-    position: absolute;
-    width: 600px;
-    height: 600px;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--hu-accent) 15%, transparent) 0%,
-      transparent 70%
-    );
-    pointer-events: none;
-    z-index: -1;
-  }
-
-  /* Coral / error accent blob */
-  .ambient-coral {
-    position: absolute;
-    width: 500px;
-    height: 500px;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      color-mix(
-          in srgb,
-          var(--hu-error, var(--hu-accent-secondary)) 12%,
-          transparent
-        )
-        0%,
-      transparent 70%
-    );
-    pointer-events: none;
-    z-index: -1;
-  }
-
-  /* Blue / tertiary accent blob */
-  .ambient-blue {
-    position: absolute;
-    width: 500px;
-    height: 500px;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--hu-accent-tertiary) 12%, transparent) 0%,
-      transparent 70%
-    );
-    pointer-events: none;
-    z-index: -1;
-  }
-
-  /* Tertiary / steel accent blob (uses --hu-accent-tertiary-subtle) */
-  .ambient-steel {
-    position: absolute;
-    width: 500px;
-    height: 500px;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      var(--hu-accent-tertiary-subtle) 0%,
-      transparent 70%
-    );
-    pointer-events: none;
-    z-index: -1;
   }
 
   /* ── Buttons (uses --hu-gradient-angle @property for animated gradient on hover) ── */
@@ -907,11 +770,6 @@
     background: color-mix(in srgb, var(--hu-accent) 2%, var(--hu-bg));
   }
 
-  /* ── Section spacing (density 9) ── */
-  .section-spacing {
-    padding-block: var(--hu-space-4xl);
-  }
-
   /* ── WebGL hero canvas ── */
   .hero-webgl-canvas {
     position: absolute;
@@ -923,52 +781,10 @@
     opacity: 0;
   }
 
-  /* Static neural-constellation fallback when WebGL is off (mobile or reduced motion) */
-  .hero-static-constellation {
-    display: none;
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background-color: transparent;
-    background-image:
-      radial-gradient(
-        ellipse 85% 55% at 50% 42%,
-        color-mix(in srgb, var(--hu-accent) 16%, transparent) 0%,
-        transparent 68%
-      ),
-      radial-gradient(
-        circle at 22% 28%,
-        color-mix(in srgb, var(--hu-accent-secondary) 14%, transparent) 0%,
-        transparent 38%
-      ),
-      radial-gradient(
-        circle at 76% 62%,
-        color-mix(in srgb, var(--hu-accent) 12%, transparent) 0%,
-        transparent 42%
-      ),
-      radial-gradient(
-        circle,
-        color-mix(in srgb, var(--hu-accent) 40%, transparent) 0.08rem,
-        transparent 0.11rem
-      ),
-      radial-gradient(
-        circle,
-        color-mix(in srgb, var(--hu-accent-secondary) 28%, transparent) 0.05rem,
-        transparent 0.09rem
-      );
-    background-size:
-      100% 100%,
-      100% 100%,
-      100% 100%,
-      2.5rem 2.5rem,
-      1.75rem 1.75rem;
-    background-position:
-      center,
-      center,
-      center,
-      0 0,
-      1.1rem 0.6rem;
+  /* Hero orb wrapper */
+  .hero-orb-wrapper {
+    position: relative;
+    z-index: 2;
   }
 
   /* ── Custom cursor ── */
@@ -1067,7 +883,6 @@
     background: var(--hu-bg);
     border: none;
     z-index: var(--hu-z-popover);
-    display: flex;
     flex-direction: column;
     justify-content: center;
   }
@@ -1079,6 +894,7 @@
   }
 
   .mobile-menu-popover:popover-open {
+    display: flex;
     opacity: 1;
     transform: translateY(0);
   }
@@ -1242,8 +1058,6 @@
 .provider-pill,
 .btn-primary,
 .btn-outline,
-.ambient-teal,
-.ambient-steel,
 .dash-preview,
 .custom-cursor,
 #terminal,
@@ -1324,66 +1138,12 @@
     opacity: 1 !important;
   }
 
-  .ambient-teal,
-  .ambient-steel,
-  .ambient-coral,
-  .ambient-blue {
-    display: none;
-  }
-
   .custom-cursor {
     display: none !important;
   }
 
   .hero-webgl-canvas {
     display: none !important;
-  }
-
-  .hero-static-constellation {
-    display: block;
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background-color: transparent;
-    background-image:
-      radial-gradient(
-        ellipse 85% 55% at 50% 42%,
-        color-mix(in srgb, var(--hu-accent) 16%, transparent) 0%,
-        transparent 68%
-      ),
-      radial-gradient(
-        circle at 22% 28%,
-        color-mix(in srgb, var(--hu-accent-secondary) 14%, transparent) 0%,
-        transparent 38%
-      ),
-      radial-gradient(
-        circle at 76% 62%,
-        color-mix(in srgb, var(--hu-accent) 12%, transparent) 0%,
-        transparent 42%
-      ),
-      radial-gradient(
-        circle,
-        color-mix(in srgb, var(--hu-accent) 40%, transparent) 0.08rem,
-        transparent 0.11rem
-      ),
-      radial-gradient(
-        circle,
-        color-mix(in srgb, var(--hu-accent-secondary) 28%, transparent) 0.05rem,
-        transparent 0.09rem
-      );
-    background-size:
-      100% 100%,
-      100% 100%,
-      100% 100%,
-      2.5rem 2.5rem,
-      1.75rem 1.75rem;
-    background-position:
-      center,
-      center,
-      center,
-      0 0,
-      1.1rem 0.6rem;
   }
 
   .comparison-bar {
@@ -1462,10 +1222,6 @@
     opacity: 1;
   }
 
-  .hero-gradient {
-    opacity: 0.3;
-  }
-
   .hero-webgl-canvas {
     opacity: 0.3 !important;
   }
@@ -1485,10 +1241,6 @@ body.hu-ambient-ready {
   filter: sepia(var(--hu-ambient-warmth))
     saturate(calc(1 + var(--hu-ambient-warmth) * 0.3));
   transition: filter 2s ease;
-}
-
-.hero-gradient::before {
-  opacity: calc(0.8 + var(--hu-scroll-depth) * 0.2);
 }
 
 .section-divider {
@@ -1549,14 +1301,11 @@ body.hu-ambient-ready {
 /* ── Print ── */
 @media print {
   nav,
-  .ambient-teal,
-  .ambient-steel,
-  .ambient-coral,
-  .ambient-blue,
   .scroll-progress,
   .chapter-nav,
   .mobile-chapter-indicator,
   .hu-film-grain,
+  .hu-particles,
   .custom-cursor,
   #hero-webgl {
     display: none !important;
@@ -1589,11 +1338,6 @@ body.hu-ambient-ready {
   syntax: "<percentage>";
   inherits: true;
   initial-value: 50%;
-}
-@property --hu-glow-opacity {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
 }
 
 /* 2. text-wrap: pretty — better line breaks on body/paragraph text */
@@ -1650,9 +1394,9 @@ h3 {
   text-wrap: balance;
 }
 
-/* ── Floating Particles ── */
+/* ── Floating Particles (hero-only) ── */
 .hu-particles {
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 0;
@@ -2269,10 +2013,10 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
-/* Film grain overlay */
+/* Film grain overlay — scoped to hero section */
 .hu-film-grain::before {
   content: "";
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 9998;

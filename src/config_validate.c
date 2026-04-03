@@ -104,6 +104,13 @@ static const char *const hu_voice_keys[] = {
 };
 static const size_t hu_voice_keys_len = sizeof(hu_voice_keys) / sizeof(hu_voice_keys[0]);
 
+static const char *const hu_media_gen_keys[] = {
+    "default_image_model", "default_video_model", "vertex_project", "vertex_region",
+    "veo_storage_uri",
+};
+static const size_t hu_media_gen_keys_len =
+    sizeof(hu_media_gen_keys) / sizeof(hu_media_gen_keys[0]);
+
 static const char *const hu_security_keys[] = {
     "autonomy_level", "sandbox", "sandbox_config", "resources", "audit",
 };
@@ -267,6 +274,10 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
         if (voice)
             check_unknown_nested_keys(voice, "voice", hu_voice_keys, hu_voice_keys_len, strict,
                                       &has_error);
+        hu_json_value_t *mg = hu_json_object_get(root, "media_gen");
+        if (mg)
+            check_unknown_nested_keys(mg, "media_gen", hu_media_gen_keys, hu_media_gen_keys_len,
+                                      strict, &has_error);
     }
 
     /* Type checking */

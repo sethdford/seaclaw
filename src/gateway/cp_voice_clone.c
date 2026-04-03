@@ -40,7 +40,9 @@ hu_error_t cp_voice_clone(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
     size_t audio_b64_len = audio_val->data.string.len;
 
     const char *mime_type = "audio/wav";
-    hu_json_value_t *mime_val = hu_json_object_get(params, "mimeType");
+    hu_json_value_t *mime_val = hu_json_object_get(params, "mime_type");
+    if (!mime_val)
+        mime_val = hu_json_object_get(params, "mimeType"); /* backward compat */
     if (mime_val && mime_val->type == HU_JSON_STRING && mime_val->data.string.len > 0)
         mime_type = mime_val->data.string.ptr;
 
@@ -144,8 +146,10 @@ hu_error_t cp_voice_clone(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
     (void)conn;
     (void)proto;
     (void)root;
-    *out = NULL;
-    *out_len = 0;
+    if (out)
+        *out = NULL;
+    if (out_len)
+        *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
 }
 

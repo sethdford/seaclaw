@@ -37,6 +37,7 @@ typedef struct hu_app_context {
     struct hu_mcp_resource_registry *mcp_resources; /* MCP resources registry; NULL if unused */
     struct hu_mcp_prompt_registry *mcp_prompts;     /* MCP prompts registry; NULL if unused */
     struct hu_task_store *task_store;               /* HuLa durable task state; NULL if disabled */
+    struct hu_canvas_store *canvas_store;           /* Live Canvas state; NULL if no canvas tool */
 } hu_app_context_t;
 
 typedef struct hu_control_protocol {

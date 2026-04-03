@@ -369,18 +369,16 @@ hu_error_t hu_config_save(const hu_config_t *cfg) {
     /* browser */
     hu_json_object_set(&a, root, "browser", hu_json_bool_new(&a, cfg->browser.enabled));
 
-    /* mcp_servers */
+    /* mcp_servers — keyed by name (matches parser expectation) */
     if (cfg->mcp_servers_len > 0) {
-        hu_json_value_t *mcp_arr = hu_json_array_new(&a);
-        if (mcp_arr) {
+        hu_json_value_t *mcp_obj = hu_json_object_new(&a);
+        if (mcp_obj) {
             for (size_t i = 0; i < cfg->mcp_servers_len; i++) {
+                if (!cfg->mcp_servers[i].name)
+                    continue;
                 hu_json_value_t *me = hu_json_object_new(&a);
                 if (!me)
                     continue;
-                if (cfg->mcp_servers[i].name)
-                    hu_json_object_set(&a, me, "name",
-                                       hu_json_string_new(&a, cfg->mcp_servers[i].name,
-                                                          strlen(cfg->mcp_servers[i].name)));
                 if (cfg->mcp_servers[i].command)
                     hu_json_object_set(&a, me, "command",
                                        hu_json_string_new(&a, cfg->mcp_servers[i].command,
@@ -398,9 +396,22 @@ hu_error_t hu_config_save(const hu_config_t *cfg) {
                         hu_json_object_set(&a, me, "args", args_arr);
                     }
                 }
-                hu_json_array_push(&a, mcp_arr, me);
+                if (cfg->mcp_servers[i].transport_type)
+                    hu_json_object_set(&a, me, "transport",
+                                       hu_json_string_new(&a, cfg->mcp_servers[i].transport_type,
+                                                          strlen(cfg->mcp_servers[i].transport_type)));
+                if (cfg->mcp_servers[i].url)
+                    hu_json_object_set(&a, me, "url",
+                                       hu_json_string_new(&a, cfg->mcp_servers[i].url,
+                                                          strlen(cfg->mcp_servers[i].url)));
+                if (cfg->mcp_servers[i].auto_connect)
+                    hu_json_object_set(&a, me, "auto_connect", hu_json_bool_new(&a, true));
+                if (cfg->mcp_servers[i].timeout_ms > 0)
+                    hu_json_object_set(&a, me, "timeout_ms",
+                                       hu_json_number_new(&a, (double)cfg->mcp_servers[i].timeout_ms));
+                hu_json_object_set(&a, mcp_obj, cfg->mcp_servers[i].name, me);
             }
-            hu_json_object_set(&a, root, "mcp_servers", mcp_arr);
+            hu_json_object_set(&a, root, "mcp_servers", mcp_obj);
         }
     }
 

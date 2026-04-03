@@ -111,6 +111,11 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"sota.metrics", cp_admin_metrics_snapshot},
     {"mcp.resources.list", cp_mcp_resources_list},
     {"mcp.prompts.list", cp_mcp_prompts_list},
+    {"canvas.list", cp_canvas_list},
+    {"canvas.get", cp_canvas_get},
+    {"canvas.edit", cp_canvas_edit},
+    {"canvas.undo", cp_canvas_undo},
+    {"canvas.redo", cp_canvas_redo},
     {NULL, NULL},
 };
 

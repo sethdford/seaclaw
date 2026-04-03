@@ -4,12 +4,25 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- h-uman brand mark: stylized "h" in Human green -->
+    <!-- h-uman brand mark: green orb with eyes -->
+    <!-- Orb body (centered in 108dp adaptive icon safe zone) -->
     <path
-        android:fillColor="#7AB648"
-        android:pathData="M38,32 L38,76 L44,76 L44,56 C44,48 50,44 56,44 C62,44 66,48 66,56 L66,76 L72,76 L72,54 C72,44 64,38 56,38 C50,38 46,40 44,44 L44,32 Z"/>
+        android:fillColor="#5A9A30"
+        android:pathData="M54,54m-32,0a32,32 0,1 1,64 0a32,32 0,1 1,-64 0"/>
+    <!-- Left eye -->
     <path
-        android:fillColor="#7AB648"
-        android:pathData="M48,40 L52,40 L52,42 L48,42 Z"
-        android:strokeWidth="0"/>
+        android:fillColor="#FFFFFF"
+        android:pathData="M43.2,51.6a6.4,8 0,1 0,12.8 0a6.4,8 0,1 0,-12.8 0"/>
+    <!-- Left eye highlight -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46.8,48.4a1.6,1.6 0,1 0,3.2 0a1.6,1.6 0,1 0,-3.2 0"/>
+    <!-- Right eye -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58.4,51.6a6.4,8 0,1 0,12.8 0a6.4,8 0,1 0,-12.8 0"/>
+    <!-- Right eye highlight -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M62,48.4a1.6,1.6 0,1 0,3.2 0a1.6,1.6 0,1 0,-3.2 0"/>
 </vector>

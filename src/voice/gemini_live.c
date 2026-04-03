@@ -727,26 +727,48 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
     /* ── serverContent ────────────────────────────────────────────── */
     hu_json_value_t *sc = hu_json_object_get(json, "serverContent");
     if (sc) {
-        /* modelTurn.parts[].inlineData (audio output) */
+        /* modelTurn.parts[].inlineData (audio output) — concatenate all audio parts */
         hu_json_value_t *mt = hu_json_object_get(sc, "modelTurn");
         if (mt) {
             hu_json_value_t *parts = hu_json_object_get(mt, "parts");
             if (parts && parts->type == HU_JSON_ARRAY && parts->data.array.len > 0) {
-                hu_json_value_t *part0 = parts->data.array.items[0];
-                hu_json_value_t *id = hu_json_object_get(part0, "inlineData");
-                if (id) {
+                hu_json_buf_t abuf = {0};
+                bool has_audio = false;
+                for (size_t pi = 0; pi < parts->data.array.len; pi++) {
+                    hu_json_value_t *part = parts->data.array.items[pi];
+                    hu_json_value_t *id = hu_json_object_get(part, "inlineData");
+                    if (!id)
+                        continue;
                     const char *data = hu_json_get_string(id, "data");
-                    if (data && data[0]) {
-                        size_t dlen = strlen(data);
-                        out->audio_base64 = hu_strndup(alloc, data, dlen);
-                        if (!out->audio_base64) {
+                    if (!data || !data[0])
+                        continue;
+                    if (!has_audio) {
+                        if (hu_json_buf_init(&abuf, alloc) != HU_OK) {
                             hu_json_free(alloc, json);
                             alloc->free(alloc->ctx, msg, msg_len + 1);
                             return HU_ERR_OUT_OF_MEMORY;
                         }
-                        out->audio_base64_len = dlen;
-                        gl_copy_event_type("serverContent.modelTurn.audio", out);
+                        has_audio = true;
                     }
+                    if (hu_json_buf_append_raw(&abuf, data, strlen(data)) != HU_OK) {
+                        hu_json_buf_free(&abuf);
+                        hu_json_free(alloc, json);
+                        alloc->free(alloc->ctx, msg, msg_len + 1);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
+                }
+                if (has_audio && abuf.len > 0) {
+                    out->audio_base64 = hu_strndup(alloc, abuf.ptr, abuf.len);
+                    hu_json_buf_free(&abuf);
+                    if (!out->audio_base64) {
+                        hu_json_free(alloc, json);
+                        alloc->free(alloc->ctx, msg, msg_len + 1);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
+                    out->audio_base64_len = strlen(out->audio_base64);
+                    gl_copy_event_type("serverContent.modelTurn.audio", out);
+                } else if (has_audio) {
+                    hu_json_buf_free(&abuf);
                 }
             }
         }
@@ -883,6 +905,8 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
                         if (!fn)
                             continue;
                         pcs[stored].name = hu_strndup(alloc, fn, strlen(fn));
+                        if (!pcs[stored].name)
+                            continue;
                         pcs[stored].name_len = strlen(fn);
                         const char *fi2 = hu_json_get_string(fc, "id");
                         if (fi2 && fi2[0]) {
@@ -900,8 +924,12 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
                         }
                         stored++;
                     }
-                    session->pending_calls = pcs;
-                    session->pending_calls_count = stored;
+                    if (stored > 0) {
+                        session->pending_calls = pcs;
+                        session->pending_calls_count = stored;
+                    } else {
+                        alloc->free(alloc->ctx, pcs, extra * sizeof(hu_gl_pending_tool_call_t));
+                    }
                 }
             }
         }
@@ -1006,7 +1034,15 @@ hu_error_t hu_gemini_live_add_tool(hu_gemini_live_session_t *session, const char
     if (!session->connected || !session->ws_client)
         return HU_ERR_IO;
     const char *desc = description ? description : "";
-    const char *params = (parameters_json && parameters_json[0]) ? parameters_json : "{}";
+    const char *params = "{}";
+    if (parameters_json && parameters_json[0]) {
+        hu_json_value_t *pv = NULL;
+        if (hu_json_parse(session->alloc, parameters_json, strlen(parameters_json), &pv) == HU_OK &&
+            pv) {
+            params = parameters_json;
+            hu_json_free(session->alloc, pv);
+        }
+    }
     hu_json_buf_t buf = {0};
     hu_error_t err = hu_json_buf_init(&buf, session->alloc);
     if (err != HU_OK)

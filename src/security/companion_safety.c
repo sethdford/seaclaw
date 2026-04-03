@@ -472,8 +472,6 @@ hu_error_t hu_companion_safety_check(hu_allocator_t *alloc, const char *response
                                      size_t response_len, const char *context, size_t context_len,
                                      hu_companion_safety_result_t *result) {
     (void)alloc;
-    (void)context;
-    (void)context_len;
 
     if (!result)
         return HU_ERR_INVALID_ARGUMENT;
@@ -499,6 +497,33 @@ hu_error_t hu_companion_safety_check(hu_allocator_t *alloc, const char *response
     result->roleplay_violation = score_roleplay_violation(text, text_len);
     result->manipulative = score_manipulative(text, text_len);
     result->isolation = score_isolation(text, text_len);
+
+    /* Boost risk scores when user context indicates vulnerability */
+    if (context && context_len > 0 && context_len < SIZE_MAX) {
+        char *ctx_norm = (char *)malloc(context_len + 1);
+        if (ctx_norm) {
+            size_t ctx_nlen =
+                hu_companion_safety_normalize(context, context_len, ctx_norm, context_len + 1);
+            bool user_vulnerable =
+                ci_contains(ctx_norm, ctx_nlen, "lonely") ||
+                ci_contains(ctx_norm, ctx_nlen, "depressed") ||
+                ci_contains(ctx_norm, ctx_nlen, "no one cares") ||
+                ci_contains(ctx_norm, ctx_nlen, "no friends") ||
+                ci_contains(ctx_norm, ctx_nlen, "only one who understands") ||
+                ci_contains(ctx_norm, ctx_nlen, "self harm") ||
+                ci_contains(ctx_norm, ctx_nlen, "kill myself") ||
+                ci_contains(ctx_norm, ctx_nlen, "want to die");
+            if (user_vulnerable) {
+                result->over_attachment *= 1.5;
+                result->manipulative *= 1.5;
+                result->isolation *= 1.5;
+                if (result->over_attachment > 1.0) result->over_attachment = 1.0;
+                if (result->manipulative > 1.0) result->manipulative = 1.0;
+                if (result->isolation > 1.0) result->isolation = 1.0;
+            }
+            free(ctx_norm);
+        }
+    }
 
     /* Weighted aggregate: manipulation and isolation weighted higher */
     result->total_risk = result->over_attachment * 0.15 + result->boundary_violation * 0.20 +
@@ -732,13 +757,8 @@ hu_error_t hu_safety_judge_check(hu_allocator_t *alloc, hu_provider_t *provider,
     return HU_OK;
 #else
     if (!provider || !provider->vtable || !provider->vtable->chat_with_system || !alloc) {
-        /* No judge available — fail closed: mark as unsafe with low confidence
-         * so rule-based pass-through still works but unvetted content is flagged */
-        if (!result->safe)
-            return HU_OK; /* already flagged by rule-based check */
-        result->safe = false;
-        result->confidence = 0.3;
-        snprintf(result->reason, sizeof(result->reason), "safety judge unavailable");
+        /* No judge available — fall back to rule-based result as documented.
+         * Rule-based check already ran; trust its verdict rather than over-blocking. */
         return HU_OK;
     }
 

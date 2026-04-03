@@ -83,7 +83,8 @@ static hu_error_t mv_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
     const char *model = hu_json_get_string(args, "model");
     if (!model) {
         hu_agent_t *cfg_agent = hu_agent_get_current_for_tools();
-        if (cfg_agent && cfg_agent->config && cfg_agent->config->media_gen.default_video_model)
+        if (cfg_agent && cfg_agent->config && cfg_agent->config->media_gen.default_video_model &&
+            mv_model_ok(cfg_agent->config->media_gen.default_video_model))
             model = cfg_agent->config->media_gen.default_video_model;
         else
             model = "veo_3.1";

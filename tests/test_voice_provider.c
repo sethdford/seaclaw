@@ -71,10 +71,11 @@ static void voice_provider_openai_optional_slots_have_noop_stubs(void) {
     HU_ASSERT_NOT_NULL(p.vtable->send_audio_stream_end);
     HU_ASSERT_NOT_NULL(p.vtable->reconnect);
     HU_ASSERT_NOT_NULL(p.vtable->send_tool_response);
-    /* No-op stubs return HU_OK for signals, HU_ERR_NOT_SUPPORTED for tool response */
+    /* No-op stubs return HU_OK for signals; tool response is now a real implementation */
     HU_ASSERT_EQ(p.vtable->send_activity_start(p.ctx), HU_OK);
     HU_ASSERT_EQ(p.vtable->reconnect(p.ctx), HU_OK);
-    HU_ASSERT_EQ(p.vtable->send_tool_response(p.ctx, "x", "y", "{}"), HU_ERR_NOT_SUPPORTED);
+    p.vtable->connect(p.ctx);
+    HU_ASSERT_EQ(p.vtable->send_tool_response(p.ctx, "test_fn", "call-1", "{}"), HU_OK);
     p.vtable->disconnect(p.ctx, &alloc);
 }
 

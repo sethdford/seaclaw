@@ -643,6 +643,34 @@ static void test_config_parse_email_channel_daemon_block(void) {
     hu_arena_destroy(arena);
 }
 
+static void test_config_parse_signal_mattermost_maixcam_channels(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json =
+        "{\"channels\":{\"signal\":{\"http_url\":\"http://127.0.0.1:8080\","
+        "\"account\":\"+15551234567\",\"daemon\":{\"poll_interval_sec\":5}},"
+        "\"mattermost\":{\"url\":\"https://chat.example.com\",\"token\":\"tok\","
+        "\"daemon\":{\"response_mode\":\"always\"}},"
+        "\"maixcam\":{\"host\":\"/dev/ttyUSB0\",\"port\":0}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(cfg.channels.signal.http_url, "http://127.0.0.1:8080");
+    HU_ASSERT_STR_EQ(cfg.channels.signal.account, "+15551234567");
+    HU_ASSERT_EQ(cfg.channels.signal.daemon.poll_interval_sec, 5);
+    HU_ASSERT_STR_EQ(cfg.channels.mattermost.url, "https://chat.example.com");
+    HU_ASSERT_STR_EQ(cfg.channels.mattermost.token, "tok");
+    HU_ASSERT_NOT_NULL(cfg.channels.mattermost.daemon.response_mode);
+    HU_ASSERT_STR_EQ(cfg.channels.mattermost.daemon.response_mode, "always");
+    HU_ASSERT_STR_EQ(cfg.channels.maixcam.host, "/dev/ttyUSB0");
+    HU_ASSERT_EQ(cfg.channels.maixcam.port, (uint16_t)0);
+    hu_arena_destroy(arena);
+}
+
 static void test_daemon_active_config_null_config_returns_null(void) {
     HU_ASSERT_NULL(hu_daemon_test_get_active_daemon_config(NULL, "discord"));
 }
@@ -665,6 +693,8 @@ static void test_daemon_active_config_known_channels_match_structs(void) {
               &cfg.channels.nostr.daemon);
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "signal") ==
               &cfg.channels.signal.daemon);
+    HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "mattermost") ==
+              &cfg.channels.mattermost.daemon);
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "slack") ==
               &cfg.channels.slack.daemon);
     HU_ASSERT(hu_daemon_test_get_active_daemon_config(&cfg, "telegram") ==
@@ -1138,6 +1168,7 @@ void run_config_parse_tests(void) {
     HU_RUN_TEST(test_config_parse_response_mode_normal);
     HU_RUN_TEST(test_config_parse_channels_default_daemon_response_mode);
     HU_RUN_TEST(test_config_parse_email_channel_daemon_block);
+    HU_RUN_TEST(test_config_parse_signal_mattermost_maixcam_channels);
     HU_RUN_TEST(test_daemon_active_config_null_config_returns_null);
     HU_RUN_TEST(test_daemon_active_config_known_channels_match_structs);
     HU_RUN_TEST(test_daemon_active_config_unknown_channel_returns_default_daemon);

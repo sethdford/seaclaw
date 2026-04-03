@@ -237,6 +237,8 @@ static const hu_daemon_config_entry_t k_daemon_configs[] = {
     {"irc", offsetof(hu_channels_config_t, irc) + offsetof(hu_irc_channel_config_t, daemon)},
     {"matrix",
      offsetof(hu_channels_config_t, matrix) + offsetof(hu_matrix_channel_config_t, daemon)},
+    {"mattermost",
+     offsetof(hu_channels_config_t, mattermost) + offsetof(hu_mattermost_channel_config_t, daemon)},
     {"nostr", offsetof(hu_channels_config_t, nostr) + offsetof(hu_nostr_channel_config_t, daemon)},
     {"signal",
      offsetof(hu_channels_config_t, signal) + offsetof(hu_signal_channel_config_t, daemon)},
@@ -295,6 +297,22 @@ static void hu_daemon_visual_attach_gov_after_send(uint64_t now_ms) {
         (void)hu_governor_record_sent(&hu_daemon_visual_attach_gov, now_ms);
 }
 #endif /* !HU_IS_TEST */
+
+static void daemon_flush_generated_media(hu_agent_t *agent) {
+    if (!agent || agent->generated_media_count == 0)
+        return;
+    for (size_t i = 0; i < agent->generated_media_count && i < 4; i++) {
+        if (agent->generated_media[i]) {
+#ifndef HU_IS_TEST
+            (void)unlink(agent->generated_media[i]);
+#endif
+            size_t l = strlen(agent->generated_media[i]);
+            agent->alloc->free(agent->alloc->ctx, agent->generated_media[i], l + 1);
+            agent->generated_media[i] = NULL;
+        }
+    }
+    agent->generated_media_count = 0;
+}
 
 #if defined(HU_ENABLE_SQLITE) && !defined(HU_IS_TEST)
 static void cross_channel_format_when(char *out, size_t out_sz, const char *ts) {
@@ -1536,6 +1554,7 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 }
                 if (response)
                     agent->alloc->free(agent->alloc->ctx, response, response_len + 1);
+                daemon_flush_generated_media(agent);
                 alloc->free(alloc->ctx, prompt, prompt_len + 1);
                 hu_agent_clear_history(agent);
             }
@@ -1603,6 +1622,7 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                             }
                             if (gm_out)
                                 agent->alloc->free(agent->alloc->ctx, gm_out, gm_out_len + 1);
+                            daemon_flush_generated_media(agent);
                             hu_agent_clear_history(agent);
                         }
                         uint32_t gm_seed = (uint32_t)(gm_now * 48271u) + (uint32_t)(uintptr_t)cp;
@@ -2320,7 +2340,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 #endif
-#ifdef HU_ENABLE_SQLITE
+#if defined(HU_ENABLE_SQLITE) && defined(HU_ENABLE_FEEDS)
                 /* P7: Feed processor poll — every 5 minutes (per-type intervals apply) */
                 {
                     static uint64_t last_feed_poll_types[HU_FEED_COUNT] = {0};
@@ -2357,6 +2377,24 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     fp.twitter_bearer_token_len =
                                         strlen(config->feeds.twitter_bearer_token);
                                 }
+                                if (config->feeds.google_photos_access_token) {
+                                    fp.google_photos_access_token =
+                                        config->feeds.google_photos_access_token;
+                                    fp.google_photos_access_token_len =
+                                        strlen(config->feeds.google_photos_access_token);
+                                }
+                                if (config->channels.facebook.page_access_token) {
+                                    fp.facebook_page_access_token =
+                                        config->channels.facebook.page_access_token;
+                                    fp.facebook_page_access_token_len =
+                                        strlen(config->channels.facebook.page_access_token);
+                                }
+                                if (config->channels.instagram.access_token) {
+                                    fp.instagram_access_token =
+                                        config->channels.instagram.access_token;
+                                    fp.instagram_access_token_len =
+                                        strlen(config->channels.instagram.access_token);
+                                }
                             }
                             hu_feed_config_t fconf;
                             memset(&fconf, 0, sizeof(fconf));
@@ -2367,6 +2405,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             fconf.enabled[HU_FEED_TWITTER] = true;
                             fconf.enabled[HU_FEED_SOCIAL_FACEBOOK] = true;
                             fconf.enabled[HU_FEED_SOCIAL_INSTAGRAM] = true;
+                            fconf.enabled[HU_FEED_EMAIL] = true;
+                            fconf.enabled[HU_FEED_APPLE_PHOTOS] = true;
+                            fconf.enabled[HU_FEED_APPLE_REMINDERS] = true;
+                            fconf.enabled[HU_FEED_GOOGLE_PHOTOS] = true;
                             fconf.poll_interval_minutes[HU_FEED_FILE_INGEST] =
                                 (config && config->feeds.poll_interval_file_ingest > 0)
                                     ? config->feeds.poll_interval_file_ingest
@@ -2389,6 +2431,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     : 120;
                             fconf.poll_interval_minutes[HU_FEED_SOCIAL_FACEBOOK] = 120;
                             fconf.poll_interval_minutes[HU_FEED_SOCIAL_INSTAGRAM] = 120;
+                            fconf.poll_interval_minutes[HU_FEED_EMAIL] = 60;
+                            fconf.poll_interval_minutes[HU_FEED_APPLE_PHOTOS] = 360;
+                            fconf.poll_interval_minutes[HU_FEED_APPLE_REMINDERS] = 120;
+                            fconf.poll_interval_minutes[HU_FEED_GOOGLE_PHOTOS] = 360;
                             fconf.max_items_per_poll =
                                 (config && config->feeds.max_items_per_poll > 0)
                                     ? config->feeds.max_items_per_poll
@@ -2819,6 +2865,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             {
                                 static hu_self_improve_state_t fidelity_state;
                                 static bool fidelity_initialized = false;
+                                static bool fidelity_baseline_set = false;
                                 if (!fidelity_initialized) {
                                     hu_self_improve_init(&fidelity_state, NULL);
                                     fidelity_initialized = true;
@@ -2843,8 +2890,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     }
                                 }
                                 fid.composite = hu_fidelity_composite(&fid);
-                                if (!fidelity_state.current_baseline.composite) {
+                                if (!fidelity_baseline_set) {
                                     hu_self_improve_set_baseline(&fidelity_state, &fid);
+                                    fidelity_baseline_set = true;
                                 } else if (!hu_self_improve_budget_exhausted(&fidelity_state)) {
                                     char *mutation = NULL;
                                     size_t mutation_len = 0;
@@ -4887,13 +4935,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             else if (temp_dir)
                                 alloc->free(alloc->ctx, temp_dir, temp_dir_len + 1);
 
-                            /* Free anniversary labels (allocated by
-                             * hu_temporal_check_anniversaries)
-                             */
-                            for (size_t ai = 0; ai < ann_count; ai++) {
-                                if (ann_buf[ai].label)
-                                    free(ann_buf[ai].label);
-                            }
+                            /* Labels in ann_buf[] are borrowed from
+                             * hu_date_entry_t — do not free them. */
+                            (void)ann_count;
                         }
                     }
 #endif /* HU_HAS_PERSONA temporal */
@@ -8265,6 +8309,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                         if (ch->channel->vtable->start_typing)
                             ch->channel->vtable->start_typing(ch->channel->ctx, batch_key, key_len);
+                        daemon_flush_generated_media(agent);
                         char *burst_response = NULL;
                         size_t burst_response_len = 0;
                         hu_error_t burst_err = hu_agent_turn(agent, combined, combined_len,
@@ -8273,6 +8318,34 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key, key_len);
                         if (burst_err == HU_OK && burst_response && burst_response_len > 0 &&
                             ch->channel->vtable->send) {
+                            /* Run hallucination guard on burst response before splitting */
+                            {
+                                hu_hallucination_result_t bhal = {0};
+                                if (hu_hallucination_extract_claims(burst_response, burst_response_len,
+                                                                    &bhal) == HU_OK &&
+                                    bhal.claim_count > 0) {
+                                    (void)hu_hallucination_verify_claims(&bhal, agent->memory, alloc);
+                                    if (bhal.needs_rewrite) {
+                                        char *brewrite = NULL;
+                                        size_t brewrite_len = 0;
+                                        if (hu_hallucination_rewrite(alloc, burst_response,
+                                                                     burst_response_len, &bhal,
+                                                                     &brewrite, &brewrite_len) ==
+                                                HU_OK &&
+                                            brewrite) {
+                                            agent->alloc->free(agent->alloc->ctx, burst_response,
+                                                               burst_response_len + 1);
+                                            burst_response = brewrite;
+                                            burst_response_len = brewrite_len;
+                                        }
+                                    }
+                                }
+                            }
+                            if (ch->channel->vtable->human_active_recently &&
+                                ch->channel->vtable->human_active_recently(
+                                    ch->channel->ctx, batch_key, key_len, 30)) {
+                                goto burst_skip;
+                            }
                             char burst_msgs[4][256];
                             int n = hu_conversation_parse_burst_response(
                                 burst_response, burst_response_len, burst_msgs, 4);
@@ -8309,6 +8382,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         "burst: %d messages for %.*s", n,
                                         (int)(key_len > 20 ? 20 : key_len), batch_key);
                         }
+                        burst_skip:
                         if (burst_response)
                             agent->alloc->free(agent->alloc->ctx, burst_response,
                                                burst_response_len + 1);
@@ -8317,17 +8391,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             agent->conversation_context = convo_ctx;
                             agent->conversation_context_len = convo_ctx_len;
                         }
-                        for (size_t gmc = 0; gmc < agent->generated_media_count && gmc < 4; gmc++) {
-                            if (agent->generated_media[gmc]) {
-#ifndef HU_IS_TEST
-                                (void)unlink(agent->generated_media[gmc]);
-#endif
-                                size_t gml = strlen(agent->generated_media[gmc]);
-                                agent->alloc->free(agent->alloc->ctx, agent->generated_media[gmc], gml + 1);
-                                agent->generated_media[gmc] = NULL;
-                            }
-                        }
-                        agent->generated_media_count = 0;
+                        daemon_flush_generated_media(agent);
                         goto skip_llm_this_batch;
                     }
                 }
@@ -8379,6 +8443,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 bool retried = false;
                 char *turing_rejected_resp = NULL;
                 size_t turing_rejected_len = 0;
+                const char *turn_media_ptrs[4] = {NULL};
+                size_t turn_media_count = 0;
                 hu_log_info("human", agent ? agent->observer : NULL,
                             "calling agent turn for %.*s...", (int)(key_len > 20 ? 20 : key_len),
                             batch_key);
@@ -8412,14 +8478,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             memcpy(stream_ctx.id, batch_key, ik);
                             stream_ctx.id[ik] = '\0';
                         }
-                        for (size_t gmc = 0; gmc < agent->generated_media_count && gmc < 4; gmc++) {
-                            if (agent->generated_media[gmc]) {
-                                size_t gml = strlen(agent->generated_media[gmc]);
-                                agent->alloc->free(agent->alloc->ctx, agent->generated_media[gmc], gml + 1);
-                                agent->generated_media[gmc] = NULL;
-                            }
-                        }
-                        agent->generated_media_count = 0;
+                        daemon_flush_generated_media(agent);
                         if (!retried) {
                             err = hu_agent_turn_stream_v2(agent, combined, combined_len,
                                                           daemon_stream_event_cb, &stream_ctx,
@@ -8430,6 +8489,20 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                     daemon_out_bus_bridge.active_turn = NULL;
+
+                    memset((void *)turn_media_ptrs, 0, sizeof(turn_media_ptrs));
+                    turn_media_count = 0;
+                    if (agent) {
+                        for (size_t gmi = 0; gmi < agent->generated_media_count && gmi < 4; gmi++) {
+                            if (agent->generated_media[gmi]) {
+                                turn_media_ptrs[turn_media_count] = agent->generated_media[gmi];
+                                agent->generated_media[gmi] = NULL;
+                                turn_media_count++;
+                            }
+                        }
+                        agent->generated_media_count = 0;
+                    }
+
                     hu_log_info("human", agent ? agent->observer : NULL,
                                 "agent turn result: err=%s response_len=%zu for %.*s",
                                 hu_error_string(err), response_len,
@@ -8874,11 +8947,38 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     cm.composite = hu_consistency_composite(&cm);
                     if (!persona_drift.baseline_set)
                         hu_drift_detector_set_baseline(&persona_drift, &cm);
-                    else if (hu_drift_detector_update(&persona_drift, &cm))
+                    else if (hu_drift_detector_update(&persona_drift, &cm)) {
                         hu_log_info("human", agent ? agent->observer : NULL,
                                     "persona drift detected: composite=%.3f baseline=%.3f",
                                     persona_drift.current.composite,
                                     persona_drift.baseline.composite);
+                        /* Persist a self-improvement patch to reinforce persona alignment
+                         * on the next turn. Uses the existing self_improve DB engine. */
+#ifdef HU_ENABLE_SQLITE
+                        {
+                            sqlite3 *ddb = hu_sqlite_memory_get_db(agent->memory);
+                            if (ddb) {
+                                hu_self_improve_t si_drift = {0};
+                                if (hu_self_improve_create(alloc, ddb, &si_drift) == HU_OK) {
+                                    hu_self_improve_init_tables(&si_drift);
+                                    hu_structured_patch_t dp = {
+                                        .type = HU_PATCH_TEXT_HINT,
+                                        .parsed = true,
+                                    };
+                                    snprintf(dp.key, sizeof(dp.key), "persona_drift_correction");
+                                    snprintf(dp.value, sizeof(dp.value),
+                                             "Persona drift detected (%.2f vs baseline %.2f). "
+                                             "Refocus on core identity traits, preferred vocabulary, "
+                                             "and characteristic communication style.",
+                                             persona_drift.current.composite,
+                                             persona_drift.baseline.composite);
+                                    hu_self_improve_apply_structured_patch(&si_drift, &dp);
+                                    hu_self_improve_deinit(&si_drift);
+                                }
+                            }
+                        }
+#endif
+                    }
                 }
 
                 /* ── Phase 4 post-turn: style drift self-tracking ─────── */
@@ -9226,6 +9326,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (de_response)
                                 agent->alloc->free(agent->alloc->ctx, de_response,
                                                    de_response_len + 1);
+                            daemon_flush_generated_media(agent);
                             alloc->free(alloc->ctx, de_prompt, de_prompt_len + 1);
                         }
                     }
@@ -9421,14 +9522,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 (void)typo_seed;
 #endif
                 if (err == HU_OK && response && response_len > 0) {
-                    /* Merge tool-generated media with proactive visual media */
                     const char *gen_media_ptrs[5] = {NULL};
                     size_t gen_media_count = 0;
-                    if (agent && agent->generated_media_count > 0) {
-                        for (size_t gmi = 0; gmi < agent->generated_media_count && gen_media_count < 5; gmi++) {
-                            if (agent->generated_media[gmi])
-                                gen_media_ptrs[gen_media_count++] = agent->generated_media[gmi];
-                        }
+                    for (size_t gmi = 0; gmi < turn_media_count && gen_media_count < 5; gmi++) {
+                        if (turn_media_ptrs[gmi])
+                            gen_media_ptrs[gen_media_count++] = turn_media_ptrs[gmi];
                     }
 
                     const char *proactive_vis_m[1] = {NULL};
@@ -9733,6 +9831,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             pv_emotion ? pv_emotion : "auto");
                                 const char *cartesia_key =
                                     hu_config_get_provider_key(config, "cartesia");
+                                if (!cartesia_key || !cartesia_key[0]) {
+                                    cartesia_key = getenv("CARTESIA_API_KEY");
+                                }
                                 if (cartesia_key && cartesia_key[0]) {
                                     hu_voice_emotion_t detected_emotion = HU_VOICE_EMOTION_NEUTRAL;
                                     float emotion_confidence = 0.0f;
@@ -10007,11 +10108,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                             }
                         }
-                        /* SOTA-002: Anti-sycophancy guard — detect and log for next-turn influence.
-                         * Friction directive is a model instruction (not user-facing), so we
-                         * inject it into agent history for the next turn instead of sending
-                         * it to the channel. Also bump the contrarian counter to increase
-                         * the probability of the existing Phase 3 anti-sycophancy prompt. */
+                        /* SOTA-002: Anti-sycophancy guard — detect and influence next turn.
+                         * When flagged, bump the contrarian counter to shift the FNV hash
+                         * in hu_opinion_contrarian_prompt, increasing the probability that
+                         * the Phase 3 anti-sycophancy directive fires on the next turn. */
                         {
                             hu_sycophancy_result_t syc_r = {0};
                             if (hu_sycophancy_check(send_ptr, send_len, combined, combined_len,
@@ -10215,6 +10315,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                 if (dt_ms > 2000)
                                                     dt_ms = 2000;
                                                 usleep((useconds_t)(dt_ms * 1000));
+                                                if (ch->channel->vtable->human_active_recently &&
+                                                    ch->channel->vtable->human_active_recently(
+                                                        ch->channel->ctx, batch_key, key_len, 30))
+                                                    break;
                                             }
                                             ch->channel->vtable->send(
                                                 ch->channel->ctx, batch_key, key_len, dt_chunks[dt],
@@ -10763,6 +10867,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             printf("[e2e] Turn limit reached (%u turns). Stopping.\n",
                                    e2e_total_turns);
                             agent->alloc->free(agent->alloc->ctx, response, response_alloc_len + 1);
+                            for (size_t tmi = 0; tmi < turn_media_count; tmi++) {
+                                if (turn_media_ptrs[tmi]) {
+#ifndef HU_IS_TEST
+                                    (void)unlink(turn_media_ptrs[tmi]);
+#endif
+                                    size_t ml = strlen(turn_media_ptrs[tmi]);
+                                    agent->alloc->free(agent->alloc->ctx,
+                                                       (void *)(uintptr_t)turn_media_ptrs[tmi], ml + 1);
+                                }
+                            }
                             goto e2e_done;
                         }
                     }
@@ -10770,20 +10884,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     agent->alloc->free(agent->alloc->ctx, response, response_alloc_len + 1);
                 }
 
-                /* Clean up tool-generated media temp files */
-                if (agent && agent->generated_media_count > 0) {
-                    for (size_t gmi = 0; gmi < agent->generated_media_count; gmi++) {
-                        if (agent->generated_media[gmi]) {
+                for (size_t tmi = 0; tmi < turn_media_count; tmi++) {
+                    if (turn_media_ptrs[tmi]) {
 #ifndef HU_IS_TEST
-                            (void)unlink(agent->generated_media[gmi]);
+                        (void)unlink(turn_media_ptrs[tmi]);
 #endif
-                            size_t gm_len = strlen(agent->generated_media[gmi]);
-                            agent->alloc->free(agent->alloc->ctx, agent->generated_media[gmi], gm_len + 1);
-                            agent->generated_media[gmi] = NULL;
-                        }
+                        size_t ml = strlen(turn_media_ptrs[tmi]);
+                        agent->alloc->free(agent->alloc->ctx, (void *)(uintptr_t)turn_media_ptrs[tmi],
+                                           ml + 1);
                     }
-                    agent->generated_media_count = 0;
                 }
+                daemon_flush_generated_media(agent);
             }
         }
 
@@ -10832,19 +10943,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
     if (0) {
     e2e_done:
-        if (agent && agent->generated_media_count > 0) {
-            for (size_t gmi = 0; gmi < agent->generated_media_count; gmi++) {
-                if (agent->generated_media[gmi]) {
-#ifndef HU_IS_TEST
-                    (void)unlink(agent->generated_media[gmi]);
-#endif
-                    size_t gm_len = strlen(agent->generated_media[gmi]);
-                    agent->alloc->free(agent->alloc->ctx, agent->generated_media[gmi], gm_len + 1);
-                    agent->generated_media[gmi] = NULL;
-                }
-            }
-            agent->generated_media_count = 0;
-        }
+        daemon_flush_generated_media(agent);
     }
 
 #undef HU_STOP_FLAG

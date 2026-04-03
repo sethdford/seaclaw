@@ -1,4 +1,6 @@
 #include "human/agent/plan_executor.h"
+#include "human/agent.h"
+#include "human/agent/tool_context.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include <stdio.h>
@@ -139,6 +141,14 @@ hu_error_t hu_plan_executor_run(hu_plan_executor_t *exec, hu_plan_t *plan,
         if (tr.success) {
             hu_planner_mark_step(plan, step_idx, HU_PLAN_STEP_DONE);
             result->steps_completed++;
+            if (tr.media_path && tr.media_path_len > 0) {
+                hu_agent_t *cur_agent = hu_agent_get_current_for_tools();
+                if (cur_agent && cur_agent->generated_media_count < 4) {
+                    char *mp = hu_strndup(exec->alloc, tr.media_path, tr.media_path_len);
+                    if (mp)
+                        cur_agent->generated_media[cur_agent->generated_media_count++] = mp;
+                }
+            }
         } else {
             hu_planner_mark_step(plan, step_idx, HU_PLAN_STEP_FAILED);
             result->steps_failed++;

@@ -45,8 +45,11 @@ static bool tool_cache_lookup(hu_tool_cache_t *cache, hu_allocator_t *alloc,
     size_t slot = (size_t)(h % HU_TOOL_CACHE_SLOTS);
     if (cache->slots[slot].occupied && cache->slots[slot].hash == h) {
         hu_tool_result_t *cached = &cache->slots[slot].result;
-        out->output = hu_strndup(alloc, cached->output, cached->output_len);
-        out->output_len = cached->output_len;
+        char *dup = hu_strndup(alloc, cached->output, cached->output_len);
+        if (!dup && cached->output && cached->output_len > 0)
+            return false;
+        out->output = dup;
+        out->output_len = dup ? cached->output_len : 0;
         out->output_owned = true;
         out->success = cached->success;
         cache->hits++;

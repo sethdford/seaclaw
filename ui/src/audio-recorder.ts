@@ -11,6 +11,7 @@ export interface AudioCaptureResult {
 
 export interface StreamingOptions {
   onLevel?: (rms: number) => void;
+  sampleRate?: number;
 }
 
 const PREFERRED_MIME_TYPES = [
@@ -112,8 +113,8 @@ export class AudioRecorder {
   }
 
   /**
-   * Stream raw PCM16 (16kHz, int16 LE) for Gemini Live native voice.
-   * Captures at native rate and downsamples to 16kHz before sending.
+   * Stream raw PCM16 (int16 LE) at the requested sample rate.
+   * Defaults to 16 kHz (Gemini Live); pass options.sampleRate for others.
    */
   async startRawPcmStreaming(
     onChunk: (data: ArrayBuffer) => void,
@@ -121,8 +122,9 @@ export class AudioRecorder {
   ): Promise<void> {
     if (this.#recording) return;
 
+    const rate = options?.sampleRate ?? 16000;
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true },
+      audio: { sampleRate: rate, channelCount: 1, echoCancellation: true },
     });
     this.#stream = stream;
     this.#streaming = true;
@@ -131,7 +133,7 @@ export class AudioRecorder {
     this.#onStreamChunk = onChunk;
     this.#onLevel = options?.onLevel ?? null;
 
-    const ctx = new AudioContext({ sampleRate: 16000 });
+    const ctx = new AudioContext({ sampleRate: rate });
     this.#rawPcmContext = ctx;
     const source = ctx.createMediaStreamSource(stream);
 

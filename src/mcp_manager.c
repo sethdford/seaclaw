@@ -310,15 +310,18 @@ hu_error_t hu_mcp_manager_connect_auto(hu_mcp_manager_t *mgr) {
     if (!mgr)
         return HU_ERR_INVALID_ARGUMENT;
 
+    hu_error_t last_err = HU_OK;
     for (size_t i = 0; i < mgr->slot_count; i++) {
         if (!mgr->slots[i].auto_connect)
             continue;
         hu_error_t err = connect_slot(mgr->alloc, &mgr->slots[i]);
-        if (err != HU_OK)
+        if (err != HU_OK) {
             hu_log_error("mcp-manager", NULL, "mcp_manager: failed to connect server '%s': %d",
                     mgr->slots[i].name ? mgr->slots[i].name : "?", (int)err);
+            last_err = err;
+        }
     }
-    return HU_OK;
+    return last_err;
 }
 
 hu_error_t hu_mcp_manager_connect_server(hu_mcp_manager_t *mgr, const char *server_name) {
@@ -393,9 +396,11 @@ static hu_error_t mgr_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         if (slot->oauth_token.access_token && !hu_mcp_oauth_token_is_expired(&slot->oauth_token)) {
             int written = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s",
                                    slot->oauth_token.access_token);
-            if (written > 0 && (size_t)written < sizeof(auth_buf)) {
-                auth_header = auth_buf;
+            if (written <= 0 || (size_t)written >= sizeof(auth_buf)) {
+                *out = hu_tool_result_fail("OAuth token too large for auth header", 36);
+                return HU_OK;
             }
+            auth_header = auth_buf;
         }
 
         /* HTTP POST to server URL */
@@ -580,8 +585,11 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
                 !hu_mcp_oauth_token_is_expired(&slot->oauth_token)) {
                 int aw = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s",
                                   slot->oauth_token.access_token);
-                if (aw > 0 && (size_t)aw < sizeof(auth_buf))
-                    auth_header = auth_buf;
+                if (aw <= 0 || (size_t)aw >= sizeof(auth_buf)) {
+                    hu_log_error("mcp-manager", NULL, "OAuth token too large for auth buffer");
+                    continue;
+                }
+                auth_header = auth_buf;
             }
 
             hu_http_response_t response = {0};
@@ -856,8 +864,11 @@ hu_error_t hu_mcp_manager_call_tool(hu_mcp_manager_t *mgr, hu_allocator_t *alloc
                 !hu_mcp_oauth_token_is_expired(&slot->oauth_token)) {
                 int aw = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s",
                                   slot->oauth_token.access_token);
-                if (aw > 0 && (size_t)aw < sizeof(auth_buf))
-                    auth_header = auth_buf;
+                if (aw <= 0 || (size_t)aw >= sizeof(auth_buf)) {
+                    alloc->free(alloc->ctx, request, request_len + 1);
+                    return HU_ERR_INVALID_ARGUMENT;
+                }
+                auth_header = auth_buf;
             }
 
             hu_http_response_t response = {0};

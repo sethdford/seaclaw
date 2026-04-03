@@ -15,7 +15,7 @@ typedef enum hu_season {
 } hu_season_t;
 
 typedef struct hu_anniversary {
-    char *label; /* e.g. "birthday", "work anniversary" */
+    const char *label; /* borrowed; e.g. "birthday", "work anniversary" */
     size_t label_len;
     int month;
     int day;

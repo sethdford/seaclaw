@@ -50,6 +50,10 @@ hu_error_t cp_memory_status(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
 
@@ -117,6 +121,10 @@ hu_error_t cp_memory_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
                           char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
 
@@ -177,6 +185,10 @@ hu_error_t cp_memory_recall(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
                             char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
 
@@ -246,6 +258,10 @@ hu_error_t cp_memory_store(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
                            char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
 
@@ -294,6 +310,10 @@ hu_error_t cp_memory_forget(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
                             char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
 
@@ -330,6 +350,10 @@ hu_error_t cp_memory_ingest(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
                             char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
 
@@ -391,6 +415,10 @@ hu_error_t cp_memory_graph(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
 
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
@@ -457,6 +485,10 @@ hu_error_t cp_memory_consolidate(hu_allocator_t *alloc, hu_app_context_t *app, h
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
 

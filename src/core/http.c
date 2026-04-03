@@ -143,10 +143,40 @@ static void curl_setup_common(CURL *curl) {
     curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
 }
 
+static bool http_is_local_url(const char *url) {
+    const char *host = url + 7; /* skip "http://" */
+    if (strncmp(host, "localhost", 9) == 0 &&
+        (host[9] == ':' || host[9] == '/' || host[9] == '\0'))
+        return true;
+    if (strncmp(host, "127.0.0.1", 9) == 0 &&
+        (host[9] == ':' || host[9] == '/' || host[9] == '\0'))
+        return true;
+    if (strncmp(host, "[::1]", 5) == 0 &&
+        (host[5] == ':' || host[5] == '/' || host[5] == '\0'))
+        return true;
+    if (strncmp(host, "0.0.0.0", 7) == 0 &&
+        (host[7] == ':' || host[7] == '/' || host[7] == '\0'))
+        return true;
+    return false;
+}
+
+static hu_error_t http_reject_plaintext(const char *url) {
+#if !HU_IS_TEST
+    if (strncmp(url, "http://", 7) == 0 && !http_is_local_url(url))
+        return HU_ERR_INVALID_ARGUMENT;
+#else
+    (void)url;
+#endif
+    return HU_OK;
+}
+
 static hu_error_t hu_http_get_impl(hu_allocator_t *alloc, const char *url, const char *auth_header,
                                    hu_http_response_t *out) {
     if (!alloc || !url || !out)
         return HU_ERR_INVALID_ARGUMENT;
+    hu_error_t scheme_err = http_reject_plaintext(url);
+    if (scheme_err != HU_OK)
+        return scheme_err;
 
     CURL *curl = curl_pool_acquire();
     if (!curl)
@@ -205,6 +235,9 @@ static hu_error_t hu_http_get_ex_impl(hu_allocator_t *alloc, const char *url,
                                       const char *extra_headers, hu_http_response_t *out) {
     if (!alloc || !url || !out)
         return HU_ERR_INVALID_ARGUMENT;
+    hu_error_t scheme_err = http_reject_plaintext(url);
+    if (scheme_err != HU_OK)
+        return scheme_err;
 
     CURL *curl = curl_pool_acquire();
     if (!curl)
@@ -278,6 +311,9 @@ static hu_error_t hu_http_post_json_impl(hu_allocator_t *alloc, const char *url,
                                          hu_http_response_t *out) {
     if (!alloc || !url || !out)
         return HU_ERR_INVALID_ARGUMENT;
+    hu_error_t scheme_err = http_reject_plaintext(url);
+    if (scheme_err != HU_OK)
+        return scheme_err;
 
     CURL *curl = curl_pool_acquire();
     if (!curl)
@@ -376,6 +412,9 @@ static hu_error_t hu_http_post_json_stream_impl(hu_allocator_t *alloc, const cha
                                                 hu_http_stream_cb callback, void *userdata) {
     if (!alloc || !url || !callback)
         return HU_ERR_INVALID_ARGUMENT;
+    hu_error_t scheme_err = http_reject_plaintext(url);
+    if (scheme_err != HU_OK)
+        return scheme_err;
 
     CURL *curl = curl_pool_acquire();
     if (!curl)
@@ -488,6 +527,9 @@ hu_error_t hu_http_request(hu_allocator_t *alloc, const char *url, const char *m
                            hu_http_response_t *out) {
     if (!alloc || !url || !method || !out)
         return HU_ERR_INVALID_ARGUMENT;
+    hu_error_t scheme_err = http_reject_plaintext(url);
+    if (scheme_err != HU_OK)
+        return scheme_err;
 
     CURL *curl = curl_pool_acquire();
     if (!curl)

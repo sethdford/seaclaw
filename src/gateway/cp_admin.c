@@ -158,7 +158,12 @@ hu_error_t cp_admin_connect(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
                                           "security.cot.summary",
                                           "sota.metrics",
                                           "mcp.resources.list",
-                                          "mcp.prompts.list"};
+                                          "mcp.prompts.list",
+                                          "canvas.list",
+                                          "canvas.get",
+                                          "canvas.edit",
+                                          "canvas.undo",
+                                          "canvas.redo"};
     for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
         hu_json_value_t *m = hu_json_string_new(alloc, methods[i], strlen(methods[i]));
         if (!m) {
@@ -749,9 +754,11 @@ hu_error_t cp_admin_nodes_action(hu_allocator_t *alloc, hu_app_context_t *app, h
                                  char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_len = 0;
-    if (!alloc || !root)
+    if (!root)
         return HU_ERR_INVALID_ARGUMENT;
 
     hu_json_value_t *params = hu_json_object_get(root, "params");
@@ -829,6 +836,8 @@ hu_error_t cp_admin_agents_list(hu_allocator_t *alloc, hu_app_context_t *app, hu
     (void)conn;
     (void)proto;
     (void)root;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_len = 0;
 
@@ -1580,7 +1589,10 @@ static void *cron_run_worker(void *arg) {
     } else {
         const char *argv[] = {"/bin/sh", "-c", w->command, NULL};
         hu_run_result_t run_result = {0};
-        hu_error_t run_err = hu_process_run(app->alloc, argv, NULL, 65536, &run_result);
+        hu_security_policy_t *cron_policy =
+            (app->agent && app->agent->policy) ? app->agent->policy : NULL;
+        hu_error_t run_err =
+            hu_process_run_with_policy(app->alloc, argv, NULL, 65536, cron_policy, &run_result);
         started = (run_err == HU_OK);
         const char *run_output = run_result.stdout_buf;
         hu_cron_add_run(app->cron, app->alloc, job_id, (int64_t)time(NULL),
@@ -1694,8 +1706,10 @@ hu_error_t cp_admin_cron_run(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws
                     } else {
                         const char *argv[] = {"/bin/sh", "-c", job->command, NULL};
                         hu_run_result_t run_result = {0};
-                        hu_error_t run_err =
-                            hu_process_run(app->alloc, argv, NULL, 65536, &run_result);
+                        hu_security_policy_t *cron_p =
+                            (app->agent && app->agent->policy) ? app->agent->policy : NULL;
+                        hu_error_t run_err = hu_process_run_with_policy(
+                            app->alloc, argv, NULL, 65536, cron_p, &run_result);
                         started = (run_err == HU_OK);
                         const char *run_output = run_result.stdout_buf;
                         hu_cron_add_run(app->cron, app->alloc, job_id, (int64_t)time(NULL),

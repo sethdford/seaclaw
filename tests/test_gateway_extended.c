@@ -1,8 +1,10 @@
 /* Gateway edge cases + control protocol + event bridge tests. */
+#include "human/agent.h"
 #include "human/bus.h"
 #include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/json.h"
+#include "human/core/string.h"
 #include "human/gateway.h"
 #include "human/gateway/control_protocol.h"
 #include "human/gateway/event_bridge.h"
@@ -10,10 +12,146 @@
 #include "human/gateway/rate_limit.h"
 #include "human/gateway/ws_server.h"
 #include "human/health.h"
+#include "human/memory.h"
+#include "human/provider.h"
+#include "human/tool.h"
 #include "test_framework.h"
 #include "cp_internal.h"
 #include <string.h>
 #include <time.h>
+
+typedef struct gw_e2e_mock_provider_ctx {
+    const char *name;
+} gw_e2e_mock_provider_ctx_t;
+
+static hu_error_t gw_e2e_mock_chat_with_system(void *ctx, hu_allocator_t *alloc,
+                                               const char *system_prompt, size_t system_prompt_len,
+                                               const char *message, size_t message_len,
+                                               const char *model, size_t model_len, double temperature,
+                                               char **out, size_t *out_len) {
+    (void)ctx;
+    (void)system_prompt;
+    (void)system_prompt_len;
+    (void)message;
+    (void)message_len;
+    (void)model;
+    (void)model_len;
+    (void)temperature;
+    const char *resp = "mock response";
+    *out = hu_strndup(alloc, resp, strlen(resp));
+    *out_len = *out ? strlen(resp) : 0;
+    return *out ? HU_OK : HU_ERR_OUT_OF_MEMORY;
+}
+
+static hu_error_t gw_e2e_mock_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_request_t *request,
+                                   const char *model, size_t model_len, double temperature,
+                                   hu_chat_response_t *out) {
+    (void)ctx;
+    (void)request;
+    (void)model;
+    (void)model_len;
+    (void)temperature;
+    const char *resp = "mock response";
+    out->content = hu_strndup(alloc, resp, strlen(resp));
+    out->content_len = out->content ? strlen(resp) : 0;
+    out->tool_calls = NULL;
+    out->tool_calls_count = 0;
+    out->usage.prompt_tokens = 1;
+    out->usage.completion_tokens = 2;
+    out->usage.total_tokens = 3;
+    out->model = NULL;
+    out->model_len = 0;
+    out->reasoning_content = NULL;
+    out->reasoning_content_len = 0;
+    return out->content ? HU_OK : HU_ERR_OUT_OF_MEMORY;
+}
+
+static bool gw_e2e_mock_supports_native_tools(void *ctx) {
+    (void)ctx;
+    return false;
+}
+
+static const char *gw_e2e_mock_get_name(void *ctx) {
+    return ((gw_e2e_mock_provider_ctx_t *)ctx)->name;
+}
+
+static void gw_e2e_mock_deinit(void *ctx, hu_allocator_t *alloc) {
+    (void)ctx;
+    (void)alloc;
+}
+
+static const hu_provider_vtable_t gw_e2e_mock_provider_vtable = {
+    .chat_with_system = gw_e2e_mock_chat_with_system,
+    .chat = gw_e2e_mock_chat,
+    .supports_native_tools = gw_e2e_mock_supports_native_tools,
+    .get_name = gw_e2e_mock_get_name,
+    .deinit = gw_e2e_mock_deinit,
+};
+
+static hu_provider_t gw_e2e_mock_provider_create(gw_e2e_mock_provider_ctx_t *ctx) {
+    ctx->name = "mock";
+    return (hu_provider_t){.ctx = ctx, .vtable = &gw_e2e_mock_provider_vtable};
+}
+
+typedef struct gw_chat_agent_bus_bridge {
+    hu_agent_t *agent;
+    hu_bus_t *bus;
+} gw_chat_agent_bus_bridge_t;
+
+static void gw_e2e_noop_stream_cb(const hu_agent_stream_event_t *event, void *ctx) {
+    (void)event;
+    (void)ctx;
+}
+
+static char gw_e2e_last_assistant_reply[512];
+
+static bool gw_e2e_on_message_sent(hu_bus_event_type_t type, const hu_bus_event_t *ev, void *u) {
+    (void)u;
+    if (type != HU_BUS_MESSAGE_SENT || !ev)
+        return true;
+    const char *msg = ev->payload ? (const char *)ev->payload : ev->message;
+    if (!msg || !msg[0])
+        return true;
+    snprintf(gw_e2e_last_assistant_reply, sizeof(gw_e2e_last_assistant_reply), "%s", msg);
+    return true;
+}
+
+static bool gw_e2e_on_message_received(hu_bus_event_type_t type, const hu_bus_event_t *ev,
+                                       void *user_ctx) {
+    (void)type;
+    gw_chat_agent_bus_bridge_t *b = (gw_chat_agent_bus_bridge_t *)user_ctx;
+    if (!b || !b->agent || !ev)
+        return true;
+    const char *msg = ev->payload ? (const char *)ev->payload : ev->message;
+    if (!msg || !msg[0])
+        return true;
+
+    char *reply = NULL;
+    size_t reply_len = 0;
+    b->agent->active_channel = "gateway";
+    b->agent->active_channel_len = 8;
+    hu_error_t err =
+        hu_agent_turn_stream_v2(b->agent, msg, strlen(msg), gw_e2e_noop_stream_cb, NULL, &reply,
+                                &reply_len);
+    if (err == HU_OK && reply && reply_len > 0 && b->bus) {
+        hu_bus_event_t rev;
+        memset(&rev, 0, sizeof(rev));
+        rev.type = HU_BUS_MESSAGE_SENT;
+        snprintf(rev.channel, HU_BUS_CHANNEL_LEN, "%s",
+                 ev->channel[0] ? ev->channel : "gateway");
+        snprintf(rev.id, HU_BUS_ID_LEN, "%s", ev->id);
+        rev.payload = reply;
+        size_t rl = reply_len;
+        if (rl >= HU_BUS_MSG_LEN)
+            rl = HU_BUS_MSG_LEN - 1;
+        memcpy(rev.message, reply, rl);
+        rev.message[rl] = '\0';
+        hu_bus_publish(b->bus, &rev);
+    }
+    if (reply)
+        b->agent->alloc->free(b->agent->alloc->ctx, reply, reply_len + 1);
+    return true;
+}
 
 static void test_gateway_webhook_paths(void) {
     HU_ASSERT_EQ(HU_GATEWAY_MAX_BODY_SIZE, 65536u);
@@ -1388,6 +1526,283 @@ static void test_rpc_tasks_cancel_no_store_returns_error(void) {
     teardown_proto(&ws, &proto);
 }
 
+static void test_cp_config_get_returns_populated_fields(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.workspace_dir = "/tmp/human_ws";
+    cfg.default_provider = "openai";
+    cfg.default_model = "gpt-4o";
+    cfg.max_tokens = 4096;
+    cfg.temperature = 0.5;
+
+    hu_app_context_t app;
+    memset(&app, 0, sizeof(app));
+    app.alloc = &alloc;
+    app.config = &cfg;
+
+    hu_control_protocol_t proto;
+    memset(&proto, 0, sizeof(proto));
+    proto.alloc = &alloc;
+
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(root);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_config_get(&alloc, &app, NULL, &proto, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_NOT_NULL(strstr(out, "\"exists\":true"));
+    HU_ASSERT_NOT_NULL(strstr(out, "/tmp/human_ws"));
+    HU_ASSERT_NOT_NULL(strstr(out, "openai"));
+    HU_ASSERT_NOT_NULL(strstr(out, "gpt-4o"));
+    HU_ASSERT_NOT_NULL(strstr(out, "4096"));
+
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+}
+
+static void test_cp_config_set_reports_saved_false_when_raw_invalid(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+
+    hu_app_context_t app;
+    memset(&app, 0, sizeof(app));
+    app.alloc = &alloc;
+    app.config = &cfg;
+
+    hu_control_protocol_t proto;
+    memset(&proto, 0, sizeof(proto));
+    proto.alloc = &alloc;
+
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(root);
+    hu_json_value_t *params = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(params);
+    hu_json_object_set(&alloc, params, "raw", hu_json_string_new(&alloc, "{not valid json", 16));
+    hu_json_object_set(&alloc, root, "params", params);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_config_set(&alloc, &app, NULL, &proto, root, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_NOT_NULL(strstr(out, "\"saved\":false"));
+
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+}
+
+static void test_cp_config_set_reports_saved_false_without_raw(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_app_context_t app;
+    memset(&app, 0, sizeof(app));
+    app.alloc = &alloc;
+    app.config = &cfg;
+    hu_control_protocol_t proto;
+    memset(&proto, 0, sizeof(proto));
+    proto.alloc = &alloc;
+
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(root);
+    hu_json_value_t *params_empty = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(params_empty);
+    hu_json_object_set(&alloc, root, "params", params_empty);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    HU_ASSERT_EQ(cp_config_set(&alloc, &app, NULL, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_NOT_NULL(strstr(out, "\"saved\":false"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+}
+
+#if defined(HU_GATEWAY_POSIX) && defined(HU_ENABLE_SQLITE)
+
+static void test_cp_memory_recall_and_store_round_trip_json(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    gw_e2e_mock_provider_ctx_t pctx;
+    hu_provider_t prov = gw_e2e_mock_provider_create(&pctx);
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    HU_ASSERT_EQ(hu_agent_from_config(&agent, &alloc, prov, NULL, 0, &mem, NULL, NULL, NULL,
+                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0,
+                                      NULL, 0, NULL, 0, NULL),
+                 HU_OK);
+
+    hu_app_context_t app;
+    memset(&app, 0, sizeof(app));
+    app.alloc = &alloc;
+    app.agent = &agent;
+
+    hu_control_protocol_t proto;
+    memset(&proto, 0, sizeof(proto));
+    proto.alloc = &alloc;
+
+    /* memory.store */
+    {
+        hu_json_value_t *root = NULL;
+        const char *req = "{\"params\":{\"key\":\"gw_rpc_mem_key\",\"content\":"
+                          "\"gateway_rpc_unique_alpha_token\",\"source\":\"test\"}}";
+        HU_ASSERT_EQ(hu_json_parse(&alloc, req, strlen(req), &root), HU_OK);
+        char *out = NULL;
+        size_t out_len = 0;
+        HU_ASSERT_EQ(cp_memory_store(&alloc, &app, NULL, &proto, root, &out, &out_len), HU_OK);
+        HU_ASSERT_NOT_NULL(out);
+        HU_ASSERT_NOT_NULL(strstr(out, "\"stored\":true"));
+        alloc.free(alloc.ctx, out, out_len + 1);
+        hu_json_free(&alloc, root);
+    }
+
+    /* memory.recall (semantic / keyword search over stored content) */
+    {
+        hu_json_value_t *root = NULL;
+        const char *req =
+            "{\"params\":{\"query\":\"gateway_rpc_unique_alpha_token\",\"limit\":5}}";
+        HU_ASSERT_EQ(hu_json_parse(&alloc, req, strlen(req), &root), HU_OK);
+        char *out = NULL;
+        size_t out_len = 0;
+        HU_ASSERT_EQ(cp_memory_recall(&alloc, &app, NULL, &proto, root, &out, &out_len), HU_OK);
+        HU_ASSERT_NOT_NULL(out);
+        HU_ASSERT_NOT_NULL(strstr(out, "entries"));
+        HU_ASSERT_NOT_NULL(strstr(out, "gw_rpc_mem_key"));
+        alloc.free(alloc.ctx, out, out_len + 1);
+        hu_json_free(&alloc, root);
+    }
+
+    hu_agent_deinit(&agent);
+    mem.vtable->deinit(mem.ctx);
+}
+
+static void test_cp_mcp_resources_and_prompts_list_json_shape(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_app_context_t app;
+    memset(&app, 0, sizeof(app));
+    app.alloc = &alloc;
+    app.mcp_resources = NULL;
+    app.mcp_prompts = NULL;
+
+    hu_control_protocol_t proto;
+    memset(&proto, 0, sizeof(proto));
+    proto.alloc = &alloc;
+
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(root);
+
+    char *out_r = NULL;
+    size_t out_r_len = 0;
+    HU_ASSERT_EQ(cp_mcp_resources_list(&alloc, &app, NULL, &proto, root, &out_r, &out_r_len),
+                 HU_OK);
+    HU_ASSERT_NOT_NULL(out_r);
+    HU_ASSERT_NOT_NULL(strstr(out_r, "\"resources\""));
+    HU_ASSERT_NOT_NULL(strstr(out_r, "\"templates\""));
+    alloc.free(alloc.ctx, out_r, out_r_len + 1);
+
+    char *out_p = NULL;
+    size_t out_p_len = 0;
+    HU_ASSERT_EQ(cp_mcp_prompts_list(&alloc, &app, NULL, &proto, root, &out_p, &out_p_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out_p);
+    HU_ASSERT_NOT_NULL(strstr(out_p, "\"prompts\""));
+    alloc.free(alloc.ctx, out_p, out_p_len + 1);
+
+    hu_json_free(&alloc, root);
+}
+
+static void test_cp_turing_scores_returns_scores_array_json(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_memory_t mem = hu_sqlite_memory_create(&alloc, ":memory:");
+    HU_ASSERT_NOT_NULL(mem.ctx);
+
+    gw_e2e_mock_provider_ctx_t pctx;
+    hu_provider_t prov = gw_e2e_mock_provider_create(&pctx);
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    HU_ASSERT_EQ(hu_agent_from_config(&agent, &alloc, prov, NULL, 0, &mem, NULL, NULL, NULL,
+                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0,
+                                      NULL, 0, NULL, 0, NULL),
+                 HU_OK);
+
+    hu_app_context_t app;
+    memset(&app, 0, sizeof(app));
+    app.alloc = &alloc;
+    app.agent = &agent;
+
+    hu_control_protocol_t proto;
+    memset(&proto, 0, sizeof(proto));
+    proto.alloc = &alloc;
+
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(root);
+    char *out = NULL;
+    size_t out_len = 0;
+    HU_ASSERT_EQ(cp_turing_scores(&alloc, &app, NULL, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_NOT_NULL(strstr(out, "\"scores\""));
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+
+    hu_agent_deinit(&agent);
+    mem.vtable->deinit(mem.ctx);
+}
+
+#endif /* HU_GATEWAY_POSIX && HU_ENABLE_SQLITE */
+
+static void test_e2e_chat_send_bus_agent_turn_produces_assistant_reply(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+    setup_proto_with_app(&alloc, &ws, &proto, &app, &bus, &cfg);
+
+    gw_e2e_mock_provider_ctx_t pctx;
+    hu_provider_t prov = gw_e2e_mock_provider_create(&pctx);
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    HU_ASSERT_EQ(hu_agent_from_config(&agent, &alloc, prov, NULL, 0, NULL, NULL, NULL, NULL,
+                                      "gpt-4o", 6, "openai", 6, 0.7, ".", 1, 25, 50, false, 0,
+                                      NULL, 0, NULL, 0, NULL),
+                 HU_OK);
+
+    app.agent = &agent;
+    gw_e2e_last_assistant_reply[0] = '\0';
+    gw_chat_agent_bus_bridge_t bridge = {.agent = &agent, .bus = &bus};
+    hu_bus_subscribe(&bus, gw_e2e_on_message_sent, NULL, HU_BUS_MESSAGE_SENT);
+    hu_bus_subscribe(&bus, gw_e2e_on_message_received, &bridge, HU_BUS_MESSAGE_RECEIVED);
+
+    hu_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    hu_json_value_t *root = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(root);
+    hu_json_value_t *params = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(params);
+    hu_json_object_set(&alloc, params, "message",
+                       hu_json_string_new(&alloc, "Hello from gateway E2E", 22));
+    hu_json_object_set(&alloc, root, "params", params);
+
+    char *out = NULL;
+    size_t out_len = 0;
+    HU_ASSERT_EQ(cp_chat_send(&alloc, &app, &conn, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_NOT_NULL(strstr(out, "queued"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, root);
+
+    HU_ASSERT_STR_EQ(gw_e2e_last_assistant_reply, "mock response");
+
+    hu_agent_deinit(&agent);
+    teardown_proto(&ws, &proto);
+}
+
 static void test_connect_handshake_advertises_critical_methods(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_app_context_t app;
@@ -1501,6 +1916,15 @@ void run_gateway_extended_tests(void) {
     HU_RUN_TEST(test_rpc_voice_config_no_crash);
     HU_RUN_TEST(test_rpc_nodes_action_missing_fields_no_crash);
     HU_RUN_TEST(test_cp_admin_nodes_action_restart_returns_mock_json);
+    HU_RUN_TEST(test_cp_config_get_returns_populated_fields);
+    HU_RUN_TEST(test_cp_config_set_reports_saved_false_when_raw_invalid);
+    HU_RUN_TEST(test_cp_config_set_reports_saved_false_without_raw);
+#if defined(HU_GATEWAY_POSIX) && defined(HU_ENABLE_SQLITE)
+    HU_RUN_TEST(test_cp_memory_recall_and_store_round_trip_json);
+    HU_RUN_TEST(test_cp_mcp_resources_and_prompts_list_json_shape);
+    HU_RUN_TEST(test_cp_turing_scores_returns_scores_array_json);
+#endif
+    HU_RUN_TEST(test_e2e_chat_send_bus_agent_turn_produces_assistant_reply);
     HU_RUN_TEST(test_connect_handshake_advertises_critical_methods);
     HU_RUN_TEST(test_event_bridge_payload_propagation);
 

@@ -116,6 +116,8 @@ hu_error_t cp_tasks_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_con
                          char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_len = 0;
 
@@ -183,6 +185,8 @@ hu_error_t cp_tasks_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn
                         char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_len = 0;
 
@@ -235,6 +239,8 @@ hu_error_t cp_tasks_cancel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
                            char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_len = 0;
 

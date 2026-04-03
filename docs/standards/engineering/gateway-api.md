@@ -79,6 +79,20 @@ All errors return JSON:
 | `hula.traces.delete` | Delete a trace by ID | `{ id: string }` | `{ ok: true }` |
 | `hula.traces.analytics` | Aggregate trace statistics | `{}` | `{ summary: { file_count, success_count, fail_count, total_trace_steps, newest_ts } }` |
 
+### Canvas Methods (Live Canvas / A2UI)
+
+| Method | Description | Request Params | Response |
+| --- | --- | --- | --- |
+| `canvas.list` | List all active canvases | `{}` | `{ canvases: [{ canvas_id, title, format, content, language?, imports?, version_seq, version_count }] }` |
+| `canvas.get` | Get a single canvas by ID | `{ canvas_id: string }` | `{ canvas: { canvas_id, title, format, content, language?, imports?, version_seq, version_count, user_edit_pending } }` |
+| `canvas.edit` | Store a user edit (sets pending flag) | `{ canvas_id: string, content: string }` | `{ ok: true, canvas_id }` |
+| `canvas.undo` | Revert to previous version | `{ canvas_id: string }` | `{ ok: true, canvas_id, version_seq, content, format }` |
+| `canvas.redo` | Forward to next version | `{ canvas_id: string }` | `{ ok: true, canvas_id, version_seq, content, format }` |
+
+**Canvas event** (push via WebSocket): `{ event: "canvas", payload: { action, canvas_id, title?, format, content?, version_seq?, language?, imports? } }`
+
+Supported formats: `html`, `svg`, `mockup`, `react`, `mermaid`, `markdown`, `code`.
+
 ### Memory Methods
 
 | Method | Description |

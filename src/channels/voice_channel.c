@@ -64,10 +64,6 @@ static hu_error_t voice_start(void *ctx) {
     }
 
     if (v->config.mode == HU_VOICE_MODE_GEMINI_LIVE) {
-#if HU_IS_TEST
-        v->running = true;
-        return HU_OK;
-#else
         hu_gemini_live_config_t glc = {
             .api_key = v->config.api_key,
             .access_token = v->config.vertex_access_token,
@@ -93,7 +89,6 @@ static hu_error_t voice_start(void *ctx) {
         }
         v->running = true;
         return HU_OK;
-#endif
     }
 
     if (v->config.mode == HU_VOICE_MODE_WEBRTC) {
@@ -266,6 +261,8 @@ hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_lo
         const char *skey = v->config.mode == HU_VOICE_MODE_REALTIME ? "voice-rt" : "voice-gl";
         hu_voice_rt_event_t event = {0};
         hu_error_t err = v->provider.vtable->recv_event(v->provider.ctx, alloc, &event, 100);
+        if (err != HU_OK && err != HU_ERR_TIMEOUT)
+            hu_log_warn("voice-channel", NULL, "recv_event error: %s", hu_error_string(err));
         if (err == HU_OK) {
             /* Forward model audio to the on_audio_ready callback if registered.
              * Audio is base64-encoded PCM; decode is deferred to the callback consumer. */

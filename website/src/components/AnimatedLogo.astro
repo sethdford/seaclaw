@@ -1,0 +1,534 @@
+---
+interface Props {
+  size?: number;
+  interactive?: boolean;
+}
+
+const { size = 180, interactive = true } = Astro.props;
+---
+
+<div
+  class="hu-orb-container"
+  style={`width: ${size}px; height: ${size}px;`}
+  role="img"
+  aria-label="h-uman logo"
+  data-interactive={interactive ? "true" : "false"}
+>
+  <div class="hu-orb-glow-outer" aria-hidden="true"></div>
+  <div class="hu-orb-glow-inner" aria-hidden="true"></div>
+
+  <div class="hu-orb-ring hu-orb-ring-1" aria-hidden="true"></div>
+  <div class="hu-orb-ring hu-orb-ring-2" aria-hidden="true"></div>
+  <div class="hu-orb-ring hu-orb-ring-3" aria-hidden="true"></div>
+
+  <div class="hu-orb-pulse-ring" aria-hidden="true"></div>
+
+  <div class="hu-orb">
+    <svg class="hu-orb-eyes" viewBox="0 0 100 100">
+      <ellipse
+        class="hu-eye hu-eye-left"
+        cx="36"
+        cy="50"
+        rx="10"
+        ry="12"
+        fill="white"></ellipse>
+      <ellipse
+        class="hu-eye hu-eye-right"
+        cx="64"
+        cy="50"
+        rx="10"
+        ry="12"
+        fill="white"></ellipse>
+    </svg>
+  </div>
+</div>
+
+<style>
+  .hu-orb-container {
+    position: relative;
+    margin: 0 auto;
+    animation: hu-orbEntry 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+    will-change: transform;
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* ── Glow layers ── */
+
+  .hu-orb-glow-outer {
+    position: absolute;
+    inset: -60%;
+    background: radial-gradient(
+      circle,
+      var(--hu-orb-glow, rgba(122, 182, 72, 0.25)) 0%,
+      transparent 70%
+    );
+    border-radius: 50%;
+    opacity: 0.5;
+    transition: opacity 0.8s ease;
+    will-change: transform, opacity;
+  }
+
+  .hu-orb-glow-inner {
+    position: absolute;
+    inset: -30%;
+    background: radial-gradient(
+      circle,
+      var(--hu-orb-glow, rgba(122, 182, 72, 0.35)) 0%,
+      transparent 60%
+    );
+    border-radius: 50%;
+    animation: hu-glowPulse 4s ease infinite;
+  }
+
+  /* ── Ring stack (animated breathing) ── */
+
+  .hu-orb-ring {
+    position: absolute;
+    border: 1px solid color-mix(in srgb, var(--hu-accent) 15%, transparent);
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+  .hu-orb-ring-1 {
+    inset: -30%;
+    animation: hu-ringBreath1 4.5s ease-in-out infinite;
+  }
+  .hu-orb-ring-2 {
+    inset: -20%;
+    animation: hu-ringBreath2 5s ease-in-out infinite 0.6s;
+  }
+  .hu-orb-ring-3 {
+    inset: -10%;
+    animation: hu-ringBreath3 5.5s ease-in-out infinite 1.2s;
+  }
+
+  /* ── Ambient pulse ring (expanding + fading) ── */
+
+  .hu-orb-pulse-ring {
+    position: absolute;
+    inset: 0;
+    border: 1px solid color-mix(in srgb, var(--hu-accent) 25%, transparent);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: hu-ambientPulse 4s ease-out infinite;
+  }
+
+  /* ── Orb body: CSS owns transform exclusively for squash & stretch ── */
+
+  .hu-orb {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: linear-gradient(
+      145deg,
+      var(--hu-orb-highlight, #7ab648),
+      var(--hu-orb-gradient-start, #5a9a30),
+      var(--hu-orb-gradient-end, #47802a)
+    );
+    box-shadow:
+      0 15px 40px color-mix(in srgb, var(--hu-accent) 40%, transparent),
+      0 0 80px color-mix(in srgb, var(--hu-accent) 15%, transparent),
+      inset 0 -5px 20px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: box-shadow 0.6s ease;
+    animation: hu-orbBreathe 4s ease-in-out infinite;
+  }
+
+  .hu-orb:hover {
+    box-shadow:
+      0 20px 50px color-mix(in srgb, var(--hu-accent) 50%, transparent),
+      0 0 100px color-mix(in srgb, var(--hu-accent) 20%, transparent),
+      inset 0 -5px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .hu-orb-eyes {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .hu-eye {
+    will-change: transform, ry;
+    transition: transform 0.08s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* ── Keyframes ── */
+
+  @keyframes hu-orbEntry {
+    0% {
+      opacity: 0;
+      transform: scale(0.6) translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes hu-glowPulse {
+    0%,
+    100% {
+      opacity: 0.4;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.05);
+    }
+  }
+
+  /* Pixar squash & stretch: non-uniform scale3d + slight lift at peak */
+  @keyframes hu-orbBreathe {
+    0% {
+      transform: scale3d(1, 1, 1) translateY(0);
+      box-shadow:
+        0 15px 40px color-mix(in srgb, var(--hu-accent) 40%, transparent),
+        0 0 80px color-mix(in srgb, var(--hu-accent) 15%, transparent),
+        inset 0 -5px 20px rgba(0, 0, 0, 0.15);
+    }
+    40% {
+      transform: scale3d(0.994, 1.012, 1) translateY(-1.5px);
+    }
+    50% {
+      transform: scale3d(0.994, 1.012, 1) translateY(-2px);
+      box-shadow:
+        0 20px 50px color-mix(in srgb, var(--hu-accent) 50%, transparent),
+        0 0 100px color-mix(in srgb, var(--hu-accent) 20%, transparent),
+        inset 0 -5px 20px rgba(0, 0, 0, 0.15);
+    }
+    60% {
+      transform: scale3d(0.997, 1.006, 1) translateY(-1px);
+    }
+    90% {
+      transform: scale3d(1, 1, 1) translateY(0);
+    }
+    100% {
+      transform: scale3d(1, 1, 1) translateY(0);
+      box-shadow:
+        0 15px 40px color-mix(in srgb, var(--hu-accent) 40%, transparent),
+        0 0 80px color-mix(in srgb, var(--hu-accent) 15%, transparent),
+        inset 0 -5px 20px rgba(0, 0, 0, 0.15);
+    }
+  }
+
+  /* Ring breathing: each ring scales + fades at its own rate */
+  @keyframes hu-ringBreath1 {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.015);
+      opacity: 0.7;
+    }
+  }
+
+  @keyframes hu-ringBreath2 {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.01);
+      opacity: 0.6;
+    }
+  }
+
+  @keyframes hu-ringBreath3 {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.02);
+      opacity: 0.5;
+    }
+  }
+
+  /* Expanding ambient pulse ring */
+  @keyframes hu-ambientPulse {
+    0% {
+      transform: scale(1);
+      opacity: 0.4;
+    }
+    100% {
+      transform: scale(1.3);
+      opacity: 0;
+    }
+  }
+
+  /* ── Reduced motion ── */
+
+  @media (prefers-reduced-motion: reduce) {
+    .hu-orb-container {
+      animation: none !important;
+    }
+    .hu-orb,
+    .hu-orb-glow-inner,
+    .hu-orb-ring-1,
+    .hu-orb-ring-2,
+    .hu-orb-ring-3,
+    .hu-orb-pulse-ring {
+      animation: none !important;
+    }
+  }
+</style>
+
+<script>
+  document
+    .querySelectorAll<HTMLElement>(".hu-orb-container")
+    .forEach((container) => {
+      const interactive = container.dataset.interactive === "true";
+      const orb = container.querySelector<HTMLElement>(".hu-orb");
+      const glowOuter =
+        container.querySelector<HTMLElement>(".hu-orb-glow-outer");
+      const leftEye =
+        container.querySelector<SVGEllipseElement>(".hu-eye-left");
+      const rightEye =
+        container.querySelector<SVGEllipseElement>(".hu-eye-right");
+      const rings = container.querySelectorAll<HTMLElement>(".hu-orb-ring");
+
+      if (!orb || !leftEye || !rightEye) return;
+
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      if (prefersReducedMotion) return;
+
+      let gazeX = 0,
+        gazeY = 0;
+      let eyeShiftX = 0,
+        eyeShiftY = 0;
+      let blinkPhase = 0;
+      let breathScale = 1;
+      let scrollOffset = 0;
+      let hoverWiden = 0;
+      let isHovering = false;
+      let glowLagX = 0,
+        glowLagY = 0;
+      let orbTiltX = 0,
+        orbTiltY = 0;
+      let idleDriftX = 0,
+        idleDriftY = 0,
+        idleDriftRot = 0;
+      let idlePhase = Math.random() * Math.PI * 2;
+      let saccadeX = 0,
+        saccadeY = 0;
+
+      function updateEyes() {
+        if (!leftEye || !rightEye) return;
+        const totalX = gazeX + eyeShiftX + scrollOffset + saccadeX;
+        const totalY = gazeY + eyeShiftY + scrollOffset + saccadeY;
+        const ry = 12 + (breathScale - 1) * 0.24 + hoverWiden - blinkPhase * 10;
+        const ryVal = Math.max(2, ry).toFixed(1);
+
+        leftEye.style.transform = `translate(${totalX}px, ${totalY}px)`;
+        leftEye.setAttribute("ry", ryVal);
+        rightEye.style.transform = `translate(${totalX}px, ${totalY}px)`;
+        rightEye.setAttribute("ry", ryVal);
+      }
+
+      /**
+       * JS-driven transforms (drift, tilt, hover scale) target the CONTAINER,
+       * leaving .hu-orb's transform free for CSS hu-orbBreathe (squash & stretch).
+       */
+      function updateContainer() {
+        const tiltStr =
+          orbTiltX !== 0 || orbTiltY !== 0
+            ? `rotateX(${(-orbTiltY * 0.3).toFixed(2)}deg) rotateY(${(orbTiltX * 0.3).toFixed(2)}deg)`
+            : "";
+        const driftStr =
+          idleDriftX !== 0 || idleDriftY !== 0
+            ? `translate(${idleDriftX.toFixed(2)}px, ${idleDriftY.toFixed(2)}px) rotate(${idleDriftRot.toFixed(3)}deg)`
+            : "";
+        const hoverStr = isHovering ? "scale(1.03)" : "";
+        const combined = [driftStr, tiltStr, hoverStr]
+          .filter(Boolean)
+          .join(" ");
+        if (combined) {
+          container.style.transform = combined;
+        } else {
+          container.style.removeProperty("transform");
+        }
+      }
+
+      function updateGlow() {
+        if (!glowOuter) return;
+        glowOuter.style.transform = `translate(${(glowLagX * 0.15).toFixed(2)}px, ${(glowLagY * 0.15).toFixed(2)}px)`;
+        const breathMod = 0.4 + breathScale * 0.15;
+        glowOuter.style.opacity = String(Math.min(0.7, breathMod).toFixed(3));
+      }
+
+      function updateRingParallax() {
+        if (!rings.length) return;
+        const gx = gazeX + eyeShiftX;
+        const gy = gazeY + eyeShiftY;
+        rings.forEach((ring, i) => {
+          const depth = 0.3 + i * 0.15;
+          const rx = gx * depth;
+          const ry = gy * depth;
+          const rot = gx * 0.1 * (i + 1);
+          ring.style.transform = `translate(${rx.toFixed(2)}px, ${ry.toFixed(2)}px) rotate(${rot.toFixed(2)}deg)`;
+        });
+      }
+
+      // ── Gaze tracking ──
+      if (interactive) {
+        orb.addEventListener("mousemove", (e) => {
+          const rect = orb.getBoundingClientRect();
+          const dx = (e.clientX - rect.left - rect.width / 2) / rect.width;
+          const dy = (e.clientY - rect.top - rect.height / 2) / rect.height;
+          gazeX += (dx * 4 - gazeX) * 0.12;
+          gazeY += (dy * 4 - gazeY) * 0.12;
+          glowLagX += (gazeX - glowLagX) * 0.05;
+          glowLagY += (gazeY - glowLagY) * 0.05;
+          orbTiltX = gazeX;
+          orbTiltY = gazeY;
+          updateEyes();
+          updateContainer();
+          updateGlow();
+          updateRingParallax();
+        });
+        orb.addEventListener("mouseenter", () => {
+          isHovering = true;
+          hoverWiden = 1;
+          updateEyes();
+          updateContainer();
+        });
+        orb.addEventListener("mouseleave", () => {
+          isHovering = false;
+          hoverWiden = 0;
+          gazeX = 0;
+          gazeY = 0;
+          glowLagX = 0;
+          glowLagY = 0;
+          orbTiltX = 0;
+          orbTiltY = 0;
+          updateEyes();
+          updateContainer();
+          updateGlow();
+          updateRingParallax();
+        });
+      }
+
+      // ── Scroll-linked eye shift ──
+      window.addEventListener(
+        "scroll",
+        () => {
+          const maxScroll =
+            document.documentElement.scrollHeight - window.innerHeight;
+          scrollOffset = (window.scrollY / (maxScroll || 1)) * 3;
+          updateEyes();
+        },
+        { passive: true },
+      );
+
+      // ── Breathing (JS-driven eye ry sync, CSS handles orb scale) ──
+      let breathPhase = 0;
+      const breathLoop = () => {
+        breathPhase += 0.02;
+        breathScale = 1 + Math.sin(breathPhase * Math.PI) * 0.01;
+        updateEyes();
+        updateGlow();
+        requestAnimationFrame(breathLoop);
+      };
+      requestAnimationFrame(breathLoop);
+
+      // ── Idle drift: figure-8 on container (12s cycle) ──
+      const idleDriftLoop = () => {
+        if (!isHovering) {
+          idlePhase += 0.003;
+          idleDriftX = Math.sin(idlePhase) * 2;
+          idleDriftY = Math.sin(idlePhase * 2) * 1.5;
+          idleDriftRot = Math.sin(idlePhase * 0.7) * 0.5;
+          updateContainer();
+        }
+        requestAnimationFrame(idleDriftLoop);
+      };
+      requestAnimationFrame(idleDriftLoop);
+
+      // ── Ambient eye drift (every 15s, 500ms tween) ──
+      function easeInOutCubic(t: number) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      }
+
+      setInterval(() => {
+        if (isHovering) return;
+        const targetX = (Math.random() - 0.5) * 8;
+        const targetY = (Math.random() - 0.5) * 6;
+        const startX = eyeShiftX;
+        const startY = eyeShiftY;
+        let elapsed = 0;
+
+        const drift = () => {
+          elapsed += 16;
+          const p = Math.min(1, elapsed / 500);
+          eyeShiftX = startX + (targetX - startX) * easeInOutCubic(p);
+          eyeShiftY = startY + (targetY - startY) * easeInOutCubic(p);
+          updateEyes();
+          updateRingParallax();
+          if (p < 1) requestAnimationFrame(drift);
+        };
+        requestAnimationFrame(drift);
+      }, 15000);
+
+      // ── Micro-saccades (random 50ms eye jumps, 0.3% chance/frame) ──
+      let saccadeActive = false;
+      const saccadeLoop = () => {
+        if (!saccadeActive && !isHovering && Math.random() < 0.003) {
+          saccadeActive = true;
+          saccadeX = (Math.random() - 0.5) * 6;
+          saccadeY = (Math.random() - 0.5) * 4;
+          updateEyes();
+
+          if (Math.random() < 0.3) {
+            blinkPhase = 1;
+            updateEyes();
+            setTimeout(() => {
+              blinkPhase = 0;
+              updateEyes();
+            }, 80);
+          }
+
+          setTimeout(() => {
+            saccadeX = 0;
+            saccadeY = 0;
+            saccadeActive = false;
+            updateEyes();
+          }, 50);
+        }
+        requestAnimationFrame(saccadeLoop);
+      };
+      requestAnimationFrame(saccadeLoop);
+
+      // ── Double blink (10-23s interval) ──
+      const scheduleBlink = () => {
+        setTimeout(
+          () => {
+            blinkPhase = 1;
+            updateEyes();
+            setTimeout(() => {
+              blinkPhase = 0;
+              updateEyes();
+              setTimeout(() => {
+                blinkPhase = 1;
+                updateEyes();
+                setTimeout(() => {
+                  blinkPhase = 0;
+                  updateEyes();
+                  scheduleBlink();
+                }, 100);
+              }, 200);
+            }, 100);
+          },
+          10000 + Math.random() * 13000,
+        );
+      };
+      scheduleBlink();
+    });
+</script>

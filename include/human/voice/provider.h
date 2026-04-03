@@ -53,6 +53,8 @@ hu_error_t hu_voice_provider_gemini_live_create(hu_allocator_t *alloc,
 typedef struct hu_voice_provider_extras {
     const char *system_instruction; /* persona/system prompt for Gemini Live */
     const char *tools_json;         /* JSON array of tool declarations for Gemini Live setup */
+    const char *voice_id;           /* override voice for this session (NULL = use config default) */
+    const char *model_id;           /* override model for this session (NULL = use config default) */
 } hu_voice_provider_extras_t;
 
 /*

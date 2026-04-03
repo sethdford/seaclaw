@@ -72,6 +72,106 @@ hu_error_t parse_string_array(hu_allocator_t *a, char ***out, size_t *out_len,
     return HU_OK;
 }
 
+/* Generic schema-driven config field parser.
+ * Parses fields from a JSON object into a target struct using a schema table.
+ * Handles string (with free+strdup), bool, and numeric fields with optional validation. */
+hu_error_t hu_config_parse_fields(hu_allocator_t *alloc, void *target,
+                                  const hu_config_field_t *schema, size_t schema_len,
+                                  const hu_json_value_t *obj) {
+    if (!alloc || !target || !schema || !obj || obj->type != HU_JSON_OBJECT)
+        return HU_OK;
+
+    for (size_t i = 0; i < schema_len; i++) {
+        const hu_config_field_t *field = &schema[i];
+        const char *key = field->key;
+        size_t offset = field->offset;
+        void *field_ptr = (char *)target + offset;
+
+        switch (field->type) {
+        case HU_CFG_STRING: {
+            const char *val = hu_json_get_string(obj, key);
+            if (val) {
+                char **str_ptr = (char **)field_ptr;
+                if (*str_ptr) {
+                    alloc->free(alloc->ctx, *str_ptr, strlen(*str_ptr) + 1);
+                }
+                *str_ptr = hu_strdup(alloc, val);
+                if (!*str_ptr)
+                    return HU_ERR_OUT_OF_MEMORY;
+            }
+            break;
+        }
+
+        case HU_CFG_BOOL: {
+            bool *bool_ptr = (bool *)field_ptr;
+            *bool_ptr = hu_json_get_bool(obj, key, *bool_ptr);
+            break;
+        }
+
+        case HU_CFG_UINT32: {
+            double val = hu_json_get_number(obj, key, -1.0);
+            if (val >= 0) {
+                if (val < field->min_val || val > field->max_val)
+                    continue;
+                uint32_t *u32_ptr = (uint32_t *)field_ptr;
+                *u32_ptr = (uint32_t)val;
+            }
+            break;
+        }
+
+        case HU_CFG_INT: {
+            double default_val = -999999.0;
+            double val = hu_json_get_number(obj, key, default_val);
+            if (val != default_val) { /* Value was found */
+                if (val < field->min_val || val > field->max_val)
+                    continue;
+                int *int_ptr = (int *)field_ptr;
+                *int_ptr = (int)val;
+            }
+            break;
+        }
+
+        case HU_CFG_UINT16: {
+            double val = hu_json_get_number(obj, key, -1.0);
+            if (val >= 0) {
+                if (val < field->min_val || val > field->max_val)
+                    continue;
+                uint16_t *u16_ptr = (uint16_t *)field_ptr;
+                *u16_ptr = (uint16_t)val;
+            }
+            break;
+        }
+
+        case HU_CFG_UINT64: {
+            double val = hu_json_get_number(obj, key, -1.0);
+            if (val >= 0) {
+                if (val < field->min_val || val > field->max_val)
+                    continue;
+                uint64_t *u64_ptr = (uint64_t *)field_ptr;
+                *u64_ptr = (uint64_t)val;
+            }
+            break;
+        }
+
+        case HU_CFG_DOUBLE: {
+            double val = hu_json_get_number(obj, key, -999999.0);
+            if (val != -999999.0) { /* Any number */
+                if (val < field->min_val || val > field->max_val)
+                    continue;
+                double *dbl_ptr = (double *)field_ptr;
+                *dbl_ptr = val;
+            }
+            break;
+        }
+
+        default:
+            break;
+        }
+    }
+
+    return HU_OK;
+}
+
 static hu_error_t parse_autonomy(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
@@ -105,31 +205,38 @@ static hu_error_t parse_autonomy(hu_allocator_t *a, hu_config_t *cfg, const hu_j
         parse_string_array(a, &cfg->autonomy.allowed_commands, &cfg->autonomy.allowed_commands_len,
                            ac);
     }
+    hu_json_value_t *ap = hu_json_object_get(obj, "allowed_paths");
+    if (ap && ap->type == HU_JSON_ARRAY) {
+        if (cfg->autonomy.allowed_paths) {
+            for (size_t i = 0; i < cfg->autonomy.allowed_paths_len; i++)
+                a->free(a->ctx, cfg->autonomy.allowed_paths[i],
+                        strlen(cfg->autonomy.allowed_paths[i]) + 1);
+            a->free(a->ctx, cfg->autonomy.allowed_paths,
+                    cfg->autonomy.allowed_paths_len * sizeof(char *));
+        }
+        parse_string_array(a, &cfg->autonomy.allowed_paths, &cfg->autonomy.allowed_paths_len, ap);
+    }
     return HU_OK;
 }
 
 static hu_error_t parse_cron(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
-    (void)a;
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
-    cfg->cron.enabled = hu_json_get_bool(obj, "enabled", cfg->cron.enabled);
-    double im = hu_json_get_number(obj, "interval_minutes", cfg->cron.interval_minutes);
-    if (im >= 1 && im <= 1440)
-        cfg->cron.interval_minutes = (uint32_t)im;
-    double mrh = hu_json_get_number(obj, "max_run_history", cfg->cron.max_run_history);
-    if (mrh >= 0 && mrh <= 10000)
-        cfg->cron.max_run_history = (uint32_t)mrh;
-    return HU_OK;
+    static const hu_config_field_t cron_schema[] = {
+        {"enabled", HU_CFG_BOOL, offsetof(hu_cron_config_t, enabled), 0, 0},
+        {"interval_minutes", HU_CFG_UINT32, offsetof(hu_cron_config_t, interval_minutes), 1, 1440},
+        {"max_run_history", HU_CFG_UINT32, offsetof(hu_cron_config_t, max_run_history), 0, 10000},
+    };
+    return hu_config_parse_fields(a, &cfg->cron, cron_schema, 3, obj);
 }
 
 static hu_error_t parse_scheduler(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
-    (void)a;
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
-    double mc = hu_json_get_number(obj, "max_concurrent", cfg->scheduler.max_concurrent);
-    if (mc >= 0 && mc <= 256)
-        cfg->scheduler.max_concurrent = (uint32_t)mc;
-    return HU_OK;
+    static const hu_config_field_t scheduler_schema[] = {
+        {"max_concurrent", HU_CFG_UINT32, offsetof(hu_scheduler_config_t, max_concurrent), 0, 256},
+    };
+    return hu_config_parse_fields(a, &cfg->scheduler, scheduler_schema, 1, obj);
 }
 
 static hu_error_t parse_gateway(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -274,6 +381,59 @@ static hu_error_t parse_memory(hu_allocator_t *a, hu_config_t *cfg, const hu_jso
     double api_tm = hu_json_get_number(obj, "api_timeout_ms", cfg->memory.api_timeout_ms);
     if (api_tm >= 0 && api_tm <= 300000)
         cfg->memory.api_timeout_ms = (uint32_t)api_tm;
+
+    const char *vs = hu_json_get_string(obj, "vector_store");
+    if (vs) {
+        if (cfg->memory.vector_store)
+            a->free(a->ctx, cfg->memory.vector_store, strlen(cfg->memory.vector_store) + 1);
+        cfg->memory.vector_store = hu_strdup(a, vs);
+    }
+    const char *vq = hu_json_get_string(obj, "vector_qdrant_url");
+    if (vq) {
+        if (cfg->memory.vector_qdrant_url)
+            a->free(a->ctx, cfg->memory.vector_qdrant_url,
+                    strlen(cfg->memory.vector_qdrant_url) + 1);
+        cfg->memory.vector_qdrant_url = hu_strdup(a, vq);
+    }
+    const char *vqa = hu_json_get_string(obj, "vector_qdrant_api_key");
+    if (vqa) {
+        if (cfg->memory.vector_qdrant_api_key)
+            a->free(a->ctx, cfg->memory.vector_qdrant_api_key,
+                    strlen(cfg->memory.vector_qdrant_api_key) + 1);
+        cfg->memory.vector_qdrant_api_key = hu_strdup(a, vqa);
+    }
+    const char *vqc = hu_json_get_string(obj, "vector_qdrant_collection");
+    if (vqc) {
+        if (cfg->memory.vector_qdrant_collection)
+            a->free(a->ctx, cfg->memory.vector_qdrant_collection,
+                    strlen(cfg->memory.vector_qdrant_collection) + 1);
+        cfg->memory.vector_qdrant_collection = hu_strdup(a, vqc);
+    }
+    const char *vpgt = hu_json_get_string(obj, "vector_pgvector_table");
+    if (vpgt) {
+        if (cfg->memory.vector_pgvector_table)
+            a->free(a->ctx, cfg->memory.vector_pgvector_table,
+                    strlen(cfg->memory.vector_pgvector_table) + 1);
+        cfg->memory.vector_pgvector_table = hu_strdup(a, vpgt);
+    }
+    double vdim = hu_json_get_number(obj, "vector_dimensions", cfg->memory.vector_dimensions);
+    if (vdim >= 8 && vdim <= 4096)
+        cfg->memory.vector_dimensions = (uint32_t)vdim;
+
+    const char *ep = hu_json_get_string(obj, "embedding_provider");
+    if (ep) {
+        if (cfg->memory.embedding_provider)
+            a->free(a->ctx, cfg->memory.embedding_provider,
+                    strlen(cfg->memory.embedding_provider) + 1);
+        cfg->memory.embedding_provider = hu_strdup(a, ep);
+    }
+    const char *eak = hu_json_get_string(obj, "embedding_api_key");
+    if (eak) {
+        if (cfg->memory.embedding_api_key)
+            a->free(a->ctx, cfg->memory.embedding_api_key,
+                    strlen(cfg->memory.embedding_api_key) + 1);
+        cfg->memory.embedding_api_key = hu_strdup(a, eak);
+    }
     return HU_OK;
 }
 
@@ -411,19 +571,11 @@ static hu_error_t parse_runtime(hu_allocator_t *a, hu_config_t *cfg, const hu_js
 static hu_error_t parse_tunnel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
-    const char *provider = hu_json_get_string(obj, "provider");
-    if (provider) {
-        if (cfg->tunnel.provider)
-            a->free(a->ctx, cfg->tunnel.provider, strlen(cfg->tunnel.provider) + 1);
-        cfg->tunnel.provider = hu_strdup(a, provider);
-    }
-    const char *domain = hu_json_get_string(obj, "domain");
-    if (domain) {
-        if (cfg->tunnel.domain)
-            a->free(a->ctx, cfg->tunnel.domain, strlen(cfg->tunnel.domain) + 1);
-        cfg->tunnel.domain = hu_strdup(a, domain);
-    }
-    return HU_OK;
+    static const hu_config_field_t tunnel_schema[] = {
+        {"provider", HU_CFG_STRING, offsetof(hu_tunnel_config_t, provider), 0, 0},
+        {"domain", HU_CFG_STRING, offsetof(hu_tunnel_config_t, domain), 0, 0},
+    };
+    return hu_config_parse_fields(a, &cfg->tunnel, tunnel_schema, 2, obj);
 }
 
 static hu_error_t parse_mcp_servers(hu_allocator_t *a, hu_config_t *cfg,
@@ -454,6 +606,34 @@ static hu_error_t parse_mcp_servers(hu_allocator_t *a, hu_config_t *cfg,
                 }
             }
         }
+
+        const char *transport = hu_json_get_string(p->value, "transport");
+        if (transport)
+            entry->transport_type = hu_strdup(a, transport);
+        const char *url = hu_json_get_string(p->value, "url");
+        if (url)
+            entry->url = hu_strdup(a, url);
+        entry->auto_connect = hu_json_get_bool(p->value, "auto_connect", false);
+        double tms = hu_json_get_number(p->value, "timeout_ms", 0);
+        if (tms > 0 && tms <= 300000)
+            entry->timeout_ms = (uint32_t)tms;
+
+        const char *oci = hu_json_get_string(p->value, "oauth_client_id");
+        if (oci)
+            entry->oauth_client_id = hu_strdup(a, oci);
+        const char *oau = hu_json_get_string(p->value, "oauth_auth_url");
+        if (oau)
+            entry->oauth_auth_url = hu_strdup(a, oau);
+        const char *otu = hu_json_get_string(p->value, "oauth_token_url");
+        if (otu)
+            entry->oauth_token_url = hu_strdup(a, otu);
+        const char *osc = hu_json_get_string(p->value, "oauth_scopes");
+        if (osc)
+            entry->oauth_scopes = hu_strdup(a, osc);
+        const char *oru = hu_json_get_string(p->value, "oauth_redirect_uri");
+        if (oru)
+            entry->oauth_redirect_uri = hu_strdup(a, oru);
+
         cfg->mcp_servers_len++;
     }
     return HU_OK;
@@ -565,15 +745,20 @@ static hu_error_t parse_plugins_cfg(hu_allocator_t *a, hu_config_t *cfg,
     return HU_OK;
 }
 static hu_error_t parse_heartbeat(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
-    (void)a;
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
-    cfg->heartbeat.enabled = hu_json_get_bool(obj, "enabled", cfg->heartbeat.enabled);
-    double im = hu_json_get_number(obj, "interval_minutes", cfg->heartbeat.interval_minutes);
-    if (!im)
-        im = hu_json_get_number(obj, "interval_secs", 0);
-    if (im > 0 && im <= 1440)
-        cfg->heartbeat.interval_minutes = (uint32_t)im;
+    static const hu_config_field_t heartbeat_schema[] = {
+        {"enabled", HU_CFG_BOOL, offsetof(hu_heartbeat_config_t, enabled), 0, 0},
+        {"interval_minutes", HU_CFG_UINT32, offsetof(hu_heartbeat_config_t, interval_minutes), 1,
+         1440},
+    };
+    hu_config_parse_fields(a, &cfg->heartbeat, heartbeat_schema, 2, obj);
+    /* Legacy fallback: check interval_secs if interval_minutes wasn't set */
+    if (cfg->heartbeat.interval_minutes == 0) {
+        double im = hu_json_get_number(obj, "interval_secs", 0);
+        if (im > 0 && im <= 1440)
+            cfg->heartbeat.interval_minutes = (uint32_t)im;
+    }
     return HU_OK;
 }
 
@@ -701,7 +886,6 @@ static hu_error_t parse_voice(hu_allocator_t *a, hu_config_t *cfg, const hu_json
 }
 
 static hu_error_t parse_session(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
-    (void)a;
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
     double im = hu_json_get_number(obj, "idle_minutes", cfg->session.idle_minutes);
@@ -717,6 +901,32 @@ static hu_error_t parse_session(hu_allocator_t *a, hu_config_t *cfg, const hu_js
             cfg->session.dm_scope = DirectScopePerChannelPeer;
         else if (strcmp(scope, "per_account_channel_peer") == 0)
             cfg->session.dm_scope = DirectScopePerAccountChannelPeer;
+    }
+    hu_json_value_t *links = hu_json_object_get(obj, "identity_links");
+    if (links && links->type == HU_JSON_ARRAY && links->data.array.len > 0) {
+        size_t n = links->data.array.len;
+        hu_identity_link_t *il =
+            (hu_identity_link_t *)a->alloc(a->ctx, n * sizeof(hu_identity_link_t));
+        if (il) {
+            size_t count = 0;
+            for (size_t i = 0; i < n; i++) {
+                hu_json_value_t *entry = links->data.array.items[i];
+                if (!entry || entry->type != HU_JSON_OBJECT)
+                    continue;
+                const char *canonical = hu_json_get_string(entry, "canonical");
+                if (!canonical)
+                    continue;
+                il[count].canonical = hu_strdup(a, canonical);
+                il[count].peers = NULL;
+                il[count].peers_len = 0;
+                hu_json_value_t *peers = hu_json_object_get(entry, "peers");
+                if (peers && peers->type == HU_JSON_ARRAY)
+                    parse_string_array(a, (char ***)&il[count].peers, &il[count].peers_len, peers);
+                count++;
+            }
+            cfg->session.identity_links = il;
+            cfg->session.identity_links_len = count;
+        }
     }
     return HU_OK;
 }
@@ -765,11 +975,12 @@ static hu_error_t parse_hardware(hu_allocator_t *a, hu_config_t *cfg, const hu_j
 }
 
 static hu_error_t parse_browser(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
-    (void)a;
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
-    cfg->browser.enabled = hu_json_get_bool(obj, "enabled", cfg->browser.enabled);
-    return HU_OK;
+    static const hu_config_field_t browser_schema[] = {
+        {"enabled", HU_CFG_BOOL, offsetof(hu_browser_config_t, enabled), 0, 0},
+    };
+    return hu_config_parse_fields(a, &cfg->browser, browser_schema, 1, obj);
 }
 
 static hu_error_t parse_cost(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -861,6 +1072,13 @@ static hu_error_t parse_feeds(hu_allocator_t *a, hu_config_t *cfg, const hu_json
             a->free(a->ctx, cfg->feeds.twitter_bearer_token,
                     strlen(cfg->feeds.twitter_bearer_token) + 1);
         cfg->feeds.twitter_bearer_token = hu_strdup(a, s);
+    }
+    s = hu_json_get_string(obj, "google_photos_access_token");
+    if (s) {
+        if (cfg->feeds.google_photos_access_token)
+            a->free(a->ctx, cfg->feeds.google_photos_access_token,
+                    strlen(cfg->feeds.google_photos_access_token) + 1);
+        cfg->feeds.google_photos_access_token = hu_strdup(a, s);
     }
     s = hu_json_get_string(obj, "interests");
     if (s) {

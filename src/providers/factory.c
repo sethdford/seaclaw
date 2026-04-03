@@ -129,51 +129,59 @@ const char *hu_compatible_provider_url(const char *name) {
     return NULL;
 }
 
+/* Table-driven provider factory entries for standard signature:
+ * hu_error_t (*create)(alloc, api_key, api_key_len, base_url, base_url_len, out)
+ */
+typedef struct {
+    const char *name;
+    size_t name_len;
+    hu_error_t (*create)(hu_allocator_t *, const char *, size_t, const char *, size_t,
+                         hu_provider_t *);
+} hu_provider_factory_entry_t;
+
+static const hu_provider_factory_entry_t s_provider_table[] = {
+    {"openai", 6, hu_openai_create},          {"anthropic", 9, hu_anthropic_create},
+    {"gemini", 6, hu_gemini_create},          {"google", 6, hu_gemini_create},
+    {"google-gemini", 13, hu_gemini_create},  {"vertex", 6, hu_gemini_create},
+    {"ollama", 6, hu_ollama_create},          {"openrouter", 10, hu_openrouter_create},
+    {"compatible", 10, hu_compatible_create}, {"claude_cli", 10, hu_claude_cli_create},
+    {"codex_cli", 9, hu_codex_cli_create},    {"openai-codex", 12, hu_openai_codex_create},
+};
+
+static const size_t s_provider_table_count = sizeof(s_provider_table) / sizeof(s_provider_table[0]);
+
 hu_error_t hu_provider_create(hu_allocator_t *alloc, const char *name, size_t name_len,
                               const char *api_key, size_t api_key_len, const char *base_url,
                               size_t base_url_len, hu_provider_t *out) {
     if (!alloc || !name || name_len == 0 || !out)
         return HU_ERR_INVALID_ARGUMENT;
 
-    if (name_len == 6 && memcmp(name, "openai", 6) == 0) {
-        return hu_openai_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
+    /* Table lookup for standard signature providers */
+    for (size_t i = 0; i < s_provider_table_count; i++) {
+        if (name_len == s_provider_table[i].name_len &&
+            memcmp(name, s_provider_table[i].name, name_len) == 0) {
+            return s_provider_table[i].create(alloc, api_key, api_key_len, base_url, base_url_len,
+                                              out);
+        }
     }
-    if (name_len == 9 && memcmp(name, "anthropic", 9) == 0) {
-        return hu_anthropic_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
+
+    /* Special case: custom: prefix for compatible provider with inline URL */
+    if (name_len > 7 && memcmp(name, "custom:", 7) == 0) {
+        const char *url = name + 7;
+        size_t url_len = name_len - 7;
+        return hu_compatible_create(alloc, api_key, api_key_len, url, url_len, out);
     }
-    if (name_len == 6 && memcmp(name, "gemini", 6) == 0) {
-        return hu_gemini_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
-    }
-    if (name_len == 6 && memcmp(name, "google", 6) == 0) {
-        return hu_gemini_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
-    }
-    if (name_len == 13 && memcmp(name, "google-gemini", 13) == 0) {
-        return hu_gemini_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
-    }
-    if (name_len == 6 && memcmp(name, "vertex", 6) == 0) {
-        return hu_gemini_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
-    }
-    if (name_len == 6 && memcmp(name, "ollama", 6) == 0) {
-        return hu_ollama_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
-    }
-    if (name_len == 10 && memcmp(name, "openrouter", 10) == 0) {
-        return hu_openrouter_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
-    }
-    if (name_len == 10 && memcmp(name, "compatible", 10) == 0) {
-        return hu_compatible_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
-    }
-    if (name_len == 10 && memcmp(name, "claude_cli", 10) == 0) {
-        return hu_claude_cli_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
-    }
-    if (name_len == 9 && memcmp(name, "codex_cli", 9) == 0) {
-        return hu_codex_cli_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
-    }
-    if (name_len == 12 && memcmp(name, "openai-codex", 12) == 0) {
-        return hu_openai_codex_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
+
+    /* Special case: anthropic-custom: prefix for anthropic provider with inline URL */
+    if (name_len > 17 && memcmp(name, "anthropic-custom:", 17) == 0) {
+        const char *url = name + 17;
+        size_t url_len = name_len - 17;
+        return hu_anthropic_create(alloc, api_key, api_key_len, url, url_len, out);
     }
 
 #ifdef HU_ENABLE_COREML
-    if (name_len == 7 && memcmp(name, "coreml", 7) == 0) {
+    /* Special case: coreml uses hu_coreml_config_t */
+    if (name_len == 6 && memcmp(name, "coreml", 6) == 0) {
         hu_coreml_config_t cc = {.model_path = base_url, .model_path_len = base_url_len};
         return hu_coreml_provider_create(alloc, &cc, out);
     }
@@ -184,6 +192,7 @@ hu_error_t hu_provider_create(hu_allocator_t *alloc, const char *name, size_t na
 #endif
 
 #ifdef HU_ENABLE_EMBEDDED_MODEL
+    /* Special case: embedded uses hu_embedded_config_t */
     if (name_len == 8 && memcmp(name, "embedded", 8) == 0) {
         hu_embedded_config_t ec = {0};
         if (base_url && base_url_len > 0) {
@@ -201,6 +210,7 @@ hu_error_t hu_provider_create(hu_allocator_t *alloc, const char *name, size_t na
 #endif
 
 #ifdef HU_ENABLE_ML
+    /* Special case: huml uses hu_huml_config_t */
     if (name_len == 4 && memcmp(name, "huml", 4) == 0) {
         hu_huml_config_t hc = {0};
         if (base_url && base_url_len > 0) {
@@ -211,17 +221,7 @@ hu_error_t hu_provider_create(hu_allocator_t *alloc, const char *name, size_t na
     }
 #endif
 
-    if (name_len > 7 && memcmp(name, "custom:", 7) == 0) {
-        const char *url = name + 7;
-        size_t url_len = name_len - 7;
-        return hu_compatible_create(alloc, api_key, api_key_len, url, url_len, out);
-    }
-    if (name_len > 17 && memcmp(name, "anthropic-custom:", 17) == 0) {
-        const char *url = name + 17;
-        size_t url_len = name_len - 17;
-        return hu_anthropic_create(alloc, api_key, api_key_len, url, url_len, out);
-    }
-
+    /* Fallback: check compatible provider registry for named providers */
     {
         char nbuf[128];
         if (name_len < sizeof(nbuf)) {

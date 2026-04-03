@@ -217,8 +217,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     .audio-toggle {
       opacity: 0.55;
       transition:
-        opacity var(--hu-duration-moderate, 200ms) var(--hu-ease-standard, ease),
-        color var(--hu-duration-fast, 100ms) var(--hu-ease-standard, ease);
+        opacity var(--hu-duration-moderate, 200ms) var(--hu-ease-in-out, ease),
+        color var(--hu-duration-fast, 100ms) var(--hu-ease-in-out, ease);
     }
     .audio-toggle:hover,
     .audio-toggle:focus-visible {
@@ -269,6 +269,10 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     })();
 
     const toggle = document.querySelector(".theme-toggle");
+    if (toggle) {
+      const isDark = document.documentElement.dataset.theme === "dark";
+      toggle.setAttribute("aria-pressed", String(isDark));
+    }
     toggle?.addEventListener("click", () => {
       const next =
         document.documentElement.dataset.theme === "dark" ? "light" : "dark";

@@ -112,24 +112,32 @@ static hu_error_t bff_memory_execute(void *ctx, hu_allocator_t *alloc, const hu_
         }
         const char *sid = hu_json_get_string(args, "session_id");
         const char *cat = hu_json_get_string(args, "category");
-        size_t cap = strlen(key) + strlen(content) + 512;
-        char *jb = (char *)alloc->alloc(alloc->ctx, cap);
-        if (!jb) {
+        hu_json_buf_t jbuf = {0};
+        if (hu_json_buf_init(&jbuf, alloc) != HU_OK) {
             *out = hu_tool_result_fail("out of memory", 12);
             return HU_ERR_OUT_OF_MEMORY;
         }
-        int n = snprintf(jb, cap, "{\"key\":\"%s\",\"content\":\"%s\"", key, content);
-        if (sid && sid[0])
-            n += snprintf(jb + n, cap - (size_t)n, ",\"session_id\":\"%s\"", sid);
-        if (cat && cat[0])
-            n += snprintf(jb + n, cap - (size_t)n, ",\"category\":\"%s\"", cat);
-        n += snprintf(jb + n, cap - (size_t)n, "}");
+        hu_json_buf_append_raw(&jbuf, "{\"key\":", 7);
+        hu_json_append_string(&jbuf, key, strlen(key));
+        hu_json_buf_append_raw(&jbuf, ",\"content\":", 11);
+        hu_json_append_string(&jbuf, content, strlen(content));
+        if (sid && sid[0]) {
+            hu_json_buf_append_raw(&jbuf, ",\"session_id\":", 14);
+            hu_json_append_string(&jbuf, sid, strlen(sid));
+        }
+        if (cat && cat[0]) {
+            hu_json_buf_append_raw(&jbuf, ",\"category\":", 12);
+            hu_json_append_string(&jbuf, cat, strlen(cat));
+        }
+        hu_json_buf_append_raw(&jbuf, "}", 1);
+        char *jb = jbuf.ptr;
+        size_t cap = jbuf.len;
         char url[768];
         snprintf(url, sizeof(url), "%s/v1/memory/store", base_buf);
         hu_http_response_t resp = {0};
         hu_error_t err =
-            hu_http_post_json_ex(alloc, url, auth, post_extra, jb, (size_t)n, &resp);
-        alloc->free(alloc->ctx, jb, cap);
+            hu_http_post_json_ex(alloc, url, auth, post_extra, jb, cap, &resp);
+        hu_json_buf_free(&jbuf);
         if (err != HU_OK) {
             if (resp.owned && resp.body)
                 hu_http_response_free(alloc, &resp);
@@ -138,7 +146,11 @@ static hu_error_t bff_memory_execute(void *ctx, hu_allocator_t *alloc, const hu_
         }
         char *rb = hu_strndup(alloc, resp.body, resp.body_len);
         hu_http_response_free(alloc, &resp);
-        *out = hu_tool_result_ok_owned(rb, rb ? strlen(rb) : 0);
+        if (!rb) {
+            *out = hu_tool_result_fail("out of memory copying response", 30);
+            return HU_OK;
+        }
+        *out = hu_tool_result_ok_owned(rb, strlen(rb));
         return HU_OK;
     }
 
@@ -150,22 +162,30 @@ static hu_error_t bff_memory_execute(void *ctx, hu_allocator_t *alloc, const hu_
         }
         long lim = (long)hu_json_get_number(args, "limit", 20);
         const char *sid = hu_json_get_string(args, "session_id");
-        size_t qcap = strlen(query) + 256;
-        char *jb = (char *)alloc->alloc(alloc->ctx, qcap);
-        if (!jb) {
+        hu_json_buf_t jbuf = {0};
+        if (hu_json_buf_init(&jbuf, alloc) != HU_OK) {
             *out = hu_tool_result_fail("out of memory", 12);
             return HU_ERR_OUT_OF_MEMORY;
         }
-        int n = snprintf(jb, qcap, "{\"query\":\"%s\",\"limit\":%ld", query, lim);
-        if (sid && sid[0])
-            n += snprintf(jb + n, qcap - (size_t)n, ",\"session_id\":\"%s\"", sid);
-        n += snprintf(jb + n, qcap - (size_t)n, "}");
+        hu_json_buf_append_raw(&jbuf, "{\"query\":", 9);
+        hu_json_append_string(&jbuf, query, strlen(query));
+        char lim_str[32];
+        int ln = snprintf(lim_str, sizeof(lim_str), ",\"limit\":%ld", lim);
+        if (ln > 0)
+            hu_json_buf_append_raw(&jbuf, lim_str, (size_t)ln);
+        if (sid && sid[0]) {
+            hu_json_buf_append_raw(&jbuf, ",\"session_id\":", 14);
+            hu_json_append_string(&jbuf, sid, strlen(sid));
+        }
+        hu_json_buf_append_raw(&jbuf, "}", 1);
+        char *jb = jbuf.ptr;
+        size_t qcap = jbuf.len;
         char url[768];
         snprintf(url, sizeof(url), "%s/v1/memory/recall", base_buf);
         hu_http_response_t resp = {0};
         hu_error_t err =
-            hu_http_post_json_ex(alloc, url, auth, post_extra, jb, (size_t)n, &resp);
-        alloc->free(alloc->ctx, jb, qcap);
+            hu_http_post_json_ex(alloc, url, auth, post_extra, jb, qcap, &resp);
+        hu_json_buf_free(&jbuf);
         if (err != HU_OK || resp.status_code < 200 || resp.status_code >= 300) {
             if (resp.owned && resp.body)
                 hu_http_response_free(alloc, &resp);
@@ -174,7 +194,11 @@ static hu_error_t bff_memory_execute(void *ctx, hu_allocator_t *alloc, const hu_
         }
         char *rb = hu_strndup(alloc, resp.body, resp.body_len);
         hu_http_response_free(alloc, &resp);
-        *out = hu_tool_result_ok_owned(rb, rb ? strlen(rb) : 0);
+        if (!rb) {
+            *out = hu_tool_result_fail("out of memory copying response", 30);
+            return HU_OK;
+        }
+        *out = hu_tool_result_ok_owned(rb, strlen(rb));
         return HU_OK;
     }
 
@@ -196,7 +220,11 @@ static hu_error_t bff_memory_execute(void *ctx, hu_allocator_t *alloc, const hu_
         }
         char *rb = hu_strndup(alloc, resp.body, resp.body_len);
         hu_http_response_free(alloc, &resp);
-        *out = hu_tool_result_ok_owned(rb, rb ? strlen(rb) : 0);
+        if (!rb) {
+            *out = hu_tool_result_fail("out of memory copying response", 30);
+            return HU_OK;
+        }
+        *out = hu_tool_result_ok_owned(rb, strlen(rb));
         return HU_OK;
     }
 
@@ -218,7 +246,11 @@ static hu_error_t bff_memory_execute(void *ctx, hu_allocator_t *alloc, const hu_
         }
         char *rb = hu_strndup(alloc, resp.body, resp.body_len);
         hu_http_response_free(alloc, &resp);
-        *out = hu_tool_result_ok_owned(rb, rb ? strlen(rb) : 0);
+        if (!rb) {
+            *out = hu_tool_result_fail("out of memory copying response", 30);
+            return HU_OK;
+        }
+        *out = hu_tool_result_ok_owned(rb, strlen(rb));
         return HU_OK;
     }
 

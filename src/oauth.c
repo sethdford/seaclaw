@@ -2,6 +2,7 @@
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include <ctype.h>
 #include <errno.h>
@@ -174,6 +175,10 @@ hu_error_t hu_mcp_oauth_build_auth_url(hu_allocator_t *alloc, const hu_oauth_con
                                        char **out_url, size_t *out_url_len) {
     if (!alloc || !config || !pkce || !state || !out_url || !out_url_len)
         return HU_ERR_INVALID_ARGUMENT;
+    if (config->auth_url && strncmp(config->auth_url, "https://", 8) != 0) {
+        hu_log_error("oauth", NULL, "auth_url must use HTTPS: %s", config->auth_url);
+        return HU_ERR_SECURITY_COMMAND_NOT_ALLOWED;
+    }
 
     *out_url = NULL;
     *out_url_len = 0;
@@ -217,6 +222,10 @@ hu_error_t hu_mcp_oauth_exchange_code(hu_allocator_t *alloc, const hu_oauth_conf
                                   hu_oauth_token_t *out_token) {
     if (!alloc || !config || !pkce || !code || !out_token)
         return HU_ERR_INVALID_ARGUMENT;
+    if (config->token_url && strncmp(config->token_url, "https://", 8) != 0) {
+        hu_log_error("oauth", NULL, "token_url must use HTTPS: %s", config->token_url);
+        return HU_ERR_SECURITY_COMMAND_NOT_ALLOWED;
+    }
 
     memset(out_token, 0, sizeof(*out_token));
 

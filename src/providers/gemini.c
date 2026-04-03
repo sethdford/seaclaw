@@ -5,6 +5,7 @@
 #include "human/core/string.h"
 #include "human/core/vertex_auth.h"
 #include "human/provider.h"
+#include "human/providers/helpers.h"
 #include "human/providers/sse.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -328,60 +329,9 @@ static hu_error_t gemini_chat_with_system(void *ctx, hu_allocator_t *alloc,
                                           const char *message, size_t message_len,
                                           const char *model, size_t model_len, double temperature,
                                           char **out, size_t *out_len) {
-    hu_chat_message_t msgs[2];
-    msgs[0].role = HU_ROLE_SYSTEM;
-    msgs[0].content = system_prompt;
-    msgs[0].content_len = system_prompt_len;
-    msgs[0].name = NULL;
-    msgs[0].name_len = 0;
-    msgs[0].tool_call_id = NULL;
-    msgs[0].tool_call_id_len = 0;
-    msgs[0].content_parts = NULL;
-    msgs[0].content_parts_count = 0;
-
-    msgs[1].role = HU_ROLE_USER;
-    msgs[1].content = message;
-    msgs[1].content_len = message_len;
-    msgs[1].name = NULL;
-    msgs[1].name_len = 0;
-    msgs[1].tool_call_id = NULL;
-    msgs[1].tool_call_id_len = 0;
-    msgs[1].content_parts = NULL;
-    msgs[1].content_parts_count = 0;
-
-    hu_chat_request_t req = {
-        .messages = msgs,
-        .messages_count = 2,
-        .model = model,
-        .model_len = model_len,
-        .temperature = temperature,
-        .max_tokens = 0,
-        .tools = NULL,
-        .tools_count = 0,
-        .timeout_secs = 0,
-        .reasoning_effort = NULL,
-        .reasoning_effort_len = 0,
-    };
-
-    hu_chat_response_t resp;
-    memset(&resp, 0, sizeof(resp));
-    hu_error_t err = gemini_chat(ctx, alloc, &req, model, model_len, temperature, &resp);
-    if (err != HU_OK)
-        return err;
-
-    if (resp.content && resp.content_len > 0) {
-        *out = hu_strndup(alloc, resp.content, resp.content_len);
-        if (!*out) {
-            hu_chat_response_free(alloc, &resp);
-            return HU_ERR_OUT_OF_MEMORY;
-        }
-        *out_len = resp.content_len;
-    } else {
-        *out = NULL;
-        *out_len = 0;
-    }
-    hu_chat_response_free(alloc, &resp);
-    return HU_OK;
+    return hu_provider_chat_with_system(ctx, alloc, gemini_chat, system_prompt, system_prompt_len,
+                                        message, message_len, model, model_len, temperature, out,
+                                        out_len);
 }
 
 static hu_error_t gemini_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_request_t *request,

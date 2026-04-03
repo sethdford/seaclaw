@@ -1787,27 +1787,27 @@ export class DemoGatewayClient extends EventTarget {
         if (isGeminiLive) {
           return {
             ok: true,
-            sessionId: `demo-${Date.now()}`,
+            session_id: `demo-${Date.now()}`,
             encoding: "pcm_f32le",
-            inputSampleRate: 16000,
-            outputSampleRate: 24000,
+            input_sample_rate: 16000,
+            output_sample_rate: 24000,
             mode: "gemini_live",
           };
         }
         if (isOpenAIRealtime) {
           return {
             ok: true,
-            sessionId: `demo-${Date.now()}`,
-            encoding: "pcm16",
-            inputSampleRate: 24000,
-            outputSampleRate: 24000,
+            session_id: `demo-${Date.now()}`,
+            encoding: "pcm_f32le",
+            input_sample_rate: 24000,
+            output_sample_rate: 24000,
             mode: "openai_realtime",
           };
         }
         return {
           ok: true,
-          sessionId: `demo-${Date.now()}`,
-          sampleRate: 24000,
+          session_id: `demo-${Date.now()}`,
+          sample_rate: 24000,
           encoding: "pcm_f32le",
         };
       }
@@ -2053,6 +2053,97 @@ export class DemoGatewayClient extends EventTarget {
             : 3;
         return { ok: true, id, status: "cancelled" };
       }
+
+      case "canvas.list":
+        return {
+          canvases: [
+            {
+              canvas_id: "cv_0",
+              title: "Dashboard Mockup",
+              format: "html",
+              content:
+                '<div style="padding:20px;font-family:sans-serif"><h2>Sales Dashboard</h2><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#7ab648">$42,150</div><div style="font-size:12px;opacity:0.6">Revenue today</div></div><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#e8b931">1,234</div><div style="font-size:12px;opacity:0.6">Active users</div></div><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#5b8def">98.7%</div><div style="font-size:12px;opacity:0.6">Uptime</div></div></div></div>',
+              language: "",
+              imports: "",
+              version_seq: 3,
+              version_count: 3,
+            },
+            {
+              canvas_id: "cv_1",
+              title: "Counter App",
+              format: "react",
+              content: `function App() {
+  const [count, setCount] = React.useState(0);
+  return (
+    <div style={{padding: 20, textAlign: "center"}}>
+      <h2>Counter: {count}</h2>
+      <button onClick={() => setCount(c => c + 1)}
+        style={{padding: "8px 24px", fontSize: 16, cursor: "pointer",
+          background: "#7ab648", color: "#fff", border: "none", borderRadius: 6}}>
+        Increment
+      </button>
+    </div>
+  );
+}`,
+              language: "",
+              imports: {},
+              version_seq: 1,
+              version_count: 1,
+            },
+          ],
+        };
+
+      case "canvas.get": {
+        const cid =
+          params && typeof (params as { canvas_id?: string }).canvas_id === "string"
+            ? (params as { canvas_id: string }).canvas_id
+            : "cv_0";
+        return {
+          canvas: {
+            canvas_id: cid,
+            title: cid === "cv_0" ? "Dashboard Mockup" : "Counter App",
+            format: cid === "cv_0" ? "html" : "react",
+            content:
+              cid === "cv_0" ? "<h2>Dashboard</h2>" : "function App() { return <div>Hello</div>; }",
+            version_seq: cid === "cv_0" ? 3 : 1,
+            version_count: cid === "cv_0" ? 3 : 1,
+            user_edit_pending: false,
+          },
+        };
+      }
+
+      case "canvas.edit":
+        return {
+          ok: true,
+          canvas_id:
+            params && typeof (params as { canvas_id?: string }).canvas_id === "string"
+              ? (params as { canvas_id: string }).canvas_id
+              : "cv_0",
+        };
+
+      case "canvas.undo":
+        return {
+          ok: true,
+          canvas_id:
+            params && typeof (params as { canvas_id?: string }).canvas_id === "string"
+              ? (params as { canvas_id: string }).canvas_id
+              : "cv_0",
+          version_seq: 2,
+          content: "<h2>Previous version</h2>",
+          format: "html",
+        };
+
+      case "canvas.redo":
+        return {
+          ok: true,
+          canvas_id:
+            params && typeof (params as { canvas_id?: string }).canvas_id === "string"
+              ? (params as { canvas_id: string }).canvas_id
+              : "cv_0",
+          version_seq: 3,
+          content: "<h2>Next version</h2>",
+          format: "html",
+        };
 
       case "hula.traces.list":
         return {
@@ -2410,7 +2501,7 @@ export class DemoGatewayClient extends EventTarget {
     return this.request("voice.audio.end", params);
   }
 
-  voiceToolResponse(params: { name: string; callId: string; result: string }): Promise<unknown> {
+  voiceToolResponse(params: { name: string; call_id: string; result: string }): Promise<unknown> {
     return this.request("voice.tool_response", params);
   }
 
@@ -2442,7 +2533,7 @@ export class DemoGatewayClient extends EventTarget {
             event: "voice.tool_call",
             payload: {
               name: "demo_tool",
-              callId: "demo-call-1",
+              call_id: "demo-call-1",
               args: '{"query":"demo"}',
             },
           },

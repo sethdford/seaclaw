@@ -74,10 +74,12 @@ export class GatewayClient extends EventTarget {
         this.#sendConnect();
       };
       this.#ws.onclose = () => {
+        this.#rejectPending("Connection closed");
         this.#setStatus("disconnected");
         this.#scheduleReconnect();
       };
       this.#ws.onerror = () => {
+        this.#rejectPending("Connection error");
         this.#setStatus("disconnected");
         this.#scheduleReconnect();
       };
@@ -101,8 +103,13 @@ export class GatewayClient extends EventTarget {
         if (payload.features) this.#features = payload.features as ServerFeatures;
       }
       this.dispatchEvent(new CustomEvent("features", { detail: this.#features }));
-    } catch {
-      /* connect handshake optional — gateway may not require it */
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Handshake failed";
+      this.dispatchEvent(
+        new CustomEvent(GatewayClient.EVENT_GATEWAY, {
+          detail: { event: "error", payload: { message: `Connect: ${msg}` } },
+        }),
+      );
     }
   }
 
@@ -110,6 +117,14 @@ export class GatewayClient extends EventTarget {
     if (this.#status === s) return;
     this.#status = s;
     this.dispatchEvent(new CustomEvent(GatewayClient.EVENT_STATUS, { detail: s }));
+  }
+
+  #rejectPending(reason: string): void {
+    for (const p of this.#pending.values()) {
+      clearTimeout(p.timeout);
+      p.reject(new Error(reason));
+    }
+    this.#pending.clear();
   }
 
   #scheduleReconnect(): void {
@@ -140,10 +155,10 @@ export class GatewayClient extends EventTarget {
   }
 
   voiceSessionStart(params?: Record<string, unknown>): Promise<{
-    sessionId?: string;
-    sampleRate?: number;
-    inputSampleRate?: number;
-    outputSampleRate?: number;
+    session_id?: string;
+    sample_rate?: number;
+    input_sample_rate?: number;
+    output_sample_rate?: number;
     encoding?: string;
     mode?: string;
   }> {
@@ -162,7 +177,7 @@ export class GatewayClient extends EventTarget {
     return this.request("voice.audio.end", params);
   }
 
-  voiceToolResponse(params: { name: string; callId: string; result: string }): Promise<unknown> {
+  voiceToolResponse(params: { name: string; call_id: string; result: string }): Promise<unknown> {
     return this.request("voice.tool_response", params);
   }
 

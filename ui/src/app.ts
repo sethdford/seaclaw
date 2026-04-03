@@ -592,6 +592,7 @@ export class ScApp extends LitElement {
     this.sidebarCollapsed = localStorage.getItem(SIDEBAR_KEY) === "true";
     this._updateViewportBreakpoint();
     window.addEventListener("resize", this._resizeHandler);
+    document.addEventListener("keydown", this._paletteEscapeCapture, true);
     document.addEventListener("keydown", this._keyHandler);
     document.addEventListener(AUTH_FAILED, this._authFailedHandler);
     window.addEventListener("hashchange", this._hashHandler);
@@ -673,6 +674,7 @@ export class ScApp extends LitElement {
       this._navHoverTimer = null;
     }
     document.removeEventListener("keydown", this._moreSheetKeyHandler);
+    document.removeEventListener("keydown", this._paletteEscapeCapture, true);
     document.removeEventListener("keydown", this._keyHandler);
     window.removeEventListener("resize", this._resizeHandler);
     document.removeEventListener(AUTH_FAILED, this._authFailedHandler);

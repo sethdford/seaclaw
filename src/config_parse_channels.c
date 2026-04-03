@@ -886,7 +886,67 @@ static void parse_signal_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_j
         val = obj->data.array.items[0];
     if (!val || val->type != HU_JSON_OBJECT)
         return;
-    parse_daemon_config(a, &cfg->channels.signal.daemon, val);
+    hu_signal_channel_config_t *sig = &cfg->channels.signal;
+    const char *s = hu_json_get_string(val, "http_url");
+    if (s) {
+        if (sig->http_url)
+            a->free(a->ctx, sig->http_url, strlen(sig->http_url) + 1);
+        sig->http_url = hu_strdup(a, s);
+    }
+    s = hu_json_get_string(val, "account");
+    if (s) {
+        if (sig->account)
+            a->free(a->ctx, sig->account, strlen(sig->account) + 1);
+        sig->account = hu_strdup(a, s);
+    }
+    parse_daemon_config(a, &sig->daemon, val);
+}
+
+static void parse_mattermost_channel(hu_allocator_t *a, hu_config_t *cfg,
+                                     const hu_json_value_t *obj) {
+    if (!obj)
+        return;
+    hu_mattermost_channel_config_t *mm = &cfg->channels.mattermost;
+    const hu_json_value_t *val = obj;
+    if (obj->type == HU_JSON_ARRAY && obj->data.array.len > 0 && obj->data.array.items &&
+        obj->data.array.items[0])
+        val = obj->data.array.items[0];
+    if (!val || val->type != HU_JSON_OBJECT)
+        return;
+    const char *s = hu_json_get_string(val, "url");
+    if (s) {
+        if (mm->url)
+            a->free(a->ctx, mm->url, strlen(mm->url) + 1);
+        mm->url = hu_strdup(a, s);
+    }
+    s = hu_json_get_string(val, "token");
+    if (s) {
+        if (mm->token)
+            a->free(a->ctx, mm->token, strlen(mm->token) + 1);
+        mm->token = hu_strdup(a, s);
+    }
+    parse_daemon_config(a, &mm->daemon, val);
+}
+
+static void parse_maixcam_channel(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
+    if (!obj)
+        return;
+    hu_maixcam_channel_config_t *mx = &cfg->channels.maixcam;
+    const hu_json_value_t *val = obj;
+    if (obj->type == HU_JSON_ARRAY && obj->data.array.len > 0 && obj->data.array.items &&
+        obj->data.array.items[0])
+        val = obj->data.array.items[0];
+    if (!val || val->type != HU_JSON_OBJECT)
+        return;
+    const char *h = hu_json_get_string(val, "host");
+    if (h) {
+        if (mx->host)
+            a->free(a->ctx, mx->host, strlen(mx->host) + 1);
+        mx->host = hu_strdup(a, h);
+    }
+    double p = hu_json_get_number(val, "port", (double)mx->port);
+    if (p >= 0.0 && p <= 65535.0)
+        mx->port = (uint16_t)p;
 }
 
 hu_error_t parse_channels(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_t *obj) {
@@ -938,6 +998,14 @@ hu_error_t parse_channels(hu_allocator_t *a, hu_config_t *cfg, const hu_json_val
     hu_json_value_t *signal_obj = hu_json_object_get(obj, "signal");
     if (signal_obj)
         parse_signal_channel(a, cfg, signal_obj);
+
+    hu_json_value_t *mattermost_obj = hu_json_object_get(obj, "mattermost");
+    if (mattermost_obj)
+        parse_mattermost_channel(a, cfg, mattermost_obj);
+
+    hu_json_value_t *maixcam_obj = hu_json_object_get(obj, "maixcam");
+    if (maixcam_obj)
+        parse_maixcam_channel(a, cfg, maixcam_obj);
 
     hu_json_value_t *whatsapp_obj = hu_json_object_get(obj, "whatsapp");
     if (whatsapp_obj)

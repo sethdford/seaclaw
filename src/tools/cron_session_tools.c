@@ -48,13 +48,20 @@ static hu_error_t cron_create_execute(void *ctx, hu_allocator_t *alloc, const hu
 
 #if HU_IS_TEST
     (void)c;
-    /* Test: simulate job creation with ID */
-    char *response = hu_sprintf(alloc,
-                                "{\"id\":1,\"cron_expr\":\"%s\",\"prompt\":\"%s\",\"recurring\":%s,\"message\":\"Job created\"}",
-                                cron_expr, prompt, recurring_d > 0.5 ? "true" : "false");
-    if (!response)
-        return HU_ERR_OUT_OF_MEMORY;
-    *out = hu_tool_result_ok_owned(response, strlen(response));
+    {
+        hu_json_buf_t jb = {0};
+        if (hu_json_buf_init(&jb, alloc) != HU_OK)
+            return HU_ERR_OUT_OF_MEMORY;
+        hu_json_buf_append_raw(&jb, "{\"id\":1,\"cron_expr\":", 20);
+        hu_json_append_string(&jb, cron_expr, strlen(cron_expr));
+        hu_json_buf_append_raw(&jb, ",\"prompt\":", 10);
+        hu_json_append_string(&jb, prompt, strlen(prompt));
+        hu_json_buf_append_raw(&jb, ",\"recurring\":", 13);
+        hu_json_buf_append_raw(&jb, recurring_d > 0.5 ? "true" : "false",
+                               recurring_d > 0.5 ? 4 : 5);
+        hu_json_buf_append_raw(&jb, ",\"message\":\"Job created\"}", 25);
+        *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+    }
 #else
     /* Production: use scheduler */
     if (!c->scheduler) {
@@ -68,12 +75,19 @@ static hu_error_t cron_create_execute(void *ctx, hu_allocator_t *alloc, const hu
         *out = hu_tool_result_fail("failed to add job", 17);
         return HU_OK;
     }
-
-    char *response = hu_sprintf(alloc, "{\"id\":%llu,\"cron_expr\":\"%s\",\"message\":\"Job created\"}",
-                                (unsigned long long)job_id, cron_expr);
-    if (!response)
-        return HU_ERR_OUT_OF_MEMORY;
-    *out = hu_tool_result_ok_owned(response, strlen(response));
+    {
+        hu_json_buf_t jb = {0};
+        if (hu_json_buf_init(&jb, alloc) != HU_OK)
+            return HU_ERR_OUT_OF_MEMORY;
+        char id_str[32];
+        int idn = snprintf(id_str, sizeof(id_str), "{\"id\":%llu,\"cron_expr\":",
+                           (unsigned long long)job_id);
+        if (idn > 0)
+            hu_json_buf_append_raw(&jb, id_str, (size_t)idn);
+        hu_json_append_string(&jb, cron_expr, strlen(cron_expr));
+        hu_json_buf_append_raw(&jb, ",\"message\":\"Job created\"}", 25);
+        *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+    }
 #endif
     return HU_OK;
 }
@@ -256,13 +270,24 @@ static hu_error_t cron_list_execute(void *ctx, hu_allocator_t *alloc, const hu_j
             if (i > 0)
                 err = hu_json_buf_append_raw(&buf, ",", 1);
             if (err == HU_OK) {
-                char job_json[512];
-                int len = snprintf(job_json, sizeof(job_json),
-                                   "{\"id\":%llu,\"expression\":\"%s\",\"command\":\"%s\",\"next_run\":%lld}",
-                                   (unsigned long long)jobs[i].id, jobs[i].expression ? jobs[i].expression : "",
-                                   jobs[i].command ? jobs[i].command : "", (long long)jobs[i].next_run_secs);
-                if (len > 0)
-                    err = hu_json_buf_append_raw(&buf, job_json, (size_t)len);
+                char id_next[96];
+                int hn = snprintf(id_next, sizeof(id_next), "{\"id\":%llu,\"expression\":",
+                                  (unsigned long long)jobs[i].id);
+                if (hn > 0)
+                    err = hu_json_buf_append_raw(&buf, id_next, (size_t)hn);
+                const char *expr = jobs[i].expression ? jobs[i].expression : "";
+                if (err == HU_OK)
+                    err = hu_json_append_string(&buf, expr, strlen(expr));
+                if (err == HU_OK)
+                    err = hu_json_buf_append_raw(&buf, ",\"command\":", 11);
+                const char *cmd = jobs[i].command ? jobs[i].command : "";
+                if (err == HU_OK)
+                    err = hu_json_append_string(&buf, cmd, strlen(cmd));
+                char tail[64];
+                int tn = snprintf(tail, sizeof(tail), ",\"next_run\":%lld}",
+                                  (long long)jobs[i].next_run_secs);
+                if (err == HU_OK && tn > 0)
+                    err = hu_json_buf_append_raw(&buf, tail, (size_t)tn);
             }
         }
     }

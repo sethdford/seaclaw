@@ -208,6 +208,8 @@ static void *dag_parallel_worker(void *arg) {
     hu_dag_node_t *node = w->node;
     node->status = HU_DAG_RUNNING;
 
+    hu_agent_set_current_for_tools(w->agent);
+
     char *resolved_args = NULL;
     size_t resolved_len = 0;
     const char *use_args = node->args_json;
@@ -224,6 +226,7 @@ static void *dag_parallel_worker(void *arg) {
         node->status = HU_DAG_FAILED;
         if (resolved_args)
             w->agent->alloc->free(w->agent->alloc->ctx, resolved_args, resolved_len + 1);
+        hu_agent_clear_current_for_tools();
         return NULL;
     }
 
@@ -234,8 +237,15 @@ static void *dag_parallel_worker(void *arg) {
         if (jerr != HU_OK)
             hu_log_error("agent_turn", NULL, "DAG tool args parse failed");
     }
-    if (dag_args && dag_tool->vtable->execute)
-        dag_tool->vtable->execute(dag_tool->ctx, w->agent->alloc, dag_args, &dag_result);
+    if (dag_args && dag_tool->vtable->execute) {
+        hu_policy_action_t pa = hu_agent_internal_evaluate_tool_policy(
+            w->agent, node->tool_name, use_args);
+        if (pa == HU_POLICY_DENY || pa == HU_POLICY_REQUIRE_APPROVAL) {
+            node->status = HU_DAG_FAILED;
+        } else {
+            dag_tool->vtable->execute(dag_tool->ctx, w->agent->alloc, dag_args, &dag_result);
+        }
+    }
     if (dag_args)
         hu_json_free(w->agent->alloc, dag_args);
     if (resolved_args)
@@ -247,10 +257,16 @@ static void *dag_parallel_worker(void *arg) {
             node->result = hu_strndup(w->agent->alloc, dag_result.output, dag_result.output_len);
             node->result_len = dag_result.output_len;
         }
+        if (dag_result.media_path && dag_result.media_path_len > 0) {
+            node->media_path = hu_strndup(w->agent->alloc, dag_result.media_path,
+                                          dag_result.media_path_len);
+            node->media_path_len = dag_result.media_path_len;
+        }
     } else {
         node->status = HU_DAG_FAILED;
     }
     hu_tool_result_free(w->agent->alloc, &dag_result);
+    hu_agent_clear_current_for_tools();
     return NULL;
 }
 #endif
@@ -410,6 +426,32 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
             break;
         }
+    }
+    /* Run dual-process dispatch early to determine if planning should fire.
+     * The full budget is recomputed after dispatch later; this is only for gating. */
+    {
+        size_t pre_recent_tools = 0;
+        if (agent->history_count > 0) {
+            for (size_t hi = agent->history_count - 1; hi > 0; hi--) {
+                if (agent->history[hi - 1].role == HU_ROLE_TOOL) {
+                    pre_recent_tools++;
+                    if (pre_recent_tools >= 8)
+                        break;
+                }
+            }
+        }
+        hu_cognition_dispatch_input_t pre_in = {
+            .message = msg,
+            .message_len = msg_len,
+            .emotional = &agent->emotional_cognition,
+            .tools_count = agent->tools_count,
+            .recent_tool_calls = pre_recent_tools,
+            .agent_max_tool_iterations = agent->max_tool_iterations,
+        };
+        hu_cognition_mode_t pre_mode = hu_cognition_dispatch(&pre_in);
+        hu_cognition_budget_t pre_budget =
+            hu_cognition_get_budget(pre_mode, agent->max_tool_iterations);
+        cognition_budget.enable_planning = pre_budget.enable_planning;
     }
     if (cognition_budget.enable_planning &&
         msg_len > 200 && agent->tools_count >= 5 && agent->provider.vtable &&
@@ -2011,6 +2053,27 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                             &emotional_ctx, &emotional_ctx_len) != HU_OK) {
         emotional_ctx = NULL;
         emotional_ctx_len = 0;
+    }
+
+    /* When EMOTIONAL mode activates prioritize_empathy, prepend an empathy-first
+     * directive so the model leads with validation before problem-solving. */
+    if (cognition_budget.prioritize_empathy && emotional_ctx && emotional_ctx_len > 0) {
+        static const char empathy_dir[] =
+            "Lead with empathy: acknowledge feelings before offering solutions. "
+            "Validate the person's experience, reflect their emotional state, "
+            "and ask if they want support or advice before problem-solving.";
+        size_t edir_len = sizeof(empathy_dir) - 1;
+        size_t new_len = edir_len + 1 + emotional_ctx_len;
+        char *aug = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
+        if (aug) {
+            memcpy(aug, empathy_dir, edir_len);
+            aug[edir_len] = '\n';
+            memcpy(aug + edir_len + 1, emotional_ctx, emotional_ctx_len);
+            aug[new_len] = '\0';
+            agent->alloc->free(agent->alloc->ctx, emotional_ctx, emotional_ctx_len + 1);
+            emotional_ctx = aug;
+            emotional_ctx_len = new_len;
+        }
     }
 
     /* PERSONA-001: Affect mirror ceiling — cap emotional intensity in prompt.
@@ -4622,6 +4685,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         for (size_t bi = 0; bi < batch.count; bi++) {
                                             if (batch.nodes[bi]->status == HU_DAG_DONE)
                                                 dag_executed = true;
+                                            if (batch.nodes[bi]->media_path &&
+                                                batch.nodes[bi]->media_path_len > 0 &&
+                                                agent->generated_media_count < 4) {
+                                                agent->generated_media[agent->generated_media_count++] =
+                                                    batch.nodes[bi]->media_path;
+                                                batch.nodes[bi]->media_path = NULL;
+                                                batch.nodes[bi]->media_path_len = 0;
+                                            }
                                         }
                                         continue;
                                     }
@@ -4666,8 +4737,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                     "[agent_turn] DAG tool args parse failed\n");
                                         }
                                         if (dag_args && dag_tool->vtable->execute) {
-                                            dag_tool->vtable->execute(dag_tool->ctx, agent->alloc,
-                                                                      dag_args, &dag_result);
+                                            hu_policy_action_t dag_pa =
+                                                hu_agent_internal_evaluate_tool_policy(
+                                                    agent, node->tool_name, args_str);
+                                            if (dag_pa == HU_POLICY_DENY ||
+                                                dag_pa == HU_POLICY_REQUIRE_APPROVAL) {
+                                                node->status = HU_DAG_FAILED;
+                                            } else {
+                                                dag_tool->vtable->execute(dag_tool->ctx,
+                                                                          agent->alloc, dag_args,
+                                                                          &dag_result);
+                                            }
                                         }
                                         if (dag_args)
                                             hu_json_free(agent->alloc, dag_args);
@@ -4681,6 +4761,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                     hu_strndup(agent->alloc, dag_result.output,
                                                                dag_result.output_len);
                                                 node->result_len = dag_result.output_len;
+                                            }
+                                            if (dag_result.media_path &&
+                                                dag_result.media_path_len > 0 &&
+                                                agent->generated_media_count < 4) {
+                                                char *mp = hu_strndup(agent->alloc,
+                                                    dag_result.media_path, dag_result.media_path_len);
+                                                if (mp)
+                                                    agent->generated_media[
+                                                        agent->generated_media_count++] = mp;
                                             }
                                         } else {
                                             node->status = HU_DAG_FAILED;
@@ -4892,9 +4981,19 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                     stderr,
                                                     "[agent_turn] tool args JSON parse failed\n");
                                             if (orch_args && orch_tool->vtable->execute) {
-                                                orch_tool->vtable->execute(orch_tool->ctx,
-                                                                           agent->alloc, orch_args,
-                                                                           &orch_result);
+                                                hu_policy_action_t orch_pa =
+                                                    hu_agent_internal_evaluate_tool_policy(
+                                                        agent, task->description,
+                                                        calls[s].arguments);
+                                                if (orch_pa != HU_POLICY_DENY &&
+                                                    orch_pa != HU_POLICY_REQUIRE_APPROVAL) {
+                                                    orch_tool->vtable->execute(
+                                                        orch_tool->ctx, agent->alloc, orch_args,
+                                                        &orch_result);
+                                                } else {
+                                                    hu_orchestrator_fail_task(
+                                                        &orch, task->id, "blocked by policy", 17);
+                                                }
                                             }
                                             if (orch_args)
                                                 hu_json_free(agent->alloc, orch_args);

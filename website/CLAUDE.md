@@ -13,7 +13,7 @@ src/pages/404.astro     Not found page
 
 ## Homepage Structure
 
-The homepage (`src/pages/index.astro`) is a 9-chapter scroll narrative with dot navigation. `chapterCount` in frontmatter controls the nav dot count (currently 9).
+The homepage (`src/pages/index.astro`) is a 10-chapter scroll narrative with dot navigation. `chapterCount` in frontmatter controls the nav dot count (currently 10).
 
 | Chapter | Section |
 | --- | --- |
@@ -22,10 +22,11 @@ The homepage (`src/pages/index.astro`) is a 9-chapter scroll narrative with dot 
 | 3 | The Problem + Contrast |
 | 4 | Crystal Grid |
 | 5 | Device Spectrum + Architecture |
-| 6 | HuLa + Ecosystem |
-| 7 | Terminal + Dashboard |
-| 8 | Quality + Comparison |
-| 9 | CTA (call to action) |
+| 6 | HuLa (Programs, not prompts) |
+| 7 | Ecosystem (Providers, Channels, Tools) |
+| 8 | Terminal + Dashboard |
+| 9 | Quality + Comparison |
+| 10 | CTA (call to action) |
 
 When adding or removing chapters, update `chapterCount` and renumber all subsequent `id="chapter-N"` + `hu-chapter-label` spans.
 

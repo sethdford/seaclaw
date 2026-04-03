@@ -68,9 +68,12 @@ const char *hu_config_get_provider_key(const hu_config_t *cfg, const char *name)
         if (cfg->providers[i].name && strcmp(cfg->providers[i].name, name) == 0) {
             if (cfg->providers[i].api_key && cfg->providers[i].api_key[0])
                 return cfg->providers[i].api_key;
-            break;
+            /* Named provider found but key is empty — don't fall back to
+             * global key (which may belong to a different provider). */
+            return NULL;
         }
     }
+    /* No provider with this name — fall back to global default. */
     return (cfg->api_key && cfg->api_key[0]) ? cfg->api_key : NULL;
 }
 

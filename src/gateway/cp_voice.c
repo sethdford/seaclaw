@@ -41,6 +41,8 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
                                char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+    if (!out || !out_len || !alloc)
+        return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_len = 0;
 
@@ -52,7 +54,9 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
         return HU_ERR_INVALID_ARGUMENT;
 
     hu_json_value_t *audio_val = hu_json_object_get(params, "audio");
-    hu_json_value_t *mime_val = hu_json_object_get(params, "mimeType");
+    hu_json_value_t *mime_val = hu_json_object_get(params, "mime_type");
+    if (!mime_val)
+        mime_val = hu_json_object_get(params, "mimeType"); /* backward compat */
 
     if (!audio_val || audio_val->type != HU_JSON_STRING || audio_val->data.string.len == 0)
         return HU_ERR_INVALID_ARGUMENT;
@@ -155,6 +159,8 @@ hu_error_t cp_voice_config(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     (void)conn;
     (void)proto;
     (void)root;
+    if (!out || !out_len || !alloc)
+        return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
     *out_len = 0;
     if (!app || !app->config)
@@ -200,8 +206,10 @@ hu_error_t cp_voice_transcribe(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     (void)conn;
     (void)proto;
     (void)root;
-    *out = NULL;
-    *out_len = 0;
+    if (out)
+        *out = NULL;
+    if (out_len)
+        *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
 }
 
@@ -213,8 +221,10 @@ hu_error_t cp_voice_config(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     (void)conn;
     (void)proto;
     (void)root;
-    *out = NULL;
-    *out_len = 0;
+    if (out)
+        *out = NULL;
+    if (out_len)
+        *out_len = 0;
     return HU_ERR_NOT_SUPPORTED;
 }
 

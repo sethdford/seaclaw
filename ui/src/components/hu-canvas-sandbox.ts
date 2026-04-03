@@ -129,9 +129,7 @@ export class HuCanvasSandbox extends LitElement {
 
   override render() {
     return html`
-      ${this._error
-        ? html`<div class="error-banner" role="alert">${this._error}</div>`
-        : ""}
+      ${this._error ? html`<div class="error-banner" role="alert">${this._error}</div>` : ""}
       ${this._harnessSrc
         ? html`<iframe
             sandbox="allow-scripts"

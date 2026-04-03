@@ -264,6 +264,8 @@ struct hu_agent {
     bool compaction_use_structured; /* use XML structured summaries in compaction */
 
     bool constitutional_enabled;
+    const char *constitutional_principles;
+    size_t constitutional_principles_len;
     bool multi_agent_enabled;
     struct hu_speculative_cache *speculative_cache;
     struct hu_semantic_cache *response_cache; /* optional; embedding-based response cache */

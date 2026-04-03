@@ -1,71 +1,100 @@
-# src/persona/ — Persona System
+# src/persona/ — Persona System (22 files)
 
-The persona system defines and manages the agent's identity, communication style, and behavioral adaptation. Persona profiles are JSON files in `~/.human/personas/`.
+Defines and manages agent identity, communication style, emotional state, and behavioral adaptation. Persona profiles are JSON in `~/.human/personas/`.
 
-## Architecture
+## Core Persona (Data Model)
 
 ```
-persona.c            Loading, parsing, and validating persona JSON profiles
+persona.c            Loading, parsing, validating persona JSON profiles
 creator.c            Interactive persona creation workflow
-analyzer.c           Analyzes communication samples to extract persona traits
-sampler.c            Sampling and variation in persona expression
-examples.c           Example conversation selection for few-shot prompting
+analyzer.c           Analyzes communication samples to extract traits
+examples.c           Example conversation bank (few-shot prompting)
+sampler.c            Sampling and variation in expression
 feedback.c           Feedback loop for persona refinement
 cli.c                CLI subcommands (list, show, create, analyze, validate)
 ```
 
-## Adaptation & Context
+## Behavior Adaptation
 
 ```
 mood.c               Mood tracking and emotional state modeling
-circadian.c          Circadian rhythm — time-of-day behavioral shifts
+circadian.c          Circadian rhythm — time-of-day behavior shifts
 relationship.c       Relationship stage tracking (new, familiar, close)
-style_clone.c        Style cloning from communication samples
-auto_profile.c       Auto-profile generation from conversation data
-auto_tune.c          Auto-tuning persona parameters over time
-training.c           Training data preparation for fine-tuning
+voice_maturity.c     Voice maturity evolution over time
+humor.c              Humor framework (timing, style, cultural context)
+```
+
+## Style & Personalization
+
+```
+style_clone.c        Clones communication style from samples
+style_learner.c      Learns style drift over time (language models, vocabulary shifts)
+markdown_loader.c    Loads persona from Markdown format (alternative to JSON)
+persona_fuse.c       Fuses per-channel overlays with core persona
+temporal.c           Temporal persona changes (seasonal, event-based)
+```
+
+## Auto-Generation & Learning
+
+```
+auto_profile.c       Auto-generates profile from conversation history
+auto_tune.c          Auto-tunes persona parameters over time
+training.c           Prepares training data for fine-tuning
 life_sim.c           Life simulation context (daily routine, life chapter)
-voice_maturity.c     Voice maturity tracking over time
-replay.c             Conversation replay for persona testing
+replay.c             Conversation replay for persona testing/validation
 ```
 
 ## Key Types
 
 ```c
-hu_persona_t               — full persona profile (identity, traits, vocab, rules, values, overlays, examples, contacts, motivation, humor, voice, etc.)
-hu_persona_overlay_t       — per-channel overrides (formality, length, emoji, typing quirks, message splitting)
-hu_persona_example_bank_t  — example conversations grouped by channel
-hu_persona_example_t       — single example (context, incoming, response)
-hu_contact_profile_t       — per-contact relationship data
+hu_persona_t               Full persona profile (identity, traits, vocab, rules, values, overlays, examples, contacts, motivation, humor, voice, etc.)
+hu_persona_overlay_t       Per-channel overrides (formality, length, emoji, typing quirks, message splitting)
+hu_persona_example_bank_t  Example conversations grouped by channel and topic
+hu_persona_example_t       Single few-shot example (context, input, response)
+hu_contact_profile_t       Per-contact relationship data and history
+hu_persona_mood_t          Current mood state with intensity and triggers
+hu_persona_circadian_t     Time-of-day behavioral shifts and energy levels
+hu_persona_style_t         Communication style (word choice, pacing, formality)
 ```
-
-## Key Functions
-
-- `hu_persona_load` — load persona from `~/.human/personas/<name>.json`
-- `hu_persona_load_json` — parse persona from raw JSON
-- `hu_persona_build_prompt` — compose system prompt from persona + channel overlay + topic
-- `hu_persona_select_examples` — pick relevant few-shot examples for a channel + topic
-- `hu_persona_find_overlay` — look up channel-specific style overrides
-- `hu_persona_find_contact` — look up per-contact relationship data
-- `hu_persona_feedback_record` / `hu_persona_feedback_apply` — feedback loop
 
 ## Prompt Assembly Flow
 
 ```
 hu_persona_build_prompt
   → identity + traits + communication rules
-  → channel overlay (formality, length, emoji for this channel)
-  → selected examples (few-shot from example bank)
-  → contact context (if known contact)
+  → channel overlay (formality, length, emoji, quirks)
+  → selected examples (few-shot, topic + channel relevant)
+  → contact context (relationship stage, history)
   → mood + circadian context
+  → temporal/seasonal adjustments
+  → voice characteristics (for voice channel)
+  → humor/timing rules
   → final system prompt string
 ```
 
+## Key Functions
+
+- `hu_persona_load` — load from `~/.human/personas/<name>.json`
+- `hu_persona_load_json` — parse from raw JSON
+- `hu_persona_load_markdown` — parse from Markdown file
+- `hu_persona_build_prompt` — compose system prompt
+- `hu_persona_select_examples` — pick few-shot examples (topic/channel aware)
+- `hu_persona_find_overlay` — look up channel overrides
+- `hu_persona_find_contact` — look up per-contact data
+- `hu_persona_feedback_record` / `hu_persona_feedback_apply` — feedback loop
+- `hu_persona_sample_variation` — generate expression variants
+- `hu_persona_analyze_style` — extract traits from samples
+- `hu_persona_apply_mood` — modulate output based on current mood
+- `hu_persona_apply_circadian` — apply time-of-day shifts
+
 ## Rules
 
-- Persona JSON parsing must handle missing/empty fields gracefully
-- Overlay lookup is by channel name — must be case-insensitive
-- Example selection should prefer topic-relevant examples, fallback to general
+- JSON parsing must handle missing/empty fields gracefully
+- Overlay lookup by channel name — case-insensitive
+- Example selection prefers topic-relevant, fallback to general
 - Never hardcode persona data — always load from profile
-- Use neutral test data in tests — no real personal information
-- Free all allocations from `hu_persona_load` via `hu_persona_deinit`
+- Use neutral test data — no real personal information
+- Free all allocations via `hu_persona_deinit`
+- `HU_IS_TEST` guards on file I/O (persona files)
+- Style learner must not drift toward harmful patterns (via policy gate)
+- Mood/circadian shifts must be bounded (sanity checks)

@@ -51,6 +51,10 @@ hu_error_t hu_voice_provider_create_from_config(hu_allocator_t *alloc, const hu_
         if (extras) {
             glc.system_instruction = extras->system_instruction;
             glc.tools_json = extras->tools_json;
+            if (extras->voice_id && extras->voice_id[0])
+                glc.voice = extras->voice_id;
+            if (extras->model_id && extras->model_id[0])
+                glc.model = extras->model_id;
         }
         return hu_voice_provider_gemini_live_create(alloc, &glc, out);
     }

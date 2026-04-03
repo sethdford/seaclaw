@@ -847,8 +847,14 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 }
                 if (args) {
                     result = hu_tool_result_fail("invalid arguments", 16);
-                    /* Prefer streaming execution for progressive output */
-                    if (tool->vtable->execute_streaming && on_event) {
+                    hu_policy_action_t stream_pa =
+                        hu_agent_internal_evaluate_tool_policy(
+                            agent, call->name,
+                            call->arguments ? call->arguments : "{}");
+                    if (stream_pa == HU_POLICY_DENY ||
+                        stream_pa == HU_POLICY_REQUIRE_APPROVAL) {
+                        result = hu_tool_result_fail("blocked by policy", 17);
+                    } else if (tool->vtable->execute_streaming && on_event) {
                         tool_stream_bridge_t bridge = {
                             .on_event = on_event,
                             .event_ctx = event_ctx,

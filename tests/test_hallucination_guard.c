@@ -101,15 +101,13 @@ static void guard_no_claims_returns_null(void) {
     HU_ASSERT(out == NULL);
 }
 
-static void guard_with_claims_rewrites(void) {
+static void guard_with_no_memory_skips_rewrite(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *out = NULL;
     size_t out_len = 0;
     const char *text = "I remember when you told me you love pizza. That's great!";
     HU_ASSERT(hu_hallucination_guard(&alloc, text, strlen(text), NULL, &out, &out_len) == HU_OK);
-    HU_ASSERT(out != NULL);
-    HU_ASSERT(out_len > 0);
-    alloc.free(alloc.ctx, out, out_len + 1);
+    HU_ASSERT(out == NULL);
 }
 
 static void guard_null_args_fail(void) {
@@ -137,6 +135,6 @@ void run_hallucination_guard_tests(void) {
     HU_RUN_TEST(rewrite_null_args_fail);
 
     HU_RUN_TEST(guard_no_claims_returns_null);
-    HU_RUN_TEST(guard_with_claims_rewrites);
+    HU_RUN_TEST(guard_with_no_memory_skips_rewrite);
     HU_RUN_TEST(guard_null_args_fail);
 }

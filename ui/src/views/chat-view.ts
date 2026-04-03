@@ -374,7 +374,6 @@ export class ScChatView extends GatewayAwareLitElement {
     const eventSession =
       (payload.session_key as string | undefined) ?? (payload.sessionKey as string | undefined);
     if (eventSession && eventSession !== this.sessionKey) return;
-    if (!eventSession && detail.event !== "error") return;
     this.chat.handleEvent(detail.event, payload, this.sessionKey);
     this._messageThread?.scrollToBottom();
   }

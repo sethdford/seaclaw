@@ -960,6 +960,95 @@ static void test_gl_tool_response_missing_name_fails(void) {
     hu_arena_destroy(arena);
 }
 
+/* ── OpenAI Realtime gateway mode tests ─────────────────────── */
+
+static void test_openai_rt_session_start_returns_mode(void) {
+    hu_allocator_t b = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(b);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *j = "{\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-test\"}],"
+                    "\"voice\":{\"mode\":\"openai_realtime\"}}";
+    HU_ASSERT_EQ(hu_config_parse_json(&cfg, j, strlen(j)), HU_OK);
+    hu_app_context_t app = {.config = &cfg, .alloc = &b};
+    hu_control_protocol_t proto = {0};
+    hu_ws_conn_t conn = {.id = 800, .active = true};
+    const char *req = "{\"params\":{\"mode\":\"openai_realtime\"}}";
+    hu_json_value_t *root = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&b, req, strlen(req), &root), HU_OK);
+    char *out = NULL;
+    size_t out_len = 0;
+    HU_ASSERT_EQ(cp_voice_session_start(&b, &app, &conn, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(strstr(out, "openai_realtime") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "ok") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "session_id") != NULL);
+    b.free(b.ctx, out, out_len);
+    hu_json_free(&b, root);
+    hu_voice_stream_on_conn_close(&conn);
+    hu_arena_destroy(arena);
+}
+
+static void test_openai_rt_full_lifecycle(void) {
+    hu_allocator_t b = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(b);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *j = "{\"providers\":[{\"name\":\"openai\",\"api_key\":\"sk-test\"}],"
+                    "\"voice\":{\"mode\":\"openai_realtime\"}}";
+    HU_ASSERT_EQ(hu_config_parse_json(&cfg, j, strlen(j)), HU_OK);
+    hu_app_context_t app = {.config = &cfg, .alloc = &b};
+    hu_control_protocol_t proto = {.alloc = &b, .app_ctx = &app};
+    hu_ws_conn_t conn = {.id = 801, .active = true};
+
+    /* Start */
+    const char *req = "{\"params\":{\"mode\":\"openai_realtime\"}}";
+    hu_json_value_t *root = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&b, req, strlen(req), &root), HU_OK);
+    char *out = NULL;
+    size_t out_len = 0;
+    HU_ASSERT_EQ(cp_voice_session_start(&b, &app, &conn, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    b.free(b.ctx, out, out_len);
+    hu_json_free(&b, root);
+
+    /* Binary audio */
+    int16_t pcm[160];
+    memset(pcm, 0, sizeof(pcm));
+    hu_voice_stream_on_binary(&proto, &conn, (const char *)pcm, sizeof(pcm));
+
+    /* Poll — OpenAI mock returns events too */
+    hu_voice_stream_poll_gemini_live();
+
+    /* Interrupt */
+    const char *ireq = "{\"params\":{}}";
+    HU_ASSERT_EQ(hu_json_parse(&b, ireq, strlen(ireq), &root), HU_OK);
+    out = NULL;
+    out_len = 0;
+    HU_ASSERT_EQ(cp_voice_session_interrupt(&b, &app, &conn, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    b.free(b.ctx, out, out_len);
+    hu_json_free(&b, root);
+
+    /* Stop */
+    const char *sreq = "{\"params\":{}}";
+    HU_ASSERT_EQ(hu_json_parse(&b, sreq, strlen(sreq), &root), HU_OK);
+    out = NULL;
+    out_len = 0;
+    HU_ASSERT_EQ(cp_voice_session_stop(&b, &app, &conn, &proto, root, &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    b.free(b.ctx, out, out_len);
+    hu_json_free(&b, root);
+
+    hu_arena_destroy(arena);
+}
+
 #endif /* HU_GATEWAY_POSIX */
 
 void run_gateway_voice_tests(void) {
@@ -989,5 +1078,7 @@ void run_gateway_voice_tests(void) {
     HU_RUN_TEST(test_gl_poll_reconnect_on_goaway);
     HU_RUN_TEST(test_gl_full_lifecycle);
     HU_RUN_TEST(test_gl_tool_response_missing_name_fails);
+    HU_RUN_TEST(test_openai_rt_session_start_returns_mode);
+    HU_RUN_TEST(test_openai_rt_full_lifecycle);
 #endif
 }

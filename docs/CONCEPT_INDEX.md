@@ -20,6 +20,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Config validation**         | `src/config_validate.c`, `src/config_schema.c`                                                                                 | `test_config_validation.c`                      |
 | **Config merge / migrate**    | `src/config_merge.c`, `src/config_migrate.c`                                                                                   | `test_config_migrate.c`                         |
 | **Config getters**            | `src/config_getters.c`, `src/config_serialize.c`                                                                               | `test_config_getters.c`                         |
+| **Config schema generation**  | `src/config_schema.c`, `include/human/config_schema.h`                                         | `test_config_schema.c`, `test_config_validation.c` |
 
 ## Agent
 
@@ -103,6 +104,8 @@ Use this to find the right files for a given task without searching the full cod
 | **Cron tools**          | `src/tools/cron_add.c`, `cron_remove.c`, `cron_list.c`, `cron_run.c` | `test_cron.c`                             |
 | **Computer use / LSP**  | `src/tools/computer_use.c`, `lsp.c`                                  | `test_computer_use.c`, `test_lsp.c`       |
 | **Tool result cache (TTL)** | `src/tools/cache_ttl.c`, `include/human/tools/cache_ttl.h`         | `test_sota_wiring.c`                      |
+| **Live Canvas / A2UI**  | `src/tools/canvas.c`, `include/human/tools/canvas.h`, `src/gateway/cp_canvas.c` | `test_canvas_tool.c`, `test_canvas_e2e.c` |
+| **Canvas UI**           | `ui/src/components/hu-canvas.ts`, `hu-canvas-sandbox.ts`, `hu-canvas-editor.ts`, `ui/src/canvas-harness.ts`, `ui/src/views/canvas-view.ts` | — |
 
 ## Memory
 
@@ -207,6 +210,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Voice / TTS / WebRTC**                               | `src/voice.c`, `src/voice_config.c`, `src/voice/realtime.c`, `src/voice/webrtc.c`, `src/tts/audio_pipeline.c`, `src/tts/emotion_map.c`                | `test_voice.c`, `test_webrtc.c`, `test_audio_pipeline.c`, `test_emotion_map.c`     |
 | **Paperclip**                                          | `src/paperclip/client.c`, `heartbeat.c`                                                                                         | `test_paperclip.c`                                                                 |
 | **Eval**                                               | `src/eval.c`, `eval_suites/*.json`, `scripts/adversarial-eval-harness.py`, `scripts/redteam-eval-fleet.sh`, `scripts/redteam-live.sh` | `test_eval.c`, `test_adversarial_detect.c`                                         |
+| **Daemon / worker pool**                         | `src/daemon.c`, `src/gateway/gateway.c`, `scripts/daemon-*`, `.claude/daemon-config.json` | `test_daemon.c` (if exists) |
 | **A2A**                                                | `src/a2a.c`                                                                                                                     | `test_a2a.c`                                                                       |
 
 ## Design system / tokens

@@ -65,13 +65,26 @@ hu_error_t hu_agent_commands_execute_plan_steps(hu_agent_t *agent, hu_plan_t *pl
         hu_tool_result_t result = hu_tool_result_fail("invalid arguments", 16);
         clock_t tool_start = clock();
         if (args) {
-            tool->vtable->execute(tool->ctx, agent->alloc, args, &result);
+            hu_policy_action_t plan_pa = hu_agent_internal_evaluate_tool_policy(
+                agent, plan->steps[i].tool_name, plan->steps[i].args_json);
+            if (plan_pa == HU_POLICY_DENY || plan_pa == HU_POLICY_REQUIRE_APPROVAL) {
+                result = hu_tool_result_fail("blocked by policy", 17);
+            } else {
+                tool->vtable->execute(tool->ctx, agent->alloc, args, &result);
+            }
             hu_json_free(agent->alloc, args);
         }
         uint64_t tool_duration_ms = hu_agent_internal_clock_diff_ms(tool_start, clock());
 
         bool ok = result.success;
         hu_planner_mark_step(plan, i, ok ? HU_PLAN_STEP_DONE : HU_PLAN_STEP_FAILED);
+
+        if (ok && result.media_path && result.media_path_len > 0 &&
+            agent->generated_media_count < 4) {
+            char *mp = hu_strndup(agent->alloc, result.media_path, result.media_path_len);
+            if (mp)
+                agent->generated_media[agent->generated_media_count++] = mp;
+        }
 
         {
             hu_observer_event_t ev = {.tag = HU_OBSERVER_EVENT_TOOL_CALL, .data = {{0}}};

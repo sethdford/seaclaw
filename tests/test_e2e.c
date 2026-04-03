@@ -200,6 +200,42 @@ static const hu_tool_vtable_t mock_tool_vtable = {
     .deinit = mock_tool_deinit,
 };
 
+static hu_error_t mock_stream_tool_execute(void *ctx, hu_allocator_t *alloc,
+                                           const hu_json_value_t *args, hu_tool_result_t *out) {
+    (void)ctx;
+    (void)alloc;
+    (void)args;
+    *out = hu_tool_result_ok("execute_fallback", 16);
+    return HU_OK;
+}
+
+static hu_error_t mock_stream_tool_execute_streaming(void *ctx, hu_allocator_t *alloc,
+                                                     const hu_json_value_t *args,
+                                                     void (*on_chunk)(void *cb_ctx, const char *data,
+                                                                      size_t len),
+                                                     void *cb_ctx, hu_tool_result_t *out) {
+    (void)ctx;
+    (void)alloc;
+    (void)args;
+    if (on_chunk) {
+        on_chunk(cb_ctx, "stream-chunk-a", 14);
+        on_chunk(cb_ctx, "stream-chunk-b", 14);
+    }
+    *out = hu_tool_result_ok("stream-final", 12);
+    return HU_OK;
+}
+
+static mock_tool_t mock_stream_shell_ctx = {.name = "shell"};
+
+static const hu_tool_vtable_t mock_stream_tool_vtable = {
+    .execute = mock_stream_tool_execute,
+    .name = mock_tool_name,
+    .description = mock_tool_desc,
+    .parameters_json = mock_tool_params,
+    .deinit = mock_tool_deinit,
+    .execute_streaming = mock_stream_tool_execute_streaming,
+};
+
 /* First stream_chat yields a tool call; second yields plain text so hu_agent_turn_stream_v2 can
  * finish (core OpenAI/Anthropic test mocks always return tools whenever tools are configured). */
 static int stream_v2_cycle_phase;
@@ -402,14 +438,24 @@ static hu_provider_t stream_v2_cycle_provider_create(hu_allocator_t *alloc,
 }
 
 typedef struct {
-    hu_agent_stream_event_type_t types[32];
+    hu_agent_stream_event_type_t types[64];
     size_t count;
+    char tool_result_concat[384];
 } stream_v2_event_collector_t;
 
 static void stream_v2_collect_events(const hu_agent_stream_event_t *event, void *ctx) {
     stream_v2_event_collector_t *c = (stream_v2_event_collector_t *)ctx;
-    if (c->count < 32)
+    if (c->count < 64)
         c->types[c->count++] = event->type;
+    if (event->type == HU_AGENT_STREAM_TOOL_RESULT && event->data && event->data_len > 0) {
+        size_t cur = strlen(c->tool_result_concat);
+        size_t room = sizeof(c->tool_result_concat) - 1 - cur;
+        if (room > 0) {
+            size_t n = event->data_len < room ? event->data_len : room;
+            memcpy(c->tool_result_concat + cur, event->data, n);
+            c->tool_result_concat[cur + n] = '\0';
+        }
+    }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -572,6 +618,48 @@ static void test_agent_turn_stream_v2_with_tools(void) {
     }
     HU_ASSERT_TRUE(text_after_tool_result);
     HU_ASSERT_TRUE(stream_v2_cycle_phase == 1);
+
+    alloc.free(alloc.ctx, response, response_len + 1);
+    hu_agent_deinit(&agent);
+#endif
+}
+
+/* Proves agent_stream.c tool_stream_bridge: execute_streaming chunks become TOOL_RESULT events. */
+static void test_agent_stream_tool_chunk_bridge_emits_chunk_and_final_results(void) {
+#if HU_IS_TEST
+    stream_v2_cycle_phase = 0;
+    hu_allocator_t alloc = hu_system_allocator();
+    stream_v2_cycle_provider_t pctx;
+    hu_provider_t prov = stream_v2_cycle_provider_create(&alloc, &pctx);
+
+    hu_tool_t tool = {.ctx = &mock_stream_shell_ctx, .vtable = &mock_stream_tool_vtable};
+
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    hu_error_t err =
+        hu_agent_from_config(&agent, &alloc, prov, &tool, 1, NULL, NULL, NULL, NULL, "gpt-4", 5,
+                             "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    stream_v2_event_collector_t coll;
+    memset(&coll, 0, sizeof(coll));
+    char *response = NULL;
+    size_t response_len = 0;
+    err = hu_agent_turn_stream_v2(&agent, "run streaming tool", 20, stream_v2_collect_events,
+                                  &coll, &response, &response_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(response);
+
+    HU_ASSERT_TRUE(strstr(coll.tool_result_concat, "stream-chunk-a") != NULL);
+    HU_ASSERT_TRUE(strstr(coll.tool_result_concat, "stream-chunk-b") != NULL);
+    HU_ASSERT_TRUE(strstr(coll.tool_result_concat, "stream-final") != NULL);
+
+    size_t tool_result_events = 0;
+    for (size_t i = 0; i < coll.count; i++) {
+        if (coll.types[i] == HU_AGENT_STREAM_TOOL_RESULT)
+            tool_result_events++;
+    }
+    HU_ASSERT_TRUE(tool_result_events >= 3);
 
     alloc.free(alloc.ctx, response, response_len + 1);
     hu_agent_deinit(&agent);
@@ -1563,6 +1651,7 @@ void run_e2e_tests(void) {
     HU_RUN_TEST(test_agent_turn_simple);
     HU_RUN_TEST(test_agent_turn_stream_v2_basic);
     HU_RUN_TEST(test_agent_turn_stream_v2_with_tools);
+    HU_RUN_TEST(test_agent_stream_tool_chunk_bridge_emits_chunk_and_final_results);
     HU_RUN_TEST(test_agent_turn_stream_v2_fallback_no_streaming);
     HU_RUN_TEST(test_agent_slash_help);
     HU_RUN_TEST(test_agent_slash_clear);

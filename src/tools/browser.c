@@ -1,6 +1,7 @@
 /* Browser tool: open URL, read page, CDP automation (click/type/scroll).
  * CDP uses a headless Chrome instance with --remote-debugging-port, communicating
  * over the project's WebSocket client. Requires Chrome/Chromium on PATH. */
+#include <ctype.h>
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
@@ -26,6 +27,26 @@
 #define HU_BROWSER_READ_MAX 8192
 #define HU_CDP_PORT         9222
 #define HU_CDP_MAX_REPLY    65536
+
+static size_t browser_js_escape(const char *src, char *dst, size_t cap) {
+    size_t w = 0;
+    for (size_t i = 0; src[i]; i++) {
+        char c = src[i];
+        if (c == '\'' || c == '\\' || c == '\n' || c == '\r' || c == '"') {
+            if (w + 1 < cap)
+                dst[w] = '\\';
+            w++;
+            if (c == '\n') c = 'n';
+            else if (c == '\r') c = 'r';
+        }
+        if (w < cap)
+            dst[w] = c;
+        w++;
+    }
+    if (w < cap) dst[w] = '\0';
+    else if (cap > 0) dst[cap - 1] = '\0';
+    return w;
+}
 
 typedef struct hu_browser_ctx {
     hu_security_policy_t *policy;
@@ -203,6 +224,7 @@ static hu_error_t browser_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
         int n = snprintf(msg, need + 1, "Opened %s in system browser", url);
         size_t len = (n > 0 && (size_t)n <= need) ? (size_t)n : need;
         msg[len] = '\0';
+        (void)bc;
         *out = hu_tool_result_ok_owned(msg, len);
         return HU_OK;
 #else
@@ -226,6 +248,11 @@ static hu_error_t browser_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
             if (!run.success) {
                 *out = hu_tool_result_fail("Browser open failed", 18);
                 return HU_OK;
+            }
+            if (bc) {
+                if (bc->current_url)
+                    alloc->free(alloc->ctx, bc->current_url, strlen(bc->current_url) + 1);
+                bc->current_url = hu_strndup(alloc, url, strlen(url));
             }
             char *msg = hu_strndup(alloc, "Opened in system browser", 24);
             if (!msg) {
@@ -319,13 +346,17 @@ static hu_error_t browser_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
                 *out = hu_tool_result_fail("Chrome/Chromium not available for CDP automation", 48);
                 return HU_OK;
             }
+            char esc_sel[512];
+            browser_js_escape(selector, esc_sel, sizeof(esc_sel));
             char js[1024];
             snprintf(js, sizeof(js),
                      "var el = document.querySelector('%s'); "
                      "if (el) { el.click(); 'clicked' } else { 'element not found' }",
-                     selector);
-            char params[1200];
-            snprintf(params, sizeof(params), "{\"expression\":\"%s\",\"returnByValue\":true}", js);
+                     esc_sel);
+            char esc_js[1200];
+            browser_js_escape(js, esc_js, sizeof(esc_js));
+            char params[1500];
+            snprintf(params, sizeof(params), "{\"expression\":\"%s\",\"returnByValue\":true}", esc_js);
             char *result = NULL;
             size_t rlen = 0;
             err = cdp_send_command(bc, alloc, "Runtime.evaluate", params, &result, &rlen);
@@ -371,16 +402,22 @@ static hu_error_t browser_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
                 return HU_OK;
             }
             if (selector && selector[0]) {
+                char esc_sel[512];
+                browser_js_escape(selector, esc_sel, sizeof(esc_sel));
+                char esc_text[1024];
+                browser_js_escape(text, esc_text, sizeof(esc_text));
                 char js[2048];
                 snprintf(js, sizeof(js),
                          "var el = document.querySelector('%s'); "
                          "if (el) { el.focus(); el.value = '%s'; "
                          "el.dispatchEvent(new Event('input',{bubbles:true})); 'typed' } "
                          "else { 'element not found' }",
-                         selector, text);
-                char params[2200];
+                         esc_sel, esc_text);
+                char esc_js[2200];
+                browser_js_escape(js, esc_js, sizeof(esc_js));
+                char params[2500];
                 snprintf(params, sizeof(params), "{\"expression\":\"%s\",\"returnByValue\":true}",
-                         js);
+                         esc_js);
                 char *result = NULL;
                 size_t rlen = 0;
                 err = cdp_send_command(bc, alloc, "Runtime.evaluate", params, &result, &rlen);
@@ -399,14 +436,27 @@ static hu_error_t browser_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
             }
             /* No selector: dispatch key events for each character */
             for (const char *p = text; *p; p++) {
+                char esc_char[16];
+                if (*p == '"')
+                    snprintf(esc_char, sizeof(esc_char), "\\\"");
+                else if (*p == '\\')
+                    snprintf(esc_char, sizeof(esc_char), "\\\\");
+                else if (*p == '\n')
+                    snprintf(esc_char, sizeof(esc_char), "\\n");
+                else if (*p == '\r')
+                    snprintf(esc_char, sizeof(esc_char), "\\r");
+                else if (*p == '\t')
+                    snprintf(esc_char, sizeof(esc_char), "\\t");
+                else
+                    snprintf(esc_char, sizeof(esc_char), "%c", *p);
                 char params[256];
-                snprintf(params, sizeof(params), "{\"type\":\"keyDown\",\"text\":\"%c\"}", *p);
+                snprintf(params, sizeof(params), "{\"type\":\"keyDown\",\"text\":\"%s\"}", esc_char);
                 char *result = NULL;
                 size_t rlen = 0;
                 cdp_send_command(bc, alloc, "Input.dispatchKeyEvent", params, &result, &rlen);
                 if (result)
                     alloc->free(alloc->ctx, result, rlen + 1);
-                snprintf(params, sizeof(params), "{\"type\":\"keyUp\",\"text\":\"%c\"}", *p);
+                snprintf(params, sizeof(params), "{\"type\":\"keyUp\",\"text\":\"%s\"}", esc_char);
                 cdp_send_command(bc, alloc, "Input.dispatchKeyEvent", params, &result, &rlen);
                 if (result)
                     alloc->free(alloc->ctx, result, rlen + 1);
@@ -445,8 +495,10 @@ static hu_error_t browser_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
             }
             char js[256];
             snprintf(js, sizeof(js), "window.scrollBy(%d,%d); 'scrolled'", (int)dx, (int)dy);
+            char esc_js[300];
+            browser_js_escape(js, esc_js, sizeof(esc_js));
             char params[400];
-            snprintf(params, sizeof(params), "{\"expression\":\"%s\",\"returnByValue\":true}", js);
+            snprintf(params, sizeof(params), "{\"expression\":\"%s\",\"returnByValue\":true}", esc_js);
             char *result = NULL;
             size_t rlen = 0;
             err = cdp_send_command(bc, alloc, "Runtime.evaluate", params, &result, &rlen);

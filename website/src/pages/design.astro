@@ -60,6 +60,44 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         --color-accent-glow: var(--hu-accent-subtle);
         --color-border: var(--hu-border-subtle);
       }
+
+      .design-section-nav {
+        position: sticky;
+        top: 4rem;
+        z-index: 10;
+        padding: var(--hu-space-sm) var(--hu-space-md);
+        display: flex;
+        gap: var(--hu-space-xs);
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        background: color-mix(in srgb, var(--hu-bg) 85%, transparent);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--color-border);
+      }
+      .design-section-nav::-webkit-scrollbar {
+        display: none;
+      }
+      .design-section-nav a {
+        white-space: nowrap;
+        padding: var(--hu-space-xs) var(--hu-space-sm);
+        border-radius: var(--hu-radius-md);
+        font-size: var(--hu-text-xs);
+        font-weight: 500;
+        color: var(--color-text-tertiary);
+        text-decoration: none;
+        transition:
+          color var(--hu-duration-fast) var(--hu-ease-out),
+          background var(--hu-duration-fast) var(--hu-ease-out);
+      }
+      .design-section-nav a:hover {
+        color: var(--color-text);
+        background: var(--hu-hover-overlay);
+      }
+      .design-section-nav a.active {
+        color: var(--hu-accent);
+        background: color-mix(in srgb, var(--hu-accent) 10%, transparent);
+      }
     </style>
   </head>
   <body
@@ -90,8 +128,26 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         </div>
       </section>
 
+      {/* ═══ Section Nav ═══ */}
+      <nav class="design-section-nav" aria-label="Design system sections">
+        <a href="#principles">Principles</a>
+        <a href="#color">Color</a>
+        <a href="#typography">Type</a>
+        <a href="#spacing">Spacing</a>
+        <a href="#elevation">Elevation</a>
+        <a href="#shape">Shape</a>
+        <a href="#iconography">Icons</a>
+        <a href="#glass">Glass</a>
+        <a href="#surfaces">Surfaces</a>
+        <a href="#motion">Motion</a>
+        <a href="#dataviz">Data Viz</a>
+        <a href="#states">States</a>
+        <a href="#a11y">A11y</a>
+        <a href="#components">Components</a>
+      </nav>
+
       {/* ═══ 2. PRINCIPLES ═══ */}
-      <section class="py-24 md:py-32 px-6 cv-defer">
+      <section id="principles" class="py-24 md:py-32 px-6 cv-defer">
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16 text-center"
@@ -211,7 +267,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </section>
 
       {/* ═══ 3. COLOR SYSTEM ═══ */}
-      <section class="py-24 md:py-32 px-6 cv-defer">
+      <section id="color" class="py-24 md:py-32 px-6 cv-defer">
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16 text-center"
@@ -393,7 +449,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </section>
 
       {/* ═══ 4. TYPOGRAPHY ═══ */}
-      <section class="py-24 md:py-32 px-6 cv-defer">
+      <section id="typography" class="py-24 md:py-32 px-6 cv-defer">
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16 text-center"
@@ -568,7 +624,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </section>
 
       {/* ═══ 5. GLASS & SURFACES ═══ */}
-      <section class="py-24 md:py-32 px-6 cv-defer">
+      <section id="glass" class="py-24 md:py-32 px-6 cv-defer">
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16 text-center"
@@ -645,7 +701,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </section>
 
       {/* ═══ 6. MOTION ═══ */}
-      <section class="py-24 md:py-32 px-6 cv-defer">
+      <section id="motion" class="py-24 md:py-32 px-6 cv-defer">
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16 text-center"
@@ -779,7 +835,769 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         </div>
       </section>
 
-      {/* ═══ 7. EXPLORE FURTHER ═══ */}
+      {/* ═══ 7. SPACING ═══ */}
+      <section id="spacing" class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Spacing
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            An 8pt-based rhythm scale from <code
+              class="px-2 py-0.5 rounded"
+              style="background: var(--hu-surface-container-high);"
+              >--hu-space-2xs</code
+            > (2px) to <code
+              class="px-2 py-0.5 rounded"
+              style="background: var(--hu-surface-container-high);"
+              >--hu-space-6xl</code
+            > (128px).
+          </p>
+          <div class="space-y-3">
+            {
+              [
+                { name: "2xs", value: "0.125rem", px: "2px" },
+                { name: "xs", value: "0.25rem", px: "4px" },
+                { name: "sm", value: "0.5rem", px: "8px" },
+                { name: "md", value: "1rem", px: "16px" },
+                { name: "lg", value: "1.5rem", px: "24px" },
+                { name: "xl", value: "2rem", px: "32px" },
+                { name: "2xl", value: "3rem", px: "48px" },
+                { name: "3xl", value: "4rem", px: "64px" },
+                { name: "4xl", value: "5rem", px: "80px" },
+                { name: "5xl", value: "6rem", px: "96px" },
+                { name: "6xl", value: "8rem", px: "128px" },
+              ].map((s) => (
+                <div class="flex items-center gap-4">
+                  <code
+                    class="text-xs w-24 shrink-0"
+                    style="color: var(--color-text-tertiary);"
+                  >
+                    --hu-space-{s.name}
+                  </code>
+                  <div
+                    class="h-6 rounded"
+                    style={`width: var(--hu-space-${s.name}); min-width: 2px; background: color-mix(in srgb, var(--hu-accent) 40%, transparent);`}
+                  />
+                  <span
+                    class="text-xs shrink-0"
+                    style="color: var(--hu-text-muted);"
+                  >
+                    {s.px}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 8. ELEVATION ═══ */}
+      <section id="elevation" class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Elevation & Shadow
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            M3-inspired elevation ladder from level 0 (flat) to level 5
+            (tooltip). Semantic shadows adapt to light/dark theme.
+          </p>
+          <div
+            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 mb-16"
+          >
+            {
+              [0, 1, 2, 3, 4, 5].map((level) => (
+                <div
+                  class="rounded-xl p-6 flex flex-col items-center justify-center gap-3 min-h-[120px]"
+                  style={`background: var(--hu-surface-container); box-shadow: var(--hu-elevation-${level});`}
+                >
+                  <span
+                    class="text-2xl font-black"
+                    style="color: var(--color-text);"
+                  >
+                    {level}
+                  </span>
+                  <span class="text-xs" style="color: var(--hu-text-muted);">
+                    Level {level}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+          <h3
+            class="text-lg font-semibold mb-6"
+            style="color: var(--color-text);"
+          >
+            Semantic Roles
+          </h3>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+            {
+              [
+                { role: "Surface", level: 0 },
+                { role: "Card", level: 1 },
+                { role: "Dropdown", level: 2 },
+                { role: "Modal", level: 3 },
+                { role: "Toast", level: 4 },
+                { role: "Tooltip", level: 5 },
+              ].map((item) => (
+                <div class="text-center">
+                  <span
+                    class="text-sm font-medium block mb-1"
+                    style="color: var(--color-text);"
+                  >
+                    {item.role}
+                  </span>
+                  <span class="text-xs" style="color: var(--hu-text-muted);">
+                    → Level {item.level}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 9. SHAPE ═══ */}
+      <section id="shape" class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Shape & Radius
+          </h2>
+          <div class="flex flex-wrap gap-6 items-end">
+            {
+              [
+                { name: "none", value: "0" },
+                { name: "sm", value: "4px" },
+                { name: "md", value: "8px" },
+                { name: "lg", value: "12px" },
+                { name: "xl", value: "16px" },
+                { name: "2xl", value: "24px" },
+                { name: "full", value: "9999px" },
+              ].map((r) => (
+                <div class="flex flex-col items-center gap-3">
+                  <div
+                    class="w-20 h-20"
+                    style={`border-radius: var(--hu-radius-${r.name}); background: color-mix(in srgb, var(--hu-accent) 20%, transparent); border: 2px solid var(--hu-accent);`}
+                  />
+                  <code
+                    class="text-xs"
+                    style="color: var(--color-text-tertiary);"
+                  >
+                    {r.name}
+                  </code>
+                  <span class="text-xs" style="color: var(--hu-text-muted);">
+                    {r.value}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 10. ICONOGRAPHY ═══ */}
+      <section id="iconography" class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Iconography
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            <strong style="color: var(--color-text);">Phosphor Regular</strong> —
+            consistent stroke width, optical alignment, <code
+              class="px-1 py-0.5 rounded"
+              style="background: var(--hu-surface-container-high);"
+              >currentColor</code
+            > inheritance.
+          </p>
+          <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
+            {
+              [
+                "M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z",
+                "M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200Z",
+                "M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32Zm0,176H48V48H208V208Z",
+                "M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z",
+                "M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Z",
+                "M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z",
+                "M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z",
+                "M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm-8-80V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,172Z",
+              ].map((path) => (
+                <div
+                  class="aspect-square rounded-lg flex items-center justify-center"
+                  style="background: var(--hu-surface-container); border: 1px solid var(--color-border);"
+                >
+                  <svg
+                    class="w-6 h-6"
+                    viewBox="0 0 256 256"
+                    fill="currentColor"
+                    style="color: var(--color-text);"
+                    aria-hidden="true"
+                  >
+                    <path d={path} />
+                  </svg>
+                </div>
+              ))
+            }
+          </div>
+          <p class="text-sm mt-6" style="color: var(--color-text-secondary);">
+            Full library: <a
+              href="https://phosphoricons.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="color: var(--hu-accent);">phosphoricons.com</a
+            >
+          </p>
+        </div>
+      </section>
+
+      {/* ═══ 11. TONAL SURFACES ═══ */}
+      <section id="surfaces" class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Tonal Surfaces
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            M3-inspired surface hierarchy tinted with primary accent for branded
+            depth. Use tonal surfaces for brand identity; neutral surfaces for
+            content-first areas.
+          </p>
+          <div class="space-y-6">
+            {
+              [
+                { name: "bg", token: "--hu-bg", desc: "Page background" },
+                {
+                  name: "bg-surface",
+                  token: "--hu-bg-surface",
+                  desc: "Neutral card/panel",
+                },
+                {
+                  name: "surface-container",
+                  token: "--hu-surface-container",
+                  desc: "Default tonal (4% tint)",
+                },
+                {
+                  name: "surface-container-high",
+                  token: "--hu-surface-container-high",
+                  desc: "Elevated interactive (6% tint)",
+                },
+                {
+                  name: "surface-container-highest",
+                  token: "--hu-surface-container-highest",
+                  desc: "Highest emphasis (8% tint)",
+                },
+              ].map((surface) => (
+                <div class="flex items-center gap-4">
+                  <div
+                    class="w-full h-16 rounded-xl flex items-center px-6 justify-between"
+                    style={`background: var(${surface.token}); border: 1px solid var(--color-border);`}
+                  >
+                    <span
+                      class="text-sm font-medium"
+                      style="color: var(--color-text);"
+                    >
+                      {surface.desc}
+                    </span>
+                    <code
+                      class="text-xs hidden sm:block"
+                      style="color: var(--color-text-tertiary);"
+                    >
+                      {surface.token}
+                    </code>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+
+          <h3
+            class="text-lg font-semibold mt-16 mb-8"
+            style="color: var(--color-text);"
+          >
+            Layout Archetypes
+          </h3>
+          <p class="text-sm mb-8" style="color: var(--color-text-secondary);">
+            Every view in the design system conforms to one of six canonical
+            archetypes.
+          </p>
+          <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {
+              [
+                {
+                  name: "Dashboard",
+                  desc: "Hero → scrollable card grid",
+                  icon: "M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200Z",
+                },
+                {
+                  name: "List-Detail",
+                  desc: "Dual-pane on expanded",
+                  icon: "M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32Zm0,176H48V48H208V208ZM184,96a8,8,0,0,1-8,8H80a8,8,0,0,1,0-16h96A8,8,0,0,1,184,96Zm0,32a8,8,0,0,1-8,8H80a8,8,0,0,1,0-16h96A8,8,0,0,1,184,128Z",
+                },
+                {
+                  name: "Conversational",
+                  desc: "Content first, controls bottom",
+                  icon: "M216,48H40A16,16,0,0,0,24,64V224a15.85,15.85,0,0,0,9.24,14.5A16.13,16.13,0,0,0,40,240a15.89,15.89,0,0,0,10.25-3.78l.12-.11L82.5,208H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48ZM40,224h0ZM216,192H82.5a16,16,0,0,0-10.3,3.75l-.12.11L40,224V64H216Z",
+                },
+                {
+                  name: "Settings",
+                  desc: "Single column, max 640px",
+                  icon: "M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z",
+                },
+                {
+                  name: "Marketplace",
+                  desc: "Sticky search → card grid",
+                  icon: "M229.66,218.34l-50.07-50.07a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.31ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z",
+                },
+                {
+                  name: "Log/Terminal",
+                  desc: "Controls top → mono output",
+                  icon: "M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z",
+                },
+              ].map((arch) => (
+                <div
+                  class="glass rounded-xl p-6"
+                  style="border: 1px solid var(--color-border);"
+                >
+                  <div class="flex items-center gap-3 mb-3">
+                    <svg
+                      class="w-5 h-5 shrink-0"
+                      viewBox="0 0 256 256"
+                      fill="currentColor"
+                      style="color: var(--hu-accent);"
+                      aria-hidden="true"
+                    >
+                      <path d={arch.icon} />
+                    </svg>
+                    <span
+                      class="text-sm font-semibold"
+                      style="color: var(--color-text);"
+                    >
+                      {arch.name}
+                    </span>
+                  </div>
+                  <p
+                    class="text-xs"
+                    style="color: var(--color-text-secondary);"
+                  >
+                    {arch.desc}
+                  </p>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 12. DATA VISUALIZATION ═══ */}
+      <section id="dataviz" class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Data Visualization
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            Chart tokens for categorical, sequential, diverging, and status
+            palettes. Maximize data-ink ratio; prefer direct labels over
+            legends.
+          </p>
+          <div class="space-y-12">
+            <div>
+              <h3
+                class="text-base font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
+                Categorical (16 colors)
+              </h3>
+              <div class="flex flex-wrap gap-2">
+                {
+                  Array.from({ length: 16 }, (_, i) => i + 1).map((n) => (
+                    <div
+                      class="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-mono"
+                      style={`background: var(--hu-chart-categorical-${n}); color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.3);`}
+                    >
+                      {n}
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+            <div>
+              <h3
+                class="text-base font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
+                Sequential (Human Green)
+              </h3>
+              <div class="flex rounded-lg overflow-hidden">
+                {
+                  [100, 200, 300, 400, 500, 600, 700, 800].map((step) => (
+                    <div
+                      class="flex-1 h-12 flex items-end justify-center pb-1"
+                      style={`background: var(--hu-chart-sequential-${step});`}
+                    >
+                      <span
+                        class={`text-xs font-mono ${step < 400 ? "text-black/60" : "text-white/80"}`}
+                      >
+                        {step}
+                      </span>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+            <div>
+              <h3
+                class="text-base font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
+                Diverging
+              </h3>
+              <div class="flex rounded-lg overflow-hidden">
+                {
+                  ["positive", "neutral", "negative"].map((key) => (
+                    <div
+                      class="flex-1 h-12 flex items-center justify-center"
+                      style={`background: var(--hu-chart-diverging-${key});`}
+                    >
+                      <span class="text-xs font-medium text-white/90">
+                        {key}
+                      </span>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+            <div>
+              <h3
+                class="text-base font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
+                Status
+              </h3>
+              <div class="flex flex-wrap gap-3">
+                {
+                  ["success", "warning", "error", "info", "muted"].map(
+                    (status) => (
+                      <div class="flex items-center gap-2">
+                        <div
+                          class="w-4 h-4 rounded-full"
+                          style={`background: var(--hu-chart-status-${status});`}
+                        />
+                        <span
+                          class="text-sm capitalize"
+                          style="color: var(--color-text);"
+                        >
+                          {status}
+                        </span>
+                      </div>
+                    ),
+                  )
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 13. STATE & INTERACTION ═══ */}
+      <section id="states" class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            State & Interaction
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            Neutral overlays for interactive states (M3). White veil on dark
+            theme, black veil on light. Brand color appears in focus rings and
+            primary accents, not hover washes.
+          </p>
+          <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {
+              [
+                { state: "Hover", token: "--hu-hover-overlay" },
+                { state: "Pressed", token: "--hu-pressed-overlay" },
+                { state: "Focus", token: "--hu-focus-overlay" },
+                { state: "Disabled", token: "--hu-disabled-overlay" },
+              ].map((item) => (
+                <div class="text-center">
+                  <div
+                    class="relative w-full h-24 rounded-xl mb-3 flex items-center justify-center"
+                    style="background: var(--hu-surface-container); border: 1px solid var(--color-border);"
+                  >
+                    <div
+                      class="absolute inset-0 rounded-xl"
+                      style={`background: var(${item.token});`}
+                    />
+                    <span
+                      class="relative text-sm font-medium"
+                      style="color: var(--color-text);"
+                    >
+                      {item.state}
+                    </span>
+                  </div>
+                  <code
+                    class="text-xs"
+                    style="color: var(--color-text-tertiary);"
+                  >
+                    {item.token}
+                  </code>
+                </div>
+              ))
+            }
+          </div>
+
+          <h3
+            class="text-lg font-semibold mt-16 mb-8"
+            style="color: var(--color-text);"
+          >
+            Focus Ring
+          </h3>
+          <div class="flex flex-wrap gap-6">
+            <button
+              type="button"
+              class="px-6 py-3 rounded-lg text-sm font-medium"
+              style="background: var(--hu-accent); color: var(--hu-on-accent);"
+            >
+              Tab to focus me
+            </button>
+            <input
+              type="text"
+              placeholder="Or focus this input"
+              class="px-4 py-3 rounded-lg text-sm"
+              style="background: var(--hu-surface-container); border: 1px solid var(--color-border); color: var(--color-text);"
+            />
+          </div>
+          <p class="text-sm mt-4" style="color: var(--color-text-secondary);">
+            Focus rings: 2px solid accent with 2px offset. Visible on keyboard
+            navigation, hidden on mouse click.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══ 14. ACCESSIBILITY ═══ */}
+      <section id="a11y" class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Accessibility
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            WCAG 2.2 AA minimum. Every component, every surface, every
+            interaction.
+          </p>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
+              <h3
+                class="text-base font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
+                Contrast
+              </h3>
+              <ul
+                class="space-y-2 text-sm"
+                style="color: var(--color-text-secondary);"
+              >
+                <li>
+                  Text on background: <strong style="color: var(--color-text);"
+                    >4.5:1</strong
+                  > minimum (AA)
+                </li>
+                <li>
+                  UI components: <strong style="color: var(--color-text);"
+                    >3:1</strong
+                  > minimum
+                </li>
+                <li>
+                  Large text (≥24px / 18.66px bold): <strong
+                    style="color: var(--color-text);">3:1</strong
+                  >
+                </li>
+                <li>
+                  Focus indicators: <strong style="color: var(--color-text);"
+                    >3:1</strong
+                  > against adjacent colors
+                </li>
+              </ul>
+            </div>
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
+              <h3
+                class="text-base font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
+                Focus & Keyboard
+              </h3>
+              <ul
+                class="space-y-2 text-sm"
+                style="color: var(--color-text-secondary);"
+              >
+                <li>All interactive elements focusable via Tab</li>
+                <li>Visible focus ring: 2px solid, 2px offset (WCAG 2.4.11)</li>
+                <li>Focus not obscured by sticky headers (WCAG 2.4.12)</li>
+                <li>Skip links for content, modals trap focus</li>
+              </ul>
+            </div>
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
+              <h3
+                class="text-base font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
+                Touch Targets
+              </h3>
+              <ul
+                class="space-y-2 text-sm"
+                style="color: var(--color-text-secondary);"
+              >
+                <li>
+                  Minimum target: <strong style="color: var(--color-text);"
+                    >44 × 44px</strong
+                  > (WCAG 2.5.8)
+                </li>
+                <li>Spacing between targets: ≥8px</li>
+                <li>
+                  Enhanced on <code
+                    class="px-1 py-0.5 rounded text-xs"
+                    style="background: var(--hu-surface-container-high);"
+                    >pointer: coarse</code
+                  > devices
+                </li>
+              </ul>
+            </div>
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
+              <h3
+                class="text-base font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
+                Motion Sensitivity
+              </h3>
+              <ul
+                class="space-y-2 text-sm"
+                style="color: var(--color-text-secondary);"
+              >
+                <li>
+                  <code
+                    class="px-1 py-0.5 rounded text-xs"
+                    style="background: var(--hu-surface-container-high);"
+                    >prefers-reduced-motion: reduce</code
+                  > disables all animation
+                </li>
+                <li>No auto-playing video or parallax without opt-in</li>
+                <li>WebGL disabled when reduced motion preferred</li>
+                <li>All transitions: opacity crossfade fallback</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 15. COMPONENTS ═══ */}
+      <section id="components" class="py-24 md:py-32 px-6 cv-defer">
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="font-family: var(--hu-font); letter-spacing: -0.03em;"
+          >
+            Components
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            LitElement web components from the <code
+              class="px-1 py-0.5 rounded"
+              style="background: var(--hu-surface-container-high);">ui/</code
+            > workspace. All use <code
+              class="px-1 py-0.5 rounded"
+              style="background: var(--hu-surface-container-high);">--hu-*</code
+            > tokens exclusively.
+          </p>
+          <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {
+              [
+                {
+                  name: "hu-card",
+                  desc: "Glass, solid, hoverable, tilt. Surfaces: default, high, highest.",
+                },
+                {
+                  name: "hu-input",
+                  desc: "Tonal variant for branded surface. Validation states built-in.",
+                },
+                {
+                  name: "hu-badge",
+                  desc: "Status indicators. Info variant uses accent-tertiary.",
+                },
+                {
+                  name: "hu-code-block",
+                  desc: "Syntax highlighting with copy button. Respects theme.",
+                },
+                {
+                  name: "hu-approval-gate",
+                  desc: "Permission approval UI for agent actions.",
+                },
+                {
+                  name: "hu-workflow-timeline",
+                  desc: "Vertical timeline for agent workflow steps.",
+                },
+              ].map((comp) => (
+                <div
+                  class="glass rounded-xl p-6"
+                  style="border: 1px solid var(--color-border);"
+                >
+                  <code
+                    class="text-sm font-mono font-semibold block mb-2"
+                    style="color: var(--hu-accent);"
+                  >
+                    &lt;{comp.name}&gt;
+                  </code>
+                  <p
+                    class="text-xs"
+                    style="color: var(--color-text-secondary);"
+                  >
+                    {comp.desc}
+                  </p>
+                </div>
+              ))
+            }
+          </div>
+          <p class="text-sm mt-8" style="color: var(--color-text-secondary);">
+            Full component docs:
+            <a
+              href={`${base}design-system/tokens/`}
+              style="color: var(--hu-accent);"
+            >
+              Starlight documentation</a
+            >
+          </p>
+        </div>
+      </section>
+
+      {/* ═══ 16. EXPLORE FURTHER ═══ */}
       <section class="py-24 md:py-32 px-6 cv-defer">
         <div class="max-w-5xl mx-auto text-center">
           <h2
@@ -988,6 +1806,44 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       };
       window.addEventListener("scroll", onScroll, { passive: true });
       onScroll();
+
+      // Section nav active state
+      const sectionNav = document.querySelector(".design-section-nav");
+      if (sectionNav) {
+        const navLinks = Array.from(sectionNav.querySelectorAll("a"));
+        const sectionIds = navLinks.map((a) =>
+          a.getAttribute("href")!.slice(1),
+        );
+        const sections = sectionIds
+          .map((id) => document.getElementById(id))
+          .filter(Boolean) as HTMLElement[];
+
+        const sectionObs = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                const id = entry.target.id;
+                navLinks.forEach((a) => {
+                  a.classList.toggle(
+                    "active",
+                    a.getAttribute("href") === `#${id}`,
+                  );
+                });
+                const activeLink = sectionNav.querySelector(`a[href="#${id}"]`);
+                if (activeLink) {
+                  activeLink.scrollIntoView({
+                    block: "nearest",
+                    inline: "center",
+                    behavior: "smooth",
+                  });
+                }
+              }
+            });
+          },
+          { threshold: 0.15, rootMargin: "-80px 0px -60% 0px" },
+        );
+        sections.forEach((s) => sectionObs.observe(s));
+      }
     </script>
   </body>
 </html>

@@ -156,7 +156,8 @@ hu_tool_cacheability_t hu_tool_cache_classify(const char *tool_name, size_t name
         nm_prefix_ci(tool_name, name_len, "write_") || nm_prefix_ci(tool_name, name_len, "run_") ||
         nm_prefix_ci(tool_name, name_len, "create_") ||
         nm_prefix_ci(tool_name, name_len, "update_") || nm_has(tool_name, name_len, "exec") ||
-        nm_has(tool_name, name_len, "shell") || nm_has(tool_name, name_len, "spawn"))
+        nm_has(tool_name, name_len, "shell") || nm_has(tool_name, name_len, "spawn") ||
+        nm_prefix_ci(tool_name, name_len, "media_"))
         return HU_TOOL_CACHE_NEVER;
 
     if (nm_has(tool_name, name_len, "weather") || nm_has(tool_name, name_len, "time") ||

@@ -113,8 +113,12 @@ hu_error_t hu_hallucination_verify_claims(hu_hallucination_result_t *result,
                                           hu_allocator_t *alloc) {
     if (!result)
         return HU_ERR_INVALID_ARGUMENT;
-    if (!memory || !memory->vtable || !memory->vtable->recall)
+    if (!memory || !memory->vtable || !memory->vtable->recall) {
+        /* Without a usable memory backend we cannot verify claims, so clear the
+         * rewrite flag to avoid blindly hedging every "I remember" statement. */
+        result->needs_rewrite = false;
         return HU_OK;
+    }
 
     result->verified_count = 0;
     result->unverified_count = 0;

@@ -2185,7 +2185,9 @@ static void test_persona_load_json_voice_block_parses(void) {
                        "\"model\":\"sonic-3-2026-01-12\","
                        "\"default_emotion\":\"content\","
                        "\"default_speed\":0.95,"
-                       "\"nonverbals\":true"
+                       "\"nonverbals\":true,"
+                       "\"strip_ssml\":true,"
+                       "\"discourse_markers\":true"
                        "}}";
     hu_persona_t p = {0};
     hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
@@ -2196,6 +2198,8 @@ static void test_persona_load_json_voice_block_parses(void) {
     HU_ASSERT_STR_EQ(p.voice.default_emotion, "content");
     HU_ASSERT_FLOAT_EQ(p.voice.default_speed, 0.95f, 0.001f);
     HU_ASSERT_TRUE(p.voice.nonverbals);
+    HU_ASSERT_TRUE(p.voice.strip_ssml);
+    HU_ASSERT_TRUE(p.voice.discourse_markers);
     hu_persona_deinit(&alloc, &p);
 }
 
@@ -2212,6 +2216,8 @@ static void test_persona_load_json_voice_defaults_when_absent(void) {
     HU_ASSERT_STR_EQ(p.voice.default_emotion, "content");
     HU_ASSERT_FLOAT_EQ(p.voice.default_speed, 0.95f, 0.001f);
     HU_ASSERT_TRUE(p.voice.nonverbals);
+    HU_ASSERT_FALSE(p.voice.strip_ssml);
+    HU_ASSERT_FALSE(p.voice.discourse_markers);
     HU_ASSERT_FALSE(p.voice_messages.enabled);
     HU_ASSERT_STR_EQ(p.voice_messages.frequency, "rare");
     HU_ASSERT_EQ(p.voice_messages.max_duration_sec, 30u);

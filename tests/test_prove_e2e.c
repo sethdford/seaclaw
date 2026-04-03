@@ -920,7 +920,7 @@ void run_prove_e2e_tests(void) {
 
     fprintf(stderr, "=== ALL INTELLIGENCE + STREAMING LOOPS PROVEN ===\n\n");
 
-    HU_TEST_SUITE("E2E Proof: Full Pipeline");
+    /* Full pipeline proofs (same suite so --suite=prove_e2e runs them all) */
 #ifdef HU_GATEWAY_POSIX
     HU_RUN_TEST(test_prove_gateway_chat_send_dispatches_and_queues_response);
 #endif

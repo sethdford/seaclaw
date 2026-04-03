@@ -91,6 +91,12 @@ typedef struct hu_feed_processor {
     size_t gmail_refresh_token_len;
     const char *twitter_bearer_token;
     size_t twitter_bearer_token_len;
+    const char *facebook_page_access_token;
+    size_t facebook_page_access_token_len;
+    const char *instagram_access_token;
+    size_t instagram_access_token_len;
+    const char *google_photos_access_token;
+    size_t google_photos_access_token_len;
 } hu_feed_processor_t;
 
 typedef struct hu_feed_item_stored {

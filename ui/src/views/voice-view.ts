@@ -594,7 +594,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     if (detail.event === "voice.tool_call") {
       const name = (detail.payload?.name as string) ?? "unknown";
-      const callId = (detail.payload?.callId as string) ?? "";
+      const callId = (detail.payload?.call_id as string) ?? "";
       const args = (detail.payload?.args as string) ?? "{}";
       this.dispatchEvent(
         new CustomEvent("voice-tool-call", {
@@ -651,6 +651,21 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     if (detail.event === "voice.reconnected") {
       ScToast.show({ message: "Voice session reconnected", variant: "info" });
+      return;
+    }
+
+    if (detail.event === "voice.setup_complete") {
+      this.#clearProcessingTimeout();
+      ScToast.show({ message: "Voice session ready", variant: "info" });
+      return;
+    }
+
+    if (detail.event === "voice.session_resumption") {
+      return;
+    }
+
+    if (detail.event === "voice.goaway") {
+      ScToast.show({ message: "Voice server reconnecting…", variant: "info" });
       return;
     }
 
@@ -765,6 +780,10 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
         if (isProviderDuplex) {
           /* Provider duplex (Gemini Live / OpenAI RT): stream raw PCM16 */
+          const inputRate =
+            (result?.input_sample_rate as number) ??
+            (result?.sample_rate as number) ??
+            (isGeminiLive ? 16000 : 24000);
           await this._recorder.startRawPcmStreaming(
             (data) => {
               try {
@@ -774,6 +793,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
               }
             },
             {
+              sampleRate: inputRate,
               onLevel: (rms) => {
                 this._audioLevel = rms;
                 this.#silence.onLevel(rms);
@@ -855,7 +875,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
         } else {
           const mime = this._recorder.streamMimeType || "audio/webm";
           await gw.voiceAudioEnd({
-            mimeType: mime,
+            mime_type: mime,
             sessionKey: SESSION_KEY_VOICE,
           });
         }
@@ -873,7 +893,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
       const audio = await blobToBase64(blob);
       const result = await gw.request<{ text?: string }>("voice.transcribe", {
         audio,
-        mimeType,
+        mime_type: mimeType,
       });
       if (result.text) {
         this.transcript = result.text;

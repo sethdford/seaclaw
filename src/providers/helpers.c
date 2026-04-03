@@ -137,3 +137,67 @@ char *hu_helpers_extract_anthropic_content(hu_allocator_t *alloc, const char *bo
     hu_json_free(alloc, parsed);
     return out;
 }
+
+hu_error_t hu_provider_chat_with_system(void *ctx, hu_allocator_t *alloc,
+                                        hu_provider_chat_fn_t chat_fn, const char *system_prompt,
+                                        size_t system_prompt_len, const char *message,
+                                        size_t message_len, const char *model, size_t model_len,
+                                        double temperature, char **out, size_t *out_len) {
+    if (!ctx || !alloc || !chat_fn || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    hu_chat_message_t msgs[2];
+    msgs[0].role = HU_ROLE_SYSTEM;
+    msgs[0].content = system_prompt;
+    msgs[0].content_len = system_prompt_len;
+    msgs[0].name = NULL;
+    msgs[0].name_len = 0;
+    msgs[0].tool_call_id = NULL;
+    msgs[0].tool_call_id_len = 0;
+    msgs[0].content_parts = NULL;
+    msgs[0].content_parts_count = 0;
+
+    msgs[1].role = HU_ROLE_USER;
+    msgs[1].content = message;
+    msgs[1].content_len = message_len;
+    msgs[1].name = NULL;
+    msgs[1].name_len = 0;
+    msgs[1].tool_call_id = NULL;
+    msgs[1].tool_call_id_len = 0;
+    msgs[1].content_parts = NULL;
+    msgs[1].content_parts_count = 0;
+
+    hu_chat_request_t req = {
+        .messages = msgs,
+        .messages_count = 2,
+        .model = model,
+        .model_len = model_len,
+        .temperature = temperature,
+        .max_tokens = 0,
+        .tools = NULL,
+        .tools_count = 0,
+        .timeout_secs = 0,
+        .reasoning_effort = NULL,
+        .reasoning_effort_len = 0,
+    };
+
+    hu_chat_response_t resp;
+    memset(&resp, 0, sizeof(resp));
+    hu_error_t err = chat_fn(ctx, alloc, &req, model, model_len, temperature, &resp);
+    if (err != HU_OK)
+        return err;
+
+    if (resp.content && resp.content_len > 0) {
+        *out = hu_strndup(alloc, resp.content, resp.content_len);
+        if (!*out) {
+            hu_chat_response_free(alloc, &resp);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        *out_len = resp.content_len;
+    } else {
+        *out = NULL;
+        *out_len = 0;
+    }
+    hu_chat_response_free(alloc, &resp);
+    return HU_OK;
+}

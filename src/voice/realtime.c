@@ -57,7 +57,6 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
     session->connected = true;
 
     {
-        char session_update[1024];
         const char *mdl = (session->config.model && session->config.model[0])
                               ? session->config.model
                               : "gpt-4o-realtime-preview";
@@ -67,23 +66,37 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
                              ? "\"turn_detection\":{\"type\":\"server_vad\",\"threshold\":0.5,"
                                "\"prefix_padding_ms\":300,\"silence_duration_ms\":500}"
                              : "\"turn_detection\":null";
-        int su = snprintf(session_update, sizeof(session_update),
-                          "{\"type\":\"session.update\",\"session\":{"
-                          "\"model\":\"%s\","
-                          "\"modalities\":[\"text\",\"audio\"],"
-                          "\"voice\":\"%s\","
-                          "\"input_audio_format\":\"pcm16\","
-                          "\"output_audio_format\":\"pcm16\","
-                          "\"input_audio_transcription\":{\"model\":\"whisper-1\"},"
-                          "%s"
-                          "}}",
-                          mdl, voice, td);
-        if (su <= 0 || (size_t)su >= sizeof(session_update)) {
+        hu_json_buf_t subuf = {0};
+        hu_error_t suerr = hu_json_buf_init(&subuf, session->alloc);
+        if (suerr != HU_OK) {
+            hu_ws_client_free(ws, session->alloc);
+            session->ws_client = NULL;
+            session->connected = false;
+            return suerr;
+        }
+        hu_json_buf_append_raw(&subuf, "{\"type\":\"session.update\",\"session\":{\"model\":", 45);
+        hu_json_append_string(&subuf, mdl, strlen(mdl));
+        hu_json_buf_append_raw(&subuf, ",\"modalities\":[\"text\",\"audio\"],\"voice\":", 40);
+        hu_json_append_string(&subuf, voice, strlen(voice));
+        hu_json_buf_append_raw(&subuf,
+            ",\"input_audio_format\":\"pcm16\","
+            "\"output_audio_format\":\"pcm16\","
+            "\"input_audio_transcription\":{\"model\":\"whisper-1\"},", 107);
+        hu_json_buf_append_raw(&subuf, td, strlen(td));
+        hu_json_buf_append_raw(&subuf, "}}", 2);
+        int su = (subuf.ptr && subuf.len > 0) ? (int)subuf.len : -1;
+        if (su <= 0) {
+            hu_json_buf_free(&subuf);
+            hu_ws_client_free(ws, session->alloc);
+            session->ws_client = NULL;
             session->connected = false;
             return HU_ERR_IO;
         }
-        hu_error_t su_err = hu_ws_send(ws, session_update, (size_t)su);
+        hu_error_t su_err = hu_ws_send(ws, subuf.ptr, subuf.len);
+        hu_json_buf_free(&subuf);
         if (su_err != HU_OK) {
+            hu_ws_client_free(ws, session->alloc);
+            session->ws_client = NULL;
             session->connected = false;
             return su_err;
         }
@@ -406,13 +419,46 @@ static hu_error_t openai_vp_noop(void *ctx) {
     return HU_OK;
 }
 
-static hu_error_t openai_vp_noop_tool_response(void *ctx, const char *name, const char *call_id,
+static hu_error_t openai_vp_send_tool_response(void *ctx, const char *name, const char *call_id,
                                                const char *response_json) {
-    (void)ctx;
     (void)name;
-    (void)call_id;
+    hu_voice_rt_session_t *session = (hu_voice_rt_session_t *)ctx;
+    if (!session || !call_id)
+        return HU_ERR_INVALID_ARGUMENT;
+#if HU_IS_TEST
+    (void)response_json;
+    return HU_OK;
+#elif defined(HU_HTTP_CURL)
+    if (!session->connected || !session->ws_client)
+        return HU_ERR_IO;
+    const char *output = (response_json && response_json[0]) ? response_json : "{}";
+    hu_json_buf_t buf = {0};
+    hu_error_t err = hu_json_buf_init(&buf, session->alloc);
+    if (err != HU_OK)
+        return err;
+    err = hu_json_buf_append_raw(&buf,
+        "{\"type\":\"conversation.item.create\",\"item\":{"
+        "\"type\":\"function_call_output\",\"call_id\":", 91);
+    if (err == HU_OK)
+        err = hu_json_append_string(&buf, call_id, strlen(call_id));
+    if (err == HU_OK)
+        err = hu_json_buf_append_raw(&buf, ",\"output\":", 10);
+    if (err == HU_OK)
+        err = hu_json_append_string(&buf, output, strlen(output));
+    if (err == HU_OK)
+        err = hu_json_buf_append_raw(&buf, "}}", 2);
+    if (err == HU_OK)
+        err = hu_ws_send((hu_ws_client_t *)session->ws_client, buf.ptr, buf.len);
+    hu_json_buf_free(&buf);
+    if (err != HU_OK)
+        return err;
+    /* Prompt model to continue generating after receiving tool output */
+    static const char resp_create[] = "{\"type\":\"response.create\"}";
+    return hu_ws_send((hu_ws_client_t *)session->ws_client, resp_create, sizeof(resp_create) - 1);
+#else
     (void)response_json;
     return HU_ERR_NOT_SUPPORTED;
+#endif
 }
 
 static const hu_voice_provider_vtable_t openai_voice_vtable = {
@@ -427,7 +473,7 @@ static const hu_voice_provider_vtable_t openai_voice_vtable = {
     .send_activity_end = openai_vp_noop,
     .send_audio_stream_end = openai_vp_noop,
     .reconnect = openai_vp_noop,
-    .send_tool_response = openai_vp_noop_tool_response,
+    .send_tool_response = openai_vp_send_tool_response,
 };
 
 hu_error_t hu_voice_provider_openai_create(hu_allocator_t *alloc,
