@@ -1,6 +1,6 @@
-#include "human/core/log.h"
 #include "human/persona.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/persona/persona_fuse.h"
 #include <stdio.h>
@@ -348,9 +348,10 @@ const hu_contact_profile_t *hu_persona_find_contact(const hu_persona_t *persona,
                                                     const char *contact_id, size_t contact_id_len) {
     if (!persona || !contact_id || !persona->contacts) {
         if (getenv("HU_DEBUG"))
-            hu_log_info("persona", NULL, "find_contact: early NULL (persona=%p contact_id=%p contacts=%p)",
-                    (const void *)persona, (const void *)contact_id,
-                    persona ? (const void *)persona->contacts : NULL);
+            hu_log_info("persona", NULL,
+                        "find_contact: early NULL (persona=%p contact_id=%p contacts=%p)",
+                        (const void *)persona, (const void *)contact_id,
+                        persona ? (const void *)persona->contacts : NULL);
         return NULL;
     }
     for (size_t i = 0; i < persona->contacts_count; i++) {
@@ -363,8 +364,8 @@ const hu_contact_profile_t *hu_persona_find_contact(const hu_persona_t *persona,
     }
     if (getenv("HU_DEBUG"))
         hu_log_info("persona", NULL, "find_contact: no match for '%.*s' among %zu contacts",
-                (int)(contact_id_len > 30 ? 30 : contact_id_len), contact_id,
-                persona->contacts_count);
+                    (int)(contact_id_len > 30 ? 30 : contact_id_len), contact_id,
+                    persona->contacts_count);
     return NULL;
 }
 
@@ -585,8 +586,8 @@ float hu_affect_mirror_ceiling(const hu_contact_profile_t *contact,
     return 0.7f;
 }
 
-float hu_affect_mirror_apply(float intensity, float ceiling,
-                             char *directive, size_t directive_cap) {
+float hu_affect_mirror_apply(float intensity, float ceiling, char *directive,
+                             size_t directive_cap) {
     if (directive && directive_cap > 0)
         directive[0] = '\0';
 
@@ -689,6 +690,128 @@ char *hu_persona_build_inner_world_context(hu_allocator_t *alloc, const hu_perso
     if (iw->secret_self_count > 0 && strcmp(relationship_stage, "inner_circle") == 0) {
         size_t idx = (seed / 23) % iw->secret_self_count;
         w = snprintf(buf + pos, cap - pos, "Private truth: %s\n", iw->secret_self[idx]);
+        if (w > 0)
+            pos += (size_t)w;
+    }
+
+    w = snprintf(buf + pos, cap - pos,
+                 "Only reference these if the conversation naturally calls for it. "
+                 "NEVER volunteer them unprompted. They make you real.\n"
+                 "--- End inner world ---\n");
+    if (w > 0)
+        pos += (size_t)w;
+
+    buf[pos] = '\0';
+    *out_len = pos;
+    return buf;
+}
+
+/* ── Inner World — graduated stage gating ────────────────────────── */
+
+hu_inner_world_t hu_persona_inner_world_for_stage(const hu_persona_t *persona,
+                                                  hu_relationship_stage_t stage) {
+    hu_inner_world_t filtered = {0};
+    if (!persona)
+        return filtered;
+
+    const hu_inner_world_t *iw = &persona->inner_world;
+
+    /* embodied_memories: any stage (NEW+) — lightest, sensory grounding */
+    filtered.embodied_memories = iw->embodied_memories;
+    filtered.embodied_memories_count = iw->embodied_memories_count;
+
+    /* contradictions: FAMILIAR+ */
+    if (stage >= HU_REL_FAMILIAR) {
+        filtered.contradictions = iw->contradictions;
+        filtered.contradictions_count = iw->contradictions_count;
+    }
+
+    /* emotional_flashpoints: TRUSTED+ */
+    if (stage >= HU_REL_TRUSTED) {
+        filtered.emotional_flashpoints = iw->emotional_flashpoints;
+        filtered.emotional_flashpoints_count = iw->emotional_flashpoints_count;
+    }
+
+    /* unfinished_business: TRUSTED+ */
+    if (stage >= HU_REL_TRUSTED) {
+        filtered.unfinished_business = iw->unfinished_business;
+        filtered.unfinished_business_count = iw->unfinished_business_count;
+    }
+
+    /* secret_self: DEEP only */
+    if (stage >= HU_REL_DEEP) {
+        filtered.secret_self = iw->secret_self;
+        filtered.secret_self_count = iw->secret_self_count;
+    }
+
+    return filtered;
+}
+
+char *hu_persona_build_inner_world_graduated(hu_allocator_t *alloc, const hu_persona_t *persona,
+                                             hu_relationship_stage_t stage, size_t *out_len) {
+    if (!alloc || !persona || !out_len)
+        return NULL;
+    *out_len = 0;
+
+    hu_inner_world_t iw = hu_persona_inner_world_for_stage(persona, stage);
+
+    bool has_content = iw.contradictions_count > 0 || iw.embodied_memories_count > 0 ||
+                       iw.emotional_flashpoints_count > 0 || iw.unfinished_business_count > 0 ||
+                       iw.secret_self_count > 0;
+    if (!has_content)
+        return NULL;
+
+    size_t cap = 4096;
+    char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+    if (!buf)
+        return NULL;
+
+    size_t pos = 0;
+    int w;
+
+    /* Use time as entropy for subset selection */
+    time_t now = time(NULL);
+    unsigned seed = (unsigned)(now / 60);
+
+    w = snprintf(buf + pos, cap - pos,
+                 "\n--- Inner World (use naturally, NEVER quote directly) ---\n");
+    if (w > 0)
+        pos += (size_t)w;
+
+    if (iw.contradictions_count > 0) {
+        size_t idx = seed % iw.contradictions_count;
+        w = snprintf(buf + pos, cap - pos, "Contradiction you live with: %s\n",
+                     iw.contradictions[idx]);
+        if (w > 0)
+            pos += (size_t)w;
+    }
+
+    if (iw.embodied_memories_count > 0) {
+        size_t idx = (seed / 7) % iw.embodied_memories_count;
+        w = snprintf(buf + pos, cap - pos, "Sense memory: %s\n", iw.embodied_memories[idx]);
+        if (w > 0)
+            pos += (size_t)w;
+    }
+
+    if (iw.emotional_flashpoints_count > 0) {
+        size_t idx = (seed / 13) % iw.emotional_flashpoints_count;
+        w = snprintf(buf + pos, cap - pos, "Emotional flashpoint: %s\n",
+                     iw.emotional_flashpoints[idx]);
+        if (w > 0)
+            pos += (size_t)w;
+    }
+
+    if (iw.unfinished_business_count > 0) {
+        size_t idx = (seed / 17) % iw.unfinished_business_count;
+        w = snprintf(buf + pos, cap - pos, "Something unresolved: %s\n",
+                     iw.unfinished_business[idx]);
+        if (w > 0)
+            pos += (size_t)w;
+    }
+
+    if (iw.secret_self_count > 0) {
+        size_t idx = (seed / 23) % iw.secret_self_count;
+        w = snprintf(buf + pos, cap - pos, "Private truth: %s\n", iw.secret_self[idx]);
         if (w > 0)
             pos += (size_t)w;
     }
@@ -2403,6 +2526,15 @@ hu_error_t hu_persona_load(hu_allocator_t *alloc, const char *name, size_t name_
 
 /* --- Prompt builder --- */
 
+/* Cap snprintf return value to the actual buffer capacity.
+ * snprintf returns the would-have-been length on truncation, which can
+ * exceed the buffer size and cause out-of-bounds reads in memcpy. */
+static inline size_t safe_snprintf_len(int w, size_t bufsize) {
+    if (w <= 0)
+        return 0;
+    return (size_t)w < bufsize ? (size_t)w : bufsize - 1;
+}
+
 static hu_error_t append_prompt(hu_allocator_t *alloc, char **buf, size_t *len, size_t *cap,
                                 const char *s, size_t slen) {
     while (*len + slen + 1 > *cap) {
@@ -2745,7 +2877,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "Why you engage: %s\n", m->primary_drive);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2754,7 +2887,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "What you protect: %s\n", m->protecting);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2763,7 +2897,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "What you avoid: %s\n", m->avoiding);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2772,7 +2907,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "What you want most: %s\n", m->wanting);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2812,7 +2948,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "- WHEN %s: %s\n", d->trigger, d->instruction);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2856,7 +2993,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[64];
                 int w = snprintf(line, sizeof(line), "Style: %s\n", h->type);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2865,7 +3003,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[64];
                 int w = snprintf(line, sizeof(line), "Frequency: %s\n", h->frequency);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2960,7 +3099,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Pushback: %s\n", cs->pushback_response);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2970,7 +3110,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w = snprintf(line, sizeof(line), "Confrontation comfort: %s\n",
                                  cs->confrontation_comfort);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2979,7 +3120,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Apology style: %s\n", cs->apology_style);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2988,7 +3130,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Saying no: %s\n", cs->boundary_assertion);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -2997,7 +3140,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Repair: %s\n", cs->repair_behavior);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3019,7 +3163,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Ceiling: %s\n", er->ceiling);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3028,7 +3173,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Floor: %s\n", er->floor);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3076,7 +3222,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w =
                     snprintf(line, sizeof(line), "Withdraws when: %s\n", er->withdrawal_conditions);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3085,7 +3232,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Recovery: %s\n", er->recovery_style);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3108,7 +3256,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w =
                     snprintf(line, sizeof(line), "Sentence pattern: %s\n", vr->sentence_pattern);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3118,7 +3267,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w =
                     snprintf(line, sizeof(line), "Paragraph cadence: %s\n", vr->paragraph_cadence);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3127,7 +3277,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Response tempo: %s\n", vr->response_tempo);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3136,7 +3287,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Emphasis: %s\n", vr->emphasis_style);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3145,7 +3297,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Pauses: %s\n", vr->pause_behavior);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3205,7 +3358,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Thinks by: %s\n", ip->thinking_style);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3215,7 +3369,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w = snprintf(line, sizeof(line), "Draws metaphors from: %s\n",
                                  ip->metaphor_sources);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3236,7 +3391,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w = snprintf(line, sizeof(line), "- Because %s → %s\n", b->backstory_beat,
                                  b->behavioral_rule);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3258,7 +3414,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Dominant sense: %s\n", sp->dominant_sense);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3286,7 +3443,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Grounding: %s\n", sp->grounding_patterns);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3309,7 +3467,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w =
                     snprintf(line, sizeof(line), "Attachment style: %s\n", ri->attachment_style);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3318,7 +3477,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "Bid response: %s\n", ri->bid_response_style);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3347,7 +3507,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w = snprintf(line, sizeof(line), "Attachment awareness: %s\n",
                                  ri->attachment_awareness);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3357,7 +3518,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w =
                     snprintf(line, sizeof(line), "Relationship layers: %s\n", ri->dunbar_awareness);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3380,7 +3542,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w = snprintf(line, sizeof(line), "Default response type: %s\n",
                                  lp->default_response_type);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3408,7 +3571,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "NVC approach: %s\n", lp->nvc_style);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3417,7 +3581,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "Validation: %s\n", lp->validation_style);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3440,7 +3605,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w =
                     snprintf(line, sizeof(line), "Rupture detection: %s\n", rp->rupture_detection);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3449,7 +3615,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "Repair approach: %s\n", rp->repair_approach);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3458,7 +3625,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "Face-saving: %s\n", rp->face_saving_style);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3499,7 +3667,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Mirroring level: %s\n", lm->mirroring_level);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3527,7 +3696,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Convergence: %s\n", lm->convergence_speed);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3536,7 +3706,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[256];
                 int w = snprintf(line, sizeof(line), "Power dynamic: %s\n", lm->power_dynamic);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3559,7 +3730,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 int w =
                     snprintf(line, sizeof(line), "Default ego state: %s\n", sd->default_ego_state);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -3568,7 +3740,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
                 char line[512];
                 int w = snprintf(line, sizeof(line), "Phatic style: %s\n", sd->phatic_style);
                 if (w > 0) {
-                    err = append_prompt(alloc, &buf, &len, &cap, line, (size_t)w);
+                    err = append_prompt(alloc, &buf, &len, &cap, line,
+                                        safe_snprintf_len(w, sizeof(line)));
                     if (err != HU_OK)
                         goto fail;
                 }
