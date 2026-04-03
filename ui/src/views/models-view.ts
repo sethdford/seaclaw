@@ -49,6 +49,27 @@ interface UsageSummary {
   by_provider?: ProviderUsage[];
 }
 
+interface RouteDecision {
+  tier: string;
+  source: string;
+  model: string;
+  heuristic_score: number;
+  timestamp: number;
+}
+
+interface TierDistribution {
+  reflexive: number;
+  conversational: number;
+  analytical: number;
+  deep: number;
+}
+
+interface ModelsDecisionsRes {
+  decisions?: RouteDecision[];
+  total?: number;
+  tier_distribution?: TierDistribution;
+}
+
 @customElement("hu-models-view")
 export class ScModelsView extends GatewayAwareLitElement {
   override autoRefreshInterval = 30_000;
@@ -165,6 +186,75 @@ export class ScModelsView extends GatewayAwareLitElement {
           grid-template-columns: 1fr;
         }
       }
+      .decisions-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--hu-text-sm);
+      }
+      .decisions-table th {
+        text-align: left;
+        padding: var(--hu-space-xs) var(--hu-space-sm);
+        color: var(--hu-text-muted);
+        font-weight: var(--hu-weight-semibold);
+        font-size: var(--hu-text-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        border-bottom: 1px solid var(--hu-border);
+      }
+      .decisions-table td {
+        padding: var(--hu-space-xs) var(--hu-space-sm);
+        color: var(--hu-text);
+        border-bottom: 1px solid color-mix(in srgb, var(--hu-border) 50%, transparent);
+      }
+      .tier-pill {
+        display: inline-block;
+        padding: 0.125rem var(--hu-space-xs);
+        border-radius: var(--hu-radius);
+        font-size: var(--hu-text-xs);
+        font-weight: var(--hu-weight-semibold);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .tier-reflexive {
+        background: color-mix(in srgb, var(--hu-text-muted) 15%, transparent);
+        color: var(--hu-text-muted);
+      }
+      .tier-conversational {
+        background: color-mix(in srgb, var(--hu-accent) 15%, transparent);
+        color: var(--hu-accent-text, var(--hu-accent));
+      }
+      .tier-analytical {
+        background: color-mix(in srgb, var(--hu-accent-secondary) 15%, transparent);
+        color: var(--hu-accent-secondary);
+      }
+      .tier-deep {
+        background: color-mix(in srgb, var(--hu-accent-tertiary) 15%, transparent);
+        color: var(--hu-accent-tertiary);
+      }
+      .source-badge {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-muted);
+        font-family: var(--hu-font-mono);
+      }
+      .tier-dist-row {
+        display: flex;
+        gap: var(--hu-space-md);
+        flex-wrap: wrap;
+        margin-bottom: var(--hu-space-md);
+      }
+      .tier-dist-item {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-xs);
+        font-size: var(--hu-text-sm);
+      }
+      .tier-dist-count {
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+      }
+      .decisions-section {
+        margin-top: var(--hu-space-2xl);
+      }
       @media (prefers-reduced-motion: reduce) {
         * {
           animation-duration: 0s !important;
@@ -207,6 +297,8 @@ export class ScModelsView extends GatewayAwareLitElement {
   @state() private error = "";
   @state() private filter = "";
   @state() private usageByProvider: ProviderUsage[] = [];
+  @state() private routeDecisions: RouteDecision[] = [];
+  @state() private tierDistribution: TierDistribution | null = null;
   @state() private settingDefault = false;
   @state() private _refreshing = false;
 
@@ -244,20 +336,27 @@ export class ScModelsView extends GatewayAwareLitElement {
     this._refreshing = this.providers.length > 0;
     this.loading = this.providers.length === 0;
     try {
-      const [modelsRes, configRes, usageRes] = await Promise.all([
+      const [modelsRes, configRes, usageRes, decisionsRes] = await Promise.all([
         gw.request<ModelsListRes>("models.list", {}).catch((): Partial<ModelsListRes> => ({})),
         gw.request<ConfigGetRes>("config.get", {}).catch((): Partial<ConfigGetRes> => ({})),
         gw.request<UsageSummary>("usage.summary", {}).catch((): Partial<UsageSummary> => ({})),
+        gw
+          .request<ModelsDecisionsRes>("models.decisions", {})
+          .catch((): Partial<ModelsDecisionsRes> => ({})),
       ]);
       this.defaultModel = modelsRes?.default_model ?? configRes?.default_model ?? "";
       this.defaultProvider = configRes?.default_provider ?? "";
       this.providers = modelsRes?.providers ?? [];
       this.usageByProvider = usageRes?.by_provider ?? [];
+      this.routeDecisions = decisionsRes?.decisions ?? [];
+      this.tierDistribution = decisionsRes?.tier_distribution ?? null;
     } catch (e) {
       this.providers = [];
       this.defaultModel = "";
       this.defaultProvider = "";
       this.usageByProvider = [];
+      this.routeDecisions = [];
+      this.tierDistribution = null;
       this.error = friendlyError(e);
     } finally {
       this.loading = false;
@@ -380,7 +479,7 @@ export class ScModelsView extends GatewayAwareLitElement {
           ></hu-empty-state>`
         : nothing}
       ${!this.error
-        ? html`${this._renderInfoSection()}${this._renderChart()}${this._renderGrid()}`
+        ? html`${this._renderInfoSection()}${this._renderChart()}${this._renderGrid()}${this._renderRoutingDecisions()}`
         : nothing}
     `;
   }
@@ -476,6 +575,77 @@ export class ScModelsView extends GatewayAwareLitElement {
               ></hu-empty-state>
             `
           : filtered.map((p) => this._renderProviderCard(p))}
+      </div>
+    `;
+  }
+
+  private _formatTime(ts: number): string {
+    if (!ts) return "—";
+    const d = new Date(ts * 1000);
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
+  private _renderRoutingDecisions() {
+    if (!this.routeDecisions.length && !this.tierDistribution) return nothing;
+    const dist = this.tierDistribution;
+    return html`
+      <div class="decisions-section">
+        <hu-section-header
+          heading="Routing Decisions"
+          description="LLM-as-Judge cost router — recent model selection decisions"
+        ></hu-section-header>
+        ${dist
+          ? html`
+              <div class="tier-dist-row">
+                <div class="tier-dist-item">
+                  <span class="tier-pill tier-reflexive">reflexive</span>
+                  <span class="tier-dist-count">${dist.reflexive}</span>
+                </div>
+                <div class="tier-dist-item">
+                  <span class="tier-pill tier-conversational">conversational</span>
+                  <span class="tier-dist-count">${dist.conversational}</span>
+                </div>
+                <div class="tier-dist-item">
+                  <span class="tier-pill tier-analytical">analytical</span>
+                  <span class="tier-dist-count">${dist.analytical}</span>
+                </div>
+                <div class="tier-dist-item">
+                  <span class="tier-pill tier-deep">deep</span>
+                  <span class="tier-dist-count">${dist.deep}</span>
+                </div>
+              </div>
+            `
+          : nothing}
+        ${this.routeDecisions.length
+          ? html`
+              <hu-card>
+                <table class="decisions-table" role="table" aria-label="Routing decisions">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Tier</th>
+                      <th>Source</th>
+                      <th>Model</th>
+                      <th>Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${[...this.routeDecisions].reverse().map(
+                      (d) => html`
+                        <tr>
+                          <td>${this._formatTime(d.timestamp)}</td>
+                          <td><span class="tier-pill tier-${d.tier}">${d.tier}</span></td>
+                          <td><span class="source-badge">${d.source}</span></td>
+                          <td>${d.model || "—"}</td>
+                          <td>${d.heuristic_score}</td>
+                        </tr>
+                      `,
+                    )}
+                  </tbody>
+                </table>
+              </hu-card>
+            `
+          : nothing}
       </div>
     `;
   }

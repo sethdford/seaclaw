@@ -1462,6 +1462,54 @@ export class DemoGatewayClient extends EventTarget {
           ],
         };
 
+      case "models.decisions":
+        return {
+          decisions: [
+            {
+              tier: "reflexive",
+              source: "heuristic",
+              model: "gemini-3.1-flash-lite-preview",
+              heuristic_score: -2,
+              timestamp: Math.floor(Date.now() / 1000) - 300,
+            },
+            {
+              tier: "conversational",
+              source: "heuristic",
+              model: "gemini-3-flash-preview",
+              heuristic_score: 2,
+              timestamp: Math.floor(Date.now() / 1000) - 240,
+            },
+            {
+              tier: "analytical",
+              source: "judge",
+              model: "gemini-3.1-pro-preview",
+              heuristic_score: 5,
+              timestamp: Math.floor(Date.now() / 1000) - 180,
+            },
+            {
+              tier: "conversational",
+              source: "judge_cached",
+              model: "gemini-3-flash-preview",
+              heuristic_score: 3,
+              timestamp: Math.floor(Date.now() / 1000) - 120,
+            },
+            {
+              tier: "deep",
+              source: "judge",
+              model: "gemini-3.1-pro-preview",
+              heuristic_score: 9,
+              timestamp: Math.floor(Date.now() / 1000) - 60,
+            },
+          ],
+          total: 5,
+          tier_distribution: {
+            reflexive: 1,
+            conversational: 2,
+            analytical: 1,
+            deep: 1,
+          },
+        };
+
       // --- Config (mutable) ---
       case "config.get":
         return { ...this.state.config };
