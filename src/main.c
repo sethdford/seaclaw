@@ -1082,7 +1082,7 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
 
 #ifdef HU_ENABLE_ML
     /* Weekly DPO preference training — runs every Sunday at 3 AM */
-    if (app_ctx.agent && app_ctx.agent->scheduler && app_ctx.agent->sota_initialized) {
+    if (app_ctx.agent && app_ctx.agent->scheduler && app_ctx.agent->sota.sota_initialized) {
         uint64_t dpo_id = 0;
         hu_error_t dpo_err = hu_cron_add_agent_job(
             (hu_cron_scheduler_t *)app_ctx.agent->scheduler, alloc, "0 3 * * 0",

@@ -2453,13 +2453,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 {
                     static int64_t last_dpo_train = 0;
                     int64_t dpo_interval = 24 * 3600;
-                    if (agent && agent->memory && agent->sota_initialized &&
+                    if (agent && agent->memory && agent->sota.sota_initialized &&
                         (last_dpo_train == 0 || ((int64_t)t - last_dpo_train) >= dpo_interval)) {
                         sqlite3 *dpo_db = hu_sqlite_memory_get_db(agent->memory);
                         if (dpo_db) {
                             hu_dpo_train_result_t dpo_result = {0};
                             hu_error_t dpo_err = hu_dpo_train_step(
-                                &agent->dpo_collector, alloc, &agent->provider, agent->model_name,
+                                &agent->sota.dpo_collector, alloc, &agent->provider, agent->model_name,
                                 agent->model_name_len, 0.1, 32, &dpo_result);
                             if (dpo_err == HU_OK && dpo_result.pairs_evaluated > 0)
                                 hu_log_info("human", agent ? agent->observer : NULL,
@@ -2851,10 +2851,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     {
                         static bool dpo_exported_this_week = false;
                         if (lt_tune && lt_tune->tm_wday == 0 && lt_tune->tm_hour == 2 &&
-                            lt_tune->tm_min == 0 && agent && agent->dpo_collector.alloc &&
+                            lt_tune->tm_min == 0 && agent && agent->sota.dpo_collector.alloc &&
                             !dpo_exported_this_week) {
                             size_t pair_count = 0;
-                            hu_dpo_pair_count(&agent->dpo_collector, &pair_count);
+                            hu_dpo_pair_count(&agent->sota.dpo_collector, &pair_count);
                             if (pair_count > 0) {
                                 char dpo_path[HU_MAX_PATH];
                                 int dpo_plen;
@@ -2868,12 +2868,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                                 size_t exported = 0;
                                 if (dpo_plen > 0 && (size_t)dpo_plen < sizeof(dpo_path) &&
-                                    hu_dpo_export_jsonl(&agent->dpo_collector, dpo_path,
+                                    hu_dpo_export_jsonl(&agent->sota.dpo_collector, dpo_path,
                                                         (size_t)dpo_plen, &exported) == HU_OK) {
                                     hu_log_info("human", agent ? agent->observer : NULL,
                                                 "weekly DPO export: %zu pairs -> %s", exported,
                                                 dpo_path);
-                                    hu_dpo_clear(&agent->dpo_collector);
+                                    hu_dpo_clear(&agent->sota.dpo_collector);
                                 }
                             }
                             dpo_exported_this_week = true;
@@ -7746,9 +7746,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                  * based on message content, relationship, and time of day */
 #ifndef HU_IS_TEST
                 if (config && config->agent.s3_local_model &&
-                    !agent->degradation_config.s3_local_model) {
-                    agent->degradation_config.s3_local_model = config->agent.s3_local_model;
-                    agent->degradation_config.s3_local_model_len =
+                    !agent->sota.degradation_config.s3_local_model) {
+                    agent->sota.degradation_config.s3_local_model = config->agent.s3_local_model;
+                    agent->sota.degradation_config.s3_local_model_len =
                         strlen(config->agent.s3_local_model);
                 }
                 {
@@ -8357,7 +8357,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                     "llm judge retry: %d/10 for %.*s",
                                                     llm_tscore.overall,
                                                     (int)(key_len > 20 ? 20 : key_len), batch_key);
-                                        hu_dpo_record_from_feedback(&agent->dpo_collector, combined,
+                                        hu_dpo_record_from_feedback(&agent->sota.dpo_collector, combined,
                                                                     combined_len, response,
                                                                     response_len, false);
                                         agent->alloc->free(agent->alloc->ctx, response,
@@ -8404,7 +8404,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* DPO: pair rejected response from Turing retry with chosen retry result */
                 if (turing_rejected_resp && turing_rejected_len > 0 && response &&
                     response_len > 0) {
-                    hu_dpo_record_from_retry(&agent->dpo_collector, combined, combined_len,
+                    hu_dpo_record_from_retry(&agent->sota.dpo_collector, combined, combined_len,
                                              turing_rejected_resp, turing_rejected_len, response,
                                              response_len);
                 }
@@ -9873,7 +9873,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                         /* DPO: record high-scoring responses as positive examples */
                         if (tscore.overall >= 8) {
-                            hu_dpo_record_from_feedback(&agent->dpo_collector, combined,
+                            hu_dpo_record_from_feedback(&agent->sota.dpo_collector, combined,
                                                         combined_len, response, response_len, true);
                         }
                     }

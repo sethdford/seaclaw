@@ -1,5 +1,6 @@
 /* Core turn execution: hu_agent_turn and turn-local helpers */
 #include "agent_internal.h"
+#include "human/core/string.h"
 #include "human/data/loader.h"
 #include "human/core/json.h"
 
@@ -949,8 +950,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     hu_srag_assessment_t srag_assessment;
     memset(&srag_assessment, 0, sizeof(srag_assessment));
     bool srag_skip_retrieval = false;
-    if (agent->sota_initialized && agent->srag_config.enabled) {
-        hu_srag_should_retrieve(agent->alloc, &agent->srag_config, msg, msg_len, NULL, 0,
+    if (agent->sota.sota_initialized && agent->sota.srag_config.enabled) {
+        hu_srag_should_retrieve(agent->alloc, &agent->sota.srag_config, msg, msg_len, NULL, 0,
                                 &srag_assessment);
         if (srag_assessment.decision == HU_SRAG_NO_RETRIEVAL)
             srag_skip_retrieval = true;
@@ -976,7 +977,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             memory_ctx_len > 0) {
             double relevance = 0.0;
             bool should_use = false;
-            hu_srag_verify_relevance(agent->alloc, &agent->srag_config, msg, msg_len, memory_ctx,
+            hu_srag_verify_relevance(agent->alloc, &agent->sota.srag_config, msg, msg_len, memory_ctx,
                                      memory_ctx_len, &relevance, &should_use);
             if (!should_use) {
                 agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
@@ -1011,7 +1012,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     }
 
     /* Data quality: validate memory context fragments before assembly */
-    if (agent->dq_config.enabled && memory_ctx && memory_ctx_len > 0) {
+    if (agent->sota.dq_config.enabled && memory_ctx && memory_ctx_len > 0) {
         hu_dq_fragment_t frag = {
             .content = memory_ctx,
             .content_len = memory_ctx_len,
@@ -1019,7 +1020,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             .source_len = 6,
         };
         hu_dq_result_t dq_result;
-        if (hu_dq_check(&agent->dq_config, &frag, 1, &dq_result) == HU_OK && !dq_result.passed) {
+        if (hu_dq_check(&agent->sota.dq_config, &frag, 1, &dq_result) == HU_OK && !dq_result.passed) {
             hu_log_info("agent_turn", NULL, "data quality: %zu issues in memory context",
                         dq_result.issue_count);
         }
@@ -1027,8 +1028,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
     /* Adaptive RAG: select strategy and record for learning */
     hu_rag_strategy_t rag_strategy_used = HU_RAG_NONE;
-    if (agent->sota_initialized && !srag_skip_retrieval) {
-        rag_strategy_used = hu_adaptive_rag_select(&agent->adaptive_rag, msg, msg_len);
+    if (agent->sota.sota_initialized && !srag_skip_retrieval) {
+        rag_strategy_used = hu_adaptive_rag_select(&agent->sota.adaptive_rag, msg, msg_len);
     }
 
 #ifdef HU_ENABLE_SQLITE
@@ -1534,7 +1535,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 (void)hu_training_data_init_tables(intel_db);
                 int64_t traj_id = 0;
                 if (hu_training_data_start_trajectory(agent->alloc, intel_db, &traj_id) == HU_OK)
-                    agent->current_trajectory_id = traj_id;
+                    agent->sota.current_trajectory_id = traj_id;
             }
 #endif
 
@@ -1961,10 +1962,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 #endif /* HU_HAS_SKILLS */
 
     /* Memory Tiers: inject core memory into prompt context */
-    if (agent->sota_initialized) {
+    if (agent->sota.sota_initialized) {
         char core_buf[2048];
         size_t core_len = 0;
-        if (hu_tier_manager_build_core_prompt(&agent->tier_manager, core_buf, sizeof(core_buf),
+        if (hu_tier_manager_build_core_prompt(&agent->sota.tier_manager, core_buf, sizeof(core_buf),
                                               &core_len) == HU_OK &&
             core_len > 0) {
             if (memory_ctx && memory_ctx_len > 0) {
@@ -2462,10 +2463,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     }
 
     /* Inject learned DPO preferences as few-shot examples */
-    if (agent->sota_initialized && agent->dpo_collector.db && system_prompt) {
+    if (agent->sota.sota_initialized && agent->sota.dpo_collector.db && system_prompt) {
         char *dpo_examples = NULL;
         size_t dpo_len = 0;
-        if (hu_dpo_get_best_examples(&agent->dpo_collector, agent->alloc, 5, &dpo_examples,
+        if (hu_dpo_get_best_examples(&agent->sota.dpo_collector, agent->alloc, 5, &dpo_examples,
                                      &dpo_len) == HU_OK &&
             dpo_examples) {
             size_t new_len = system_prompt_len + dpo_len;
@@ -3076,10 +3077,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             req.thinking_budget = agent->turn_thinking_budget;
 
         /* Adaptive token budget: classify tier and apply budget constraints */
-        if (agent->token_budget.enabled) {
+        if (agent->sota.token_budget.enabled) {
             hu_thinking_tier_t tier =
                 hu_token_budget_classify(msg, msg_len, agent->history_count, agent->tools_count);
-            const hu_tier_budget_t *budget = hu_token_budget_get(&agent->token_budget, tier);
+            const hu_tier_budget_t *budget = hu_token_budget_get(&agent->sota.token_budget, tier);
             if (budget) {
                 if (budget->thinking_budget > 0 && req.thinking_budget == 0)
                     req.thinking_budget = (int)budget->thinking_budget;
@@ -3095,14 +3096,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             hu_sensitivity_result_t sens = hu_sensitivity_classify_message(msg, msg_len);
             if (hu_sensitivity_requires_local(sens.level)) {
                 const char *prev_model = turn_model;
-                if (agent->degradation_config.s3_local_model &&
-                    agent->degradation_config.s3_local_model_len > 0) {
-                    turn_model = agent->degradation_config.s3_local_model;
-                    turn_model_len = agent->degradation_config.s3_local_model_len;
-                } else if (agent->degradation_config.fallback_model &&
-                           agent->degradation_config.fallback_model_len > 0) {
-                    turn_model = agent->degradation_config.fallback_model;
-                    turn_model_len = agent->degradation_config.fallback_model_len;
+                if (agent->sota.degradation_config.s3_local_model &&
+                    agent->sota.degradation_config.s3_local_model_len > 0) {
+                    turn_model = agent->sota.degradation_config.s3_local_model;
+                    turn_model_len = agent->sota.degradation_config.s3_local_model_len;
+                } else if (agent->sota.degradation_config.fallback_model &&
+                           agent->sota.degradation_config.fallback_model_len > 0) {
+                    turn_model = agent->sota.degradation_config.fallback_model;
+                    turn_model_len = agent->sota.degradation_config.fallback_model_len;
                 }
                 hu_log_info("agent", agent->observer,
                             "S3 sensitivity: %s — routed %.*s -> %.*s",
@@ -3146,9 +3147,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
         /* Provider graceful degradation: try primary -> fallback -> honest failure */
         hu_degrade_strategy_t degrade_strategy = HU_DEGRADE_PRIMARY;
-        if (agent->degradation_config.enabled) {
+        if (agent->sota.degradation_config.enabled) {
             hu_degradation_result_t degrade_result;
-            err = hu_provider_degrade_chat(&agent->degradation_config, &agent->provider,
+            err = hu_provider_degrade_chat(&agent->sota.degradation_config, &agent->provider,
                                            agent->alloc, &req, turn_model, turn_model_len,
                                            turn_temp, &degrade_result);
             resp = degrade_result.response;
@@ -3173,7 +3174,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 
         /* Degradation honest failure: show message but return non-OK for CLI exit codes. */
-        if (err == HU_ERR_PROVIDER_RESPONSE && agent->degradation_config.enabled &&
+        if (err == HU_ERR_PROVIDER_RESPONSE && agent->sota.degradation_config.enabled &&
             degrade_strategy == HU_DEGRADE_HONEST_FAILURE && resp.content && resp.content_len > 0) {
             char *dup = hu_strndup(agent->alloc, resp.content, resp.content_len);
             size_t dup_len = dup ? strlen(dup) : 0;
@@ -3238,11 +3239,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 
         /* Chaos testing: optionally inject faults into LLM response */
-        if (agent->chaos_engine.config.enabled) {
-            hu_chaos_fault_t fault = hu_chaos_maybe_inject(&agent->chaos_engine);
+        if (agent->sota.chaos_engine.config.enabled) {
+            hu_chaos_fault_t fault = hu_chaos_maybe_inject(&agent->sota.chaos_engine);
             if (fault != HU_CHAOS_NONE) {
                 hu_error_t chaos_err =
-                    hu_chaos_apply_to_response(&agent->chaos_engine, agent->alloc, fault, &resp);
+                    hu_chaos_apply_to_response(&agent->sota.chaos_engine, agent->alloc, fault, &resp);
                 if (chaos_err != HU_OK) {
                     hu_log_info("agent_turn", NULL, "chaos fault injected: %s",
                                 hu_chaos_fault_name(fault));
@@ -3255,15 +3256,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         turn_tokens += resp.usage.total_tokens;
 
         /* Token budget: record spend and check session cap */
-        if (agent->token_budget.enabled) {
-            hu_token_budget_record(&agent->token_budget, resp.usage.total_tokens);
-            if (!hu_token_budget_can_spend(&agent->token_budget, 0)) {
+        if (agent->sota.token_budget.enabled) {
+            hu_token_budget_record(&agent->sota.token_budget, resp.usage.total_tokens);
+            if (!hu_token_budget_can_spend(&agent->sota.token_budget, 0)) {
                 hu_log_info("agent_turn", NULL, "token budget exhausted for session");
             }
         }
 
         /* GVR (Generator-Verifier-Reviser): verify and optionally revise the response */
-        if (agent->gvr_config.enabled && resp.content && resp.content_len > 0 &&
+        if (agent->sota.gvr_config.enabled && resp.content && resp.content_len > 0 &&
             resp.tool_calls_count == 0) {
             const char *user_prompt = NULL;
             size_t user_prompt_len = 0;
@@ -3273,7 +3274,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
             hu_gvr_pipeline_result_t gvr_result;
             hu_error_t gvr_err = hu_gvr_pipeline(
-                agent->alloc, &agent->provider, &agent->gvr_config, turn_model, turn_model_len,
+                agent->alloc, &agent->provider, &agent->sota.gvr_config, turn_model, turn_model_len,
                 user_prompt, user_prompt_len, resp.content, resp.content_len, &gvr_result);
             if (gvr_err == HU_OK && gvr_result.final_content) {
                 if (gvr_result.revisions_performed > 0) {
@@ -3426,10 +3427,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
             if (resp.content && resp.content_len > 0) {
                 /* PRM: score response reasoning chain for quality */
-                if (agent->sota_initialized && agent->prm_config.enabled &&
+                if (agent->sota.sota_initialized && agent->sota.prm_config.enabled &&
                     resp.content_len > 100) {
                     hu_prm_result_t prm_res;
-                    if (hu_prm_score_chain(agent->alloc, &agent->prm_config, resp.content,
+                    if (hu_prm_score_chain(agent->alloc, &agent->sota.prm_config, resp.content,
                                            resp.content_len, &prm_res) == HU_OK) {
                         prm_turn_score = prm_res.aggregate_score;
                         hu_prm_result_free(agent->alloc, &prm_res);
@@ -3437,9 +3438,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
 
                 /* PRM per-step: score response quality as a reasoning step */
-                if (agent->sota_initialized && agent->prm_config.enabled && resp.content_len > 50) {
+                if (agent->sota.sota_initialized && agent->sota.prm_config.enabled && resp.content_len > 50) {
                     double step_score = 0.0;
-                    hu_prm_score_step(agent->alloc, &agent->prm_config, resp.content,
+                    hu_prm_score_step(agent->alloc, &agent->sota.prm_config, resp.content,
                                       resp.content_len, msg, msg_len, &step_score);
                     prm_turn_score = step_score;
                 }
@@ -3486,14 +3487,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
                         /* DPO: save the rejected response for pairing with the
                          * chosen response after retry succeeds. */
-                        if (agent->sota_initialized && resp.content && resp.content_len > 0) {
+                        if (agent->sota.sota_initialized && resp.content && resp.content_len > 0) {
                             if (dpo_rejected_resp)
                                 agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
                                                    dpo_rejected_resp_len + 1);
                             dpo_rejected_resp =
                                 hu_strndup(agent->alloc, resp.content, resp.content_len);
                             dpo_rejected_resp_len = resp.content_len;
-                            hu_dpo_record_from_feedback(&agent->dpo_collector, msg, msg_len,
+                            hu_dpo_record_from_feedback(&agent->sota.dpo_collector, msg, msg_len,
                                                         resp.content, resp.content_len, false);
                         }
 
@@ -3506,9 +3507,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
 
                 /* DPO retry pair: record chosen vs rejected when reflection retry succeeded */
-                if (agent->sota_initialized && dpo_rejected_resp && dpo_rejected_resp_len > 0 &&
+                if (agent->sota.sota_initialized && dpo_rejected_resp && dpo_rejected_resp_len > 0 &&
                     resp.content && resp.content_len > 0) {
-                    hu_dpo_record_from_retry(&agent->dpo_collector, msg, msg_len, dpo_rejected_resp,
+                    hu_dpo_record_from_retry(&agent->sota.dpo_collector, msg, msg_len, dpo_rejected_resp,
                                              dpo_rejected_resp_len, resp.content, resp.content_len);
                     agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
                                        dpo_rejected_resp_len + 1);
@@ -3991,9 +3992,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             if (n > 0 && (size_t)n < sizeof(key_buf)) {
                                 /* Memory policy: let heuristic decide if we should store */
                                 hu_mem_action_type_t mem_action = HU_MEM_STORE;
-                                if (agent->mem_policy.enabled) {
+                                if (agent->sota.mem_policy.enabled) {
                                     hu_mem_state_t mstate = {0};
-                                    mem_action = hu_mem_policy_decide(&agent->mem_policy, &mstate,
+                                    mem_action = hu_mem_policy_decide(&agent->sota.mem_policy, &mstate,
                                                                       f->object, strlen(f->object));
                                 }
                                 if (mem_action == HU_MEM_STORE || mem_action == HU_MEM_UPDATE) {
@@ -4004,9 +4005,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         hu_log_error("agent", NULL, "memory store failed: %s",
                                                      hu_error_string(store_err));
                                 }
-                                if (agent->sota_initialized) {
+                                if (agent->sota.sota_initialized) {
                                     hu_memory_tier_t assigned;
-                                    hu_tier_manager_auto_tier(&agent->tier_manager, key_buf,
+                                    hu_tier_manager_auto_tier(&agent->sota.tier_manager, key_buf,
                                                               (size_t)n, f->object,
                                                               strlen(f->object), &assigned);
                                 }
@@ -4120,13 +4121,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                                  "User prefers detailed responses",
                                                                  31, 0.2, now_vl);
                         /* DPO: record user feedback as preference signal */
-                        if (agent->sota_initialized && agent->history_count >= 2) {
+                        if (agent->sota.sota_initialized && agent->history_count >= 2) {
                             const char *last_resp =
                                 agent->history[agent->history_count - 2].content;
                             size_t last_resp_len =
                                 agent->history[agent->history_count - 2].content_len;
                             if (last_resp && last_resp_len > 0 && (is_positive || is_negative))
-                                hu_dpo_record_from_feedback(&agent->dpo_collector, msg, msg_len,
+                                hu_dpo_record_from_feedback(&agent->sota.dpo_collector, msg, msg_len,
                                                             last_resp, last_resp_len, is_positive);
                         }
 
@@ -4136,8 +4137,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
 #endif
             /* Adaptive RAG: record retrieval quality for learning */
-            if (agent->sota_initialized && rag_strategy_used != HU_RAG_NONE && memory_ctx_len > 0)
-                hu_adaptive_rag_record_outcome(&agent->adaptive_rag, rag_strategy_used,
+            if (agent->sota.sota_initialized && rag_strategy_used != HU_RAG_NONE && memory_ctx_len > 0)
+                hu_adaptive_rag_record_outcome(&agent->sota.adaptive_rag, rag_strategy_used,
                                                memory_ctx_len > 100 ? 0.8 : 0.4);
 
 #ifdef HU_HAS_PERSONA
@@ -4193,9 +4194,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
 
             /* Tier management: promote frequently-accessed memories, periodic consolidation */
-            if (agent->sota_initialized && agent->memory) {
+            if (agent->sota.sota_initialized && agent->memory) {
                 if (memory_ctx && memory_ctx_len > 20) {
-                    hu_tier_manager_promote(&agent->tier_manager, memory_ctx,
+                    hu_tier_manager_promote(&agent->sota.tier_manager, memory_ctx,
                                             memory_ctx_len < 128 ? memory_ctx_len : 128,
                                             HU_TIER_ARCHIVAL, HU_TIER_RECALL);
                 }
@@ -4424,16 +4425,16 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
 #if defined(HU_ENABLE_ML)
             /* End RL trajectory for this turn */
-            if (agent->current_trajectory_id > 0 && agent->memory) {
+            if (agent->sota.current_trajectory_id > 0 && agent->memory) {
                 sqlite3 *traj_db = hu_sqlite_memory_get_db(agent->memory);
                 if (traj_db) {
                     double total_reward = (turn_tool_results_count > 0)
                                               ? 0.5 + 0.1 * (double)turn_tool_results_count
                                               : 0.3;
-                    (void)hu_training_data_end_trajectory(traj_db, agent->current_trajectory_id,
+                    (void)hu_training_data_end_trajectory(traj_db, agent->sota.current_trajectory_id,
                                                           total_reward);
                 }
-                agent->current_trajectory_id = 0;
+                agent->sota.current_trajectory_id = 0;
             }
 #endif
 #endif /* HU_ENABLE_SQLITE */
@@ -4922,11 +4923,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     }
                                     if (swarm_n > 0) {
                                         /* MAR: use structured critique personas when enabled */
-                                        if (agent->mar_config.enabled && swarm_n == 1) {
+                                        if (agent->sota.mar_config.enabled && swarm_n == 1) {
                                             hu_mar_result_t mar_result;
                                             memset(&mar_result, 0, sizeof(mar_result));
                                             hu_error_t mar_err = hu_mar_execute(
-                                                agent->alloc, &agent->provider, &agent->mar_config,
+                                                agent->alloc, &agent->provider, &agent->sota.mar_config,
                                                 swarm_tasks[0].description,
                                                 swarm_tasks[0].description_len, &mar_result);
                                             if (mar_err == HU_OK && mar_result.final_output &&
@@ -5451,9 +5452,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             }
 
                             /* ESCALATE enforcement: check approval matrix */
-                            if (agent->escalate_protocol.rule_count > 0) {
+                            if (agent->sota.escalate_protocol.rule_count > 0) {
                                 hu_escalate_level_t esc_level =
-                                    hu_escalate_evaluate(&agent->escalate_protocol, tn_buf, tn);
+                                    hu_escalate_evaluate(&agent->sota.escalate_protocol, tn_buf, tn);
                                 if (esc_level == HU_ESCALATE_DENY) {
                                     hu_tool_result_free(agent->alloc, result);
                                     *result = hu_tool_result_fail("blocked by ESCALATE policy", 26);
@@ -5652,10 +5653,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             }
 
                             /* Tool result validation: schema + semantic checks */
-                            if (agent->tool_validator.default_level > HU_VALIDATE_NONE &&
+                            if (agent->sota.tool_validator.default_level > HU_VALIDATE_NONE &&
                                 result->success) {
                                 hu_validation_result_t vr;
-                                hu_tool_validator_check(&agent->tool_validator, tn_buf, tn, result,
+                                hu_tool_validator_check(&agent->sota.tool_validator, tn_buf, tn, result,
                                                         &vr);
                                 if (!vr.passed) {
                                     hu_log_error("agent_turn", NULL,
@@ -5752,7 +5753,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 #if defined(HU_ENABLE_ML)
                                 /* Trajectory: record tool step for RL training data */
                                 {
-                                    int64_t traj_id = agent->current_trajectory_id;
+                                    int64_t traj_id = agent->sota.current_trajectory_id;
                                     if (traj_id > 0) {
                                         const char *out_text =
                                             result->success ? result->output : result->error_msg;
@@ -6277,7 +6278,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 
         /* Scratchpad: persist turn metadata as working memory */
-        if (agent->scratchpad.max_bytes > 0) {
+        if (agent->sota.scratchpad.max_bytes > 0) {
             char turn_key[32];
             int tk_n = snprintf(turn_key, sizeof(turn_key), "turn_%d", (int)iter);
             if (tk_n > 0 && (size_t)tk_n < sizeof(turn_key)) {
@@ -6285,13 +6286,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 int tv_n = snprintf(turn_val, sizeof(turn_val), "tokens=%u,tools=%zu",
                                     (unsigned)turn_tokens, turn_tool_results_count);
                 if (tv_n > 0 && (size_t)tv_n < sizeof(turn_val))
-                    hu_scratchpad_set(&agent->scratchpad, agent->alloc, turn_key, (size_t)tk_n,
+                    hu_scratchpad_set(&agent->sota.scratchpad, agent->alloc, turn_key, (size_t)tk_n,
                                       turn_val, (size_t)tv_n);
             }
         }
 
         /* Checkpoint: auto-save state after tool iterations */
-        if (hu_checkpoint_should_save(&agent->checkpoint_store, (uint32_t)iter)) {
+        if (hu_checkpoint_should_save(&agent->sota.checkpoint_store, (uint32_t)iter)) {
             char cp_state[128];
             int cp_n = snprintf(cp_state, sizeof(cp_state), "{\"iter\":%d,\"tokens\":%llu}",
                                 (int)iter, (unsigned long long)agent->total_tokens);
@@ -6299,7 +6300,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 if ((size_t)cp_n >= sizeof(cp_state))
                     cp_n = (int)(sizeof(cp_state) - 1);
                 static const char cp_task[] = "agent_turn";
-                hu_checkpoint_save(&agent->checkpoint_store, agent->alloc, cp_task,
+                hu_checkpoint_save(&agent->sota.checkpoint_store, agent->alloc, cp_task,
                                    sizeof(cp_task) - 1, (uint32_t)iter, HU_CHECKPOINT_ACTIVE,
                                    cp_state, (size_t)cp_n);
             }

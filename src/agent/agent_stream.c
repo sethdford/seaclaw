@@ -724,7 +724,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * so we can run the quality pipeline before the user sees the response. */
         bool quality_buffered = false;
 #ifndef HU_IS_TEST
-        quality_buffered = agent->gvr_config.enabled || agent->constitutional_enabled;
+        quality_buffered = agent->sota.gvr_config.enabled || agent->constitutional_enabled;
 #endif
         hu_emotional_weight_t v2_ew = hu_emotional_weight_classify(msg, msg_len);
         uint32_t v2_pacing = (uint32_t)hu_emotional_pacing_adjust(0, v2_ew);
@@ -861,11 +861,11 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * Skip when persona is active — GVR's generic verifier rejects
          * persona-style responses (casual, terse) and rewrites them into
          * bland AI-speak, which is worse. */
-        if (agent->gvr_config.enabled && !agent->persona) {
+        if (agent->sota.gvr_config.enabled && !agent->persona) {
             hu_gvr_pipeline_result_t gvr_result;
             memset(&gvr_result, 0, sizeof(gvr_result));
             hu_error_t gvr_err = hu_gvr_pipeline(
-                agent->alloc, &agent->provider, &agent->gvr_config, agent->model_name,
+                agent->alloc, &agent->provider, &agent->sota.gvr_config, agent->model_name,
                 agent->model_name_len, msg, msg_len, final_content, final_content_len, &gvr_result);
             if (gvr_err == HU_OK && gvr_result.final_content &&
                 gvr_result.revisions_performed > 0) {
@@ -998,7 +998,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
     {
         bool was_buffered = false;
 #ifndef HU_IS_TEST
-        was_buffered = agent->gvr_config.enabled || agent->constitutional_enabled;
+        was_buffered = agent->sota.gvr_config.enabled || agent->constitutional_enabled;
 #endif
         if (was_buffered && final_content && on_event) {
             hu_agent_stream_event_t final_ev;

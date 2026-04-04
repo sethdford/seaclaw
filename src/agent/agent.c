@@ -492,48 +492,48 @@ hu_error_t hu_agent_from_config(
     }
 
     /* SOTA operational modules — safe defaults for production */
-    out->dq_config.enabled = true;
-    out->dq_config.deduplicate = true;
-    out->dq_config.check_encoding = true;
+    out->sota.dq_config.enabled = true;
+    out->sota.dq_config.deduplicate = true;
+    out->sota.dq_config.check_encoding = true;
 
-    hu_token_budget_init_defaults(&out->token_budget);
-    out->token_budget.enabled = true;
+    hu_token_budget_init_defaults(&out->sota.token_budget);
+    out->sota.token_budget.enabled = true;
 
-    out->tool_validator.default_level = HU_VALIDATE_SCHEMA;
+    out->sota.tool_validator.default_level = HU_VALIDATE_SCHEMA;
 
-    out->checkpoint_store.auto_checkpoint = true;
-    out->checkpoint_store.interval_steps = 5;
+    out->sota.checkpoint_store.auto_checkpoint = true;
+    out->sota.checkpoint_store.interval_steps = 5;
 
-    out->scratchpad.max_bytes = 4096;
+    out->sota.scratchpad.max_bytes = 4096;
 
-    out->mem_policy.enabled = true;
-    out->mem_policy.recency_weight = 0.4;
-    out->mem_policy.relevance_weight = 0.4;
-    out->mem_policy.frequency_weight = 0.2;
+    out->sota.mem_policy.enabled = true;
+    out->sota.mem_policy.recency_weight = 0.4;
+    out->sota.mem_policy.relevance_weight = 0.4;
+    out->sota.mem_policy.frequency_weight = 0.2;
 
-    out->gvr_config.enabled = true;
-    out->gvr_config.max_revisions = 2;
+    out->sota.gvr_config.enabled = true;
+    out->sota.gvr_config.max_revisions = 2;
 
-    out->degradation_config.enabled = true;
-    out->degradation_config.max_retries = 1;
+    out->sota.degradation_config.enabled = true;
+    out->sota.degradation_config.max_retries = 1;
 
     /* SOTA neural subsystems initialization */
-    out->srag_config = hu_srag_config_default();
-    out->prm_config = hu_prm_config_default();
+    out->sota.srag_config = hu_srag_config_default();
+    out->sota.prm_config = hu_prm_config_default();
     {
 #ifdef HU_ENABLE_SQLITE
         sqlite3 *sota_db = memory ? hu_sqlite_memory_get_db(memory) : NULL;
 #else
         void *sota_db = NULL;
 #endif
-        hu_adaptive_rag_create(alloc, sota_db, &out->adaptive_rag);
-        hu_tier_manager_create(alloc, sota_db, &out->tier_manager);
-        hu_tier_manager_init_tables(&out->tier_manager);
-        hu_tier_manager_load_core(&out->tier_manager);
-        hu_dpo_collector_create(alloc, sota_db, 10000, &out->dpo_collector);
-        hu_dpo_init_tables(&out->dpo_collector);
+        hu_adaptive_rag_create(alloc, sota_db, &out->sota.adaptive_rag);
+        hu_tier_manager_create(alloc, sota_db, &out->sota.tier_manager);
+        hu_tier_manager_init_tables(&out->sota.tier_manager);
+        hu_tier_manager_load_core(&out->sota.tier_manager);
+        hu_dpo_collector_create(alloc, sota_db, 10000, &out->sota.dpo_collector);
+        hu_dpo_init_tables(&out->sota.dpo_collector);
     }
-    out->sota_initialized = true;
+    out->sota.sota_initialized = true;
 
     hu_emotional_cognition_init(&out->emotional_cognition);
     hu_metacognition_init(&out->metacognition);
@@ -780,11 +780,11 @@ void hu_agent_deinit(hu_agent_t *agent) {
             hu_log_error("agent", NULL, "STM promotion failed: %s", hu_error_string(promo_err));
     }
     hu_stm_deinit(&agent->stm);
-    if (agent->sota_initialized) {
-        hu_adaptive_rag_deinit(&agent->adaptive_rag);
-        hu_tier_manager_deinit(&agent->tier_manager);
-        hu_dpo_collector_deinit(&agent->dpo_collector);
-        agent->sota_initialized = false;
+    if (agent->sota.sota_initialized) {
+        hu_adaptive_rag_deinit(&agent->sota.adaptive_rag);
+        hu_tier_manager_deinit(&agent->sota.tier_manager);
+        hu_dpo_collector_deinit(&agent->sota.dpo_collector);
+        agent->sota.sota_initialized = false;
     }
     hu_pattern_radar_deinit(&agent->radar);
     if (agent->commitment_store) {
@@ -862,8 +862,8 @@ hu_error_t hu_agent_consolidate_memory(hu_agent_t *agent) {
 
     /* After consolidation, demote stale recall-tier entries to archival.
      * Uses a sentinel key to trigger a sweep of entries older than the threshold. */
-    if (agent->sota_initialized) {
-        hu_tier_manager_demote(&agent->tier_manager, "__consolidation_sweep__", 23, HU_TIER_RECALL,
+    if (agent->sota.sota_initialized) {
+        hu_tier_manager_demote(&agent->sota.tier_manager, "__consolidation_sweep__", 23, HU_TIER_RECALL,
                                HU_TIER_ARCHIVAL);
     }
     return err;

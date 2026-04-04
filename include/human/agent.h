@@ -3,7 +3,6 @@
 
 #include "human/agent/approval_gate.h"
 #include "human/agent/chaos.h"
-#include "human/agent/workflow_event.h"
 #include "human/agent/checkpoint.h"
 #include "human/agent/commitment_store.h"
 #include "human/agent/data_quality.h"
@@ -38,7 +37,6 @@
 #include "human/memory/retrieval.h"
 #include "human/security/delegation.h"
 #include "human/security/escalate.h"
-#include "human/security/delegation.h"
 #include "human/tools/validation.h"
 #include "human/usage.h"
 #include "human/webhook.h"
@@ -95,6 +93,30 @@ typedef struct hu_owned_message {
 } hu_owned_message_t;
 
 typedef struct hu_agent hu_agent_t;
+
+/* SOTA neural subsystem fields, extracted from hu_agent_t to reduce struct size.
+ * Embedded as hu_agent_t::sota — always present, never NULL. */
+typedef struct hu_agent_extensions {
+    hu_srag_config_t srag_config;
+    hu_adaptive_rag_t adaptive_rag;
+    hu_tier_manager_t tier_manager;
+    hu_prm_config_t prm_config;
+    hu_dpo_collector_t dpo_collector;
+    int64_t current_trajectory_id; /* ML trajectory for RL training (0 = inactive) */
+    bool sota_initialized;
+
+    hu_gvr_config_t gvr_config;
+    hu_provider_degradation_config_t degradation_config;
+    hu_token_budget_config_t token_budget;
+    hu_tool_validator_t tool_validator;
+    hu_dq_config_t dq_config;
+    hu_mar_config_t mar_config;
+    hu_mem_policy_t mem_policy;
+    hu_chaos_engine_t chaos_engine;
+    hu_checkpoint_store_t checkpoint_store;
+    hu_scratchpad_t scratchpad;
+    hu_escalate_protocol_t escalate_protocol;
+} hu_agent_extensions_t;
 
 /* Optional context pressure config. Pass to hu_agent_from_config; NULL = use defaults. */
 typedef struct hu_agent_context_config {
@@ -282,47 +304,8 @@ struct hu_agent {
     void (*tool_stream_cb)(void *ctx, const char *data, size_t len);
     void *tool_stream_ctx;
 
-    /* SOTA neural subsystems */
-    hu_srag_config_t srag_config;
-    hu_adaptive_rag_t adaptive_rag;
-    hu_tier_manager_t tier_manager;
-    hu_prm_config_t prm_config;
-    hu_dpo_collector_t dpo_collector;
-    int64_t current_trajectory_id; /* ML trajectory for RL training (0 = inactive) */
-    bool sota_initialized;
-
-    /* GVR (Generator-Verifier-Reviser) pipeline config */
-    hu_gvr_config_t gvr_config;
-
-    /* Provider graceful degradation config */
-    hu_provider_degradation_config_t degradation_config;
-
-    /* Adaptive token budget (DOVA-style tier allocation) */
-    hu_token_budget_config_t token_budget;
-
-    /* Tool result validation */
-    hu_tool_validator_t tool_validator;
-
-    /* Data quality checks for context assembly */
-    hu_dq_config_t dq_config;
-
-    /* MAR orchestration config */
-    hu_mar_config_t mar_config;
-
-    /* Policy-learned memory management */
-    hu_mem_policy_t mem_policy;
-
-    /* Chaos testing engine */
-    hu_chaos_engine_t chaos_engine;
-
-    /* Checkpoint/resume store */
-    hu_checkpoint_store_t checkpoint_store;
-
-    /* Structured scratchpad */
-    hu_scratchpad_t scratchpad;
-
-    /* ESCALATE.md protocol */
-    hu_escalate_protocol_t escalate_protocol;
+    /* SOTA neural subsystems (extracted to reduce main struct field count) */
+    hu_agent_extensions_t sota;
 
     /* Permission tiers */
     hu_permission_level_t permission_level;      /* effective (may be escalated) */
