@@ -77,7 +77,6 @@ export class ScChatBubble extends LitElement {
       display: block;
       contain: layout style;
     }
-
     @keyframes hu-cursor-fade-out {
       from {
         opacity: 1;
@@ -101,89 +100,33 @@ export class ScChatBubble extends LitElement {
       }
     }
 
-    :host {
-      display: block;
-    }
-
     .bubble {
       position: relative;
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
       line-height: var(--hu-leading-relaxed);
       padding: var(--hu-space-sm) var(--hu-space-md);
-      box-shadow: var(--hu-shadow-sm);
     }
 
     .bubble.role-user {
       margin-left: auto;
       max-width: 75%;
-      background: linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--hu-accent) 85%, transparent),
-        var(--hu-accent-hover)
-      );
-      color: var(--hu-on-accent-text, var(--hu-on-accent));
+      background: var(--hu-surface-container-high);
+      color: var(--hu-text);
       border-radius: var(--hu-radius-xl) var(--hu-radius-xl) var(--hu-radius-sm) var(--hu-radius-xl);
       animation: hu-bubble-send var(--hu-duration-normal)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
-
-      &::after {
-        content: "";
-        display: var(--tail-display, none);
-        position: absolute;
-        bottom: -1px;
-        right: calc(-1 * var(--hu-space-sm));
-        width: var(--hu-space-sm);
-        height: calc(var(--hu-space-sm) + var(--hu-space-2xs));
-        background: var(--hu-accent);
-        clip-path: polygon(0 0, 100% 100%, 0 100%);
-      }
-
-      &.show-tail::after {
-        --tail-display: block;
-      }
     }
 
     .bubble.role-assistant {
       margin-right: auto;
-      max-width: 85%;
-      background: color-mix(in srgb, var(--hu-surface-container) 65%, transparent);
-      backdrop-filter: blur(var(--hu-blur-md));
-      -webkit-backdrop-filter: blur(var(--hu-blur-md));
+      max-width: 90%;
+      background: var(--hu-surface-container);
       color: var(--hu-text);
-      border: 1px solid color-mix(in srgb, var(--hu-color-white) 8%, transparent);
+      border: 1px solid var(--hu-border-subtle);
       border-radius: var(--hu-radius-xl) var(--hu-radius-xl) var(--hu-radius-xl) var(--hu-radius-sm);
-      box-shadow: var(--hu-shadow-xs);
       animation: hu-bubble-receive var(--hu-duration-normal)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
-
-      &::after {
-        content: "";
-        display: var(--tail-display, none);
-        position: absolute;
-        bottom: -1px;
-        left: calc(-1 * var(--hu-space-sm));
-        width: var(--hu-space-sm);
-        height: calc(var(--hu-space-sm) + var(--hu-space-2xs));
-        background: color-mix(in srgb, var(--hu-surface-container) 65%, transparent);
-        clip-path: polygon(100% 0, 100% 100%, 0 100%);
-      }
-
-      &.show-tail::after {
-        --tail-display: block;
-      }
-    }
-
-    @media (prefers-reduced-transparency: reduce) {
-      .bubble.role-assistant {
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        background: var(--hu-surface-container);
-        border: 1px solid var(--hu-border-subtle);
-      }
-      .bubble.role-assistant::after {
-        background: var(--hu-surface-container);
-      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -220,11 +163,11 @@ export class ScChatBubble extends LitElement {
     }
 
     .bubble.role-user .md-content {
-      color: var(--hu-on-accent);
+      color: var(--hu-text);
 
       & a {
-        color: var(--hu-on-accent);
-        text-decoration: underline;
+        color: var(--hu-accent);
+        text-decoration: none;
         &:hover {
           text-decoration: underline;
         }
@@ -235,7 +178,7 @@ export class ScChatBubble extends LitElement {
         font-size: 0.9em;
         padding: 0.1em 0.35em;
         border-radius: var(--hu-radius-sm);
-        background: color-mix(in srgb, var(--hu-on-accent) 90%, transparent);
+        background: var(--hu-bg-inset);
       }
     }
 
@@ -251,18 +194,19 @@ export class ScChatBubble extends LitElement {
 
     .md-content {
       & h1.md-heading {
-        font-size: var(--hu-text-2xl);
+        font-size: var(--hu-text-lg);
       }
       & h2.md-heading {
-        font-size: var(--hu-text-xl);
+        font-size: var(--hu-text-base);
+        font-weight: var(--hu-weight-semibold);
       }
       & h3.md-heading {
-        font-size: var(--hu-text-lg);
+        font-size: var(--hu-text-base);
       }
       & h4.md-heading,
       & h5.md-heading,
       & h6.md-heading {
-        font-size: var(--hu-text-base);
+        font-size: var(--hu-text-sm);
       }
     }
 
@@ -279,8 +223,8 @@ export class ScChatBubble extends LitElement {
     }
 
     .bubble.role-user .md-blockquote {
-      border-left-color: var(--hu-on-accent);
-      color: var(--hu-on-accent);
+      border-left-color: var(--hu-accent);
+      color: var(--hu-text);
     }
 
     .md-list {
@@ -335,19 +279,19 @@ export class ScChatBubble extends LitElement {
 
     .bubble.role-user .md-table th,
     .bubble.role-user .md-table td {
-      border-color: color-mix(in srgb, var(--hu-on-accent) 30%, transparent);
+      border-color: var(--hu-border);
     }
 
     .bubble.role-user .md-table tbody tr:nth-child(even) {
-      background: color-mix(in srgb, var(--hu-on-accent) 8%, transparent);
+      background: color-mix(in srgb, var(--hu-surface-container) 40%, transparent);
     }
 
     .bubble.role-user .md-table tbody tr:hover {
-      background: color-mix(in srgb, var(--hu-on-accent) 15%, transparent);
+      background: var(--hu-hover-overlay);
     }
 
     .bubble.role-user .md-table th {
-      background: color-mix(in srgb, var(--hu-on-accent) 25%, transparent);
+      background: var(--hu-surface-container-high);
     }
 
     .md-table th {
@@ -361,7 +305,7 @@ export class ScChatBubble extends LitElement {
     }
 
     .bubble.role-user .md-hr {
-      border-top-color: color-mix(in srgb, var(--hu-on-accent) 40%, transparent);
+      border-top-color: var(--hu-border);
     }
 
     .md-content img {
@@ -395,7 +339,7 @@ export class ScChatBubble extends LitElement {
     }
 
     .bubble.role-user .cursor {
-      background: var(--hu-on-accent);
+      background: var(--hu-accent);
     }
 
     .bubble.settling {
@@ -438,7 +382,7 @@ export class ScChatBubble extends LitElement {
     }
 
     .bubble.role-user .meta-slot {
-      color: var(--hu-on-accent);
+      color: var(--hu-text-secondary);
     }
 
     .bubble:hover .meta-slot {
@@ -487,17 +431,17 @@ export class ScChatBubble extends LitElement {
       text-overflow: ellipsis;
     }
     .bubble.role-user .reply-quote {
-      border-left-color: var(--hu-on-accent);
-      background: color-mix(in srgb, var(--hu-on-accent) 15%, transparent);
+      border-left-color: var(--hu-accent);
+      background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
     }
     .bubble.role-user .reply-quote:hover {
-      background: color-mix(in srgb, var(--hu-on-accent) 20%, transparent);
+      background: color-mix(in srgb, var(--hu-accent) 12%, transparent);
     }
     .bubble.role-user .reply-role {
-      color: var(--hu-on-accent);
+      color: var(--hu-text-secondary);
     }
     .bubble.role-user .reply-preview {
-      color: var(--hu-on-accent);
+      color: var(--hu-text);
     }
   `;
 

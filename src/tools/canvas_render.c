@@ -24,6 +24,7 @@ static const unsigned char hu_canvas_png_sig[8] = {
 };
 #endif
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static bool hu_canvas_path_shell_safe(const char *p) {
     if (!p)
         return false;
@@ -35,6 +36,7 @@ static bool hu_canvas_path_shell_safe(const char *p) {
     }
     return true;
 }
+#endif /* !(HU_IS_TEST) */
 
 static hu_error_t hu_canvas_copy_out_path(char *dst, size_t dst_cap, const char *src, size_t src_len) {
     if (src_len == 0 || src_len >= dst_cap)
@@ -76,6 +78,7 @@ hu_canvas_format_t hu_canvas_format_from_string(const char *s, size_t len) {
 }
 
 #ifndef _WIN32
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static hu_error_t hu_canvas_drain_popen(FILE *f, int *exit_status) {
     char drain[512];
     while (fgets(drain, (int)sizeof(drain), f) != NULL) {
@@ -190,8 +193,10 @@ static hu_error_t hu_canvas_mermaid_render(const char *content, size_t content_l
         return HU_ERR_NOT_SUPPORTED;
     return HU_OK;
 }
+#endif /* !(HU_IS_TEST) */
 #endif
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static hu_error_t hu_canvas_write_text_summary(hu_allocator_t *alloc, const char *content, size_t content_len,
                                                const char *label, const char *out_path_stack) {
     FILE *f = fopen(out_path_stack, "wb");
@@ -222,6 +227,7 @@ static hu_error_t hu_canvas_write_text_summary(hu_allocator_t *alloc, const char
     (void)alloc;
     return HU_OK;
 }
+#endif /* !(HU_IS_TEST) */
 
 hu_error_t hu_canvas_render_to_image(hu_allocator_t *alloc, const char *content, size_t content_len,
                                      hu_canvas_format_t format, const char *out_path, size_t out_path_len) {

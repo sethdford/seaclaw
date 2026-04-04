@@ -358,11 +358,6 @@
   --hu-view-transition-easing: cubic-bezier(0.16, 1, 0.3, 1);
   --hu-view-transition-new-enter: ease-out;
   --hu-view-transition-old-exit: ease-in;
-  /* Orb logo tokens */
-  --hu-orb-gradient-start: #5A9A30;
-  --hu-orb-gradient-end: #47802A;
-  --hu-orb-glow: rgba(122, 182, 72, 0.25);
-  --hu-orb-highlight: #7AB648;
   /* Dark theme colors (default) */
   --hu-accent: #7ab648;
   --hu-accent-hover: #8dc63f;
@@ -407,6 +402,13 @@
   --hu-focus-ring: #7ab648;
   --hu-focus-ring-offset: 2px;
   --hu-focus-ring-width: 2px;
+  --hu-hero-gradient: linear-gradient(
+    135deg,
+    rgba(122, 182, 72, 0.1) 0%,
+    rgba(90, 154, 48, 0.05) 40%,
+    rgba(74, 111, 165, 0.03) 80%,
+    transparent 100%
+  );
   --hu-hover-overlay: rgba(255, 255, 255, 0.08);
   --hu-info: #3b82f6;
   --hu-info-dim: rgba(59, 130, 246, 0.15);
@@ -680,7 +682,6 @@
 @media (prefers-color-scheme: light) {
   :root {
     /* Light theme — state/interactive tokens */
-    --hu-orb-glow: rgba(90, 154, 48, 0.2);
     --hu-accent: #7ab648;
     --hu-accent-hover: #5a9a30;
     --hu-accent-light: #e2f2c8;
@@ -719,6 +720,12 @@
     --hu-focus-ring: #5a9a30;
     --hu-focus-ring-offset: 2px;
     --hu-focus-ring-width: 2px;
+    --hu-hero-gradient: linear-gradient(
+      135deg,
+      rgba(122, 182, 72, 0.07) 0%,
+      rgba(122, 182, 72, 0.03) 50%,
+      transparent 100%
+    );
     --hu-hover-overlay: rgba(0, 0, 0, 0.06);
     --hu-info: #2563eb;
     --hu-info-dim: rgba(37, 99, 235, 0.1);
@@ -813,6 +820,13 @@
   --hu-focus-ring: #7ab648;
   --hu-focus-ring-offset: 2px;
   --hu-focus-ring-width: 2px;
+  --hu-hero-gradient: linear-gradient(
+    135deg,
+    rgba(122, 182, 72, 0.1) 0%,
+    rgba(90, 154, 48, 0.05) 40%,
+    rgba(74, 111, 165, 0.03) 80%,
+    transparent 100%
+  );
   --hu-hover-overlay: rgba(255, 255, 255, 0.08);
   --hu-info: #3b82f6;
   --hu-info-dim: rgba(59, 130, 246, 0.15);
@@ -878,7 +892,6 @@
 
 [data-theme="light"] {
   /* Light theme — explicit override for theme switcher */
-  --hu-orb-glow: rgba(90, 154, 48, 0.2);
   --hu-accent: #7ab648;
   --hu-accent-hover: #5a9a30;
   --hu-accent-light: #e2f2c8;
@@ -917,6 +930,12 @@
   --hu-focus-ring: #5a9a30;
   --hu-focus-ring-offset: 2px;
   --hu-focus-ring-width: 2px;
+  --hu-hero-gradient: linear-gradient(
+    135deg,
+    rgba(122, 182, 72, 0.07) 0%,
+    rgba(122, 182, 72, 0.03) 50%,
+    transparent 100%
+  );
   --hu-hover-overlay: rgba(0, 0, 0, 0.06);
   --hu-info: #2563eb;
   --hu-info-dim: rgba(37, 99, 235, 0.1);

@@ -815,6 +815,7 @@ hu_error_t hu_persona_load_markdown_buffer(hu_allocator_t *alloc, const char *co
 }
 #endif
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static int md_cmp_cstr(const void *a, const void *b) {
     const char *const *sa = (const char *const *)a;
     const char *const *sb = (const char *const *)b;
@@ -931,6 +932,7 @@ static hu_error_t discover_agents_platform(hu_allocator_t *alloc, const char *ag
     return HU_OK;
 }
 #endif
+#endif /* !(HU_IS_TEST) */
 
 hu_error_t hu_persona_discover_agents(hu_allocator_t *alloc, const char *agents_dir,
                                       char ***out_names, size_t *out_count) {

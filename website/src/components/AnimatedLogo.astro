@@ -213,540 +213,585 @@ const { size = 180, interactive = true } = Astro.props;
 </style>
 
 <script>
-  document
-    .querySelectorAll<HTMLElement>(".hu-orb-container")
-    .forEach((container) => {
-      const interactive = container.dataset.interactive === "true";
-      const orb = container.querySelector<HTMLElement>(".hu-orb");
-      const glow = container.querySelector<HTMLElement>(".hu-orb-glow");
-      const pulse = container.querySelector<HTMLElement>(".hu-orb-pulse");
-      const leftEye =
-        container.querySelector<SVGEllipseElement>(".hu-eye-left");
-      const rightEye =
-        container.querySelector<SVGEllipseElement>(".hu-eye-right");
+  function huDeferOrbScript(fn: () => void): void {
+    const prmEarly = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (prmEarly.matches) return;
+    const go = (): void => {
+      const ric = (
+        window as unknown as {
+          requestIdleCallback?: (
+            cb: () => void,
+            opts?: { timeout: number },
+          ) => number;
+        }
+      ).requestIdleCallback;
+      if (typeof ric === "function") ric(fn, { timeout: 5000 });
+      else setTimeout(fn, 0);
+    };
+    if (document.documentElement.classList.contains("hu-lcp-done")) {
+      go();
+      return;
+    }
+    let fired = false;
+    const once = (): void => {
+      if (fired) return;
+      fired = true;
+      mo.disconnect();
+      clearTimeout(tid);
+      go();
+    };
+    const mo = new MutationObserver(() => {
+      if (document.documentElement.classList.contains("hu-lcp-done")) once();
+    });
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    const tid = window.setTimeout(once, 4000);
+  }
 
-      if (!orb || !leftEye || !rightEye) return;
+  huDeferOrbScript(() => {
+    document
+      .querySelectorAll<HTMLElement>(".hu-orb-container")
+      .forEach((container) => {
+        const interactive = container.dataset.interactive === "true";
+        const orb = container.querySelector<HTMLElement>(".hu-orb");
+        const glow = container.querySelector<HTMLElement>(".hu-orb-glow");
+        const pulse = container.querySelector<HTMLElement>(".hu-orb-pulse");
+        const leftEye =
+          container.querySelector<SVGEllipseElement>(".hu-eye-left");
+        const rightEye =
+          container.querySelector<SVGEllipseElement>(".hu-eye-right");
 
-      const prm = window.matchMedia("(prefers-reduced-motion: reduce)");
-      if (prm.matches) return;
-      prm.addEventListener("change", (e) => {
-        if (e.matches) location.reload();
-      });
+        if (!orb || !leftEye || !rightEye) return;
 
-      const BASE_RX = 10;
-      const BASE_RY = 12;
-      const GAZE_K = 0.09;
-      const GAZE_D = 0.78;
-      const BODY_K = 0.025;
-      const BODY_D = 0.88;
-      const EXPR_K = 0.14;
-      const EXPR_D = 0.72;
-      const PUPIL_K = 0.06;
-      const PUPIL_D = 0.85;
-      const GAZE_NEAR = 9;
-      const GAZE_FAR = 3.5;
-      const MAX_TILT = 3;
-      const PUPIL_MIN = 0.85;
-      const PUPIL_MAX = 1.15;
-      const EYE_RX_FLOOR = 3;
-      const EYE_RY_FLOOR = 2;
-      const BLINK_MIN = 3500;
-      const BLINK_MAX = 7000;
-      const GLANCE_MIN = 5000;
-      const GLANCE_MAX = 11000;
-      const SACCADE_MIN = 2500;
-      const SACCADE_MAX = 5000;
-      const IDLE_MS = 25000;
+        const prm = window.matchMedia("(prefers-reduced-motion: reduce)");
+        if (prm.matches) return;
+        prm.addEventListener("change", (e) => {
+          if (e.matches) location.reload();
+        });
 
-      const EXPR: Record<string, [number, number, number, number]> = {
-        neutral: [0, 0, 0, 1.0],
-        curious: [1.2, 2.5, 0.12, 1.12],
-        surprised: [2, 4, 0.2, 1.15],
-        delighted: [0.8, -1.5, 0.18, 1.1],
-        thinking: [-0.5, -1.2, -0.05, 0.92],
-        sleepy: [-0.8, -5, -0.18, 0.88],
-        alert: [1.5, 3, 0.18, 1.12],
-        playful: [0.6, 1, 0.15, 1.08],
-        focused: [0, -0.5, 0.05, 0.95],
-      };
+        const BASE_RX = 10;
+        const BASE_RY = 12;
+        const GAZE_K = 0.09;
+        const GAZE_D = 0.78;
+        const BODY_K = 0.025;
+        const BODY_D = 0.88;
+        const EXPR_K = 0.14;
+        const EXPR_D = 0.72;
+        const PUPIL_K = 0.06;
+        const PUPIL_D = 0.85;
+        const GAZE_NEAR = 9;
+        const GAZE_FAR = 3.5;
+        const MAX_TILT = 3;
+        const PUPIL_MIN = 0.85;
+        const PUPIL_MAX = 1.15;
+        const EYE_RX_FLOOR = 3;
+        const EYE_RY_FLOOR = 2;
+        const BLINK_MIN = 3500;
+        const BLINK_MAX = 7000;
+        const GLANCE_MIN = 5000;
+        const GLANCE_MAX = 11000;
+        const SACCADE_MIN = 2500;
+        const SACCADE_MAX = 5000;
+        const IDLE_MS = 25000;
 
-      let mouseX = window.innerWidth / 2,
-        mouseY = window.innerHeight / 2;
-      let gazeX = 0,
-        gazeY = 0,
-        gVelX = 0,
-        gVelY = 0,
-        gTargetX = 0,
-        gTargetY = 0;
-      let saccadeX = 0,
-        saccadeY = 0,
-        ambientX = 0,
-        ambientY = 0;
-      let exRx = 0,
-        exRy = 0,
-        exGlow = 0,
-        exPupil = 1;
-      let tRx = 0,
-        tRy = 0,
-        tGlow = 0,
-        tPupil = 1;
-      let rxV = 0,
-        ryV = 0,
-        pupilV = 0;
-      let blinkRy = 0,
-        breathPhase = 0,
-        scrollOffset = 0;
-      let tiltAngle = 0,
-        tiltVel = 0,
-        squashY = 1,
-        squashVel = 0,
-        bounceY = 0,
-        bounceVel = 0;
-      let glowOffX = 0,
-        glowOffY = 0;
-      let isVisible = true,
-        isHovering = false,
-        isSleepy = false;
-      let lastActivity = Date.now(),
-        bodyActive = false,
-        blinking = false;
-      let lookBiasX = 0,
-        lookBiasY = 0,
-        lookTargetX = 0,
-        lookTargetY = 0;
-      let exprTimer: ReturnType<typeof setTimeout> | null = null;
+        const EXPR: Record<string, [number, number, number, number]> = {
+          neutral: [0, 0, 0, 1.0],
+          curious: [1.2, 2.5, 0.12, 1.12],
+          surprised: [2, 4, 0.2, 1.15],
+          delighted: [0.8, -1.5, 0.18, 1.1],
+          thinking: [-0.5, -1.2, -0.05, 0.92],
+          sleepy: [-0.8, -5, -0.18, 0.88],
+          alert: [1.5, 3, 0.18, 1.12],
+          playful: [0.6, 1, 0.15, 1.08],
+          focused: [0, -0.5, 0.05, 0.95],
+        };
 
-      function setExpr(name: string, duration = 0) {
-        const e = EXPR[name] || EXPR.neutral;
-        tRx = e[0];
-        tRy = e[1];
-        tGlow = e[2];
-        tPupil = e[3];
-        if (exprTimer) clearTimeout(exprTimer);
-        if (duration > 0)
-          exprTimer = setTimeout(() => setExpr("neutral"), duration);
-      }
-
-      function setExprWithAnticipation(name: string, duration = 0) {
-        microBlink(50);
-        setTimeout(() => setExpr(name, duration), 60);
-      }
-
-      function microBlink(ms = 70) {
-        if (blinking) return;
-        blinking = true;
-        blinkRy = -9;
-        setTimeout(() => {
-          blinkRy = 0;
+        let mouseX = window.innerWidth / 2,
+          mouseY = window.innerHeight / 2;
+        let gazeX = 0,
+          gazeY = 0,
+          gVelX = 0,
+          gVelY = 0,
+          gTargetX = 0,
+          gTargetY = 0;
+        let saccadeX = 0,
+          saccadeY = 0,
+          ambientX = 0,
+          ambientY = 0;
+        let exRx = 0,
+          exRy = 0,
+          exGlow = 0,
+          exPupil = 1;
+        let tRx = 0,
+          tRy = 0,
+          tGlow = 0,
+          tPupil = 1;
+        let rxV = 0,
+          ryV = 0,
+          pupilV = 0;
+        let blinkRy = 0,
+          breathPhase = 0,
+          scrollOffset = 0;
+        let tiltAngle = 0,
+          tiltVel = 0,
+          squashY = 1,
+          squashVel = 0,
+          bounceY = 0,
+          bounceVel = 0;
+        let glowOffX = 0,
+          glowOffY = 0;
+        let isVisible = true,
+          isHovering = false,
+          isSleepy = false;
+        let lastActivity = Date.now(),
+          bodyActive = false,
           blinking = false;
-        }, ms);
-      }
+        let lookBiasX = 0,
+          lookBiasY = 0,
+          lookTargetX = 0,
+          lookTargetY = 0;
+        let exprTimer: ReturnType<typeof setTimeout> | null = null;
 
-      function doubleBlink() {
-        if (blinking) return;
-        blinking = true;
-        blinkRy = -11;
-        setTimeout(() => {
-          blinkRy = 0;
+        function setExpr(name: string, duration = 0) {
+          const e = EXPR[name] || EXPR.neutral;
+          tRx = e[0];
+          tRy = e[1];
+          tGlow = e[2];
+          tPupil = e[3];
+          if (exprTimer) clearTimeout(exprTimer);
+          if (duration > 0)
+            exprTimer = setTimeout(() => setExpr("neutral"), duration);
+        }
+
+        function setExprWithAnticipation(name: string, duration = 0) {
+          microBlink(50);
+          setTimeout(() => setExpr(name, duration), 60);
+        }
+
+        function microBlink(ms = 70) {
+          if (blinking) return;
+          blinking = true;
+          blinkRy = -9;
           setTimeout(() => {
-            blinkRy = -11;
-            setTimeout(() => {
-              blinkRy = 0;
-              blinking = false;
-            }, 90);
-          }, 180);
-        }, 90);
-      }
+            blinkRy = 0;
+            blinking = false;
+          }, ms);
+        }
 
-      function singleBlink() {
-        if (blinking) return;
-        blinking = true;
-        blinkRy = -11;
-        setTimeout(
-          () => {
-            blinkRy = -11.5;
-            setTimeout(
-              () => {
+        function doubleBlink() {
+          if (blinking) return;
+          blinking = true;
+          blinkRy = -11;
+          setTimeout(() => {
+            blinkRy = 0;
+            setTimeout(() => {
+              blinkRy = -11;
+              setTimeout(() => {
                 blinkRy = 0;
                 blinking = false;
-              },
-              60 + Math.random() * 40,
-            );
-          },
-          20 + Math.random() * 30,
-        );
-      }
+              }, 90);
+            }, 180);
+          }, 90);
+        }
 
-      function sleepyBlink() {
-        if (blinking) return;
-        blinking = true;
-        blinkRy = -10;
-        setTimeout(() => {
-          blinkRy = -12;
+        function singleBlink() {
+          if (blinking) return;
+          blinking = true;
+          blinkRy = -11;
+          setTimeout(
+            () => {
+              blinkRy = -11.5;
+              setTimeout(
+                () => {
+                  blinkRy = 0;
+                  blinking = false;
+                },
+                60 + Math.random() * 40,
+              );
+            },
+            20 + Math.random() * 30,
+          );
+        }
+
+        function sleepyBlink() {
+          if (blinking) return;
+          blinking = true;
+          blinkRy = -10;
           setTimeout(() => {
-            blinkRy = -8;
+            blinkRy = -12;
             setTimeout(() => {
-              blinkRy = 0;
-              blinking = false;
-            }, 200);
-          }, 300);
-        }, 150);
-      }
+              blinkRy = -8;
+              setTimeout(() => {
+                blinkRy = 0;
+                blinking = false;
+              }, 200);
+            }, 300);
+          }, 150);
+        }
 
-      function easeIO(t: number) {
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      }
+        function easeIO(t: number) {
+          return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
 
-      document.addEventListener(
-        "mousemove",
-        (e) => {
-          mouseX = e.clientX;
-          mouseY = e.clientY;
-          lastActivity = Date.now();
-          if (isSleepy) {
-            isSleepy = false;
-            sleepyBlink();
-            setTimeout(() => setExpr("alert", 800), 400);
-          }
-        },
-        { passive: true },
-      );
-
-      document.addEventListener(
-        "touchmove",
-        (e) => {
-          if (e.touches.length > 0) {
-            mouseX = e.touches[0].clientX;
-            mouseY = e.touches[0].clientY;
+        document.addEventListener(
+          "mousemove",
+          (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
             lastActivity = Date.now();
-          }
-        },
-        { passive: true },
-      );
+            if (isSleepy) {
+              isSleepy = false;
+              sleepyBlink();
+              setTimeout(() => setExpr("alert", 800), 400);
+            }
+          },
+          { passive: true },
+        );
 
-      document.addEventListener("click", (e) => {
-        lastActivity = Date.now();
-        if ((e.target as HTMLElement).closest(".hu-orb-container")) {
-          squashVel = 0.06;
-          setTimeout(() => {
-            setExpr("delighted", 1500);
-            bounceVel = -4;
-            squashVel = -0.08;
-          }, 80);
-        } else {
-          microBlink(60);
-        }
-      });
+        document.addEventListener(
+          "touchmove",
+          (e) => {
+            if (e.touches.length > 0) {
+              mouseX = e.touches[0].clientX;
+              mouseY = e.touches[0].clientY;
+              lastActivity = Date.now();
+            }
+          },
+          { passive: true },
+        );
 
-      window.addEventListener(
-        "scroll",
-        () => {
-          const max =
-            document.documentElement.scrollHeight - window.innerHeight;
-          scrollOffset = (window.scrollY / (max || 1)) * 3;
+        document.addEventListener("click", (e) => {
           lastActivity = Date.now();
-        },
-        { passive: true },
-      );
-
-      document.addEventListener("visibilitychange", () => {
-        isVisible = document.visibilityState === "visible";
-        if (isVisible) {
-          lastActivity = Date.now();
-          setExprWithAnticipation("surprised", 600);
-          setTimeout(() => setExpr("curious", 1200), 650);
-        }
-      });
-
-      if (interactive) {
-        orb.addEventListener("mouseenter", () => {
-          isHovering = true;
-          setExpr("curious");
-          lastActivity = Date.now();
-        });
-        orb.addEventListener("mouseleave", () => {
-          isHovering = false;
-          if (!isSleepy) {
-            microBlink(50);
-            setTimeout(() => setExpr("neutral"), 60);
-          }
-        });
-      }
-
-      document.addEventListener(
-        "mouseover",
-        (e) => {
-          const el = (e.target as HTMLElement).closest(
-            "a, button, [role='button']",
-          );
-          if (el && !el.closest(".hu-orb-container")) {
-            const r = el.getBoundingClientRect();
-            const o = container.getBoundingClientRect();
-            const dx = r.left + r.width / 2 - (o.left + o.width / 2);
-            const dy = r.top + r.height / 2 - (o.top + o.height / 2);
-            const maxD = Math.max(window.innerWidth, window.innerHeight) * 0.5;
-            lookTargetX = (dx / maxD) * 3.5;
-            lookTargetY = (dy / maxD) * 3.5;
-          }
-        },
-        { passive: true },
-      );
-
-      document.addEventListener(
-        "mouseout",
-        (e) => {
-          if ((e.target as HTMLElement).closest("a, button, [role='button']")) {
-            lookTargetX = 0;
-            lookTargetY = 0;
-          }
-        },
-        { passive: true },
-      );
-
-      container.addEventListener(
-        "animationend",
-        () => {
-          container.style.animation = "none";
-          bodyActive = true;
-        },
-        { once: true },
-      );
-
-      function scheduleGlance() {
-        setTimeout(
-          () => {
-            if (!isVisible || isHovering) {
-              scheduleGlance();
-              return;
-            }
-            const tx = (Math.random() - 0.5) * 7,
-              ty = (Math.random() - 0.5) * 5;
-            const sx = ambientX,
-              sy = ambientY;
-            if (Math.random() < 0.4) microBlink(50);
-            let el = 0;
-            const dur = 450 + Math.random() * 150;
-            function go() {
-              el += 16;
-              const p = Math.min(1, el / dur);
-              ambientX = sx + (tx - sx) * easeIO(p);
-              ambientY = sy + (ty - sy) * easeIO(p);
-              if (p < 1) requestAnimationFrame(go);
-            }
-            requestAnimationFrame(go);
-            setTimeout(
-              () => {
-                const rx = ambientX,
-                  ry = ambientY;
-                let re = 0;
-                const rd = 500 + Math.random() * 200;
-                function back() {
-                  re += 16;
-                  const p = Math.min(1, re / rd);
-                  ambientX = rx * (1 - easeIO(p));
-                  ambientY = ry * (1 - easeIO(p));
-                  if (p < 1) requestAnimationFrame(back);
-                }
-                requestAnimationFrame(back);
-              },
-              1200 + Math.random() * 2500,
-            );
-            scheduleGlance();
-          },
-          GLANCE_MIN + Math.random() * (GLANCE_MAX - GLANCE_MIN),
-        );
-      }
-      scheduleGlance();
-
-      function scheduleBlink() {
-        setTimeout(
-          () => {
-            if (!isVisible) {
-              scheduleBlink();
-              return;
-            }
-            const r = Math.random();
-            if (isSleepy) sleepyBlink();
-            else if (r < 0.55) doubleBlink();
-            else if (r < 0.85) singleBlink();
-            else microBlink(55);
-            scheduleBlink();
-          },
-          (isSleepy ? 1800 : BLINK_MIN) +
-            Math.random() * (BLINK_MAX - BLINK_MIN),
-        );
-      }
-      scheduleBlink();
-
-      function scheduleSaccade() {
-        setTimeout(
-          () => {
-            if (!isVisible || isHovering) {
-              scheduleSaccade();
-              return;
-            }
-            saccadeX = (Math.random() - 0.5) * 4.5;
-            saccadeY = (Math.random() - 0.5) * 3.5;
-            if (Math.random() < 0.2) microBlink(50);
-            setTimeout(
-              () => {
-                saccadeX = 0;
-                saccadeY = 0;
-              },
-              35 + Math.random() * 35,
-            );
-            scheduleSaccade();
-          },
-          SACCADE_MIN + Math.random() * (SACCADE_MAX - SACCADE_MIN),
-        );
-      }
-      scheduleSaccade();
-
-      function scheduleFidget() {
-        setTimeout(
-          () => {
-            if (!isVisible || isHovering || isSleepy) {
-              scheduleFidget();
-              return;
-            }
-            const picks = [
-              "thinking",
-              "curious",
-              "alert",
-              "playful",
-              "focused",
-            ];
-            setExprWithAnticipation(
-              picks[Math.floor(Math.random() * picks.length)],
-              1000 + Math.random() * 1200,
-            );
-            scheduleFidget();
-          },
-          12000 + Math.random() * 12000,
-        );
-      }
-      scheduleFidget();
-
-      function scheduleCameraLook() {
-        setTimeout(
-          () => {
-            if (!isVisible || isHovering || isSleepy) {
-              scheduleCameraLook();
-              return;
-            }
-            const sa = ambientX,
-              sb = ambientY;
-            ambientX = 0;
-            ambientY = 0;
-            gTargetX = 0;
-            gTargetY = 0;
-            setExpr("playful", 1800);
+          if ((e.target as HTMLElement).closest(".hu-orb-container")) {
+            squashVel = 0.06;
             setTimeout(() => {
-              ambientX = sa;
-              ambientY = sb;
-            }, 1800);
-            scheduleCameraLook();
+              setExpr("delighted", 1500);
+              bounceVel = -4;
+              squashVel = -0.08;
+            }, 80);
+          } else {
+            microBlink(60);
+          }
+        });
+
+        window.addEventListener(
+          "scroll",
+          () => {
+            const max =
+              document.documentElement.scrollHeight - window.innerHeight;
+            scrollOffset = (window.scrollY / (max || 1)) * 3;
+            lastActivity = Date.now();
           },
-          30000 + Math.random() * 40000,
+          { passive: true },
         );
-      }
-      scheduleCameraLook();
 
-      if (interactive) {
-        setTimeout(() => {
-          setExpr("curious", 1200);
-          setTimeout(() => {
-            setExpr("playful", 800);
-            setTimeout(() => setExpr("neutral"), 800);
-          }, 1200);
-        }, 1600);
-      }
+        document.addEventListener("visibilitychange", () => {
+          isVisible = document.visibilityState === "visible";
+          if (isVisible) {
+            lastActivity = Date.now();
+            setExprWithAnticipation("surprised", 600);
+            setTimeout(() => setExpr("curious", 1200), 650);
+          }
+        });
 
-      function tick() {
-        if (!isVisible) {
-          requestAnimationFrame(tick);
-          return;
-        }
-        if (Date.now() - lastActivity > IDLE_MS && !isSleepy) {
-          isSleepy = true;
-          setExpr("sleepy");
-        }
-
-        const oR = container.getBoundingClientRect();
-        const oCX = oR.left + oR.width / 2,
-          oCY = oR.top + oR.height / 2;
-        const dx = mouseX - oCX,
-          dy = mouseY - oCY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const prox = isHovering ? 1 : Math.max(0, 1 - dist / (oR.width * 4));
-        const range = GAZE_FAR + (GAZE_NEAR - GAZE_FAR) * prox;
-        const maxD = Math.max(window.innerWidth, window.innerHeight) / 2;
-
-        lookBiasX += (lookTargetX - lookBiasX) * 0.05;
-        lookBiasY += (lookTargetY - lookBiasY) * 0.05;
-        gTargetX = (dx / maxD) * range + lookBiasX;
-        gTargetY = (dy / maxD) * range + lookBiasY;
-        gVelX = (gVelX + (gTargetX - gazeX) * GAZE_K) * GAZE_D;
-        gVelY = (gVelY + (gTargetY - gazeY) * GAZE_K) * GAZE_D;
-        gazeX += gVelX;
-        gazeY += gVelY;
-
-        rxV = (rxV + (tRx - exRx) * EXPR_K) * EXPR_D;
-        ryV = (ryV + (tRy - exRy) * EXPR_K) * EXPR_D;
-        exRx += rxV;
-        exRy += ryV;
-        exGlow += (tGlow - exGlow) * 0.07;
-        pupilV = (pupilV + (tPupil - exPupil) * PUPIL_K) * PUPIL_D;
-        exPupil += pupilV;
-        exPupil = Math.max(PUPIL_MIN, Math.min(PUPIL_MAX, exPupil));
-
-        breathPhase += 0.015;
-        const breathRy = Math.sin(breathPhase * Math.PI) * 0.3;
-        const breathScale = Math.sin(breathPhase * Math.PI) * 0.003;
-
-        const totalX = gazeX + ambientX + saccadeX;
-        const totalY = gazeY + ambientY + saccadeY + scrollOffset;
-        const fRx = Math.max(EYE_RX_FLOOR, (BASE_RX + exRx) * exPupil);
-        const fRy = Math.max(EYE_RY_FLOOR, BASE_RY + exRy + breathRy + blinkRy);
-
-        const conv = isHovering ? 0.6 : 0.3;
-        leftEye!.style.transform = `translate(${(totalX - conv).toFixed(2)}px, ${totalY.toFixed(2)}px)`;
-        leftEye!.setAttribute("rx", fRx.toFixed(2));
-        leftEye!.setAttribute("ry", fRy.toFixed(2));
-        rightEye!.style.transform = `translate(${(totalX + conv).toFixed(2)}px, ${totalY.toFixed(2)}px)`;
-        rightEye!.setAttribute("rx", fRx.toFixed(2));
-        rightEye!.setAttribute("ry", fRy.toFixed(2));
-
-        if (bodyActive) {
-          const tiltTarget = totalX * 0.35;
-          tiltVel = (tiltVel + (tiltTarget - tiltAngle) * BODY_K) * BODY_D;
-          tiltAngle += tiltVel;
-          tiltAngle = Math.max(-MAX_TILT, Math.min(MAX_TILT, tiltAngle));
-          squashVel = (squashVel + (1 - squashY) * 0.12) * 0.68;
-          squashY += squashVel;
-          bounceVel = (bounceVel + (0 - bounceY) * 0.12) * 0.68;
-          bounceY += bounceVel;
-          const scaleX = 1 + (1 - squashY) * 0.5;
-          container.style.transform = `translateY(${bounceY.toFixed(1)}px) rotate(${tiltAngle.toFixed(2)}deg) scale(${(scaleX + breathScale).toFixed(4)}, ${(squashY + breathScale).toFixed(4)})`;
+        if (interactive) {
+          orb.addEventListener("mouseenter", () => {
+            isHovering = true;
+            setExpr("curious");
+            lastActivity = Date.now();
+          });
+          orb.addEventListener("mouseleave", () => {
+            isHovering = false;
+            if (!isSleepy) {
+              microBlink(50);
+              setTimeout(() => setExpr("neutral"), 60);
+            }
+          });
         }
 
-        if (glow) {
-          glowOffX += (totalX * 2 - glowOffX) * 0.04;
-          glowOffY += (totalY * 2 - glowOffY) * 0.04;
-          glow.style.opacity = Math.max(0, Math.min(1, 0.6 + exGlow)).toFixed(
-            3,
+        document.addEventListener(
+          "mouseover",
+          (e) => {
+            const el = (e.target as HTMLElement).closest(
+              "a, button, [role='button']",
+            );
+            if (el && !el.closest(".hu-orb-container")) {
+              const r = el.getBoundingClientRect();
+              const o = container.getBoundingClientRect();
+              const dx = r.left + r.width / 2 - (o.left + o.width / 2);
+              const dy = r.top + r.height / 2 - (o.top + o.height / 2);
+              const maxD =
+                Math.max(window.innerWidth, window.innerHeight) * 0.5;
+              lookTargetX = (dx / maxD) * 3.5;
+              lookTargetY = (dy / maxD) * 3.5;
+            }
+          },
+          { passive: true },
+        );
+
+        document.addEventListener(
+          "mouseout",
+          (e) => {
+            if (
+              (e.target as HTMLElement).closest("a, button, [role='button']")
+            ) {
+              lookTargetX = 0;
+              lookTargetY = 0;
+            }
+          },
+          { passive: true },
+        );
+
+        container.addEventListener(
+          "animationend",
+          () => {
+            container.style.animation = "none";
+            bodyActive = true;
+          },
+          { once: true },
+        );
+
+        function scheduleGlance() {
+          setTimeout(
+            () => {
+              if (!isVisible || isHovering) {
+                scheduleGlance();
+                return;
+              }
+              const tx = (Math.random() - 0.5) * 7,
+                ty = (Math.random() - 0.5) * 5;
+              const sx = ambientX,
+                sy = ambientY;
+              if (Math.random() < 0.4) microBlink(50);
+              let el = 0;
+              const dur = 450 + Math.random() * 150;
+              function go() {
+                el += 16;
+                const p = Math.min(1, el / dur);
+                ambientX = sx + (tx - sx) * easeIO(p);
+                ambientY = sy + (ty - sy) * easeIO(p);
+                if (p < 1) requestAnimationFrame(go);
+              }
+              requestAnimationFrame(go);
+              setTimeout(
+                () => {
+                  const rx = ambientX,
+                    ry = ambientY;
+                  let re = 0;
+                  const rd = 500 + Math.random() * 200;
+                  function back() {
+                    re += 16;
+                    const p = Math.min(1, re / rd);
+                    ambientX = rx * (1 - easeIO(p));
+                    ambientY = ry * (1 - easeIO(p));
+                    if (p < 1) requestAnimationFrame(back);
+                  }
+                  requestAnimationFrame(back);
+                },
+                1200 + Math.random() * 2500,
+              );
+              scheduleGlance();
+            },
+            GLANCE_MIN + Math.random() * (GLANCE_MAX - GLANCE_MIN),
           );
-          glow.style.transform = `translate(${glowOffX.toFixed(1)}px, ${glowOffY.toFixed(1)}px)`;
         }
-        if (pulse) {
-          pulse.style.opacity = Math.max(
-            0,
-            Math.min(1, 0.4 + exGlow * 0.8),
-          ).toFixed(3);
+        scheduleGlance();
+
+        function scheduleBlink() {
+          setTimeout(
+            () => {
+              if (!isVisible) {
+                scheduleBlink();
+                return;
+              }
+              const r = Math.random();
+              if (isSleepy) sleepyBlink();
+              else if (r < 0.55) doubleBlink();
+              else if (r < 0.85) singleBlink();
+              else microBlink(55);
+              scheduleBlink();
+            },
+            (isSleepy ? 1800 : BLINK_MIN) +
+              Math.random() * (BLINK_MAX - BLINK_MIN),
+          );
+        }
+        scheduleBlink();
+
+        function scheduleSaccade() {
+          setTimeout(
+            () => {
+              if (!isVisible || isHovering) {
+                scheduleSaccade();
+                return;
+              }
+              saccadeX = (Math.random() - 0.5) * 4.5;
+              saccadeY = (Math.random() - 0.5) * 3.5;
+              if (Math.random() < 0.2) microBlink(50);
+              setTimeout(
+                () => {
+                  saccadeX = 0;
+                  saccadeY = 0;
+                },
+                35 + Math.random() * 35,
+              );
+              scheduleSaccade();
+            },
+            SACCADE_MIN + Math.random() * (SACCADE_MAX - SACCADE_MIN),
+          );
+        }
+        scheduleSaccade();
+
+        function scheduleFidget() {
+          setTimeout(
+            () => {
+              if (!isVisible || isHovering || isSleepy) {
+                scheduleFidget();
+                return;
+              }
+              const picks = [
+                "thinking",
+                "curious",
+                "alert",
+                "playful",
+                "focused",
+              ];
+              setExprWithAnticipation(
+                picks[Math.floor(Math.random() * picks.length)],
+                1000 + Math.random() * 1200,
+              );
+              scheduleFidget();
+            },
+            12000 + Math.random() * 12000,
+          );
+        }
+        scheduleFidget();
+
+        function scheduleCameraLook() {
+          setTimeout(
+            () => {
+              if (!isVisible || isHovering || isSleepy) {
+                scheduleCameraLook();
+                return;
+              }
+              const sa = ambientX,
+                sb = ambientY;
+              ambientX = 0;
+              ambientY = 0;
+              gTargetX = 0;
+              gTargetY = 0;
+              setExpr("playful", 1800);
+              setTimeout(() => {
+                ambientX = sa;
+                ambientY = sb;
+              }, 1800);
+              scheduleCameraLook();
+            },
+            30000 + Math.random() * 40000,
+          );
+        }
+        scheduleCameraLook();
+
+        if (interactive) {
+          setTimeout(() => {
+            setExpr("curious", 1200);
+            setTimeout(() => {
+              setExpr("playful", 800);
+              setTimeout(() => setExpr("neutral"), 800);
+            }, 1200);
+          }, 1600);
         }
 
+        function tick() {
+          if (!isVisible) {
+            requestAnimationFrame(tick);
+            return;
+          }
+          if (Date.now() - lastActivity > IDLE_MS && !isSleepy) {
+            isSleepy = true;
+            setExpr("sleepy");
+          }
+
+          const oR = container.getBoundingClientRect();
+          const oCX = oR.left + oR.width / 2,
+            oCY = oR.top + oR.height / 2;
+          const dx = mouseX - oCX,
+            dy = mouseY - oCY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const prox = isHovering ? 1 : Math.max(0, 1 - dist / (oR.width * 4));
+          const range = GAZE_FAR + (GAZE_NEAR - GAZE_FAR) * prox;
+          const maxD = Math.max(window.innerWidth, window.innerHeight) / 2;
+
+          lookBiasX += (lookTargetX - lookBiasX) * 0.05;
+          lookBiasY += (lookTargetY - lookBiasY) * 0.05;
+          gTargetX = (dx / maxD) * range + lookBiasX;
+          gTargetY = (dy / maxD) * range + lookBiasY;
+          gVelX = (gVelX + (gTargetX - gazeX) * GAZE_K) * GAZE_D;
+          gVelY = (gVelY + (gTargetY - gazeY) * GAZE_K) * GAZE_D;
+          gazeX += gVelX;
+          gazeY += gVelY;
+
+          rxV = (rxV + (tRx - exRx) * EXPR_K) * EXPR_D;
+          ryV = (ryV + (tRy - exRy) * EXPR_K) * EXPR_D;
+          exRx += rxV;
+          exRy += ryV;
+          exGlow += (tGlow - exGlow) * 0.07;
+          pupilV = (pupilV + (tPupil - exPupil) * PUPIL_K) * PUPIL_D;
+          exPupil += pupilV;
+          exPupil = Math.max(PUPIL_MIN, Math.min(PUPIL_MAX, exPupil));
+
+          breathPhase += 0.015;
+          const breathRy = Math.sin(breathPhase * Math.PI) * 0.3;
+          const breathScale = Math.sin(breathPhase * Math.PI) * 0.003;
+
+          const totalX = gazeX + ambientX + saccadeX;
+          const totalY = gazeY + ambientY + saccadeY + scrollOffset;
+          const fRx = Math.max(EYE_RX_FLOOR, (BASE_RX + exRx) * exPupil);
+          const fRy = Math.max(
+            EYE_RY_FLOOR,
+            BASE_RY + exRy + breathRy + blinkRy,
+          );
+
+          const conv = isHovering ? 0.6 : 0.3;
+          leftEye!.style.transform = `translate(${(totalX - conv).toFixed(2)}px, ${totalY.toFixed(2)}px)`;
+          leftEye!.setAttribute("rx", fRx.toFixed(2));
+          leftEye!.setAttribute("ry", fRy.toFixed(2));
+          rightEye!.style.transform = `translate(${(totalX + conv).toFixed(2)}px, ${totalY.toFixed(2)}px)`;
+          rightEye!.setAttribute("rx", fRx.toFixed(2));
+          rightEye!.setAttribute("ry", fRy.toFixed(2));
+
+          if (bodyActive) {
+            const tiltTarget = totalX * 0.35;
+            tiltVel = (tiltVel + (tiltTarget - tiltAngle) * BODY_K) * BODY_D;
+            tiltAngle += tiltVel;
+            tiltAngle = Math.max(-MAX_TILT, Math.min(MAX_TILT, tiltAngle));
+            squashVel = (squashVel + (1 - squashY) * 0.12) * 0.68;
+            squashY += squashVel;
+            bounceVel = (bounceVel + (0 - bounceY) * 0.12) * 0.68;
+            bounceY += bounceVel;
+            const scaleX = 1 + (1 - squashY) * 0.5;
+            container.style.transform = `translateY(${bounceY.toFixed(1)}px) rotate(${tiltAngle.toFixed(2)}deg) scale(${(scaleX + breathScale).toFixed(4)}, ${(squashY + breathScale).toFixed(4)})`;
+          }
+
+          if (glow) {
+            glowOffX += (totalX * 2 - glowOffX) * 0.04;
+            glowOffY += (totalY * 2 - glowOffY) * 0.04;
+            glow.style.opacity = Math.max(0, Math.min(1, 0.6 + exGlow)).toFixed(
+              3,
+            );
+            glow.style.transform = `translate(${glowOffX.toFixed(1)}px, ${glowOffY.toFixed(1)}px)`;
+          }
+          if (pulse) {
+            pulse.style.opacity = Math.max(
+              0,
+              Math.min(1, 0.4 + exGlow * 0.8),
+            ).toFixed(3);
+          }
+
+          requestAnimationFrame(tick);
+        }
         requestAnimationFrame(tick);
-      }
-      requestAnimationFrame(tick);
-    });
+      });
+  });
 </script>

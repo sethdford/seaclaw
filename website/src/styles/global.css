@@ -426,10 +426,12 @@
   }
 
   /* ── Hero choreographed entrance ── */
-  /* LCP-critical: hero-logo and hero-headline render immediately (no animation).
-   * Secondary elements animate in after LCP fires via .hu-lcp-done gate. */
+  /* LCP-critical: wordmark, logo row, and tagline paint at full opacity immediately.
+   * Do not put .hero-fade-in on those nodes — Lighthouse uses the largest text paint.
+   * Secondary elements stay at opacity 0 until .hu-lcp-done. */
   .hero-logo,
-  .hero-headline {
+  .hero-headline,
+  .hero-wordmark {
     opacity: 1;
     transform: none;
   }

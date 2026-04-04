@@ -29,8 +29,8 @@ export class ScChatView extends GatewayAwareLitElement {
         display: flex;
         flex-direction: column;
         contain: layout style;
-        height: 100%;
-        max-height: calc(100vh - var(--hu-space-5xl));
+        flex: 1;
+        min-height: 0;
       }
       .main-wrap {
         display: flex;
@@ -44,12 +44,18 @@ export class ScChatView extends GatewayAwareLitElement {
         display: flex;
         flex-direction: column;
         flex: 1;
-        height: 100%;
+        min-height: 0;
         max-width: 45rem;
         margin: 0 auto;
         position: relative;
         width: 100%;
         container-type: inline-size;
+      }
+      .thread-column {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
       }
       .status-bar {
         display: flex;
@@ -590,10 +596,7 @@ export class ScChatView extends GatewayAwareLitElement {
           ${this.chat.historyLoading
             ? this._renderSkeleton()
             : html`
-                <div
-                  class="hu-stagger-motion9"
-                  style="flex: 1; display: flex; flex-direction: column; min-height: 0;"
-                >
+                <div class="hu-stagger-motion9 thread-column">
                   <hu-message-thread
                     .items=${this.chat.items}
                     .isWaiting=${this.chat.isWaiting}

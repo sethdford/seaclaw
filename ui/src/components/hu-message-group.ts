@@ -73,14 +73,19 @@ export class ScMessageGroup extends LitElement {
       align-items: center;
       gap: var(--hu-space-xs);
       margin-top: var(--hu-space-2xs);
-      opacity: 0;
+      opacity: 0.4;
       transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
       font-size: var(--hu-text-2xs, 0.625rem);
       color: var(--hu-text-faint);
     }
 
-    .group:hover .group-footer {
-      opacity: 1;
+    @media (hover: hover) {
+      .group-footer {
+        opacity: 0.3;
+      }
+      .group:hover .group-footer {
+        opacity: 0.8;
+      }
     }
 
     .group.user .group-footer {

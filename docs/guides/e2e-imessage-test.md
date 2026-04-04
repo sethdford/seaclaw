@@ -1,3 +1,8 @@
+---
+title: "E2E iMessage Agent-to-Agent Test"
+description: "End-to-end test with two human instances conversing over real iMessage."
+---
+
 # E2E iMessage Agent-to-Agent Test
 
 Two `human` instances talking to each other over real iMessage, proving the full pipeline works end-to-end: poll → classify → agent turn → send → repeat.

@@ -50,7 +50,7 @@ export class ScReasoningBlock extends LitElement {
     @keyframes hu-reasoning-enter {
       from {
         opacity: 0;
-        transform: translateY(-0.5rem);
+        transform: translateY(calc(-1 * var(--hu-space-sm)));
       }
       to {
         opacity: 1;
@@ -163,28 +163,29 @@ export class ScReasoningBlock extends LitElement {
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
       color: var(--hu-text);
-      overflow: hidden;
-      opacity: 1;
-      transform: translateY(0);
+      display: grid;
       transition:
-        max-height var(--hu-duration-normal) var(--hu-ease-out),
-        opacity var(--hu-duration-normal) var(--hu-ease-out),
-        transform var(--hu-duration-normal) var(--hu-ease-out),
-        padding var(--hu-duration-normal) var(--hu-ease-out);
+        grid-template-rows var(--hu-duration-normal) var(--hu-ease-out),
+        opacity var(--hu-duration-normal) var(--hu-ease-out);
     }
 
     .content.expanded {
-      max-height: 125rem;
-      padding: 0 var(--hu-space-md) var(--hu-space-md);
+      grid-template-rows: 1fr;
       opacity: 1;
-      transform: translateY(0);
     }
 
     .content.collapsed {
-      max-height: 0;
-      padding: 0;
+      grid-template-rows: 0fr;
       opacity: 0;
-      transform: translateY(-0.25rem);
+    }
+
+    .content-inner {
+      overflow: hidden;
+      padding: 0 var(--hu-space-md);
+    }
+
+    .content.expanded .content-inner {
+      padding-bottom: var(--hu-space-md);
     }
 
     .preview {
@@ -272,13 +273,10 @@ export class ScReasoningBlock extends LitElement {
 
       .content {
         transition: none;
-        opacity: 1;
-        transform: none;
       }
 
       .content.collapsed {
-        opacity: 1;
-        transform: none;
+        opacity: 0;
       }
 
       .header.streaming,
@@ -505,11 +503,13 @@ export class ScReasoningBlock extends LitElement {
           role=${this.streaming ? "status" : nothing}
           aria-live=${this.streaming ? "polite" : nothing}
         >
-          ${this.collapsed
-            ? nothing
-            : renderMarkdown(this.streaming ? this._visibleContent : this.content, {
-                streaming: this.streaming,
-              })}
+          <div class="content-inner">
+            ${this.collapsed
+              ? nothing
+              : renderMarkdown(this.streaming ? this._visibleContent : this.content, {
+                  streaming: this.streaming,
+                })}
+          </div>
         </div>
       </div>
     `;

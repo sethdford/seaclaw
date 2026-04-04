@@ -10101,6 +10101,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* GIF calibration: detect positive tapbacks on our GIF messages via SQL */
+#ifdef HU_HAS_IMESSAGE
                 {
                     int gif_taps = hu_imessage_count_recent_gif_tapbacks(batch_key, key_len);
                     if (gif_taps > 0) {
@@ -10121,6 +10122,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+#endif
 
                 /* GIF reaction: send a GIF when the moment calls for it */
                 bool gif_sent_this_turn = false;

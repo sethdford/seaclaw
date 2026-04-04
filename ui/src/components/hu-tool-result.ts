@@ -110,20 +110,15 @@ export class ScToolResult extends LitElement {
       }
     }
 
-    @keyframes hu-pulse-border {
-      0%,
-      100% {
-        border-left-color: var(--hu-info);
-      }
-      50% {
-        border-left-color: color-mix(in srgb, var(--hu-info) 30%, transparent);
-      }
+    @keyframes hu-tool-running-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
     }
 
     @keyframes hu-tool-enter {
       from {
         opacity: 0;
-        transform: translateY(-0.5rem);
+        transform: translateY(calc(-1 * var(--hu-space-sm)));
       }
       to {
         opacity: 1;
@@ -158,19 +153,10 @@ export class ScToolResult extends LitElement {
 
     .container {
       --current-status-color: var(--hu-info);
-      background: color-mix(
-        in srgb,
-        var(--hu-surface, var(--hu-bg-surface)) var(--hu-glass-subtle-bg-opacity, 4%),
-        transparent
-      );
-      backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
-        saturate(var(--hu-glass-subtle-saturate, 120%));
-      -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
-        saturate(var(--hu-glass-subtle-saturate, 120%));
-      border: 1px solid var(--hu-border);
+      background: var(--hu-surface-container);
+      border: 1px solid var(--hu-border-subtle);
       border-left: 0.1875rem solid var(--current-status-color);
       border-radius: var(--hu-radius);
-      box-shadow: var(--hu-shadow-xs);
       overflow: hidden;
       animation: hu-tool-enter var(--hu-duration-normal) var(--hu-ease-out) forwards;
 
@@ -178,7 +164,7 @@ export class ScToolResult extends LitElement {
         --current-status-color: var(--hu-info);
         animation:
           hu-tool-enter var(--hu-duration-normal) var(--hu-ease-out) forwards,
-          hu-pulse-border var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
+          hu-tool-running-pulse var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
       }
       &.status-success {
         --current-status-color: var(--hu-success);

@@ -1,3 +1,8 @@
+---
+title: "iMessage Capability Matrix"
+description: "Canonical reference for iMessage capabilities, implementation status, feasibility, and priority."
+---
+
 # iMessage Capability Matrix
 
 ## Overview

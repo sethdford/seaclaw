@@ -1,3 +1,8 @@
+---
+title: "Canvas Security Model"
+description: "Security boundaries, threat model, and mitigations for the Live Canvas sandboxed iframe."
+---
+
 # Canvas Security Model
 
 ## Overview

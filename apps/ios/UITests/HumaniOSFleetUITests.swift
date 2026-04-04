@@ -79,13 +79,9 @@ final class HumaniOSFleetUITests: XCTestCase {
         return exact
     }
 
-    /// "More" overflow tab: under `tabBars` on classic layout, sometimes a top-level button on newer OS builds.
+    /// Overflow **More** tab: query at app scope so it resolves whether the control is nested under `tabBars` or flattened on newer OS builds.
     private func moreTabButton() -> XCUIElement {
-        let fromBar = primaryTabBar.buttons["More"]
-        if fromBar.exists {
-            return fromBar
-        }
-        return app.buttons["More"]
+        app.buttons["More"]
     }
 
     private func anyPrimaryTabChromeVisible() -> Bool {
@@ -93,8 +89,7 @@ final class HumaniOSFleetUITests: XCTestCase {
             return true
         }
         for label in primaryTabLabels {
-            let id = tabAccessibilityIdentifier(for: label)
-            if app.buttons[id].waitForExistence(timeout: 1) {
+            if app.buttons[tabAccessibilityIdentifier(for: label)].exists {
                 return true
             }
         }

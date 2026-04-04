@@ -1,3 +1,8 @@
+---
+title: "iMessage imsg CLI Integration Feasibility"
+description: "Investigation into integrating the steipete/imsg CLI for more stable iMessage tapback sending."
+---
+
 # iMessage imsg CLI Integration Feasibility
 
 **Date:** 2026-04-03  

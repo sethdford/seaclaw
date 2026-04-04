@@ -585,7 +585,7 @@ export class ScApp extends LitElement {
   }
 
   private get _hasDetail(): boolean {
-    return LIST_DETAIL_TABS.includes(this.tab);
+    return false;
   }
 
   private get prefersReducedMotion(): boolean {
@@ -892,7 +892,7 @@ export class ScApp extends LitElement {
   private _updateViewportBreakpoint(): void {
     const w = window.innerWidth;
     const was = this._isMediumViewport;
-    const now = w >= 601 && w <= 904;
+    const now = w >= 600 && w <= 904;
     if (was !== now) {
       this._isMediumViewport = now;
     }

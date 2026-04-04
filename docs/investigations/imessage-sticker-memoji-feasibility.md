@@ -1,3 +1,8 @@
+---
+title: "iMessage Sticker/Memoji Feasibility Investigation"
+description: "Feasibility of reading and sending stickers and Memoji via chat.db and available APIs."
+---
+
 # iMessage Sticker/Memoji Feasibility Investigation
 
 **Date:** 2026-04-03  

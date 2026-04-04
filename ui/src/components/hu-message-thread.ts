@@ -211,7 +211,7 @@ export class ScMessageThread extends LitElement {
     }
     .scroll-bottom-pill {
       position: absolute;
-      bottom: 5.625rem; /* hu-lint-ok: scroll-to-bottom offset above composer */
+      bottom: var(--hu-composer-offset, 1rem);
       left: 50%;
       transform: translateX(-50%);
       background: var(--hu-bg-surface);

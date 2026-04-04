@@ -147,5 +147,15 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("src/scripts/hero-canvas")) return "hero-canvas";
+            if (id.includes("src/scripts/home-deferred")) return "home-deferred";
+          },
+        },
+      },
+    },
   },
 });

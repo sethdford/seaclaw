@@ -35,6 +35,7 @@ void hu_declarative_tool_def_free(hu_declarative_tool_def_t *def, hu_allocator_t
     memset(def, 0, sizeof(*def));
 }
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static hu_decl_exec_type_t parse_exec_type(const char *t) {
     if (!t)
         return HU_DECL_EXEC_HTTP;
@@ -172,6 +173,7 @@ static hu_error_t read_pipe_all(hu_allocator_t *alloc, FILE *fp, char **out, siz
     *out_len = len;
     return HU_OK;
 }
+#endif /* !(HU_IS_TEST) */
 
 static hu_error_t copy_def(hu_allocator_t *alloc, const hu_declarative_tool_def_t *src,
                            hu_declarative_tool_def_t *dst) {
@@ -232,6 +234,7 @@ static hu_error_t decl_execute(void *ctx, hu_allocator_t *alloc, const hu_json_v
     switch (c->def.exec_type) {
     case HU_DECL_EXEC_CHAIN:
     case HU_DECL_EXEC_TRANSFORM: {
+        (void)args;
         static const char msg[] = "chain/transform not yet wired";
         *out = hu_tool_result_fail(msg, sizeof(msg) - 1);
         return HU_OK;
@@ -239,6 +242,7 @@ static hu_error_t decl_execute(void *ctx, hu_allocator_t *alloc, const hu_json_v
     case HU_DECL_EXEC_HTTP:
     case HU_DECL_EXEC_SHELL:
 #if defined(HU_IS_TEST) && HU_IS_TEST
+        (void)args;
         *out = hu_tool_result_ok("ok", 2);
         return HU_OK;
 #else
@@ -331,6 +335,7 @@ hu_error_t hu_declarative_tool_create(hu_allocator_t *alloc, const hu_declarativ
     return HU_OK;
 }
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static void free_defs_array(hu_allocator_t *alloc, hu_declarative_tool_def_t *defs, size_t n) {
     if (!defs || !alloc)
         return;
@@ -459,6 +464,7 @@ static hu_error_t load_one_json_file(hu_allocator_t *alloc, const char *path,
     hu_json_free(alloc, root);
     return HU_OK;
 }
+#endif /* !(HU_IS_TEST) */
 
 hu_error_t hu_declarative_tools_discover(hu_allocator_t *alloc, const char *dir,
                                          hu_declarative_tool_def_t **out, size_t *out_count) {

@@ -42,55 +42,13 @@ export class ScMessageStream extends LitElement {
 
     .bubble.role-user {
       margin-left: auto;
-      background: color-mix(in srgb, var(--hu-accent) 12%, var(--hu-bg-surface));
-      border: 1px solid color-mix(in srgb, var(--hu-accent) 20%, var(--hu-border-subtle));
+      background: var(--hu-surface-container-high);
     }
 
     .bubble.role-assistant {
       margin-right: auto;
-      position: relative;
-      background: color-mix(
-        in srgb,
-        var(--hu-bg-surface) var(--hu-glass-standard-bg-opacity, 6%),
-        transparent
-      );
-      backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
-        saturate(var(--hu-glass-standard-saturate, 180%));
-      -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
-        saturate(var(--hu-glass-standard-saturate, 180%));
-      border: 1px solid
-        color-mix(
-          in srgb,
-          var(--hu-border) var(--hu-glass-standard-border-opacity, 8%),
-          transparent
-        );
-    }
-
-    .bubble.role-assistant::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: radial-gradient(
-        circle at var(--hu-light-x, 50%) var(--hu-light-y, 50%),
-        color-mix(in srgb, var(--hu-color-white) 4%, transparent),
-        transparent 60%
-      );
-      pointer-events: none;
-      mix-blend-mode: overlay;
-      z-index: 0;
-    }
-
-    @media (prefers-reduced-transparency: reduce) {
-      .bubble.role-assistant {
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        background: var(--hu-bg-surface);
-        border: 1px solid var(--hu-border);
-      }
-      .bubble.role-assistant::after {
-        display: none;
-      }
+      background: var(--hu-surface-container);
+      border: 1px solid var(--hu-border-subtle);
     }
 
     .content {
@@ -107,18 +65,19 @@ export class ScMessageStream extends LitElement {
     }
 
     .md-content h1.md-heading {
-      font-size: var(--hu-text-2xl);
+      font-size: var(--hu-text-lg);
     }
     .md-content h2.md-heading {
-      font-size: var(--hu-text-xl);
+      font-size: var(--hu-text-base);
+      font-weight: var(--hu-weight-semibold);
     }
     .md-content h3.md-heading {
-      font-size: var(--hu-text-lg);
+      font-size: var(--hu-text-base);
     }
     .md-content h4.md-heading,
     .md-content h5.md-heading,
     .md-content h6.md-heading {
-      font-size: var(--hu-text-base);
+      font-size: var(--hu-text-sm);
     }
 
     .md-paragraph {
@@ -188,6 +147,10 @@ export class ScMessageStream extends LitElement {
       background: var(--hu-bg-inset);
     }
 
+    @keyframes hu-cursor-glow-stream {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
     .cursor {
       display: inline-block;
       width: 2px;
@@ -195,7 +158,8 @@ export class ScMessageStream extends LitElement {
       background: var(--hu-accent);
       margin-left: var(--hu-space-2xs);
       vertical-align: text-bottom;
-      animation: hu-pulse var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
+      border-radius: var(--hu-radius-xs);
+      animation: hu-cursor-glow-stream var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
     }
 
     @media (prefers-reduced-motion: reduce) {
