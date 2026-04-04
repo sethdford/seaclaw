@@ -886,7 +886,11 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * Skip when persona is active — GVR's generic verifier rejects
          * persona-style responses (casual, terse) and rewrites them into
          * bland AI-speak, which is worse. */
-        if (agent->gvr_config.enabled && !agent->persona) {
+        if (agent->gvr_config.enabled
+#ifdef HU_HAS_PERSONA
+            && !agent->persona
+#endif
+        ) {
             hu_gvr_pipeline_result_t gvr_result;
             memset(&gvr_result, 0, sizeof(gvr_result));
             hu_error_t gvr_err = hu_gvr_pipeline(agent->alloc, &agent->provider, &agent->gvr_config,
@@ -911,28 +915,30 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * Short + in-persona + has follow-up question = good, skip rethink.
          * Short + formal/no-question = needs help, do rethink. */
         bool needs_rethink = false;
+#ifdef HU_HAS_PERSONA
         if (agent->persona && final_content_len > 0 && final_content_len < 100 && msg_len > 15 &&
             agent->provider.vtable && agent->provider.vtable->chat_with_system) {
             bool has_question = (memchr(final_content, '?', final_content_len) != NULL);
             bool starts_lowercase = (final_content[0] >= 'a' && final_content[0] <= 'z');
-            /* Has follow-up question = engaged, skip rethink regardless of length */
             if (has_question)
                 needs_rethink = false;
-            /* No question + under 70 chars = needs more substance */
             else if (final_content_len < 70)
                 needs_rethink = true;
-            /* 70-100 chars, no question, uppercase = definitely rethink */
             else if (!starts_lowercase)
                 needs_rethink = true;
-            /* 70-100 chars, lowercase, no question = borderline, skip */
             else
                 needs_rethink = false;
         }
+#endif
         if (needs_rethink) {
-            /* Build rethink prompt with persona context for style fidelity */
+#ifdef HU_HAS_PERSONA
             const char *persona_name = agent->persona ? agent->persona->name : "the persona";
             const char *persona_identity =
                 (agent->persona && agent->persona->identity) ? agent->persona->identity : "";
+#else
+            const char *persona_name = "the persona";
+            const char *persona_identity = "";
+#endif
             char rethink_sys[2048];
             snprintf(rethink_sys, sizeof(rethink_sys),
                      "You are %s. %.*s\n\n"
