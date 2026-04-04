@@ -39,7 +39,7 @@ option(HU_ENABLE_EMBEDDED_MODEL "Enable embedded model provider (llama.cpp/llama
 option(HU_ENABLE_COREML "Enable CoreML/MLX provider (macOS only)" OFF)
 option(HU_ENABLE_MCP "Enable MCP client (multi-server tool discovery)" ON)
 
-# WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
+# WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DHU_BUILD_WASM=ON ..
 
 # --- Per-channel build options (CLI ON by default, others OFF) ---
 option(HU_ENABLE_CLI "Build CLI channel" ON)
