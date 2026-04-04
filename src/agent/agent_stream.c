@@ -971,20 +971,20 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         }
 
         /* 3. Metacognition: signal-based re-entry (one regen max) */
-        if (agent->metacognition.cfg.enabled) {
+        if (agent->infra.metacognition.cfg.enabled) {
             hu_metacognition_signal_t mc_sig =
                 hu_metacognition_monitor(msg, msg_len, final_content, final_content_len, NULL, 0,
-                                         0.0f, 0, 0, &agent->metacognition);
+                                         0.0f, 0, 0, &agent->infra.metacognition);
             hu_metacog_action_t mc_act =
-                hu_metacognition_plan_action(&agent->metacognition, &mc_sig);
-            if (mc_act != HU_METACOG_ACTION_NONE && agent->metacognition.regen_count < 1) {
+                hu_metacognition_plan_action(&agent->infra.metacognition, &mc_sig);
+            if (mc_act != HU_METACOG_ACTION_NONE && agent->infra.metacognition.regen_count < 1) {
                 /* Inject metacognition directive and re-call provider once */
                 char directive[256];
                 size_t dir_len = 0;
                 hu_metacognition_apply(mc_act, directive, sizeof(directive), &dir_len);
                 if (dir_len > 0) {
                     hu_log_info("human", NULL, "[metacog] %s → re-generating", directive);
-                    agent->metacognition.regen_count++;
+                    agent->infra.metacognition.regen_count++;
                 }
             }
         }

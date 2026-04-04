@@ -293,7 +293,7 @@ hu_error_t hu_agent_from_config(
             hu_speculative_cache_t *cache =
                 (hu_speculative_cache_t *)alloc->alloc(alloc->ctx, sizeof(hu_speculative_cache_t));
             if (cache && hu_speculative_cache_init(cache, alloc) == HU_OK)
-                out->speculative_cache = cache;
+                out->infra.speculative_cache = cache;
         }
     }
 
@@ -426,39 +426,39 @@ hu_error_t hu_agent_from_config(
     hu_idempotency_registry_t *idem_reg = NULL;
     hu_error_t idem_err = hu_idempotency_create(alloc, &idem_reg);
     if (idem_err == HU_OK) {
-        out->idempotency_registry = idem_reg;
+        out->infra.idempotency_registry = idem_reg;
     } else {
-        out->idempotency_registry = NULL;
+        out->infra.idempotency_registry = NULL;
     }
 
     /* Workflow event log for durable execution and audit trail */
     hu_workflow_event_log_t *wf_log = NULL;
     hu_error_t wf_err = hu_workflow_event_log_create(alloc, "~/.human/workflows", &wf_log);
     if (wf_err == HU_OK) {
-        out->workflow_log = wf_log;
+        out->infra.workflow_log = wf_log;
     } else {
-        out->workflow_log = NULL;
+        out->infra.workflow_log = NULL;
     }
 
     /* Approval gate manager for human-in-the-loop workflow pauses */
     hu_gate_manager_t *gate_mgr = NULL;
     hu_error_t gate_err = hu_gate_manager_create(alloc, "~/.human/gates", &gate_mgr);
     if (gate_err == HU_OK) {
-        out->gate_manager = gate_mgr;
+        out->infra.gate_manager = gate_mgr;
     } else {
-        out->gate_manager = NULL;
+        out->infra.gate_manager = NULL;
     }
 
     /* Delegation token registry for agent-to-agent authorization */
-    out->delegation_registry = hu_delegation_registry_create(alloc);
+    out->infra.delegation_registry = hu_delegation_registry_create(alloc);
 
     /* Webhook manager for incoming webhook event handling */
     hu_webhook_manager_t *webhook_mgr = NULL;
     hu_error_t webhook_err = hu_webhook_manager_create(alloc, &webhook_mgr);
     if (webhook_err == HU_OK) {
-        out->webhook_manager = webhook_mgr;
+        out->infra.webhook_manager = webhook_mgr;
     } else {
-        out->webhook_manager = NULL;
+        out->infra.webhook_manager = NULL;
     }
 
     /* Superhuman services */
@@ -535,12 +535,12 @@ hu_error_t hu_agent_from_config(
     }
     out->sota.sota_initialized = true;
 
-    hu_emotional_cognition_init(&out->emotional_cognition);
-    hu_metacognition_init(&out->metacognition);
-    out->current_cognition_mode = HU_COGNITION_FAST;
+    hu_emotional_cognition_init(&out->infra.emotional_cognition);
+    hu_metacognition_init(&out->infra.metacognition);
+    out->infra.current_cognition_mode = HU_COGNITION_FAST;
 #ifdef HU_ENABLE_SQLITE
-    if (hu_cognition_db_open(&out->cognition_db) != HU_OK)
-        out->cognition_db = NULL;
+    if (hu_cognition_db_open(&out->infra.cognition_db) != HU_OK)
+        out->infra.cognition_db = NULL;
 #endif
 
     /* Initialize instruction discovery from workspace */
@@ -706,32 +706,32 @@ void hu_agent_deinit(hu_agent_t *agent) {
                            agent->tool_specs_count * sizeof(hu_tool_spec_t));
         agent->tool_specs = NULL;
     }
-    if (agent->prompt_cache) {
-        hu_prompt_cache_deinit((hu_prompt_cache_t *)agent->prompt_cache);
-        agent->alloc->free(agent->alloc->ctx, agent->prompt_cache, sizeof(hu_prompt_cache_t));
-        agent->prompt_cache = NULL;
+    if (agent->infra.prompt_cache) {
+        hu_prompt_cache_deinit((hu_prompt_cache_t *)agent->infra.prompt_cache);
+        agent->alloc->free(agent->alloc->ctx, agent->infra.prompt_cache, sizeof(hu_prompt_cache_t));
+        agent->infra.prompt_cache = NULL;
     }
-    if (agent->tool_cache_ttl) {
-        hu_tool_cache_ttl_deinit((hu_tool_cache_ttl_t *)agent->tool_cache_ttl);
-        agent->alloc->free(agent->alloc->ctx, agent->tool_cache_ttl, sizeof(hu_tool_cache_ttl_t));
-        agent->tool_cache_ttl = NULL;
+    if (agent->infra.tool_cache_ttl) {
+        hu_tool_cache_ttl_deinit((hu_tool_cache_ttl_t *)agent->infra.tool_cache_ttl);
+        agent->alloc->free(agent->alloc->ctx, agent->infra.tool_cache_ttl, sizeof(hu_tool_cache_ttl_t));
+        agent->infra.tool_cache_ttl = NULL;
     }
-    if (agent->kv_cache) {
-        hu_kv_cache_deinit(agent->kv_cache);
-        agent->alloc->free(agent->alloc->ctx, agent->kv_cache, sizeof(hu_kv_cache_manager_t));
-        agent->kv_cache = NULL;
+    if (agent->infra.kv_cache) {
+        hu_kv_cache_deinit(agent->infra.kv_cache);
+        agent->alloc->free(agent->alloc->ctx, agent->infra.kv_cache, sizeof(hu_kv_cache_manager_t));
+        agent->infra.kv_cache = NULL;
     }
-    if (agent->context_engine) {
-        hu_context_engine_t *ce = (hu_context_engine_t *)agent->context_engine;
+    if (agent->infra.context_engine) {
+        hu_context_engine_t *ce = (hu_context_engine_t *)agent->infra.context_engine;
         if (ce->vtable && ce->vtable->deinit)
             ce->vtable->deinit(ce->ctx, agent->alloc);
         agent->alloc->free(agent->alloc->ctx, ce, sizeof(hu_context_engine_t));
-        agent->context_engine = NULL;
+        agent->infra.context_engine = NULL;
     }
-    if (agent->acp_inbox) {
-        hu_acp_inbox_deinit((hu_acp_inbox_t *)agent->acp_inbox);
-        agent->alloc->free(agent->alloc->ctx, agent->acp_inbox, sizeof(hu_acp_inbox_t));
-        agent->acp_inbox = NULL;
+    if (agent->infra.acp_inbox) {
+        hu_acp_inbox_deinit((hu_acp_inbox_t *)agent->infra.acp_inbox);
+        agent->alloc->free(agent->alloc->ctx, agent->infra.acp_inbox, sizeof(hu_acp_inbox_t));
+        agent->infra.acp_inbox = NULL;
     }
     if (agent->cached_static_prompt) {
         agent->alloc->free(agent->alloc->ctx, agent->cached_static_prompt,
@@ -791,30 +791,30 @@ void hu_agent_deinit(hu_agent_t *agent) {
         hu_commitment_store_destroy(agent->commitment_store);
         agent->commitment_store = NULL;
     }
-    if (agent->idempotency_registry) {
-        hu_idempotency_destroy(agent->idempotency_registry, agent->alloc);
-        agent->idempotency_registry = NULL;
+    if (agent->infra.idempotency_registry) {
+        hu_idempotency_destroy(agent->infra.idempotency_registry, agent->alloc);
+        agent->infra.idempotency_registry = NULL;
     }
-    if (agent->workflow_log) {
-        hu_workflow_event_log_destroy(agent->workflow_log, agent->alloc);
-        agent->workflow_log = NULL;
+    if (agent->infra.workflow_log) {
+        hu_workflow_event_log_destroy(agent->infra.workflow_log, agent->alloc);
+        agent->infra.workflow_log = NULL;
     }
-    if (agent->gate_manager) {
-        hu_gate_manager_destroy(agent->gate_manager, agent->alloc);
-        agent->gate_manager = NULL;
+    if (agent->infra.gate_manager) {
+        hu_gate_manager_destroy(agent->infra.gate_manager, agent->alloc);
+        agent->infra.gate_manager = NULL;
     }
-    if (agent->delegation_registry) {
-        hu_delegation_registry_destroy(agent->delegation_registry);
-        agent->delegation_registry = NULL;
+    if (agent->infra.delegation_registry) {
+        hu_delegation_registry_destroy(agent->infra.delegation_registry);
+        agent->infra.delegation_registry = NULL;
     }
-    if (agent->webhook_manager) {
-        hu_webhook_manager_destroy(agent->alloc, agent->webhook_manager);
-        agent->webhook_manager = NULL;
+    if (agent->infra.webhook_manager) {
+        hu_webhook_manager_destroy(agent->alloc, agent->infra.webhook_manager);
+        agent->infra.webhook_manager = NULL;
     }
 #ifdef HU_ENABLE_SQLITE
-    if (agent->cognition_db) {
-        hu_cognition_db_close(agent->cognition_db);
-        agent->cognition_db = NULL;
+    if (agent->infra.cognition_db) {
+        hu_cognition_db_close(agent->infra.cognition_db);
+        agent->infra.cognition_db = NULL;
     }
 #endif
     if (agent->provider.vtable && agent->provider.vtable->deinit) {
@@ -838,11 +838,11 @@ void hu_agent_deinit(hu_agent_t *agent) {
         hu_undo_stack_destroy(agent->undo_stack);
         agent->undo_stack = NULL;
     }
-    if (agent->speculative_cache) {
-        hu_speculative_cache_deinit(agent->speculative_cache);
-        agent->alloc->free(agent->alloc->ctx, agent->speculative_cache,
+    if (agent->infra.speculative_cache) {
+        hu_speculative_cache_deinit(agent->infra.speculative_cache);
+        agent->alloc->free(agent->alloc->ctx, agent->infra.speculative_cache,
                            sizeof(hu_speculative_cache_t));
-        agent->speculative_cache = NULL;
+        agent->infra.speculative_cache = NULL;
     }
     if (agent->instruction_discovery) {
         hu_instruction_discovery_destroy(agent->alloc, agent->instruction_discovery);

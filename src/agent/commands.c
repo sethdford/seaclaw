@@ -483,7 +483,7 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
         scfg.autonomy_level = agent->autonomy_level;
         scfg.caller_spawn_depth = agent->spawn_depth;
         scfg.shared_cost_tracker = agent->cost_tracker;
-        scfg.metacognition_policy = &agent->metacognition.cfg;
+        scfg.metacognition_policy = &agent->infra.metacognition.cfg;
         uint64_t new_id = 0;
         hu_error_t err =
             hu_agent_pool_spawn(agent->agent_pool, &scfg, arg_buf, arg_len, "cli-spawn", &new_id);
@@ -745,20 +745,20 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             sub++;
 
         if (hu_strncasecmp(sub, "status", 6) == 0) {
-            if (!agent->workflow_log) {
+            if (!agent->infra.workflow_log) {
                 return hu_strndup(agent->alloc, "No workflow log active.", 23);
             }
-            size_t count = hu_workflow_event_log_count(agent->workflow_log);
+            size_t count = hu_workflow_event_log_count(agent->infra.workflow_log);
             return hu_sprintf(agent->alloc, "Workflow: %zu events logged", count);
         }
 
         if (hu_strncasecmp(sub, "gates", 5) == 0) {
-            if (!agent->gate_manager) {
+            if (!agent->infra.gate_manager) {
                 return hu_strndup(agent->alloc, "No approval gate manager active.", 32);
             }
             hu_approval_gate_t *gates = NULL;
             size_t gate_count = 0;
-            hu_error_t err = hu_gate_list_pending(agent->gate_manager, agent->alloc, &gates,
+            hu_error_t err = hu_gate_list_pending(agent->infra.gate_manager, agent->alloc, &gates,
                                                  &gate_count);
             if (err != HU_OK) {
                 return hu_sprintf(agent->alloc, "Failed to list gates: %s", hu_error_string(err));
@@ -785,10 +785,10 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             const char *gate_id = sub + 7;
             while (*gate_id == ' ' || *gate_id == '\t')
                 gate_id++;
-            if (!*gate_id || !agent->gate_manager) {
+            if (!*gate_id || !agent->infra.gate_manager) {
                 return hu_strndup(agent->alloc, "Usage: /workflow approve <gate_id>", 34);
             }
-            hu_error_t err = hu_gate_resolve(agent->gate_manager, agent->alloc, gate_id,
+            hu_error_t err = hu_gate_resolve(agent->infra.gate_manager, agent->alloc, gate_id,
                                             HU_GATE_APPROVED, "Approved by user", 16);
             if (err != HU_OK) {
                 return hu_sprintf(agent->alloc, "Approve failed: %s", hu_error_string(err));
@@ -800,10 +800,10 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             const char *gate_id = sub + 6;
             while (*gate_id == ' ' || *gate_id == '\t')
                 gate_id++;
-            if (!*gate_id || !agent->gate_manager) {
+            if (!*gate_id || !agent->infra.gate_manager) {
                 return hu_strndup(agent->alloc, "Usage: /workflow reject <gate_id>", 33);
             }
-            hu_error_t err = hu_gate_resolve(agent->gate_manager, agent->alloc, gate_id,
+            hu_error_t err = hu_gate_resolve(agent->infra.gate_manager, agent->alloc, gate_id,
                                             HU_GATE_REJECTED, "Rejected by user", 16);
             if (err != HU_OK) {
                 return hu_sprintf(agent->alloc, "Reject failed: %s", hu_error_string(err));
