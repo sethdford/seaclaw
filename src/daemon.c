@@ -7,165 +7,44 @@
 #ifdef __APPLE__
 #define _DARWIN_C_SOURCE
 #endif
+/* Core daemon headers */
 #include "human/daemon.h"
 #include "human/agent.h"
-#include "human/agent/anticipatory.h"
-#include "human/agent/collab_planning.h"
-#include "human/agent/conversation_plan.h"
-#include "human/agent/episodic.h"
-#include "human/agent/info_asymmetry.h"
-#include "human/agent/model_router.h"
-#include "human/agent/outcomes.h"
-#include "human/agent/proactive.h"
-#include "human/agent/theory_of_mind.h"
-#include "human/agent/weather_awareness.h"
-#include "human/agent/weather_fetch.h"
-#include "human/channels/format.h"
-#include "human/channels/imessage.h"
 #include "human/config.h"
-#include "human/context/conversation.h"
-#include "human/context/event_extract.h"
-#include "human/context/temporal_events.h"
-#include "human/context/mood.h"
-#include "human/context/style_tracker.h"
-#include "human/context/vision.h"
 #include "human/core/error.h"
 #include "human/core/log.h"
 #include "human/core/process_util.h"
 #include "human/core/string.h"
-#include "human/daemon_proactive.h"
-#include "human/intelligence/trust.h"
-#include "human/memory/comfort_patterns.h"
-#include "human/memory/consolidation.h"
-#include "human/memory/consolidation_engine.h"
-#include "human/memory/deep_extract.h"
-#include "human/memory/emotional_graph.h"
-#include "human/memory/emotional_moments.h"
-#include "human/memory/emotional_residue.h"
-#include "human/memory/episodic.h"
-#include "human/memory/evolved_opinions.h"
-#include "human/memory/fast_capture.h"
-#include "human/memory/forgetting.h"
-#include "human/memory/forgetting_curve.h"
-#include "human/memory/graph.h"
-#include "human/memory/inbox.h"
-#include "human/memory/promotion.h"
-#include "human/memory/prospective.h"
-#include "human/memory/retrieval.h"
-#include "human/memory/superhuman.h"
-#include "human/memory/verify_claim.h"
-#include "human/multimodal.h"
-#include "human/channels/channel_embed.h"
+
+/* Subsystem facades — each aggregates related implementation headers */
+#include "human/daemon/agent_facade.h"
+#include "human/daemon/context_facade.h"
+#include "human/daemon/feeds_facade.h"
+#include "human/daemon/intelligence_facade.h"
+#include "human/daemon/memory_facade.h"
+#include "human/daemon/ml_facade.h"
+#include "human/daemon/persona_facade.h"
+#include "human/daemon/platform_facade.h"
+#include "human/daemon/voice_facade.h"
+
+/* Security */
 #include "human/security/adversarial.h"
 #include "human/security/companion_safety.h"
 #include "human/security/moderation.h"
-#include "human/tts/audio_pipeline.h"
-#include "human/tts/cartesia.h"
-#include "human/voice.h"
-#include "human/voice/emotion_voice_map.h"
-#include "human/voice/session.h"
-#ifdef HU_ENABLE_SQLITE
-#include "human/memory.h"
-#include "human/memory/contact_graph.h"
-#if defined(HU_ENABLE_ML)
-#include "human/ml/dpo.h"
-#include "human/ml/experiment.h"
-#include "human/ml/prepare.h"
-#include "human/ml/tokenizer_ml.h"
-#include "human/ml/training_data.h"
-#endif
-#endif
-#include "human/agent/arbitrator.h"
-#include "human/agent/governor.h"
-#include "human/agent/constitutional.h"
-#include "human/agent/timing.h"
-#include "human/eval/turing_score.h"
-#include "human/feeds/awareness.h"
-#include "human/feeds/findings.h"
-#include "human/feeds/processor.h"
-#include "human/feeds/research.h"
-#include "human/memory/compression.h"
-#include "human/memory/knowledge.h"
-#include "human/memory/rag_pipeline.h"
-#include "human/observability/bth_metrics.h"
-#include "human/visual/content.h"
-#define HU_COGNITIVE_SKIP_LIFE_CHAPTER 1
-#include "human/memory/cognitive.h"
-#undef HU_COGNITIVE_SKIP_LIFE_CHAPTER
-#include "human/bus.h"
-#include "human/channel_monitor.h"
-#include "human/context/context_ext.h"
-#include "human/humanness.h"
-#include "human/context/repair.h"
-#ifdef HU_HAS_PERSONA
-#include "human/persona/voice_maturity.h"
-#endif
-#ifdef HU_HAS_SKILLS
-#include "human/intelligence/feedback.h"
-#include "human/intelligence/meta_learning.h"
-#include "human/intelligence/reflection.h"
-#include "human/intelligence/skills.h"
-#endif
-#ifdef HU_ENABLE_SQLITE
-#include "human/agent/goals.h"
-#include "human/intelligence/cycle.h"
-#include "human/intelligence/online_learning.h"
-#include "human/intelligence/self_improve.h"
-#include "human/intelligence/value_learning.h"
-#include "human/intelligence/world_model.h"
-#endif
-#include "human/platform.h"
-#include "human/platform/calendar.h"
-#include <stdlib.h>
-#ifdef HU_HAS_PERSONA
-#include "human/agent/inner_thoughts.h"
-#include "human/context/anticipatory.h"
-#include "human/context/authentic.h"
-#include "human/context/humor.h"
-#include "human/context/protective.h"
-#include "human/context/self_awareness.h"
-#include "human/context/social_graph.h"
-#include "human/context/theory_of_mind.h"
-#include "human/memory/degradation.h"
-#include "human/memory/life_chapters.h"
-#include "human/persona.h"
-#include "human/persona/auto_profile.h"
-#include "human/persona/auto_tune.h"
-#include "human/persona/life_sim.h"
-#include "human/persona/mood.h"
-#include "human/persona/replay.h"
-#include "human/persona/temporal.h"
-#ifdef HU_ENABLE_AUTHENTIC
-#include "human/context/cognitive_load.h"
-#endif
-#include "human/agent/collab_planning.h"
-#include "human/context/behavioral.h"
-#include "human/context/intelligence.h"
-#include "human/context/rel_dynamics.h"
-#include "human/persona/training.h"
-/* Forward declaration — avoids type conflict with context/style_tracker.h hu_style_fingerprint_t */
-hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc, const char **own_messages,
-                                       size_t own_msg_count, char **prompt_out, size_t *prompt_len);
-#endif
+
+/* Daemon modules */
+#include "human/daemon_cron.h"
+#include "human/daemon_lifecycle.h"
+#include "human/daemon_proactive.h"
+#include "human/daemon_routing.h"
 #ifdef HU_HAS_CRON
 #include "human/cron.h"
 #include "human/crontab.h"
 #endif
-#include "human/daemon_cron.h"
-#include "human/daemon_lifecycle.h"
-#include "human/daemon_routing.h"
-#if HU_HAS_PWA
-#include "human/pwa_learner.h"
-#endif
-#if defined(__APPLE__)
-#include "human/calibration/clone.h"
-#endif
-#if defined(HU_ENABLE_CARTESIA)
-#include "human/context/voice_decision.h"
-#include "human/tts/audio_pipeline.h"
-#include "human/tts/cartesia.h"
-#include "human/tts/emotion_map.h"
-#endif
+
+/* Forward declaration — avoids type conflict with context/style_tracker.h */
+hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc, const char **own_messages,
+                                       size_t own_msg_count, char **prompt_out, size_t *prompt_len);
 #include <ctype.h>
 #include <limits.h>
 #include <stddef.h>
@@ -2524,8 +2403,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (dpo_db) {
                             hu_dpo_train_result_t dpo_result = {0};
                             hu_error_t dpo_err = hu_dpo_train_step(
-                                &agent->sota.dpo_collector, alloc, &agent->provider, agent->model_name,
-                                agent->model_name_len, 0.1, 32, &dpo_result);
+                                &agent->sota.dpo_collector, alloc, &agent->provider,
+                                agent->model_name, agent->model_name_len, 0.1, 32, &dpo_result);
                             if (dpo_err == HU_OK && dpo_result.pairs_evaluated > 0)
                                 hu_log_info("human", agent ? agent->observer : NULL,
                                             "DPO training: loss=%.4f, alignment=%.2f, "
@@ -4889,8 +4768,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                     /* ── Phase 4 pre-turn: conversation repair acknowledgment ── */
-                    if (repair_signal.should_acknowledge &&
-                        repair_signal.directive[0] != '\0') {
+                    if (repair_signal.should_acknowledge && repair_signal.directive[0] != '\0') {
                         size_t rlen = strlen(repair_signal.directive);
                         char *rc = (char *)alloc->alloc(alloc->ctx, rlen + 1);
                         if (rc) {
@@ -7335,12 +7213,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         /* ── Phase 4: MToM gap detection ─────────── */
                         hu_tom_gap_t *tom_gaps = NULL;
                         size_t tom_gap_count = 0;
-                        if (hu_tom_detect_gaps(&tom_states[tom_idx], alloc,
-                                                &tom_gaps, &tom_gap_count) == HU_OK &&
+                        if (hu_tom_detect_gaps(&tom_states[tom_idx], alloc, &tom_gaps,
+                                               &tom_gap_count) == HU_OK &&
                             tom_gaps && tom_gap_count > 0) {
                             size_t gd_len = 0;
-                            char *gd = hu_tom_build_gap_directive(
-                                alloc, tom_gaps, tom_gap_count, &gd_len);
+                            char *gd =
+                                hu_tom_build_gap_directive(alloc, tom_gaps, tom_gap_count, &gd_len);
                             if (gd && gd_len > 0) {
                                 if (convo_ctx) {
                                     size_t gt = convo_ctx_len + gd_len + 2;
@@ -7350,8 +7228,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         gm[convo_ctx_len] = '\n';
                                         memcpy(gm + convo_ctx_len + 1, gd, gd_len);
                                         gm[gt - 1] = '\0';
-                                        alloc->free(alloc->ctx, convo_ctx,
-                                                    convo_ctx_len + 1);
+                                        alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
                                         convo_ctx = gm;
                                         convo_ctx_len = gt - 1;
                                     }
@@ -7930,12 +7807,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             jm_len = strlen(config->agent.mr_judge_model);
                         }
                         sel = hu_model_route_with_judge(
-                            &mr_cfg, combined, combined_len, rel, rel_len, bth_hour,
-                            history_count, &agent->provider, jm, jm_len,
-                            agent->alloc, &judge_cache);
+                            &mr_cfg, combined, combined_len, rel, rel_len, bth_hour, history_count,
+                            &agent->provider, jm, jm_len, agent->alloc, &judge_cache);
                     } else {
-                        sel = hu_model_route(&mr_cfg, combined, combined_len, rel,
-                                             rel_len, bth_hour, history_count);
+                        sel = hu_model_route(&mr_cfg, combined, combined_len, rel, rel_len,
+                                             bth_hour, history_count);
                     }
                     agent->turn_model = sel.model;
                     agent->turn_model_len = sel.model_len;
@@ -8549,9 +8425,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                     "llm judge retry: %d/10 for %.*s",
                                                     llm_tscore.overall,
                                                     (int)(key_len > 20 ? 20 : key_len), batch_key);
-                                        hu_dpo_record_from_feedback(&agent->sota.dpo_collector, combined,
-                                                                    combined_len, response,
-                                                                    response_len, false);
+                                        hu_dpo_record_from_feedback(&agent->sota.dpo_collector,
+                                                                    combined, combined_len,
+                                                                    response, response_len, false);
                                         agent->alloc->free(agent->alloc->ctx, response,
                                                            response_len + 1);
                                         response = NULL;
@@ -8703,8 +8579,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* ── Phase 4 post-turn: style drift self-tracking ─────── */
 #ifdef HU_ENABLE_SQLITE
                 if (err == HU_OK && response && response_len > 0 && agent->memory)
-                    (void)hu_style_fingerprint_update_self(agent->memory, alloc,
-                                                           response, response_len);
+                    (void)hu_style_fingerprint_update_self(agent->memory, alloc, response,
+                                                           response_len);
 #endif
 
                 /* ── Phase 4 post-turn: voice vulnerability tracking ──── */
@@ -8714,7 +8590,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (vuln > 0.0f) {
                         float cur = agent->persona->voice.vulnerability_level;
                         cur = cur * 0.7f + vuln * 0.3f;
-                        if (cur > 1.0f) cur = 1.0f;
+                        if (cur > 1.0f)
+                            cur = 1.0f;
                         agent->persona->voice.vulnerability_level = cur;
                     }
                 }
