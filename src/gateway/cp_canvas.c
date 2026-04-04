@@ -57,7 +57,9 @@ hu_error_t cp_canvas_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
     }
 
     hu_json_object_set(alloc, obj, "canvases", arr);
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err2 = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err2;
 #endif
 }
 
@@ -132,7 +134,7 @@ hu_error_t cp_canvas_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_con
     hu_json_object_set(alloc, canvas, "user_edit_pending",
                        hu_json_bool_new(alloc, info.user_edit_pending));
     hu_json_object_set(alloc, obj, "canvas", canvas);
-    return cp_respond_json(alloc, obj, out, out_len);
+    return hu_json_stringify(alloc, obj, out, out_len);
     }
 #endif
 }
@@ -191,7 +193,7 @@ hu_error_t cp_canvas_edit(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
         return HU_ERR_OUT_OF_MEMORY;
     hu_json_object_set(alloc, obj, "ok", hu_json_bool_new(alloc, true));
     cp_json_set_str(alloc, obj, "canvas_id", canvas_id);
-    return cp_respond_json(alloc, obj, out, out_len);
+    return hu_json_stringify(alloc, obj, out, out_len);
     }
 #endif
 }
@@ -254,7 +256,7 @@ hu_error_t cp_canvas_undo(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
                        hu_json_number_new(alloc, (double)info.version_seq));
     cp_json_set_str(alloc, obj, "content", info.content);
     cp_json_set_str(alloc, obj, "format", info.format);
-    return cp_respond_json(alloc, obj, out, out_len);
+    return hu_json_stringify(alloc, obj, out, out_len);
     }
 #endif
 }
@@ -317,7 +319,7 @@ hu_error_t cp_canvas_redo(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
                        hu_json_number_new(alloc, (double)info.version_seq));
     cp_json_set_str(alloc, obj, "content", info.content);
     cp_json_set_str(alloc, obj, "format", info.format);
-    return cp_respond_json(alloc, obj, out, out_len);
+    return hu_json_stringify(alloc, obj, out, out_len);
     }
 #endif
 }

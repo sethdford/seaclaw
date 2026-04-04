@@ -711,6 +711,7 @@ set(HU_CORE_SOURCES
     src/tools/factory.c
     src/tools/canvas_render.c
     src/tools/canvas_store.c
+    src/tools/canvas_persist.c
     src/tools/declarative.c
     src/tools/mcp_resource_tools.c
     src/tools/cron_session_tools.c
