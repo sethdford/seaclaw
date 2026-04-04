@@ -416,7 +416,9 @@ export class ScChatBubble extends LitElement {
       font-family: var(--hu-font);
       color: var(--hu-text-secondary);
       cursor: pointer;
-      transition: color var(--hu-duration-fast), border-color var(--hu-duration-fast);
+      transition:
+        color var(--hu-duration-fast),
+        border-color var(--hu-duration-fast);
     }
     .outline-toggle:hover {
       color: var(--hu-accent);
@@ -446,14 +448,20 @@ export class ScChatBubble extends LitElement {
       background: transparent;
       border: none;
       text-align: left;
-      transition: color var(--hu-duration-fast), background var(--hu-duration-fast);
+      transition:
+        color var(--hu-duration-fast),
+        background var(--hu-duration-fast);
     }
     .outline-item:hover {
       color: var(--hu-accent);
       background: color-mix(in srgb, var(--hu-accent) 6%, transparent);
     }
-    .outline-item[data-level="2"] { padding-left: var(--hu-space-md); }
-    .outline-item[data-level="3"] { padding-left: var(--hu-space-lg); }
+    .outline-item[data-level="2"] {
+      padding-left: var(--hu-space-md);
+    }
+    .outline-item[data-level="3"] {
+      padding-left: var(--hu-space-lg);
+    }
 
     /* Threaded reply quote */
     .reply-quote {

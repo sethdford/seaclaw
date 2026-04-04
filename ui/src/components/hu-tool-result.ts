@@ -111,8 +111,13 @@ export class ScToolResult extends LitElement {
     }
 
     @keyframes hu-tool-running-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
+      0%,
+      100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
     }
 
     @keyframes hu-tool-enter {

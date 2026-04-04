@@ -816,7 +816,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
         }
         const result = (await gw.voiceSessionStart(startParams)) as Record<string, unknown>;
         const isGeminiLive = result?.mode === "gemini_live";
-        const isProviderDuplex = isGeminiLive || result?.mode === "openai_realtime" || result?.mode === "realtime";
+        const isProviderDuplex =
+          isGeminiLive || result?.mode === "openai_realtime" || result?.mode === "realtime";
         this.#activeSessionIsGL = isProviderDuplex;
 
         gw.setOnBinaryChunk((ab) => {
@@ -1026,7 +1027,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
     return html`
       <div class="setup-banner" role="region" aria-label="Voice setup">
         <h3 style="margin:0 0 var(--hu-space-sm) 0;font:var(--hu-font-heading-sm)">Voice Setup</h3>
-        <p style="margin:0 0 var(--hu-space-md) 0;color:var(--hu-text-secondary);font:var(--hu-font-body-sm)">
+        <p
+          style="margin:0 0 var(--hu-space-md) 0;color:var(--hu-text-secondary);font:var(--hu-font-body-sm)"
+        >
           Choose a voice provider and enter your API key to start talking.
         </p>
         <fieldset
@@ -1056,10 +1059,14 @@ export class ScVoiceView extends GatewayAwareLitElement {
             `,
           )}
         </fieldset>
-        <p style="margin:0 0 var(--hu-space-sm) 0;color:var(--hu-text-tertiary);font:var(--hu-font-body-xs)">
+        <p
+          style="margin:0 0 var(--hu-space-sm) 0;color:var(--hu-text-tertiary);font:var(--hu-font-body-xs)"
+        >
           ${selected.help}
         </p>
-        <div style="display:flex;gap:var(--hu-space-xs);align-items:center;margin-bottom:var(--hu-space-sm)">
+        <div
+          style="display:flex;gap:var(--hu-space-xs);align-items:center;margin-bottom:var(--hu-space-sm)"
+        >
           <input
             type="password"
             placeholder="Paste API key"
@@ -1081,10 +1088,18 @@ export class ScVoiceView extends GatewayAwareLitElement {
           </button>
         </div>
         ${this._setupError
-          ? html`<p style="margin:0 0 var(--hu-space-xs) 0;color:var(--hu-error);font:var(--hu-font-body-xs)">${this._setupError}</p>`
+          ? html`<p
+              style="margin:0 0 var(--hu-space-xs) 0;color:var(--hu-error);font:var(--hu-font-body-xs)"
+            >
+              ${this._setupError}
+            </p>`
           : nothing}
         ${this._setupSuccess
-          ? html`<p style="margin:0 0 var(--hu-space-xs) 0;color:var(--hu-success);font:var(--hu-font-body-xs)">Connected successfully. Ready to talk.</p>`
+          ? html`<p
+              style="margin:0 0 var(--hu-space-xs) 0;color:var(--hu-success);font:var(--hu-font-body-xs)"
+            >
+              Connected successfully. Ready to talk.
+            </p>`
           : nothing}
       </div>
     `;

@@ -118,7 +118,7 @@ export class ScMessageThread extends LitElement {
       flex: 1;
       overflow-y: auto;
       padding: var(--hu-space-md);
-      padding-bottom: calc(var(--hu-space-3xl, 48px) + 100px);
+      padding-bottom: var(--hu-messages-padding-bottom, calc(var(--hu-space-3xl, 48px) + 100px));
       display: flex;
       flex-direction: column;
       gap: var(--hu-space-xl);
@@ -167,7 +167,8 @@ export class ScMessageThread extends LitElement {
     .bubble-wrapper {
       position: relative;
       max-width: 42rem;
-      animation: message-enter var(--hu-duration-normal, 200ms) var(--hu-ease-spring-gentle, ease-out) both;
+      animation: message-enter var(--hu-duration-normal, 200ms)
+        var(--hu-ease-spring-gentle, ease-out) both;
     }
     .bubble-wrapper.user {
       margin-left: auto;
@@ -467,7 +468,7 @@ export class ScMessageThread extends LitElement {
       justify-content: center;
       gap: var(--hu-space-lg);
       padding: var(--hu-space-2xl) var(--hu-space-lg);
-      padding-bottom: 20vh;
+      padding-bottom: var(--hu-hero-padding-bottom, 20vh);
       text-align: center;
       animation: hu-hero-enter var(--hu-duration-slow) var(--hu-ease-out) both;
     }

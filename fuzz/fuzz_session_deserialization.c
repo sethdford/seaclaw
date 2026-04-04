@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 /*
  * Fuzz harness for session persistence JSON deserialization.
  * Must not crash, overflow, or leak on any input.

@@ -33,8 +33,8 @@ export class ScMessageStream extends LitElement {
     .bubble {
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
-      line-height: var(--hu-leading-relaxed);
-      padding: var(--hu-space-md) var(--hu-space-lg);
+      line-height: var(--hu-leading-normal);
+      padding: var(--hu-space-sm) var(--hu-space-md);
       border-radius: var(--hu-radius-xl);
       max-width: 85%;
       animation: hu-slide-up var(--hu-duration-fast) var(--hu-ease-out) both;
@@ -148,8 +148,13 @@ export class ScMessageStream extends LitElement {
     }
 
     @keyframes hu-cursor-glow-stream {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      0%,
+      100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.4;
+      }
     }
     .cursor {
       display: inline-block;

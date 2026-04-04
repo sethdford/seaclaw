@@ -192,6 +192,19 @@ export class ScChatView extends GatewayAwareLitElement {
         z-index: 10;
         background: var(--hu-bg-surface);
       }
+      /* Empty state: center composer vertically like Claude.ai / ChatGPT */
+      .container.empty {
+        justify-content: center;
+        --hu-hero-padding-bottom: var(--hu-space-lg);
+        --hu-messages-padding-bottom: var(--hu-space-sm);
+      }
+      .container.empty .thread-column {
+        flex: none;
+      }
+      .container.empty hu-chat-composer {
+        position: static;
+        background: transparent;
+      }
       @container (max-width: 640px) /* --hu-breakpoint-md */ {
         .container {
           padding: 0 var(--hu-space-sm);
@@ -599,6 +612,8 @@ export class ScChatView extends GatewayAwareLitElement {
       ...s,
       active: s.id === this.sessionKey,
     }));
+    const isEmpty =
+      this.chat.items.length === 0 && !this.chat.historyLoading && !this.chat.isWaiting;
     return html`
       <div class="main-wrap">
         <hu-chat-sessions-panel
@@ -610,10 +625,9 @@ export class ScChatView extends GatewayAwareLitElement {
           @hu-session-delete=${this._onSessionDelete}
           @hu-session-rename=${this._onSessionRename}
         ></hu-chat-sessions-panel>
-        <div class="container">
+        <div class="container ${isEmpty ? "empty" : ""}">
           ${this.chat.items.length > 0 ? this._renderStatusBar() : nothing}
-          ${this._renderErrorBanner()}
-          ${this._renderHistoryErrorBanner()} ${this._renderSearch()}
+          ${this._renderErrorBanner()} ${this._renderHistoryErrorBanner()} ${this._renderSearch()}
           ${this.chat.historyLoading
             ? this._renderSkeleton()
             : html`
