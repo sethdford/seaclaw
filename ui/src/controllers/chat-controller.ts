@@ -123,8 +123,14 @@ export class ChatController implements ReactiveController {
     try {
       const gw = (this.host as unknown as { _gw?: GatewayClient })._gw;
       if (gw) {
-        const sessionKey = this.items.length > 0 ? (this.items[0] as Record<string, unknown>).session as string | undefined : undefined;
-        const before = this.items.length > 0 ? (this.items[0] as Record<string, unknown>).id as string | undefined : undefined;
+        const sessionKey =
+          this.items.length > 0
+            ? ((this.items[0] as Record<string, unknown>).session as string | undefined)
+            : undefined;
+        const before =
+          this.items.length > 0
+            ? ((this.items[0] as Record<string, unknown>).id as string | undefined)
+            : undefined;
         const res = await gw.request<{ messages?: ChatItem[] }>("chat.history", {
           session: sessionKey,
           before,

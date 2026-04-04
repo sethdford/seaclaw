@@ -261,10 +261,9 @@ export class ScSecurityView extends GatewayAwareLitElement {
       }
       /* Load CoT audit summary if available */
       try {
-        const cot = await gw.request<{ entries?: { tool: string; verdict: string; reason: string }[] }>(
-          "security.cot.summary",
-          {},
-        );
+        const cot = await gw.request<{
+          entries?: { tool: string; verdict: string; reason: string }[];
+        }>("security.cot.summary", {});
         this.cotEntries = Array.isArray(cot?.entries) ? cot.entries : [];
       } catch {
         this.cotEntries = [];
@@ -620,15 +619,29 @@ export class ScSecurityView extends GatewayAwareLitElement {
   private _renderCotAudit() {
     if (this.cotEntries.length === 0) return nothing;
     return html`
-      <hu-section-header heading="Chain-of-Thought Audit" description="Recent tool safety reviews"></hu-section-header>
+      <hu-section-header
+        heading="Chain-of-Thought Audit"
+        description="Recent tool safety reviews"
+      ></hu-section-header>
       <div class="grid hu-stagger-motion9">
         ${this.cotEntries.map(
           (e) => html`
             <hu-card surface="default">
               <div class="card-inner">
                 <div class="card-title">${e.tool}</div>
-                <hu-badge variant=${e.verdict === "allow" ? "success" : e.verdict === "deny" ? "error" : "info"}>${e.verdict}</hu-badge>
-                <p style="color:var(--hu-text-secondary);font-size:var(--hu-text-sm);margin-top:var(--hu-space-xs)">${e.reason}</p>
+                <hu-badge
+                  variant=${e.verdict === "allow"
+                    ? "success"
+                    : e.verdict === "deny"
+                      ? "error"
+                      : "info"}
+                  >${e.verdict}</hu-badge
+                >
+                <p
+                  style="color:var(--hu-text-secondary);font-size:var(--hu-text-sm);margin-top:var(--hu-space-xs)"
+                >
+                  ${e.reason}
+                </p>
               </div>
             </hu-card>
           `,

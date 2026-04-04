@@ -104,7 +104,9 @@ export class HuWorkflowView extends GatewayAwareLitElement {
   }
 
   private _renderSkeleton() {
-    return html`<div class="grid">${[1, 2, 3].map(() => html`<hu-skeleton style="height:8rem"></hu-skeleton>`)}</div>`;
+    return html`<div class="grid">
+      ${[1, 2, 3].map(() => html`<hu-skeleton style="height:8rem"></hu-skeleton>`)}
+    </div>`;
   }
 
   override render() {
@@ -155,7 +157,11 @@ export class HuWorkflowView extends GatewayAwareLitElement {
                 ${t.status === "pending" || t.status === "running"
                   ? html`
                       <div class="task-actions">
-                        <hu-button size="sm" variant="outline" @click=${() => this._cancelTask(t.id)}>
+                        <hu-button
+                          size="sm"
+                          variant="outline"
+                          @click=${() => this._cancelTask(t.id)}
+                        >
                           Cancel
                         </hu-button>
                       </div>
