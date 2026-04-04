@@ -1074,7 +1074,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
       <div class="controls-zone hu-scroll-reveal-stagger">
         <hu-voice-orb
           .state=${this._orbVisualState}
-          .audioLevel=${this._audioLevel}
+          .audioLevel=${this._userVadSpeaking ? Math.max(this._audioLevel, 0.4) : this._audioLevel}
           ?disabled=${micDisabled}
           @hu-voice-mic-toggle=${this.toggleMic}
         ></hu-voice-orb>
