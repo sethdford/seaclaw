@@ -428,6 +428,8 @@ set(HU_CORE_SOURCES
     src/agent/context.c
     src/agent/prompt.c
     src/agent/memory_loader.c
+    src/agent/agent_definition.c
+    src/agent/agent_git.c
     src/agent/dispatcher.c
     src/agent/compaction.c
     src/agent/spawn.c
@@ -1924,6 +1926,8 @@ enable_testing()
 
 set(HU_TEST_SOURCES
     tests/test_main.c
+    tests/test_agent_definition.c
+    tests/test_agent_git.c
     tests/test_agent_modules.c
     tests/test_tot_recursive.c
     tests/test_agent_subsystems.c
@@ -1951,6 +1955,8 @@ set(HU_TEST_SOURCES
     tests/test_channel.c
     tests/test_channel_format.c
     tests/test_channel_rate_limit.c
+    tests/test_channel_http.c
+    tests/test_webhook_channel.c
     tests/test_tool.c
     tests/test_webhook.c
     tests/test_peripheral.c
@@ -2004,6 +2010,7 @@ set(HU_TEST_SOURCES
     tests/test_voice_rt_openai.c
     tests/test_voice_provider.c
     tests/test_voice_session.c
+    tests/test_gemini_live.c
     tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c
@@ -2309,7 +2316,8 @@ list(APPEND HU_TEST_SOURCES
 
 add_executable(human_tests ${HU_TEST_SOURCES} wasm/wasm_alloc.c src/bootstrap.c)
 target_link_libraries(human_tests human_core_test)
-target_include_directories(human_tests PRIVATE ${HU_ROOT}/tests ${HU_ROOT}/src/gateway)
+target_include_directories(human_tests PRIVATE ${HU_ROOT}/tests ${HU_ROOT}/src/gateway
+    ${HU_ROOT}/src/channels)
 target_compile_definitions(human_tests PRIVATE "HU_EVAL_SUITES_DIR=\"${HU_ROOT}/eval_suites\"")
 # HU_HAS_PERSONA always set for tests: test lib has persona (main or extra), struct layout must match
 target_compile_definitions(human_tests PRIVATE HU_IS_TEST=1 HU_GATEWAY_TEST_MODE=1 HU_HAS_NONE_ENGINE=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1 HU_HAS_RUNTIME_EXOTIC=1)

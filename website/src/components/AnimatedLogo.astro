@@ -13,7 +13,7 @@ const { size = 180, interactive = true } = Astro.props;
   role="img"
   aria-label="h-uman logo"
   data-interactive={interactive ? "true" : "false"}
-  tabindex="0"
+  tabindex="-1"
 >
   <div class="hu-orb-glow" aria-hidden="true"></div>
 
@@ -24,7 +24,7 @@ const { size = 180, interactive = true } = Astro.props;
   <div class="hu-orb-pulse" aria-hidden="true"></div>
 
   <div class="hu-orb">
-    <svg class="hu-orb-eyes" viewBox="0 0 100 100">
+    <svg class="hu-orb-eyes" viewBox="0 0 100 100" aria-hidden="true">
       <ellipse
         class="hu-eye hu-eye-left"
         cx="36"
