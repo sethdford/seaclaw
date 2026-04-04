@@ -6,6 +6,7 @@
 #include "human/core/string.h"
 #include "human/security.h"
 #include "human/security/sandbox.h"
+#include "human/security/skill_trust.h"
 #include "human/tool.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,6 +78,12 @@ static hu_error_t shell_execute(void *ctx, hu_allocator_t *alloc, const hu_json_
     size_t cmd_len = strlen(cmd);
     if (cmd_len > HU_SHELL_CMD_MAX) {
         *out = hu_tool_result_fail("command too long", 16);
+        return HU_OK;
+    }
+
+    /* Plan 12: Skill trust — reject commands with dangerous patterns */
+    if (hu_skill_trust_inspect_command(cmd, cmd_len) != HU_OK) {
+        *out = hu_tool_result_fail("command blocked by skill trust inspection", 41);
         return HU_OK;
     }
 
@@ -317,6 +324,12 @@ static hu_error_t shell_execute_streaming(void *ctx, hu_allocator_t *alloc,
     size_t cmd_len = strlen(cmd);
     if (cmd_len > HU_SHELL_CMD_MAX) {
         *out = hu_tool_result_fail("command too long", 16);
+        return HU_OK;
+    }
+
+    /* Plan 12: Skill trust — reject commands with dangerous patterns (streaming) */
+    if (hu_skill_trust_inspect_command(cmd, cmd_len) != HU_OK) {
+        *out = hu_tool_result_fail("command blocked by skill trust inspection", 41);
         return HU_OK;
     }
 

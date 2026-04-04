@@ -36,7 +36,10 @@
 #include "human/hook.h"
 #include "human/permission.h"
 #include "human/mcp_manager.h"
+#include "human/agent/agent_definition.h"
+#include "human/agent/agent_git.h"
 #include "human/agent/instruction_discover.h"
+#include "human/channels/twilio_media.h"
 #include "human/tools/webhook_tools.h"
 #include "human/webhook.h"
 #ifdef HU_HAS_VOICE_CHANNEL
@@ -937,6 +940,18 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                 bi->agent.instruction_discovery = disc;
         }
 
+#ifndef HU_IS_TEST
+        /* Plan 7: Markdown agent definition (SOUL.md, RULES.md, etc.) */
+        {
+            hu_agent_definition_t adef = {0};
+            if (hu_agent_definition_load(alloc, ws, &adef) == HU_OK)
+                hu_agent_definition_deinit(&adef, alloc);
+        }
+
+        /* Plan 10: Git-native agent versioning */
+        (void)hu_agent_git_init(alloc, ws);
+#endif
+
         ctx->agent = &bi->agent;
         ctx->agent_ok = true;
     }
@@ -1566,6 +1581,29 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             }
         }
 #endif /* HU_HAS_VOICE_CHANNEL */
+
+        /* Plan 8: Twilio Media Streams (G.711 codec, real-time voice via WebSocket) */
+        if (cfg->channels.twilio.account_sid && cfg->channels.twilio.account_sid[0] &&
+            ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
+            hu_twilio_media_config_t tmcfg = {
+                .account_sid = cfg->channels.twilio.account_sid,
+                .auth_token = cfg->channels.twilio.auth_token,
+                .phone_number = cfg->channels.twilio.from_number,
+                .voice_webhook_url = NULL,
+                .voice_provider = "gemini_live",
+            };
+            err = hu_twilio_media_create(alloc, &tmcfg, &bi->channel_slots[ch_count]);
+            if (err == HU_OK) {
+                bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
+                bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
+                bi->channels[ch_count].poll_fn = NULL;
+                bi->channels[ch_count].webhook_fn = NULL;
+                bi->channels[ch_count].interval_ms = 1000u;
+                bi->channels[ch_count].last_poll_ms = 0;
+                bi->channel_destroys[ch_count] = NULL;
+                ch_count++;
+            }
+        }
 
         bi->channel_count = ch_count;
         ctx->channels = bi->channels;

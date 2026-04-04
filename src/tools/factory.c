@@ -17,6 +17,7 @@
 #endif
 #ifdef HU_HAS_TOOLS_ADVANCED
 #include "human/tools/canvas.h"
+#include "human/tools/declarative.h"
 #include "human/tools/claude_code.h"
 #include "human/tools/composio.h"
 #include "human/tools/database.h"
@@ -665,6 +666,25 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     if (err != HU_OK)
         goto fail;
     idx++;
+
+    /* Plan 11: Declarative tools from workspace YAML/JSON definitions */
+#ifdef HU_HAS_TOOLS_ADVANCED
+    {
+        hu_declarative_tool_def_t *decl_defs = NULL;
+        size_t decl_count = 0;
+        const char *tools_dir = workspace_dir ? workspace_dir : ".";
+        if (hu_declarative_tools_discover(alloc, tools_dir, &decl_defs, &decl_count) == HU_OK &&
+            decl_count > 0) {
+            for (size_t di = 0; di < decl_count && idx < HU_TOOLS_COUNT; di++) {
+                if (hu_declarative_tool_create(alloc, &decl_defs[di], &tools[idx]) == HU_OK)
+                    idx++;
+            }
+            for (size_t di = 0; di < decl_count; di++)
+                hu_declarative_tool_def_free(&decl_defs[di], alloc);
+            alloc->free(alloc->ctx, decl_defs, decl_count * sizeof(*decl_defs));
+        }
+    }
+#endif
 
     /* Load MCP server tools from config when available */
     hu_tool_t *mcp_tools = NULL;
