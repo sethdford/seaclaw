@@ -771,6 +771,14 @@ void hu_agent_deinit(hu_agent_t *agent) {
         agent->alloc->free(agent->alloc->ctx, agent->persona_prompt, agent->persona_prompt_len + 1);
         agent->persona_prompt = NULL;
     }
+    for (size_t mi = 0; mi < agent->generated_media_count; mi++) {
+        if (agent->generated_media[mi]) {
+            agent->alloc->free(agent->alloc->ctx, agent->generated_media[mi],
+                               strlen(agent->generated_media[mi]) + 1);
+            agent->generated_media[mi] = NULL;
+        }
+    }
+    agent->generated_media_count = 0;
     /* Promote important STM entities to persistent memory before cleanup */
     if (agent->memory && agent->memory->vtable) {
         hu_promotion_config_t promo_config = HU_PROMOTION_DEFAULTS;

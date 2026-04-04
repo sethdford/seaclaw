@@ -5803,6 +5803,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
                         dispatch_tool_done:
                             (void)0;
+                            /* Capture media path from dispatched tool result */
+                            if (result->success && result->media_path &&
+                                result->media_path_len > 0 &&
+                                agent->generated_media_count < 4) {
+                                char *mp = hu_strndup(
+                                    agent->alloc, result->media_path, result->media_path_len);
+                                if (mp)
+                                    agent->generated_media[agent->generated_media_count++] = mp;
+                            }
                             const char *res_content =
                                 result->success ? result->output : result->error_msg;
                             size_t res_len =
@@ -6107,6 +6116,16 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 result.success ? result.output : result.error_msg;
                             size_t res_len =
                                 result.success ? result.output_len : result.error_msg_len;
+
+                            /* Capture media path from tool result for channel attachment */
+                            if (result.success && result.media_path &&
+                                result.media_path_len > 0 &&
+                                agent->generated_media_count < 4) {
+                                char *mp = hu_strndup(
+                                    agent->alloc, result.media_path, result.media_path_len);
+                                if (mp)
+                                    agent->generated_media[agent->generated_media_count++] = mp;
+                            }
 
                             /* TTL cache store on sequential path */
                             if (seq_cache && result.success && res_content && res_len > 0 &&

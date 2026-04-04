@@ -2562,6 +2562,39 @@ static void test_firebase_tool_execute_missing_required(void) {
         tool.vtable->deinit(tool.ctx, &alloc);
 }
 
+static void test_tool_media_image_exists(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t *tools = NULL;
+    size_t count = 0;
+    hu_error_t err =
+        hu_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "media_image"));
+    hu_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_media_video_exists(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t *tools = NULL;
+    size_t count = 0;
+    hu_error_t err =
+        hu_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "media_video"));
+    hu_tools_destroy_default(&alloc, tools, count);
+}
+
+static void test_tool_media_gif_exists(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t *tools = NULL;
+    size_t count = 0;
+    hu_error_t err =
+        hu_tools_create_default(&alloc, ".", 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &tools, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(find_tool_by_name(tools, count, "media_gif"));
+    hu_tools_destroy_default(&alloc, tools, count);
+}
+
 void run_tools_all_tests(void) {
     HU_TEST_SUITE("Tools (all) - Shell/File");
     HU_RUN_TEST(test_shell_create);
@@ -2839,4 +2872,9 @@ void run_tools_all_tests(void) {
     HU_RUN_TEST(test_tool_pdf_execute);
     HU_RUN_TEST(test_tool_diff_exists);
     HU_RUN_TEST(test_tool_diff_execute);
+
+    HU_TEST_SUITE("Tools (all) - Media Generation");
+    HU_RUN_TEST(test_tool_media_image_exists);
+    HU_RUN_TEST(test_tool_media_video_exists);
+    HU_RUN_TEST(test_tool_media_gif_exists);
 }

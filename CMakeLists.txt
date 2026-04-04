@@ -383,6 +383,7 @@ set(HU_CORE_SOURCES
     src/observability/multi_observer.c
     src/observability/bth_metrics.c
     src/observability/otlp.c
+    src/observability/background_registry.c
     src/tunnel/none.c
     src/tunnel/root.c
     src/gateway/gateway.c
@@ -437,6 +438,7 @@ set(HU_CORE_SOURCES
     src/agent/team.c
     src/agent/mailbox.c
     src/agent/task_list.c
+    src/agent/task_store.c
     src/agent/profile.c
     src/agent/planner.c
     src/agent/plan_executor.c
@@ -744,6 +746,7 @@ set(HU_CORE_SOURCES
     src/memory/vector/store.c
     src/memory/vector/store_pgvector.c
     src/memory/vector/store_qdrant.c
+    src/memory/vector/vector_retrieval_remote.c
     src/memory/lifecycle/semantic_cache.c
 )
 
@@ -1966,10 +1969,8 @@ set(HU_TEST_SOURCES
     tests/test_webhook_channel.c
     tests/test_cp_tasks.c
     tests/test_vector_retrieval_remote.c
-    tests/test_background_registry.c
     tests/test_cp_tasks.c
     tests/test_vector_retrieval_remote.c
-    tests/test_background_registry.c
     tests/test_tool.c
     tests/test_webhook.c
     tests/test_peripheral.c
