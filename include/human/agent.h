@@ -401,4 +401,8 @@ hu_error_t hu_agent_set_persona(hu_agent_t *agent, const char *name, size_t name
 /* Run memory consolidation (merge similar entries, decay old). */
 hu_error_t hu_agent_consolidate_memory(hu_agent_t *agent);
 
+/* Load externalized word lists for agent_turn from data files. Gracefully falls back to defaults. */
+hu_error_t hu_agent_turn_data_init(hu_allocator_t *alloc);
+void hu_agent_turn_data_cleanup(hu_allocator_t *alloc);
+
 #endif /* HU_AGENT_H */

@@ -1,0 +1,10 @@
+{
+  "negative": [
+    "sad", "frustrated", "angry", "upset", "worried", "anxious", "stressed",
+    "tired", "exhausted", "hurt", "disappointed", "confused", "lost", "struggling"
+  ],
+  "positive": [
+    "happy", "excited", "great", "amazing", "wonderful", "grateful",
+    "thankful", "love", "celebrating"
+  ]
+}

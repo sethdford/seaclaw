@@ -36,4 +36,8 @@ hu_error_t hu_plan_build_prompt(const hu_conversation_plan_t *plan, hu_allocator
 
 void hu_conversation_plan_deinit(hu_conversation_plan_t *plan, hu_allocator_t *alloc);
 
+/* Load externalized word lists from data files. Gracefully falls back to defaults. */
+hu_error_t hu_conversation_plan_data_init(hu_allocator_t *alloc);
+void hu_conversation_plan_data_cleanup(hu_allocator_t *alloc);
+
 #endif

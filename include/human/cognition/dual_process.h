@@ -2,6 +2,7 @@
 #define HU_COGNITION_DUAL_PROCESS_H
 
 #include "human/cognition/emotional.h"
+#include "human/core/allocator.h"
 #include "human/core/error.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -44,5 +45,9 @@ hu_cognition_budget_t hu_cognition_get_budget(hu_cognition_mode_t mode,
 
 /* Get mode name string for observer events. */
 const char *hu_cognition_mode_name(hu_cognition_mode_t mode);
+
+/* Load externalized word lists from data files. Gracefully falls back to defaults. */
+hu_error_t hu_dual_process_data_init(hu_allocator_t *alloc);
+void hu_dual_process_data_cleanup(hu_allocator_t *alloc);
 
 #endif /* HU_COGNITION_DUAL_PROCESS_H */

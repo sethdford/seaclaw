@@ -1,5 +1,7 @@
 #include "human/agent/conversation_plan.h"
 #include "human/core/string.h"
+#include "human/data/loader.h"
+#include "human/core/json.h"
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -9,15 +11,94 @@
 #define TARGET_LENGTH_CAP           300
 #define DEEP_CONVERSATION_THRESHOLD 1000
 
-static const char *const EMOTIONAL_KEYWORDS[] = {
+/* Default fallback arrays (NULL-terminated) */
+static const char *DEFAULT_EMOTIONAL_KEYWORDS[] = {
     "sad",          "happy",    "angry",       "frustrated", "worried", "anxious", "excited",
     "disappointed", "stressed", "overwhelmed", "lonely",     "scared",  "hurt",
+    NULL
 };
-#define EMOTIONAL_KEYWORD_COUNT (sizeof(EMOTIONAL_KEYWORDS) / sizeof(EMOTIONAL_KEYWORDS[0]))
+
+static const char *DEFAULT_NEW_TOPIC_PATTERNS[] = {
+    "new ", "about ", "tell me", "what about", "regarding ",
+    NULL
+};
+
+/* Runtime loaded patterns */
+static const char **s_emotional_keywords = DEFAULT_EMOTIONAL_KEYWORDS;
+static const char **s_new_topic_patterns = DEFAULT_NEW_TOPIC_PATTERNS;
+
+static void load_patterns(hu_allocator_t *alloc, hu_json_value_t *root, const char *key,
+                          const char ***dest) {
+    if (!root || !dest)
+        return;
+    hu_json_value_t *arr = hu_json_object_get(root, key);
+    if (!arr || arr->type != HU_JSON_ARRAY)
+        return;
+    size_t count = arr->data.array.len;
+    if (count == 0)
+        return;
+    const char **patterns = (const char **)alloc->alloc(alloc->ctx, (count + 1) * sizeof(const char *));
+    if (!patterns)
+        return;
+    memset(patterns, 0, (count + 1) * sizeof(const char *));
+    for (size_t i = 0; i < count; i++) {
+        hu_json_value_t *item = arr->data.array.items[i];
+        if (item && item->type == HU_JSON_STRING) {
+            patterns[i] = hu_strndup(alloc, item->data.string.ptr, item->data.string.len);
+        }
+    }
+    patterns[count] = NULL;
+    *dest = patterns;
+}
+
+hu_error_t hu_conversation_plan_data_init(hu_allocator_t *alloc) {
+    if (!alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char *json_data = NULL;
+    size_t json_len = 0;
+    hu_error_t err = hu_data_load(alloc, "agent/conversation_plan_words.json", &json_data, &json_len);
+    if (err != HU_OK)
+        return HU_OK; /* Fail gracefully, keep defaults */
+
+    hu_json_value_t *root = NULL;
+    err = hu_json_parse(alloc, json_data, json_len, &root);
+    alloc->free(alloc->ctx, json_data, json_len);
+    if (err != HU_OK || !root)
+        return HU_OK; /* Fail gracefully, keep defaults */
+
+    load_patterns(alloc, root, "emotional_keywords", &s_emotional_keywords);
+    load_patterns(alloc, root, "new_topic_patterns", &s_new_topic_patterns);
+
+    hu_json_free(alloc, root);
+    return HU_OK;
+}
+
+static void free_patterns(hu_allocator_t *alloc, const char **arr, const char **default_arr) {
+    if (arr != default_arr && arr) {
+        for (size_t i = 0; arr[i]; i++) {
+            alloc->free(alloc->ctx, (char *)arr[i], strlen(arr[i]) + 1);
+        }
+        size_t count = 0;
+        for (size_t i = 0; arr[i]; i++) count++;
+        alloc->free(alloc->ctx, (void *)arr, (count + 1) * sizeof(const char *));
+    }
+}
+
+void hu_conversation_plan_data_cleanup(hu_allocator_t *alloc) {
+    if (!alloc)
+        return;
+
+    free_patterns(alloc, s_emotional_keywords, DEFAULT_EMOTIONAL_KEYWORDS);
+    free_patterns(alloc, s_new_topic_patterns, DEFAULT_NEW_TOPIC_PATTERNS);
+
+    s_emotional_keywords = DEFAULT_EMOTIONAL_KEYWORDS;
+    s_new_topic_patterns = DEFAULT_NEW_TOPIC_PATTERNS;
+}
 
 static bool contains_emotional_keyword(const char *msg, size_t len) {
-    for (size_t i = 0; i < EMOTIONAL_KEYWORD_COUNT; i++) {
-        const char *kw = EMOTIONAL_KEYWORDS[i];
+    for (size_t i = 0; s_emotional_keywords[i]; i++) {
+        const char *kw = s_emotional_keywords[i];
         size_t kw_len = strlen(kw);
         for (size_t j = 0; j + kw_len <= len; j++) {
             if (strncasecmp(msg + j, kw, kw_len) != 0)
@@ -40,12 +121,10 @@ static bool contains_question(const char *msg, size_t len) {
 }
 
 static bool mentions_new_topic(const char *msg, size_t len) {
-    /* Simple heuristic: "new", "about", "tell me", "what about", "regarding" */
-    const char *patterns[] = {"new ", "about ", "tell me", "what about", "regarding "};
-    for (size_t p = 0; p < sizeof(patterns) / sizeof(patterns[0]); p++) {
-        size_t plen = strlen(patterns[p]);
+    for (size_t p = 0; s_new_topic_patterns[p]; p++) {
+        size_t plen = strlen(s_new_topic_patterns[p]);
         for (size_t i = 0; i + plen <= len; i++) {
-            if (strncasecmp(msg + i, patterns[p], plen) == 0)
+            if (strncasecmp(msg + i, s_new_topic_patterns[p], plen) == 0)
                 return true;
         }
     }

@@ -1,5 +1,120 @@
 /* Core turn execution: hu_agent_turn and turn-local helpers */
 #include "agent_internal.h"
+#include "human/data/loader.h"
+#include "human/core/json.h"
+
+/* Default fallback arrays (NULL-terminated) */
+static const char *DEFAULT_MULTISTEP_NEEDLES[] = {
+    " first ", " then ", " finally", " step ", " steps ", "step 1",
+    "step 2",  "\n1.",   "\n2.",     "1) ",    "2) ",
+    NULL
+};
+
+static const char *DEFAULT_SENTIMENT_NEG[] = {
+    "sad",   "frustrated", "angry", "upset",        "worried",  "anxious", "stressed",
+    "tired", "exhausted",  "hurt",  "disappointed", "confused", "lost",    "struggling",
+    NULL
+};
+
+static const char *DEFAULT_SENTIMENT_POS[] = {
+    "happy",    "excited",   "great",
+    "amazing",  "wonderful", "grateful",
+    "thankful", "love",      "celebrating",
+    NULL
+};
+
+/* Runtime loaded patterns */
+static const char **s_multistep_needles = DEFAULT_MULTISTEP_NEEDLES;
+static const char **s_sentiment_neg = DEFAULT_SENTIMENT_NEG;
+static const char **s_sentiment_pos = DEFAULT_SENTIMENT_POS;
+
+static void at_load_patterns(hu_allocator_t *alloc, hu_json_value_t *root, const char *key,
+                             const char ***dest) {
+    if (!root || !dest)
+        return;
+    hu_json_value_t *arr = hu_json_object_get(root, key);
+    if (!arr || arr->type != HU_JSON_ARRAY)
+        return;
+    size_t count = arr->data.array.len;
+    if (count == 0)
+        return;
+    const char **patterns = (const char **)alloc->alloc(alloc->ctx, (count + 1) * sizeof(const char *));
+    if (!patterns)
+        return;
+    memset(patterns, 0, (count + 1) * sizeof(const char *));
+    for (size_t i = 0; i < count; i++) {
+        hu_json_value_t *item = arr->data.array.items[i];
+        if (item && item->type == HU_JSON_STRING) {
+            patterns[i] = hu_strndup(alloc, item->data.string.ptr, item->data.string.len);
+        }
+    }
+    patterns[count] = NULL;
+    *dest = patterns;
+}
+
+static void at_free_patterns(hu_allocator_t *alloc, const char **arr, const char **default_arr) {
+    if (arr != default_arr && arr) {
+        for (size_t i = 0; arr[i]; i++) {
+            alloc->free(alloc->ctx, (char *)arr[i], strlen(arr[i]) + 1);
+        }
+        size_t count = 0;
+        for (size_t i = 0; arr[i]; i++) count++;
+        alloc->free(alloc->ctx, (void *)arr, (count + 1) * sizeof(const char *));
+    }
+}
+
+hu_error_t hu_agent_turn_data_init(hu_allocator_t *alloc) {
+    if (!alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    /* Load multistep indicators */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "agent/multistep_indicators.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            alloc->free(alloc->ctx, json_data, json_len);
+            if (err == HU_OK && root) {
+                at_load_patterns(alloc, root, "needles", &s_multistep_needles);
+                hu_json_free(alloc, root);
+            }
+        }
+    }
+
+    /* Load sentiment words */
+    {
+        char *json_data = NULL;
+        size_t json_len = 0;
+        hu_error_t err = hu_data_load(alloc, "agent/sentiment_words.json", &json_data, &json_len);
+        if (err == HU_OK) {
+            hu_json_value_t *root = NULL;
+            err = hu_json_parse(alloc, json_data, json_len, &root);
+            alloc->free(alloc->ctx, json_data, json_len);
+            if (err == HU_OK && root) {
+                at_load_patterns(alloc, root, "negative", &s_sentiment_neg);
+                at_load_patterns(alloc, root, "positive", &s_sentiment_pos);
+                hu_json_free(alloc, root);
+            }
+        }
+    }
+
+    return HU_OK;
+}
+
+void hu_agent_turn_data_cleanup(hu_allocator_t *alloc) {
+    if (!alloc)
+        return;
+
+    at_free_patterns(alloc, s_multistep_needles, DEFAULT_MULTISTEP_NEEDLES);
+    at_free_patterns(alloc, s_sentiment_neg, DEFAULT_SENTIMENT_NEG);
+    at_free_patterns(alloc, s_sentiment_pos, DEFAULT_SENTIMENT_POS);
+
+    s_multistep_needles = DEFAULT_MULTISTEP_NEEDLES;
+    s_sentiment_neg = DEFAULT_SENTIMENT_NEG;
+    s_sentiment_pos = DEFAULT_SENTIMENT_POS;
+}
 
 #ifdef HU_HAS_SKILLS
 static hu_error_t agent_skill_route_embed_fn(void *embed_ctx, hu_allocator_t *alloc,
@@ -230,12 +345,8 @@ static void *dag_parallel_worker(void *arg) {
 static bool message_looks_multistep_for_orchestrator(const char *m, size_t mlen) {
     if (!m || mlen < 48)
         return false;
-    static const char *const needles[] = {
-        " first ", " then ", " finally", " step ", " steps ", "step 1",
-        "step 2",  "\n1.",   "\n2.",     "1) ",    "2) ",
-    };
-    for (size_t ni = 0; ni < sizeof(needles) / sizeof(needles[0]); ni++) {
-        const char *n = needles[ni];
+    for (size_t ni = 0; s_multistep_needles[ni]; ni++) {
+        const char *n = s_multistep_needles[ni];
         size_t nl = strlen(n);
         if (nl > mlen)
             continue;
@@ -1444,20 +1555,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     }
     /* Sentiment-aware persona: detect user's emotional tone and adjust */
     if (persona_prompt && msg && msg_len > 0) {
-        static const char *neg_words[] = {
-            "sad",   "frustrated", "angry", "upset",        "worried",  "anxious", "stressed",
-            "tired", "exhausted",  "hurt",  "disappointed", "confused", "lost",    "struggling"};
-        static const char *pos_words[] = {"happy",    "excited",   "great",
-                                          "amazing",  "wonderful", "grateful",
-                                          "thankful", "love",      "celebrating"};
         int neg_count = 0, pos_count = 0;
-        for (int w = 0; w < (int)(sizeof(neg_words) / sizeof(neg_words[0])); w++) {
-            size_t wlen = strlen(neg_words[w]);
+        for (int w = 0; s_sentiment_neg[w]; w++) {
+            size_t wlen = strlen(s_sentiment_neg[w]);
             for (size_t p = 0; p + wlen <= msg_len; p++) {
                 bool match = true;
                 for (size_t j = 0; j < wlen && match; j++) {
                     char c = msg[p + j];
-                    char n = neg_words[w][j];
+                    char n = s_sentiment_neg[w][j];
                     if (c >= 'A' && c <= 'Z')
                         c += 32;
                     if (c != n)
@@ -1469,13 +1574,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             }
         }
-        for (int w = 0; w < (int)(sizeof(pos_words) / sizeof(pos_words[0])); w++) {
-            size_t wlen = strlen(pos_words[w]);
+        for (int w = 0; s_sentiment_pos[w]; w++) {
+            size_t wlen = strlen(s_sentiment_pos[w]);
             for (size_t p = 0; p + wlen <= msg_len; p++) {
                 bool match = true;
                 for (size_t j = 0; j < wlen && match; j++) {
                     char c = msg[p + j];
-                    char n = pos_words[w][j];
+                    char n = s_sentiment_pos[w][j];
                     if (c >= 'A' && c <= 'Z')
                         c += 32;
                     if (c != n)
