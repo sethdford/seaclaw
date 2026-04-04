@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static hu_error_t json_buf_finish(hu_json_buf_t *buf, hu_allocator_t *alloc, char **out,
                                   size_t *out_len) {
     if (!buf || !alloc || !out || !out_len)
@@ -110,12 +111,17 @@ static hu_error_t append_task_fields(hu_json_buf_t *buf, const hu_task_record_t 
         return e;
     return hu_json_buf_append_raw(buf, "}", 1);
 }
+#endif /* !(HU_IS_TEST) */
 
 hu_error_t cp_tasks_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                          const hu_control_protocol_t *proto, const hu_json_value_t *root,
                          char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)app;
+    (void)root;
+#endif
     if (!alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -185,6 +191,10 @@ hu_error_t cp_tasks_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn
                         char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)app;
+    (void)root;
+#endif
     if (!alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -239,6 +249,10 @@ hu_error_t cp_tasks_cancel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
                            char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)app;
+    (void)root;
+#endif
     if (!alloc || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;

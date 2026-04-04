@@ -20,31 +20,37 @@ struct ContentView: View {
             LazyView(OverviewView())
                 .tabItem {
                     Label("Overview", systemImage: "square.grid.2x2")
+                        .accessibilityIdentifier("tab_overview")
                 }
                 .tag(AppTab.overview)
             LazyView(ChatView())
                 .tabItem {
                     Label("Chat", systemImage: "bubble.left.and.bubble.right")
+                        .accessibilityIdentifier("tab_chat")
                 }
                 .tag(AppTab.chat)
             LazyView(MemoryView())
                 .tabItem {
                     Label("Memory", systemImage: "memorychip")
+                        .accessibilityIdentifier("tab_memory")
                 }
                 .tag(AppTab.memory)
             LazyView(SessionsView())
                 .tabItem {
                     Label("Sessions", systemImage: "clock.arrow.circlepath")
+                        .accessibilityIdentifier("tab_sessions")
                 }
                 .tag(AppTab.sessions)
             LazyView(ToolsView())
                 .tabItem {
                     Label("Tools", systemImage: "wrench.and.screwdriver")
+                        .accessibilityIdentifier("tab_tools")
                 }
                 .tag(AppTab.tools)
             LazyView(SettingsView())
                 .tabItem {
                     Label("Settings", systemImage: "gear")
+                        .accessibilityIdentifier("tab_settings")
                 }
                 .tag(AppTab.settings)
         }

@@ -283,6 +283,8 @@ hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *c
 
     /* Call the judge provider */
 #ifdef HU_IS_TEST
+    (void)judge_model;
+    (void)judge_model_len;
     /* In test mode, skip the actual LLM call and fall through to heuristics */
     sel.source = HU_ROUTE_JUDGE_FALLBACK;
     apply_tier_to_selection(&sel, cfg, score);

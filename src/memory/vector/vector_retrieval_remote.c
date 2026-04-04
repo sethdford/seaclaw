@@ -24,29 +24,6 @@ typedef struct qdr_ret_ctx {
     size_t dimensions;
 } qdr_ret_ctx_t;
 
-static size_t json_escape_string(const char *in, size_t in_len, char *out, size_t out_cap) {
-    size_t o = 0;
-    if (out_cap < 3)
-        return 0;
-    out[o++] = '"';
-    for (size_t i = 0; i < in_len && o + 2 < out_cap; i++) {
-        unsigned char c = (unsigned char)in[i];
-        if (c == '"' || c == '\\') {
-            if (o + 2 >= out_cap)
-                break;
-            out[o++] = '\\';
-            out[o++] = (char)c;
-        } else if (c >= 32 && c != 127) {
-            out[o++] = (char)c;
-        }
-    }
-    if (o + 1 >= out_cap)
-        o = out_cap - 2;
-    out[o++] = '"';
-    out[o] = '\0';
-    return o;
-}
-
 #if HU_IS_TEST
 static hu_error_t qdr_insert(void *ctx, hu_allocator_t *alloc, const char *id, size_t id_len,
                              const hu_embedding_t *embedding, const char *content,
@@ -84,6 +61,29 @@ static size_t qdr_count(void *ctx) {
     return 0;
 }
 #else
+static size_t json_escape_string(const char *in, size_t in_len, char *out, size_t out_cap) {
+    size_t o = 0;
+    if (out_cap < 3)
+        return 0;
+    out[o++] = '"';
+    for (size_t i = 0; i < in_len && o + 2 < out_cap; i++) {
+        unsigned char c = (unsigned char)in[i];
+        if (c == '"' || c == '\\') {
+            if (o + 2 >= out_cap)
+                break;
+            out[o++] = '\\';
+            out[o++] = (char)c;
+        } else if (c >= 32 && c != 127) {
+            out[o++] = (char)c;
+        }
+    }
+    if (o + 1 >= out_cap)
+        o = out_cap - 2;
+    out[o++] = '"';
+    out[o] = '\0';
+    return o;
+}
+
 static hu_error_t qdr_insert(void *ctx, hu_allocator_t *alloc, const char *id, size_t id_len,
                              const hu_embedding_t *embedding, const char *content,
                              size_t content_len) {

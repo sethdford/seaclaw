@@ -28,9 +28,25 @@ final class HumaniOSFleetUITests: XCTestCase {
 
     // MARK: - Lifecycle helpers
 
-    /// Resolves a tab bar button: exact title, compound VoiceOver-style label, or first tab for Overview (SwiftUI / OS differences on CI simulators).
+    /// Stable UI-test identifiers on `ContentView` tab items (`tab_overview`, …).
+    private func tabAccessibilityIdentifier(for title: String) -> String {
+        "tab_" + title.lowercased().replacingOccurrences(of: " ", with: "_")
+    }
+
+    /// Prefer the system tab bar; some iOS versions still expose a `tabBars` node even when tab controls are not its direct children.
+    private var primaryTabBar: XCUIElement {
+        app.tabBars.firstMatch
+    }
+
+    /// Resolves a tab control: accessibility id (preferred), `tabBars` buttons, then app-level buttons (newer iOS / SwiftUI).
     private func tabBarButton(for title: String) -> XCUIElement {
-        let bar = app.tabBars.firstMatch
+        let id = tabAccessibilityIdentifier(for: title)
+        let byId = app.buttons[id]
+        if byId.waitForExistence(timeout: Timeout.tabItem) {
+            return byId
+        }
+
+        let bar = primaryTabBar
         _ = bar.buttons.firstMatch.waitForExistence(timeout: Timeout.tabItem)
         let exact = bar.buttons[title]
         if exact.waitForExistence(timeout: Timeout.tabItem) {
@@ -42,10 +58,47 @@ final class HumaniOSFleetUITests: XCTestCase {
         if fuzzy.waitForExistence(timeout: 8) {
             return fuzzy
         }
+
+        let appExact = app.buttons[title]
+        if appExact.waitForExistence(timeout: Timeout.tabItem) {
+            return appExact
+        }
+        let appFuzzy = app.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] %@", title))
+            .firstMatch
+        if appFuzzy.waitForExistence(timeout: 8) {
+            return appFuzzy
+        }
+
         if title == "Overview" {
-            return bar.buttons.element(boundBy: 0)
+            if bar.buttons.count > 0 {
+                return bar.buttons.element(boundBy: 0)
+            }
+            return app.buttons[id]
         }
         return exact
+    }
+
+    /// "More" overflow tab: under `tabBars` on classic layout, sometimes a top-level button on newer OS builds.
+    private func moreTabButton() -> XCUIElement {
+        let fromBar = primaryTabBar.buttons["More"]
+        if fromBar.exists {
+            return fromBar
+        }
+        return app.buttons["More"]
+    }
+
+    private func anyPrimaryTabChromeVisible() -> Bool {
+        if primaryTabBar.buttons.count > 0 {
+            return true
+        }
+        for label in primaryTabLabels {
+            let id = tabAccessibilityIdentifier(for: label)
+            if app.buttons[id].waitForExistence(timeout: 1) {
+                return true
+            }
+        }
+        return false
     }
 
     private func launchAndSettle() {
@@ -54,15 +107,22 @@ final class HumaniOSFleetUITests: XCTestCase {
             app.wait(for: .runningForeground, timeout: Timeout.launchForeground),
             "App should reach foreground (CI simulator startup)",
         )
-        let tabBar = app.tabBars.firstMatch
+        let tabBar = primaryTabBar
+        let tabBarChrome = tabBar.waitForExistence(timeout: Timeout.tabBar)
+        let overviewId = app.buttons[tabAccessibilityIdentifier(for: "Overview")]
+        let tabsByIdentifier = overviewId.waitForExistence(timeout: Timeout.tabBar)
         XCTAssertTrue(
-            tabBar.waitForExistence(timeout: Timeout.tabBar),
-            "Tab bar should appear after launch",
+            tabBarChrome || tabsByIdentifier,
+            "Tab bar or tab accessibility roots should appear after launch",
         )
-        _ = tabBar.buttons.firstMatch.waitForExistence(timeout: Timeout.tabBar)
+        if tabBarChrome {
+            _ = tabBar.buttons.firstMatch.waitForExistence(timeout: Timeout.tabBar)
+        }
         let overview = tabBarButton(for: "Overview")
         XCTAssertTrue(
-            overview.waitForExistence(timeout: Timeout.tabBar) || tabBar.buttons.count > 0,
+            overview.waitForExistence(timeout: Timeout.tabBar)
+                || tabBar.buttons.count > 0
+                || anyPrimaryTabChromeVisible(),
             "Primary shell should expose Overview (or first tab when labels differ)",
         )
     }
@@ -80,7 +140,7 @@ final class HumaniOSFleetUITests: XCTestCase {
             direct.tap()
             return
         }
-        let more = app.tabBars.buttons["More"]
+        let more = moreTabButton()
         XCTAssertTrue(more.waitForExistence(timeout: Timeout.tabItem), "Expected More tab for overflow item \(label)")
         XCTAssertTrue(more.isHittable, "More tab should be tappable")
         more.tap()
@@ -94,7 +154,7 @@ final class HumaniOSFleetUITests: XCTestCase {
             XCTAssertTrue(direct.isHittable, "Tab \(label) should be hittable")
             return
         }
-        let more = app.tabBars.buttons["More"]
+        let more = moreTabButton()
         XCTAssertTrue(more.waitForExistence(timeout: Timeout.tabItem), "Expected More tab for overflow item \(label)")
         XCTAssertTrue(more.isHittable, "More tab should be hittable (touch target / hit testing)")
         more.tap()
@@ -124,14 +184,20 @@ final class HumaniOSFleetUITests: XCTestCase {
                 "Expected tab bar item \(label)",
             )
         }
-        let toolsOnBar = app.tabBars.buttons["Tools"].waitForExistence(timeout: 3)
-        let settingsOnBar = app.tabBars.buttons["Settings"].waitForExistence(timeout: 3)
+        let toolsOnBar = primaryTabBar.buttons["Tools"].waitForExistence(timeout: 3)
+            || app.buttons["tab_tools"].waitForExistence(timeout: 3)
+            || app.buttons["Tools"].waitForExistence(timeout: 3)
+        let settingsOnBar = primaryTabBar.buttons["Settings"].waitForExistence(timeout: 3)
+            || app.buttons["tab_settings"].waitForExistence(timeout: 3)
+            || app.buttons["Settings"].waitForExistence(timeout: 3)
         if toolsOnBar, settingsOnBar {
-            XCTAssertTrue(app.tabBars.buttons["Tools"].exists)
-            XCTAssertTrue(app.tabBars.buttons["Settings"].exists)
+            XCTAssertTrue(primaryTabBar.buttons["Tools"].exists || app.buttons["tab_tools"].exists || app.buttons["Tools"].exists)
+            XCTAssertTrue(
+                primaryTabBar.buttons["Settings"].exists || app.buttons["tab_settings"].exists || app.buttons["Settings"].exists,
+            )
         } else {
             XCTAssertTrue(
-                app.tabBars.buttons["More"].waitForExistence(timeout: Timeout.tabItem),
+                moreTabButton().waitForExistence(timeout: Timeout.tabItem),
                 "With six tabs on iPhone, overflow destinations appear under More",
             )
         }

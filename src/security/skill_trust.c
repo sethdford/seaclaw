@@ -173,6 +173,7 @@ const char *hu_skill_trust_get_policy(hu_skill_sandbox_tier_t tier) {
     }
 }
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static void fprint_json_string(FILE *f, const char *s) {
     fputc('"', f);
     for (; s && *s; s++) {
@@ -193,6 +194,7 @@ static int build_audit_path(char *out, size_t out_cap) {
         return -1;
     return 0;
 }
+#endif
 
 hu_error_t hu_skill_trust_audit_record(hu_allocator_t *alloc, const hu_skill_audit_entry_t *entry) {
     if (!alloc || !entry)

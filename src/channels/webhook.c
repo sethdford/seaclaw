@@ -23,9 +23,11 @@ typedef struct hu_webhook_ctx {
     bool running;
 } hu_webhook_ctx_t;
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static const char *webhook_effective_msg_field(const hu_webhook_ctx_t *c) {
     return (c->message_field && c->message_field[0]) ? c->message_field : HU_WEBHOOK_DEFAULT_MSG_FIELD;
 }
+#endif
 
 static hu_error_t webhook_start(void *ctx) {
     hu_webhook_ctx_t *c = (hu_webhook_ctx_t *)ctx;

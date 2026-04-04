@@ -144,6 +144,7 @@ static hu_error_t webhook_poll_execute(void *ctx, hu_allocator_t *alloc,
     }
 
 #if HU_IS_TEST
+    (void)c;
     char *result = hu_sprintf(alloc, "{\"events\":[]}");
     *out = hu_tool_result_ok_owned(result, result ? strlen(result) : 0);
     return HU_OK;
@@ -248,6 +249,7 @@ static hu_error_t webhook_list_execute(void *ctx, hu_allocator_t *alloc,
         return HU_ERR_INVALID_ARGUMENT;
 
 #if HU_IS_TEST
+    (void)c;
     char *result = hu_sprintf(alloc, "{\"webhooks\":[]}");
     *out = hu_tool_result_ok_owned(result, result ? strlen(result) : 0);
     return HU_OK;

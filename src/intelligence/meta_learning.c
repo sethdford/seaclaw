@@ -86,7 +86,7 @@ hu_error_t hu_meta_learning_load(sqlite3 *db, hu_meta_params_t *out) {
     out->refinement_frequency_weeks = HU_META_DEFAULT_REFINEMENT;
     out->discovery_min_feedback_count = HU_META_DEFAULT_DISCOVERY;
 
-    double d;
+    double d = out->default_confidence_threshold;
     if (kv_get_double(db, HU_META_KEY_CONFIDENCE, &d) == HU_OK)
         out->default_confidence_threshold = d;
     int i;

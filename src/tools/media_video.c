@@ -52,11 +52,13 @@ static const char *mv_params(void *ctx) {
            "\"required\":[\"prompt\"]}";
 }
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static const char *mv_model_id(const char *model) {
     if (strcmp(model, "veo_3.1_fast") == 0) return "veo-3.1-fast-generate-001";
     if (strcmp(model, "veo_3.1_lite") == 0) return "veo-3.1-lite-generate-001";
     return "veo-3.1-generate-001";
 }
+#endif
 
 static bool mv_model_ok(const char *s) {
     if (!s) return false;

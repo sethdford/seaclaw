@@ -48,6 +48,7 @@ static const char *mg_params(void *ctx) {
            "\"required\":[\"prompt\"]}";
 }
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static hu_error_t mg_convert_to_gif(hu_allocator_t *alloc, const char *mp4_path,
                                     char *gif_path, size_t gif_cap) {
     int n = snprintf(gif_path, gif_cap, "%.*s.gif",
@@ -78,6 +79,7 @@ static hu_error_t mg_convert_to_gif(hu_allocator_t *alloc, const char *mp4_path,
     return HU_OK;
 #endif
 }
+#endif /* !(HU_IS_TEST) */
 
 static hu_error_t mg_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
                              hu_tool_result_t *out) {
