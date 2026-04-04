@@ -469,6 +469,99 @@ static void media_agent_deinit_cleans_generated_media(void) {
     HU_ASSERT(agent.generated_media[1] == NULL);
 }
 
+
+/* Verify daemon merge pattern produces correct media array for channel send,
+ * including both proactive and tool-generated media with correct ordering. */
+static void media_daemon_full_pipeline_with_channel_send(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    /* Set up agent with generated media */
+    hu_agent_t agent;
+    memset(&agent, 0, sizeof(agent));
+    agent.alloc = &alloc;
+
+    hu_tool_t img_tool, gif_tool;
+    memset(&img_tool, 0, sizeof(img_tool));
+    memset(&gif_tool, 0, sizeof(gif_tool));
+    HU_ASSERT_EQ(hu_media_image_create(&alloc, &img_tool), HU_OK);
+    HU_ASSERT_EQ(hu_media_gif_create(&alloc, &gif_tool), HU_OK);
+
+    /* Execute image tool */
+    hu_json_value_t *args = NULL;
+    const char *ij = "{\"prompt\":\"full pipeline test\"}";
+    HU_ASSERT_EQ(hu_json_parse(&alloc, ij, strlen(ij), &args), HU_OK);
+    hu_tool_result_t r1 = {0};
+    HU_ASSERT_EQ(img_tool.vtable->execute(img_tool.ctx, &alloc, args, &r1), HU_OK);
+    HU_ASSERT(r1.success && r1.media_path);
+    if (r1.media_path && r1.media_path_len > 0 && agent.generated_media_count < 4) {
+        agent.generated_media[agent.generated_media_count++] =
+            hu_strndup(&alloc, r1.media_path, r1.media_path_len);
+    }
+    hu_tool_result_free(&alloc, &r1);
+    hu_json_free(&alloc, args);
+
+    /* Execute GIF tool */
+    args = NULL;
+    const char *gj = "{\"prompt\":\"celebration\"}";
+    HU_ASSERT_EQ(hu_json_parse(&alloc, gj, strlen(gj), &args), HU_OK);
+    hu_tool_result_t r2 = {0};
+    HU_ASSERT_EQ(gif_tool.vtable->execute(gif_tool.ctx, &alloc, args, &r2), HU_OK);
+    HU_ASSERT(r2.success && r2.media_path);
+    if (r2.media_path && r2.media_path_len > 0 && agent.generated_media_count < 4) {
+        agent.generated_media[agent.generated_media_count++] =
+            hu_strndup(&alloc, r2.media_path, r2.media_path_len);
+    }
+    hu_tool_result_free(&alloc, &r2);
+    hu_json_free(&alloc, args);
+
+    HU_ASSERT_EQ(agent.generated_media_count, (size_t)2);
+
+    /* Simulate daemon merge (exact pattern from daemon.c) */
+    const char *proactive_vis_m[] = {"/tmp/proactive_search.jpg"};
+    size_t proactive_vis_n = 1;
+
+    const char *all_send_media[8];
+    size_t all_send_media_n = 0;
+    for (size_t pmi = 0; pmi < proactive_vis_n && all_send_media_n < 8; pmi++)
+        all_send_media[all_send_media_n++] = proactive_vis_m[pmi];
+    for (size_t gmi = 0; gmi < agent.generated_media_count && all_send_media_n < 8; gmi++)
+        all_send_media[all_send_media_n++] = agent.generated_media[gmi];
+
+    const char *const *all_send_media_ptr = all_send_media_n > 0 ? all_send_media : NULL;
+    size_t all_send_media_cnt = all_send_media_n;
+
+    /* Verify: 3 media items (1 proactive + 2 generated) */
+    HU_ASSERT_NOT_NULL(all_send_media_ptr);
+    HU_ASSERT_EQ(all_send_media_cnt, (size_t)3);
+    HU_ASSERT_STR_EQ(all_send_media[0], "/tmp/proactive_search.jpg");
+    HU_ASSERT(strstr(all_send_media[1], ".png") != NULL);
+    HU_ASSERT(strstr(all_send_media[2], ".gif") != NULL);
+
+    /* Send through iMessage channel (test mode records text, media is passed) */
+    hu_channel_t ch;
+    hu_imessage_create(&alloc, "+15559876543", 12, NULL, 0, &ch);
+    hu_error_t err = ch.vtable->send(ch.ctx, "+15559876543", 12,
+                                     "Check these out!", 16,
+                                     all_send_media_ptr, all_send_media_cnt);
+    HU_ASSERT_EQ(err, HU_OK);
+    size_t msg_len = 0;
+    const char *msg = hu_imessage_test_get_last_message(&ch, &msg_len);
+    HU_ASSERT_NOT_NULL(msg);
+    HU_ASSERT_EQ(msg_len, 16u);
+    HU_ASSERT_STR_EQ(msg, "Check these out!");
+    hu_imessage_destroy(&ch);
+
+    /* Simulate daemon cleanup (exact pattern from daemon.c) */
+    for (size_t gmc = 0; gmc < agent.generated_media_count; gmc++) {
+        if (agent.generated_media[gmc]) {
+            alloc.free(alloc.ctx, agent.generated_media[gmc],
+                       strlen(agent.generated_media[gmc]) + 1);
+            agent.generated_media[gmc] = NULL;
+        }
+    }
+    agent.generated_media_count = 0;
+}
+
 /* ── registration ───────────────────────────────────────────────────────── */
 
 void run_media_gen_tests(void) {
@@ -504,4 +597,5 @@ void run_media_gen_tests(void) {
     HU_RUN_TEST(media_tool_result_captured_by_agent);
     HU_RUN_TEST(media_config_fallback_chain);
     HU_RUN_TEST(media_agent_deinit_cleans_generated_media);
+    HU_RUN_TEST(media_daemon_full_pipeline_with_channel_send);
 }

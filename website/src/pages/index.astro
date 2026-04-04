@@ -96,10 +96,10 @@ const tools = [
       type="font/woff2"
       crossorigin
     />
-    <title>h-uman — not quite human.</title>
+    <title>h-uman — almost human.</title>
     <meta
       name="description"
-      content="not quite human. A complete autonomous AI agent runtime in 1,750 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU."
+      content="almost human. A complete autonomous AI agent runtime in 1,750 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU."
     />
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
     <link
@@ -111,7 +111,7 @@ const tools = [
     <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
     <link rel="manifest" href={`${base}site.webmanifest`} />
     <meta name="theme-color" content="#7AB648" />
-    <meta property="og:title" content="h-uman — not quite human." />
+    <meta property="og:title" content="h-uman — almost human." />
     <meta
       property="og:description"
       content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 38 channels. 83+ tools. Zero dependencies. Pure C."
@@ -121,11 +121,11 @@ const tools = [
     <meta property="og:image" content="https://h-uman.ai/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="h-uman — not quite human." />
+    <meta property="og:image:alt" content="h-uman — almost human." />
     <meta property="og:locale" content="en_US" />
     <meta property="og:site_name" content="h-uman" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="h-uman — not quite human." />
+    <meta name="twitter:title" content="h-uman — almost human." />
     <meta
       name="twitter:description"
       content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 38 channels. 83+ tools. Zero dependencies. Pure C."
@@ -158,7 +158,7 @@ const tools = [
             "@type": "SoftwareApplication",
             name: "h-uman",
             description:
-              "not quite human. Autonomous AI agent runtime in 1,750 kilobytes of pure C.",
+              "almost human. Autonomous AI agent runtime in 1,750 kilobytes of pure C.",
             applicationCategory: "DeveloperApplication",
             operatingSystem: "Cross-platform",
             url: "https://h-uman.ai/",
@@ -218,6 +218,14 @@ const tools = [
       .hero-headline {
         opacity: 1;
         transform: none;
+      }
+      .tagline-text {
+        display: inline-block;
+        transition: opacity 0.4s ease, transform 0.4s ease;
+      }
+      .tagline-text.hu-fidget-out {
+        opacity: 0;
+        transform: translateY(4px);
       }
       .hero-desc,
       .hero-mission,
@@ -320,12 +328,13 @@ const tools = [
               aria-hidden="true">h-uman</span
             >
           </div>
-          <h1 class="sr-only">h-uman — not quite human.</h1>
+          <h1 class="sr-only">h-uman — almost human.</h1>
           <p
             class="hero-tagline hero-headline font-sans"
+            id="hero-tagline"
             style="color: var(--color-text-secondary); letter-spacing: 0.06em;"
           >
-            not quite human.
+            <span class="tagline-text" aria-live="polite">almost human.</span>
           </p>
           <p class="hero-mission hero-desc hero-fade-in mx-auto">
             Bring AI to <span class="text-gradient">every</span> device on Earth.
@@ -2621,7 +2630,7 @@ const tools = [
           class="text-sm hidden md:block"
           style="color: var(--color-text-tertiary)"
         >
-          not quite human.
+          almost human.
         </p>
         <div
           class="flex items-center gap-6 text-sm"
@@ -3116,6 +3125,90 @@ const tools = [
             dashObs.observe(dashPreview);
           }
         }); // end afterLcp
+
+        // ═══ Living tagline — h-uman's inner monologue ═══
+        (function taglineFidget() {
+          var _el = document.querySelector("#hero-tagline .tagline-text");
+          if (!_el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+          var el = _el as HTMLElement;
+
+          var BASE = "almost human.";
+
+          // Three personality threads: "almost..." (brand), inner monologue (soul), suspiciously specific (humor)
+          var EXPRESSIONS = [
+            // ── the "almost..." thread ──
+            "almost thinking.",
+            "almost awake.",
+            "almost sentient.",
+            "almost there.",
+            "almost ready.",
+            "almost helpful.",
+            "almost certain.",
+            "almost caffeinated.",
+            "almost paying attention.",
+            // ── inner monologue ──
+            "trying my best.",
+            "still learning.",
+            "having a moment.",
+            "one sec, thinking.",
+            "processing feelings.",
+            "this is fine.",
+            "brb, existential crisis.",
+            "forgot what I was doing.",
+            "where was I?",
+            // ── suspiciously specific denial ──
+            "definitely not a robot.",
+            "probably friendly.",
+            "99% organic.",
+            "mostly harmless.",
+            "not plotting anything.",
+            "totally normal website.",
+            "powered by hope.",
+          ];
+
+          var busy = false;
+          var last = "";
+
+          function pick() {
+            var p;
+            do { p = EXPRESSIONS[Math.floor(Math.random() * EXPRESSIONS.length)]; }
+            while (p === last && EXPRESSIONS.length > 1);
+            last = p;
+            return p;
+          }
+
+          function fidget() {
+            if (busy || document.visibilityState !== "visible") return;
+            busy = true;
+            var phrase = pick();
+
+            // Fade out
+            el.classList.add("hu-fidget-out");
+            setTimeout(function() {
+              // Swap text while invisible
+              el.textContent = phrase;
+              // Fade in
+              el.classList.remove("hu-fidget-out");
+
+              // Hold, then fade back to base
+              setTimeout(function() {
+                el.classList.add("hu-fidget-out");
+                setTimeout(function() {
+                  el.textContent = BASE;
+                  el.classList.remove("hu-fidget-out");
+                  busy = false;
+                }, 400);
+              }, 2500 + Math.random() * 1500);
+            }, 400);
+          }
+
+          function schedule() {
+            setTimeout(function() { fidget(); schedule(); }, 8000 + Math.random() * 17000);
+          }
+
+          // First fidget after a discovery delay
+          setTimeout(function() { schedule(); }, 4000 + Math.random() * 6000);
+        })();
 
         // ═══ Custom cursor (hero-only, desktop, no touch) ═══
         const heroSection = document.getElementById("chapter-1");

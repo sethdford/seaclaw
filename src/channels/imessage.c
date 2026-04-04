@@ -385,6 +385,7 @@ size_t escape_for_applescript(char *out, size_t out_cap, const char *in, size_t 
     return j;
 }
 
+
 /* Build an AppleScript to send a POSIX file attachment via iMessage.
  * Pure string builder — does NOT execute the script.
  * Returns bytes written (excluding NUL) or 0 on error. */
@@ -1524,6 +1525,48 @@ static hu_error_t imessage_vt_build_read_receipt_context(void *ctx, hu_allocator
     return hu_imessage_build_read_receipt_context(alloc, contact_id, contact_id_len, out, out_len);
 }
 
+
+static hu_error_t imessage_mark_read(void *ctx, const char *contact_id,
+                                     size_t contact_id_len) {
+#ifdef HU_IS_TEST
+    (void)ctx;
+    (void)contact_id;
+    (void)contact_id_len;
+    return HU_OK;
+#else
+    hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
+    if (!contact_id || contact_id_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    size_t esc_cap = contact_id_len * 2 + 1;
+    char *esc = (char *)c->alloc->alloc(c->alloc->ctx, esc_cap);
+    if (!esc)
+        return HU_ERR_OUT_OF_MEMORY;
+    escape_for_applescript(esc, esc_cap, contact_id, contact_id_len);
+
+    size_t script_cap = 512 + strlen(esc);
+    char *script = (char *)c->alloc->alloc(c->alloc->ctx, script_cap);
+    if (!script) {
+        c->alloc->free(c->alloc->ctx, esc, esc_cap);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    snprintf(script, script_cap,
+             "tell application \"Messages\"\n"
+             "  set targetBuddy to buddy \"%s\" of service \"iMessage\"\n"
+             "  set targetChat to a reference to chat id (id of targetBuddy)\n"
+             "  read targetChat\n"
+             "end tell", esc);
+
+    const char *argv[] = {"osascript", "-e", script, NULL};
+    hu_run_result_t rr = {0};
+    hu_error_t err = hu_process_run(c->alloc, argv, NULL, 0, &rr);
+    hu_run_result_free(c->alloc, &rr);
+    c->alloc->free(c->alloc->ctx, script, script_cap);
+    c->alloc->free(c->alloc->ctx, esc, esc_cap);
+    return err;
+#endif
+}
+
 static const hu_channel_vtable_t imessage_vtable = {
     .start = imessage_start,
     .stop = imessage_stop,
@@ -1541,6 +1584,7 @@ static const hu_channel_vtable_t imessage_vtable = {
     .get_latest_attachment_path = imessage_vt_get_latest_attachment_path,
     .build_reaction_context = imessage_vt_build_reaction_context,
     .build_read_receipt_context = imessage_vt_build_read_receipt_context,
+    .mark_read = imessage_mark_read,
 };
 
 hu_error_t hu_imessage_create(hu_allocator_t *alloc, const char *default_target,

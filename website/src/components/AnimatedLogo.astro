@@ -16,29 +16,14 @@ const { size = 180, interactive = true } = Astro.props;
   tabindex="-1"
 >
   <div class="hu-orb-glow" aria-hidden="true"></div>
-
   <div class="hu-orb-ring hu-orb-ring-1" aria-hidden="true"></div>
   <div class="hu-orb-ring hu-orb-ring-2" aria-hidden="true"></div>
   <div class="hu-orb-ring hu-orb-ring-3" aria-hidden="true"></div>
-
   <div class="hu-orb-pulse" aria-hidden="true"></div>
-
   <div class="hu-orb">
     <svg class="hu-orb-eyes" viewBox="0 0 100 100" aria-hidden="true">
-      <ellipse
-        class="hu-eye hu-eye-left"
-        cx="36"
-        cy="50"
-        rx="10"
-        ry="12"
-        fill="white"></ellipse>
-      <ellipse
-        class="hu-eye hu-eye-right"
-        cx="64"
-        cy="50"
-        rx="10"
-        ry="12"
-        fill="white"></ellipse>
+      <ellipse class="hu-eye hu-eye-left" cx="36" cy="50" rx="10" ry="12" fill="white" />
+      <ellipse class="hu-eye hu-eye-right" cx="64" cy="50" rx="10" ry="12" fill="white" />
     </svg>
   </div>
 </div>
@@ -47,784 +32,363 @@ const { size = 180, interactive = true } = Astro.props;
   .hu-orb-container {
     position: relative;
     margin: 0 auto;
-    perspective: 1000px;
-    transform-style: preserve-3d;
-    animation: hu-orbEntry 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: hu-orbEntry 1.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
     will-change: transform;
   }
-
   .hu-orb-container:focus-visible {
     outline: 2px solid var(--hu-accent, #7ab648);
     outline-offset: 8px;
     border-radius: 50%;
   }
-
   .hu-orb-glow {
     position: absolute;
     inset: -60%;
-    background: radial-gradient(
-      ellipse at center,
-      rgba(74, 103, 65, 0.5) 0%,
-      rgba(74, 103, 65, 0.3) 30%,
-      rgba(74, 103, 65, 0.1) 60%,
-      transparent 80%
-    );
+    background: radial-gradient(circle, var(--hu-orb-glow, rgba(122, 182, 72, 0.25)) 0%, transparent 70%);
     border-radius: 50%;
-    opacity: 0.4;
-    will-change: transform, opacity;
-    transition: background 0.5s ease-out;
+    opacity: 0.6;
+    transition: opacity 0.8s ease;
+    will-change: opacity, transform;
   }
-
   .hu-orb-ring {
     position: absolute;
-    border: 1px solid
-      color-mix(in srgb, var(--hu-accent, #7ab648) 20%, transparent);
+    border: 1px solid rgba(122, 182, 72, 0.12);
     border-radius: 50%;
     pointer-events: none;
-    will-change: transform;
-    box-shadow:
-      0 0 30px rgba(74, 103, 65, 0.2),
-      inset 0 0 15px rgba(255, 255, 255, 0.05);
   }
-
-  .hu-orb-ring-1 {
-    inset: -30%;
-    opacity: 0.35;
-    filter: blur(0.3px);
-  }
-  .hu-orb-ring-2 {
-    inset: -20%;
-    opacity: 0.25;
-    filter: blur(0.5px);
-  }
-  .hu-orb-ring-3 {
-    inset: -10%;
-    opacity: 0.15;
-    filter: blur(0.8px);
-  }
-
+  .hu-orb-ring-1 { inset: -32%; opacity: 0.4; }
+  .hu-orb-ring-2 { inset: -20%; opacity: 0.6; }
+  .hu-orb-ring-3 { inset: -10%; opacity: 0.8; }
   .hu-orb-pulse {
     position: absolute;
-    inset: 0;
-    border: 1px solid rgba(74, 103, 65, 0.25);
+    inset: -35%;
+    background: radial-gradient(circle, rgba(122, 182, 72, 0.3) 0%, transparent 60%);
     border-radius: 50%;
-    pointer-events: none;
-    animation: hu-ambientPulse 4s ease-out infinite;
+    animation: hu-glowPulse 5s ease infinite;
   }
-  .hu-orb-pulse::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    border: 1px solid rgba(74, 103, 65, 0.15);
-    animation: hu-ambientPulse 4s ease-out infinite;
-    animation-delay: 2s;
-  }
-
   .hu-orb {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    overflow: hidden;
-    transform-style: preserve-3d;
-    backface-visibility: hidden;
-    background:
-      radial-gradient(
-        ellipse 60% 40% at 30% 25%,
-        rgba(255, 255, 255, 0.25) 0%,
-        transparent 50%
-      ),
-      radial-gradient(
-        ellipse 50% 30% at 70% 80%,
-        rgba(0, 0, 0, 0.1) 0%,
-        transparent 50%
-      ),
-      linear-gradient(
-        145deg,
-        var(--hu-orb-highlight, #7ab648),
-        var(--hu-orb-gradient-start, #5a9a30),
-        var(--hu-orb-gradient-end, #47802a)
-      );
-    box-shadow:
-      inset 0 -12px 30px rgba(0, 0, 0, 0.2),
-      inset 0 12px 25px rgba(255, 255, 255, 0.15),
-      inset 8px 0 20px rgba(0, 0, 0, 0.08),
-      inset -8px 0 20px rgba(0, 0, 0, 0.08),
-      0 8px 32px rgba(0, 0, 0, 0.12),
-      0 4px 12px rgba(0, 0, 0, 0.08),
-      0 2px 4px rgba(0, 0, 0, 0.04);
+    background: linear-gradient(145deg, var(--hu-orb-highlight, #7AB648), var(--hu-orb-gradient-start, #5A9A30), var(--hu-orb-gradient-end, #47802A));
+    box-shadow: 0 12px 40px rgba(90, 154, 48, 0.35), 0 0 60px rgba(122, 182, 72, 0.12), inset 0 -6px 20px rgba(0, 0, 0, 0.18), inset 0 4px 12px rgba(255, 255, 255, 0.06);
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
     will-change: transform;
+    transition: box-shadow 0.6s ease;
+    animation: hu-orbBreathe 5s ease-in-out infinite;
   }
-
-  .hu-orb::before {
-    content: "";
-    position: absolute;
-    top: 8%;
-    left: 15%;
-    width: 35%;
-    height: 25%;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.35) 0%,
-      rgba(255, 255, 255, 0.1) 50%,
-      transparent 100%
-    );
-    border-radius: 50%;
-    filter: blur(4px);
-    pointer-events: none;
-    opacity: 0.8;
+  .hu-orb-container:hover .hu-orb {
+    box-shadow: 0 16px 50px rgba(90, 154, 48, 0.45), 0 0 80px rgba(122, 182, 72, 0.18), inset 0 -6px 20px rgba(0, 0, 0, 0.18), inset 0 4px 12px rgba(255, 255, 255, 0.08);
   }
-
-  .hu-orb::after {
-    content: "";
-    position: absolute;
-    top: 60%;
-    right: 18%;
-    width: 12%;
-    height: 8%;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 50%;
-    filter: blur(3px);
-    pointer-events: none;
-  }
-
-  .hu-orb-eyes {
-    width: 100%;
-    height: 100%;
-    display: block;
-    position: relative;
-    z-index: 1;
-  }
-
+  .hu-orb-eyes { width: 100%; height: 100%; display: block; }
   .hu-eye {
-    will-change: transform;
+    will-change: transform, rx, ry;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.08));
   }
-
-  @media (hover: hover) {
-    .hu-orb-container:hover .hu-orb-ring {
-      opacity: 0.4 !important;
-      transition: opacity 0.3s ease-out;
-    }
-    .hu-orb-container:hover .hu-orb {
-      filter: brightness(1.05);
-      transition: filter 0.3s ease-out;
-    }
-  }
-
   @keyframes hu-orbEntry {
-    0% {
-      opacity: 0;
-      transform: scale(0.6) translateY(20px);
-    }
-    100% {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
+    0% { opacity: 0; transform: scale(0.3) translateY(30px); }
+    40% { opacity: 1; transform: scale(1.08) translateY(-4px); }
+    60% { transform: scale(0.96) translateY(2px); }
+    80% { transform: scale(1.02) translateY(-1px); }
+    100% { transform: scale(1) translateY(0); }
   }
-
-  @keyframes hu-ambientPulse {
-    0% {
-      transform: scale(1);
-      opacity: 0.4;
-    }
-    50% {
-      transform: scale(1.15);
-      opacity: 0.15;
-    }
-    100% {
-      transform: scale(1.3);
-      opacity: 0;
-    }
+  @keyframes hu-glowPulse {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 0.65; transform: scale(1.04); }
   }
-
+  @keyframes hu-orbBreathe {
+    0%, 100% { transform: scale(1); box-shadow: 0 12px 40px rgba(90, 154, 48, 0.35), 0 0 60px rgba(122, 182, 72, 0.12), inset 0 -6px 20px rgba(0, 0, 0, 0.18), inset 0 4px 12px rgba(255, 255, 255, 0.06); }
+    50% { transform: scale(1.025); box-shadow: 0 16px 48px rgba(90, 154, 48, 0.4), 0 0 72px rgba(122, 182, 72, 0.16), inset 0 -6px 20px rgba(0, 0, 0, 0.18), inset 0 4px 12px rgba(255, 255, 255, 0.08); }
+  }
   @media (prefers-reduced-motion: reduce) {
-    .hu-orb-container,
-    .hu-orb,
-    .hu-orb-glow,
-    .hu-orb-ring,
-    .hu-orb-pulse,
-    .hu-orb-pulse::after {
-      animation: none !important;
-      transition: none !important;
-    }
+    .hu-orb-container, .hu-orb, .hu-orb-glow, .hu-orb-pulse { animation: none !important; transition: none !important; }
   }
-
   @media (prefers-contrast: high) {
-    .hu-orb-glow {
-      opacity: 0.6;
-    }
-    .hu-orb-ring {
-      opacity: 0.5;
-      border-width: 2px;
-    }
-    .hu-eye {
-      filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8));
-    }
+    .hu-orb-glow { opacity: 0.7; }
+    .hu-orb-ring { opacity: 0.6; border-width: 2px; }
+    .hu-eye { filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8)); }
   }
-
   @media print {
-    .hu-orb-container,
-    .hu-orb-container * {
-      animation: none !important;
-      transition: none !important;
-    }
+    .hu-orb-container, .hu-orb-container * { animation: none !important; transition: none !important; }
   }
 </style>
 
 <script>
-  document
-    .querySelectorAll<HTMLElement>(".hu-orb-container")
-    .forEach((container) => {
-      const interactive = container.dataset.interactive === "true";
-      const orb = container.querySelector<HTMLElement>(".hu-orb");
-      const glow = container.querySelector<HTMLElement>(".hu-orb-glow");
-      const leftEye =
-        container.querySelector<SVGEllipseElement>(".hu-eye-left");
-      const rightEye =
-        container.querySelector<SVGEllipseElement>(".hu-eye-right");
-      const rings = container.querySelectorAll<HTMLElement>(".hu-orb-ring");
-
-      if (!orb || !leftEye || !rightEye) return;
-
-      const prefersReducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      );
-      if (prefersReducedMotion.matches) return;
-
-      prefersReducedMotion.addEventListener("change", (e) => {
-        if (e.matches) location.reload();
-      });
-
-      const STIFFNESS = 0.15;
-      const DAMPING = 0.75;
-      const MAX_GAZE = 15;
-      const DEADZONE = 50;
-      const ANTICIPATION = 0.05;
-
-      const SACCADE_CHANCE = 0.003;
-      const SACCADE_DISTANCE = 3;
-      const SACCADE_DURATION = 50;
-
-      const BLINK_MIN = 2500;
-      const BLINK_MAX = 5000;
-      const BLINK_DURATION = 150;
-      const DOUBLE_BLINK_CHANCE = 0.15;
-
-      const PUPIL_SPEED = 0.05;
-      const PUPIL_MIN = 0.85;
-      const PUPIL_MAX = 1.15;
-      const BASE_RX = 10;
-      const BASE_RY = 12;
-
-      const BREATH_BASE = 4000;
-      const BREATH_VARIANCE = 500;
-      const BREATH_SCALE = 1.025;
-      const BREATH_PAUSE_CHANCE = 0.1;
-
-      const ATTENTION_DECAY = 0.995;
-      const ATTENTION_THRESHOLD = 0.3;
-
-      let mouseX = window.innerWidth / 2;
-      let mouseY = window.innerHeight / 2;
-      let targetX = 0;
-      let targetY = 0;
-      let currentX = 0;
-      let currentY = 0;
-      let velocityX = 0;
-      let velocityY = 0;
-
-      let pupilScale = 1.0;
-      let targetPupilScale = 1.0;
-
-      let isBlinking = false;
-      let blinkPhase = 0;
-
-      let breathPhase = 0;
-      let breathDirection = 1;
-      let breathHolding = false;
-      let currentBreathDuration = BREATH_BASE;
-
-      let attentionLevel = 0;
-      let attentionTarget: Element | null = null;
-
-      let currentExpression = "neutral";
-
-      let inSaccade = false;
-      let saccadeStartTime = 0;
-      let saccadeOffsetX = 0;
-      let saccadeOffsetY = 0;
-
-      let isVisible = true;
-      let isHovering = false;
-
-      let idlePhase = Math.random() * Math.PI * 2;
-      let idleDriftX = 0;
-      let idleDriftY = 0;
-      let idleDriftRot = 0;
-
-      let scrollTilt = 0;
-      let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
-      let lastScrollY = window.scrollY;
-
-      let lastTime = performance.now();
-
-      const MOOD_COLORS: Record<string, string> = {
-        neutral: "rgba(74, 103, 65, 0.4)",
-        curious: "rgba(58, 107, 115, 0.5)",
-        delighted: "rgba(106, 138, 90, 0.5)",
-        warmth: "rgba(166, 122, 106, 0.4)",
-        concern: "rgba(122, 106, 90, 0.4)",
-        thinking: "rgba(90, 107, 138, 0.4)",
-        recognition: "rgba(154, 138, 90, 0.5)",
-        interest: "rgba(106, 138, 90, 0.45)",
-        "deep-breath": "rgba(90, 106, 90, 0.35)",
-      };
-
-      const EXPRESSIONS: Record<
-        string,
-        { duration: number; pupilDilation?: number }
-      > = {
-        curious: { duration: 800, pupilDilation: 1.05 },
-        delighted: { duration: 600, pupilDilation: 1.1 },
-        thinking: { duration: 1200 },
-        recognition: { duration: 400, pupilDilation: 1.12 },
-        concern: { duration: 600 },
-        warmth: { duration: 800, pupilDilation: 1.05 },
-        interest: { duration: 300, pupilDilation: 1.08 },
-        "deep-breath": { duration: 3000 },
-      };
-
-      const SECTION_REACTIONS: Record<
-        string,
-        { expression: string; delay: number }
-      > = {
-        features: { expression: "curious", delay: 500 },
-        about: { expression: "warmth", delay: 400 },
-        pricing: { expression: "thinking", delay: 600 },
-        faq: { expression: "curious", delay: 400 },
-        demo: { expression: "delighted", delay: 200 },
-        testimonials: { expression: "warmth", delay: 400 },
-        privacy: { expression: "concern", delay: 350 },
-        security: { expression: "concern", delay: 350 },
-      };
-
-      function easeOutCubic(t: number) {
-        return 1 - Math.pow(1 - t, 3);
-      }
-
-      function updateTargetFromPointer() {
-        const rect = container.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        const dx = mouseX - cx;
-        const dy = mouseY - cy;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < DEADZONE) return;
-
-        const maxDist = Math.max(window.innerWidth, window.innerHeight) / 2;
-        const intensity = easeOutCubic(Math.min(distance / maxDist, 1));
-
-        const ax = dx + (dx - (targetX * maxDist) / MAX_GAZE) * ANTICIPATION;
-        const ay = dy + (dy - (targetY * maxDist) / MAX_GAZE) * ANTICIPATION;
-
-        targetX = (ax / maxDist) * MAX_GAZE * intensity;
-        targetY = (ay / maxDist) * MAX_GAZE * intensity;
-      }
-
-      function blink() {
-        if (isBlinking) return;
-        isBlinking = true;
-        const start = performance.now();
-
-        function animateBlink(now: number) {
-          const elapsed = now - start;
-          const p = Math.min(elapsed / BLINK_DURATION, 1);
-          blinkPhase = Math.sin(p * Math.PI);
-          if (p < 1) {
-            requestAnimationFrame(animateBlink);
-          } else {
-            blinkPhase = 0;
-            isBlinking = false;
-            if (Math.random() < DOUBLE_BLINK_CHANCE) {
-              setTimeout(() => blink(), 200);
-            }
-          }
-        }
-        requestAnimationFrame(animateBlink);
-      }
-
-      function scheduleBlink() {
-        const delay = BLINK_MIN + Math.random() * (BLINK_MAX - BLINK_MIN);
-        setTimeout(() => {
-          if (isVisible) blink();
-          scheduleBlink();
-        }, delay);
-      }
-
-      function triggerExpression(name: string) {
-        const expr = EXPRESSIONS[name];
-        if (!expr) return;
-
-        container.classList.remove(`hu-expr-${currentExpression}`);
-        currentExpression = name;
-        container.classList.add(`hu-expr-${name}`);
-
-        if (expr.pupilDilation) {
-          targetPupilScale = expr.pupilDilation;
-        }
-
-        updateGlowMood(name);
-
-        setTimeout(() => {
-          container.classList.remove(`hu-expr-${name}`);
-          currentExpression = "neutral";
-          updateGlowMood("neutral");
-        }, expr.duration);
-      }
-
-      function updateGlowMood(mood: string) {
-        if (!glow) return;
-        const color = MOOD_COLORS[mood] || MOOD_COLORS.neutral;
-        glow.style.background = `radial-gradient(circle, ${color} 0%, transparent 70%)`;
-      }
-
-      function lookAtElement(el: Element) {
-        attentionTarget = el;
-        const rect = el.getBoundingClientRect();
-        const avatarRect = container.getBoundingClientRect();
-        const dx =
-          rect.left + rect.width / 2 - (avatarRect.left + avatarRect.width / 2);
-        const dy =
-          rect.top + rect.height / 2 - (avatarRect.top + avatarRect.height / 2);
-        const maxDist = Math.max(window.innerWidth, window.innerHeight) / 2;
-        targetX = (dx / maxDist) * MAX_GAZE * 1.5;
-        targetY = (dy / maxDist) * MAX_GAZE * 1.5;
-        triggerExpression("delighted");
-      }
-
-      function releaseAttention() {
-        attentionTarget = null;
-        updateTargetFromPointer();
-      }
-
-      document.addEventListener(
-        "mousemove",
-        (e) => {
-          mouseX = e.clientX;
-          mouseY = e.clientY;
-          attentionLevel = Math.min(1, attentionLevel + 0.1);
-          if (!attentionTarget) updateTargetFromPointer();
-          const speed = Math.sqrt(
-            Math.pow(e.movementX || 0, 2) + Math.pow(e.movementY || 0, 2),
-          );
-          targetPupilScale = 1.0 + Math.min(speed / 100, 0.15);
-        },
-        { passive: true },
-      );
-
-      document.addEventListener(
-        "touchmove",
-        (e) => {
-          if (e.touches.length > 0) {
-            mouseX = e.touches[0].clientX;
-            mouseY = e.touches[0].clientY;
-            attentionLevel = Math.min(1, attentionLevel + 0.15);
-            if (!attentionTarget) updateTargetFromPointer();
-          }
-        },
-        { passive: true },
-      );
-
-      document.addEventListener("click", (e) => {
-        const target = e.target as HTMLElement;
-        if (target.closest("button, a, .btn, [role='button']")) {
-          blink();
-        }
-      });
-
-      window.addEventListener(
-        "scroll",
-        () => {
-          const newY = window.scrollY;
-          const delta = newY - lastScrollY;
-          lastScrollY = newY;
-          if (Math.abs(delta) > 2) {
-            scrollTilt = Math.max(-5, Math.min(5, delta * 0.5));
-            if (scrollTimeout) clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(() => {
-              scrollTilt = 0;
-            }, 150);
-          }
-        },
-        { passive: true },
-      );
-
-      if (interactive) {
-        container.addEventListener("mouseenter", () => {
-          isHovering = true;
-        });
-        container.addEventListener("mouseleave", () => {
-          isHovering = false;
-          if (!attentionTarget) {
-            targetX = 0;
-            targetY = 0;
-          }
-        });
-      }
-
-      document
-        .querySelectorAll("a, button, .btn, [role='button']")
-        .forEach((el) => {
-          el.addEventListener("mouseenter", () => lookAtElement(el));
-          el.addEventListener("mouseleave", () => releaseAttention());
-        });
-
-      document.addEventListener("visibilitychange", () => {
-        isVisible = document.visibilityState === "visible";
-        if (isVisible) lastTime = performance.now();
-      });
-
-      let currentSection: string | null = null;
-      const sections = document.querySelectorAll("section[id], [data-section]");
-      if (sections.length > 0) {
-        const observer = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting && entry.intersectionRatio > 0.3) {
-                const id =
-                  entry.target.id ||
-                  (entry.target as HTMLElement).dataset.section;
-                if (id && id !== currentSection) {
-                  currentSection = id;
-                  for (const [key, config] of Object.entries(
-                    SECTION_REACTIONS,
-                  )) {
-                    if (id.toLowerCase().includes(key)) {
-                      setTimeout(
-                        () => triggerExpression(config.expression),
-                        config.delay,
-                      );
-                      break;
-                    }
-                  }
-                }
-              }
-            });
-          },
-          {
-            threshold: [0.3, 0.5, 0.7],
-            rootMargin: "-100px 0px -100px 0px",
-          },
-        );
-        sections.forEach((s) => observer.observe(s));
-      }
-
-      try {
-        const lastVisit = localStorage.getItem("hu_last_visit");
-        const visitCount = parseInt(
-          localStorage.getItem("hu_visit_count") || "0",
-          10,
-        );
-        if (lastVisit && visitCount > 1) {
-          setTimeout(() => triggerExpression("recognition"), 1500);
-        }
-        localStorage.setItem("hu_last_visit", Date.now().toString());
-        localStorage.setItem("hu_visit_count", String(visitCount + 1));
-      } catch {
-        /* storage unavailable */
-      }
-
-      function scheduleAmbient() {
-        setTimeout(
-          () => {
-            if (isVisible && attentionLevel < ATTENTION_THRESHOLD) {
-              const actions = [
-                () => {
-                  targetX = (Math.random() - 0.5) * MAX_GAZE * 1.5;
-                  targetY = (Math.random() - 0.5) * MAX_GAZE * 0.8;
-                  setTimeout(
-                    () => {
-                      targetX = 0;
-                      targetY = 0;
-                    },
-                    1500 + Math.random() * 1000,
-                  );
-                },
-                () => {
-                  scrollTilt = (Math.random() - 0.5) * 4;
-                  setTimeout(() => {
-                    scrollTilt = 0;
-                  }, 2000);
-                },
-                () => triggerExpression("deep-breath"),
-                () => {
-                  blink();
-                  setTimeout(() => blink(), 250);
-                },
-              ];
-              actions[Math.floor(Math.random() * actions.length)]();
-            }
-            scheduleAmbient();
-          },
-          8000 + Math.random() * 15000,
-        );
-      }
-      scheduleAmbient();
-
-      function animationLoop(now: number) {
-        if (!isVisible) {
-          lastTime = now;
-          requestAnimationFrame(animationLoop);
-          return;
-        }
-
-        const dt = Math.min((now - lastTime) / 16.67, 2);
-        lastTime = now;
-
-        const dx = targetX - currentX;
-        const dy = targetY - currentY;
-        velocityX = (velocityX + dx * STIFFNESS) * DAMPING;
-        velocityY = (velocityY + dy * STIFFNESS) * DAMPING;
-        currentX += velocityX * dt;
-        currentY += velocityY * dt;
-
-        const speed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (speed < 0.01 && dist < 0.1) {
-          currentX = targetX;
-          currentY = targetY;
-          velocityX = 0;
-          velocityY = 0;
-        }
-
-        pupilScale += (targetPupilScale - pupilScale) * PUPIL_SPEED * dt;
-        pupilScale = Math.max(PUPIL_MIN, Math.min(PUPIL_MAX, pupilScale));
-        targetPupilScale += (1.0 - targetPupilScale) * 0.02 * dt;
-
-        if (!breathHolding) {
-          const breathSpeed = (1 / currentBreathDuration) * 16.67 * dt;
-          breathPhase += breathSpeed * breathDirection;
-          if (breathPhase >= 1) {
-            breathPhase = 1;
-            breathDirection = -1;
-            if (Math.random() < BREATH_PAUSE_CHANCE) {
-              breathHolding = true;
-              setTimeout(
-                () => {
-                  breathHolding = false;
-                },
-                200 + Math.random() * 300,
-              );
-            }
-          } else if (breathPhase <= 0) {
-            breathPhase = 0;
-            breathDirection = 1;
-            currentBreathDuration =
-              BREATH_BASE + (Math.random() - 0.5) * BREATH_VARIANCE * 2;
-          }
-        }
-        const breathCurve = Math.sin(breathPhase * Math.PI);
-        const breathS = 1 + (BREATH_SCALE - 1) * breathCurve;
-
-        attentionLevel *= Math.pow(ATTENTION_DECAY, dt);
-        if (attentionLevel < ATTENTION_THRESHOLD && !attentionTarget) {
-          if (Math.random() < 0.001 * dt) {
-            targetX = (Math.random() - 0.5) * MAX_GAZE;
-            targetY = (Math.random() - 0.5) * MAX_GAZE * 0.5;
-          }
-        }
-
-        if (!inSaccade && Math.random() < SACCADE_CHANCE * dt) {
-          inSaccade = true;
-          saccadeStartTime = now;
-          saccadeOffsetX = (Math.random() - 0.5) * SACCADE_DISTANCE * 2;
-          saccadeOffsetY = (Math.random() - 0.5) * SACCADE_DISTANCE * 2;
-          if (Math.random() < 0.3) blink();
-        }
-        if (inSaccade && now - saccadeStartTime > SACCADE_DURATION) {
-          inSaccade = false;
-          saccadeOffsetX = 0;
-          saccadeOffsetY = 0;
-        }
-
-        if (!isHovering && attentionLevel < ATTENTION_THRESHOLD) {
-          idlePhase += 0.003 * dt;
-          idleDriftX = Math.sin(idlePhase) * 2;
-          idleDriftY = Math.sin(idlePhase * 2) * 1.5;
-          idleDriftRot = Math.sin(idlePhase * 0.7) * 0.5;
-        } else {
-          idleDriftX *= 0.95;
-          idleDriftY *= 0.95;
-          idleDriftRot *= 0.95;
-        }
-
-        if (!orb || !leftEye || !rightEye) {
-          requestAnimationFrame(animationLoop);
-          return;
-        }
-
-        const finalX = currentX + saccadeOffsetX;
-        const finalY = currentY + saccadeOffsetY;
-
-        const eyeRy = Math.max(2, BASE_RY * breathS - blinkPhase * 10);
-        const eyeRx = BASE_RX * pupilScale;
-
-        leftEye.style.transform = `translate(${finalX.toFixed(2)}px, ${finalY.toFixed(2)}px)`;
-        leftEye.setAttribute("ry", eyeRy.toFixed(1));
-        leftEye.setAttribute("rx", eyeRx.toFixed(1));
-        rightEye.style.transform = `translate(${finalX.toFixed(2)}px, ${finalY.toFixed(2)}px)`;
-        rightEye.setAttribute("ry", eyeRy.toFixed(1));
-        rightEye.setAttribute("rx", eyeRx.toFixed(1));
-
-        const rotX = -finalY * 0.3;
-        const rotY = finalX * 0.3;
-        orb.style.transform =
-          `rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) ` +
-          `scale3d(${(1 / breathS).toFixed(4)}, ${breathS.toFixed(4)}, 1)`;
-
-        const parts: string[] = [];
-        if (Math.abs(idleDriftX) > 0.01 || Math.abs(idleDriftY) > 0.01) {
-          parts.push(
-            `translate(${idleDriftX.toFixed(2)}px, ${idleDriftY.toFixed(2)}px) rotate(${idleDriftRot.toFixed(3)}deg)`,
-          );
-        }
-        if (Math.abs(scrollTilt) > 0.01) {
-          parts.push(`rotate(${scrollTilt.toFixed(2)}deg)`);
-        }
-        if (isHovering) {
-          parts.push("scale(1.03)");
-        }
-        if (parts.length) {
-          container.style.transform = parts.join(" ");
-        } else {
-          container.style.removeProperty("transform");
-        }
-
-        if (glow) {
-          glow.style.transform = `translate(${(finalX * 0.15).toFixed(2)}px, ${(finalY * 0.15).toFixed(2)}px)`;
-          const baseOpacity = isHovering ? 0.6 : 0.4;
-          glow.style.opacity = (baseOpacity + breathCurve * 0.15).toFixed(3);
-        }
-
-        rings.forEach((ring, i) => {
-          const depth = 0.3 + i * 0.15;
-          const rx = finalX * depth;
-          const ry = finalY * depth;
-          const rot = finalX * 0.1 * (i + 1);
-          const ringBreath = 1 + Math.sin(now / (4500 + i * 500)) * 0.008;
-          ring.style.transform =
-            `translate(${rx.toFixed(2)}px, ${ry.toFixed(2)}px) ` +
-            `rotate(${rot.toFixed(2)}deg) scale(${ringBreath.toFixed(4)})`;
-        });
-
-        requestAnimationFrame(animationLoop);
-      }
-
-      requestAnimationFrame(animationLoop);
-      scheduleBlink();
+  document.querySelectorAll<HTMLElement>(".hu-orb-container").forEach((container) => {
+    const interactive = container.dataset.interactive === "true";
+    const orb = container.querySelector<HTMLElement>(".hu-orb");
+    const glow = container.querySelector<HTMLElement>(".hu-orb-glow");
+    const pulse = container.querySelector<HTMLElement>(".hu-orb-pulse");
+    const leftEye = container.querySelector<SVGEllipseElement>(".hu-eye-left");
+    const rightEye = container.querySelector<SVGEllipseElement>(".hu-eye-right");
+
+    if (!orb || !leftEye || !rightEye) return;
+
+    const prm = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (prm.matches) return;
+    prm.addEventListener("change", (e) => { if (e.matches) location.reload(); });
+
+    const BASE_RX = 10;
+    const BASE_RY = 12;
+    const GAZE_K = 0.09; const GAZE_D = 0.78;
+    const BODY_K = 0.025; const BODY_D = 0.88;
+    const EXPR_K = 0.14; const EXPR_D = 0.72;
+    const PUPIL_K = 0.06; const PUPIL_D = 0.85;
+    const GAZE_NEAR = 9; const GAZE_FAR = 3.5; const MAX_TILT = 3;
+    const PUPIL_MIN = 0.85; const PUPIL_MAX = 1.15;
+    const EYE_RX_FLOOR = 3; const EYE_RY_FLOOR = 2;
+    const BLINK_MIN = 3500; const BLINK_MAX = 7000;
+    const GLANCE_MIN = 5000; const GLANCE_MAX = 11000;
+    const SACCADE_MIN = 2500; const SACCADE_MAX = 5000;
+    const IDLE_MS = 25000;
+
+    const EXPR: Record<string, [number, number, number, number]> = {
+      neutral:   [ 0,     0,     0,     1.0  ],
+      curious:   [ 1.2,   2.5,   0.12,  1.12 ],
+      surprised: [ 2,     4,     0.2,   1.15 ],
+      delighted: [ 0.8,  -1.5,   0.18,  1.1  ],
+      thinking:  [-0.5,  -1.2,  -0.05,  0.92 ],
+      sleepy:    [-0.8,  -5,    -0.18,  0.88 ],
+      alert:     [ 1.5,   3,     0.18,  1.12 ],
+      playful:   [ 0.6,   1,     0.15,  1.08 ],
+      focused:   [ 0,    -0.5,   0.05,  0.95 ],
+    };
+
+    let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+    let gazeX = 0, gazeY = 0, gVelX = 0, gVelY = 0, gTargetX = 0, gTargetY = 0;
+    let saccadeX = 0, saccadeY = 0, ambientX = 0, ambientY = 0;
+    let exRx = 0, exRy = 0, exGlow = 0, exPupil = 1;
+    let tRx = 0, tRy = 0, tGlow = 0, tPupil = 1;
+    let rxV = 0, ryV = 0, pupilV = 0;
+    let blinkRy = 0, breathPhase = 0, scrollOffset = 0;
+    let tiltAngle = 0, tiltVel = 0, squashY = 1, squashVel = 0, bounceY = 0, bounceVel = 0;
+    let glowOffX = 0, glowOffY = 0;
+    let isVisible = true, isHovering = false, isSleepy = false;
+    let lastActivity = Date.now(), bodyActive = false, blinking = false;
+    let lookBiasX = 0, lookBiasY = 0, lookTargetX = 0, lookTargetY = 0;
+    let exprTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function setExpr(name: string, duration = 0) {
+      const e = EXPR[name] || EXPR.neutral;
+      tRx = e[0]; tRy = e[1]; tGlow = e[2]; tPupil = e[3];
+      if (exprTimer) clearTimeout(exprTimer);
+      if (duration > 0) exprTimer = setTimeout(() => setExpr("neutral"), duration);
+    }
+
+    function setExprWithAnticipation(name: string, duration = 0) {
+      microBlink(50);
+      setTimeout(() => setExpr(name, duration), 60);
+    }
+
+    function microBlink(ms = 70) {
+      if (blinking) return;
+      blinking = true; blinkRy = -9;
+      setTimeout(() => { blinkRy = 0; blinking = false; }, ms);
+    }
+
+    function doubleBlink() {
+      if (blinking) return;
+      blinking = true; blinkRy = -11;
+      setTimeout(() => { blinkRy = 0;
+        setTimeout(() => { blinkRy = -11;
+          setTimeout(() => { blinkRy = 0; blinking = false; }, 90);
+        }, 180);
+      }, 90);
+    }
+
+    function singleBlink() {
+      if (blinking) return;
+      blinking = true;
+      blinkRy = -11;
+      setTimeout(() => { blinkRy = -11.5;
+        setTimeout(() => { blinkRy = 0; blinking = false; }, 60 + Math.random() * 40);
+      }, 20 + Math.random() * 30);
+    }
+
+    function sleepyBlink() {
+      if (blinking) return;
+      blinking = true; blinkRy = -10;
+      setTimeout(() => { blinkRy = -12;
+        setTimeout(() => { blinkRy = -8;
+          setTimeout(() => { blinkRy = 0; blinking = false; }, 200);
+        }, 300);
+      }, 150);
+    }
+
+    function easeIO(t: number) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+    document.addEventListener("mousemove", (e) => {
+      mouseX = e.clientX; mouseY = e.clientY; lastActivity = Date.now();
+      if (isSleepy) { isSleepy = false; sleepyBlink(); setTimeout(() => setExpr("alert", 800), 400); }
+    }, { passive: true });
+
+    document.addEventListener("touchmove", (e) => {
+      if (e.touches.length > 0) { mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY; lastActivity = Date.now(); }
+    }, { passive: true });
+
+    document.addEventListener("click", (e) => {
+      lastActivity = Date.now();
+      if ((e.target as HTMLElement).closest(".hu-orb-container")) {
+        squashVel = 0.06;
+        setTimeout(() => { setExpr("delighted", 1500); bounceVel = -4; squashVel = -0.08; }, 80);
+      } else { microBlink(60); }
     });
+
+    window.addEventListener("scroll", () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      scrollOffset = (window.scrollY / (max || 1)) * 3; lastActivity = Date.now();
+    }, { passive: true });
+
+    document.addEventListener("visibilitychange", () => {
+      isVisible = document.visibilityState === "visible";
+      if (isVisible) { lastActivity = Date.now(); setExprWithAnticipation("surprised", 600); setTimeout(() => setExpr("curious", 1200), 650); }
+    });
+
+    if (interactive) {
+      orb.addEventListener("mouseenter", () => { isHovering = true; setExpr("curious"); lastActivity = Date.now(); });
+      orb.addEventListener("mouseleave", () => { isHovering = false; if (!isSleepy) { microBlink(50); setTimeout(() => setExpr("neutral"), 60); } });
+    }
+
+    document.addEventListener("mouseover", (e) => {
+      const el = (e.target as HTMLElement).closest("a, button, [role='button']");
+      if (el && !el.closest(".hu-orb-container")) {
+        const r = el.getBoundingClientRect(); const o = container.getBoundingClientRect();
+        const dx = (r.left + r.width / 2) - (o.left + o.width / 2);
+        const dy = (r.top + r.height / 2) - (o.top + o.height / 2);
+        const maxD = Math.max(window.innerWidth, window.innerHeight) * 0.5;
+        lookTargetX = (dx / maxD) * 3.5; lookTargetY = (dy / maxD) * 3.5;
+      }
+    }, { passive: true });
+
+    document.addEventListener("mouseout", (e) => {
+      if ((e.target as HTMLElement).closest("a, button, [role='button']")) { lookTargetX = 0; lookTargetY = 0; }
+    }, { passive: true });
+
+    container.addEventListener("animationend", () => { container.style.animation = "none"; bodyActive = true; }, { once: true });
+
+    function scheduleGlance() {
+      setTimeout(() => {
+        if (!isVisible || isHovering) { scheduleGlance(); return; }
+        const tx = (Math.random() - 0.5) * 7, ty = (Math.random() - 0.5) * 5;
+        const sx = ambientX, sy = ambientY;
+        if (Math.random() < 0.4) microBlink(50);
+        let el = 0; const dur = 450 + Math.random() * 150;
+        function go() { el += 16; const p = Math.min(1, el / dur); ambientX = sx + (tx - sx) * easeIO(p); ambientY = sy + (ty - sy) * easeIO(p); if (p < 1) requestAnimationFrame(go); }
+        requestAnimationFrame(go);
+        setTimeout(() => { const rx = ambientX, ry = ambientY; let re = 0; const rd = 500 + Math.random() * 200;
+          function back() { re += 16; const p = Math.min(1, re / rd); ambientX = rx * (1 - easeIO(p)); ambientY = ry * (1 - easeIO(p)); if (p < 1) requestAnimationFrame(back); }
+          requestAnimationFrame(back);
+        }, 1200 + Math.random() * 2500);
+        scheduleGlance();
+      }, GLANCE_MIN + Math.random() * (GLANCE_MAX - GLANCE_MIN));
+    }
+    scheduleGlance();
+
+    function scheduleBlink() {
+      setTimeout(() => {
+        if (!isVisible) { scheduleBlink(); return; }
+        const r = Math.random();
+        if (isSleepy) sleepyBlink(); else if (r < 0.55) doubleBlink(); else if (r < 0.85) singleBlink(); else microBlink(55);
+        scheduleBlink();
+      }, (isSleepy ? 1800 : BLINK_MIN) + Math.random() * (BLINK_MAX - BLINK_MIN));
+    }
+    scheduleBlink();
+
+    function scheduleSaccade() {
+      setTimeout(() => {
+        if (!isVisible || isHovering) { scheduleSaccade(); return; }
+        saccadeX = (Math.random() - 0.5) * 4.5; saccadeY = (Math.random() - 0.5) * 3.5;
+        if (Math.random() < 0.2) microBlink(50);
+        setTimeout(() => { saccadeX = 0; saccadeY = 0; }, 35 + Math.random() * 35);
+        scheduleSaccade();
+      }, SACCADE_MIN + Math.random() * (SACCADE_MAX - SACCADE_MIN));
+    }
+    scheduleSaccade();
+
+    function scheduleFidget() {
+      setTimeout(() => {
+        if (!isVisible || isHovering || isSleepy) { scheduleFidget(); return; }
+        const picks = ["thinking", "curious", "alert", "playful", "focused"];
+        setExprWithAnticipation(picks[Math.floor(Math.random() * picks.length)], 1000 + Math.random() * 1200);
+        scheduleFidget();
+      }, 12000 + Math.random() * 12000);
+    }
+    scheduleFidget();
+
+    function scheduleCameraLook() {
+      setTimeout(() => {
+        if (!isVisible || isHovering || isSleepy) { scheduleCameraLook(); return; }
+        const sa = ambientX, sb = ambientY;
+        ambientX = 0; ambientY = 0; gTargetX = 0; gTargetY = 0;
+        setExpr("playful", 1800);
+        setTimeout(() => { ambientX = sa; ambientY = sb; }, 1800);
+        scheduleCameraLook();
+      }, 30000 + Math.random() * 40000);
+    }
+    scheduleCameraLook();
+
+    if (interactive) {
+      setTimeout(() => { setExpr("curious", 1200); setTimeout(() => { setExpr("playful", 800); setTimeout(() => setExpr("neutral"), 800); }, 1200); }, 1600);
+    }
+
+    function tick() {
+      if (!isVisible) { requestAnimationFrame(tick); return; }
+      if (Date.now() - lastActivity > IDLE_MS && !isSleepy) { isSleepy = true; setExpr("sleepy"); }
+
+      const oR = container.getBoundingClientRect();
+      const oCX = oR.left + oR.width / 2, oCY = oR.top + oR.height / 2;
+      const dx = mouseX - oCX, dy = mouseY - oCY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const prox = isHovering ? 1 : Math.max(0, 1 - dist / (oR.width * 4));
+      const range = GAZE_FAR + (GAZE_NEAR - GAZE_FAR) * prox;
+      const maxD = Math.max(window.innerWidth, window.innerHeight) / 2;
+
+      lookBiasX += (lookTargetX - lookBiasX) * 0.05; lookBiasY += (lookTargetY - lookBiasY) * 0.05;
+      gTargetX = (dx / maxD) * range + lookBiasX; gTargetY = (dy / maxD) * range + lookBiasY;
+      gVelX = (gVelX + (gTargetX - gazeX) * GAZE_K) * GAZE_D; gVelY = (gVelY + (gTargetY - gazeY) * GAZE_K) * GAZE_D;
+      gazeX += gVelX; gazeY += gVelY;
+
+      rxV = (rxV + (tRx - exRx) * EXPR_K) * EXPR_D; ryV = (ryV + (tRy - exRy) * EXPR_K) * EXPR_D;
+      exRx += rxV; exRy += ryV; exGlow += (tGlow - exGlow) * 0.07;
+      pupilV = (pupilV + (tPupil - exPupil) * PUPIL_K) * PUPIL_D; exPupil += pupilV;
+      exPupil = Math.max(PUPIL_MIN, Math.min(PUPIL_MAX, exPupil));
+
+      breathPhase += 0.015;
+      const breathRy = Math.sin(breathPhase * Math.PI) * 0.3;
+      const breathScale = Math.sin(breathPhase * Math.PI) * 0.003;
+
+      const totalX = gazeX + ambientX + saccadeX;
+      const totalY = gazeY + ambientY + saccadeY + scrollOffset;
+      const fRx = Math.max(EYE_RX_FLOOR, (BASE_RX + exRx) * exPupil);
+      const fRy = Math.max(EYE_RY_FLOOR, BASE_RY + exRy + breathRy + blinkRy);
+
+      const conv = isHovering ? 0.6 : 0.3;
+      leftEye!.style.transform = `translate(${(totalX - conv).toFixed(2)}px, ${totalY.toFixed(2)}px)`;
+      leftEye!.setAttribute("rx", fRx.toFixed(2)); leftEye!.setAttribute("ry", fRy.toFixed(2));
+      rightEye!.style.transform = `translate(${(totalX + conv).toFixed(2)}px, ${totalY.toFixed(2)}px)`;
+      rightEye!.setAttribute("rx", fRx.toFixed(2)); rightEye!.setAttribute("ry", fRy.toFixed(2));
+
+      if (bodyActive) {
+        const tiltTarget = totalX * 0.35;
+        tiltVel = (tiltVel + (tiltTarget - tiltAngle) * BODY_K) * BODY_D; tiltAngle += tiltVel;
+        tiltAngle = Math.max(-MAX_TILT, Math.min(MAX_TILT, tiltAngle));
+        squashVel = (squashVel + (1 - squashY) * 0.12) * 0.68; squashY += squashVel;
+        bounceVel = (bounceVel + (0 - bounceY) * 0.12) * 0.68; bounceY += bounceVel;
+        const scaleX = 1 + (1 - squashY) * 0.5;
+        container.style.transform = `translateY(${bounceY.toFixed(1)}px) rotate(${tiltAngle.toFixed(2)}deg) scale(${(scaleX + breathScale).toFixed(4)}, ${(squashY + breathScale).toFixed(4)})`;
+      }
+
+      if (glow) {
+        glowOffX += (totalX * 2 - glowOffX) * 0.04; glowOffY += (totalY * 2 - glowOffY) * 0.04;
+        glow.style.opacity = Math.max(0, Math.min(1, 0.6 + exGlow)).toFixed(3);
+        glow.style.transform = `translate(${glowOffX.toFixed(1)}px, ${glowOffY.toFixed(1)}px)`;
+      }
+      if (pulse) { pulse.style.opacity = Math.max(0, Math.min(1, 0.4 + exGlow * 0.8)).toFixed(3); }
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  });
 </script>

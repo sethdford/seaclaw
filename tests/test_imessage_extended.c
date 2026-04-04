@@ -9,6 +9,10 @@
 
 #if (defined(__APPLE__) && defined(__MACH__)) || HU_IS_TEST
 extern size_t escape_for_applescript(char *out, size_t out_cap, const char *in, size_t in_len);
+extern size_t imessage_sanitize_output(char *buf, size_t len);
+extern size_t imessage_build_attach_script(char *out, size_t out_cap,
+                                           const char *target_escaped,
+                                           const char *path_escaped);
 #endif
 
 #if (defined(__APPLE__) && defined(__MACH__)) || HU_IS_TEST
@@ -288,6 +292,111 @@ static void test_imessage_allow_from_filter_no_crash(void) {
     hu_imessage_destroy(&ch);
 }
 
+
+/* -- imessage_sanitize_output tests -- */
+
+static void test_sanitize_strips_ai_phrases(void) {
+    char buf[256];
+    strcpy(buf, "I'd be happy to help you with that");
+    size_t len = imessage_sanitize_output(buf, strlen(buf));
+    HU_ASSERT(strstr(buf, "I'd be happy to") == NULL);
+    HU_ASSERT(len < 35);
+    HU_ASSERT(len > 0);
+}
+
+static void test_sanitize_strips_great_question(void) {
+    char buf[256];
+    strcpy(buf, "Great question! The answer is 42");
+    size_t len = imessage_sanitize_output(buf, strlen(buf));
+    HU_ASSERT(strstr(buf, "Great question!") == NULL);
+    HU_ASSERT(strstr(buf, "42") != NULL);
+    (void)len;
+}
+
+static void test_sanitize_strips_as_an_ai(void) {
+    char buf[256];
+    strcpy(buf, "As an AI, I think that's cool");
+    size_t len = imessage_sanitize_output(buf, strlen(buf));
+    HU_ASSERT(strstr(buf, "As an AI") == NULL);
+    (void)len;
+}
+
+static void test_sanitize_preserves_normal_text(void) {
+    char buf[256];
+    strcpy(buf, "haha yeah that's wild");
+    size_t orig_len = strlen(buf);
+    size_t len = imessage_sanitize_output(buf, orig_len);
+    HU_ASSERT_EQ(len, orig_len);
+    HU_ASSERT_STR_EQ(buf, "haha yeah that's wild");
+}
+
+static void test_sanitize_collapses_double_spaces(void) {
+    char buf[256];
+    strcpy(buf, "hello  world");
+    size_t len = imessage_sanitize_output(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "hello world");
+    HU_ASSERT_EQ(len, 11u);
+}
+
+static void test_sanitize_trims_whitespace(void) {
+    char buf[256];
+    strcpy(buf, "  hello world  ");
+    size_t len = imessage_sanitize_output(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "hello world");
+    HU_ASSERT_EQ(len, 11u);
+}
+
+static void test_sanitize_empty_safe(void) {
+    char buf[4] = "";
+    size_t len = imessage_sanitize_output(buf, 0);
+    HU_ASSERT_EQ(len, 0u);
+}
+
+static void test_sanitize_null_safe(void) {
+    size_t len = imessage_sanitize_output(NULL, 10);
+    HU_ASSERT_EQ(len, 0u);
+}
+
+/* -- imessage_build_attach_script tests -- */
+
+static void test_build_attach_script_basic(void) {
+    char out[1024];
+    size_t len = imessage_build_attach_script(out, sizeof(out),
+                                              "+15551234567",
+                                              "/tmp/human_img_test.png");
+    HU_ASSERT(len > 0);
+    HU_ASSERT(strstr(out, "POSIX file") != NULL);
+    HU_ASSERT(strstr(out, "/tmp/human_img_test.png") != NULL);
+    HU_ASSERT(strstr(out, "+15551234567") != NULL);
+    HU_ASSERT(strstr(out, "tell application") != NULL);
+    HU_ASSERT(strstr(out, "end tell") != NULL);
+}
+
+static void test_build_attach_script_small_buf_fails(void) {
+    char out[32];
+    size_t len = imessage_build_attach_script(out, sizeof(out),
+                                              "+15551234567",
+                                              "/tmp/img.png");
+    HU_ASSERT_EQ(len, 0u);
+}
+
+static void test_build_attach_script_null_args(void) {
+    char out[512];
+    HU_ASSERT_EQ(imessage_build_attach_script(NULL, 512, "t", "p"), 0u);
+    HU_ASSERT_EQ(imessage_build_attach_script(out, 512, NULL, "p"), 0u);
+    HU_ASSERT_EQ(imessage_build_attach_script(out, 512, "t", NULL), 0u);
+}
+
+static void test_build_attach_script_with_escaped_path(void) {
+    char tgt[256], path[256], out[1024];
+    escape_for_applescript(tgt, sizeof(tgt), "alice@me.com", 12);
+    escape_for_applescript(path, sizeof(path), "/tmp/file with spaces.jpg", 25);
+    size_t len = imessage_build_attach_script(out, sizeof(out), tgt, path);
+    HU_ASSERT(len > 0);
+    HU_ASSERT(strstr(out, "alice@me.com") != NULL);
+    HU_ASSERT(strstr(out, "/tmp/file with spaces.jpg") != NULL);
+}
+
 void run_imessage_extended_tests(void) {
     HU_TEST_SUITE("iMessage Extended");
 
@@ -299,6 +408,18 @@ void run_imessage_extended_tests(void) {
     HU_RUN_TEST(test_imessage_escape_truncation);
     HU_RUN_TEST(test_imessage_escape_strips_control_chars);
     HU_RUN_TEST(test_imessage_escape_tabs_and_newlines_stripped);
+    HU_RUN_TEST(test_sanitize_strips_ai_phrases);
+    HU_RUN_TEST(test_sanitize_strips_great_question);
+    HU_RUN_TEST(test_sanitize_strips_as_an_ai);
+    HU_RUN_TEST(test_sanitize_preserves_normal_text);
+    HU_RUN_TEST(test_sanitize_collapses_double_spaces);
+    HU_RUN_TEST(test_sanitize_trims_whitespace);
+    HU_RUN_TEST(test_sanitize_empty_safe);
+    HU_RUN_TEST(test_sanitize_null_safe);
+    HU_RUN_TEST(test_build_attach_script_basic);
+    HU_RUN_TEST(test_build_attach_script_small_buf_fails);
+    HU_RUN_TEST(test_build_attach_script_null_args);
+    HU_RUN_TEST(test_build_attach_script_with_escaped_path);
 #endif
     HU_RUN_TEST(test_imessage_reaction_to_tapback_mapping);
     HU_RUN_TEST(test_imessage_create_with_allow_from);
