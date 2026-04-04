@@ -538,6 +538,7 @@ static void media_daemon_full_pipeline_with_channel_send(void) {
     HU_ASSERT(strstr(all_send_media[2], ".gif") != NULL);
 
     /* Send through iMessage channel (test mode records text, media is passed) */
+#ifdef HU_HAS_IMESSAGE
     hu_channel_t ch;
     hu_imessage_create(&alloc, "+15559876543", 12, NULL, 0, &ch);
     hu_error_t err = ch.vtable->send(ch.ctx, "+15559876543", 12,
@@ -550,6 +551,7 @@ static void media_daemon_full_pipeline_with_channel_send(void) {
     HU_ASSERT_EQ(msg_len, 16u);
     HU_ASSERT_STR_EQ(msg, "Check these out!");
     hu_imessage_destroy(&ch);
+#endif
 
     /* Simulate daemon cleanup (exact pattern from daemon.c) */
     for (size_t gmc = 0; gmc < agent.generated_media_count; gmc++) {
