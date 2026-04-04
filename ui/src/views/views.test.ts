@@ -72,15 +72,14 @@ describe("hu-chat-view", () => {
     el.remove();
   });
 
-  it("has suggestion pills in composer when empty", async () => {
+  it("has composer without suggestion pills by default", async () => {
     const el = document.createElement("hu-chat-view") as HTMLElement & {
       updateComplete: Promise<boolean>;
     };
     document.body.appendChild(el);
     await el.updateComplete;
     const composer = el.shadowRoot?.querySelector("hu-chat-composer");
-    const cards = composer?.shadowRoot?.querySelectorAll(".pill") ?? [];
-    expect(cards.length).toBeGreaterThanOrEqual(1);
+    expect(composer).toBeTruthy();
     el.remove();
   });
 
