@@ -428,10 +428,8 @@ const { size = 180, interactive = true } = Astro.props;
         const maxDist = Math.max(window.innerWidth, window.innerHeight) / 2;
         const intensity = easeOutCubic(Math.min(distance / maxDist, 1));
 
-        const ax =
-          dx + (dx - (targetX * maxDist) / MAX_GAZE) * ANTICIPATION;
-        const ay =
-          dy + (dy - (targetY * maxDist) / MAX_GAZE) * ANTICIPATION;
+        const ax = dx + (dx - (targetX * maxDist) / MAX_GAZE) * ANTICIPATION;
+        const ay = dy + (dy - (targetY * maxDist) / MAX_GAZE) * ANTICIPATION;
 
         targetX = (ax / maxDist) * MAX_GAZE * intensity;
         targetY = (ay / maxDist) * MAX_GAZE * intensity;
@@ -499,13 +497,9 @@ const { size = 180, interactive = true } = Astro.props;
         const rect = el.getBoundingClientRect();
         const avatarRect = container.getBoundingClientRect();
         const dx =
-          rect.left +
-          rect.width / 2 -
-          (avatarRect.left + avatarRect.width / 2);
+          rect.left + rect.width / 2 - (avatarRect.left + avatarRect.width / 2);
         const dy =
-          rect.top +
-          rect.height / 2 -
-          (avatarRect.top + avatarRect.height / 2);
+          rect.top + rect.height / 2 - (avatarRect.top + avatarRect.height / 2);
         const maxDist = Math.max(window.innerWidth, window.innerHeight) / 2;
         targetX = (dx / maxDist) * MAX_GAZE * 1.5;
         targetY = (dy / maxDist) * MAX_GAZE * 1.5;
@@ -595,9 +589,7 @@ const { size = 180, interactive = true } = Astro.props;
       });
 
       let currentSection: string | null = null;
-      const sections = document.querySelectorAll(
-        "section[id], [data-section]",
-      );
+      const sections = document.querySelectorAll("section[id], [data-section]");
       if (sections.length > 0) {
         const observer = new IntersectionObserver(
           (entries) => {
@@ -700,9 +692,7 @@ const { size = 180, interactive = true } = Astro.props;
         currentX += velocityX * dt;
         currentY += velocityY * dt;
 
-        const speed = Math.sqrt(
-          velocityX * velocityX + velocityY * velocityY,
-        );
+        const speed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (speed < 0.01 && dist < 0.1) {
           currentX = targetX;
@@ -817,9 +807,7 @@ const { size = 180, interactive = true } = Astro.props;
         if (glow) {
           glow.style.transform = `translate(${(finalX * 0.15).toFixed(2)}px, ${(finalY * 0.15).toFixed(2)}px)`;
           const baseOpacity = isHovering ? 0.6 : 0.4;
-          glow.style.opacity = (baseOpacity + breathCurve * 0.15).toFixed(
-            3,
-          );
+          glow.style.opacity = (baseOpacity + breathCurve * 0.15).toFixed(3);
         }
 
         rings.forEach((ring, i) => {

@@ -314,10 +314,13 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       });
     } else {
       if (menu) menu.classList.remove("is-open");
-      const focusableSelector = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      const focusableSelector =
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
       function trapFocus(e: KeyboardEvent) {
         if (e.key !== "Tab" || !menu) return;
-        const focusable = [...menu.querySelectorAll(focusableSelector)] as HTMLElement[];
+        const focusable = [
+          ...menu.querySelectorAll(focusableSelector),
+        ] as HTMLElement[];
         if (!focusable.length) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
@@ -334,7 +337,9 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         setExpanded(open);
         if (open && menu) {
           document.addEventListener("keydown", trapFocus);
-          const firstLink = menu.querySelector(focusableSelector) as HTMLElement;
+          const firstLink = menu.querySelector(
+            focusableSelector,
+          ) as HTMLElement;
           firstLink?.focus();
         } else {
           document.removeEventListener("keydown", trapFocus);

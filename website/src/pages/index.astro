@@ -2799,15 +2799,28 @@ const tools = [
           var tid = setTimeout(once, 3000);
         }
 
-        function easeOutPower3(t: number) { return 1 - Math.pow(1 - t, 3); }
+        function easeOutPower3(t: number) {
+          return 1 - Math.pow(1 - t, 3);
+        }
 
-        function tweenValue(from: number, to: number, dur: number, delay: number, onUpdate: (v: number) => void, onDone?: () => void) {
+        function tweenValue(
+          from: number,
+          to: number,
+          dur: number,
+          delay: number,
+          onUpdate: (v: number) => void,
+          onDone?: () => void,
+        ) {
           const s = performance.now() + delay;
           function tick(now: number) {
-            if (now < s) { requestAnimationFrame(tick); return; }
+            if (now < s) {
+              requestAnimationFrame(tick);
+              return;
+            }
             const p = Math.min((now - s) / dur, 1);
             onUpdate(from + (to - from) * easeOutPower3(p));
-            if (p < 1) requestAnimationFrame(tick); else if (onDone) onDone();
+            if (p < 1) requestAnimationFrame(tick);
+            else if (onDone) onDone();
           }
           requestAnimationFrame(tick);
         }
@@ -2815,7 +2828,9 @@ const tools = [
         function fadeIn(el: HTMLElement, dur = 600, d = 0) {
           el.style.opacity = "0";
           el.style.transition = `opacity ${dur}ms ease-out ${d}ms`;
-          requestAnimationFrame(() => { el.style.opacity = "1"; });
+          requestAnimationFrame(() => {
+            el.style.opacity = "1";
+          });
         }
 
         afterLcp(() => {
@@ -2832,12 +2847,24 @@ const tools = [
                   const target = parseInt(el.dataset.count || "0");
                   const valSpan = el.querySelector(".count-value");
                   if (!valSpan) return;
-                  tweenValue(0, target, 1500, i * 80,
-                    (v) => { valSpan.textContent = target > 100 ? Math.round(v).toLocaleString() : Math.round(v).toString(); },
+                  tweenValue(
+                    0,
+                    target,
+                    1500,
+                    i * 80,
+                    (v) => {
+                      valSpan.textContent =
+                        target > 100
+                          ? Math.round(v).toLocaleString()
+                          : Math.round(v).toString();
+                    },
                     () => {
-                      (item as HTMLElement).style.transition = "transform 0.15s ease-out";
+                      (item as HTMLElement).style.transition =
+                        "transform 0.15s ease-out";
                       (item as HTMLElement).style.transform = "scale(1.04)";
-                      setTimeout(() => { (item as HTMLElement).style.transform = "scale(1)"; }, 150);
+                      setTimeout(() => {
+                        (item as HTMLElement).style.transform = "scale(1)";
+                      }, 150);
                     },
                   );
                 });
@@ -2855,7 +2882,10 @@ const tools = [
                 if (!entries[0]?.isIntersecting) return;
                 archObs.disconnect();
                 const core = document.getElementById("arch-core");
-                if (core) { core.style.transition = "opacity 0.6s ease-out"; core.style.opacity = "1"; }
+                if (core) {
+                  core.style.transition = "opacity 0.6s ease-out";
+                  core.style.opacity = "1";
+                }
                 document.querySelectorAll(".arch-line").forEach((el, i) => {
                   const line = el as SVGElement;
                   line.setAttribute("stroke-dasharray", "200");
@@ -2869,7 +2899,9 @@ const tools = [
                 document.querySelectorAll(".arch-node").forEach((el, i) => {
                   const node = el as HTMLElement;
                   node.style.transition = `opacity 0.5s ease-out ${600 + i * 80}ms`;
-                  requestAnimationFrame(() => { node.style.opacity = "1"; });
+                  requestAnimationFrame(() => {
+                    node.style.opacity = "1";
+                  });
                 });
               },
               { threshold: 0.15 },
@@ -3028,30 +3060,54 @@ const tools = [
                 dashObs.disconnect();
                 fadeIn(dashPreview as HTMLElement, 600);
                 document.querySelectorAll(".dash-count").forEach((el, i) => {
-                  const target = parseInt((el as HTMLElement).dataset.target || "0");
+                  const target = parseInt(
+                    (el as HTMLElement).dataset.target || "0",
+                  );
                   tweenValue(0, target, 1200, 300 + i * 100, (v) => {
                     el.textContent = Math.round(v).toString();
                   });
                 });
                 const actContainer = document.getElementById("dash-activity");
                 if (actContainer) {
-                  const iconChatCircle = '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-4-1.08,8.09,8.09,0,0,0-2.53.41L40,216l12.47-37.4a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>';
-                  const iconLightning = '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,12.95l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112-120A8,8,0,0,0,215.79,118.17Z"/></svg>';
-                  const iconPlayCircle = '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm36.44-94.66-48-32A8,8,0,0,0,104,96v64a8,8,0,0,0,12.44,6.66l48-32a8,8,0,0,0,0-13.32ZM120,145.05V111l25.58,17Z"/></svg>';
+                  const iconChatCircle =
+                    '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-4-1.08,8.09,8.09,0,0,0-2.53.41L40,216l12.47-37.4a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>';
+                  const iconLightning =
+                    '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,12.95l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112-120A8,8,0,0,0,215.79,118.17Z"/></svg>';
+                  const iconPlayCircle =
+                    '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm36.44-94.66-48-32A8,8,0,0,0,104,96v64a8,8,0,0,0,12.44,6.66l48-32a8,8,0,0,0,0-13.32ZM120,145.05V111l25.58,17Z"/></svg>';
                   const activities = [
-                    { icon: iconChatCircle, text: "Alice via Telegram: Can you review the PR?", time: "just now" },
-                    { icon: iconLightning, text: "Tool shell: git status", time: "1m ago" },
-                    { icon: iconChatCircle, text: "Bob via Discord: Deploy looks good", time: "2m ago" },
-                    { icon: iconPlayCircle, text: 'Session "Code Review" started', time: "3m ago" },
+                    {
+                      icon: iconChatCircle,
+                      text: "Alice via Telegram: Can you review the PR?",
+                      time: "just now",
+                    },
+                    {
+                      icon: iconLightning,
+                      text: "Tool shell: git status",
+                      time: "1m ago",
+                    },
+                    {
+                      icon: iconChatCircle,
+                      text: "Bob via Discord: Deploy looks good",
+                      time: "2m ago",
+                    },
+                    {
+                      icon: iconPlayCircle,
+                      text: 'Session "Code Review" started',
+                      time: "3m ago",
+                    },
                   ];
                   activities.forEach((act, i) => {
-                    setTimeout(() => {
-                      const div = document.createElement("div");
-                      div.className = "flex items-center gap-2";
-                      div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-xs" style="color: var(--hu-text-muted)">${act.time}</span>`;
-                      actContainer.appendChild(div);
-                      fadeIn(div, 400);
-                    }, 800 + i * 400);
+                    setTimeout(
+                      () => {
+                        const div = document.createElement("div");
+                        div.className = "flex items-center gap-2";
+                        div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-xs" style="color: var(--hu-text-muted)">${act.time}</span>`;
+                        actContainer.appendChild(div);
+                        fadeIn(div, 400);
+                      },
+                      800 + i * 400,
+                    );
                   });
                 }
               },
@@ -3291,7 +3347,9 @@ const tools = [
           for (let i = 255; i > 0; i--) {
             seed = (seed * 1664525 + 1013904223) >>> 0;
             const j = seed % (i + 1);
-            const tmp = p[i]; p[i] = p[j]; p[j] = tmp;
+            const tmp = p[i];
+            p[i] = p[j];
+            p[j] = tmp;
           }
           for (let i = 0; i < 256; i++) p[i + 256] = p[i];
           const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
@@ -3309,24 +3367,41 @@ const tools = [
             const v = fade(yf);
             const A = p[X] + Y;
             const B = p[X + 1] + Y;
-            return lerp(v,
+            return lerp(
+              v,
               lerp(u, grad2(p[A], xf, yf), grad2(p[B], xf - 1, yf)),
-              lerp(u, grad2(p[A + 1], xf, yf - 1), grad2(p[B + 1], xf - 1, yf - 1))
+              lerp(
+                u,
+                grad2(p[A + 1], xf, yf - 1),
+                grad2(p[B + 1], xf - 1, yf - 1),
+              ),
             );
           };
         }
 
         // ═══ Hero Canvas — lightweight 2D neural network (no Three.js) ═══
-        const heroCanvas = document.getElementById("hero-webgl") as HTMLCanvasElement;
+        const heroCanvas = document.getElementById(
+          "hero-webgl",
+        ) as HTMLCanvasElement;
         const isDesktop = window.matchMedia("(min-width: 769px)").matches;
         if (heroCanvas && isDesktop) {
-          const heroObs = new IntersectionObserver((entries) => {
-            if (!entries[0]?.isIntersecting) return;
-            heroObs.disconnect();
-            const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
-            if (ric) ric(() => initHeroCanvas(heroCanvas), { timeout: 4000 });
-            else setTimeout(() => initHeroCanvas(heroCanvas), 2000);
-          }, { threshold: 0.01 });
+          const heroObs = new IntersectionObserver(
+            (entries) => {
+              if (!entries[0]?.isIntersecting) return;
+              heroObs.disconnect();
+              const ric = (
+                window as unknown as {
+                  requestIdleCallback?: (
+                    cb: () => void,
+                    opts?: { timeout: number },
+                  ) => number;
+                }
+              ).requestIdleCallback;
+              if (ric) ric(() => initHeroCanvas(heroCanvas), { timeout: 4000 });
+              else setTimeout(() => initHeroCanvas(heroCanvas), 2000);
+            },
+            { threshold: 0.01 },
+          );
           heroObs.observe(heroCanvas);
         } else if (heroCanvas) {
           heroCanvas.style.display = "none";
@@ -3334,7 +3409,10 @@ const tools = [
 
         function initHeroCanvas(canvas: HTMLCanvasElement) {
           const ctx = canvas.getContext("2d");
-          if (!ctx) { canvas.style.display = "none"; return; }
+          if (!ctx) {
+            canvas.style.display = "none";
+            return;
+          }
           const section = canvas.closest("section")!;
           const CW = () => section.clientWidth;
           const CH = () => section.clientHeight;
@@ -3344,8 +3422,14 @@ const tools = [
           ctx.scale(dpr, dpr);
 
           const noise = createNoise2D();
-          const accentHex = getComputedStyle(document.documentElement).getPropertyValue("--hu-accent").trim() || "#7AB648";
-          const secondaryHex = getComputedStyle(document.documentElement).getPropertyValue("--hu-accent-secondary").trim() || "#f59e0b";
+          const accentHex =
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--hu-accent")
+              .trim() || "#7AB648";
+          const secondaryHex =
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--hu-accent-secondary")
+              .trim() || "#f59e0b";
           function hexToRGB(hex: string): [number, number, number] {
             const v = parseInt(hex.replace("#", ""), 16);
             return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
@@ -3377,7 +3461,9 @@ const tools = [
           const conns: [number, number][] = [];
           let lStart = 0;
           for (let L = 0; L < layerSizes.length - 1; L++) {
-            const nCur = layerSizes[L], nNext = layerSizes[L + 1], nStart = lStart + nCur;
+            const nCur = layerSizes[L],
+              nNext = layerSizes[L + 1],
+              nStart = lStart + nCur;
             for (let i = 0; i < nCur; i++) {
               const k = 2 + Math.floor(Math.random() * 3);
               const used = new Set<number>();
@@ -3393,12 +3479,23 @@ const tools = [
           const FLOW_COUNT = 400;
           const flowX = new Float32Array(FLOW_COUNT);
           const flowY = new Float32Array(FLOW_COUNT);
-          for (let i = 0; i < FLOW_COUNT; i++) { flowX[i] = Math.random(); flowY[i] = Math.random(); }
+          for (let i = 0; i < FLOW_COUNT; i++) {
+            flowX[i] = Math.random();
+            flowY[i] = Math.random();
+          }
 
-          let mx = -1, my = -1;
+          let mx = -1,
+            my = -1;
           const MOUSE_RAD = 120;
-          const onMove = (e: MouseEvent) => { const r = canvas.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; };
-          const onLeave = () => { mx = -1; my = -1; };
+          const onMove = (e: MouseEvent) => {
+            const r = canvas.getBoundingClientRect();
+            mx = e.clientX - r.left;
+            my = e.clientY - r.top;
+          };
+          const onLeave = () => {
+            mx = -1;
+            my = -1;
+          };
           document.addEventListener("mousemove", onMove);
           document.addEventListener("mouseleave", onLeave);
 
@@ -3411,20 +3508,30 @@ const tools = [
             animId = requestAnimationFrame(animate);
             if (now - lastFrame < FRAME_INTERVAL) return;
             lastFrame = now;
-            const cw = CW(), ch = CH();
+            const cw = CW(),
+              ch = CH();
             const t = now * 0.001;
             const breath = 1 + 0.04 * Math.sin(t * 0.8);
             ctx.clearRect(0, 0, cw, ch);
 
             for (let i = 0; i < nodeCount; i++) {
               const [bx, by] = nodeBase[i];
-              let x = bx * cw + orbitR[i] * Math.cos(t * 0.6 + orbitP[i]) * breath;
-              let y = by * ch + orbitR[i] * Math.sin(t * 0.5 + orbitP[i] * 1.1) * breath;
+              let x =
+                bx * cw + orbitR[i] * Math.cos(t * 0.6 + orbitP[i]) * breath;
+              let y =
+                by * ch +
+                orbitR[i] * Math.sin(t * 0.5 + orbitP[i] * 1.1) * breath;
               x += 4 * noise(x * 0.005, t * 0.3);
               y += 4 * noise(y * 0.005 + 50, t * 0.3);
               if (mx >= 0) {
-                const dx = x - mx, dy = y - my, d = Math.sqrt(dx * dx + dy * dy);
-                if (d < MOUSE_RAD && d > 1) { const f = (1 - d / MOUSE_RAD) * 8; x += (dx / d) * f; y += (dy / d) * f; }
+                const dx = x - mx,
+                  dy = y - my,
+                  d = Math.sqrt(dx * dx + dy * dy);
+                if (d < MOUSE_RAD && d > 1) {
+                  const f = (1 - d / MOUSE_RAD) * 8;
+                  x += (dx / d) * f;
+                  y += (dy / d) * f;
+                }
               }
               nodePos[i * 2] = x;
               nodePos[i * 2 + 1] = y;
@@ -3432,38 +3539,79 @@ const tools = [
 
             for (let c = 0; c < conns.length; c++) {
               const [a, b] = conns[c];
-              const ax = nodePos[a * 2], ay = nodePos[a * 2 + 1], bx = nodePos[b * 2], by = nodePos[b * 2 + 1];
-              let alpha = 0.08 * (0.6 + 0.4 * Math.sin((t * 3 + c * 0.1) * Math.PI * 2));
-              if (mx >= 0) { const d = Math.sqrt(((ax + bx) / 2 - mx) ** 2 + ((ay + by) / 2 - my) ** 2); if (d < MOUSE_RAD * 1.5) alpha += 0.12 * (1 - d / (MOUSE_RAD * 1.5)); }
-              ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+              const ax = nodePos[a * 2],
+                ay = nodePos[a * 2 + 1],
+                bx = nodePos[b * 2],
+                by = nodePos[b * 2 + 1];
+              let alpha =
+                0.08 * (0.6 + 0.4 * Math.sin((t * 3 + c * 0.1) * Math.PI * 2));
+              if (mx >= 0) {
+                const d = Math.sqrt(
+                  ((ax + bx) / 2 - mx) ** 2 + ((ay + by) / 2 - my) ** 2,
+                );
+                if (d < MOUSE_RAD * 1.5)
+                  alpha += 0.12 * (1 - d / (MOUSE_RAD * 1.5));
+              }
+              ctx.beginPath();
+              ctx.moveTo(ax, ay);
+              ctx.lineTo(bx, by);
               ctx.strokeStyle = `rgba(${accentRGB[0]},${accentRGB[1]},${accentRGB[2]},${alpha})`;
-              ctx.lineWidth = 1; ctx.stroke();
+              ctx.lineWidth = 1;
+              ctx.stroke();
             }
 
             for (let i = 0; i < nodeCount; i++) {
-              const x = nodePos[i * 2], y = nodePos[i * 2 + 1];
+              const x = nodePos[i * 2],
+                y = nodePos[i * 2 + 1];
               const rgb = isAccent[i] ? secondaryRGB : accentRGB;
-              const a = Math.min(1, 0.5 * (isAccent[i] ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathP[i]) : 1));
-              ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2);
-              ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`; ctx.fill();
+              const a = Math.min(
+                1,
+                0.5 *
+                  (isAccent[i]
+                    ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathP[i])
+                    : 1),
+              );
+              ctx.beginPath();
+              ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+              ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
+              ctx.fill();
             }
 
             const flowStep = 0.0008;
             for (let i = 0; i < FLOW_COUNT; i++) {
               flowX[i] += flowStep * noise(flowY[i] * 3, t * 0.3);
               flowY[i] += flowStep * noise(flowX[i] * 3 + 23.1, t * 0.3);
-              if (flowX[i] > 1.1) flowX[i] -= 1.2; else if (flowX[i] < -0.1) flowX[i] += 1.2;
-              if (flowY[i] > 1.1) flowY[i] -= 1.2; else if (flowY[i] < -0.1) flowY[i] += 1.2;
-              ctx.beginPath(); ctx.arc(flowX[i] * cw, flowY[i] * ch, 1, 0, Math.PI * 2);
-              ctx.fillStyle = `rgba(${accentRGB[0]},${accentRGB[1]},${accentRGB[2]},0.12)`; ctx.fill();
+              if (flowX[i] > 1.1) flowX[i] -= 1.2;
+              else if (flowX[i] < -0.1) flowX[i] += 1.2;
+              if (flowY[i] > 1.1) flowY[i] -= 1.2;
+              else if (flowY[i] < -0.1) flowY[i] += 1.2;
+              ctx.beginPath();
+              ctx.arc(flowX[i] * cw, flowY[i] * ch, 1, 0, Math.PI * 2);
+              ctx.fillStyle = `rgba(${accentRGB[0]},${accentRGB[1]},${accentRGB[2]},0.12)`;
+              ctx.fill();
             }
 
             if (mx >= 0) {
-              const g = ctx.createRadialGradient(mx, my, 0, mx, my, MOUSE_RAD * 0.8);
-              g.addColorStop(0, `rgba(${accentRGB[0]},${accentRGB[1]},${accentRGB[2]},0.08)`);
+              const g = ctx.createRadialGradient(
+                mx,
+                my,
+                0,
+                mx,
+                my,
+                MOUSE_RAD * 0.8,
+              );
+              g.addColorStop(
+                0,
+                `rgba(${accentRGB[0]},${accentRGB[1]},${accentRGB[2]},0.08)`,
+              );
               g.addColorStop(1, "transparent");
               ctx.fillStyle = g;
-              ctx.fillRect(mx - MOUSE_RAD, my - MOUSE_RAD, MOUSE_RAD * 2, MOUSE_RAD * 2);
+              ctx.fillRect(
+                mx - MOUSE_RAD,
+                my - MOUSE_RAD,
+                MOUSE_RAD * 2,
+                MOUSE_RAD * 2,
+              );
             }
           };
 
@@ -3471,14 +3619,30 @@ const tools = [
           canvas.style.transition = "opacity 1.5s ease-out";
           animate(performance.now());
 
-          const onResize = () => { canvas.width = CW() * dpr; canvas.height = CH() * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
+          const onResize = () => {
+            canvas.width = CW() * dpr;
+            canvas.height = CH() * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          };
           window.addEventListener("resize", onResize);
-          const cleanObs = new IntersectionObserver((entries) => {
-            if (!entries[0]?.isIntersecting) cancelAnimationFrame(animId);
-            else { lastFrame = 0; animate(performance.now()); }
-          }, { threshold: 0 });
+          const cleanObs = new IntersectionObserver(
+            (entries) => {
+              if (!entries[0]?.isIntersecting) cancelAnimationFrame(animId);
+              else {
+                lastFrame = 0;
+                animate(performance.now());
+              }
+            },
+            { threshold: 0 },
+          );
           cleanObs.observe(canvas);
-          const dispose = () => { cancelAnimationFrame(animId); cleanObs.disconnect(); window.removeEventListener("resize", onResize); document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseleave", onLeave); };
+          const dispose = () => {
+            cancelAnimationFrame(animId);
+            cleanObs.disconnect();
+            window.removeEventListener("resize", onResize);
+            document.removeEventListener("mousemove", onMove);
+            document.removeEventListener("mouseleave", onLeave);
+          };
           window.addEventListener("pagehide", dispose, { once: true });
         }
       }
