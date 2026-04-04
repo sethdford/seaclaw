@@ -822,7 +822,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             bi->cfg.agent.persona ? strlen(bi->cfg.agent.persona) : 0, &ctx_cfg);
         if (err != HU_OK)
             goto fail;
-        hu_metacognition_apply_config(&bi->agent.metacognition, &bi->cfg.agent.metacognition);
+        hu_metacognition_apply_config(&bi->agent.infra.metacognition, &bi->cfg.agent.metacognition);
         memset(&bi->voice_cfg, 0, sizeof(bi->voice_cfg));
         (void)hu_voice_config_from_settings(&bi->cfg, &bi->voice_cfg);
         if (bi->voice_cfg.tts_provider || bi->voice_cfg.local_tts_endpoint ||
@@ -853,7 +853,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             hu_context_engine_t *ce =
                 (hu_context_engine_t *)alloc->alloc(alloc->ctx, sizeof(hu_context_engine_t));
             if (ce && hu_context_engine_legacy_create(alloc, ce) == HU_OK)
-                bi->agent.context_engine = (struct hu_context_engine *)ce;
+                bi->agent.infra.context_engine = (struct hu_context_engine *)ce;
             else if (ce)
                 alloc->free(alloc->ctx, ce, sizeof(hu_context_engine_t));
         }
@@ -863,7 +863,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             hu_acp_inbox_t *inbox =
                 (hu_acp_inbox_t *)alloc->alloc(alloc->ctx, sizeof(hu_acp_inbox_t));
             if (inbox && hu_acp_inbox_init(inbox, alloc, 16) == HU_OK)
-                bi->agent.acp_inbox = (struct hu_acp_inbox *)inbox;
+                bi->agent.infra.acp_inbox = (struct hu_acp_inbox *)inbox;
             else if (inbox)
                 alloc->free(alloc->ctx, inbox, sizeof(hu_acp_inbox_t));
         }

@@ -118,6 +118,34 @@ typedef struct hu_agent_extensions {
     hu_escalate_protocol_t escalate_protocol;
 } hu_agent_extensions_t;
 
+/* Cognition, caching, and workflow infrastructure extracted from hu_agent_t.
+ * Embedded as hu_agent_t::infra — always present, never NULL. */
+typedef struct hu_agent_infra {
+    /* Cognition subsystems */
+    hu_emotional_cognition_t emotional_cognition;
+    hu_metacognition_t metacognition;
+    hu_cognition_mode_t current_cognition_mode;
+#ifdef HU_ENABLE_SQLITE
+    struct sqlite3 *cognition_db; /* shared DB for evolving + episodic */
+#endif
+
+    /* Cross-turn caches */
+    struct hu_prompt_cache *prompt_cache;     /* owned; NULL until first turn */
+    struct hu_tool_cache_ttl *tool_cache_ttl; /* owned; NULL until first turn */
+    hu_kv_cache_manager_t *kv_cache;          /* owned; NULL until first turn */
+    struct hu_context_engine *context_engine; /* owned; NULL = use legacy behavior */
+    struct hu_acp_inbox *acp_inbox;           /* owned; NULL until multi_agent enabled */
+    struct hu_speculative_cache *speculative_cache;
+    struct hu_semantic_cache *response_cache; /* optional; embedding-based response cache */
+
+    /* Workflow infrastructure */
+    struct hu_idempotency_registry *idempotency_registry; /* optional; NULL = no dedup */
+    hu_workflow_event_log_t *workflow_log;                /* optional; NULL = no event logging */
+    hu_gate_manager_t *gate_manager;                      /* optional; NULL = no approval gates */
+    hu_delegation_registry_t *delegation_registry;        /* optional; NULL = no delegation */
+    hu_webhook_manager_t *webhook_manager;                /* optional; NULL = no webhooks */
+} hu_agent_infra_t;
+
 /* Optional context pressure config. Pass to hu_agent_from_config; NULL = use defaults. */
 typedef struct hu_agent_context_config {
     uint64_t token_limit;   /* 0 = resolve from model at runtime */
@@ -283,8 +311,6 @@ struct hu_agent {
 
     bool constitutional_enabled;
     bool multi_agent_enabled;
-    struct hu_speculative_cache *speculative_cache;
-    struct hu_semantic_cache *response_cache; /* optional; embedding-based response cache */
 
 #ifdef HU_ENABLE_SQLITE
     hu_meta_params_t meta_params;
@@ -318,43 +344,8 @@ struct hu_agent {
     /* Instruction file discovery cache */
     hu_instruction_discovery_t *instruction_discovery;
 
-    /* Cognition subsystems */
-    hu_emotional_cognition_t emotional_cognition;
-    hu_metacognition_t metacognition;
-    hu_cognition_mode_t current_cognition_mode;
-#ifdef HU_ENABLE_SQLITE
-    struct sqlite3 *cognition_db; /* shared DB for evolving + episodic */
-#endif
-
-    /* SOTA: cross-turn prompt cache for system prompt deduplication */
-    struct hu_prompt_cache *prompt_cache; /* owned; NULL until first turn */
-
-    /* SOTA: cross-turn tool result cache with TTL */
-    struct hu_tool_cache_ttl *tool_cache_ttl; /* owned; NULL until first turn */
-
-    /* SOTA: KV-cache-style context segment tracking for pruning */
-    hu_kv_cache_manager_t *kv_cache; /* owned; NULL until first turn */
-
-    /* SOTA: pluggable context engine for RAG/graph/hybrid context assembly */
-    struct hu_context_engine *context_engine; /* owned; NULL = use legacy behavior */
-
-    /* SOTA: agent communication protocol inbox for multi-agent coordination */
-    struct hu_acp_inbox *acp_inbox; /* owned; NULL until multi_agent enabled */
-
-    /* Idempotency registry for crash-proof tool execution (HuLa replay engine) */
-    struct hu_idempotency_registry *idempotency_registry; /* optional; NULL = no dedup */
-
-    /* Workflow event log for durable execution and audit trail */
-    hu_workflow_event_log_t *workflow_log; /* optional; NULL = no event logging */
-
-    /* Approval gate manager for human-in-the-loop workflow pauses */
-    hu_gate_manager_t *gate_manager; /* optional; NULL = no approval gates */
-
-    /* Delegation token registry for agent-to-agent authorization */
-    hu_delegation_registry_t *delegation_registry; /* optional; NULL = no delegation */
-
-    /* Webhook manager for incoming webhook event handling */
-    hu_webhook_manager_t *webhook_manager; /* optional; NULL = no webhooks */
+    /* Cognition, caching, and workflow infrastructure (extracted) */
+    hu_agent_infra_t infra;
 
     /* Media generation: tool-produced file paths accumulated per turn */
     char *generated_media[4];

@@ -185,7 +185,7 @@ static void *spawn_thread(void *arg) {
             goto done;
         }
         if (s->inherit_metacognition_policy)
-            hu_metacognition_apply_config(&ag->metacognition, s->inherit_metacognition_policy);
+            hu_metacognition_apply_config(&ag->infra.metacognition, s->inherit_metacognition_policy);
         ag->agent_id = s->agent_id;
         ag->spawn_depth = s->child_spawn_depth;
         ag->worktree_mgr = pool->worktree_mgr;
@@ -259,7 +259,7 @@ static void *spawn_thread(void *arg) {
             goto done;
         }
         if (s->inherit_metacognition_policy)
-            hu_metacognition_apply_config(&ag.metacognition, s->inherit_metacognition_policy);
+            hu_metacognition_apply_config(&ag.infra.metacognition, s->inherit_metacognition_policy);
         ag.agent_id = s->agent_id;
         ag.spawn_depth = s->child_spawn_depth;
         ag.worktree_mgr = pool->worktree_mgr;
@@ -825,7 +825,7 @@ void hu_spawn_config_apply_current_tool_agent(hu_spawn_config_t *cfg) {
         return;
     cfg->caller_spawn_depth = cur->spawn_depth;
     cfg->shared_cost_tracker = cur->cost_tracker;
-    cfg->metacognition_policy = &cur->metacognition.cfg;
+    cfg->metacognition_policy = &cur->infra.metacognition.cfg;
 }
 
 void hu_spawn_config_apply_parent_agent(hu_spawn_config_t *cfg, const hu_agent_t *parent) {
@@ -855,8 +855,8 @@ void hu_spawn_config_apply_parent_agent(hu_spawn_config_t *cfg, const hu_agent_t
     cfg->autonomy_level = parent->autonomy_level;
     cfg->caller_spawn_depth = parent->spawn_depth;
     cfg->shared_cost_tracker = parent->cost_tracker;
-    cfg->metacognition_policy = &parent->metacognition.cfg;
-    cfg->parent_delegation_registry = (void *)parent->delegation_registry;
+    cfg->metacognition_policy = &parent->infra.metacognition.cfg;
+    cfg->parent_delegation_registry = (void *)parent->infra.delegation_registry;
     cfg->parent_agent_id = parent->agent_id;
 
     if (parent->turn_model && parent->turn_model_len > 0) {

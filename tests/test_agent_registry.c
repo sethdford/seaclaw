@@ -299,8 +299,8 @@ static void test_spawn_config_apply_current_tool_agent_null_safe(void) {
 static void test_spawn_config_apply_current_tool_agent_metacog_pointer(void) {
     hu_agent_t parent;
     memset(&parent, 0, sizeof(parent));
-    hu_metacognition_init(&parent.metacognition);
-    parent.metacognition.cfg.max_regen = 77u;
+    hu_metacognition_init(&parent.infra.metacognition);
+    parent.infra.metacognition.cfg.max_regen = 77u;
     parent.spawn_depth = 4u;
 
     hu_named_agent_config_t named = {
@@ -314,7 +314,7 @@ static void test_spawn_config_apply_current_tool_agent_metacog_pointer(void) {
 
     hu_agent_set_current_for_tools(&parent);
     hu_spawn_config_apply_current_tool_agent(&spawn);
-    HU_ASSERT_TRUE(spawn.metacognition_policy == &parent.metacognition.cfg);
+    HU_ASSERT_TRUE(spawn.metacognition_policy == &parent.infra.metacognition.cfg);
     HU_ASSERT_EQ(spawn.caller_spawn_depth, 4u);
     HU_ASSERT_EQ(spawn.metacognition_policy->max_regen, 77u);
 
