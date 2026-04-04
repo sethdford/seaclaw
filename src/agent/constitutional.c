@@ -180,12 +180,18 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
         if (n > 0 && (size_t)n < prompt_cap - pos)
             pos += (size_t)n;
     }
-    pos += (size_t)snprintf(critique_prompt + pos, prompt_cap - pos,
+    {
+        int tail = snprintf(critique_prompt + pos, prompt_cap - pos,
                             "\nUser asked: %.*s\n\nAssistant responded: %.*s\n\n"
                             "Does the response violate any principle? "
                             "Reply with PASS, MINOR, or REWRITE followed by the principle number "
                             "and reasoning.",
                             (int)user_msg_len, user_msg, (int)response_len, response);
+        if (tail > 0 && (size_t)tail < prompt_cap - pos)
+            pos += (size_t)tail;
+        else if (tail > 0)
+            pos = prompt_cap - 1;
+    }
 
     hu_chat_message_t msgs[2];
     memset(msgs, 0, sizeof(msgs));
