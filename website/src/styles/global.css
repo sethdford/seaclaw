@@ -18,35 +18,55 @@
 
 @font-face {
   font-family: "Avenir";
-  src: url("/fonts/avenir/Avenir-Light.woff2") format("woff2");
+  src:
+    local("Avenir-Light"),
+    local("Avenir Light"),
+    local("AvenirNext-UltraLight"),
+    url("/fonts/avenir/Avenir-Light.woff2") format("woff2");
   font-weight: 300;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Avenir";
-  src: url("/fonts/avenir/Avenir-Book.woff2") format("woff2");
+  src:
+    local("Avenir-Book"),
+    local("Avenir Book"),
+    local("AvenirNext-Regular"),
+    url("/fonts/avenir/Avenir-Book.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Avenir";
-  src: url("/fonts/avenir/Avenir-Medium.woff2") format("woff2");
+  src:
+    local("Avenir-Medium"),
+    local("Avenir Medium"),
+    local("AvenirNext-Medium"),
+    url("/fonts/avenir/Avenir-Medium.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Avenir";
-  src: url("/fonts/avenir/Avenir-Heavy.woff2") format("woff2");
+  src:
+    local("Avenir-Heavy"),
+    local("Avenir Heavy"),
+    local("AvenirNext-Bold"),
+    url("/fonts/avenir/Avenir-Heavy.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Avenir";
-  src: url("/fonts/avenir/Avenir-Black.woff2") format("woff2");
+  src:
+    local("Avenir-Black"),
+    local("Avenir Black"),
+    local("AvenirNext-Heavy"),
+    url("/fonts/avenir/Avenir-Black.woff2") format("woff2");
   font-weight: 900;
   font-style: normal;
   font-display: optional;

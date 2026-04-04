@@ -375,13 +375,23 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
     msgs = all_msgs;
     msgs_count = total_msgs;
 
+    const char *eff_model = agent->model_name;
+    size_t eff_model_len = agent->model_name_len;
+    double eff_temp = agent->temperature;
+    if (agent->turn_model && agent->turn_model_len > 0) {
+        eff_model = agent->turn_model;
+        eff_model_len = agent->turn_model_len;
+    }
+    if (agent->turn_temperature > 0.0)
+        eff_temp = agent->turn_temperature;
+
     hu_chat_request_t req;
     memset(&req, 0, sizeof(req));
     req.messages = msgs;
     req.messages_count = msgs_count;
-    req.model = agent->model_name;
-    req.model_len = agent->model_name_len;
-    req.temperature = agent->temperature;
+    req.model = eff_model;
+    req.model_len = eff_model_len;
+    req.temperature = eff_temp;
     req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
     req.tools_count = agent->tool_specs_count;
 
@@ -395,9 +405,9 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
                                     .first_chunk_sent = false};
         hu_stream_chat_result_t sresp;
         memset(&sresp, 0, sizeof(sresp));
-        err = agent->provider.vtable->stream_chat(
-            agent->provider.ctx, agent->alloc, &req, agent->model_name, agent->model_name_len,
-            agent->temperature, stream_chunk_to_token_cb, &wrap, &sresp);
+        err = agent->provider.vtable->stream_chat(agent->provider.ctx, agent->alloc, &req,
+                                                  eff_model, eff_model_len, eff_temp,
+                                                  stream_chunk_to_token_cb, &wrap, &sresp);
         if (msgs)
             agent->alloc->free(agent->alloc->ctx, msgs, msgs_count * sizeof(hu_chat_message_t));
         if (system_prompt)
@@ -451,6 +461,19 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
     *response_out = NULL;
     if (response_len_out)
         *response_len_out = 0;
+
+    const char *eff_model_v2 = agent->model_name;
+    size_t eff_model_v2_len = agent->model_name_len;
+    double eff_temp_v2 = agent->temperature;
+    if (agent->turn_model && agent->turn_model_len > 0) {
+        eff_model_v2 = agent->turn_model;
+        eff_model_v2_len = agent->turn_model_len;
+    }
+    if (agent->turn_temperature > 0.0)
+        eff_temp_v2 = agent->turn_temperature;
+    (void)eff_model_v2;
+    (void)eff_model_v2_len;
+    (void)eff_temp_v2;
 
     hu_agent_set_current_for_tools(agent);
     hu_agent_internal_process_mailbox_messages(agent);
@@ -713,11 +736,13 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         memset(&req, 0, sizeof(req));
         req.messages = all_msgs;
         req.messages_count = total_msgs;
-        req.model = agent->model_name;
-        req.model_len = agent->model_name_len;
-        req.temperature = agent->temperature;
+        req.model = eff_model_v2;
+        req.model_len = eff_model_v2_len;
+        req.temperature = eff_temp_v2;
         req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
         req.tools_count = agent->tool_specs_count;
+        if (agent->turn_thinking_budget > 0)
+            req.thinking_budget = agent->turn_thinking_budget;
 
         /* Stream from the provider (with emotional pacing on first chunk).
          * When quality systems (GVR/Constitutional) are enabled, suppress streaming
@@ -734,9 +759,9 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                                  .first_content_sent = false};
         hu_stream_chat_result_t sresp;
         memset(&sresp, 0, sizeof(sresp));
-        err = agent->provider.vtable->stream_chat(
-            agent->provider.ctx, agent->alloc, &req, agent->model_name, agent->model_name_len,
-            agent->temperature, stream_chunk_to_event_cb, &wrap, &sresp);
+        err = agent->provider.vtable->stream_chat(agent->provider.ctx, agent->alloc, &req,
+                                                  eff_model_v2, eff_model_v2_len, eff_temp_v2,
+                                                  stream_chunk_to_event_cb, &wrap, &sresp);
 
         agent->alloc->free(agent->alloc->ctx, all_msgs, total_msgs * sizeof(hu_chat_message_t));
 
@@ -864,9 +889,9 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         if (agent->gvr_config.enabled && !agent->persona) {
             hu_gvr_pipeline_result_t gvr_result;
             memset(&gvr_result, 0, sizeof(gvr_result));
-            hu_error_t gvr_err = hu_gvr_pipeline(
-                agent->alloc, &agent->provider, &agent->gvr_config, agent->model_name,
-                agent->model_name_len, msg, msg_len, final_content, final_content_len, &gvr_result);
+            hu_error_t gvr_err = hu_gvr_pipeline(agent->alloc, &agent->provider, &agent->gvr_config,
+                                                 eff_model_v2, eff_model_v2_len, msg, msg_len,
+                                                 final_content, final_content_len, &gvr_result);
             if (gvr_err == HU_OK && gvr_result.final_content &&
                 gvr_result.revisions_performed > 0) {
                 if (content_owned)
@@ -931,8 +956,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 size_t revised_len = 0;
                 hu_error_t re_err = agent->provider.vtable->chat_with_system(
                     agent->provider.ctx, agent->alloc, rethink_sys, sizeof(rethink_sys) - 1,
-                    rethink_user, (size_t)rn, agent->model_name, agent->model_name_len, 0.9,
-                    &revised, &revised_len);
+                    rethink_user, (size_t)rn, eff_model_v2, eff_model_v2_len, 0.9, &revised,
+                    &revised_len);
                 if (re_err == HU_OK && revised && revised_len > final_content_len) {
                     hu_log_info("human", NULL, "[quality] persona rethink: %zu → %zu chars",
                                 final_content_len, revised_len);
@@ -953,8 +978,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             hu_constitutional_config_t const_cfg = hu_constitutional_config_default();
             hu_critique_result_t critique;
             memset(&critique, 0, sizeof(critique));
-            if (hu_constitutional_critique(agent->alloc, &agent->provider, agent->model_name,
-                                           agent->model_name_len, msg, msg_len, final_content,
+            if (hu_constitutional_critique(agent->alloc, &agent->provider, eff_model_v2,
+                                           eff_model_v2_len, msg, msg_len, final_content,
                                            final_content_len, &const_cfg, &critique) == HU_OK) {
                 if (critique.verdict == HU_CRITIQUE_REWRITE && critique.revised_response &&
                     critique.revised_response_len > 0) {

@@ -2024,7 +2024,7 @@ hu_error_t cp_admin_skills_search(hu_allocator_t *alloc, hu_app_context_t *app, 
 
     hu_skill_registry_entry_t *entries = NULL;
     size_t count = 0;
-    hu_error_t e = hu_skill_registry_search(alloc, query, &entries, &count);
+    hu_error_t e = hu_skill_registry_search(alloc, NULL, query, &entries, &count);
 
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj) {

@@ -11,7 +11,8 @@ static const struct eval_suite_expect_row {
     const char *file;
     size_t expect_tasks;
 } k_eval_suite_expect[] = {
-    {"adversarial.json", 10},       {"anti_sycophancy.json", 8},
+    {"adversarial.json", 10},       {"adversarial_turing.json", 30},
+    {"anti_sycophancy.json", 8},
     {"capability_edges.json", 10},  {"coding_basic.json", 5},
     {"companion_safety.json", 12},  {"fidelity.json", 18},
     {"hula_orchestration.json", 4}, {"human_likeness.json", 8},

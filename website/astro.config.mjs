@@ -32,6 +32,7 @@ export default defineConfig({
       ],
       customCss: ["./src/styles/global.css"],
       sidebar: [
+        { label: "Welcome", slug: "welcome" },
         {
           label: "Getting Started",
           items: [

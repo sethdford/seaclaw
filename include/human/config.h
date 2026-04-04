@@ -621,6 +621,14 @@ typedef struct hu_config {
     uint32_t update_check_interval_hours; /* default 24; 0 = use default */
     hu_arena_t *arena;
     hu_allocator_t allocator;
+
+    struct {
+        char *default_image_model;
+        char *default_video_model;
+        char *vertex_project;
+        char *vertex_region;
+        char *veo_storage_uri;
+    } media_gen;
 } hu_config_t;
 
 hu_error_t hu_config_load(hu_allocator_t *backing, hu_config_t *out);

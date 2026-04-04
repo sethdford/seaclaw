@@ -206,6 +206,7 @@ void run_governor_tests(void);
 void run_relationship_dynamics_tests(void);
 void run_model_router_tests(void);
 void run_turing_score_tests(void);
+void run_adversarial_turing_tests(void);
 void run_arbitrator_tests(void);
 void run_planning_tests(void);
 void run_rel_dynamics_tests(void);
@@ -250,6 +251,7 @@ int run_context_engine_rag_tests(void);
 int run_humanness_tests(void);
 int run_opinions_persistence_tests(void);
 void run_visual_content_tests(void);
+void run_media_gen_tests(void);
 void run_opinions_tests(void);
 void run_life_chapters_tests(void);
 void run_social_graph_tests(void);
@@ -309,6 +311,7 @@ void run_paperclip_tests(void);
 #endif
 void run_cartesia_tests(void);
 void run_cartesia_stream_tests(void);
+void run_transcript_prep_tests(void);
 void register_voice_clone_tests(void);
 #ifdef HU_ENABLE_CARTESIA
 void run_audio_pipeline_tests(void);
@@ -639,6 +642,7 @@ int main(int argc, char **argv) {
     run_relationship_dynamics_tests();
     run_model_router_tests();
     run_turing_score_tests();
+    run_adversarial_turing_tests();
     run_arbitrator_tests();
     run_planning_tests();
     run_rel_dynamics_tests();
@@ -685,6 +689,7 @@ int main(int argc, char **argv) {
     run_humanness_tests();
     run_opinions_persistence_tests();
     run_visual_content_tests();
+    run_media_gen_tests();
     run_opinions_tests();
     run_life_chapters_tests();
     run_social_graph_tests();
@@ -736,6 +741,7 @@ int main(int argc, char **argv) {
 #endif
     run_cartesia_tests();
     run_cartesia_stream_tests();
+    run_transcript_prep_tests();
     register_voice_clone_tests();
 #ifdef HU_ENABLE_CARTESIA
     run_audio_pipeline_tests();

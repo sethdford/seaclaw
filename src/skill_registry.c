@@ -203,15 +203,17 @@ static bool matches_query(const char *q, const char *name, const char *desc, con
     return false;
 }
 
-hu_error_t hu_skill_registry_search(hu_allocator_t *alloc, const char *query,
-                                    hu_skill_registry_entry_t **out_entries, size_t *out_count) {
+hu_error_t hu_skill_registry_search(hu_allocator_t *alloc, const char *registry_url,
+                                    const char *query, hu_skill_registry_entry_t **out_entries,
+                                    size_t *out_count) {
     if (!alloc || !out_entries || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
     *out_entries = NULL;
     *out_count = 0;
 
+    const char *url = (registry_url && registry_url[0]) ? registry_url : HU_SKILL_REGISTRY_URL;
     hu_http_response_t resp = {0};
-    hu_error_t err = hu_http_get(alloc, HU_SKILL_REGISTRY_URL, NULL, &resp);
+    hu_error_t err = hu_http_get(alloc, url, NULL, &resp);
     if (err != HU_OK || !resp.body || resp.body_len == 0) {
         hu_http_response_free(alloc, &resp);
         return err != HU_OK ? err : HU_ERR_PROVIDER_RESPONSE;
@@ -570,7 +572,8 @@ hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *source_p
 #endif
 }
 
-hu_error_t hu_skill_registry_install_by_name(hu_allocator_t *alloc, const char *name) {
+hu_error_t hu_skill_registry_install_by_name(hu_allocator_t *alloc, const char *registry_url,
+                                             const char *name) {
     if (!alloc || !name || !name[0])
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -578,7 +581,7 @@ hu_error_t hu_skill_registry_install_by_name(hu_allocator_t *alloc, const char *
 #ifdef HU_GATEWAY_POSIX
     hu_skill_registry_entry_t *entries = NULL;
     size_t count = 0;
-    hu_error_t err = hu_skill_registry_search(alloc, name, &entries, &count);
+    hu_error_t err = hu_skill_registry_search(alloc, registry_url, name, &entries, &count);
     if (err != HU_OK) {
         if (entries)
             hu_skill_registry_entries_free(alloc, entries, count);
@@ -683,11 +686,13 @@ hu_error_t hu_skill_registry_install_by_name(hu_allocator_t *alloc, const char *
     return HU_OK;
 #else
     (void)alloc;
+    (void)registry_url;
     (void)name;
     return HU_ERR_NOT_SUPPORTED;
 #endif
 #else
     (void)alloc;
+    (void)registry_url;
     (void)name;
     return HU_OK;
 #endif

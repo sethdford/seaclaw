@@ -488,22 +488,22 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
 
         message_len = imessage_sanitize_output(clean, message_len);
 
-        /* Hard length cap for iMessage: truncate at sentence boundary near 300 chars */
-        if (message_len > 300) {
-            size_t cut = 300;
-            while (cut > 100 && message[cut] != '.' && message[cut] != '!' && message[cut] != '?')
+        /* Hard length cap for iMessage: truncate at sentence boundary near 1000 chars */
+        if (message_len > 1000) {
+            size_t cut = 1000;
+            while (cut > 200 && clean[cut] != '.' && clean[cut] != '!' && clean[cut] != '?')
                 cut--;
-            if (cut > 100) {
+            if (cut > 200) {
                 message_len = cut + 1;
                 clean[message_len] = '\0';
             } else {
-                size_t space_cut = 300;
-                while (space_cut > 100 && message[space_cut] != ' ')
+                size_t space_cut = 1000;
+                while (space_cut > 200 && clean[space_cut] != ' ')
                     space_cut--;
-                if (space_cut > 100)
+                if (space_cut > 200)
                     message_len = space_cut;
                 else
-                    message_len = 300;
+                    message_len = 1000;
                 clean[message_len] = '\0';
             }
         }
@@ -1200,7 +1200,7 @@ static hu_error_t imessage_get_response_constraints(void *ctx,
     (void)ctx;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;
-    out->max_chars = 300;
+    out->max_chars = 1000;
     return HU_OK;
 }
 

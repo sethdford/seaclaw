@@ -63,13 +63,13 @@ static void test_voice_channel_create_with_config_applies_defaults(void) {
 static void test_skill_registry_search_null_alloc_fails(void) {
     hu_skill_registry_entry_t *entries = NULL;
     size_t count = 0;
-    hu_error_t err = hu_skill_registry_search(NULL, "query", &entries, &count);
+    hu_error_t err = hu_skill_registry_search(NULL, NULL, "query", &entries, &count);
     HU_ASSERT_NEQ(err, HU_OK);
 }
 
 static void test_skill_registry_search_null_out_fails(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_error_t err = hu_skill_registry_search(&alloc, "query", NULL, NULL);
+    hu_error_t err = hu_skill_registry_search(&alloc, NULL, "query", NULL, NULL);
     HU_ASSERT_NEQ(err, HU_OK);
 }
 
@@ -77,7 +77,7 @@ static void test_skill_registry_search_mock_returns_valid_entries(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_skill_registry_entry_t *entries = NULL;
     size_t count = 0;
-    hu_error_t err = hu_skill_registry_search(&alloc, "code", &entries, &count);
+    hu_error_t err = hu_skill_registry_search(&alloc, NULL, "code", &entries, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(entries);
     HU_ASSERT_TRUE(count >= 1);

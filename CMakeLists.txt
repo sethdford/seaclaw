@@ -306,6 +306,7 @@ set(HU_CORE_SOURCES
     src/core/string.c
     src/core/json.c
     src/core/http.c
+    src/core/vertex_auth.c
     src/core/process_util.c
     src/sse/sse_client.c
     src/websocket/websocket.c
@@ -536,6 +537,7 @@ set(HU_CORE_SOURCES
     src/agent/compaction_structured.c
     src/agent/session_persist.c
     src/agent/instruction_discover.c
+    src/agent/self_improve.c
     src/providers/error_classify.c
     src/providers/api_key.c
     src/providers/helpers.c
@@ -686,6 +688,9 @@ set(HU_CORE_SOURCES
     src/tools/homeassistant.c
     src/tools/diff.c
     src/tools/voice_clone.c
+    src/tools/media_image.c
+    src/tools/media_video.c
+    src/tools/media_gif.c
     src/tools/factory.c
     src/tools/mcp_resource_tools.c
     src/tools/cron_session_tools.c
@@ -797,6 +802,7 @@ list(APPEND HU_CORE_SOURCES
     src/a2a.c
     src/eval.c
     src/eval/turing_score.c
+    src/eval/turing_adversarial.c
     src/eval_judge.c
     src/eval_benchmarks.c
     src/mcp_resources.c
@@ -926,6 +932,7 @@ endif()
 list(APPEND HU_CORE_SOURCES src/tts/cartesia.c)
 list(APPEND HU_CORE_SOURCES src/tts/cartesia_stream.c)
 list(APPEND HU_CORE_SOURCES src/tts/voice_clone.c)
+list(APPEND HU_CORE_SOURCES src/tts/transcript_prep.c)
 
 # Cartesia full pipeline (requires libcurl for API calls)
 if(HU_ENABLE_CARTESIA)
@@ -2123,6 +2130,7 @@ set(HU_TEST_SOURCES
     tests/test_theory_of_mind.c
     tests/test_anticipatory.c
     tests/test_visual_content.c
+    tests/test_media_gen.c
     tests/test_opinions.c
     tests/test_life_chapters.c
     tests/test_social_graph.c
@@ -2185,6 +2193,7 @@ endif()
 list(APPEND HU_TEST_SOURCES tests/test_cartesia.c)
 list(APPEND HU_TEST_SOURCES tests/test_cartesia_stream.c)
 list(APPEND HU_TEST_SOURCES tests/test_voice_clone.c)
+list(APPEND HU_TEST_SOURCES tests/test_transcript_prep.c)
 if(HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_SOURCES tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)
 endif()
@@ -2218,6 +2227,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_a2a.c
     tests/test_eval.c
     tests/test_turing_score.c
+    tests/test_turing_adversarial.c
     tests/test_eval_judge.c
     tests/test_eval_benchmarks.c
     tests/test_token_budget.c

@@ -4,9 +4,10 @@
   "version": "0.5.0",
   "scripts": {
     "check": "astro check",
+    "predev": "node scripts/generate-assets.mjs",
     "dev": "astro dev",
     "start": "astro dev",
-    "prebuild": "cd ../design-tokens && npm run build || true && cd ../website && node scripts/generate-assets.mjs",
+    "prebuild": "(cd ../design-tokens && npm run build) || echo 'WARN: design-tokens build failed, using cached output' && cd ../website && node scripts/generate-assets.mjs",
     "build": "astro build",
     "generate-assets": "node scripts/generate-assets.mjs",
     "preview": "astro preview",

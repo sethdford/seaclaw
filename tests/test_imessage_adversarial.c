@@ -230,7 +230,7 @@ static void imessage_response_constraints_300_chars(void) {
     HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
     hu_channel_response_constraints_t c = {0};
     HU_ASSERT_EQ(ch.vtable->get_response_constraints(ch.ctx, &c), HU_OK);
-    HU_ASSERT_EQ(c.max_chars, 300u);
+    HU_ASSERT_EQ(c.max_chars, 1000u);
     hu_imessage_destroy(&ch);
 }
 

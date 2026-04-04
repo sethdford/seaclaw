@@ -142,10 +142,9 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
 
     const char *model = hu_json_get_string(args, "model");
     if (!model) {
-        hu_agent_t *cfg_agent = hu_agent_get_current_for_tools();
-        if (cfg_agent && cfg_agent->config && cfg_agent->config->media_gen.default_image_model &&
-            mi_model_ok(cfg_agent->config->media_gen.default_image_model))
-            model = cfg_agent->config->media_gen.default_image_model;
+        const char *env_model = getenv("HU_DEFAULT_IMAGE_MODEL");
+        if (env_model && mi_model_ok(env_model))
+            model = env_model;
         else
             model = "gemini";
     } else if (!mi_model_ok(model)) {

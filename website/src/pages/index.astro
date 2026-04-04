@@ -114,7 +114,7 @@ const tools = [
     <meta property="og:title" content="h-uman — not quite human." />
     <meta
       property="og:description"
-      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 31 channels. 87+ tools. Zero dependencies. Pure C."
+      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 38 channels. 83+ tools. Zero dependencies. Pure C."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://h-uman.ai/" />
@@ -128,7 +128,7 @@ const tools = [
     <meta name="twitter:title" content="h-uman — not quite human." />
     <meta
       name="twitter:description"
-      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 31 channels. 87+ tools. Zero dependencies. Pure C."
+      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 38 channels. 83+ tools. Zero dependencies. Pure C."
     />
     <meta name="twitter:image" content="https://h-uman.ai/og-image.png" />
 
@@ -1057,10 +1057,9 @@ const tools = [
       {/* ═══ DEVICE SPECTRUM + ARCHITECTURE ═══ */}
 
       <section
-        id="chapter-5"
+        id="use-cases"
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span id="use-cases" class="sr-only">Use cases</span>
         <div class="max-w-5xl mx-auto">
           <h2
             class="spectrum-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4 text-center"
@@ -1204,7 +1203,7 @@ const tools = [
                 class="text-xs font-mono"
                 style="color: var(--color-text-tertiary)"
               >
-                31 channels
+                38 channels
               </div>
             </div>
 
@@ -1586,8 +1585,7 @@ const tools = [
           </div>
         </div>
         <!-- Architecture -->
-        <span id="architecture" class="sr-only">Architecture</span>
-        <div class="max-w-5xl mx-auto text-center">
+        <div id="architecture" class="max-w-5xl mx-auto text-center">
           <h2
             class="arch-title hu-scroll-reveal font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             style="color: var(--color-text); letter-spacing: -0.03em;"
@@ -1705,7 +1703,7 @@ const tools = [
                   cx: 441,
                   cy: 441,
                   label: "Tools",
-                  tip: "87+ tools: shell, files, git, browser, web search, hardware",
+                  tip: "83+ tools: shell, files, git, browser, web search, hardware",
                 },
                 {
                   cx: 300,
@@ -2849,7 +2847,7 @@ const tools = [
                       });
                     });
                 } catch (e) {
-                  console.warn("[gsap] numbers animation failed:", e);
+                  void e;
                   document
                     .querySelectorAll(".number-item [data-count]")
                     .forEach((el) => {
