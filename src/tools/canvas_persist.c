@@ -124,32 +124,37 @@ hu_error_t hu_canvas_persist_load_all(void *db, hu_canvas_store_t *store) {
 #else /* !HU_ENABLE_SQLITE */
 
 hu_error_t hu_canvas_store_set_db(hu_canvas_store_t *store, void *db) {
-    (void)store;
-    (void)db;
+    if (!store || !db)
+        return HU_ERR_INVALID_ARGUMENT;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t hu_canvas_persist_save(void *db, const char *canvas_id, const char *format,
                                   const char *imports, const char *language, const char *title,
                                   const char *content) {
-    (void)db; (void)canvas_id; (void)format; (void)imports; (void)language;
-    (void)title; (void)content;
+    if (!db || !canvas_id)
+        return HU_ERR_INVALID_ARGUMENT;
+    (void)format; (void)imports; (void)language; (void)title; (void)content;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t hu_canvas_persist_save_version(void *db, const char *canvas_id, uint32_t version_seq,
                                           const char *content) {
-    (void)db; (void)canvas_id; (void)version_seq; (void)content;
+    if (!db || !canvas_id)
+        return HU_ERR_INVALID_ARGUMENT;
+    (void)version_seq; (void)content;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t hu_canvas_persist_delete(void *db, const char *canvas_id) {
-    (void)db; (void)canvas_id;
+    if (!db || !canvas_id)
+        return HU_ERR_INVALID_ARGUMENT;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t hu_canvas_persist_load_all(void *db, hu_canvas_store_t *store) {
-    (void)db; (void)store;
+    if (!db || !store)
+        return HU_ERR_INVALID_ARGUMENT;
     return HU_ERR_NOT_SUPPORTED;
 }
 
