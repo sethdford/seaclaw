@@ -2172,6 +2172,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         emotional_ctx_len = 0;
     }
 
+#if defined(HU_HAS_PERSONA)
     /* PERSONA-001: Affect mirror ceiling — cap emotional intensity in prompt.
      * Prevents the AI from matching extreme emotional intensity, especially
      * with acquaintances where mirroring high emotion can feel uncanny. */
@@ -2205,6 +2206,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
         }
     }
+#endif /* HU_HAS_PERSONA */
 
     /* Per-contact Turing hints: load weak-dimension guidance for this contact */
     char *contact_turing_hint = NULL;

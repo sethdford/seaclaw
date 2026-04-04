@@ -2008,6 +2008,7 @@ set(HU_TEST_SOURCES
     tests/test_channel_http.c
     tests/test_webhook_channel.c
     tests/test_cp_tasks.c
+    tests/test_cp_canvas.c
     tests/test_vector_retrieval_remote.c
     tests/test_background_registry.c
     tests/test_anticipatory_state.c

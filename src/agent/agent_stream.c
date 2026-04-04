@@ -861,7 +861,11 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * Skip when persona is active — GVR's generic verifier rejects
          * persona-style responses (casual, terse) and rewrites them into
          * bland AI-speak, which is worse. */
-        if (agent->sota.gvr_config.enabled && !agent->persona) {
+        if (agent->sota.gvr_config.enabled
+#if defined(HU_HAS_PERSONA)
+            && !agent->persona
+#endif
+        ) {
             hu_gvr_pipeline_result_t gvr_result;
             memset(&gvr_result, 0, sizeof(gvr_result));
             hu_error_t gvr_err = hu_gvr_pipeline(
@@ -880,6 +884,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             hu_gvr_pipeline_result_free(agent->alloc, &gvr_result);
         }
 
+#if defined(HU_HAS_PERSONA)
         /* 1b. Persona quality rethink: re-prompt for more substance.
          * Triggers when response is short (<80 chars) for a substantive question,
          * but ONLY if the first draft lacks engagement (no question mark).
@@ -947,6 +952,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 }
             }
         }
+#endif /* HU_HAS_PERSONA */
 
         /* 2. Constitutional AI: critique against principles, rewrite if needed */
         if (agent->constitutional_enabled) {

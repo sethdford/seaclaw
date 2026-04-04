@@ -431,6 +431,7 @@ void run_daemon_routing_tests(void);
 void run_daemon_proactive_tests(void);
 void run_daemon_trust_tests(void);
 void run_cp_tasks_tests(void);
+void run_cp_canvas_tests(void);
 void run_vector_retrieval_remote_tests(void);
 void run_anticipatory_state_tests(void);
 void run_canvas_tool_tests(void);
@@ -902,6 +903,7 @@ int main(int argc, char **argv) {
     run_daemon_proactive_tests();
     run_daemon_trust_tests();
     run_cp_tasks_tests();
+    run_cp_canvas_tests();
     run_vector_retrieval_remote_tests();
     run_background_registry_tests();
     run_consistency_tests();

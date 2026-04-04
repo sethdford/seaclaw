@@ -2009,8 +2009,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     static uint32_t daemon_turn_counter = 0;
     /* Phase 4: Conversation repair signal (persists across turn boundary) */
     static hu_repair_signal_t repair_signal = {0};
+#ifdef HU_ENABLE_SQLITE
     /* Phase 4: Style drift check counter */
     static unsigned drift_check_counter = 0;
+#endif
 
     hu_inbox_watcher_t inbox_watcher = {0};
     static int64_t last_inbox_poll_ms = 0;
