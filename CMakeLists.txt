@@ -2370,7 +2370,7 @@ if(HU_ENABLE_INTEGRATION_TESTS)
 endif()
 
 # --- WASM/WASI target (optional, use with wasm32-wasi toolchain) ---
-# Usage: cmake -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
+# Usage: cmake -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake -DHU_BUILD_WASM=ON ..
 if(HU_BUILD_WASM)
     include(cmake/wasm_sources.cmake)
     add_executable(human.wasm
