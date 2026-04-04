@@ -6,6 +6,9 @@
 #include "test_framework.h"
 #include <string.h>
 
+hu_error_t hu_agent_turn_data_init(hu_allocator_t *alloc);
+void hu_agent_turn_data_cleanup(hu_allocator_t *alloc);
+
 /* --- dual_process data init/cleanup --- */
 
 static void test_dual_process_data_init_succeeds(void) {

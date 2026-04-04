@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 static hu_allocator_t test_allocator = {0};
 
@@ -17,6 +18,7 @@ static void test_workflow_event_log_create_destroy(void) {
     hu_allocator_t alloc = hu_test_allocator_create();
 
     hu_workflow_event_log_t *log = NULL;
+    (void)unlink("/tmp/test_events.jsonl");
     hu_error_t err = hu_workflow_event_log_create(&alloc, "/tmp/test_events.jsonl", &log);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(log);
@@ -32,6 +34,7 @@ static void test_workflow_event_append_single(void) {
     hu_allocator_t alloc = hu_test_allocator_create();
 
     hu_workflow_event_log_t *log = NULL;
+    (void)unlink("/tmp/test_events_single.jsonl");
     hu_error_t err = hu_workflow_event_log_create(&alloc, "/tmp/test_events_single.jsonl", &log);
     HU_ASSERT_EQ(err, HU_OK);
 
@@ -58,6 +61,7 @@ static void test_workflow_event_sequence_numbers(void) {
     hu_allocator_t alloc = hu_test_allocator_create();
 
     hu_workflow_event_log_t *log = NULL;
+    (void)unlink("/tmp/test_events_seq.jsonl");
     hu_error_t err = hu_workflow_event_log_create(&alloc, "/tmp/test_events_seq.jsonl", &log);
     HU_ASSERT_EQ(err, HU_OK);
 
@@ -90,6 +94,7 @@ static void test_workflow_event_replay(void) {
     hu_allocator_t alloc = hu_test_allocator_create();
 
     hu_workflow_event_log_t *log = NULL;
+    (void)unlink("/tmp/test_events_replay.jsonl");
     hu_error_t err = hu_workflow_event_log_create(&alloc, "/tmp/test_events_replay.jsonl", &log);
     HU_ASSERT_EQ(err, HU_OK);
 
@@ -150,6 +155,7 @@ static void test_workflow_event_find_by_key_found(void) {
     hu_allocator_t alloc = hu_test_allocator_create();
 
     hu_workflow_event_log_t *log = NULL;
+    (void)unlink("/tmp/test_events_find.jsonl");
     hu_error_t err = hu_workflow_event_log_create(&alloc, "/tmp/test_events_find.jsonl", &log);
     HU_ASSERT_EQ(err, HU_OK);
 
@@ -195,6 +201,7 @@ static void test_workflow_event_find_by_key_not_found(void) {
     hu_allocator_t alloc = hu_test_allocator_create();
 
     hu_workflow_event_log_t *log = NULL;
+    (void)unlink("/tmp/test_events_notfound.jsonl");
     hu_error_t err = hu_workflow_event_log_create(&alloc, "/tmp/test_events_notfound.jsonl", &log);
     HU_ASSERT_EQ(err, HU_OK);
 
@@ -212,6 +219,7 @@ static void test_workflow_event_replay_empty(void) {
     hu_allocator_t alloc = hu_test_allocator_create();
 
     hu_workflow_event_log_t *log = NULL;
+    (void)unlink("/tmp/test_events_empty.jsonl");
     hu_error_t err = hu_workflow_event_log_create(&alloc, "/tmp/test_events_empty.jsonl", &log);
     HU_ASSERT_EQ(err, HU_OK);
 
@@ -277,6 +285,7 @@ static void test_workflow_event_special_chars(void) {
     hu_allocator_t alloc = hu_test_allocator_create();
 
     hu_workflow_event_log_t *log = NULL;
+    (void)unlink("/tmp/test_events_special.jsonl");
     hu_error_t err =
         hu_workflow_event_log_create(&alloc, "/tmp/test_events_special.jsonl", &log);
     HU_ASSERT_EQ(err, HU_OK);
@@ -357,6 +366,7 @@ static void test_workflow_event_multiple_workflows(void) {
     hu_allocator_t alloc = hu_test_allocator_create();
 
     hu_workflow_event_log_t *log = NULL;
+    (void)unlink("/tmp/test_events_multi.jsonl");
     hu_error_t err = hu_workflow_event_log_create(&alloc, "/tmp/test_events_multi.jsonl", &log);
     HU_ASSERT_EQ(err, HU_OK);
 

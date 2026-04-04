@@ -702,6 +702,8 @@ set(HU_CORE_SOURCES
     src/channels/thread_binding.c
     src/channels/format.c
     src/channels/rate_limit.c
+    src/channels/channel_http.c
+    src/channels/webhook.c
     src/security/policy_engine.c
     src/security/replay.c
     src/plugins/registry.c
