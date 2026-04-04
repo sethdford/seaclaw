@@ -1,8 +1,8 @@
 #include "human/context/temporal_events.h"
+#include <string.h>
 
 #ifdef HU_ENABLE_SQLITE
 #include <stdio.h>
-#include <string.h>
 #include <time.h>
 
 hu_error_t hu_temporal_events_init_table(sqlite3 *db) {
@@ -58,15 +58,18 @@ hu_error_t hu_temporal_events_store_batch(sqlite3 *db, const char *contact_id,
                                           const hu_event_extract_result_t *result,
                                           int64_t now_ts) {
     if (!db || !contact_id || !result) return HU_ERR_INVALID_ARGUMENT;
+    hu_error_t first_err = HU_OK;
     for (size_t i = 0; i < result->event_count; i++) {
         const hu_extracted_event_t *ev = &result->events[i];
         if (ev->confidence < 0.3) continue;
         int64_t resolved = 0;
         if (ev->temporal_ref && ev->temporal_ref_len > 0)
             resolved = hu_temporal_resolve_reference(ev->temporal_ref, ev->temporal_ref_len, now_ts);
-        hu_temporal_events_store(db, contact_id, contact_id_len, ev, resolved, now_ts);
+        hu_error_t err = hu_temporal_events_store(db, contact_id, contact_id_len, ev, resolved, now_ts);
+        if (err != HU_OK && first_err == HU_OK)
+            first_err = err;
     }
-    return HU_OK;
+    return first_err;
 }
 
 hu_error_t hu_temporal_events_get_upcoming(sqlite3 *db, hu_allocator_t *alloc, int64_t now_ts,

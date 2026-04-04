@@ -41,8 +41,9 @@ hu_error_t hu_temporal_events_get_upcoming(sqlite3 *db, hu_allocator_t *alloc,
 
 hu_error_t hu_temporal_events_mark_followed_up(sqlite3 *db, int64_t event_id);
 
+#endif /* HU_ENABLE_SQLITE */
+
 int64_t hu_temporal_resolve_reference(const char *temporal_ref, size_t ref_len,
                                       int64_t now_ts);
 
-#endif
-#endif
+#endif /* HU_CONTEXT_TEMPORAL_EVENTS_H */

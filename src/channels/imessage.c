@@ -1534,11 +1534,20 @@ static hu_error_t imessage_mark_read(void *ctx, const char *contact_id,
     (void)contact_id;
     (void)contact_id_len;
     return HU_OK;
+#elif !defined(__APPLE__) || !defined(__MACH__)
+    (void)ctx;
+    (void)contact_id;
+    (void)contact_id_len;
+    return HU_ERR_NOT_SUPPORTED;
 #else
+    if (!ctx)
+        return HU_ERR_INVALID_ARGUMENT;
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
-    if (!contact_id || contact_id_len == 0)
+    if (!c->alloc || !contact_id || contact_id_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
 
+    if (contact_id_len > 4096)
+        return HU_ERR_INVALID_ARGUMENT;
     size_t esc_cap = contact_id_len * 2 + 1;
     char *esc = (char *)c->alloc->alloc(c->alloc->ctx, esc_cap);
     if (!esc)
@@ -1551,12 +1560,17 @@ static hu_error_t imessage_mark_read(void *ctx, const char *contact_id,
         c->alloc->free(c->alloc->ctx, esc, esc_cap);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    snprintf(script, script_cap,
+    int n = snprintf(script, script_cap,
              "tell application \"Messages\"\n"
              "  set targetBuddy to buddy \"%s\" of service \"iMessage\"\n"
              "  set targetChat to a reference to chat id (id of targetBuddy)\n"
              "  read targetChat\n"
              "end tell", esc);
+    if (n < 0 || (size_t)n >= script_cap) {
+        c->alloc->free(c->alloc->ctx, script, script_cap);
+        c->alloc->free(c->alloc->ctx, esc, esc_cap);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
 
     const char *argv[] = {"osascript", "-e", script, NULL};
     hu_run_result_t rr = {0};

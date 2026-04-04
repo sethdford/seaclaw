@@ -289,30 +289,39 @@ static int timing_cmp_double(const void *a, const void *b) {
 }
 
 static void timing_fill_bucket(hu_timing_bucket_t *b, double *samples, size_t n) {
+    memset(b, 0, sizeof(*b));
     if (n == 0) return;
     qsort(samples, n, sizeof(double), timing_cmp_double);
     b->sample_count = (uint32_t)n;
     b->mean = 0;
     for (size_t i = 0; i < n; i++) b->mean += samples[i];
     b->mean /= (double)n;
-    b->p10 = samples[(size_t)(n * 0.10)];
-    b->p25 = samples[(size_t)(n * 0.25)];
-    b->p50 = samples[n / 2];
-    b->p75 = samples[(size_t)(n * 0.75)];
-    b->p90 = samples[(size_t)(n * 0.90)];
+    size_t p10i = n <= 1 ? 0 : (size_t)((n - 1) * 0.10 + 0.5);
+    size_t p25i = n <= 1 ? 0 : (size_t)((n - 1) * 0.25 + 0.5);
+    size_t p50i = n <= 1 ? 0 : (n - 1) / 2;
+    size_t p75i = n <= 1 ? 0 : (size_t)((n - 1) * 0.75 + 0.5);
+    size_t p90i = n <= 1 ? 0 : (size_t)((n - 1) * 0.90 + 0.5);
+    b->p10 = samples[p10i];
+    b->p25 = samples[p25i];
+    b->p50 = samples[p50i];
+    b->p75 = samples[p75i];
+    b->p90 = samples[p90i];
 }
 
 hu_error_t hu_timing_model_learn_from_db(hu_timing_model_t *model, sqlite3 *db,
                                          const char *contact_id, size_t contact_id_len) {
     if (!model || !db || !contact_id) return HU_ERR_INVALID_ARGUMENT;
     const char *sql =
-        "SELECT m1.date/1000000000 + 978307200 AS sent_ts, "
-        "       m1.is_from_me, LENGTH(m1.text) AS msg_len "
-        "FROM message m1 "
-        "JOIN chat_message_join cmj ON cmj.message_id = m1.ROWID "
-        "JOIN chat_handle_join chj ON chj.chat_id = cmj.chat_id "
-        "JOIN handle h ON h.ROWID = chj.handle_id "
-        "WHERE h.id = ?1 ORDER BY m1.date ASC LIMIT 2000";
+        "SELECT sent_ts, is_from_me, msg_len FROM ("
+        "  SELECT m1.date/1000000000 + 978307200 AS sent_ts, "
+        "         m1.is_from_me, LENGTH(m1.text) AS msg_len "
+        "  FROM message m1 "
+        "  JOIN chat_message_join cmj ON cmj.message_id = m1.ROWID "
+        "  JOIN chat_handle_join chj ON chj.chat_id = cmj.chat_id "
+        "  JOIN handle h ON h.ROWID = chj.handle_id "
+        "  WHERE h.id = ?1 AND m1.text IS NOT NULL "
+        "  ORDER BY m1.date DESC LIMIT 2000"
+        ") ORDER BY sent_ts ASC";
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) return HU_ERR_IO;
     sqlite3_bind_text(stmt, 1, contact_id, (int)contact_id_len, SQLITE_STATIC);

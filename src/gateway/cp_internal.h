@@ -280,4 +280,21 @@ hu_error_t cp_security_cot_summary(hu_allocator_t *alloc, hu_app_context_t *app,
                                    const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                    char **out, size_t *out_len);
 
+/* Canvas handlers */
+hu_error_t cp_canvas_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                          const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                          char **out, size_t *out_len);
+hu_error_t cp_canvas_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                         const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                         char **out, size_t *out_len);
+hu_error_t cp_canvas_edit(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                          const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                          char **out, size_t *out_len);
+hu_error_t cp_canvas_undo(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                          const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                          char **out, size_t *out_len);
+hu_error_t cp_canvas_redo(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                          const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                          char **out, size_t *out_len);
+
 #endif /* HU_CP_INTERNAL_H */

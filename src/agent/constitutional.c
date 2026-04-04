@@ -83,7 +83,7 @@ static CONST_UNUSED hu_critique_verdict_t parse_verdict(const char *resp, size_t
         (p[2] == 'N' || p[2] == 'n') && (p[3] == 'O' || p[3] == 'o') &&
         (p[4] == 'R' || p[4] == 'r'))
         return HU_CRITIQUE_MINOR;
-    if (len >= 6 && (p[0] == 'R' || p[0] == 'r') && (p[1] == 'E' || p[1] == 'e') &&
+    if (len >= 7 && (p[0] == 'R' || p[0] == 'r') && (p[1] == 'E' || p[1] == 'e') &&
         (p[2] == 'W' || p[2] == 'w') && (p[3] == 'R' || p[3] == 'r') &&
         (p[4] == 'I' || p[4] == 'i') && (p[5] == 'T' || p[5] == 't') &&
         (p[6] == 'E' || p[6] == 'e'))
@@ -105,7 +105,7 @@ static CONST_UNUSED int parse_principle_index(const char *resp, size_t resp_len)
             (p[6] == 'p' || p[6] == 'P') && (p[7] == 'l' || p[7] == 'L') &&
             (p[8] == 'e' || p[8] == 'E')) {
             p += 9;
-            while (p < end && (isspace((unsigned char)*p) || *p == '#'))
+            while (p < end && (isspace((unsigned char)*p) || *p == '#' || *p == ':'))
                 p++;
             if (p < end && *p >= '0' && *p <= '9') {
                 int idx = (int)(*p - '0');
@@ -246,7 +246,9 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
 
         size_t rewrite_cap = response_len + 256;
         char *rewrite_prompt = (char *)alloc->alloc(alloc->ctx, rewrite_cap);
-        if (rewrite_prompt) {
+        if (!rewrite_prompt) {
+            result->verdict = HU_CRITIQUE_PASS;
+        } else {
             int n = snprintf(rewrite_prompt, rewrite_cap,
                              "Revise this response to satisfy the principle: %s\n\n"
                              "Original: %.*s\n\nRewrite:",

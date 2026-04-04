@@ -932,13 +932,10 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
             }
 #endif
 
-            if (!should_checkin)
-                break;
-
-#ifndef HU_IS_TEST
-            /* Event-triggered follow-ups from recent messages */
             char *event_ctx = NULL;
             size_t event_ctx_len = 0;
+#ifndef HU_IS_TEST
+            /* Event extraction + temporal storage runs unconditionally */
             if (combined_len > 0) {
                 hu_event_extract_result_t extract_result;
                 memset(&extract_result, 0, sizeof(extract_result));
@@ -972,9 +969,10 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
 #endif
                 hu_event_extract_result_deinit(&extract_result, alloc);
             }
+#endif /* !HU_IS_TEST */
 
 #ifdef HU_ENABLE_SQLITE
-            /* Temporal event follow-up — check for upcoming events within 24h */
+            /* Temporal event follow-up — upcoming events can trigger check-in */
             if (!should_checkin && agent && agent->memory && cp->contact_id) {
                 sqlite3 *tev_db2 = hu_sqlite_memory_get_db(agent->memory);
                 if (tev_db2) {
@@ -995,6 +993,9 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 }
             }
 #endif
+
+            if (!should_checkin)
+                break;
 
 #ifdef HU_ENABLE_SQLITE
             /* F20: Commitment follow-up — add due commitments for this contact */
@@ -1585,7 +1586,6 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 alloc->free(alloc->ctx, event_ctx, event_ctx_len + 1);
             if (silence_ctx)
                 alloc->free(alloc->ctx, silence_ctx, silence_ctx_len + 1);
-#endif
             break;
         }
     }
@@ -2447,14 +2447,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     memcpy(style_patch.value, best_frag, copy);
                                     style_patch.value[copy] = '\0';
                                 }
-                                (void)style_patch; /* self_improve not wired in this branch */
+                                {
+                                    hu_self_improve_t rlaif_si = {0};
+                                    if (hu_self_improve_create(alloc, rlaif_db, &rlaif_si) == HU_OK) {
+                                        hu_self_improve_init_tables(&rlaif_si);
+                                        hu_self_improve_apply_structured_patch(&rlaif_si,
+                                                                               &style_patch);
+                                        hu_self_improve_deinit(&rlaif_si);
+                                    }
+                                }
                                 hu_log_info("human", agent ? agent->observer : NULL,
                                             "rlaif nightly: applied style patch from %zu DPO pairs (loss=%.4f)",
                                             rlaif_result.pairs_evaluated, rlaif_result.loss);
                                 alloc->free(alloc->ctx, best_frag, best_frag_len + 1);
                             }
+                            rlaif_nightly_done_today = true;
                         }
-                        rlaif_nightly_done_today = true;
                     }
                     if (rlaif_lt && rlaif_lt->tm_hour != 3)
                         rlaif_nightly_done_today = false;
@@ -2674,7 +2682,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         const char *dname =
                                             hu_turing_dimension_name((hu_turing_dimension_t)d);
                                         hu_structured_patch_t patch = {
-                                            .type = HU_PATCH_TEXT_HINT,
+                                            .type = HU_PATCH_STYLE_RULE,
                                             .parsed = true,
                                         };
                                         snprintf(patch.key, sizeof(patch.key), "turing_%s", dname);

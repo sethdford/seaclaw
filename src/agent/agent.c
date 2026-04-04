@@ -205,7 +205,9 @@ hu_error_t hu_agent_from_config(
     out->alloc = alloc;
     out->provider = provider;
     out->timing_model = (hu_timing_model_t *)alloc->alloc(alloc->ctx, sizeof(hu_timing_model_t));
-    if (out->timing_model) memset(out->timing_model, 0, sizeof(*out->timing_model));
+    if (!out->timing_model)
+        return HU_ERR_OUT_OF_MEMORY;
+    memset(out->timing_model, 0, sizeof(*out->timing_model));
     out->memory = memory;
     out->retrieval_engine = NULL;
     out->session_store = session_store;
