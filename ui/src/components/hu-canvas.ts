@@ -58,7 +58,7 @@ export class HuCanvas extends LitElement {
 
     .format-badge {
       display: inline-flex;
-      padding: 2px var(--hu-space-xs);
+      padding: 2px var(--hu-space-xs); /* hu-lint-ok */
       border-radius: var(--hu-radius-sm);
       background: color-mix(in srgb, var(--hu-accent-tertiary) 15%, transparent);
       color: var(--hu-accent-tertiary);

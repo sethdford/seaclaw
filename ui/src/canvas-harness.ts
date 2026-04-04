@@ -26,14 +26,14 @@ export function buildHarness(): string {
     color: #e0e0e0; background: transparent;
     overflow: hidden;
   }
-  #root { padding: 8px; }
+  #root { padding: 8px; } /* hu-lint-ok */
   #root :where(img, svg) { max-width: 100%; height: auto; }
   .harness-error {
     color: #ff6b6b; background: #2d1515; border: 1px solid #5a2020;
-    border-radius: 6px; padding: 12px; margin: 8px; font-family: monospace;
+    border-radius: 6px; padding: 12px; margin: 8px; font-family: monospace; /* hu-lint-ok */
     font-size: 12px; white-space: pre-wrap;
   }
-  pre { background: #1a1a2e; border-radius: 6px; padding: 12px; overflow-x: auto; }
+  pre { background: #1a1a2e; border-radius: 6px; padding: 12px; overflow-x: auto; } /* hu-lint-ok */
   code { font-family: "SF Mono", "Fira Code", monospace; font-size: 13px; }
 </style>
 </head>

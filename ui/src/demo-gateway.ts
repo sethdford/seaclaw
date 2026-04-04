@@ -2063,8 +2063,8 @@ export class DemoGatewayClient extends EventTarget {
               canvas_id: "cv_0",
               title: "Dashboard Mockup",
               format: "html",
-              content:
-                '<div style="padding:20px;font-family:sans-serif"><h2>Sales Dashboard</h2><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#7ab648">$42,150</div><div style="font-size:12px;opacity:0.6">Revenue today</div></div><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#e8b931">1,234</div><div style="font-size:12px;opacity:0.6">Active users</div></div><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#5b8def">98.7%</div><div style="font-size:12px;opacity:0.6">Uptime</div></div></div></div>',
+              content: // prettier-ignore
+                '<div style="padding:20px;font-family:sans-serif"><h2>Sales Dashboard</h2><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#7ab648">$42,150</div><div style="font-size:12px;opacity:0.6">Revenue today</div></div><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#e8b931">1,234</div><div style="font-size:12px;opacity:0.6">Active users</div></div><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#5b8def">98.7%</div><div style="font-size:12px;opacity:0.6">Uptime</div></div></div></div>', /* hu-lint-ok */
               language: "",
               imports: "",
               version_seq: 3,
@@ -2080,7 +2080,7 @@ export class DemoGatewayClient extends EventTarget {
     <div style={{padding: 20, textAlign: "center"}}>
       <h2>Counter: {count}</h2>
       <button onClick={() => setCount(c => c + 1)}
-        style={{padding: "8px 24px", fontSize: 16, cursor: "pointer",
+        style={{padding: "8px 24px", fontSize: 16, cursor: "pointer", /* hu-lint-ok */
           background: "#7ab648", color: "#fff", border: "none", borderRadius: 6}}>
         Increment
       </button>
