@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { renderMarkdown } from "../lib/markdown.js";
+import { icons } from "../icons.js";
 import "./hu-code-block.js";
 import "./hu-toast.js";
 import { ScToast } from "./hu-toast.js";
@@ -21,6 +22,8 @@ export class ScChatBubble extends LitElement {
   @property({ type: Number }) ariaMessageTotal = 0;
 
   @state() private _visibleContent = "";
+  @state() private _outlineOpen = false;
+  @state() private _headings: Array<{ level: number; text: string; id: string }> = [];
   private _wordQueue: string[] = [];
   private _releaseTimer = 0;
   private _lastContentLength = 0;
@@ -400,6 +403,58 @@ export class ScChatBubble extends LitElement {
       outline-offset: var(--hu-focus-ring-offset);
     }
 
+    .outline-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--hu-space-2xs);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      margin-bottom: var(--hu-space-xs);
+      background: color-mix(in srgb, var(--hu-accent) 6%, transparent);
+      border: 1px solid color-mix(in srgb, var(--hu-accent) 15%, transparent);
+      border-radius: var(--hu-radius-full);
+      font-size: var(--hu-text-2xs, 0.625rem);
+      font-family: var(--hu-font);
+      color: var(--hu-text-secondary);
+      cursor: pointer;
+      transition: color var(--hu-duration-fast), border-color var(--hu-duration-fast);
+    }
+    .outline-toggle:hover {
+      color: var(--hu-accent);
+      border-color: var(--hu-accent);
+    }
+    .outline-toggle svg {
+      width: var(--hu-icon-xs);
+      height: var(--hu-icon-xs);
+    }
+    .outline-list {
+      list-style: none;
+      padding: 0 0 var(--hu-space-xs) 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--hu-space-2xs);
+    }
+    .outline-item {
+      display: block;
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      font-size: var(--hu-text-xs);
+      font-family: var(--hu-font);
+      color: var(--hu-text-secondary);
+      text-decoration: none;
+      border-radius: var(--hu-radius-sm);
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      text-align: left;
+      transition: color var(--hu-duration-fast), background var(--hu-duration-fast);
+    }
+    .outline-item:hover {
+      color: var(--hu-accent);
+      background: color-mix(in srgb, var(--hu-accent) 6%, transparent);
+    }
+    .outline-item[data-level="2"] { padding-left: var(--hu-space-md); }
+    .outline-item[data-level="3"] { padding-left: var(--hu-space-lg); }
+
     /* Threaded reply quote */
     .reply-quote {
       display: block;
@@ -450,9 +505,43 @@ export class ScChatBubble extends LitElement {
     this._clearReleaseTimer();
   }
 
+  private static readonly _OUTLINE_CHAR_THRESHOLD = 2000;
+
   override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("content") || changed.has("streaming")) {
       this._updateWordBuffer();
+    }
+    if (changed.has("content") && !this.streaming && this.role === "assistant") {
+      this._extractHeadings();
+    }
+  }
+
+  private _extractHeadings(): void {
+    if (this.content.length < ScChatBubble._OUTLINE_CHAR_THRESHOLD) {
+      this._headings = [];
+      return;
+    }
+    const headings: Array<{ level: number; text: string; id: string }> = [];
+    const re = /^(#{1,3})\s+(.+)$/gm;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(this.content)) !== null) {
+      const level = m[1].length;
+      const text = m[2].trim();
+      const id = `h-${headings.length}`;
+      headings.push({ level, text, id });
+    }
+    this._headings = headings;
+  }
+
+  private _scrollToHeading(text: string): void {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const headingEls = root.querySelectorAll(".md-heading");
+    for (const el of headingEls) {
+      if (el.textContent?.trim() === text) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        return;
+      }
     }
   }
 
@@ -584,6 +673,38 @@ export class ScChatBubble extends LitElement {
         tabindex="0"
       >
         <div class="content">
+          ${this._headings.length > 0
+            ? html`
+                <button
+                  class="outline-toggle"
+                  type="button"
+                  @click=${() => (this._outlineOpen = !this._outlineOpen)}
+                  aria-label="Toggle section outline"
+                >
+                  ${icons["list-bullets"] ?? icons.list ?? nothing}
+                  ${this._outlineOpen ? "Hide" : "Outline"} (${this._headings.length})
+                </button>
+                ${this._outlineOpen
+                  ? html`
+                      <ul class="outline-list" role="navigation" aria-label="Section outline">
+                        ${this._headings.map(
+                          (h) => html`
+                            <li>
+                              <button
+                                class="outline-item"
+                                data-level=${h.level}
+                                @click=${() => this._scrollToHeading(h.text)}
+                              >
+                                ${h.text}
+                              </button>
+                            </li>
+                          `,
+                        )}
+                      </ul>
+                    `
+                  : nothing}
+              `
+            : nothing}
           ${this.replyTo
             ? html`
                 <div

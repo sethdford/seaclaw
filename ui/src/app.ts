@@ -405,8 +405,10 @@ export class ScApp extends LitElement {
         align-items: center;
         justify-content: space-around;
         background: color-mix(in srgb, var(--hu-bg-surface) 82%, transparent);
-        backdrop-filter: blur(var(--hu-glass-blur, 20px)) saturate(180%);
-        -webkit-backdrop-filter: blur(var(--hu-glass-blur, 20px)) saturate(180%);
+        backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
+          saturate(var(--hu-glass-subtle-saturate, 120%));
+        -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
+          saturate(var(--hu-glass-subtle-saturate, 120%));
         box-shadow: var(--hu-shadow-sm);
         padding: var(--hu-space-xs) 0;
         padding-bottom: env(safe-area-inset-bottom, 0);

@@ -119,6 +119,7 @@ export class ScSidebar extends LitElement {
       transition:
         width var(--hu-duration-normal) var(--hu-spring-out, cubic-bezier(0.34, 1.56, 0.64, 1)),
         min-width var(--hu-duration-normal) var(--hu-spring-out, cubic-bezier(0.34, 1.56, 0.64, 1));
+      will-change: width;
       overflow: hidden;
     }
 

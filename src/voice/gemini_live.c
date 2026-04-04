@@ -48,7 +48,7 @@ static size_t gl_url_encode(const char *src, char *dst, size_t dst_cap) {
  * Google AI: ...?key=API_KEY
  * Vertex AI: wss://{region}-aiplatform.googleapis.com/ws/...?access_token=TOKEN
  */
-#if !HU_IS_TEST
+#if !HU_IS_TEST && defined(HU_HTTP_CURL)
 static int build_ws_url(const hu_gemini_live_config_t *cfg, char *buf, size_t cap) {
     if (cfg->region && cfg->region[0] && cfg->project_id && cfg->project_id[0]) {
         const char *token = cfg->access_token ? cfg->access_token : "";

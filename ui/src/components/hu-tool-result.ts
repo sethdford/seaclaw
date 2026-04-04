@@ -258,7 +258,7 @@ export class ScToolResult extends LitElement {
     }
 
     .icon.success {
-      color: var(--hu-accent);
+      color: var(--hu-success);
     }
 
     .icon.error {
