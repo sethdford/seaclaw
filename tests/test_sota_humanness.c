@@ -8,9 +8,10 @@
 #include <string.h>
 #include <time.h>
 
+#include "human/agent/timing.h"
+
 #ifdef HU_ENABLE_SQLITE
 #include "human/context/temporal_events.h"
-#include "human/agent/timing.h"
 #include <sqlite3.h>
 #endif
 
@@ -60,22 +61,20 @@ static void best_of_n_parse_valid(void) {
     hu_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     const char *json = "{\"agent\":{\"best_of_n\":3}}";
-    hu_allocator_t alloc = hu_system_allocator();
-    hu_error_t err = hu_config_parse(&alloc, json, strlen(json), &cfg);
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)cfg.agent.best_of_n, 3);
-    hu_config_free(&alloc, &cfg);
+    hu_config_deinit(&cfg);
 }
 
 static void best_of_n_parse_clamped_at_5(void) {
     hu_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     const char *json = "{\"agent\":{\"best_of_n\":8}}";
-    hu_allocator_t alloc = hu_system_allocator();
-    hu_error_t err = hu_config_parse(&alloc, json, strlen(json), &cfg);
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)cfg.agent.best_of_n, 0);
-    hu_config_free(&alloc, &cfg);
+    hu_config_deinit(&cfg);
 }
 
 /* ─── parse_verdict word boundary ─── */
@@ -380,6 +379,14 @@ void run_sota_humanness_tests(void) {
     HU_RUN_TEST(config_persona_identity_lock_is_last);
     HU_RUN_TEST(config_persona_all_descriptions_non_empty);
     HU_RUN_TEST(best_of_n_default_is_zero);
+    HU_RUN_TEST(best_of_n_parse_valid);
+    HU_RUN_TEST(best_of_n_parse_clamped_at_5);
+    HU_RUN_TEST(parse_verdict_passing_not_pass);
+    HU_RUN_TEST(parse_verdict_pass_with_space);
+    HU_RUN_TEST(parse_verdict_minor_only);
+    HU_RUN_TEST(parse_verdict_minority_not_minor);
+    HU_RUN_TEST(timing_model_sample_clamps_hour);
+    HU_RUN_TEST(timing_model_sample_clamps_dow);
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(temporal_resolve_tomorrow);
     HU_RUN_TEST(temporal_resolve_next_week);

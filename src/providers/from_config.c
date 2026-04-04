@@ -105,7 +105,7 @@ hu_error_t hu_provider_create_from_config(hu_allocator_t *alloc, const hu_config
                 ? cfg->reliability.primary_provider
                 : "openai";
         size_t primary_len = strlen(primary_name);
-        const char *api_key = hu_config_get_provider_key(cfg, primary_name);
+        char *api_key = resolve_key(alloc, cfg, primary_name);
         size_t api_key_len = api_key ? strlen(api_key) : 0;
         const char *base_url = hu_config_get_provider_base_url(cfg, primary_name);
         size_t base_url_len = base_url ? strlen(base_url) : 0;
@@ -125,7 +125,7 @@ hu_error_t hu_provider_create_from_config(hu_allocator_t *alloc, const hu_config
             cfg->reliability.fallback_providers[0][0]) {
             const char *fb_name = cfg->reliability.fallback_providers[0];
             size_t fb_len = strlen(fb_name);
-            const char *fb_key = hu_config_get_provider_key(cfg, fb_name);
+            char *fb_key = resolve_key(alloc, cfg, fb_name);
             size_t fb_key_len = fb_key ? strlen(fb_key) : 0;
             const char *fb_url = hu_config_get_provider_base_url(cfg, fb_name);
             size_t fb_url_len = fb_url ? strlen(fb_url) : 0;
