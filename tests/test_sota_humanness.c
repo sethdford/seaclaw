@@ -318,6 +318,12 @@ void run_sota_humanness_tests(void) {
     HU_RUN_TEST(temporal_resolve_null_returns_zero);
     HU_RUN_TEST(temporal_resolve_unknown_defaults_7_days);
     HU_RUN_TEST(temporal_resolve_case_insensitive);
-    /* temporal_events + timing tests disabled — struct/API mismatches */
+    HU_RUN_TEST(temporal_events_init_table_creates_table);
+    HU_RUN_TEST(temporal_events_store_and_retrieve);
+    HU_RUN_TEST(temporal_events_mark_followed_up_hides_event);
+    HU_RUN_TEST(temporal_events_low_confidence_filtered);
+    HU_RUN_TEST(timing_model_learn_from_empty_db);
+    HU_RUN_TEST(timing_model_learn_computes_percentiles);
+    HU_RUN_TEST(timing_model_learn_null_args);
 #endif
 }

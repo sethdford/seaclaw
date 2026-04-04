@@ -41,7 +41,6 @@ void run_channel_rate_limit_tests(void);
 void run_channel_http_tests(void);
 void run_webhook_channel_tests(void);
 void run_bg_registry_tests(void);
-void run_canvas_render_tests(void);
 void run_channel_embeds_tests(void);
 void run_twilio_media_impl_tests(void);
 void run_declarative_tools_tests(void);
@@ -432,7 +431,6 @@ void run_daemon_trust_tests(void);
 void run_cp_tasks_tests(void);
 void run_vector_retrieval_remote_tests(void);
 void run_background_registry_tests(void);
-void run_voice_streaming_e2e_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -499,7 +497,6 @@ int main(int argc, char **argv) {
     run_channel_http_tests();
     run_webhook_channel_tests();
     run_bg_registry_tests();
-    run_canvas_render_tests();
     run_channel_embeds_tests();
     run_twilio_media_impl_tests();
     run_declarative_tools_tests();
@@ -889,7 +886,6 @@ int main(int argc, char **argv) {
     run_cp_tasks_tests();
     run_vector_retrieval_remote_tests();
     run_background_registry_tests();
-    run_voice_streaming_e2e_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

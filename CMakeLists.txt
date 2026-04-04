@@ -360,6 +360,7 @@ set(HU_CORE_SOURCES
     src/agent_routing.c
     src/health.c
     src/security/security.c
+    src/security/sycophancy_guard.c
     src/security/mcp_audit.c
     src/security/policy.c
     src/security/causal_armor.c
@@ -411,9 +412,12 @@ set(HU_CORE_SOURCES
     src/agent/acp_bridge.c
     src/agent/kv_cache.c
     src/tools/cache_ttl.c
+    src/tools/vision_ocr.c
     src/voice/emotion_voice_map.c
     src/voice/audio_emotion.c
     src/persona/persona_fuse.c
+    src/persona/humor.c
+    src/persona/markdown_loader.c
     src/gateway/event_bridge.c
     src/gateway/tenant.c
     src/runtime/native.c
@@ -585,6 +589,8 @@ set(HU_CORE_SOURCES
     src/memory/graph_index.c
     src/memory/policy.c
     src/memory/deep_extract.c
+    src/memory/fact_extract.c
+    src/memory/hallucination_guard.c
     src/memory/graph.c
     src/memory/multimodal_index.c
     src/memory/lifecycle/cache.c
@@ -619,6 +625,7 @@ set(HU_CORE_SOURCES
     src/memory/inbox.c
     src/memory/vector/circuit_breaker.c
     src/cognition/db.c
+    src/cognition/trust.c
     src/cognition/emotional.c
     src/cognition/evolving.c
     src/cognition/metacognition.c
@@ -816,6 +823,7 @@ list(APPEND HU_CORE_SOURCES src/security/wasi_sandbox.c)
 list(APPEND HU_CORE_SOURCES
     src/a2a.c
     src/eval.c
+    src/eval/consistency.c
     src/eval/turing_score.c
     src/eval/turing_adversarial.c
     src/eval_judge.c
