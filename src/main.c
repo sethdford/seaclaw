@@ -2630,8 +2630,61 @@ static void handle_sighup(int sig) {
     hu_config_set_reload_requested();
 }
 
+/* Load KEY=VALUE pairs from a .env file into the process environment.
+ * Skips comments (#), empty lines, and lines without '='.
+ * Does NOT override existing env vars. */
+static void load_dotenv(const char *path) {
+    if (!path)
+        return;
+    FILE *f = fopen(path, "r");
+    if (!f)
+        return;
+    char line[4096];
+    while (fgets(line, sizeof(line), f)) {
+        char *p = line;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p == '#' || *p == '\n' || *p == '\0')
+            continue;
+        char *eq = strchr(p, '=');
+        if (!eq)
+            continue;
+        *eq = '\0';
+        char *key = p;
+        char *val = eq + 1;
+        /* Trim trailing whitespace from key */
+        char *ke = eq - 1;
+        while (ke > key && (*ke == ' ' || *ke == '\t'))
+            *ke-- = '\0';
+        /* Trim newline/quotes from value */
+        size_t vlen = strlen(val);
+        while (vlen > 0 && (val[vlen - 1] == '\n' || val[vlen - 1] == '\r'))
+            val[--vlen] = '\0';
+        /* Strip surrounding quotes */
+        if (vlen >= 2 && ((val[0] == '"' && val[vlen - 1] == '"') ||
+                          (val[0] == '\'' && val[vlen - 1] == '\''))) {
+            val[vlen - 1] = '\0';
+            val++;
+        }
+        if (key[0] && !getenv(key))
+            setenv(key, val, 0);
+    }
+    fclose(f);
+}
+
 int main(int argc, char *argv[]) {
     hu_allocator_t alloc = hu_system_allocator();
+
+    /* Load .env files: project-local, ~/.human/.env */
+    load_dotenv(".env");
+    {
+        const char *home = getenv("HOME");
+        if (home) {
+            char envpath[512];
+            snprintf(envpath, sizeof(envpath), "%s/.human/.env", home);
+            load_dotenv(envpath);
+        }
+    }
 
 #if defined(__unix__) || defined(__APPLE__)
     signal(SIGHUP, handle_sighup);
