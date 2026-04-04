@@ -1960,7 +1960,6 @@ set(HU_TEST_SOURCES
     tests/test_sycophancy_guard.c
     tests/test_task_store.c
     tests/test_trust_calibration.c
-    tests/test_twilio_media.c
     tests/test_vision_ocr.c
     tests/test_channel_embeds.c
     tests/test_twilio_media_impl.c
