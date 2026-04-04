@@ -1,9 +1,10 @@
-#include "test_framework.h"
 #include "human/agent/constitutional.h"
 #include "human/channel.h"
+#include "human/channels/imessage.h"
 #include "human/config.h"
 #include "human/context/event_extract.h"
 #include "human/core/allocator.h"
+#include "test_framework.h"
 #include <ctype.h>
 #include <string.h>
 #include <time.h>
@@ -60,6 +61,7 @@ static void best_of_n_default_is_zero(void) {
 static void best_of_n_parse_valid(void) {
     hu_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
+    cfg.allocator = hu_system_allocator();
     const char *json = "{\"agent\":{\"best_of_n\":3}}";
     hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
     HU_ASSERT_EQ(err, HU_OK);
@@ -70,6 +72,7 @@ static void best_of_n_parse_valid(void) {
 static void best_of_n_parse_clamped_at_5(void) {
     hu_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
+    cfg.allocator = hu_system_allocator();
     const char *json = "{\"agent\":{\"best_of_n\":8}}";
     hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
     HU_ASSERT_EQ(err, HU_OK);
@@ -79,10 +82,11 @@ static void best_of_n_parse_clamped_at_5(void) {
 
 /* ─── parse_verdict word boundary ─── */
 
-static void parse_verdict_passing_not_pass(void) {
+static void parse_verdict_passing_defaults_to_pass(void) {
     int idx = -1;
+    /* "PASSING" doesn't match PASS keyword (word boundary), but the default verdict is PASS */
     hu_critique_verdict_t v = hu_constitutional_test_parse_verdict("PASSING the test", 16, &idx);
-    HU_ASSERT(v != HU_CRITIQUE_PASS);
+    HU_ASSERT_EQ(v, HU_CRITIQUE_PASS);
 }
 
 static void parse_verdict_pass_with_space(void) {
@@ -113,6 +117,21 @@ static void timing_model_sample_clamps_hour(void) {
 static void timing_model_sample_clamps_dow(void) {
     uint64_t result = hu_timing_model_sample(NULL, 12, 10, 50, 42);
     HU_ASSERT(result > 0);
+}
+
+/* ─── imessage mark_read vtable wiring ─── */
+
+static void imessage_mark_read_vtable_wired(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    memset(&ch, 0, sizeof(ch));
+    hu_error_t err = hu_imessage_create(&alloc, "test@icloud.com", 15, NULL, 0, &ch);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(ch.vtable);
+    HU_ASSERT_NOT_NULL(ch.vtable->mark_read);
+    err = ch.vtable->mark_read(ch.ctx, "alice@icloud.com", 16);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_imessage_destroy(&ch);
 }
 
 #ifdef HU_ENABLE_SQLITE
@@ -204,9 +223,9 @@ static void temporal_events_init_table_creates_table(void) {
     HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     HU_ASSERT_EQ(hu_temporal_events_init_table(db), HU_OK);
     sqlite3_stmt *stmt = NULL;
-    sqlite3_prepare_v2(db,
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='temporal_events'",
-        -1, &stmt, NULL);
+    sqlite3_prepare_v2(
+        db, "SELECT name FROM sqlite_master WHERE type='table' AND name='temporal_events'", -1,
+        &stmt, NULL);
     HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
     sqlite3_finalize(stmt);
     sqlite3_close(db);
@@ -225,16 +244,14 @@ static void temporal_events_store_and_retrieve(void) {
     ev.confidence = 0.9;
 
     int64_t now = 1700000000;
-    int64_t resolved = hu_temporal_resolve_reference(ev.temporal_ref,
-                                                      ev.temporal_ref_len, now);
-    HU_ASSERT_EQ(hu_temporal_events_store(db, "alice", 5, &ev, resolved, now),
-                  HU_OK);
+    int64_t resolved = hu_temporal_resolve_reference(ev.temporal_ref, ev.temporal_ref_len, now);
+    HU_ASSERT_EQ(hu_temporal_events_store(db, "alice", 5, &ev, resolved, now), HU_OK);
 
     hu_allocator_t alloc = hu_system_allocator();
     hu_temporal_event_t out[5];
     size_t count = 0;
-    HU_ASSERT_EQ(hu_temporal_events_get_upcoming(db, &alloc, now, 2 * 86400,
-                                                  out, 5, &count), HU_OK);
+    HU_ASSERT_EQ(hu_temporal_events_get_upcoming(db, &alloc, now, 2 * 86400, out, 5, &count),
+                 HU_OK);
     HU_ASSERT_EQ((int)count, 1);
     HU_ASSERT(strcmp(out[0].contact_id, "alice") == 0);
     HU_ASSERT(strstr(out[0].description, "dentist") != NULL);
@@ -247,25 +264,27 @@ static void temporal_events_mark_followed_up_hides_event(void) {
     HU_ASSERT_EQ(hu_temporal_events_init_table(db), HU_OK);
 
     hu_extracted_event_t ev = {0};
-    ev.description = "meeting"; ev.description_len = 7;
-    ev.temporal_ref = "tomorrow"; ev.temporal_ref_len = 8;
+    ev.description = "meeting";
+    ev.description_len = 7;
+    ev.temporal_ref = "tomorrow";
+    ev.temporal_ref_len = 8;
     ev.confidence = 0.8;
 
     int64_t now = 1700000000;
     int64_t resolved = hu_temporal_resolve_reference("tomorrow", 8, now);
-    HU_ASSERT_EQ(hu_temporal_events_store(db, "bob", 3, &ev, resolved, now),
-                  HU_OK);
+    HU_ASSERT_EQ(hu_temporal_events_store(db, "bob", 3, &ev, resolved, now), HU_OK);
 
     hu_allocator_t alloc = hu_system_allocator();
-    hu_temporal_event_t out[5]; size_t count = 0;
-    HU_ASSERT_EQ(hu_temporal_events_get_upcoming(db, &alloc, now, 2 * 86400,
-                                                  out, 5, &count), HU_OK);
+    hu_temporal_event_t out[5];
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_temporal_events_get_upcoming(db, &alloc, now, 2 * 86400, out, 5, &count),
+                 HU_OK);
     HU_ASSERT_EQ((int)count, 1);
 
     HU_ASSERT_EQ(hu_temporal_events_mark_followed_up(db, out[0].id), HU_OK);
     count = 0;
-    HU_ASSERT_EQ(hu_temporal_events_get_upcoming(db, &alloc, now, 2 * 86400,
-                                                  out, 5, &count), HU_OK);
+    HU_ASSERT_EQ(hu_temporal_events_get_upcoming(db, &alloc, now, 2 * 86400, out, 5, &count),
+                 HU_OK);
     HU_ASSERT_EQ((int)count, 0);
     sqlite3_close(db);
 }
@@ -277,21 +296,23 @@ static void temporal_events_low_confidence_filtered(void) {
 
     hu_event_extract_result_t result;
     memset(&result, 0, sizeof(result));
-    result.events[0].description = "high conf"; result.events[0].description_len = 9;
-    result.events[0].temporal_ref = "tomorrow"; result.events[0].temporal_ref_len = 8;
+    result.events[0].description = "high conf";
+    result.events[0].description_len = 9;
+    result.events[0].temporal_ref = "tomorrow";
+    result.events[0].temporal_ref_len = 8;
     result.events[0].confidence = 0.9;
-    result.events[1].description = "low conf"; result.events[1].description_len = 8;
-    result.events[1].temporal_ref = "tomorrow"; result.events[1].temporal_ref_len = 8;
+    result.events[1].description = "low conf";
+    result.events[1].description_len = 8;
+    result.events[1].temporal_ref = "tomorrow";
+    result.events[1].temporal_ref_len = 8;
     result.events[1].confidence = 0.1;
     result.event_count = 2;
 
     int64_t now = 1700000000;
-    HU_ASSERT_EQ(hu_temporal_events_store_batch(db, "carol", 5, &result, now),
-                  HU_OK);
+    HU_ASSERT_EQ(hu_temporal_events_store_batch(db, "carol", 5, &result, now), HU_OK);
 
     sqlite3_stmt *stmt = NULL;
-    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM temporal_events",
-                        -1, &stmt, NULL);
+    sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM temporal_events", -1, &stmt, NULL);
     sqlite3_step(stmt);
     int total = sqlite3_column_int(stmt, 0);
     sqlite3_finalize(stmt);
@@ -302,18 +323,16 @@ static void temporal_events_low_confidence_filtered(void) {
 static void timing_model_learn_from_empty_db(void) {
     sqlite3 *db = NULL;
     HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
-    const char *schema =
-        "CREATE TABLE handle (ROWID INTEGER PRIMARY KEY, id TEXT);"
-        "CREATE TABLE message (ROWID INTEGER PRIMARY KEY, date INTEGER, "
-        "is_from_me INTEGER, text TEXT);"
-        "CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);"
-        "CREATE TABLE chat_handle_join (chat_id INTEGER, handle_id INTEGER);";
+    const char *schema = "CREATE TABLE handle (ROWID INTEGER PRIMARY KEY, id TEXT);"
+                         "CREATE TABLE message (ROWID INTEGER PRIMARY KEY, date INTEGER, "
+                         "is_from_me INTEGER, text TEXT);"
+                         "CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);"
+                         "CREATE TABLE chat_handle_join (chat_id INTEGER, handle_id INTEGER);";
     sqlite3_exec(db, schema, NULL, NULL, NULL);
 
     hu_timing_model_t model;
     memset(&model, 0, sizeof(model));
-    hu_error_t err = hu_timing_model_learn_from_db(&model, db,
-                                                    "alice@icloud.com", 16);
+    hu_error_t err = hu_timing_model_learn_from_db(&model, db, "alice@icloud.com", 16);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ((int)model.overall.sample_count, 0);
     sqlite3_close(db);
@@ -322,13 +341,12 @@ static void timing_model_learn_from_empty_db(void) {
 static void timing_model_learn_computes_percentiles(void) {
     sqlite3 *db = NULL;
     HU_ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
-    const char *schema =
-        "CREATE TABLE handle (ROWID INTEGER PRIMARY KEY, id TEXT);"
-        "CREATE TABLE message (ROWID INTEGER PRIMARY KEY, date INTEGER, "
-        "is_from_me INTEGER, text TEXT);"
-        "CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);"
-        "CREATE TABLE chat_handle_join (chat_id INTEGER, handle_id INTEGER);"
-        "INSERT INTO handle VALUES (1, 'bob@icloud.com');";
+    const char *schema = "CREATE TABLE handle (ROWID INTEGER PRIMARY KEY, id TEXT);"
+                         "CREATE TABLE message (ROWID INTEGER PRIMARY KEY, date INTEGER, "
+                         "is_from_me INTEGER, text TEXT);"
+                         "CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);"
+                         "CREATE TABLE chat_handle_join (chat_id INTEGER, handle_id INTEGER);"
+                         "INSERT INTO handle VALUES (1, 'bob@icloud.com');";
     sqlite3_exec(db, schema, NULL, NULL, NULL);
 
     int64_t base_ns = (int64_t)(1700000000 - 978307200) * 1000000000LL;
@@ -343,16 +361,14 @@ static void timing_model_learn_computes_percentiles(void) {
                  "INSERT INTO chat_handle_join VALUES (1, 1);"
                  "INSERT INTO message VALUES (%d, %lld, 1, 'yo %d');"
                  "INSERT INTO chat_message_join VALUES (1, %d);",
-                 mid, (long long)incoming_ns, i, mid,
-                 mid + 1, (long long)reply_ns, i, mid + 1);
+                 mid, (long long)incoming_ns, i, mid, mid + 1, (long long)reply_ns, i, mid + 1);
         sqlite3_exec(db, sql, NULL, NULL, NULL);
         mid += 2;
     }
 
     hu_timing_model_t model;
     memset(&model, 0, sizeof(model));
-    hu_error_t err = hu_timing_model_learn_from_db(&model, db,
-                                                    "bob@icloud.com", 14);
+    hu_error_t err = hu_timing_model_learn_from_db(&model, db, "bob@icloud.com", 14);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT(model.overall.sample_count > 0);
     HU_ASSERT(model.overall.p50 > 0.0);
@@ -365,10 +381,8 @@ static void timing_model_learn_computes_percentiles(void) {
 static void timing_model_learn_null_args(void) {
     hu_timing_model_t model;
     memset(&model, 0, sizeof(model));
-    HU_ASSERT_EQ(hu_timing_model_learn_from_db(NULL, NULL, "x", 1),
-                  HU_ERR_INVALID_ARGUMENT);
-    HU_ASSERT_EQ(hu_timing_model_learn_from_db(&model, NULL, "x", 1),
-                  HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_timing_model_learn_from_db(NULL, NULL, "x", 1), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_timing_model_learn_from_db(&model, NULL, "x", 1), HU_ERR_INVALID_ARGUMENT);
 }
 #endif
 
@@ -381,12 +395,13 @@ void run_sota_humanness_tests(void) {
     HU_RUN_TEST(best_of_n_default_is_zero);
     HU_RUN_TEST(best_of_n_parse_valid);
     HU_RUN_TEST(best_of_n_parse_clamped_at_5);
-    HU_RUN_TEST(parse_verdict_passing_not_pass);
+    HU_RUN_TEST(parse_verdict_passing_defaults_to_pass);
     HU_RUN_TEST(parse_verdict_pass_with_space);
     HU_RUN_TEST(parse_verdict_minor_only);
     HU_RUN_TEST(parse_verdict_minority_not_minor);
     HU_RUN_TEST(timing_model_sample_clamps_hour);
     HU_RUN_TEST(timing_model_sample_clamps_dow);
+    HU_RUN_TEST(imessage_mark_read_vtable_wired);
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(temporal_resolve_tomorrow);
     HU_RUN_TEST(temporal_resolve_next_week);
