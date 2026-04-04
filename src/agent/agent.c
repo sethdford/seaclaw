@@ -95,6 +95,63 @@ hu_agent_t *hu_agent_get_current_for_tools(void) {
     return hu__current_agent_for_tools;
 }
 
+/* Pending voice message state — thread-local, set by send_voice_message tool,
+ * consumed by daemon after agent turn. */
+#define PV_MAX_TRANSCRIPT 4096
+#define PV_MAX_EMOTION 64
+
+static _Thread_local bool pv_active;
+static _Thread_local char pv_emotion[PV_MAX_EMOTION];
+static _Thread_local char pv_transcript[PV_MAX_TRANSCRIPT];
+static _Thread_local size_t pv_transcript_len;
+
+void hu_agent_request_voice_send(const char *emotion, const char *transcript,
+                                 size_t transcript_len) {
+    pv_active = true;
+    pv_emotion[0] = '\0';
+    pv_transcript[0] = '\0';
+    pv_transcript_len = 0;
+    if (emotion && emotion[0]) {
+        size_t elen = strlen(emotion);
+        if (elen >= PV_MAX_EMOTION) elen = PV_MAX_EMOTION - 1;
+        memcpy(pv_emotion, emotion, elen);
+        pv_emotion[elen] = '\0';
+    }
+    if (transcript && transcript_len > 0) {
+        size_t tlen = transcript_len;
+        if (tlen >= PV_MAX_TRANSCRIPT) tlen = PV_MAX_TRANSCRIPT - 1;
+        /* Clamp to UTF-8 boundary */
+        while (tlen > 0 && ((unsigned char)transcript[tlen] & 0xC0) == 0x80)
+            tlen--;
+        memcpy(pv_transcript, transcript, tlen);
+        pv_transcript[tlen] = '\0';
+        pv_transcript_len = tlen;
+    }
+}
+
+bool hu_agent_has_pending_voice(void) {
+    return pv_active;
+}
+
+const char *hu_agent_pending_voice_emotion(void) {
+    if (!pv_active || pv_emotion[0] == '\0') return NULL;
+    return pv_emotion;
+}
+
+const char *hu_agent_pending_voice_transcript(size_t *out_len) {
+    if (out_len) *out_len = 0;
+    if (!pv_active || pv_transcript[0] == '\0') return NULL;
+    if (out_len) *out_len = pv_transcript_len;
+    return pv_transcript;
+}
+
+void hu_agent_clear_pending_voice(void) {
+    pv_active = false;
+    pv_emotion[0] = '\0';
+    pv_transcript[0] = '\0';
+    pv_transcript_len = 0;
+}
+
 void hu_agent_internal_record_cost(hu_agent_t *agent, const hu_token_usage_t *usage) {
     if (!agent || !usage)
         return;

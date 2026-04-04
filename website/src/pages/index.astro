@@ -2901,7 +2901,7 @@ const tools = [
                       0.6,
                     );
                 } catch (e) {
-                  console.warn("[gsap] arch animation failed:", e);
+                  void e;
                   document
                     .querySelectorAll("#arch-core, .arch-line, .arch-node")
                     .forEach((el) => {
@@ -2942,7 +2942,7 @@ const tools = [
                   gsap.to(terminalEl, { opacity: 1, duration: 0.6 });
                   typeTerminal(outputEl, gsap);
                 } catch (e) {
-                  console.warn("[gsap] terminal animation failed:", e);
+                  void e;
                   terminalEl.style.opacity = "1";
                   outputEl.textContent =
                     '$ ./human agent -m "Hello"\nHello! I\'m h-uman — a fully autonomous AI assistant.';
@@ -3137,7 +3137,7 @@ const tools = [
                     });
                   }
                 } catch (e) {
-                  console.warn("[gsap] dashboard animation failed:", e);
+                  void e;
                   (dashPreview as HTMLElement).style.opacity = "1";
                   document.querySelectorAll(".dash-count").forEach((el) => {
                     el.textContent = (el as HTMLElement).dataset.target || "0";
@@ -3827,7 +3827,7 @@ const tools = [
             };
             window.addEventListener("pagehide", disposeWebGL, { once: true });
           } catch (e) {
-            console.warn("[hero-webgl] init failed, falling back:", e);
+            void e;
             canvas.style.display = "none";
           }
         }

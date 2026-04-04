@@ -1,3 +1,7 @@
+#if defined(__linux__)
+#define _DEFAULT_SOURCE
+#endif
+
 #include "human/tts/voice_clone.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
@@ -6,6 +10,7 @@
 #include "human/persona.h"
 #include "human/platform.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #if defined(__unix__) || defined(__APPLE__)

@@ -145,7 +145,7 @@ hu_error_t hu_cartesia_tts_synthesize(hu_allocator_t *alloc,
     if (err)
         goto fail;
 
-    char num_buf[32];
+    char num_buf[64];
     int n = snprintf(num_buf, sizeof(num_buf), "\"speed\":%.2f", (double)speed);
     if (n <= 0 || (size_t)n >= sizeof(num_buf)) {
         err = HU_ERR_INTERNAL;
