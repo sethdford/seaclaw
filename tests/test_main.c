@@ -399,6 +399,7 @@ void run_bootstrap_tests(void);
 void run_thread_pool_tests(void);
 void run_weakness_tests(void);
 void run_trust_tests(void);
+void run_sota_humanness_tests(void);
 void run_distiller_tests(void);
 void run_plan_executor_tests(void);
 void run_planner_mcts_wiring_tests(void);
@@ -848,6 +849,7 @@ int main(int argc, char **argv) {
     run_thread_pool_tests();
     run_weakness_tests();
     run_trust_tests();
+    run_sota_humanness_tests();
     run_distiller_tests();
     run_plan_executor_tests();
     run_planner_mcts_wiring_tests();

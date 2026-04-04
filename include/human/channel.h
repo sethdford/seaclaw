@@ -152,6 +152,8 @@ typedef struct hu_channel_vtable {
     hu_error_t (*build_read_receipt_context)(void *ctx, hu_allocator_t *alloc,
                                              const char *contact_id, size_t contact_id_len,
                                              char **out, size_t *out_len);
+    /* Optional — mark conversation as read for a contact. NULL = skip. */
+    hu_error_t (*mark_read)(void *ctx, const char *contact_id, size_t contact_id_len);
 } hu_channel_vtable_t;
 
 #endif /* HU_CHANNEL_H */

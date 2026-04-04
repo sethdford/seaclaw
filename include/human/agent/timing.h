@@ -44,4 +44,12 @@ uint64_t hu_timing_adjust(uint64_t base_delay_ms, uint8_t conversation_depth,
 
 void hu_timing_model_deinit(hu_allocator_t *alloc, hu_timing_model_t *model);
 
+#ifdef HU_ENABLE_SQLITE
+#include <sqlite3.h>
+hu_error_t hu_timing_model_learn_from_db(hu_timing_model_t *model, sqlite3 *db,
+                                         const char *contact_id, size_t contact_id_len);
+hu_error_t hu_timing_model_learn_from_chatdb(hu_timing_model_t *model,
+                                             const char *contact_id, size_t contact_id_len);
+#endif
+
 #endif

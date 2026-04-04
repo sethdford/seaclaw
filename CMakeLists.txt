@@ -474,6 +474,7 @@ set(HU_CORE_SOURCES
     src/context/theory_of_mind.c
     src/context/mood.c
     src/context/event_extract.c
+    src/context/temporal_events.c
     src/context/vision.c
     src/context/intelligence.c
     src/intelligence/skill_system.c
@@ -1946,6 +1947,9 @@ set(HU_TEST_SOURCES
     tests/test_agent_git.c
     tests/test_bg_registry.c
     tests/test_canvas_render.c
+    tests/test_canvas_e2e.c
+    tests/test_canvas_persist.c
+    tests/test_canvas_tool.c
     tests/test_channel_embeds.c
     tests/test_twilio_media_impl.c
     tests/test_declarative_tools.c
@@ -2215,6 +2219,7 @@ set(HU_TEST_SOURCES
     tests/test_mutual_tom.c
     tests/test_opinion_history.c
     tests/test_trust.c
+    tests/test_sota_humanness.c
     tests/test_distiller.c
     tests/test_model_router.c
     tests/test_plan_executor.c

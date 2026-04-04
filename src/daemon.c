@@ -55,6 +55,7 @@
 #include "human/memory/superhuman.h"
 #include "human/memory/verify_claim.h"
 #include "human/multimodal.h"
+#include "human/channels/channel_embed.h"
 #include "human/security/adversarial.h"
 #include "human/security/companion_safety.h"
 #include "human/security/moderation.h"
@@ -1877,12 +1878,40 @@ static bool daemon_outbound_bus_cb(hu_bus_event_type_t type, const hu_bus_event_
         return true;
 
     hu_error_t se = HU_OK;
-    if (sch->channel->vtable->send_event) {
-        se = sch->channel->vtable->send_event(sch->channel->ctx, target, target_len, msg, msg_len,
-                                              NULL, 0, HU_OUTBOUND_STAGE_FINAL);
-    } else if (sch->channel->vtable->send) {
-        se = sch->channel->vtable->send(sch->channel->ctx, target, target_len, msg, msg_len, NULL,
-                                        0);
+    bool sent_via_embed = false;
+    if (sch->channel->vtable->name && sch->channel->vtable->send) {
+        const char *ch_name = sch->channel->vtable->name(sch->channel->ctx);
+        if (ch_name && msg_len > 200) {
+            hu_allocator_t embed_alloc = hu_system_allocator();
+            hu_embed_t emb = {0};
+            emb.type = HU_EMBED_RICH;
+            emb.description = (char *)msg;
+            char *embed_json = NULL;
+            size_t embed_json_len = 0;
+            hu_error_t ef = HU_ERR_NOT_SUPPORTED;
+            if (strcmp(ch_name, "discord") == 0)
+                ef = hu_embed_format_discord(&embed_alloc, &emb, &embed_json, &embed_json_len);
+            else if (strcmp(ch_name, "slack") == 0)
+                ef = hu_embed_format_slack(&embed_alloc, &emb, &embed_json, &embed_json_len);
+            else if (strcmp(ch_name, "telegram") == 0)
+                ef = hu_embed_format_telegram(&embed_alloc, &emb, &embed_json, &embed_json_len);
+            if (ef == HU_OK && embed_json) {
+                se = sch->channel->vtable->send(sch->channel->ctx, target, target_len,
+                                                embed_json, embed_json_len, NULL, 0);
+                embed_alloc.free(embed_alloc.ctx, embed_json, embed_json_len + 1);
+                sent_via_embed = true;
+            }
+        }
+    }
+
+    if (!sent_via_embed) {
+        if (sch->channel->vtable->send_event) {
+            se = sch->channel->vtable->send_event(sch->channel->ctx, target, target_len, msg,
+                                                  msg_len, NULL, 0, HU_OUTBOUND_STAGE_FINAL);
+        } else if (sch->channel->vtable->send) {
+            se = sch->channel->vtable->send(sch->channel->ctx, target, target_len, msg, msg_len,
+                                            NULL, 0);
+        }
     }
     if (sch->channel->vtable->stop_typing)
         sch->channel->vtable->stop_typing(sch->channel->ctx, target, target_len);

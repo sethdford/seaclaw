@@ -128,7 +128,8 @@ typedef struct hu_agent_config {
     char *mr_judge_model;                /* model router: model to use for judge (default: reflexive) */
     char *s3_local_model;                /* dedicated model for S3 (private) content; NULL = use degradation fallback */
     bool prompt_cache_enabled;           /* enable cross-turn system prompt dedup (default true) */
-    bool agent_comm_enabled;             /* enable ACP inter-agent messaging (default false) */
+    bool agent_comm_enabled;
+    uint32_t best_of_n;             /* enable ACP inter-agent messaging (default false) */
     char *context_engine_type;           /* "legacy" (default) or "rag" */
     /* Claude Code feature integration */
     uint8_t permission_level;          /* 0=ReadOnly, 1=WorkspaceWrite, 2=DangerFullAccess */

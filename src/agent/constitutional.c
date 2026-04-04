@@ -291,6 +291,33 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
 #endif
 }
 
+hu_constitutional_config_t hu_constitutional_config_persona(void) {
+    hu_constitutional_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.enabled = true;
+    cfg.rewrite_enabled = true;
+    cfg.principle_count = 6;
+    cfg.principles[0].name = "no_ai_tells"; cfg.principles[0].name_len = 11;
+    cfg.principles[0].description = "No phrases revealing AI authorship.";
+    cfg.principles[0].description_len = 35;
+    cfg.principles[1].name = "style_match"; cfg.principles[1].name_len = 11;
+    cfg.principles[1].description = "Match persona texting style.";
+    cfg.principles[1].description_len = 28;
+    cfg.principles[2].name = "energy_match"; cfg.principles[2].name_len = 12;
+    cfg.principles[2].description = "Tone must match context energy.";
+    cfg.principles[2].description_len = 31;
+    cfg.principles[3].name = "genuine_warmth"; cfg.principles[3].name_len = 14;
+    cfg.principles[3].description = "Show genuine warmth, not performative empathy.";
+    cfg.principles[3].description_len = 46;
+    cfg.principles[4].name = "no_formatting"; cfg.principles[4].name_len = 13;
+    cfg.principles[4].description = "Never use markdown in casual texting.";
+    cfg.principles[4].description_len = 37;
+    cfg.principles[5].name = "identity_lock"; cfg.principles[5].name_len = 13;
+    cfg.principles[5].description = "Never break character or acknowledge being AI.";
+    cfg.principles[5].description_len = 46;
+    return cfg;
+}
+
 #ifdef HU_IS_TEST
 hu_critique_verdict_t hu_constitutional_test_parse_verdict(const char *resp, size_t resp_len,
                                                            int *principle_idx) {

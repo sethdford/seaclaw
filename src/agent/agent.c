@@ -204,6 +204,8 @@ hu_error_t hu_agent_from_config(
 
     out->alloc = alloc;
     out->provider = provider;
+    out->timing_model = (hu_timing_model_t *)alloc->alloc(alloc->ctx, sizeof(hu_timing_model_t));
+    if (out->timing_model) memset(out->timing_model, 0, sizeof(*out->timing_model));
     out->memory = memory;
     out->retrieval_engine = NULL;
     out->session_store = session_store;
@@ -689,6 +691,11 @@ void hu_agent_deinit(hu_agent_t *agent) {
         uint64_t id = agent->agent_id ? agent->agent_id : (uint64_t)(uintptr_t)agent;
         (void)hu_mailbox_unregister(agent->mailbox, id);
         agent->mailbox = NULL;
+    }
+    if (agent->timing_model) {
+        hu_timing_model_deinit(agent->alloc, agent->timing_model);
+        agent->alloc->free(agent->alloc->ctx, agent->timing_model, sizeof(hu_timing_model_t));
+        agent->timing_model = NULL;
     }
     hu_agent_clear_history(agent);
     if (agent->history) {

@@ -63,4 +63,6 @@ hu_critique_verdict_t hu_constitutional_test_parse_verdict(const char *resp, siz
 int hu_constitutional_test_parse_principle_index(const char *resp, size_t resp_len);
 #endif
 
+hu_constitutional_config_t hu_constitutional_config_persona(void);
+
 #endif

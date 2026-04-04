@@ -288,6 +288,10 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
         cfg->agent.context_engine_type = hu_strdup(a, ce_type);
     }
 
+    hu_json_value_t *bon = hu_json_object_get(obj, "best_of_n");
+    if (bon && bon->type == HU_JSON_NUMBER)
+        cfg->agent.best_of_n = (uint32_t)bon->data.number;
+
     hu_json_value_t *mr_obj = hu_json_object_get(obj, "model_router");
     if (mr_obj && mr_obj->type == HU_JSON_OBJECT) {
         const char *mr_ref = hu_json_get_string(mr_obj, "reflexive_model");
