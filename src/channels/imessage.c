@@ -233,11 +233,10 @@ static void imessage_stop(void *ctx) {
 
 #if (defined(__APPLE__) && defined(__MACH__)) || HU_IS_TEST
 
-#if !HU_IS_TEST
 /* Safety net: remove AI-sounding phrases that slipped through. Primary mechanism is
  * prompt-level guidance in hu_conversation_build_awareness. Modifies in-place.
  * Returns new length. Case-insensitive except "Absolutely! " (capital A only). */
-static size_t imessage_sanitize_output(char *buf, size_t len) {
+size_t imessage_sanitize_output(char *buf, size_t len) {
     if (!buf || len == 0)
         return 0;
 
@@ -317,7 +316,6 @@ static size_t imessage_sanitize_output(char *buf, size_t len) {
 
     return len;
 }
-#endif /* !HU_IS_TEST */
 
 const char *hu_imessage_reaction_to_tapback_name(hu_reaction_type_t reaction) {
     switch (reaction) {
@@ -386,6 +384,27 @@ size_t escape_for_applescript(char *out, size_t out_cap, const char *in, size_t 
     out[j] = '\0';
     return j;
 }
+
+/* Build an AppleScript to send a POSIX file attachment via iMessage.
+ * Pure string builder — does NOT execute the script.
+ * Returns bytes written (excluding NUL) or 0 on error. */
+size_t imessage_build_attach_script(char *out, size_t out_cap,
+                                    const char *target_escaped,
+                                    const char *path_escaped) {
+    if (!out || out_cap < 128 || !target_escaped || !path_escaped)
+        return 0;
+    int n = snprintf(out, out_cap,
+        "tell application \"Messages\"\n"
+        "  set targetService to 1st service whose service type = iMessage\n"
+        "  set targetBuddy to buddy \"%s\" of targetService\n"
+        "  send POSIX file \"%s\" to targetBuddy\n"
+        "end tell",
+        target_escaped, path_escaped);
+    if (n > 0 && (size_t)n < out_cap)
+        return (size_t)n;
+    return 0;
+}
+
 #endif
 
 static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len,
@@ -671,16 +690,10 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
                     size_t m_script_cap = 256 + strlen(m_tgt_esc) + strlen(path_esc);
                     char *m_script = (char *)c->alloc->alloc(c->alloc->ctx, m_script_cap);
                     if (m_script) {
-                        int m_n = snprintf(
-                            m_script, m_script_cap,
-                            "tell application \"Messages\"\n"
-                            "  set targetService to 1st service whose service type = iMessage\n"
-                            "  set targetBuddy to buddy \"%s\" of targetService\n"
-                            "  send POSIX file \"%s\" to targetBuddy\n"
-                            "end tell",
-                            m_tgt_esc, path_esc);
+                        size_t m_n = imessage_build_attach_script(
+                            m_script, m_script_cap, m_tgt_esc, path_esc);
                         c->alloc->free(c->alloc->ctx, path_esc, path_esc_cap);
-                        if (m_n > 0 && (size_t)m_n < m_script_cap) {
+                        if (m_n > 0) {
                             const char *argv[] = {"osascript", "-e", m_script, NULL};
                             hu_run_result_t result = {0};
                             hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
