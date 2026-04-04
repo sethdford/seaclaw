@@ -22,6 +22,7 @@ import "./logs-view.js";
 import "./memory-view.js";
 import "./turing-view.js";
 import "./hula-view.js";
+import "./settings-view.js";
 
 const VIEW_TAGS = [
   "hu-overview-view",
@@ -43,6 +44,7 @@ const VIEW_TAGS = [
   "hu-memory-view",
   "hu-turing-view",
   "hu-hula-view",
+  "hu-settings-view",
 ];
 
 describe("views", () => {
@@ -485,6 +487,26 @@ describe("hu-logs-view deep", () => {
       ".controls, .filters, hu-segmented-control, .log-area, hu-card",
     );
     expect(controls).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("hu-settings-view", () => {
+  it("renders tab buttons for all settings sections", async () => {
+    const el = document.createElement("hu-settings-view");
+    document.body.appendChild(el);
+    await new Promise((r) => setTimeout(r, 50));
+    const tabs = el.shadowRoot?.querySelectorAll(".tab-btn") ?? [];
+    expect(tabs.length).toBe(16);
+    el.remove();
+  });
+
+  it("renders page hero with Settings heading", async () => {
+    const el = document.createElement("hu-settings-view");
+    document.body.appendChild(el);
+    await new Promise((r) => setTimeout(r, 50));
+    const hero = el.shadowRoot?.querySelector("hu-page-hero");
+    expect(hero).toBeTruthy();
     el.remove();
   });
 });

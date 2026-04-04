@@ -15,74 +15,29 @@ interface NavItem {
 }
 
 const NAV_SHORTCUT_MAP: Record<string, string> = {
-  overview: "g o",
   chat: "g c",
-  agents: "g a",
-  config: "g s",
-  tools: "g t",
-  logs: "g l",
-  models: "g m",
-  memory: "g e",
   voice: "g v",
   canvas: "g p",
-  channels: "g h",
-  skills: "g k",
-  automations: "g u",
-  security: "g y",
-  nodes: "g n",
-  usage: "g g",
-  metrics: "g i",
-  sessions: "g r",
-  turing: "g f",
-  hula: "g j",
+  memory: "g e",
+  agents: "g a",
+  settings: "g s",
 };
 
-interface NavSection {
-  title: string;
-  items: NavItem[];
-}
-
-const SECTIONS: NavSection[] = [
-  {
-    title: "Core",
-    items: [
-      { id: "overview", label: "Overview", icon: icons.grid },
-      { id: "chat", label: "Chat", icon: icons["message-square"] },
-    ],
-  },
-  {
-    title: "AI",
-    items: [
-      { id: "agents", label: "Agents", icon: icons.zap },
-      { id: "models", label: "Models", icon: icons.cpu },
-      { id: "memory", label: "Memory", icon: icons.brain },
-      { id: "voice", label: "Voice", icon: icons.mic },
-      { id: "canvas", label: "Canvas", icon: icons.monitor },
-      { id: "turing", label: "Turing", icon: icons["chart-line"] },
-    ],
-  },
-  {
-    title: "Platform",
-    items: [
-      { id: "tools", label: "Tools", icon: icons.wrench },
-      { id: "channels", label: "Channels", icon: icons.radio },
-      { id: "skills", label: "Skills", icon: icons.puzzle },
-      { id: "automations", label: "Automations", icon: icons.timer },
-    ],
-  },
-  {
-    title: "System",
-    items: [
-      { id: "config", label: "Config", icon: icons.settings },
-      { id: "security", label: "Security", icon: icons.shield },
-      { id: "nodes", label: "Nodes", icon: icons.server },
-      { id: "usage", label: "Usage", icon: icons["bar-chart"] },
-      { id: "metrics", label: "Observability", icon: icons["chart-line"] },
-      { id: "logs", label: "Logs", icon: icons.terminal },
-      { id: "hula", label: "HuLa", icon: icons.code },
-    ],
-  },
+/** Primary nav items — the 5 top-level destinations. */
+const PRIMARY_NAV: NavItem[] = [
+  { id: "chat", label: "Chat", icon: icons["message-square"] },
+  { id: "voice", label: "Voice", icon: icons.mic },
+  { id: "canvas", label: "Canvas", icon: icons.monitor },
+  { id: "memory", label: "Memory", icon: icons.brain },
+  { id: "agents", label: "Agents", icon: icons.zap },
 ];
+
+/** Settings item — pinned to the sidebar footer. */
+const SETTINGS_NAV: NavItem = {
+  id: "settings",
+  label: "Settings",
+  icon: icons.settings,
+};
 
 /** Pointer-proximity pull for expanded sidebar nav (see magnetic listeners). */
 const HU_SIDEBAR_MAGNETIC_RADIUS_PX = 200;
@@ -263,29 +218,9 @@ export class ScSidebar extends LitElement {
       padding: var(--hu-space-sm);
     }
 
-    .section {
-      margin-bottom: var(--hu-space-md);
-    }
-
-    .section-title {
-      font-size: var(--hu-text-xs);
-      font-weight: var(--hu-weight-medium);
-      letter-spacing: var(--hu-tracking-xs);
-      text-transform: uppercase;
-      color: var(--hu-text);
-      padding: var(--hu-space-xs) var(--hu-space-md);
+    .settings-item {
+      border-left: 2px solid transparent;
       margin-bottom: var(--hu-space-xs);
-      white-space: nowrap;
-      overflow: hidden;
-      transition: opacity var(--hu-duration-normal) var(--hu-ease-out);
-    }
-
-    :host([collapsed]) .section-title {
-      opacity: 0;
-      height: 0;
-      padding: 0;
-      margin: 0;
-      overflow: hidden;
     }
 
     .nav-item {
@@ -297,7 +232,7 @@ export class ScSidebar extends LitElement {
       padding: var(--hu-space-sm) var(--hu-space-md);
       background: transparent;
       border: none;
-      border-left: 3px solid transparent;
+      border-left: 2px solid transparent;
       border-radius: var(--hu-radius-sm);
       font-size: var(--hu-text-sm);
       color: var(--hu-text);
@@ -330,7 +265,7 @@ export class ScSidebar extends LitElement {
 
       &[aria-current] {
         background: var(--hu-surface-container-high);
-        border-left: 3px solid var(--hu-accent);
+        border-left: 2px solid var(--hu-accent);
         border-radius: var(--hu-radius-sm) 0 0 var(--hu-radius-sm);
         color: var(--hu-accent-text, var(--hu-accent));
       }
@@ -527,7 +462,7 @@ export class ScSidebar extends LitElement {
     }
   `;
 
-  @property({ type: String }) activeTab = "overview";
+  @property({ type: String }) activeTab = "chat";
   @property({ type: Boolean, reflect: true }) collapsed = false;
   @property({ type: String }) connectionStatus: ConnectionStatus = "disconnected";
   @property({ type: String }) theme: "system" | "dark" | "light" = (() => {
@@ -592,43 +527,48 @@ export class ScSidebar extends LitElement {
         </header>
 
         <nav class="nav" aria-label="Main navigation">
-          ${SECTIONS.map(
-            (section) => html`
-              <div class="section">
-                <div class="section-title">${section.title}</div>
-                ${section.items.map(
-                  (item) => html`
-                    <div
-                      class="nav-item-wrap"
-                      @mouseenter=${() => this._onNavItemEnter(item.id)}
-                      @mouseleave=${() => this._onNavItemLeave()}
-                    >
-                      <button
-                        class="nav-item"
-                        data-nav-id=${item.id}
-                        ?aria-current=${this.activeTab === item.id}
-                        aria-label=${item.label}
-                        title=${this.collapsed ? item.label : undefined}
-                        @click=${() => this._dispatchTabChange(item.id)}
-                        @mouseenter=${() => this._dispatchNavHover(item.id)}
-                      >
-                        <span class="icon">${item.icon}</span>
-                        <span class="label">${item.label}</span>
-                      </button>
-                      ${this._showShortcutTooltip && this._hoveredItemId === item.id
-                        ? html`<span class="shortcut-tooltip" role="tooltip"
-                            >${NAV_SHORTCUT_MAP[item.id] ?? ""}</span
-                          >`
-                        : nothing}
-                    </div>
-                  `,
-                )}
+          ${PRIMARY_NAV.map(
+            (item) => html`
+              <div
+                class="nav-item-wrap"
+                @mouseenter=${() => this._onNavItemEnter(item.id)}
+                @mouseleave=${() => this._onNavItemLeave()}
+              >
+                <button
+                  class="nav-item"
+                  data-nav-id=${item.id}
+                  ?aria-current=${this.activeTab === item.id}
+                  aria-label=${item.label}
+                  title=${this.collapsed ? item.label : undefined}
+                  @click=${() => this._dispatchTabChange(item.id)}
+                  @mouseenter=${() => this._dispatchNavHover(item.id)}
+                >
+                  <span class="icon">${item.icon}</span>
+                  <span class="label">${item.label}</span>
+                </button>
+                ${this._showShortcutTooltip && this._hoveredItemId === item.id
+                  ? html`<span class="shortcut-tooltip" role="tooltip"
+                      >${NAV_SHORTCUT_MAP[item.id] ?? ""}</span
+                    >`
+                  : nothing}
               </div>
             `,
           )}
         </nav>
 
         <footer class="footer">
+          <button
+            class="nav-item settings-item"
+            data-nav-id=${SETTINGS_NAV.id}
+            ?aria-current=${this.activeTab === SETTINGS_NAV.id}
+            aria-label=${SETTINGS_NAV.label}
+            title=${this.collapsed ? SETTINGS_NAV.label : undefined}
+            @click=${() => this._dispatchTabChange(SETTINGS_NAV.id)}
+            @mouseenter=${() => this._dispatchNavHover(SETTINGS_NAV.id)}
+          >
+            <span class="icon">${SETTINGS_NAV.icon}</span>
+            <span class="label">${SETTINGS_NAV.label}</span>
+          </button>
           <div class="status-row">
             <hu-status-dot status=${this.connectionStatus}></hu-status-dot>
             <span class="status-label">${this.connectionStatus}</span>

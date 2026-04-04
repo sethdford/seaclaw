@@ -29,6 +29,15 @@ export class ScTypingIndicator extends LitElement {
       }
     }
 
+    @keyframes hu-thinking-shimmer {
+      from {
+        background-position: -200% center;
+      }
+      to {
+        background-position: 200% center;
+      }
+    }
+
     :host {
       display: block;
     }
@@ -38,10 +47,26 @@ export class ScTypingIndicator extends LitElement {
       align-items: center;
       gap: var(--hu-space-sm);
       padding: var(--hu-space-xs) var(--hu-space-md);
-      background: var(--hu-surface-container);
+      background: linear-gradient(
+        90deg,
+        var(--hu-surface-container) 0%,
+        color-mix(in srgb, var(--hu-accent) 8%, var(--hu-surface-container)) 50%,
+        var(--hu-surface-container) 100%
+      );
+      background-size: 200% 100%;
       border: 1px solid var(--hu-border-subtle);
       border-radius: var(--hu-radius-full);
-      animation: hu-indicator-enter var(--hu-duration-normal) var(--hu-ease-out) both;
+      animation:
+        hu-indicator-enter var(--hu-duration-normal) var(--hu-ease-out) both,
+        hu-thinking-shimmer calc(var(--hu-duration-slowest) * 3) var(--hu-ease-in-out) infinite;
+    }
+
+    .label {
+      font-family: var(--hu-font);
+      font-size: var(--hu-text-xs);
+      font-weight: var(--hu-weight-medium);
+      color: var(--hu-accent);
+      white-space: nowrap;
     }
 
     .dots {
@@ -54,7 +79,7 @@ export class ScTypingIndicator extends LitElement {
       width: var(--hu-space-xs);
       height: var(--hu-space-xs);
       border-radius: var(--hu-radius-full);
-      background: var(--hu-text-secondary);
+      background: var(--hu-accent);
       animation: hu-dot-wave var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
     }
 
@@ -79,6 +104,7 @@ export class ScTypingIndicator extends LitElement {
     @media (prefers-reduced-motion: reduce) {
       .indicator {
         animation: none;
+        background: var(--hu-surface-container);
       }
 
       .dot {
@@ -96,6 +122,7 @@ export class ScTypingIndicator extends LitElement {
   override render() {
     return html`
       <div class="indicator" role="status" aria-live="polite" aria-label="Assistant is thinking">
+        <span class="label">Thinking</span>
         <span class="dots" aria-hidden="true">
           <span class="dot"></span>
           <span class="dot"></span>

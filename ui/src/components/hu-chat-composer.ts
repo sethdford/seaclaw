@@ -901,6 +901,20 @@ export class ScChatComposer extends LitElement {
     );
   }
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.dispatchEvent(
+      new CustomEvent("hu-composer-connected", { bubbles: true, composed: true }),
+    );
+  }
+
+  override disconnectedCallback(): void {
+    this.dispatchEvent(
+      new CustomEvent("hu-composer-disconnected", { bubbles: true, composed: true }),
+    );
+    super.disconnectedCallback();
+  }
+
   protected override updated(changed: Map<string, unknown>): void {
     if (changed.has("value") && this._textarea && this._textarea.value !== this.value) {
       this._textarea.value = this.value;

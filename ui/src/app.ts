@@ -31,7 +31,8 @@ type TabId =
   | "turing"
   | "hula"
   | "workflow"
-  | "design-system";
+  | "design-system"
+  | "settings";
 
 const VALID_TABS: TabId[] = [
   "overview",
@@ -56,6 +57,7 @@ const VALID_TABS: TabId[] = [
   "hula",
   "workflow",
   "design-system",
+  "settings",
 ];
 
 const SIDEBAR_KEY = "hu-sidebar-collapsed";
@@ -83,35 +85,21 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   hula: () => import("./views/hula-view.js"),
   workflow: () => import("./views/workflow-view.js"),
   "design-system": () => import("./views/design-system-view.js"),
+  settings: () => import("./views/settings-view.js"),
 };
 
 const loadedViews = new Set<TabId>();
 
 const MOBILE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] = [
-  { id: "overview", label: "Home", icon: icons.grid },
   { id: "chat", label: "Chat", icon: icons["message-square"] },
+  { id: "voice", label: "Voice", icon: icons.mic },
+  { id: "canvas", label: "Canvas", icon: icons.monitor },
   { id: "agents", label: "Agents", icon: icons.zap },
-  { id: "config", label: "Config", icon: icons.settings },
 ];
 
 const MORE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] = [
-  { id: "tools", label: "Tools", icon: icons.wrench },
-  { id: "sessions", label: "Sessions", icon: icons["clock-counter-clockwise"] },
-  { id: "models", label: "Models", icon: icons.cpu },
-  { id: "channels", label: "Channels", icon: icons["message-square"] },
-  { id: "automations", label: "Automations", icon: icons.timer },
-  { id: "skills", label: "Skills", icon: icons.puzzle },
-  { id: "voice", label: "Voice", icon: icons.mic },
-  { id: "canvas", label: "Canvas", icon: icons.monitor },
   { id: "memory", label: "Memory", icon: icons.brain },
-  { id: "hula", label: "HuLa", icon: icons.zap },
-  { id: "workflow", label: "Workflow", icon: icons.clock },
-  { id: "nodes", label: "Nodes", icon: icons.server },
-  { id: "usage", label: "Usage", icon: icons["bar-chart"] },
-  { id: "metrics", label: "Observability", icon: icons["chart-line"] },
-  { id: "security", label: "Security", icon: icons.shield },
-  { id: "logs", label: "Logs", icon: icons.terminal },
-  { id: "turing", label: "Turing", icon: icons["chart-line"] },
+  { id: "settings", label: "Settings", icon: icons.settings },
 ];
 
 @customElement("hu-app")
@@ -514,7 +502,7 @@ export class ScApp extends LitElement {
     }
   `;
 
-  @state() private tab: TabId = "overview";
+  @state() private tab: TabId = "chat";
   @state() private chatSessionKey = "default";
   @state() private connectionStatus: GatewayStatus = "disconnected";
   @state() private sidebarCollapsed = false;
@@ -713,7 +701,7 @@ export class ScApp extends LitElement {
   private _onHashChange(): void {
     const hash = window.location.hash.replace("#", "");
     if (!hash) {
-      void this._ensureLoaded("overview");
+      void this._ensureLoaded("chat");
       return;
     }
     const [tabPart, ...rest] = hash.split(":");
@@ -725,7 +713,7 @@ export class ScApp extends LitElement {
       }
       void this._applyHashRoute(targetTab);
     } else {
-      window.location.hash = "overview";
+      window.location.hash = "chat";
     }
   }
 
@@ -816,12 +804,12 @@ export class ScApp extends LitElement {
       e.preventDefault();
       this._clearPendingG();
       const map: Record<string, TabId> = {
-        o: "overview",
         c: "chat",
+        v: "voice",
+        p: "canvas",
+        e: "memory",
         a: "agents",
-        s: "config",
-        t: "tools",
-        l: "logs",
+        s: "settings",
       };
       const tab = map[e.key.toLowerCase()];
       if (tab && VALID_TABS.includes(tab)) {
@@ -950,7 +938,7 @@ export class ScApp extends LitElement {
   }
 
   private _prefetchOnIdle(): void {
-    const targets: TabId[] = ["chat", "agents", "config"];
+    const targets: TabId[] = ["chat", "voice", "agents"];
     for (const t of targets) this._prefetchSilent(t);
   }
 
@@ -1230,8 +1218,10 @@ export class ScApp extends LitElement {
         return html`<hu-workflow-view></hu-workflow-view>`;
       case "design-system":
         return html`<hu-design-system-view></hu-design-system-view>`;
+      case "settings":
+        return html`<hu-settings-view></hu-settings-view>`;
       default:
-        return html`<hu-overview-view></hu-overview-view>`;
+        return html`<hu-chat-view .sessionKey=${this.chatSessionKey}></hu-chat-view>`;
     }
   }
 }

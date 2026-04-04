@@ -4,7 +4,7 @@
 @import "./scroll-driven.css";
 
 :root {
-  --hu-color-white: #fffefa;
+  --hu-color-white: #ffffff;
   --hu-color-black: #0c0a08;
   /* Ambient intelligence (dashboard + shared utilities) */
   --hu-ambient-warmth: 0;

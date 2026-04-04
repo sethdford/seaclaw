@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import { AudioRecorder, blobToBase64 } from "../audio-recorder.js";
@@ -93,6 +93,7 @@ export class ScFloatingMic extends LitElement {
   @state() private isListening = false;
   @state() private isTranscribing = false;
   @state() private overlayText = "";
+  @state() private _composerPresent = false;
   private _recorder = new AudioRecorder();
   #streamChunks: Blob[] = [];
   readonly #silence = createVoiceSilenceController({
@@ -102,14 +103,27 @@ export class ScFloatingMic extends LitElement {
     },
   });
 
+  private _onComposerConnected = (): void => {
+    this._composerPresent = true;
+  };
+  private _onComposerDisconnected = (): void => {
+    this._composerPresent = false;
+  };
+
   override connectedCallback(): void {
     super.connectedCallback();
     this._setupKeyboardShortcut();
+    window.addEventListener("hu-composer-connected", this._onComposerConnected);
+    window.addEventListener("hu-composer-disconnected", this._onComposerDisconnected);
+    // Check if composer already exists on the page
+    this._composerPresent = !!document.querySelector("hu-chat-composer");
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this._removeKeyboardShortcut();
+    window.removeEventListener("hu-composer-connected", this._onComposerConnected);
+    window.removeEventListener("hu-composer-disconnected", this._onComposerDisconnected);
     this._recorder.dispose();
   }
 
@@ -258,6 +272,7 @@ export class ScFloatingMic extends LitElement {
   }
 
   override render() {
+    if (this._composerPresent) return nothing;
     const btnClass = this.isListening ? "listening" : this.isTranscribing ? "transcribing" : "";
     return html`
       <div>

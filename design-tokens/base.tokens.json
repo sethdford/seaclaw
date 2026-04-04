@@ -109,29 +109,29 @@
         "$description": "Prominent surface — lighter than elevated for hero/featured areas"
       },
       "light-container": {
-        "$value": "#f9f7f4",
+        "$value": "#f8f8f6",
         "$type": "color",
-        "$description": "warm cream + 6% human.100 — default card/panel surface"
+        "$description": "cool neutral + 6% human.100 — default card/panel surface"
       },
       "light-container-high": {
-        "$value": "#f0ede9",
+        "$value": "#f0eeed",
         "$type": "color",
-        "$description": "warm gray + 8% human.100 — elevated interactive surfaces"
+        "$description": "cool gray + 8% human.100 — elevated interactive surfaces"
       },
       "light-container-highest": {
-        "$value": "#e9e5e0",
+        "$value": "#e8e7e4",
         "$type": "color",
-        "$description": "warm gray + 10% human.100 — highest emphasis surfaces"
+        "$description": "cool gray + 10% human.100 — highest emphasis surfaces"
       },
       "light-dim": {
-        "$value": "#e6e2de",
+        "$value": "#e5e4e1",
         "$type": "color",
-        "$description": "Recessed surface — warm light theme inset/well areas"
+        "$description": "Recessed surface — cool light theme inset/well areas"
       },
       "light-bright": {
-        "$value": "#fffefa",
+        "$value": "#ffffff",
         "$type": "color",
-        "$description": "Prominent surface — warm cream brightest level for hero/featured areas"
+        "$description": "Prominent surface — clean white brightest level for hero/featured areas"
       }
     },
     "teal": {

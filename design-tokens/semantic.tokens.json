@@ -347,29 +347,29 @@
   "light": {
     "$description": "Light theme — warm cream surfaces, human green accents, charcoal text",
     "bg": {
-      "$value": "#F4F1EE",
+      "$value": "#F5F5F3",
       "$type": "color",
-      "$description": "Warm cream base"
+      "$description": "Cool neutral base"
     },
     "bg-inset": {
-      "$value": "#EBE7E3",
+      "$value": "#EDEDEB",
       "$type": "color"
     },
     "bg-surface": {
-      "$value": "#FFFEFA",
+      "$value": "#FFFFFF",
       "$type": "color",
-      "$description": "Off-white warm cream surface"
+      "$description": "Clean white surface"
     },
     "bg-warm": {
       "$value": "#FAF8F6",
       "$type": "color"
     },
     "bg-elevated": {
-      "$value": "#F9F7F4",
+      "$value": "#FAFAF8",
       "$type": "color"
     },
     "bg-overlay": {
-      "$value": "#FFFEFA",
+      "$value": "#FFFFFF",
       "$type": "color"
     },
     "surface-container": {
@@ -495,11 +495,11 @@
       "$type": "color"
     },
     "border": {
-      "$value": "#D8D2CC",
+      "$value": "#DCDAD8",
       "$type": "color"
     },
     "border-subtle": {
-      "$value": "#E6E1DB",
+      "$value": "#E8E6E3",
       "$type": "color"
     },
     "success": {
@@ -633,7 +633,7 @@
       "$type": "shadow"
     },
     "surface-gradient": {
-      "$value": "linear-gradient(180deg, #FFFEFA 0%, #F4F1EE 100%)",
+      "$value": "linear-gradient(180deg, #FFFFFF 0%, #F5F5F3 100%)",
       "$type": "string",
       "$description": "Warm cream to cream-gray — subtle depth on warm clean cards"
     },
