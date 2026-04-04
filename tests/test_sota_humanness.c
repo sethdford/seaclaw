@@ -201,6 +201,7 @@ static void best_of_n_parse_negative_ignored(void) {
 
 /* ─── imessage mark_read vtable wiring ─── */
 
+#ifdef HU_HAS_IMESSAGE
 static void imessage_mark_read_vtable_wired(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
@@ -213,6 +214,7 @@ static void imessage_mark_read_vtable_wired(void) {
     HU_ASSERT_EQ(err, HU_OK);
     hu_imessage_destroy(&ch);
 }
+#endif
 
 #ifdef HU_ENABLE_SQLITE
 /* ─── Temporal event resolution ─── */
@@ -517,7 +519,9 @@ void run_sota_humanness_tests(void) {
     HU_RUN_TEST(principle_index_no_number);
     HU_RUN_TEST(timing_model_sample_clamps_hour);
     HU_RUN_TEST(timing_model_sample_clamps_dow);
+#ifdef HU_HAS_IMESSAGE
     HU_RUN_TEST(imessage_mark_read_vtable_wired);
+#endif
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(temporal_resolve_tomorrow);
     HU_RUN_TEST(temporal_resolve_next_week);

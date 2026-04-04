@@ -322,7 +322,7 @@ static hu_error_t mg_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
     }
 
     /* Download the MP4 */
-    char dl_url[1024];
+    char dl_url[2048];
     if (strncmp(gcs_uri_buf, "gs://", 5) == 0)
         snprintf(dl_url, sizeof(dl_url), "https://storage.googleapis.com/%s", gcs_uri_buf + 5);
     else
