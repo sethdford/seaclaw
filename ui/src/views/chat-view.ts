@@ -611,7 +611,8 @@ export class ScChatView extends GatewayAwareLitElement {
           @hu-session-rename=${this._onSessionRename}
         ></hu-chat-sessions-panel>
         <div class="container">
-          ${this._renderStatusBar()} ${this._renderErrorBanner()}
+          ${this.chat.items.length > 0 ? this._renderStatusBar() : nothing}
+          ${this._renderErrorBanner()}
           ${this._renderHistoryErrorBanner()} ${this._renderSearch()}
           ${this.chat.historyLoading
             ? this._renderSkeleton()
@@ -735,7 +736,7 @@ export class ScChatView extends GatewayAwareLitElement {
             .value=${this.inputValue}
             .waiting=${this.chat.isWaiting}
             .disabled=${this.connectionStatus === "disconnected"}
-            .showSuggestions=${this.chat.items.length === 0}
+            .showSuggestions=${false}
             .streamElapsed=${this.chat.streamElapsed}
             .placeholder=${this.connectionStatus === "disconnected"
               ? "Disconnected \u2014 reconnect to send messages"
