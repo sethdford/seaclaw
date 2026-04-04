@@ -5,6 +5,7 @@
 #include "human/agent/anticipatory.h"
 #include "human/agent/arbitrator.h"
 #include "human/agent/collab_planning.h"
+#include "human/agent/constitutional.h"
 #include "human/agent/conversation_plan.h"
 #include "human/agent/episodic.h"
 #include "human/agent/goals.h"

@@ -1,8 +1,10 @@
 #include "test_framework.h"
 #include "human/agent/constitutional.h"
+#include "human/channel.h"
 #include "human/config.h"
 #include "human/context/event_extract.h"
 #include "human/core/allocator.h"
+#include <ctype.h>
 #include <string.h>
 #include <time.h>
 
@@ -50,6 +52,68 @@ static void best_of_n_default_is_zero(void) {
     hu_agent_config_t acfg;
     memset(&acfg, 0, sizeof(acfg));
     HU_ASSERT_EQ((int)acfg.best_of_n, 0);
+}
+
+/* ─── best_of_n config parsing ─── */
+
+static void best_of_n_parse_valid(void) {
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    const char *json = "{\"agent\":{\"best_of_n\":3}}";
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_error_t err = hu_config_parse(&alloc, json, strlen(json), &cfg);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ((int)cfg.agent.best_of_n, 3);
+    hu_config_free(&alloc, &cfg);
+}
+
+static void best_of_n_parse_clamped_at_5(void) {
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    const char *json = "{\"agent\":{\"best_of_n\":8}}";
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_error_t err = hu_config_parse(&alloc, json, strlen(json), &cfg);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ((int)cfg.agent.best_of_n, 0);
+    hu_config_free(&alloc, &cfg);
+}
+
+/* ─── parse_verdict word boundary ─── */
+
+static void parse_verdict_passing_not_pass(void) {
+    int idx = -1;
+    hu_critique_verdict_t v = hu_constitutional_test_parse_verdict("PASSING the test", 16, &idx);
+    HU_ASSERT(v != HU_CRITIQUE_PASS);
+}
+
+static void parse_verdict_pass_with_space(void) {
+    int idx = -1;
+    hu_critique_verdict_t v = hu_constitutional_test_parse_verdict("PASS - looks good", 18, &idx);
+    HU_ASSERT_EQ((int)v, (int)HU_CRITIQUE_PASS);
+}
+
+static void parse_verdict_minor_only(void) {
+    int idx = -1;
+    hu_critique_verdict_t v = hu_constitutional_test_parse_verdict("MINOR issue", 11, &idx);
+    HU_ASSERT_EQ((int)v, (int)HU_CRITIQUE_MINOR);
+}
+
+static void parse_verdict_minority_not_minor(void) {
+    int idx = -1;
+    hu_critique_verdict_t v = hu_constitutional_test_parse_verdict("MINORITY opinion", 16, &idx);
+    HU_ASSERT(v != HU_CRITIQUE_MINOR);
+}
+
+/* ─── Timing model bounds ─── */
+
+static void timing_model_sample_clamps_hour(void) {
+    uint64_t result = hu_timing_model_sample(NULL, 30, 0, 50, 42);
+    HU_ASSERT(result > 0);
+}
+
+static void timing_model_sample_clamps_dow(void) {
+    uint64_t result = hu_timing_model_sample(NULL, 12, 10, 50, 42);
+    HU_ASSERT(result > 0);
 }
 
 #ifdef HU_ENABLE_SQLITE

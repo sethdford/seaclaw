@@ -2,18 +2,33 @@
 #include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/log.h"
+#include "human/providers/api_key.h"
 #include "human/providers/ensemble.h"
 #include "human/providers/factory.h"
 #include "human/providers/reliable.h"
 #include "human/providers/router.h"
 #include <string.h>
 
+/* Resolve API key: config.json → env var (ANTHROPIC_API_KEY, etc.) → NULL */
+static char *resolve_key(hu_allocator_t *alloc, const hu_config_t *cfg, const char *prov_name) {
+    const char *cfg_key = hu_config_get_provider_key(cfg, prov_name);
+    char *key = hu_api_key_resolve(alloc, prov_name, strlen(prov_name), cfg_key,
+                                   cfg_key ? strlen(cfg_key) : 0);
+    if (!key) {
+        hu_log_error("provider", NULL,
+                     "No API key for '%s'. Set the corresponding env var or add to config.json",
+                     prov_name);
+    }
+    return key;
+}
+
 static hu_error_t create_provider_from_name(hu_allocator_t *alloc, const hu_config_t *cfg,
                                             const char *prov_name, hu_provider_t *out) {
     if (!prov_name || !prov_name[0])
         return HU_ERR_INVALID_ARGUMENT;
     size_t len = strlen(prov_name);
-    const char *api_key = hu_config_get_provider_key(cfg, prov_name);
+    char *api_key = resolve_key(alloc, cfg, prov_name);
     size_t api_key_len = api_key ? strlen(api_key) : 0;
     const char *base_url = hu_config_get_provider_base_url(cfg, prov_name);
     size_t base_url_len = base_url ? strlen(base_url) : 0;
@@ -156,8 +171,8 @@ hu_error_t hu_provider_create_from_config(hu_allocator_t *alloc, const hu_config
         size_t name_count = 0;
 
         if (cfg->ensemble.providers_len > 0) {
-            for (size_t i = 0; i < cfg->ensemble.providers_len && name_count < HU_ENSEMBLE_MAX_PROVIDERS;
-                 i++) {
+            for (size_t i = 0;
+                 i < cfg->ensemble.providers_len && name_count < HU_ENSEMBLE_MAX_PROVIDERS; i++) {
                 const char *pname = cfg->ensemble.providers[i];
                 if (pname && pname[0])
                     names_buf[name_count++] = pname;
@@ -167,8 +182,7 @@ hu_error_t hu_provider_create_from_config(hu_allocator_t *alloc, const hu_config
                 names_buf[name_count++] = cfg->default_provider;
             if (cfg->reliability.fallback_providers_len > 0 &&
                 cfg->reliability.fallback_providers[0] &&
-                cfg->reliability.fallback_providers[0][0] &&
-                name_count < HU_ENSEMBLE_MAX_PROVIDERS)
+                cfg->reliability.fallback_providers[0][0] && name_count < HU_ENSEMBLE_MAX_PROVIDERS)
                 names_buf[name_count++] = cfg->reliability.fallback_providers[0];
         }
 

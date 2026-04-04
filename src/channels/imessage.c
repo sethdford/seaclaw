@@ -1562,7 +1562,8 @@ static hu_error_t imessage_mark_read(void *ctx, const char *contact_id,
     }
     int n = snprintf(script, script_cap,
              "tell application \"Messages\"\n"
-             "  set targetBuddy to buddy \"%s\" of service \"iMessage\"\n"
+             "  set targetService to 1st service whose service type = iMessage\n"
+             "  set targetBuddy to buddy \"%s\" of targetService\n"
              "  set targetChat to a reference to chat id (id of targetBuddy)\n"
              "  read targetChat\n"
              "end tell", esc);

@@ -77,11 +77,12 @@ static CONST_UNUSED hu_critique_verdict_t parse_verdict(const char *resp, size_t
     size_t len = (size_t)((resp + resp_len) - p);
 
     if (len >= 4 && (p[0] == 'P' || p[0] == 'p') && (p[1] == 'A' || p[1] == 'a') &&
-        (p[2] == 'S' || p[2] == 's') && (p[3] == 'S' || p[3] == 's'))
+        (p[2] == 'S' || p[2] == 's') && (p[3] == 'S' || p[3] == 's') &&
+        (len == 4 || !isalpha((unsigned char)p[4])))
         return HU_CRITIQUE_PASS;
     if (len >= 5 && (p[0] == 'M' || p[0] == 'm') && (p[1] == 'I' || p[1] == 'i') &&
         (p[2] == 'N' || p[2] == 'n') && (p[3] == 'O' || p[3] == 'o') &&
-        (p[4] == 'R' || p[4] == 'r'))
+        (p[4] == 'R' || p[4] == 'r') && (len == 5 || !isalpha((unsigned char)p[5])))
         return HU_CRITIQUE_MINOR;
     if (len >= 7 && (p[0] == 'R' || p[0] == 'r') && (p[1] == 'E' || p[1] == 'e') &&
         (p[2] == 'W' || p[2] == 'w') && (p[3] == 'R' || p[3] == 'r') &&
@@ -250,7 +251,7 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
         size_t rewrite_cap = response_len + 256;
         char *rewrite_prompt = (char *)alloc->alloc(alloc->ctx, rewrite_cap);
         if (!rewrite_prompt) {
-            result->verdict = HU_CRITIQUE_PASS;
+            /* OOM: keep REWRITE verdict so caller knows the response wasn't approved */
         } else {
             int n = snprintf(rewrite_prompt, rewrite_cap,
                              "Revise this response to satisfy the principle: %s\n\n"

@@ -27,6 +27,9 @@
 #include "human/daemon/platform_facade.h"
 #include "human/daemon/voice_facade.h"
 
+/* Channel helpers */
+#include "human/channels/channel_embed.h"
+
 /* Plan 2: Background observer registry */
 #include "human/background_observer.h"
 /* Core utilities */
@@ -2457,14 +2460,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #else
                     struct tm *rlaif_lt = localtime_r(&t, &rlaif_tm);
 #endif
-<<<<<<< HEAD
-                    if (rlaif_lt && rlaif_lt->tm_hour == 3 && !rlaif_nightly_done_today &&
-                        agent && agent->memory && agent->sota.sota_initialized) {
-=======
                     if (rlaif_lt && rlaif_lt->tm_hour == 3 && !rlaif_nightly_done_today && agent &&
                         agent->memory && agent->sota.sota_initialized) {
                         rlaif_nightly_done_today = true;
->>>>>>> 1c94875d (feat(voice): merge real-time voice streaming pipeline e2e)
                         sqlite3 *rlaif_db = hu_sqlite_memory_get_db(agent->memory);
                         if (rlaif_db) {
                             hu_dpo_train_result_t rlaif_result = {0};
@@ -2786,7 +2784,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                             }
                         }
-#endif
                         /* Channel-aware Turing analysis: per-channel weak dimensions */
                         if (tdb && agent->persona) {
                             static const char *turing_channels[] = {"telegram", "discord",  "slack",
@@ -2874,10 +2871,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                             }
                         }
-
-                        turing_eval_today = true;
-                        hu_log_info("human", agent ? agent->observer : NULL,
-                                    "daily turing evaluation completed");
+                        if (tdb) {
+                            turing_eval_today = true;
+                            hu_log_info("human", agent ? agent->observer : NULL,
+                                        "daily turing evaluation completed");
+                        }
+#endif
                     }
 
                     /* Weekly DPO export: Sunday at 2 AM */
@@ -2907,9 +2906,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                 "weekly DPO export: %zu pairs -> %s", exported,
                                                 dpo_path);
                                     hu_dpo_clear(&agent->sota.dpo_collector);
+                                    dpo_exported_this_week = true;
                                 }
                             }
-                            dpo_exported_this_week = true;
                         }
                         if (lt_tune && lt_tune->tm_wday != 0)
                             dpo_exported_this_week = false;
@@ -3547,17 +3546,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     memset(agent->timing_model, 0, sizeof(*agent->timing_model));
                     hu_timing_model_learn_from_chatdb(agent->timing_model, batch_key, key_len);
                     agent->timing_model->contact_id = hu_strdup(alloc, batch_key);
-                    agent->timing_model->contact_id_len = key_len;
+                    if (agent->timing_model->contact_id)
+                        agent->timing_model->contact_id_len = key_len;
                 }
 #endif
 
                                 /* Seen behavior: model realistic "read then wait" patterns */
 #ifndef HU_IS_TEST
-<<<<<<< HEAD
-                    /* Trigger read receipt before response delay */
-                    if (ch->channel->vtable->mark_read)
-                        ch->channel->vtable->mark_read(ch->channel->ctx, batch_key, key_len);
-=======
                 /* Trigger read receipt with human-like delay */
                 if (ch->channel->vtable->mark_read) {
                     uint32_t read_seed =
@@ -3566,7 +3561,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     usleep(read_delay_ms * 1000u);
                     ch->channel->vtable->mark_read(ch->channel->ctx, batch_key, key_len);
                 }
->>>>>>> 1c94875d (feat(voice): merge real-time voice streaming pipeline e2e)
                 {
                     uint32_t seen_seed =
                         (uint32_t)time(NULL) * 1103515245u + (uint32_t)(uintptr_t)combined;
@@ -8203,14 +8197,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         int best_score = best_ts.overall;
                         double orig_temp = agent->turn_temperature;
                         for (uint32_t ci = 0; ci < n_extra; ci++) {
-<<<<<<< HEAD
-                            agent->turn_temperature = (orig_temp > 0.0 ? orig_temp : agent->temperature) + 0.1 * (double)(ci + 1);
-                            if (agent->turn_temperature > 1.5) agent->turn_temperature = 1.5;
-                            char *cand = NULL; size_t cand_len = 0;
-                            hu_agent_clear_history(agent);
-                            hu_error_t cerr = hu_agent_turn(agent, combined, combined_len, &cand, &cand_len);
-                            if (cerr != HU_OK || !cand || cand_len == 0) { if (cand) alloc->free(alloc->ctx, cand, cand_len + 1); continue; }
-=======
                             agent->turn_temperature =
                                 (orig_temp > 0.0 ? orig_temp : agent->temperature) +
                                 0.1 * (double)(ci + 1);
@@ -8218,6 +8204,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 agent->turn_temperature = 1.5;
                             char *cand = NULL;
                             size_t cand_len = 0;
+                            hu_agent_clear_history(agent);
                             hu_error_t cerr =
                                 hu_agent_turn(agent, combined, combined_len, &cand, &cand_len);
                             if (cerr != HU_OK || !cand || cand_len == 0) {
@@ -8225,7 +8212,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     alloc->free(alloc->ctx, cand, cand_len + 1);
                                 continue;
                             }
->>>>>>> 1c94875d (feat(voice): merge real-time voice streaming pipeline e2e)
                             hu_turing_score_t cand_ts;
                             hu_turing_score_heuristic(cand, cand_len, combined, combined_len, &cand_ts);
                             if (agent->active_channel) hu_turing_apply_channel_weights(&cand_ts, agent->active_channel, agent->active_channel_len);

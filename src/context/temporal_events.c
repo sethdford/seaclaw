@@ -126,8 +126,8 @@ hu_error_t hu_temporal_events_mark_followed_up(sqlite3 *db, int64_t event_id) {
 
 int64_t hu_temporal_resolve_reference(const char *temporal_ref, size_t ref_len, int64_t now_ts) {
     if (!temporal_ref || ref_len == 0) return 0;
-    char lower[128];
-    size_t clen = ref_len < 127 ? ref_len : 127;
+    char lower[256];
+    size_t clen = ref_len < 255 ? ref_len : 255;
     for (size_t i = 0; i < clen; i++)
         lower[i] = (char)(temporal_ref[i] >= 'A' && temporal_ref[i] <= 'Z'
                           ? temporal_ref[i] + 32 : temporal_ref[i]);

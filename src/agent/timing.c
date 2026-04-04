@@ -181,6 +181,10 @@ static uint64_t sample_from_bucket(const hu_timing_bucket_t *bucket, uint32_t *s
 
 uint64_t hu_timing_model_sample(const hu_timing_model_t *model, uint8_t hour, uint8_t day_of_week,
                                 size_t incoming_msg_len, uint32_t seed) {
+    if (hour > 23)
+        hour = 23;
+    if (day_of_week > 6)
+        day_of_week = 6;
     if (!model)
         return hu_timing_model_sample_default(hour, seed);
 

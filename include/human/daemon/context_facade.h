@@ -9,6 +9,7 @@
 #include "human/context/context_ext.h"
 #include "human/context/conversation.h"
 #include "human/context/event_extract.h"
+#include "human/context/temporal_events.h"
 #include "human/context/humor.h"
 #include "human/context/intelligence.h"
 #include "human/context/mood.h"
