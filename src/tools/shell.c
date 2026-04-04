@@ -51,6 +51,18 @@ static hu_error_t shell_execute(void *ctx, hu_allocator_t *alloc, const hu_json_
         return HU_ERR_INVALID_ARGUMENT;
     }
 
+    /* Plan 12: Skill trust — reject dangerous commands before test stub
+     * so the guard is exercised in both test and production builds. */
+    {
+        const char *pre_cmd = hu_json_get_string(args, "command");
+        if (pre_cmd && strlen(pre_cmd) > 0) {
+            if (hu_skill_trust_inspect_command(pre_cmd, strlen(pre_cmd)) != HU_OK) {
+                *out = hu_tool_result_fail("command blocked by skill trust inspection", 41);
+                return HU_OK;
+            }
+        }
+    }
+
 #if HU_IS_TEST
     {
         const char *stub = "(shell disabled in test mode)";
@@ -78,12 +90,6 @@ static hu_error_t shell_execute(void *ctx, hu_allocator_t *alloc, const hu_json_
     size_t cmd_len = strlen(cmd);
     if (cmd_len > HU_SHELL_CMD_MAX) {
         *out = hu_tool_result_fail("command too long", 16);
-        return HU_OK;
-    }
-
-    /* Plan 12: Skill trust — reject commands with dangerous patterns */
-    if (hu_skill_trust_inspect_command(cmd, cmd_len) != HU_OK) {
-        *out = hu_tool_result_fail("command blocked by skill trust inspection", 41);
         return HU_OK;
     }
 
@@ -299,6 +305,17 @@ static hu_error_t shell_execute_streaming(void *ctx, hu_allocator_t *alloc,
         return HU_ERR_INVALID_ARGUMENT;
     }
 
+    /* Plan 12: Skill trust — reject dangerous commands before test stub (streaming) */
+    {
+        const char *pre_cmd = hu_json_get_string(args, "command");
+        if (pre_cmd && strlen(pre_cmd) > 0) {
+            if (hu_skill_trust_inspect_command(pre_cmd, strlen(pre_cmd)) != HU_OK) {
+                *out = hu_tool_result_fail("command blocked by skill trust inspection", 41);
+                return HU_OK;
+            }
+        }
+    }
+
 #if HU_IS_TEST
     const char *stub = "(shell disabled in test mode)";
     on_chunk(cb_ctx, stub, strlen(stub));
@@ -324,12 +341,6 @@ static hu_error_t shell_execute_streaming(void *ctx, hu_allocator_t *alloc,
     size_t cmd_len = strlen(cmd);
     if (cmd_len > HU_SHELL_CMD_MAX) {
         *out = hu_tool_result_fail("command too long", 16);
-        return HU_OK;
-    }
-
-    /* Plan 12: Skill trust — reject commands with dangerous patterns (streaming) */
-    if (hu_skill_trust_inspect_command(cmd, cmd_len) != HU_OK) {
-        *out = hu_tool_result_fail("command blocked by skill trust inspection", 41);
         return HU_OK;
     }
 

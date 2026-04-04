@@ -160,12 +160,15 @@ static void blend_buckets(const hu_timing_bucket_t *a, const hu_timing_bucket_t 
         *out = *a;
         return;
     }
-    out->p10 = (a->p10 + b->p10) / 2.0;
-    out->p25 = (a->p25 + b->p25) / 2.0;
-    out->p50 = (a->p50 + b->p50) / 2.0;
-    out->p75 = (a->p75 + b->p75) / 2.0;
-    out->p90 = (a->p90 + b->p90) / 2.0;
-    out->mean = (a->mean + b->mean) / 2.0;
+    double total = (double)(a->sample_count + b->sample_count);
+    double wa = (double)a->sample_count / total;
+    double wb = (double)b->sample_count / total;
+    out->p10 = a->p10 * wa + b->p10 * wb;
+    out->p25 = a->p25 * wa + b->p25 * wb;
+    out->p50 = a->p50 * wa + b->p50 * wb;
+    out->p75 = a->p75 * wa + b->p75 * wb;
+    out->p90 = a->p90 * wa + b->p90 * wb;
+    out->mean = a->mean * wa + b->mean * wb;
     out->sample_count = a->sample_count + b->sample_count;
 }
 

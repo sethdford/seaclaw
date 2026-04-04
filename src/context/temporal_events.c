@@ -146,14 +146,24 @@ int64_t hu_temporal_resolve_reference(const char *temporal_ref, size_t ref_len, 
             while (p < lower + clen && *p == ' ') p++;
             while (p < lower + clen && *p >= '0' && *p <= '9') {
                 num = num * 10 + (int)(*p - '0');
+                if (num > 100000) { num = 100000; break; }
                 p++;
             }
             if (num > 0) {
-                if (strstr(lower, "minute")) return now_ts + num * 60;
-                if (strstr(lower, "hour")) return now_ts + num * 3600;
-                if (strstr(lower, "day")) return now_ts + num * 86400;
-                if (strstr(lower, "week")) return now_ts + num * 7 * 86400;
-                if (strstr(lower, "month")) return now_ts + num * 30 * 86400;
+                /* Scan forward from digits for the unit token */
+                const char *unit_start = p;
+                while (unit_start < lower + clen && *unit_start == ' ') unit_start++;
+                size_t unit_rem = (size_t)(lower + clen - unit_start);
+                if (unit_rem >= 6 && memcmp(unit_start, "minute", 6) == 0)
+                    return now_ts + num * 60;
+                if (unit_rem >= 4 && memcmp(unit_start, "hour", 4) == 0)
+                    return now_ts + num * 3600;
+                if (unit_rem >= 3 && memcmp(unit_start, "day", 3) == 0)
+                    return now_ts + num * 86400;
+                if (unit_rem >= 4 && memcmp(unit_start, "week", 4) == 0)
+                    return now_ts + num * 7 * 86400;
+                if (unit_rem >= 5 && memcmp(unit_start, "month", 5) == 0)
+                    return now_ts + num * 30 * 86400;
                 return now_ts + num * 3600;
             }
         }

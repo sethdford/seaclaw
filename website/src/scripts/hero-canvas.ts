@@ -33,11 +33,7 @@ function createNoise2D(): (x: number, y: number) => number {
     return lerp(
       v,
       lerp(u, grad2(p[A], xf, yf), grad2(p[B], xf - 1, yf)),
-      lerp(
-        u,
-        grad2(p[A + 1], xf, yf - 1),
-        grad2(p[B + 1], xf - 1, yf - 1),
-      ),
+      lerp(u, grad2(p[A + 1], xf, yf - 1), grad2(p[B + 1], xf - 1, yf - 1)),
     );
   };
 }
@@ -151,11 +147,9 @@ export function initHeroCanvas(canvas: HTMLCanvasElement) {
 
     for (let i = 0; i < nodeCount; i++) {
       const [bx, by] = nodeBase[i];
-      let x =
-        bx * cw + orbitR[i] * Math.cos(t * 0.6 + orbitP[i]) * breath;
+      let x = bx * cw + orbitR[i] * Math.cos(t * 0.6 + orbitP[i]) * breath;
       let y =
-        by * ch +
-        orbitR[i] * Math.sin(t * 0.5 + orbitP[i] * 1.1) * breath;
+        by * ch + orbitR[i] * Math.sin(t * 0.5 + orbitP[i] * 1.1) * breath;
       x += 4 * noise(x * 0.005, t * 0.3);
       y += 4 * noise(y * 0.005 + 50, t * 0.3);
       if (mx >= 0) {
@@ -184,8 +178,7 @@ export function initHeroCanvas(canvas: HTMLCanvasElement) {
         const d = Math.sqrt(
           ((ax + bx) / 2 - mx) ** 2 + ((ay + by) / 2 - my) ** 2,
         );
-        if (d < MOUSE_RAD * 1.5)
-          alpha += 0.12 * (1 - d / (MOUSE_RAD * 1.5));
+        if (d < MOUSE_RAD * 1.5) alpha += 0.12 * (1 - d / (MOUSE_RAD * 1.5));
       }
       ctx.beginPath();
       ctx.moveTo(ax, ay);
@@ -201,10 +194,7 @@ export function initHeroCanvas(canvas: HTMLCanvasElement) {
       const rgb = isAccent[i] ? secondaryRGB : accentRGB;
       const a = Math.min(
         1,
-        0.5 *
-          (isAccent[i]
-            ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathP[i])
-            : 1),
+        0.5 * (isAccent[i] ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathP[i]) : 1),
       );
       ctx.beginPath();
       ctx.arc(x, y, 2.5, 0, Math.PI * 2);
@@ -227,14 +217,7 @@ export function initHeroCanvas(canvas: HTMLCanvasElement) {
     }
 
     if (mx >= 0) {
-      const g = ctx.createRadialGradient(
-        mx,
-        my,
-        0,
-        mx,
-        my,
-        MOUSE_RAD * 0.8,
-      );
+      const g = ctx.createRadialGradient(mx, my, 0, mx, my, MOUSE_RAD * 0.8);
       g.addColorStop(
         0,
         `rgba(${accentRGB[0]},${accentRGB[1]},${accentRGB[2]},0.08)`,

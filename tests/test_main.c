@@ -14,6 +14,7 @@ void run_data_loader_tests(void);
 void run_agent_modules_tests(void);
 void run_agent_definition_tests(void);
 void run_agent_git_tests(void);
+void run_task_store_tests(void);
 void run_compaction_hierarchical_tests(void);
 void run_tot_recursive_tests(void);
 void run_agent_subsystems_tests(void);
@@ -485,6 +486,7 @@ int main(int argc, char **argv) {
     run_agent_modules_tests();
     run_agent_definition_tests();
     run_agent_git_tests();
+    run_task_store_tests();
     run_compaction_hierarchical_tests();
     run_tot_recursive_tests();
     run_agent_subsystems_tests();

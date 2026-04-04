@@ -1096,7 +1096,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
     this._setupSuccess = false;
     try {
       const gw = this.gateway ?? this._boundGateway;
-      if (!gw || typeof (gw as Record<string, unknown>).voiceValidate !== "function") {
+      if (!gw || typeof (gw as unknown as Record<string, unknown>).voiceValidate !== "function") {
         this._setupError = "Gateway not connected";
         return;
       }

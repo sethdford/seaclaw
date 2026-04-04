@@ -1,5 +1,7 @@
 #include "human/security/skill_trust.h"
 #include "human/core/allocator.h"
+#include "human/tools/shell.h"
+#include "human/core/json.h"
 #include "test_framework.h"
 #include <string.h>
 
@@ -50,6 +52,50 @@ static void skill_trust_audit_test_mode(void) {
     HU_ASSERT_EQ(hu_skill_trust_audit_record(&a, &e), HU_OK);
 }
 
+static void skill_trust_shell_integration_blocks_dangerous(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t shell = {0};
+    HU_ASSERT_EQ(hu_shell_create(&alloc, "/tmp", 4, NULL, &shell), HU_OK);
+
+    hu_json_value_t *args = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, "{\"command\":\"rm -rf /\"}", 21, &args), HU_OK);
+    HU_ASSERT_NOT_NULL(args);
+
+    hu_tool_result_t result = {0};
+    hu_error_t err = shell.vtable->execute(shell.ctx, &alloc, args, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(result.output);
+    HU_ASSERT(strstr(result.output, "blocked by skill trust") != NULL);
+
+    if (result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len);
+    hu_json_free(&alloc, args);
+    if (shell.vtable->deinit)
+        shell.vtable->deinit(shell.ctx, &alloc);
+}
+
+static void skill_trust_shell_integration_allows_safe(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tool_t shell = {0};
+    HU_ASSERT_EQ(hu_shell_create(&alloc, "/tmp", 4, NULL, &shell), HU_OK);
+
+    hu_json_value_t *args = NULL;
+    HU_ASSERT_EQ(hu_json_parse(&alloc, "{\"command\":\"echo hello\"}", 23, &args), HU_OK);
+    HU_ASSERT_NOT_NULL(args);
+
+    hu_tool_result_t result = {0};
+    hu_error_t err = shell.vtable->execute(shell.ctx, &alloc, args, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(result.output);
+    HU_ASSERT(strstr(result.output, "blocked") == NULL);
+
+    if (result.output)
+        alloc.free(alloc.ctx, (void *)result.output, result.output_len);
+    hu_json_free(&alloc, args);
+    if (shell.vtable->deinit)
+        shell.vtable->deinit(shell.ctx, &alloc);
+}
+
 void run_skill_trust_tests(void) {
     HU_TEST_SUITE("SkillTrust");
     HU_RUN_TEST(skill_trust_inspect_safe_command);
@@ -61,4 +107,6 @@ void run_skill_trust_tests(void) {
     HU_RUN_TEST(skill_trust_verify_trusted_publisher);
     HU_RUN_TEST(skill_trust_verify_untrusted_publisher);
     HU_RUN_TEST(skill_trust_audit_test_mode);
+    HU_RUN_TEST(skill_trust_shell_integration_blocks_dangerous);
+    HU_RUN_TEST(skill_trust_shell_integration_allows_safe);
 }

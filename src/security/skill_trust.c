@@ -228,6 +228,7 @@ hu_error_t hu_skill_trust_audit_record(hu_allocator_t *alloc, const hu_skill_aud
 #endif
 }
 
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static int build_publishers_path(char *out, size_t out_cap) {
     const char *home = getenv("HOME");
     if (!home || !home[0])
@@ -279,6 +280,7 @@ static hu_error_t read_file_contents(hu_allocator_t *alloc, const char *path, ch
     *out_len = n;
     return HU_OK;
 }
+#endif
 
 hu_error_t hu_skill_trust_load_publishers(hu_allocator_t *alloc, hu_publisher_key_t **out,
                                           size_t *out_count) {

@@ -221,7 +221,9 @@ const tools = [
       }
       .tagline-text {
         display: inline-block;
-        transition: opacity 0.4s ease, transform 0.4s ease;
+        transition:
+          opacity 0.4s ease,
+          transform 0.4s ease;
       }
       .tagline-text.hu-fidget-out {
         opacity: 0;
@@ -3129,7 +3131,11 @@ const tools = [
         // ═══ Living tagline — h-uman's inner monologue ═══
         (function taglineFidget() {
           var _el = document.querySelector("#hero-tagline .tagline-text");
-          if (!_el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+          if (
+            !_el ||
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          )
+            return;
           var el = _el as HTMLElement;
 
           var BASE = "almost human.";
@@ -3171,8 +3177,9 @@ const tools = [
 
           function pick() {
             var p;
-            do { p = EXPRESSIONS[Math.floor(Math.random() * EXPRESSIONS.length)]; }
-            while (p === last && EXPRESSIONS.length > 1);
+            do {
+              p = EXPRESSIONS[Math.floor(Math.random() * EXPRESSIONS.length)];
+            } while (p === last && EXPRESSIONS.length > 1);
             last = p;
             return p;
           }
@@ -3184,30 +3191,44 @@ const tools = [
 
             // Fade out
             el.classList.add("hu-fidget-out");
-            setTimeout(function() {
+            setTimeout(function () {
               // Swap text while invisible
               el.textContent = phrase;
               // Fade in
               el.classList.remove("hu-fidget-out");
 
               // Hold, then fade back to base
-              setTimeout(function() {
-                el.classList.add("hu-fidget-out");
-                setTimeout(function() {
-                  el.textContent = BASE;
-                  el.classList.remove("hu-fidget-out");
-                  busy = false;
-                }, 400);
-              }, 2500 + Math.random() * 1500);
+              setTimeout(
+                function () {
+                  el.classList.add("hu-fidget-out");
+                  setTimeout(function () {
+                    el.textContent = BASE;
+                    el.classList.remove("hu-fidget-out");
+                    busy = false;
+                  }, 400);
+                },
+                2500 + Math.random() * 1500,
+              );
             }, 400);
           }
 
           function schedule() {
-            setTimeout(function() { fidget(); schedule(); }, 8000 + Math.random() * 17000);
+            setTimeout(
+              function () {
+                fidget();
+                schedule();
+              },
+              8000 + Math.random() * 17000,
+            );
           }
 
           // First fidget after a discovery delay
-          setTimeout(function() { schedule(); }, 4000 + Math.random() * 6000);
+          setTimeout(
+            function () {
+              schedule();
+            },
+            4000 + Math.random() * 6000,
+          );
         })();
 
         // ═══ Custom cursor (hero-only, desktop, no touch) ═══

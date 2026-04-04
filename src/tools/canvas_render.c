@@ -1,7 +1,9 @@
+#define _DEFAULT_SOURCE
 #include "human/tools/canvas_render.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifdef _WIN32
@@ -284,5 +286,6 @@ hu_error_t hu_canvas_render_to_image(hu_allocator_t *alloc, const char *content,
         return HU_ERR_NOT_SUPPORTED;
 #endif
     }
+    return HU_ERR_NOT_SUPPORTED;
 #endif
 }

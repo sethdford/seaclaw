@@ -941,15 +941,27 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         }
 
 #ifndef HU_IS_TEST
-        /* Plan 7: Markdown agent definition (SOUL.md, RULES.md, etc.) */
+        /* Plan 7: Markdown agent definition (SOUL.md, RULES.md, etc.)
+         * Apply soul traits and body as persona prompt when no persona is already set. */
         {
             hu_agent_definition_t adef = {0};
-            if (hu_agent_definition_load(alloc, ws, &adef) == HU_OK)
+            if (hu_agent_definition_load(alloc, ws, &adef) == HU_OK) {
+                if (adef.soul_body && !bi->agent.persona_prompt) {
+                    size_t blen = strlen(adef.soul_body);
+                    bi->agent.persona_prompt =
+                        (char *)alloc->alloc(alloc->ctx, blen + 1);
+                    if (bi->agent.persona_prompt) {
+                        memcpy(bi->agent.persona_prompt, adef.soul_body, blen + 1);
+                        bi->agent.persona_prompt_len = blen;
+                    }
+                }
                 hu_agent_definition_deinit(&adef, alloc);
+            }
         }
 
-        /* Plan 10: Git-native agent versioning */
+        /* Plan 10: Git-native agent versioning — init repo, snapshot after agent setup */
         (void)hu_agent_git_init(alloc, ws);
+        (void)hu_agent_git_snapshot(alloc, ws, "bootstrap");
 #endif
 
         ctx->agent = &bi->agent;

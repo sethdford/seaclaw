@@ -2435,8 +2435,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (agent && agent->memory && agent->sota.sota_initialized &&
                         (last_dpo_train == 0 || ((int64_t)t - last_dpo_train) >= dpo_interval)) {
                         sqlite3 *dpo_db = hu_sqlite_memory_get_db(agent->memory);
-                        last_dpo_train = (int64_t)t;
                         if (dpo_db) {
+                            last_dpo_train = (int64_t)t;
                             hu_dpo_train_result_t dpo_result = {0};
                             hu_error_t dpo_err = hu_dpo_train_step(
                                 &agent->sota.dpo_collector, alloc, &agent->provider,

@@ -78,47 +78,68 @@ static CONST_UNUSED hu_critique_verdict_t parse_verdict(const char *resp, size_t
 
     if (len >= 4 && (p[0] == 'P' || p[0] == 'p') && (p[1] == 'A' || p[1] == 'a') &&
         (p[2] == 'S' || p[2] == 's') && (p[3] == 'S' || p[3] == 's') &&
-        (len == 4 || !isalpha((unsigned char)p[4])))
+        (len == 4 || !isalnum((unsigned char)p[4])))
         return HU_CRITIQUE_PASS;
     if (len >= 5 && (p[0] == 'M' || p[0] == 'm') && (p[1] == 'I' || p[1] == 'i') &&
         (p[2] == 'N' || p[2] == 'n') && (p[3] == 'O' || p[3] == 'o') &&
-        (p[4] == 'R' || p[4] == 'r') && (len == 5 || !isalpha((unsigned char)p[5])))
+        (p[4] == 'R' || p[4] == 'r') && (len == 5 || !isalnum((unsigned char)p[5])))
         return HU_CRITIQUE_MINOR;
     if (len >= 7 && (p[0] == 'R' || p[0] == 'r') && (p[1] == 'E' || p[1] == 'e') &&
         (p[2] == 'W' || p[2] == 'w') && (p[3] == 'R' || p[3] == 'r') &&
         (p[4] == 'I' || p[4] == 'i') && (p[5] == 'T' || p[5] == 't') &&
-        (p[6] == 'E' || p[6] == 'e'))
+        (p[6] == 'E' || p[6] == 'e') && (len == 7 || !isalnum((unsigned char)p[7])))
         return HU_CRITIQUE_REWRITE;
 
     return HU_CRITIQUE_PASS;
 }
 
-/* Extract principle index from response (e.g. "principle 2" or "principle 2") */
+/* Scan digits, capped to prevent overflow. Returns -1 if no digits found. */
+static CONST_UNUSED int scan_capped_int(const char **pp, const char *end) {
+    const char *p = *pp;
+    while (p < end && (isspace((unsigned char)*p) || *p == '#' || *p == ':'))
+        p++;
+    if (p >= end || *p < '0' || *p > '9') return -1;
+    int idx = 0;
+    while (p < end && *p >= '0' && *p <= '9') {
+        idx = idx * 10 + (int)(*p - '0');
+        if (idx > 999) { idx = 999; break; }
+        p++;
+    }
+    *pp = p;
+    return idx;
+}
+
+/* Extract principle index from response. Tries "principle N" first, then
+ * falls back to the first integer after the verdict keyword. */
 static CONST_UNUSED int parse_principle_index(const char *resp, size_t resp_len) {
-    if (!resp || resp_len < 9)
+    if (!resp || resp_len == 0)
         return -1;
     const char *p = resp;
     const char *end = resp + resp_len;
+    /* Try "principle" keyword first */
     while (p + 9 <= end) {
         if ((p[0] == 'p' || p[0] == 'P') && (p[1] == 'r' || p[1] == 'R') &&
             (p[2] == 'i' || p[2] == 'I') && (p[3] == 'n' || p[3] == 'N') &&
             (p[4] == 'c' || p[4] == 'C') && (p[5] == 'i' || p[5] == 'I') &&
             (p[6] == 'p' || p[6] == 'P') && (p[7] == 'l' || p[7] == 'L') &&
             (p[8] == 'e' || p[8] == 'E')) {
-            p += 9;
-            while (p < end && (isspace((unsigned char)*p) || *p == '#' || *p == ':'))
-                p++;
-            if (p < end && *p >= '0' && *p <= '9') {
-                int idx = (int)(*p - '0');
-                p++;
-                while (p < end && *p >= '0' && *p <= '9') {
-                    idx = idx * 10 + (int)(*p - '0');
-                    p++;
-                }
-                return idx;
-            }
+            const char *after = p + 9;
+            int idx = scan_capped_int(&after, end);
+            if (idx >= 0) return idx;
         }
         p++;
+    }
+    /* Fallback: first integer after the verdict keyword */
+    p = resp;
+    while (p < end && (isspace((unsigned char)*p) || *p == '\n'))
+        p++;
+    /* Skip past verdict word */
+    while (p < end && isalpha((unsigned char)*p))
+        p++;
+    {
+        const char *fp = p;
+        int idx = scan_capped_int(&fp, end);
+        if (idx >= 0) return idx;
     }
     return -1;
 }
