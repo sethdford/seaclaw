@@ -1,6 +1,7 @@
 #include "test_framework.h"
 #include "human/agent/constitutional.h"
 #include "human/config.h"
+#include "human/context/event_extract.h"
 #include "human/core/allocator.h"
 #include <string.h>
 #include <time.h>

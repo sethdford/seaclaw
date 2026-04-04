@@ -1087,7 +1087,7 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                         hu_temporal_events_init_table(tev_db);
                         hu_temporal_events_store_batch(tev_db, cp->contact_id,
                                                        strlen(cp->contact_id),
-                                                       &extract_result,
+                                                       (const struct hu_deep_extract_result *)&extract_result,
                                                        (int64_t)now);
                     }
                 }
