@@ -122,7 +122,6 @@ static void temporal_resolve_case_insensitive(void) {
     HU_ASSERT_EQ(resolved, now + 86400);
 }
 
-#if 0 /* broken temporal events + timing tests */
 /* ─── Temporal events SQLite ─── */
 
 static void temporal_events_init_table_creates_table(void) {
@@ -296,7 +295,6 @@ static void timing_model_learn_null_args(void) {
     HU_ASSERT_EQ(hu_timing_model_learn_from_db(&model, NULL, "x", 1),
                   HU_ERR_INVALID_ARGUMENT);
 }
-#endif /* #if 0 */
 #endif
 
 void run_sota_humanness_tests(void) {

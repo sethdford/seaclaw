@@ -1,6 +1,7 @@
 #include "cp_internal.h"
 #include "human/core/string.h"
 #include "human/tools/canvas.h"
+#include "human/tools/canvas_store.h"
 
 #ifdef HU_GATEWAY_POSIX
 

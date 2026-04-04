@@ -406,6 +406,8 @@ set(HU_CORE_SOURCES
     src/gateway/cp_turing.c
     src/gateway/cp_mcp.c
     src/gateway/cp_security.c
+    src/gateway/cp_canvas.c
+    src/gateway/cp_tasks.c
     src/gateway/mcp_context.c
     src/agent/prompt_cache.c
     src/agent/agent_comm.c
@@ -708,6 +710,7 @@ set(HU_CORE_SOURCES
     src/tools/media_gif.c
     src/tools/factory.c
     src/tools/canvas_render.c
+    src/tools/canvas_store.c
     src/tools/declarative.c
     src/tools/mcp_resource_tools.c
     src/tools/cron_session_tools.c
@@ -1955,9 +1958,9 @@ set(HU_TEST_SOURCES
     tests/test_agent_git.c
     tests/test_bg_registry.c
     tests/test_canvas_render.c
-
-
-
+    tests/test_canvas_e2e.c
+    tests/test_canvas_persist.c
+    tests/test_canvas_tool.c
     tests/test_consistency.c
     tests/test_fact_extract.c
     tests/test_hallucination_guard.c
