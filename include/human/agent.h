@@ -40,10 +40,7 @@
 #include "human/security/escalate.h"
 #include "human/security/delegation.h"
 #include "human/tools/validation.h"
-<<<<<<< HEAD
-=======
 #include "human/usage.h"
->>>>>>> fix/sota-audit-fixes
 #include "human/webhook.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/meta_learning.h"
@@ -375,13 +372,10 @@ struct hu_agent {
 
     /* Webhook manager for incoming webhook event handling */
     hu_webhook_manager_t *webhook_manager; /* optional; NULL = no webhooks */
-<<<<<<< HEAD
-=======
 
     /* Media generation: tool-produced file paths accumulated per turn */
     char *generated_media[4];
     size_t generated_media_count;
->>>>>>> fix/sota-audit-fixes
 };
 
 /* Create agent from minimal config (no full config loader yet).

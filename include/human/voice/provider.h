@@ -22,6 +22,12 @@ typedef struct hu_voice_provider_vtable {
     hu_error_t (*cancel_response)(void *ctx);
     void (*disconnect)(void *ctx, hu_allocator_t *alloc);
     const char *(*get_name)(void *ctx);
+    hu_error_t (*send_activity_start)(void *ctx);
+    hu_error_t (*send_activity_end)(void *ctx);
+    hu_error_t (*send_audio_stream_end)(void *ctx);
+    hu_error_t (*reconnect)(void *ctx);
+    hu_error_t (*send_tool_response)(void *ctx, const char *name, const char *call_id,
+                                     const char *response_json);
 } hu_voice_provider_vtable_t;
 
 typedef struct hu_voice_provider {
@@ -33,5 +39,32 @@ typedef struct hu_voice_provider {
 hu_error_t hu_voice_provider_openai_create(hu_allocator_t *alloc,
                                             const hu_voice_rt_config_t *config,
                                             hu_voice_provider_t *out);
+
+struct hu_gemini_live_config;
+hu_error_t hu_voice_provider_gemini_live_create(hu_allocator_t *alloc,
+                                                const struct hu_gemini_live_config *config,
+                                                hu_voice_provider_t *out);
+
+typedef struct hu_voice_provider_extras {
+    const char *system_instruction;
+    const char *tools_json;
+    const char *voice_id;
+    const char *model_id;
+    const char *api_key;
+    const char *vertex_region;
+    const char *vertex_project;
+    const char *vertex_access_token;
+    int sample_rate;
+} hu_voice_provider_extras_t;
+
+struct hu_config;
+hu_error_t hu_voice_provider_create_from_config(hu_allocator_t *alloc,
+                                                const struct hu_config *config, const char *mode,
+                                                const hu_voice_provider_extras_t *extras,
+                                                hu_voice_provider_t *out);
+
+hu_error_t hu_voice_provider_create_from_extras(hu_allocator_t *alloc, const char *mode,
+                                                const hu_voice_provider_extras_t *extras,
+                                                hu_voice_provider_t *out);
 
 #endif
