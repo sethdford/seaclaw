@@ -665,6 +665,7 @@ set(HU_CORE_SOURCES
     src/tools/report.c
     src/tools/broadcast.c
     src/tools/send_message.c
+    src/tools/send_voice_message.c
     src/tools/calendar.c
     src/tools/skill_write.c
     src/tools/pwa.c
@@ -1994,6 +1995,7 @@ set(HU_TEST_SOURCES
     tests/test_sota_wiring.c
     tests/test_sota_live_wiring.c
     tests/test_voice_rt_openai.c
+    tests/test_voice_provider.c
     tests/test_voice_session.c
     tests/test_autonomy.c
     tests/test_retrieval.c
@@ -2194,6 +2196,8 @@ list(APPEND HU_TEST_SOURCES tests/test_cartesia.c)
 list(APPEND HU_TEST_SOURCES tests/test_cartesia_stream.c)
 list(APPEND HU_TEST_SOURCES tests/test_voice_clone.c)
 list(APPEND HU_TEST_SOURCES tests/test_transcript_prep.c)
+list(APPEND HU_TEST_SOURCES tests/test_send_voice_message.c)
+list(APPEND HU_TEST_SOURCES tests/test_voice_message_integration.c)
 if(HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_SOURCES tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)
 endif()

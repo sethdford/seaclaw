@@ -63,6 +63,7 @@ void run_multimodal_video_tests(void);
 void run_voice_duplex_tests(void);
 void run_turn_signal_tests(void);
 void run_voice_rt_openai_tests(void);
+void run_voice_provider_tests(void);
 void run_voice_session_tests(void);
 void run_autonomy_tests(void);
 void run_retrieval_tests(void);
@@ -312,6 +313,8 @@ void run_paperclip_tests(void);
 void run_cartesia_tests(void);
 void run_cartesia_stream_tests(void);
 void run_transcript_prep_tests(void);
+void run_send_voice_message_tests(void);
+void run_voice_message_integration_tests(void);
 void register_voice_clone_tests(void);
 #ifdef HU_ENABLE_CARTESIA
 void run_audio_pipeline_tests(void);
@@ -502,6 +505,7 @@ int main(int argc, char **argv) {
     run_voice_duplex_tests();
     run_turn_signal_tests();
     run_voice_rt_openai_tests();
+    run_voice_provider_tests();
     run_voice_session_tests();
     run_autonomy_tests();
     run_retrieval_tests();
@@ -742,6 +746,8 @@ int main(int argc, char **argv) {
     run_cartesia_tests();
     run_cartesia_stream_tests();
     run_transcript_prep_tests();
+    run_send_voice_message_tests();
+    run_voice_message_integration_tests();
     register_voice_clone_tests();
 #ifdef HU_ENABLE_CARTESIA
     run_audio_pipeline_tests();
