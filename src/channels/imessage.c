@@ -111,6 +111,7 @@ typedef struct hu_imessage_ctx {
     size_t sent_ring_idx;
     char typing_last_target[128];
     size_t typing_last_target_len;
+    bool use_imsg_cli;
     bool imsg_cli_checked;
     bool has_imsg_cli;
 #if HU_IS_TEST
@@ -219,6 +220,7 @@ bool hu_imessage_user_responded_recently(void *channel_ctx, const char *handle, 
 #endif
 #endif
 
+#if defined(__APPLE__) && defined(__MACH__)
 /* Check if the imsg CLI (steipete/imsg) is available on $PATH.
  * Caches the result after first check. Requires HU_IS_TEST=0. */
 static bool imsg_cli_available(hu_imessage_ctx_t *c) {
@@ -240,6 +242,7 @@ static bool imsg_cli_available(hu_imessage_ctx_t *c) {
 #endif
     return c->has_imsg_cli;
 }
+#endif /* __APPLE__ && __MACH__ */
 
 static hu_error_t imessage_start(void *ctx) {
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
@@ -552,31 +555,34 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
             }
         }
 
+        {
+            bool try_imsg = c->use_imsg_cli;
 #ifdef HU_IMESSAGE_SEND_IMSG
-        /* Try imsg CLI first for faster, more reliable sending */
-        if (imsg_cli_available(c)) {
-            char tgt_buf[256];
-            size_t tb = tgt_len < sizeof(tgt_buf) - 1 ? tgt_len : sizeof(tgt_buf) - 1;
-            memcpy(tgt_buf, tgt, tb);
-            tgt_buf[tb] = '\0';
-            const char *imsg_argv[] = {
-                "imsg", "send", "--to", tgt_buf, "--text", message,
-                "--service", "imessage", NULL};
-            hu_run_result_t imsg_result = {0};
-            hu_error_t imsg_err =
-                hu_process_run(c->alloc, imsg_argv, NULL, 65536, &imsg_result);
-            bool imsg_ok =
-                (imsg_err == HU_OK && imsg_result.success && imsg_result.exit_code == 0);
-            hu_run_result_free(c->alloc, &imsg_result);
-            if (imsg_ok) {
-                imessage_record_sent(c, message, message_len);
-                goto imsg_media;
-            }
-            if (getenv("HU_DEBUG"))
-                hu_log_info("imessage", NULL,
-                            "imsg send failed, falling back to AppleScript");
-        }
+            try_imsg = true;
 #endif
+            if (try_imsg && imsg_cli_available(c)) {
+                char tgt_buf[256];
+                size_t tb = tgt_len < sizeof(tgt_buf) - 1 ? tgt_len : sizeof(tgt_buf) - 1;
+                memcpy(tgt_buf, tgt, tb);
+                tgt_buf[tb] = '\0';
+                const char *imsg_argv[] = {
+                    "imsg", "send", "--to", tgt_buf, "--text", message,
+                    "--service", "imessage", NULL};
+                hu_run_result_t imsg_result = {0};
+                hu_error_t imsg_err =
+                    hu_process_run(c->alloc, imsg_argv, NULL, 65536, &imsg_result);
+                bool imsg_ok =
+                    (imsg_err == HU_OK && imsg_result.success && imsg_result.exit_code == 0);
+                hu_run_result_free(c->alloc, &imsg_result);
+                if (imsg_ok) {
+                    imessage_record_sent(c, message, message_len);
+                    goto imsg_media;
+                }
+                if (getenv("HU_DEBUG"))
+                    hu_log_info("imessage", NULL,
+                                "imsg send failed, falling back to AppleScript");
+            }
+        }
         /* Escaped strings: worst case 2x length */
         size_t msg_esc_cap = message_len * 2 + 1;
         size_t tgt_esc_cap = tgt_len * 2 + 1;
@@ -716,9 +722,7 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
     }
 
 #if !HU_IS_TEST
-#ifdef HU_IMESSAGE_SEND_IMSG
 imsg_media:
-#endif
     /* Send media attachments (local file paths only) after text succeeds */
     if (send_err == HU_OK && media && media_count > 0) {
         size_t m_tgt_cap = tgt_len * 2 + 1;
@@ -1797,10 +1801,11 @@ static hu_error_t imessage_start_typing(void *ctx, const char *recipient,
     const char *argv[] = {"osascript", "-e", script, NULL};
     hu_run_result_t result = {0};
     hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
+    bool ok = (err == HU_OK && result.exit_code == 0);
     hu_run_result_free(c->alloc, &result);
-    if (err != HU_OK && getenv("HU_DEBUG"))
+    if (!ok && getenv("HU_DEBUG"))
         hu_log_error("imessage", NULL, "start_typing failed (accessibility?)");
-    return err;
+    return ok ? HU_OK : (err != HU_OK ? err : HU_ERR_INTERNAL);
 #endif
 }
 
@@ -1832,8 +1837,9 @@ static hu_error_t imessage_stop_typing(void *ctx, const char *recipient,
     const char *argv[] = {"osascript", "-e", script, NULL};
     hu_run_result_t result = {0};
     hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
+    bool ok = (err == HU_OK && result.exit_code == 0);
     hu_run_result_free(c->alloc, &result);
-    return err;
+    return ok ? HU_OK : (err != HU_OK ? err : HU_ERR_INTERNAL);
 #endif
 }
 
@@ -1933,6 +1939,13 @@ bool hu_imessage_is_configured(hu_channel_t *ch) {
         return false;
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ch->ctx;
     return c->default_target != NULL && c->default_target_len > 0;
+}
+
+void hu_imessage_set_use_imsg_cli(hu_channel_t *ch, bool use) {
+    if (!ch || !ch->ctx)
+        return;
+    hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ch->ctx;
+    c->use_imsg_cli = use;
 }
 
 void hu_imessage_destroy(hu_channel_t *ch) {
