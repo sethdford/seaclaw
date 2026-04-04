@@ -76,6 +76,7 @@
 #include "human/agent/arbitrator.h"
 #include "human/agent/governor.h"
 #include "human/agent/timing.h"
+#include "human/eval/turing_adversarial.h"
 #include "human/eval/turing_score.h"
 #include "human/feeds/awareness.h"
 #include "human/feeds/findings.h"
@@ -2753,6 +2754,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     }
                                     hu_self_improve_deinit(&si_engine);
                                 }
+                            }
+
+                            /* Adversarial Turing cycle: generate dimension-targeted probes,
+                             * score heuristically, and record mutations */
+                            {
+                                hu_self_improve_state_t adv_state;
+                                memset(&adv_state, 0, sizeof(adv_state));
+                                hu_fidelity_score_t adv_baseline = {.composite = 0.5f};
+                                hu_self_improve_set_baseline(&adv_state, &adv_baseline);
+                                size_t adv_mutations = 0;
+                                hu_error_t adv_err = hu_turing_adversarial_run_cycle(
+                                    alloc, &adv_state, dim_avgs, &adv_mutations);
+                                if (adv_err == HU_OK && adv_mutations > 0)
+                                    hu_log_info("daemon", NULL,
+                                                "[turing-adversarial] applied %zu mutations",
+                                                adv_mutations);
                             }
                         }
 #endif
@@ -9956,6 +9973,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
+#ifdef HU_ENABLE_IMESSAGE
                 /* GIF calibration: detect positive tapbacks on our GIF messages via SQL */
                 {
                     int gif_taps = hu_imessage_count_recent_gif_tapbacks(batch_key, key_len);
@@ -9977,6 +9995,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+#endif
 
                 /* GIF reaction: send a GIF when the moment calls for it */
                 bool gif_sent_this_turn = false;
