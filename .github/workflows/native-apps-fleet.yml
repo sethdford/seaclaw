@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Cache Xcode DerivedData
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Developer/Xcode/DerivedData
           key: ${{ runner.os }}-xcode-dd-${{ hashFiles('apps/ios/**/*.swift', 'apps/ios/project.yml', 'apps/shared/HumanKit/**/*.swift') }}
@@ -68,7 +68,7 @@ jobs:
             ${{ runner.os }}-xcode-dd-
 
       - name: Cache Homebrew downloads (XcodeGen)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Caches/Homebrew
           key: ${{ runner.os }}-brew-${{ hashFiles('.github/workflows/native-apps-fleet.yml', '.github/actions/ios-uitest/**') }}
@@ -83,7 +83,7 @@ jobs:
 
       - name: Upload xcresult + log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-${{ matrix.slug }}-xcresult
           path: |
@@ -108,7 +108,7 @@ jobs:
           java-version: "17"
 
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -133,7 +133,7 @@ jobs:
 
       - name: Upload Android test outputs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-api${{ matrix.api-level }}-outputs
           path: |
