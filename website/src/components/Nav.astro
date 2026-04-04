@@ -314,14 +314,46 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       });
     } else {
       if (menu) menu.classList.remove("is-open");
+      const focusableSelector = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      function trapFocus(e: KeyboardEvent) {
+        if (e.key !== "Tab" || !menu) return;
+        const focusable = [...menu.querySelectorAll(focusableSelector)] as HTMLElement[];
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
       btn?.addEventListener("click", () => {
         const open = menu?.classList.toggle("is-open") ?? false;
         setExpanded(open);
+        if (open && menu) {
+          document.addEventListener("keydown", trapFocus);
+          const firstLink = menu.querySelector(focusableSelector) as HTMLElement;
+          firstLink?.focus();
+        } else {
+          document.removeEventListener("keydown", trapFocus);
+          btn?.focus();
+        }
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && menu?.classList.contains("is-open")) {
+          menu.classList.remove("is-open");
+          setExpanded(false);
+          document.removeEventListener("keydown", trapFocus);
+          btn?.focus();
+        }
       });
       menu?.querySelectorAll(".mobile-menu-link").forEach((link) => {
         link.addEventListener("click", () => {
           menu.classList.remove("is-open");
           setExpanded(false);
+          document.removeEventListener("keydown", trapFocus);
         });
       });
     }

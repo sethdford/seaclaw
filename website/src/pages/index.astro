@@ -2799,64 +2799,48 @@ const tools = [
           var tid = setTimeout(once, 3000);
         }
 
+        function easeOutPower3(t: number) { return 1 - Math.pow(1 - t, 3); }
+
+        function tweenValue(from: number, to: number, dur: number, delay: number, onUpdate: (v: number) => void, onDone?: () => void) {
+          const s = performance.now() + delay;
+          function tick(now: number) {
+            if (now < s) { requestAnimationFrame(tick); return; }
+            const p = Math.min((now - s) / dur, 1);
+            onUpdate(from + (to - from) * easeOutPower3(p));
+            if (p < 1) requestAnimationFrame(tick); else if (onDone) onDone();
+          }
+          requestAnimationFrame(tick);
+        }
+
+        function fadeIn(el: HTMLElement, dur = 600, d = 0) {
+          el.style.opacity = "0";
+          el.style.transition = `opacity ${dur}ms ease-out ${d}ms`;
+          requestAnimationFrame(() => { el.style.opacity = "1"; });
+        }
+
         afterLcp(() => {
           // ═══ Count-up numbers (lazy GSAP) ═══
           const numbersGrid = document.querySelector(".numbers-grid");
           if (numbersGrid) {
             const numbersObs = new IntersectionObserver(
-              async (entries) => {
+              (entries) => {
                 if (!entries[0]?.isIntersecting) return;
                 numbersObs.disconnect();
-                try {
-                  const { gsap } = await import("gsap");
-                  document
-                    .querySelectorAll(".number-item")
-                    .forEach((item, i) => {
-                      const el = item.querySelector(
-                        "[data-count]",
-                      ) as HTMLElement;
-                      if (!el) return;
-                      const target = parseInt(el.dataset.count || "0");
-                      const valSpan = el.querySelector(".count-value");
-                      if (!valSpan) return;
-                      const obj = { val: 0 };
-                      gsap.to(obj, {
-                        val: target,
-                        duration: 1.5,
-                        ease: "power3.out",
-                        delay: i * 0.08,
-                        onUpdate: () => {
-                          valSpan.textContent =
-                            target > 100
-                              ? Math.round(obj.val).toLocaleString()
-                              : Math.round(obj.val).toString();
-                        },
-                        onComplete: () => {
-                          gsap.fromTo(
-                            item,
-                            { scale: 1 },
-                            {
-                              scale: 1.04,
-                              duration: 0.15,
-                              yoyo: true,
-                              repeat: 1,
-                              ease: "power2.out",
-                            },
-                          );
-                        },
-                      });
-                    });
-                } catch (e) {
-                  void e;
-                  document
-                    .querySelectorAll(".number-item [data-count]")
-                    .forEach((el) => {
-                      const valSpan = el.querySelector(".count-value");
-                      if (valSpan)
-                        valSpan.textContent =
-                          (el as HTMLElement).dataset.count || "0";
-                    });
-                }
+                document.querySelectorAll(".number-item").forEach((item, i) => {
+                  const el = item.querySelector("[data-count]") as HTMLElement;
+                  if (!el) return;
+                  const target = parseInt(el.dataset.count || "0");
+                  const valSpan = el.querySelector(".count-value");
+                  if (!valSpan) return;
+                  tweenValue(0, target, 1500, i * 80,
+                    (v) => { valSpan.textContent = target > 100 ? Math.round(v).toLocaleString() : Math.round(v).toString(); },
+                    () => {
+                      (item as HTMLElement).style.transition = "transform 0.15s ease-out";
+                      (item as HTMLElement).style.transform = "scale(1.04)";
+                      setTimeout(() => { (item as HTMLElement).style.transform = "scale(1)"; }, 150);
+                    },
+                  );
+                });
               },
               { threshold: 0.15 },
             );
@@ -2867,47 +2851,26 @@ const tools = [
           const archDiagram = document.getElementById("arch-diagram");
           if (archDiagram) {
             const archObs = new IntersectionObserver(
-              async (entries) => {
+              (entries) => {
                 if (!entries[0]?.isIntersecting) return;
                 archObs.disconnect();
-                try {
-                  const { gsap } = await import("gsap");
-                  const archTl = gsap.timeline({
-                    defaults: { ease: "power3.out" },
+                const core = document.getElementById("arch-core");
+                if (core) { core.style.transition = "opacity 0.6s ease-out"; core.style.opacity = "1"; }
+                document.querySelectorAll(".arch-line").forEach((el, i) => {
+                  const line = el as SVGElement;
+                  line.setAttribute("stroke-dasharray", "200");
+                  line.setAttribute("stroke-dashoffset", "200");
+                  line.style.transition = `stroke-dashoffset 0.7s ease-out ${300 + i * 60}ms`;
+                  requestAnimationFrame(() => {
+                    line.setAttribute("stroke-dashoffset", "0");
+                    line.setAttribute("stroke", "var(--color-accent)");
                   });
-                  archTl
-                    .to("#arch-core", { opacity: 1, duration: 0.6 })
-                    .fromTo(
-                      ".arch-line",
-                      {
-                        attr: {
-                          "stroke-dasharray": "200",
-                          "stroke-dashoffset": "200",
-                        },
-                      },
-                      {
-                        attr: {
-                          "stroke-dashoffset": "0",
-                          stroke: "var(--color-accent)",
-                        },
-                        duration: 0.7,
-                        stagger: 0.06,
-                      },
-                      0.3,
-                    )
-                    .to(
-                      ".arch-node",
-                      { opacity: 1, duration: 0.5, stagger: 0.08 },
-                      0.6,
-                    );
-                } catch (e) {
-                  void e;
-                  document
-                    .querySelectorAll("#arch-core, .arch-line, .arch-node")
-                    .forEach((el) => {
-                      (el as HTMLElement).style.opacity = "1";
-                    });
-                }
+                });
+                document.querySelectorAll(".arch-node").forEach((el, i) => {
+                  const node = el as HTMLElement;
+                  node.style.transition = `opacity 0.5s ease-out ${600 + i * 80}ms`;
+                  requestAnimationFrame(() => { node.style.opacity = "1"; });
+                });
               },
               { threshold: 0.15 },
             );
@@ -2934,19 +2897,11 @@ const tools = [
           const outputEl = document.getElementById("terminal-output");
           if (terminalEl && outputEl) {
             const termObs = new IntersectionObserver(
-              async (entries) => {
+              (entries) => {
                 if (!entries[0]?.isIntersecting) return;
                 termObs.disconnect();
-                try {
-                  const { gsap } = await import("gsap");
-                  gsap.to(terminalEl, { opacity: 1, duration: 0.6 });
-                  typeTerminal(outputEl, gsap);
-                } catch (e) {
-                  void e;
-                  terminalEl.style.opacity = "1";
-                  outputEl.textContent =
-                    '$ ./human agent -m "Hello"\nHello! I\'m h-uman — a fully autonomous AI assistant.';
-                }
+                fadeIn(terminalEl, 600);
+                typeTerminal(outputEl);
               },
               { threshold: 0.15 },
             );
@@ -2959,7 +2914,7 @@ const tools = [
             highlights?: Array<{ text: string; cls: string }>;
           }
 
-          function typeTerminal(container: HTMLElement, gsap: any) {
+          function typeTerminal(container: HTMLElement) {
             const accentColor = "var(--color-accent)";
             const lines: TermLine[] = [
               {
@@ -3056,7 +3011,7 @@ const tools = [
                 div.appendChild(w);
                 div.style.opacity = "0";
                 container.appendChild(div);
-                gsap.to(div, { opacity: 1, duration: 0.3 });
+                fadeIn(div, 300);
                 lineIdx++;
                 setTimeout(nextLine, 200);
               }
@@ -3068,79 +3023,35 @@ const tools = [
           const dashPreview = document.querySelector(".dash-preview");
           if (dashPreview) {
             const dashObs = new IntersectionObserver(
-              async (entries) => {
+              (entries) => {
                 if (!entries[0]?.isIntersecting) return;
                 dashObs.disconnect();
-                try {
-                  const { gsap } = await import("gsap");
-                  gsap.to(dashPreview, { opacity: 1, duration: 0.6 });
-                  document.querySelectorAll(".dash-count").forEach((el, i) => {
-                    const target = parseInt(
-                      (el as HTMLElement).dataset.target || "0",
-                    );
-                    const obj = { val: 0 };
-                    gsap.to(obj, {
-                      val: target,
-                      duration: 1.2,
-                      ease: "power3.out",
-                      delay: 0.3 + i * 0.1,
-                      onUpdate: () => {
-                        el.textContent = Math.round(obj.val).toString();
-                      },
-                    });
+                fadeIn(dashPreview as HTMLElement, 600);
+                document.querySelectorAll(".dash-count").forEach((el, i) => {
+                  const target = parseInt((el as HTMLElement).dataset.target || "0");
+                  tweenValue(0, target, 1200, 300 + i * 100, (v) => {
+                    el.textContent = Math.round(v).toString();
                   });
-                  const actContainer = document.getElementById("dash-activity");
-                  if (actContainer) {
-                    const iconChatCircle =
-                      '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-4-1.08,8.09,8.09,0,0,0-2.53.41L40,216l12.47-37.4a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>';
-                    const iconLightning =
-                      '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,12.95l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112-120A8,8,0,0,0,215.79,118.17Z"/></svg>';
-                    const iconPlayCircle =
-                      '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm36.44-94.66-48-32A8,8,0,0,0,104,96v64a8,8,0,0,0,12.44,6.66l48-32a8,8,0,0,0,0-13.32ZM120,145.05V111l25.58,17Z"/></svg>';
-                    const activities = [
-                      {
-                        icon: iconChatCircle,
-                        text: "Alice via Telegram: Can you review the PR?",
-                        time: "just now",
-                      },
-                      {
-                        icon: iconLightning,
-                        text: "Tool shell: git status",
-                        time: "1m ago",
-                      },
-                      {
-                        icon: iconChatCircle,
-                        text: "Bob via Discord: Deploy looks good",
-                        time: "2m ago",
-                      },
-                      {
-                        icon: iconPlayCircle,
-                        text: 'Session "Code Review" started',
-                        time: "3m ago",
-                      },
-                    ];
-                    activities.forEach((act, i) => {
-                      setTimeout(
-                        () => {
-                          const div = document.createElement("div");
-                          div.className = "flex items-center gap-2";
-                          div.style.opacity = "0";
-                          div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-xs" style="color: var(--hu-text-muted)">${act.time}</span>`;
-                          actContainer.appendChild(div);
-                          requestAnimationFrame(() => {
-                            div.style.transition = "opacity 0.4s ease-out";
-                            div.style.opacity = "1";
-                          });
-                        },
-                        800 + i * 400,
-                      );
-                    });
-                  }
-                } catch (e) {
-                  void e;
-                  (dashPreview as HTMLElement).style.opacity = "1";
-                  document.querySelectorAll(".dash-count").forEach((el) => {
-                    el.textContent = (el as HTMLElement).dataset.target || "0";
+                });
+                const actContainer = document.getElementById("dash-activity");
+                if (actContainer) {
+                  const iconChatCircle = '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-4-1.08,8.09,8.09,0,0,0-2.53.41L40,216l12.47-37.4a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>';
+                  const iconLightning = '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,12.95l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112-120A8,8,0,0,0,215.79,118.17Z"/></svg>';
+                  const iconPlayCircle = '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm36.44-94.66-48-32A8,8,0,0,0,104,96v64a8,8,0,0,0,12.44,6.66l48-32a8,8,0,0,0,0-13.32ZM120,145.05V111l25.58,17Z"/></svg>';
+                  const activities = [
+                    { icon: iconChatCircle, text: "Alice via Telegram: Can you review the PR?", time: "just now" },
+                    { icon: iconLightning, text: "Tool shell: git status", time: "1m ago" },
+                    { icon: iconChatCircle, text: "Bob via Discord: Deploy looks good", time: "2m ago" },
+                    { icon: iconPlayCircle, text: 'Session "Code Review" started', time: "3m ago" },
+                  ];
+                  activities.forEach((act, i) => {
+                    setTimeout(() => {
+                      const div = document.createElement("div");
+                      div.className = "flex items-center gap-2";
+                      div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-xs" style="color: var(--hu-text-muted)">${act.time}</span>`;
+                      actContainer.appendChild(div);
+                      fadeIn(div, 400);
+                    }, 800 + i * 400);
                   });
                 }
               },
@@ -3372,464 +3283,203 @@ const tools = [
           qCards.forEach((c) => ringObs.observe(c));
         }
 
-        /** Compact 3D classic Perlin noise (-1..1-ish). Inline — no extra deps. */
-        function createNoise3D(): (x: number, y: number, z: number) => number {
+        /** Compact 2D Perlin noise. Inline — no extra deps. */
+        function createNoise2D(): (x: number, y: number) => number {
           const p = new Uint8Array(512);
           for (let i = 0; i < 256; i++) p[i] = i;
           let seed = 2463534242;
           for (let i = 255; i > 0; i--) {
             seed = (seed * 1664525 + 1013904223) >>> 0;
             const j = seed % (i + 1);
-            const tmp = p[i];
-            p[i] = p[j];
-            p[j] = tmp;
+            const tmp = p[i]; p[i] = p[j]; p[j] = tmp;
           }
           for (let i = 0; i < 256; i++) p[i + 256] = p[i];
           const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
           const lerp = (t: number, a: number, b: number) => a + t * (b - a);
-          const grad = (hash: number, x: number, y: number, z: number) => {
-            const h = hash & 15;
-            const u = h < 8 ? x : y;
-            const v = h < 4 ? y : h === 12 || h === 14 ? x : z;
-            return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+          const grad2 = (hash: number, x: number, y: number) => {
+            const h = hash & 3;
+            return (h < 2 ? x : -x) + (h === 0 || h === 3 ? y : -y);
           };
-          return (x: number, y: number, z: number) => {
+          return (x: number, y: number) => {
             const X = Math.floor(x) & 255;
             const Y = Math.floor(y) & 255;
-            const Z = Math.floor(z) & 255;
-            let xf = x - Math.floor(x);
-            let yf = y - Math.floor(y);
-            let zf = z - Math.floor(z);
+            const xf = x - Math.floor(x);
+            const yf = y - Math.floor(y);
             const u = fade(xf);
             const v = fade(yf);
-            const w = fade(zf);
             const A = p[X] + Y;
-            const AA = p[A] + Z;
-            const AB = p[A + 1] + Z;
             const B = p[X + 1] + Y;
-            const BA = p[B] + Z;
-            const BB = p[B + 1] + Z;
-            return lerp(
-              w,
-              lerp(
-                v,
-                lerp(u, grad(p[AA], xf, yf, zf), grad(p[BA], xf - 1, yf, zf)),
-                lerp(
-                  u,
-                  grad(p[AB], xf, yf - 1, zf),
-                  grad(p[BB], xf - 1, yf - 1, zf),
-                ),
-              ),
-              lerp(
-                v,
-                lerp(
-                  u,
-                  grad(p[AA + 1], xf, yf, zf - 1),
-                  grad(p[BA + 1], xf - 1, yf, zf - 1),
-                ),
-                lerp(
-                  u,
-                  grad(p[AB + 1], xf, yf - 1, zf - 1),
-                  grad(p[BB + 1], xf - 1, yf - 1, zf - 1),
-                ),
-              ),
+            return lerp(v,
+              lerp(u, grad2(p[A], xf, yf), grad2(p[B], xf - 1, yf)),
+              lerp(u, grad2(p[A + 1], xf, yf - 1), grad2(p[B + 1], xf - 1, yf - 1))
             );
           };
         }
 
-        // ═══ WebGL Hero — lazy-load Three.js only when hero visible, defer until idle ═══
-        const heroCanvas = document.getElementById(
-          "hero-webgl",
-        ) as HTMLCanvasElement;
+        // ═══ Hero Canvas — lightweight 2D neural network (no Three.js) ═══
+        const heroCanvas = document.getElementById("hero-webgl") as HTMLCanvasElement;
         const isDesktop = window.matchMedia("(min-width: 769px)").matches;
         if (heroCanvas && isDesktop) {
-          const heroObs = new IntersectionObserver(
-            (entries) => {
-              if (!entries[0]?.isIntersecting) return;
-              heroObs.disconnect();
-              const ric = (
-                window as unknown as {
-                  requestIdleCallback?: (
-                    cb: () => void,
-                    opts?: { timeout: number },
-                  ) => number;
-                }
-              ).requestIdleCallback;
-              if (ric) ric(() => initHeroWebGL(heroCanvas), { timeout: 4000 });
-              else setTimeout(() => initHeroWebGL(heroCanvas), 2000);
-            },
-            { threshold: 0.01 },
-          );
+          const heroObs = new IntersectionObserver((entries) => {
+            if (!entries[0]?.isIntersecting) return;
+            heroObs.disconnect();
+            const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+            if (ric) ric(() => initHeroCanvas(heroCanvas), { timeout: 4000 });
+            else setTimeout(() => initHeroCanvas(heroCanvas), 2000);
+          }, { threshold: 0.01 });
           heroObs.observe(heroCanvas);
         } else if (heroCanvas) {
           heroCanvas.style.display = "none";
         }
 
-        async function initHeroWebGL(canvas: HTMLCanvasElement) {
-          try {
-            const THREE = await import("three");
-            const section = canvas.closest("section")!;
-            const w = () => section.clientWidth;
-            const h = () => section.clientHeight;
-            const renderer = new THREE.WebGLRenderer({
-              canvas,
-              alpha: true,
-              antialias: true,
-              powerPreference: "low-power",
-            });
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.setSize(w(), h());
+        function initHeroCanvas(canvas: HTMLCanvasElement) {
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { canvas.style.display = "none"; return; }
+          const section = canvas.closest("section")!;
+          const CW = () => section.clientWidth;
+          const CH = () => section.clientHeight;
+          const dpr = Math.min(window.devicePixelRatio, 2);
+          canvas.width = CW() * dpr;
+          canvas.height = CH() * dpr;
+          ctx.scale(dpr, dpr);
 
-            const scene = new THREE.Scene();
-            const camera = new THREE.PerspectiveCamera(60, w() / h(), 0.1, 100);
-            camera.position.z = 30;
-
-            const noise3D = createNoise3D();
-
-            const accentColor =
-              getComputedStyle(document.documentElement)
-                .getPropertyValue("--hu-accent")
-                .trim() || "#7AB648";
-            const accentSecondary =
-              getComputedStyle(document.documentElement)
-                .getPropertyValue("--hu-accent-secondary")
-                .trim() || "#f59e0b";
-
-            // Neural network topology: 5 layers, 8–15 nodes per layer
-            const layerSizes = [10, 12, 10, 12, 10];
-            const layerZ = [-14, -7, 0, 7, 14];
-            const layerWidth = 18;
-            const nodeBasePos: number[][] = [];
-            for (let L = 0; L < layerSizes.length; L++) {
-              const n = layerSizes[L];
-              const z = layerZ[L];
-              for (let i = 0; i < n; i++) {
-                const t = n > 1 ? i / (n - 1) : 0.5;
-                const x = (t - 0.5) * layerWidth;
-                const y = Math.sin(i * 0.7) * 1.5;
-                nodeBasePos.push([x, y, z]);
-              }
-            }
-            const nodeCount = nodeBasePos.length;
-
-            // Orbital/breathing params per node
-            const orbitRadius = new Float32Array(nodeCount);
-            const orbitPhase = new Float32Array(nodeCount);
-            const breathPhase = new Float32Array(nodeCount);
-            const isAccent = new Uint8Array(nodeCount);
-            for (let i = 0; i < nodeCount; i++) {
-              orbitRadius[i] = 0.15 + Math.random() * 0.25;
-              orbitPhase[i] = Math.random() * Math.PI * 2;
-              breathPhase[i] = Math.random() * Math.PI * 2;
-              isAccent[i] = Math.random() < 0.2 ? 1 : 0;
-            }
-
-            // Connections between adjacent layers (each node → 2–4 random next-layer nodes)
-            const connections: [number, number][] = [];
-            let layerStart = 0;
-            for (let L = 0; L < layerSizes.length - 1; L++) {
-              const nCur = layerSizes[L];
-              const nNext = layerSizes[L + 1];
-              const nextStart = layerStart + nCur;
-              for (let i = 0; i < nCur; i++) {
-                const src = layerStart + i;
-                const k = 2 + Math.floor(Math.random() * 3);
-                const used = new Set<number>();
-                for (let c = 0; c < Math.min(k, nNext); c++) {
-                  let t = Math.floor(Math.random() * nNext);
-                  while (used.has(t)) t = (t + 1) % nNext;
-                  used.add(t);
-                  connections.push([src, nextStart + t]);
-                }
-              }
-              layerStart = nextStart;
-            }
-
-            const FLOW_TOTAL_CAP = 5000;
-            const flowCount = Math.max(0, FLOW_TOTAL_CAP - nodeCount);
-            const FLOW_WRAP = 20;
-            const flowPosArr = new Float32Array(flowCount * 3);
-            for (let fi = 0; fi < flowCount; fi++) {
-              flowPosArr[fi * 3] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
-              flowPosArr[fi * 3 + 1] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
-              flowPosArr[fi * 3 + 2] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
-            }
-            const flowGeo = new THREE.BufferGeometry();
-            flowGeo.setAttribute(
-              "position",
-              new THREE.BufferAttribute(flowPosArr, 3),
-            );
-            const flowMat = new THREE.PointsMaterial({
-              color: new THREE.Color(accentColor),
-              size: 0.055,
-              sizeAttenuation: true,
-              transparent: true,
-              opacity: 0.22,
-              blending: THREE.AdditiveBlending,
-              depthWrite: false,
-            });
-            const flowPoints = new THREE.Points(flowGeo, flowMat);
-            scene.add(flowPoints);
-
-            const linePositions = new Float32Array(connections.length * 6);
-            const lineColors = new Float32Array(connections.length * 6);
-            const lineGeo = new THREE.BufferGeometry();
-            lineGeo.setAttribute(
-              "position",
-              new THREE.BufferAttribute(linePositions, 3),
-            );
-            lineGeo.setAttribute(
-              "color",
-              new THREE.BufferAttribute(lineColors, 3),
-            );
-            const lineMat = new THREE.LineBasicMaterial({
-              vertexColors: true,
-              transparent: true,
-              opacity: 0.18,
-              blending: THREE.AdditiveBlending,
-              depthWrite: false,
-            });
-            const lines = new THREE.LineSegments(lineGeo, lineMat);
-            scene.add(lines);
-
-            const posArr = new Float32Array(nodeCount * 3);
-            const colorArr = new Float32Array(nodeCount * 3);
-            const geo = new THREE.BufferGeometry();
-            geo.setAttribute("position", new THREE.BufferAttribute(posArr, 3));
-            geo.setAttribute("color", new THREE.BufferAttribute(colorArr, 3));
-
-            const accentCol = new THREE.Color(accentColor);
-            const secondaryCol = new THREE.Color(accentSecondary);
-            const mat = new THREE.PointsMaterial({
-              size: 0.18,
-              vertexColors: true,
-              sizeAttenuation: true,
-              transparent: true,
-              opacity: 0.7,
-              blending: THREE.AdditiveBlending,
-              depthWrite: false,
-            });
-            const points = new THREE.Points(geo, mat);
-            scene.add(points);
-
-            // Mouse interaction
-            const mouse = new THREE.Vector2(-10, -10);
-            const mouse3D = new THREE.Vector3(0, 0, 0);
-            const raycaster = new THREE.Raycaster();
-            const plane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
-            const intersect = new THREE.Vector3();
-            const onDocMouseMove = (e: MouseEvent) => {
-              mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-              mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-            };
-            const onDocMouseLeave = () => {
-              mouse.x = -10;
-              mouse.y = -10;
-            };
-            document.addEventListener("mousemove", onDocMouseMove);
-            document.addEventListener("mouseleave", onDocMouseLeave);
-
-            // Mouse glow sprite
-            const glowGeo = new THREE.BufferGeometry();
-            glowGeo.setAttribute(
-              "position",
-              new THREE.Float32BufferAttribute([0, 0, 0], 3),
-            );
-            const glowMat = new THREE.PointsMaterial({
-              size: 4,
-              color: new THREE.Color(accentColor),
-              transparent: true,
-              opacity: 0.15,
-              blending: THREE.AdditiveBlending,
-              depthWrite: false,
-              sizeAttenuation: true,
-            });
-            const glowPoint = new THREE.Points(glowGeo, glowMat);
-            glowPoint.visible = false;
-            scene.add(glowPoint);
-
-            const MOUSE_RADIUS = 8;
-            const MOUSE_STRENGTH = 0.015;
-            const FRAME_INTERVAL = 1000 / 60;
-            let lastFrame = 0;
-            let animId: number;
-
-            const animate = (now: number) => {
-              animId = requestAnimationFrame(animate);
-              if (now - lastFrame < FRAME_INTERVAL) return;
-              lastFrame = now;
-              const t = now * 0.001;
-              const breath = 1 + 0.04 * Math.sin(t * 0.8);
-
-              raycaster.setFromCamera(mouse, camera);
-              raycaster.ray.intersectPlane(plane, intersect);
-              mouse3D.copy(intersect);
-              const mouseActive =
-                mouse.x > -2 && mouse.x < 2 && mouse.y > -2 && mouse.y < 2;
-              glowPoint.visible = mouseActive;
-              if (mouseActive) {
-                glowPoint.position.copy(mouse3D);
-              }
-
-              for (let i = 0; i < nodeCount; i++) {
-                const [bx, by, bz] = nodeBasePos[i];
-                const orb = orbitRadius[i];
-                const ph = orbitPhase[i];
-                const br = breathPhase[i];
-                let x = bx + orb * Math.cos(t * 0.6 + ph) * breath;
-                let y = by + orb * Math.sin(t * 0.5 + ph * 1.1) * breath;
-                let z = bz + orb * 0.5 * Math.sin(t * 0.4 + br) * breath;
-
-                const nScale = 0.4;
-                x += nScale * noise3D(x * 0.15, y * 0.15, t * 0.3);
-                y += nScale * noise3D(y * 0.15, z * 0.15, t * 0.3);
-                z += nScale * noise3D(z * 0.15, x * 0.15, t * 0.3);
-
-                if (mouseActive) {
-                  const dx = x - mouse3D.x;
-                  const dy = y - mouse3D.y;
-                  const dz = z - mouse3D.z;
-                  const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                  if (dist < MOUSE_RADIUS && dist > 0.01) {
-                    const f = (1 - dist / MOUSE_RADIUS) * MOUSE_STRENGTH;
-                    x += (dx / dist) * f;
-                    y += (dy / dist) * f;
-                    z += (dz / dist) * f;
-                  }
-                }
-
-                posArr[i * 3] = x;
-                posArr[i * 3 + 1] = y;
-                posArr[i * 3 + 2] = z;
-                const depth = (z + 14) / 28;
-                const col = isAccent[i] ? secondaryCol : accentCol;
-                const alphaMult = 0.4 + 0.6 * depth;
-                const pulseMult = isAccent[i]
-                  ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathPhase[i])
-                  : 1;
-                colorArr[i * 3] = col.r * alphaMult * pulseMult;
-                colorArr[i * 3 + 1] = col.g * alphaMult * pulseMult;
-                colorArr[i * 3 + 2] = col.b * alphaMult * pulseMult;
-              }
-              geo.attributes.position.needsUpdate = true;
-              geo.attributes.color!.needsUpdate = true;
-
-              const flowStep = 0.038;
-              for (let fi = 0; fi < flowCount; fi++) {
-                let fx = flowPosArr[fi * 3];
-                let fy = flowPosArr[fi * 3 + 1];
-                let fz = flowPosArr[fi * 3 + 2];
-                fx += flowStep * noise3D(fy * 0.15, fz * 0.15, t * 0.3);
-                fy += flowStep * noise3D(fz * 0.15 + 23.1, fx * 0.15, t * 0.3);
-                fz += flowStep * noise3D(fx * 0.15, fy * 0.15 + 61.4, t * 0.3);
-                if (fx > FLOW_WRAP) fx -= FLOW_WRAP * 2;
-                else if (fx < -FLOW_WRAP) fx += FLOW_WRAP * 2;
-                if (fy > FLOW_WRAP) fy -= FLOW_WRAP * 2;
-                else if (fy < -FLOW_WRAP) fy += FLOW_WRAP * 2;
-                if (fz > FLOW_WRAP) fz -= FLOW_WRAP * 2;
-                else if (fz < -FLOW_WRAP) fz += FLOW_WRAP * 2;
-                flowPosArr[fi * 3] = fx;
-                flowPosArr[fi * 3 + 1] = fy;
-                flowPosArr[fi * 3 + 2] = fz;
-              }
-              flowGeo.attributes.position.needsUpdate = true;
-
-              for (let c = 0; c < connections.length; c++) {
-                const [a, b] = connections[c];
-                const ax = posArr[a * 3];
-                const ay = posArr[a * 3 + 1];
-                const az = posArr[a * 3 + 2];
-                const bx = posArr[b * 3];
-                const by = posArr[b * 3 + 1];
-                const bz = posArr[b * 3 + 2];
-                linePositions[c * 6] = ax;
-                linePositions[c * 6 + 1] = ay;
-                linePositions[c * 6 + 2] = az;
-                linePositions[c * 6 + 3] = bx;
-                linePositions[c * 6 + 4] = by;
-                linePositions[c * 6 + 5] = bz;
-
-                const midX = (ax + bx) * 0.5;
-                const midY = (ay + by) * 0.5;
-                const midZ = (az + bz) * 0.5;
-                const distToMouse = mouseActive
-                  ? Math.sqrt(
-                      (midX - mouse3D.x) ** 2 +
-                        (midY - mouse3D.y) ** 2 +
-                        (midZ - mouse3D.z) ** 2,
-                    )
-                  : 999;
-                const brighten =
-                  distToMouse < MOUSE_RADIUS * 1.5
-                    ? 1 + 0.8 * (1 - distToMouse / (MOUSE_RADIUS * 1.5))
-                    : 1;
-                const flowPhase = (t * 3 + c * 0.1) % 1;
-                const flowPulse = 0.6 + 0.4 * Math.sin(flowPhase * Math.PI * 2);
-                const base = Math.min(1, (0.2 + 0.15 * flowPulse) * brighten);
-                lineColors[c * 6] = accentCol.r * base;
-                lineColors[c * 6 + 1] = accentCol.g * base;
-                lineColors[c * 6 + 2] = accentCol.b * base;
-                lineColors[c * 6 + 3] = accentCol.r * base;
-                lineColors[c * 6 + 4] = accentCol.g * base;
-                lineColors[c * 6 + 5] = accentCol.b * base;
-              }
-              lineGeo.attributes.position.needsUpdate = true;
-              lineGeo.attributes.color!.needsUpdate = true;
-
-              camera.position.x +=
-                (mouse.x * 2 - camera.position.x * 0.3) * 0.02;
-              camera.position.y +=
-                (-mouse.y * 1.5 - camera.position.y * 0.3) * 0.02;
-              camera.lookAt(0, 0, 0);
-
-              renderer.render(scene, camera);
-            };
-
-            canvas.style.opacity = "1";
-            canvas.style.transition = "opacity 1.5s ease-out";
-            animate(performance.now());
-
-            const onResize = () => {
-              camera.aspect = w() / h();
-              camera.updateProjectionMatrix();
-              renderer.setSize(w(), h());
-            };
-            window.addEventListener("resize", onResize);
-
-            const cleanObs = new IntersectionObserver(
-              (entries) => {
-                if (!entries[0]?.isIntersecting) {
-                  cancelAnimationFrame(animId);
-                } else {
-                  lastFrame = 0;
-                  animate(performance.now());
-                }
-              },
-              { threshold: 0 },
-            );
-            cleanObs.observe(canvas);
-
-            const disposeWebGL = () => {
-              cancelAnimationFrame(animId);
-              cleanObs.disconnect();
-              window.removeEventListener("resize", onResize);
-              document.removeEventListener("mousemove", onDocMouseMove);
-              document.removeEventListener("mouseleave", onDocMouseLeave);
-              renderer.dispose();
-              scene.traverse((obj: any) => {
-                if (obj.geometry) obj.geometry.dispose();
-                if (obj.material) {
-                  if (Array.isArray(obj.material))
-                    obj.material.forEach((m: any) => m.dispose());
-                  else obj.material.dispose();
-                }
-              });
-            };
-            window.addEventListener("pagehide", disposeWebGL, { once: true });
-          } catch (e) {
-            void e;
-            canvas.style.display = "none";
+          const noise = createNoise2D();
+          const accentHex = getComputedStyle(document.documentElement).getPropertyValue("--hu-accent").trim() || "#7AB648";
+          const secondaryHex = getComputedStyle(document.documentElement).getPropertyValue("--hu-accent-secondary").trim() || "#f59e0b";
+          function hexToRGB(hex: string): [number, number, number] {
+            const v = parseInt(hex.replace("#", ""), 16);
+            return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
           }
+          const accentRGB = hexToRGB(accentHex);
+          const secondaryRGB = hexToRGB(secondaryHex);
+
+          const layerSizes = [10, 12, 10, 12, 10];
+          const layerX = [0.1, 0.28, 0.5, 0.72, 0.9];
+          const nodeBase: [number, number][] = [];
+          for (let L = 0; L < layerSizes.length; L++) {
+            const n = layerSizes[L];
+            for (let i = 0; i < n; i++) {
+              const t = n > 1 ? i / (n - 1) : 0.5;
+              nodeBase.push([layerX[L], 0.15 + t * 0.7]);
+            }
+          }
+          const nodeCount = nodeBase.length;
+          const orbitR = new Float32Array(nodeCount);
+          const orbitP = new Float32Array(nodeCount);
+          const breathP = new Float32Array(nodeCount);
+          const isAccent = new Uint8Array(nodeCount);
+          for (let i = 0; i < nodeCount; i++) {
+            orbitR[i] = 3 + Math.random() * 6;
+            orbitP[i] = Math.random() * Math.PI * 2;
+            breathP[i] = Math.random() * Math.PI * 2;
+            isAccent[i] = Math.random() < 0.2 ? 1 : 0;
+          }
+          const conns: [number, number][] = [];
+          let lStart = 0;
+          for (let L = 0; L < layerSizes.length - 1; L++) {
+            const nCur = layerSizes[L], nNext = layerSizes[L + 1], nStart = lStart + nCur;
+            for (let i = 0; i < nCur; i++) {
+              const k = 2 + Math.floor(Math.random() * 3);
+              const used = new Set<number>();
+              for (let c = 0; c < Math.min(k, nNext); c++) {
+                let t = Math.floor(Math.random() * nNext);
+                while (used.has(t)) t = (t + 1) % nNext;
+                used.add(t);
+                conns.push([lStart + i, nStart + t]);
+              }
+            }
+            lStart = nStart;
+          }
+          const FLOW_COUNT = 400;
+          const flowX = new Float32Array(FLOW_COUNT);
+          const flowY = new Float32Array(FLOW_COUNT);
+          for (let i = 0; i < FLOW_COUNT; i++) { flowX[i] = Math.random(); flowY[i] = Math.random(); }
+
+          let mx = -1, my = -1;
+          const MOUSE_RAD = 120;
+          const onMove = (e: MouseEvent) => { const r = canvas.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; };
+          const onLeave = () => { mx = -1; my = -1; };
+          document.addEventListener("mousemove", onMove);
+          document.addEventListener("mouseleave", onLeave);
+
+          const FRAME_INTERVAL = 1000 / 60;
+          let lastFrame = 0;
+          let animId: number;
+          const nodePos = new Float32Array(nodeCount * 2);
+
+          const animate = (now: number) => {
+            animId = requestAnimationFrame(animate);
+            if (now - lastFrame < FRAME_INTERVAL) return;
+            lastFrame = now;
+            const cw = CW(), ch = CH();
+            const t = now * 0.001;
+            const breath = 1 + 0.04 * Math.sin(t * 0.8);
+            ctx.clearRect(0, 0, cw, ch);
+
+            for (let i = 0; i < nodeCount; i++) {
+              const [bx, by] = nodeBase[i];
+              let x = bx * cw + orbitR[i] * Math.cos(t * 0.6 + orbitP[i]) * breath;
+              let y = by * ch + orbitR[i] * Math.sin(t * 0.5 + orbitP[i] * 1.1) * breath;
+              x += 4 * noise(x * 0.005, t * 0.3);
+              y += 4 * noise(y * 0.005 + 50, t * 0.3);
+              if (mx >= 0) {
+                const dx = x - mx, dy = y - my, d = Math.sqrt(dx * dx + dy * dy);
+                if (d < MOUSE_RAD && d > 1) { const f = (1 - d / MOUSE_RAD) * 8; x += (dx / d) * f; y += (dy / d) * f; }
+              }
+              nodePos[i * 2] = x;
+              nodePos[i * 2 + 1] = y;
+            }
+
+            for (let c = 0; c < conns.length; c++) {
+              const [a, b] = conns[c];
+              const ax = nodePos[a * 2], ay = nodePos[a * 2 + 1], bx = nodePos[b * 2], by = nodePos[b * 2 + 1];
+              let alpha = 0.08 * (0.6 + 0.4 * Math.sin((t * 3 + c * 0.1) * Math.PI * 2));
+              if (mx >= 0) { const d = Math.sqrt(((ax + bx) / 2 - mx) ** 2 + ((ay + by) / 2 - my) ** 2); if (d < MOUSE_RAD * 1.5) alpha += 0.12 * (1 - d / (MOUSE_RAD * 1.5)); }
+              ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+              ctx.strokeStyle = `rgba(${accentRGB[0]},${accentRGB[1]},${accentRGB[2]},${alpha})`;
+              ctx.lineWidth = 1; ctx.stroke();
+            }
+
+            for (let i = 0; i < nodeCount; i++) {
+              const x = nodePos[i * 2], y = nodePos[i * 2 + 1];
+              const rgb = isAccent[i] ? secondaryRGB : accentRGB;
+              const a = Math.min(1, 0.5 * (isAccent[i] ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathP[i]) : 1));
+              ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+              ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`; ctx.fill();
+            }
+
+            const flowStep = 0.0008;
+            for (let i = 0; i < FLOW_COUNT; i++) {
+              flowX[i] += flowStep * noise(flowY[i] * 3, t * 0.3);
+              flowY[i] += flowStep * noise(flowX[i] * 3 + 23.1, t * 0.3);
+              if (flowX[i] > 1.1) flowX[i] -= 1.2; else if (flowX[i] < -0.1) flowX[i] += 1.2;
+              if (flowY[i] > 1.1) flowY[i] -= 1.2; else if (flowY[i] < -0.1) flowY[i] += 1.2;
+              ctx.beginPath(); ctx.arc(flowX[i] * cw, flowY[i] * ch, 1, 0, Math.PI * 2);
+              ctx.fillStyle = `rgba(${accentRGB[0]},${accentRGB[1]},${accentRGB[2]},0.12)`; ctx.fill();
+            }
+
+            if (mx >= 0) {
+              const g = ctx.createRadialGradient(mx, my, 0, mx, my, MOUSE_RAD * 0.8);
+              g.addColorStop(0, `rgba(${accentRGB[0]},${accentRGB[1]},${accentRGB[2]},0.08)`);
+              g.addColorStop(1, "transparent");
+              ctx.fillStyle = g;
+              ctx.fillRect(mx - MOUSE_RAD, my - MOUSE_RAD, MOUSE_RAD * 2, MOUSE_RAD * 2);
+            }
+          };
+
+          canvas.style.opacity = "1";
+          canvas.style.transition = "opacity 1.5s ease-out";
+          animate(performance.now());
+
+          const onResize = () => { canvas.width = CW() * dpr; canvas.height = CH() * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
+          window.addEventListener("resize", onResize);
+          const cleanObs = new IntersectionObserver((entries) => {
+            if (!entries[0]?.isIntersecting) cancelAnimationFrame(animId);
+            else { lastFrame = 0; animate(performance.now()); }
+          }, { threshold: 0 });
+          cleanObs.observe(canvas);
+          const dispose = () => { cancelAnimationFrame(animId); cleanObs.disconnect(); window.removeEventListener("resize", onResize); document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseleave", onLeave); };
+          window.addEventListener("pagehide", dispose, { once: true });
         }
       }
     </script>
