@@ -1,12 +1,13 @@
 ---
 import "../styles/global.css";
 import Nav from "../components/Nav.astro";
+import AnimatedLogo from "../components/AnimatedLogo.astro";
 
 const rawBase = import.meta.env.BASE_URL;
 const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
 ---
 
-<html lang="en">
+<html lang="en" class="hu-lcp-done">
   <head>
     <script is:inline>
       (function () {
@@ -22,7 +23,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     <link rel="canonical" href="https://h-uman.ai/brand/" />
     <link
       rel="preload"
-      href="/fonts/avenir/Avenir-Black.woff2"
+      href={`${base}fonts/avenir/Avenir-Black.woff2`}
       as="font"
       type="font/woff2"
       crossorigin
@@ -30,7 +31,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     />
     <link
       rel="preload"
-      href="/fonts/avenir/Avenir-Book.woff2"
+      href={`${base}fonts/avenir/Avenir-Book.woff2`}
       as="font"
       type="font/woff2"
       crossorigin
@@ -73,7 +74,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     <main id="main-content" tabindex="-1">
       {/* ═══ 1. Hero ═══ */}
       <section
-        class="relative min-h-[70vh] flex flex-col items-center justify-center px-6 pt-24 overflow-hidden"
+        class="relative min-h-[70vh] flex flex-col items-center justify-center px-6 pt-24 pb-16 overflow-hidden"
         style="background: var(--hu-bg-surface, #152333);"
       >
         <div
@@ -82,6 +83,9 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         >
         </div>
         <div class="relative z-10 max-w-5xl mx-auto text-center">
+          <div class="mb-8">
+            <AnimatedLogo size={160} interactive />
+          </div>
           <h1
             class="text-[clamp(3.5rem,10vw,7rem)] font-black leading-[0.95] tracking-tighter mb-4"
             style="font-family: var(--hu-font); color: var(--hu-text);"
@@ -105,8 +109,20 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         </div>
       </section>
 
+      {/* ═══ Section Nav ═══ */}
+      <nav class="brand-section-nav" aria-label="Brand guide sections">
+        <a href="#name">Name</a>
+        <a href="#logo">Logo</a>
+        <a href="#color">Color</a>
+        <a href="#typography">Typography</a>
+        <a href="#voice">Voice</a>
+        <a href="#iconography">Icons</a>
+        <a href="#motion">Motion</a>
+        <a href="#resources">Resources</a>
+      </nav>
+
       {/* ═══ 2. Name & Tagline ═══ */}
-      <section class="py-24 md:py-32 px-6 cv-defer" data-reveal>
+      <section id="name" class="py-24 md:py-32 px-6 cv-defer" data-reveal>
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
@@ -162,90 +178,495 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         </div>
       </section>
 
-      {/* ═══ 3. Logo ═══ */}
-      <section class="py-24 md:py-32 px-6 cv-defer" data-reveal>
+      {/* ═══ 3. Logo System ═══ */}
+      <section id="logo" class="py-24 md:py-32 px-6 cv-defer" data-reveal>
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
-            Logo
+            Logo System
           </h2>
-          <div class="grid gap-12">
-            <div
-              class="rounded-2xl p-12 md:p-16 flex flex-col items-center justify-center min-h-[320px]"
-              style="background: var(--hu-bg-surface, #152333);"
-            >
-              <div
-                class="relative flex items-center justify-center p-16 rounded-xl mb-8"
-                style="background: color-mix(in srgb, var(--hu-accent) 8%, transparent); border: 1px dashed color-mix(in srgb, var(--hu-accent) 30%, transparent);"
+
+          <div class="space-y-16">
+            {/* Symbol + Clear Space */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
               >
-                <span
-                  class="absolute top-4 left-4 right-4 bottom-4 border border-dashed rounded-lg opacity-40"
-                  style="border-color: var(--hu-accent);"
-                  aria-hidden="true"></span>
-                <img
-                  src={`${base}human.svg`}
-                  alt="h-uman logo"
-                  width="160"
-                  height="160"
-                  class="w-32 h-32 md:w-40 md:h-40 relative z-10"
-                  loading="lazy"
-                />
+                Symbol
+              </h3>
+              <div
+                class="rounded-2xl p-12 md:p-16 flex flex-col items-center justify-center min-h-[320px]"
+                style="background: var(--hu-bg-surface, #152333);"
+              >
+                <div
+                  class="relative flex items-center justify-center p-16 rounded-xl mb-8"
+                  style="background: color-mix(in srgb, var(--hu-accent) 8%, transparent); border: 1px dashed color-mix(in srgb, var(--hu-accent) 30%, transparent);"
+                >
+                  <span
+                    class="absolute top-4 left-4 right-4 bottom-4 border border-dashed rounded-lg opacity-40"
+                    style="border-color: var(--hu-accent);"
+                    aria-hidden="true"></span>
+                  <img
+                    src={`${base}human.svg`}
+                    alt="h-uman logo"
+                    width="160"
+                    height="160"
+                    class="w-32 h-32 md:w-40 md:h-40 relative z-10"
+                    loading="lazy"
+                  />
+                </div>
+                <p class="text-sm" style="color: var(--hu-text-secondary);">
+                  Clear space: minimum 1× logo height on all sides
+                </p>
               </div>
-              <p class="text-sm" style="color: var(--hu-text-secondary);">
-                Clear space: minimum 1× logo height on all sides
+            </div>
+
+            {/* Lockups */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
+              >
+                Lockups
+              </h3>
+              <div class="grid sm:grid-cols-2 gap-6">
+                <div
+                  class="rounded-2xl p-10 flex flex-col items-center justify-center gap-4"
+                  style="background: var(--hu-bg-surface, #152333);"
+                >
+                  <div class="flex items-center gap-4">
+                    <img
+                      src={`${base}human.svg`}
+                      alt=""
+                      width="48"
+                      height="48"
+                      class="w-12 h-12"
+                      loading="lazy"
+                      aria-hidden="true"
+                    />
+                    <span
+                      class="text-2xl font-black"
+                      style="font-family: var(--hu-font); color: var(--color-text);"
+                      >h-uman</span
+                    >
+                  </div>
+                  <span class="text-xs" style="color: var(--hu-text-muted);"
+                    >Horizontal lockup</span
+                  >
+                </div>
+                <div
+                  class="rounded-2xl p-10 flex flex-col items-center justify-center gap-4"
+                  style="background: var(--hu-bg-surface, #152333);"
+                >
+                  <img
+                    src={`${base}human.svg`}
+                    alt=""
+                    width="48"
+                    height="48"
+                    class="w-12 h-12"
+                    loading="lazy"
+                    aria-hidden="true"
+                  />
+                  <span
+                    class="text-2xl font-black"
+                    style="font-family: var(--hu-font); color: var(--color-text);"
+                    >h-uman</span
+                  >
+                  <span class="text-xs" style="color: var(--hu-text-muted);"
+                    >Stacked lockup</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            {/* Monochrome & Reversed */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
+              >
+                Monochrome & Reversed
+              </h3>
+              <div class="grid sm:grid-cols-3 gap-6">
+                <div
+                  class="rounded-xl p-8 flex flex-col items-center justify-center gap-3"
+                  style="background: var(--hu-bg-surface, #152333);"
+                >
+                  <img
+                    src={`${base}human.svg`}
+                    alt="Full color logo"
+                    width="64"
+                    height="64"
+                    class="w-16 h-16"
+                    loading="lazy"
+                  />
+                  <span class="text-xs" style="color: var(--hu-text-muted);"
+                    >Full color</span
+                  >
+                </div>
+                <div
+                  class="rounded-xl p-8 flex flex-col items-center justify-center gap-3"
+                  style="background: var(--hu-bg-surface, #152333);"
+                >
+                  <img
+                    src={`${base}human.svg`}
+                    alt="Monochrome logo"
+                    width="64"
+                    height="64"
+                    class="w-16 h-16 brightness-0 invert"
+                    loading="lazy"
+                  />
+                  <span class="text-xs" style="color: var(--hu-text-muted);"
+                    >Monochrome (white)</span
+                  >
+                </div>
+                <div
+                  class="rounded-xl p-8 flex flex-col items-center justify-center gap-3"
+                  style="background: var(--hu-color-white, #fffefa);"
+                >
+                  <img
+                    src={`${base}human.svg`}
+                    alt="Reversed logo"
+                    width="64"
+                    height="64"
+                    class="w-16 h-16 brightness-0"
+                    loading="lazy"
+                  />
+                  <span class="text-xs" style="color: var(--hu-text-muted);"
+                    >Monochrome (black)</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            {/* Size Minimum */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
+              >
+                Minimum Size
+              </h3>
+              <div class="flex items-end gap-8 flex-wrap">
+                <div class="flex flex-col items-center gap-2">
+                  <img
+                    src={`${base}human.svg`}
+                    alt=""
+                    width="64"
+                    height="64"
+                    class="w-16 h-16"
+                    loading="lazy"
+                    aria-hidden="true"
+                  />
+                  <span class="text-xs" style="color: var(--hu-text-muted);"
+                    >64px</span
+                  >
+                </div>
+                <div class="flex flex-col items-center gap-2">
+                  <img
+                    src={`${base}human.svg`}
+                    alt=""
+                    width="48"
+                    height="48"
+                    class="w-12 h-12"
+                    loading="lazy"
+                    aria-hidden="true"
+                  />
+                  <span class="text-xs" style="color: var(--hu-text-muted);"
+                    >48px</span
+                  >
+                </div>
+                <div class="flex flex-col items-center gap-2">
+                  <img
+                    src={`${base}human.svg`}
+                    alt=""
+                    width="32"
+                    height="32"
+                    class="w-8 h-8"
+                    loading="lazy"
+                    aria-hidden="true"
+                  />
+                  <span class="text-xs" style="color: var(--hu-text-muted);"
+                    >32px</span
+                  >
+                </div>
+                <div class="flex flex-col items-center gap-2">
+                  <img
+                    src={`${base}human.svg`}
+                    alt=""
+                    width="24"
+                    height="24"
+                    class="w-6 h-6"
+                    loading="lazy"
+                    aria-hidden="true"
+                  />
+                  <span class="text-xs" style="color: var(--hu-text-muted);"
+                    >24px <svg
+                      class="inline w-3.5 h-3.5"
+                      viewBox="0 0 256 256"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      ><path
+                        d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"
+                      ></path></svg
+                    > min</span
+                  >
+                </div>
+                <div class="flex flex-col items-center gap-2 opacity-40">
+                  <img
+                    src={`${base}human.svg`}
+                    alt=""
+                    width="16"
+                    height="16"
+                    class="w-4 h-4"
+                    loading="lazy"
+                    aria-hidden="true"
+                  />
+                  <span class="text-xs" style="color: var(--hu-error);"
+                    >16px — too small</span
+                  >
+                </div>
+              </div>
+              <p
+                class="text-sm mt-4"
+                style="color: var(--color-text-secondary);"
+              >
+                Minimum reproduction size: <strong>24px</strong> (favicon/tab). Below
+                24px the mark loses legibility.
               </p>
             </div>
-            <div class="grid sm:grid-cols-3 gap-6">
-              <div
-                class="rounded-xl p-8 flex flex-col items-center justify-center"
-                style="background: var(--hu-bg-surface, #152333);"
+
+            {/* Misuse */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
               >
-                <img
-                  src={`${base}human.svg`}
-                  alt="h-uman logo 64px"
-                  width="64"
-                  height="64"
-                  class="w-16 h-16"
-                  loading="lazy"
-                />
-                <span class="text-xs mt-3" style="color: var(--hu-text-muted);"
-                  >64px</span
-                >
+                Misuse
+              </h3>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                <div class="brand-misuse-card">
+                  <div
+                    class="brand-misuse-demo"
+                    style="background: var(--hu-bg-surface, #152333);"
+                  >
+                    <img
+                      src={`${base}human.svg`}
+                      alt=""
+                      width="48"
+                      height="48"
+                      class="w-12 h-8"
+                      loading="lazy"
+                      aria-hidden="true"
+                      style="transform: scaleX(1.5);"
+                    />
+                  </div>
+                  <span
+                    class="text-xs mt-2 block"
+                    style="color: var(--hu-error);">Don't stretch</span
+                  >
+                </div>
+                <div class="brand-misuse-card">
+                  <div
+                    class="brand-misuse-demo"
+                    style="background: var(--hu-bg-surface, #152333);"
+                  >
+                    <img
+                      src={`${base}human.svg`}
+                      alt=""
+                      width="48"
+                      height="48"
+                      class="w-12 h-12"
+                      loading="lazy"
+                      aria-hidden="true"
+                      style="opacity: 0.3;"
+                    />
+                  </div>
+                  <span
+                    class="text-xs mt-2 block"
+                    style="color: var(--hu-error);">Don't reduce opacity</span
+                  >
+                </div>
+                <div class="brand-misuse-card">
+                  <div
+                    class="brand-misuse-demo"
+                    style="background: var(--hu-bg-surface, #152333);"
+                  >
+                    <img
+                      src={`${base}human.svg`}
+                      alt=""
+                      width="48"
+                      height="48"
+                      class="w-12 h-12"
+                      loading="lazy"
+                      aria-hidden="true"
+                      style="filter: hue-rotate(90deg);"
+                    />
+                  </div>
+                  <span
+                    class="text-xs mt-2 block"
+                    style="color: var(--hu-error);">Don't recolor the orb</span
+                  >
+                </div>
+                <div class="brand-misuse-card">
+                  <div
+                    class="brand-misuse-demo"
+                    style="background: var(--hu-bg-surface, #152333);"
+                  >
+                    <svg
+                      viewBox="0 0 100 100"
+                      class="w-12 h-12"
+                      aria-hidden="true"
+                    >
+                      <circle cx="50" cy="50" r="40" fill="#5A9A30"></circle>
+                      <circle cx="36" cy="47" r="6" fill="white"
+                      ></circle><circle cx="38" cy="44" r="2" fill="black"
+                      ></circle>
+                      <circle cx="64" cy="47" r="6" fill="white"
+                      ></circle><circle cx="66" cy="44" r="2" fill="black"
+                      ></circle>
+                    </svg>
+                  </div>
+                  <span
+                    class="text-xs mt-2 block"
+                    style="color: var(--hu-error);">Don't add pupils</span
+                  >
+                </div>
               </div>
-              <div
-                class="rounded-xl p-8 flex flex-col items-center justify-center"
-                style="background: var(--hu-bg-surface); border: 1px solid var(--color-border);"
+            </div>
+
+            {/* Animation Rules */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
               >
-                <img
-                  src={`${base}human.svg`}
-                  alt="h-uman logo 48px light"
-                  width="48"
-                  height="48"
-                  class="w-12 h-12"
-                  loading="lazy"
-                />
-                <span
-                  class="text-xs mt-3"
-                  style="color: var(--color-text-tertiary);">48px on light</span
+                Animation Rules
+              </h3>
+              <div class="grid sm:grid-cols-2 gap-8 mb-8">
+                <div
+                  class="glass rounded-2xl p-8"
+                  style="border: 1px solid var(--color-border);"
                 >
+                  <div class="flex items-center gap-2 mb-4">
+                    <svg
+                      class="w-5 h-5"
+                      viewBox="0 0 256 256"
+                      fill="currentColor"
+                      style="color: var(--hu-accent);"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"
+                      ></path>
+                    </svg>
+                    <span
+                      class="text-base font-semibold"
+                      style="color: var(--color-text);">Allowed</span
+                    >
+                  </div>
+                  <ul
+                    class="space-y-2 text-sm"
+                    style="color: var(--color-text-secondary);"
+                  >
+                    <li>
+                      Squash & stretch breathing (non-uniform scale3d, 4s cycle)
+                    </li>
+                    <li>Double-blink (randomized, 10–23s interval)</li>
+                    <li>Eye gaze tracking with 3D tilt on mouse hover</li>
+                    <li>Ambient eye drift (subtle, 15s cycle)</li>
+                    <li>
+                      Micro-saccades (50ms random eye jumps, 30% trigger a quick
+                      blink)
+                    </li>
+                    <li>Glow pulse + glow lag (follows gaze at 0.15x)</li>
+                    <li>Ring breathing with staggered parallax</li>
+                    <li>
+                      Dual ambient pulse rings (4s, staggered 2s apart, fade
+                      out)
+                    </li>
+                    <li>Idle drift (figure-8 translate + micro-rotate)</li>
+                    <li>Spring entry animation (scale 0.6 → 1)</li>
+                    <li>Hover scale (1.03x) with spring easing</li>
+                    <li>Scroll-linked subtle eye shift</li>
+                    <li>
+                      Must respect <code
+                        class="px-1 py-0.5 rounded"
+                        style="background: var(--hu-surface-container-high);"
+                        >prefers-reduced-motion</code
+                      >
+                    </li>
+                  </ul>
+                </div>
+                <div
+                  class="glass rounded-2xl p-8"
+                  style="border: 1px solid var(--color-border);"
+                >
+                  <div class="flex items-center gap-2 mb-4">
+                    <svg
+                      class="w-5 h-5"
+                      viewBox="0 0 256 256"
+                      fill="currentColor"
+                      style="color: var(--hu-error);"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"
+                      ></path>
+                    </svg>
+                    <span
+                      class="text-base font-semibold"
+                      style="color: var(--color-text);">Not allowed</span
+                    >
+                  </div>
+                  <ul
+                    class="space-y-2 text-sm"
+                    style="color: var(--color-text-secondary);"
+                  >
+                    <li>Continuous rotation or spinning</li>
+                    <li>Adding pupils, eyelids, or extra features</li>
+                    <li>Making eyes uneven or asymmetric</li>
+                    <li>Recoloring eyes (always white)</li>
+                    <li>Particle/dissolve effects on the orb</li>
+                    <li>Bounce, wobble, or playful motion</li>
+                  </ul>
+                </div>
               </div>
-              <div
-                class="rounded-xl p-8 flex flex-col items-center justify-center"
-                style="background: var(--hu-bg-surface, #152333);"
-              >
-                <img
-                  src={`${base}human.svg`}
-                  alt="h-uman logo 32px dark"
-                  width="32"
-                  height="32"
-                  class="w-8 h-8"
-                  loading="lazy"
-                />
-                <span class="text-xs mt-3" style="color: var(--hu-text-muted);"
-                  >32px on dark</span
+
+              {/* Animated vs Static comparison */}
+              <div class="grid sm:grid-cols-2 gap-8">
+                <div
+                  class="rounded-2xl p-10 flex flex-col items-center justify-center gap-4"
+                  style="background: var(--hu-bg-surface, #152333);"
                 >
+                  <AnimatedLogo size={100} interactive />
+                  <span
+                    class="text-sm font-medium"
+                    style="color: var(--hu-text-secondary);"
+                    >Animated — hero, landing pages</span
+                  >
+                </div>
+                <div
+                  class="rounded-2xl p-10 flex flex-col items-center justify-center gap-4"
+                  style="background: var(--hu-bg-surface, #152333);"
+                >
+                  <img
+                    src={`${base}human.svg`}
+                    alt="Static orb mark"
+                    width="100"
+                    height="100"
+                    class="w-[100px] h-[100px]"
+                    loading="lazy"
+                  />
+                  <span
+                    class="text-sm font-medium"
+                    style="color: var(--hu-text-secondary);"
+                    >Static — nav, footer, favicons</span
+                  >
+                </div>
               </div>
             </div>
           </div>
@@ -253,7 +674,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </section>
 
       {/* ═══ 4. Color ═══ */}
-      <section class="py-24 md:py-32 px-6 cv-defer" data-reveal>
+      <section id="color" class="py-24 md:py-32 px-6 cv-defer" data-reveal>
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
@@ -261,7 +682,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
           >
             Color
           </h2>
-          <div class="space-y-12">
+          <div class="space-y-16">
+            {/* Primary Color */}
             <div>
               <h3
                 class="text-lg font-semibold mb-4"
@@ -287,32 +709,213 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 >
               </p>
             </div>
+
+            {/* Dynamic Color Ramp */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
+              >
+                Dynamic Color Ramp
+              </h3>
+              <p
+                class="text-sm mb-6"
+                style="color: var(--color-text-secondary);"
+              >
+                OKLCH palette auto-generated from brand hex. Tokens: <code
+                  class="px-1 py-0.5 rounded"
+                  style="background: var(--hu-surface-container-high);"
+                  >--hu-dynamic-primary-{`{50..950}`}</code
+                >
+              </p>
+              <div class="brand-ramp-strip">
+                {
+                  [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map(
+                    (step) => (
+                      <div
+                        class="brand-ramp-chip"
+                        style={`background: var(--hu-dynamic-primary-${step}, var(--hu-accent));`}
+                      >
+                        <span
+                          class={
+                            step < 500
+                              ? "brand-ramp-label-dark"
+                              : "brand-ramp-label-light"
+                          }
+                        >
+                          {step}
+                        </span>
+                      </div>
+                    ),
+                  )
+                }
+              </div>
+            </div>
+
+            {/* Accent Hierarchy */}
             <div>
               <h3
                 class="text-lg font-semibold mb-4"
                 style="color: var(--color-text);"
               >
-                Accent Hierarchy
+                Accent Hierarchy (60-30-10)
               </h3>
+              <p
+                class="text-sm mb-6"
+                style="color: var(--color-text-secondary);"
+              >
+                Primary dominates (60%), secondary highlights (30%), tertiary
+                accents (10%). Error is reserved exclusively for
+                destructive/failure states.
+              </p>
               <div class="brand-color-grid">
                 <div class="brand-swatch brand-swatch-primary">
-                  <span>Primary</span>
-                  <code>--hu-accent</code>
+                  <span>Primary</span><code>--hu-accent</code>
                 </div>
                 <div class="brand-swatch brand-swatch-secondary">
-                  <span>Secondary</span>
-                  <code>--hu-accent-secondary</code>
+                  <span>Secondary</span><code>--hu-accent-secondary</code>
                 </div>
                 <div class="brand-swatch brand-swatch-tertiary">
-                  <span>Tertiary</span>
-                  <code>--hu-accent-tertiary</code>
+                  <span>Tertiary</span><code>--hu-accent-tertiary</code>
                 </div>
                 <div class="brand-swatch brand-swatch-error">
-                  <span>Error</span>
-                  <code>--hu-error</code>
+                  <span>Error</span><code>--hu-error</code>
                 </div>
               </div>
             </div>
+
+            {/* Semantic Colors */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
+              >
+                Semantic Roles
+              </h3>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div
+                  class="rounded-xl p-4 text-center"
+                  style="background: color-mix(in srgb, var(--hu-accent) 15%, transparent); border: 1px solid var(--hu-accent);"
+                >
+                  <span
+                    class="text-sm font-semibold block mb-1"
+                    style="color: var(--hu-accent);">Success</span
+                  >
+                  <code
+                    class="text-xs"
+                    style="color: var(--color-text-secondary);"
+                    >--hu-accent</code
+                  >
+                </div>
+                <div
+                  class="rounded-xl p-4 text-center"
+                  style="background: color-mix(in srgb, var(--hu-accent-secondary) 15%, transparent); border: 1px solid var(--hu-accent-secondary);"
+                >
+                  <span
+                    class="text-sm font-semibold block mb-1"
+                    style="color: var(--hu-accent-secondary);">Warning</span
+                  >
+                  <code
+                    class="text-xs"
+                    style="color: var(--color-text-secondary);"
+                    >--hu-accent-secondary</code
+                  >
+                </div>
+                <div
+                  class="rounded-xl p-4 text-center"
+                  style="background: color-mix(in srgb, var(--hu-accent-tertiary) 15%, transparent); border: 1px solid var(--hu-accent-tertiary);"
+                >
+                  <span
+                    class="text-sm font-semibold block mb-1"
+                    style="color: var(--hu-accent-tertiary);">Info</span
+                  >
+                  <code
+                    class="text-xs"
+                    style="color: var(--color-text-secondary);"
+                    >--hu-accent-tertiary</code
+                  >
+                </div>
+                <div
+                  class="rounded-xl p-4 text-center"
+                  style="background: color-mix(in srgb, var(--hu-error) 15%, transparent); border: 1px solid var(--hu-error);"
+                >
+                  <span
+                    class="text-sm font-semibold block mb-1"
+                    style="color: var(--hu-error);">Error</span
+                  >
+                  <code
+                    class="text-xs"
+                    style="color: var(--color-text-secondary);">--hu-error</code
+                  >
+                </div>
+              </div>
+            </div>
+
+            {/* Contrast Pairings */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
+              >
+                Accessible Contrast Pairings
+              </h3>
+              <div class="overflow-x-auto">
+                <table class="brand-contrast-table">
+                  <thead>
+                    <tr>
+                      <th style="color: var(--color-text);">Foreground</th>
+                      <th style="color: var(--color-text);">Background</th>
+                      <th style="color: var(--color-text);">Ratio</th>
+                      <th style="color: var(--color-text);">WCAG</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="color: var(--color-text-secondary);"
+                        >--hu-text (light)</td
+                      >
+                      <td style="color: var(--color-text-secondary);"
+                        >--hu-bg (light)</td
+                      >
+                      <td style="color: var(--color-text);">12.6:1</td>
+                      <td><span class="brand-pass-badge">AAA</span></td>
+                    </tr>
+                    <tr>
+                      <td style="color: var(--color-text-secondary);"
+                        >--hu-text (dark)</td
+                      >
+                      <td style="color: var(--color-text-secondary);"
+                        >--hu-bg (dark)</td
+                      >
+                      <td style="color: var(--color-text);">11.8:1</td>
+                      <td><span class="brand-pass-badge">AAA</span></td>
+                    </tr>
+                    <tr>
+                      <td style="color: var(--color-text-secondary);"
+                        >--hu-accent</td
+                      >
+                      <td style="color: var(--color-text-secondary);"
+                        >--hu-bg (dark)</td
+                      >
+                      <td style="color: var(--color-text);">5.2:1</td>
+                      <td><span class="brand-pass-badge">AA</span></td>
+                    </tr>
+                    <tr>
+                      <td style="color: var(--color-text-secondary);"
+                        >--hu-on-accent</td
+                      >
+                      <td style="color: var(--color-text-secondary);"
+                        >--hu-accent</td
+                      >
+                      <td style="color: var(--color-text);">4.8:1</td>
+                      <td><span class="brand-pass-badge">AA</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Light & Dark */}
             <div>
               <h3
                 class="text-lg font-semibold mb-4"
@@ -320,6 +923,13 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               >
                 Light & Dark
               </h3>
+              <p
+                class="text-sm mb-6"
+                style="color: var(--color-text-secondary);"
+              >
+                Toggle the site theme (top-right button) to see how every color
+                adapts. Accents stay consistent; surfaces and text shift.
+              </p>
               <div class="grid sm:grid-cols-2 gap-6">
                 <div
                   class="rounded-2xl p-6 border"
@@ -384,7 +994,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </section>
 
       {/* ═══ 5. Typography ═══ */}
-      <section class="py-24 md:py-32 px-6 cv-defer" data-reveal>
+      <section id="typography" class="py-24 md:py-32 px-6 cv-defer" data-reveal>
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
@@ -511,7 +1121,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       </section>
 
       {/* ═══ 6. Voice & Tone ═══ */}
-      <section class="py-24 md:py-32 px-6 cv-defer" data-reveal>
+      <section id="voice" class="py-24 md:py-32 px-6 cv-defer" data-reveal>
         <div class="max-w-5xl mx-auto">
           <h2
             class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
@@ -667,10 +1277,536 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         </div>
       </section>
 
-      {/* ═══ 7. Footer ═══ */}
+      {/* ═══ 7. Iconography ═══ */}
+      <section
+        id="iconography"
+        class="py-24 md:py-32 px-6 cv-defer"
+        data-reveal
+      >
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="color: var(--color-text); letter-spacing: -0.03em;"
+          >
+            Iconography
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            <strong style="color: var(--color-text);">Phosphor Regular</strong> is
+            the canonical icon library. Icons use <code
+              class="px-2 py-0.5 rounded"
+              style="background: var(--hu-surface-container-high);"
+              >currentColor</code
+            > — color is inherited from the parent.
+          </p>
+
+          <div class="space-y-12">
+            {/* Sizing Grid */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
+              >
+                Sizing
+              </h3>
+              <div class="flex items-end gap-8 flex-wrap">
+                {
+                  [16, 20, 24, 32].map((size) => (
+                    <div class="flex flex-col items-center gap-3">
+                      <div
+                        class="flex items-center justify-center rounded-lg"
+                        style={`width: ${size + 24}px; height: ${size + 24}px; background: var(--hu-surface-container); border: 1px solid var(--color-border);`}
+                      >
+                        <svg
+                          style={`width: ${size}px; height: ${size}px; color: var(--color-text);`}
+                          viewBox="0 0 256 256"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.68l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187.11,155a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.67a73.68,73.68,0,0,1-8.68,0,8,8,0,0,0-5.68,1.74L100.45,197.7a91.57,91.57,0,0,1-15-6.23L101,168.89a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64l-22.58-2.51a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.68,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.68L58.3,82.09a91.57,91.57,0,0,1,6.23-15L87.11,69.6a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,101,55.72l2.51-22.58a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.68,1.74,73.68,73.68,0,0,1,8.68,0,8,8,0,0,0,5.68-1.74L173.91,27.3a91.57,91.57,0,0,1,15,6.23l-2.51,22.58a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.9,123.66Z" />
+                        </svg>
+                      </div>
+                      <span
+                        class="text-xs"
+                        style="color: var(--hu-text-muted);"
+                      >
+                        {size}px
+                      </span>
+                    </div>
+                  ))
+                }
+              </div>
+              <p
+                class="text-sm mt-6"
+                style="color: var(--color-text-secondary);"
+              >
+                Default sizes: 16px inline, 20px buttons, 24px navigation, 32px
+                feature highlights.
+              </p>
+            </div>
+
+            {/* Color Inheritance */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
+              >
+                Color Inheritance
+              </h3>
+              <div class="flex gap-6 flex-wrap">
+                {
+                  [
+                    { label: "Default", color: "var(--color-text)" },
+                    { label: "Primary", color: "var(--hu-accent)" },
+                    { label: "Secondary", color: "var(--hu-accent-secondary)" },
+                    { label: "Tertiary", color: "var(--hu-accent-tertiary)" },
+                    { label: "Muted", color: "var(--hu-text-muted)" },
+                  ].map((item) => (
+                    <div class="flex flex-col items-center gap-2">
+                      <svg
+                        style={`width: 24px; height: 24px; color: ${item.color};`}
+                        viewBox="0 0 256 256"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm-8-80V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,172Z" />
+                      </svg>
+                      <span
+                        class="text-xs"
+                        style="color: var(--hu-text-muted);"
+                      >
+                        {item.label}
+                      </span>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+
+            {/* No Emoji Rule */}
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
+              <div class="flex items-center gap-3 mb-4">
+                <svg
+                  class="w-6 h-6"
+                  viewBox="0 0 256 256"
+                  fill="currentColor"
+                  style="color: var(--hu-error);"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"
+                  ></path>
+                </svg>
+                <span
+                  class="text-base font-semibold"
+                  style="color: var(--color-text);"
+                  >Never use emoji as UI icons</span
+                >
+              </div>
+              <div class="grid sm:grid-cols-2 gap-6 text-sm">
+                <div>
+                  <span
+                    class="text-xs uppercase block mb-2"
+                    style="color: var(--hu-error);">Bad</span
+                  >
+                  <div
+                    class="flex gap-3 items-center"
+                    style="color: var(--color-text-tertiary);"
+                  >
+                    <span class="text-2xl">&#9888;&#65039;</span> Warning state
+                  </div>
+                  <div
+                    class="flex gap-3 items-center mt-2"
+                    style="color: var(--color-text-tertiary);"
+                  >
+                    <span class="text-2xl">&#128172;</span> Chat feature
+                  </div>
+                </div>
+                <div>
+                  <span
+                    class="text-xs uppercase block mb-2"
+                    style="color: var(--hu-accent);">Good</span
+                  >
+                  <div
+                    class="flex gap-3 items-center"
+                    style="color: var(--color-text);"
+                  >
+                    <svg
+                      class="w-6 h-6"
+                      viewBox="0 0 256 256"
+                      fill="currentColor"
+                      style="color: var(--hu-accent-secondary);"
+                      aria-hidden="true"
+                      ><path
+                        d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"
+                      ></path></svg
+                    >
+                    Warning state
+                  </div>
+                  <div
+                    class="flex gap-3 items-center mt-2"
+                    style="color: var(--color-text);"
+                  >
+                    <svg
+                      class="w-6 h-6"
+                      viewBox="0 0 256 256"
+                      fill="currentColor"
+                      style="color: var(--hu-accent-tertiary);"
+                      aria-hidden="true"
+                      ><path
+                        d="M216,48H40A16,16,0,0,0,24,64V224a15.85,15.85,0,0,0,9.24,14.5A16.13,16.13,0,0,0,40,240a15.89,15.89,0,0,0,10.25-3.78.69.69,0,0,0,.13-.11L82.5,208H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48ZM40,224h0ZM216,192H82.5a16,16,0,0,0-10.3,3.75l-.12.11L40,224V64H216Z"
+                      ></path></svg
+                    >
+                    Chat feature
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 8. Motion ═══ */}
+      <section id="motion" class="py-24 md:py-32 px-6 cv-defer" data-reveal>
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="color: var(--color-text); letter-spacing: -0.03em;"
+          >
+            Motion
+          </h2>
+          <p class="text-lg mb-12" style="color: var(--color-text-secondary);">
+            h-uman motion is <strong style="color: var(--color-text);"
+              >purposeful, restrained, and spring-first</strong
+            >. Every animation communicates state change. Nothing moves for
+            decoration alone.
+          </p>
+
+          <div class="space-y-12">
+            {/* Principles */}
+            <div class="grid md:grid-cols-3 gap-6">
+              <div
+                class="glass rounded-2xl p-8"
+                style="border: 1px solid var(--color-border);"
+              >
+                <h3
+                  class="text-base font-semibold mb-3"
+                  style="color: var(--color-text);"
+                >
+                  Spring-First
+                </h3>
+                <p class="text-sm" style="color: var(--color-text-secondary);">
+                  Prefer spring physics over bezier curves. Springs feel natural
+                  because they have velocity and overshoot — real objects behave
+                  this way.
+                </p>
+              </div>
+              <div
+                class="glass rounded-2xl p-8"
+                style="border: 1px solid var(--color-border);"
+              >
+                <h3
+                  class="text-base font-semibold mb-3"
+                  style="color: var(--color-text);"
+                >
+                  Purposeful
+                </h3>
+                <p class="text-sm" style="color: var(--color-text-secondary);">
+                  Every animation communicates: entrance, exit, state change, or
+                  spatial relationship. If you can't name the purpose, remove
+                  the animation.
+                </p>
+              </div>
+              <div
+                class="glass rounded-2xl p-8"
+                style="border: 1px solid var(--color-border);"
+              >
+                <h3
+                  class="text-base font-semibold mb-3"
+                  style="color: var(--color-text);"
+                >
+                  Restrained
+                </h3>
+                <p class="text-sm" style="color: var(--color-text-secondary);">
+                  Maximum duration: 700ms. Typical: 200-400ms. Use compositor
+                  properties only (transform, opacity, filter). Always respect <code
+                    class="px-1 py-0.5 rounded text-xs"
+                    style="background: var(--hu-surface-container-high);"
+                    >prefers-reduced-motion</code
+                  >.
+                </p>
+              </div>
+            </div>
+
+            {/* Duration Scale */}
+            <div>
+              <h3
+                class="text-lg font-semibold mb-6"
+                style="color: var(--color-text);"
+              >
+                Duration Scale
+              </h3>
+              <div class="space-y-4">
+                {
+                  [
+                    {
+                      name: "Instant",
+                      token: "--hu-duration-instant",
+                      value: "50ms",
+                      width: "5%",
+                    },
+                    {
+                      name: "Fast",
+                      token: "--hu-duration-fast",
+                      value: "100ms",
+                      width: "14%",
+                    },
+                    {
+                      name: "Normal",
+                      token: "--hu-duration-normal",
+                      value: "200ms",
+                      width: "28%",
+                    },
+                    {
+                      name: "Slow",
+                      token: "--hu-duration-slow",
+                      value: "400ms",
+                      width: "57%",
+                    },
+                    {
+                      name: "Slower",
+                      token: "--hu-duration-slower",
+                      value: "700ms",
+                      width: "100%",
+                    },
+                  ].map((dur) => (
+                    <div class="flex items-center gap-4">
+                      <span
+                        class="text-sm w-16 shrink-0"
+                        style="color: var(--color-text);"
+                      >
+                        {dur.name}
+                      </span>
+                      <div
+                        class="flex-1 h-8 rounded-lg overflow-hidden"
+                        style="background: var(--hu-surface-container);"
+                      >
+                        <div
+                          class="h-full rounded-lg flex items-center justify-end px-3"
+                          style={`width: ${dur.width}; background: color-mix(in srgb, var(--hu-accent) 30%, transparent);`}
+                        >
+                          <span
+                            class="text-xs font-mono"
+                            style="color: var(--hu-accent);"
+                          >
+                            {dur.value}
+                          </span>
+                        </div>
+                      </div>
+                      <code
+                        class="text-xs hidden sm:block shrink-0"
+                        style="color: var(--color-text-tertiary);"
+                      >
+                        {dur.token}
+                      </code>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+
+            {/* Signature */}
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
+              <h3
+                class="text-base font-semibold mb-4"
+                style="color: var(--color-text);"
+              >
+                What "h-uman motion" feels like
+              </h3>
+              <ul
+                class="space-y-2 text-sm"
+                style="color: var(--color-text-secondary);"
+              >
+                <li>
+                  Elements arrive with slight overshoot, then settle — like a
+                  ball landing on a surface
+                </li>
+                <li>Exits are faster than entrances (200ms out vs 300ms in)</li>
+                <li>
+                  Staggered reveals cascade top-to-bottom, 50ms apart, capped at
+                  300ms total
+                </li>
+                <li>
+                  No bounce, no wobble, no playfulness — this is infrastructure
+                  software
+                </li>
+                <li>
+                  Focus rings appear instantly; content transitions smoothly
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 9. Resources ═══ */}
+      <section id="resources" class="py-24 md:py-32 px-6 cv-defer" data-reveal>
+        <div class="max-w-5xl mx-auto">
+          <h2
+            class="text-[clamp(2rem,4vw,3rem)] font-black mb-16"
+            style="color: var(--color-text); letter-spacing: -0.03em;"
+          >
+            Resources
+          </h2>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
+              <h3
+                class="text-base font-semibold mb-3"
+                style="color: var(--color-text);"
+              >
+                Logo Downloads
+              </h3>
+              <p
+                class="text-sm mb-4"
+                style="color: var(--color-text-secondary);"
+              >
+                SVG mark for all digital use. Minimum 24px. Always maintain
+                clear space.
+              </p>
+              <a
+                href={`${base}human.svg`}
+                download="h-uman-logo.svg"
+                class="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                style="color: var(--hu-accent); background: color-mix(in srgb, var(--hu-accent) 10%, transparent);"
+              >
+                <svg
+                  class="w-4 h-4"
+                  viewBox="0 0 256 256"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M224,152v56a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V152a8,8,0,0,1,16,0v56H208V152a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,132.69V40a8,8,0,0,0-16,0v92.69L93.66,106.34a8,8,0,0,0-11.32,11.32Z"
+                  ></path>
+                </svg>
+                Download SVG
+              </a>
+            </div>
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
+              <h3
+                class="text-base font-semibold mb-3"
+                style="color: var(--color-text);"
+              >
+                Font Licensing
+              </h3>
+              <p
+                class="text-sm mb-4"
+                style="color: var(--color-text-secondary);"
+              >
+                Avenir is a commercial typeface by Adrian Frutiger (Linotype).
+                Licensed for web embedding via self-hosted WOFF2. Ensure your
+                license covers your use case.
+              </p>
+              <p class="text-xs" style="color: var(--color-text-tertiary);">
+                Fallback stack: Avenir Next, -apple-system, BlinkMacSystemFont,
+                system-ui, sans-serif
+              </p>
+            </div>
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
+              <h3
+                class="text-base font-semibold mb-3"
+                style="color: var(--color-text);"
+              >
+                Color Tokens
+              </h3>
+              <p
+                class="text-sm mb-4"
+                style="color: var(--color-text-secondary);"
+              >
+                All color values live in <code
+                  class="px-1 py-0.5 rounded text-xs"
+                  style="background: var(--hu-surface-container-high);"
+                  >design-tokens/base.tokens.json</code
+                >. CSS custom properties are generated during build. Never
+                hard-code hex values.
+              </p>
+              <a
+                href="https://github.com/sethdford/h-uman/tree/main/design-tokens"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-2 text-sm font-medium"
+                style="color: var(--hu-accent);"
+              >
+                View tokens on GitHub
+                <svg
+                  class="w-4 h-4"
+                  viewBox="0 0 256 256"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"
+                  ></path>
+                </svg>
+              </a>
+            </div>
+            <div
+              class="glass rounded-2xl p-8"
+              style="border: 1px solid var(--color-border);"
+            >
+              <h3
+                class="text-base font-semibold mb-3"
+                style="color: var(--color-text);"
+              >
+                Design System
+              </h3>
+              <p
+                class="text-sm mb-4"
+                style="color: var(--color-text-secondary);"
+              >
+                For the full component library, layout archetypes, spacing
+                system, and implementation guidelines.
+              </p>
+              <a
+                href={`${base}design/`}
+                class="inline-flex items-center gap-2 text-sm font-medium"
+                style="color: var(--hu-accent);"
+              >
+                View Design System
+                <svg
+                  class="w-4 h-4"
+                  viewBox="0 0 256 256"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"
+                  ></path>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ Footer ═══ */}
     </main>
 
-    <footer class="site-footer py-12 px-6" role="contentinfo">
+    <footer class="site-footer py-8 sm:py-12 px-6" role="contentinfo">
       <div
         class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4"
       >
@@ -683,6 +1819,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             class="w-5 h-5"
             loading="lazy"
             decoding="async"
+            fetchpriority="low"
           />
           <span class="text-[13px]" style="color: var(--color-text-tertiary)">
             h-uman
@@ -705,7 +1842,6 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             target="_blank"
             rel="noopener noreferrer"
             class="hover:opacity-80 transition-opacity"
-            style="transition-duration: var(--hu-duration-normal);"
           >
             GitHub
           </a>
@@ -714,6 +1850,70 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     </footer>
 
     <style>
+      /* Brand section nav */
+      .brand-section-nav {
+        position: sticky;
+        top: 4rem;
+        z-index: 10;
+        padding: var(--hu-space-sm) var(--hu-space-md);
+        display: flex;
+        gap: var(--hu-space-sm);
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        background: color-mix(in srgb, var(--hu-bg) 85%, transparent);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--color-border);
+      }
+      .brand-section-nav::-webkit-scrollbar {
+        display: none;
+      }
+      .brand-section-nav a {
+        white-space: nowrap;
+        padding: var(--hu-space-xs) var(--hu-space-sm);
+        border-radius: var(--hu-radius-md);
+        font-size: var(--hu-text-xs);
+        font-weight: 500;
+        color: var(--color-text-tertiary);
+        text-decoration: none;
+        transition:
+          color var(--hu-duration-fast) var(--hu-ease-out),
+          background var(--hu-duration-fast) var(--hu-ease-out);
+      }
+      .brand-section-nav a:hover {
+        color: var(--color-text);
+        background: var(--hu-hover-overlay);
+      }
+      .brand-section-nav a.active {
+        color: var(--hu-accent);
+        background: color-mix(in srgb, var(--hu-accent) 10%, transparent);
+      }
+
+      /* Color ramp */
+      .brand-ramp-strip {
+        display: flex;
+        border-radius: var(--hu-radius-lg);
+        overflow: hidden;
+      }
+      .brand-ramp-chip {
+        flex: 1;
+        aspect-ratio: 1;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding-bottom: var(--hu-space-xs);
+        min-width: 40px;
+      }
+      .brand-ramp-label-dark {
+        font-size: var(--hu-text-2xs);
+        color: rgba(0, 0, 0, 0.7);
+      }
+      .brand-ramp-label-light {
+        font-size: var(--hu-text-2xs);
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      /* Color swatches */
       .brand-color-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -749,6 +1949,49 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         opacity: 0.9;
         margin-top: var(--hu-space-xs);
       }
+
+      /* Contrast table */
+      .brand-contrast-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--hu-text-sm);
+      }
+      .brand-contrast-table th,
+      .brand-contrast-table td {
+        padding: var(--hu-space-sm) var(--hu-space-md);
+        text-align: left;
+        border-bottom: 1px solid var(--color-border);
+      }
+      .brand-contrast-table th {
+        font-weight: 600;
+        font-size: var(--hu-text-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .brand-pass-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: var(--hu-radius-sm);
+        font-size: var(--hu-text-2xs);
+        font-weight: 600;
+        background: color-mix(in srgb, var(--hu-accent) 15%, transparent);
+        color: var(--hu-accent);
+      }
+
+      /* Misuse cards */
+      .brand-misuse-card {
+        text-align: center;
+      }
+      .brand-misuse-demo {
+        border-radius: var(--hu-radius-lg);
+        padding: var(--hu-space-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 1;
+      }
+
+      /* Type specimens */
       .brand-type-spec {
         padding-bottom: var(--hu-space-lg);
         border-bottom: 1px solid var(--color-border);
@@ -756,6 +1999,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
       .brand-type-spec:last-of-type {
         border-bottom: none;
       }
+
       @media (prefers-reduced-motion: reduce) {
         [data-reveal] {
           opacity: 1 !important;
@@ -790,19 +2034,57 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         document.querySelectorAll("[data-reveal]").forEach((el) => {
           revealObserver.observe(el);
         });
+      }
 
-        const nav = document.getElementById("site-nav");
-        if (nav) {
-          const onScroll = () => {
-            if (window.scrollY > 80) {
-              nav.classList.add("glass-nav");
-            } else {
-              nav.classList.remove("glass-nav");
-            }
-          };
-          window.addEventListener("scroll", onScroll, { passive: true });
-          onScroll();
-        }
+      const nav = document.getElementById("site-nav");
+      if (nav) {
+        const onScroll = () => {
+          if (window.scrollY > 80) {
+            nav.classList.add("glass-nav");
+          } else {
+            nav.classList.remove("glass-nav");
+          }
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
+        onScroll();
+      }
+
+      // Section nav active state
+      const sectionNav = document.querySelector(".brand-section-nav");
+      if (sectionNav) {
+        const navLinks = Array.from(sectionNav.querySelectorAll("a"));
+        const sectionIds = navLinks.map((a) =>
+          a.getAttribute("href")!.slice(1),
+        );
+        const sections = sectionIds
+          .map((id) => document.getElementById(id))
+          .filter(Boolean) as HTMLElement[];
+
+        const sectionObs = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                const id = entry.target.id;
+                navLinks.forEach((a) => {
+                  a.classList.toggle(
+                    "active",
+                    a.getAttribute("href") === `#${id}`,
+                  );
+                });
+                const activeLink = sectionNav.querySelector(`a[href="#${id}"]`);
+                if (activeLink) {
+                  activeLink.scrollIntoView({
+                    block: "nearest",
+                    inline: "center",
+                    behavior: "smooth",
+                  });
+                }
+              }
+            });
+          },
+          { threshold: 0.2, rootMargin: "-80px 0px -60% 0px" },
+        );
+        sections.forEach((s) => sectionObs.observe(s));
       }
     </script>
   </body>

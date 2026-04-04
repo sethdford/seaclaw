@@ -22,13 +22,51 @@ const SHIKI_LANGS = new Set([
   "shell",
   "jsx",
   "tsx",
-  "java",
-  "ruby",
-  "php",
   "swift",
-  "kotlin",
   "zig",
 ]);
+
+const LANG_ALIASES: Record<string, string> = { shell: "bash" };
+
+type HighlighterCore = {
+  codeToHtml: (code: string, opts: { lang: string; theme: string }) => string;
+};
+let _highlighterPromise: Promise<HighlighterCore> | null = null;
+
+async function getHighlighter(): Promise<HighlighterCore> {
+  if (_highlighterPromise) return _highlighterPromise;
+  _highlighterPromise = (async () => {
+    const { createHighlighterCore } = await import("shiki/core");
+    const { createOnigurumaEngine } = await import("shiki/engine/oniguruma");
+    return createHighlighterCore({
+      themes: [
+        import("@shikijs/themes/github-dark-default"),
+        import("@shikijs/themes/github-light-default"),
+      ],
+      langs: [
+        import("@shikijs/langs/javascript"),
+        import("@shikijs/langs/typescript"),
+        import("@shikijs/langs/python"),
+        import("@shikijs/langs/bash"),
+        import("@shikijs/langs/json"),
+        import("@shikijs/langs/html"),
+        import("@shikijs/langs/css"),
+        import("@shikijs/langs/c"),
+        import("@shikijs/langs/rust"),
+        import("@shikijs/langs/go"),
+        import("@shikijs/langs/sql"),
+        import("@shikijs/langs/yaml"),
+        import("@shikijs/langs/markdown"),
+        import("@shikijs/langs/jsx"),
+        import("@shikijs/langs/tsx"),
+        import("@shikijs/langs/swift"),
+        import("@shikijs/langs/zig"),
+      ],
+      engine: createOnigurumaEngine(import("shiki/wasm")),
+    });
+  })();
+  return _highlighterPromise;
+}
 
 @customElement("hu-code-block")
 export class ScCodeBlock extends LitElement {
@@ -192,7 +230,8 @@ export class ScCodeBlock extends LitElement {
   }
 
   private async _highlight(): Promise<void> {
-    const lang = this.language.toLowerCase().trim();
+    let lang = this.language.toLowerCase().trim();
+    lang = LANG_ALIASES[lang] ?? lang;
     const supported = lang && SHIKI_LANGS.has(lang);
     if (!supported) {
       this._highlighted = "";
@@ -200,13 +239,10 @@ export class ScCodeBlock extends LitElement {
       return;
     }
     try {
-      const { codeToHtml } = await import("shiki");
+      const highlighter = await getHighlighter();
       const theme = this._darkScheme ? "github-dark-default" : "github-light-default";
-      const html = await codeToHtml(this.code, {
-        lang,
-        theme,
-      });
-      this._highlighted = html;
+      const result = highlighter.codeToHtml(this.code, { lang, theme });
+      this._highlighted = result;
     } catch {
       this._highlighted = "";
     }

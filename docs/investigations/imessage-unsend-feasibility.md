@@ -101,3 +101,15 @@ JXA has the same limitations as AppleScript for Messages — it uses the same Ap
 | Accessibility permission denied               | Medium   | Same as tapback; clear error message                              |
 | Wrong message unsent (multi-message burst)    | Medium   | Unsend only the last sent message; document ordering assumptions  |
 | Messages.app not focused / wrong conversation | Medium   | Ensure correct conversation is active before unsend attempt       |
+
+---
+
+## Update (2026-04-03)
+
+Reviewed against current third-party tooling:
+
+- **imsg v0.5.0** (steipete/imsg, 2026-02-16): No unsend/retract command. imsg focuses on send, react, watch, and history.
+- **User behavior data**: Unsend usage is higher than originally estimated (~1 in 50 messages, per worldmetrics.org 2026), but the AX automation approach remains fragile.
+- **Conclusion unchanged**: Unsend is only partially feasible via AX automation. Not recommended for production use without significant reliability improvements.
+
+Cross-reference: `imessage-capability-matrix.md`, `imessage-imsg-cli-integration.md`

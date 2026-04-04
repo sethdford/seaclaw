@@ -20,7 +20,6 @@ import "../components/hu-status-dot.js";
 import "../components/hu-voice-orb.js";
 import "../components/hu-voice-conversation.js";
 import "../components/hu-voice-clone.js";
-import "../components/hu-empty-state.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
 
@@ -220,10 +219,13 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private _speaking = false;
   @state() private _audioLevel = 0;
   @state() private _showClonePanel = false;
+  @state() private _geminiLiveMode = false;
   private _durationTimer: ReturnType<typeof setInterval> | null = null;
   private _recorder = new AudioRecorder();
   readonly #playback = new AudioPlaybackEngine(24000);
   #voiceStreaming = false;
+  #activeSessionIsGL = false;
+  #processingTimer: ReturnType<typeof setTimeout> | null = null;
   readonly #silence = createVoiceSilenceController({
     isActive: () => this.voiceStatus === "listening" && this.#voiceStreaming,
     onSilenceEnd: () => {
@@ -315,6 +317,11 @@ export class ScVoiceView extends GatewayAwareLitElement {
           message: "Audio recording is not supported in this browser",
           variant: "info",
         });
+      }
+      try {
+        this._geminiLiveMode = localStorage.getItem("hu-gemini-live") === "true";
+      } catch {
+        /* ignore */
       }
       this._restoreFromCache();
       this.#playback.setOnPlaybackEnd(() => {
@@ -438,11 +445,34 @@ export class ScVoiceView extends GatewayAwareLitElement {
       }
     }
     this.#voiceStreaming = false;
+    this.#activeSessionIsGL = false;
+    this.#clearProcessingTimeout();
     this.#playback.interrupt();
     this._speaking = false;
+    if (this.voiceStatus !== "idle") {
+      this.voiceStatus = "idle";
+    }
+  }
+
+  #armProcessingTimeout(): void {
+    this.#clearProcessingTimeout();
+    this.#processingTimer = setTimeout(() => {
+      if (this.voiceStatus === "processing") {
+        this.voiceStatus = "idle";
+        this.requestUpdate();
+      }
+    }, 15_000);
+  }
+
+  #clearProcessingTimeout(): void {
+    if (this.#processingTimer) {
+      clearTimeout(this.#processingTimer);
+      this.#processingTimer = null;
+    }
   }
 
   async #onGatewayDisconnectedDuringVoice(): Promise<void> {
+    this.#clearProcessingTimeout();
     const gw = this.gateway ?? this._boundGateway;
     gw?.setOnBinaryChunk?.(null);
     if (this._recorder.isRecording) {
@@ -454,6 +484,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
       this.#voiceStreaming ||
       this._speaking;
     this.#voiceStreaming = false;
+    this.#activeSessionIsGL = false;
     this.#playback.interrupt();
     this._speaking = false;
     if (this.voiceStatus === "listening" || this.voiceStatus === "processing") {
@@ -517,6 +548,10 @@ export class ScVoiceView extends GatewayAwareLitElement {
     return -1;
   }
 
+  /* Tool execution happens server-side in cp_voice_stream.c — the gateway
+     dispatches tools against the agent's registered tool set and sends
+     results back to Gemini. No client-side response needed. */
+
   private onGatewayEvent(e: Event): void {
     const ev = e as CustomEvent<{
       event: string;
@@ -538,12 +573,116 @@ export class ScVoiceView extends GatewayAwareLitElement {
       return;
     }
 
+    if (detail.event === "voice.assistant.transcript") {
+      const text = (detail.payload?.text as string) ?? "";
+      if (text) {
+        const last = this._messages[this._messages.length - 1];
+        if (last && last.role === "assistant") {
+          last.content += text;
+          this._messages = [...this._messages];
+        } else {
+          this._messages = [
+            ...this._messages,
+            { role: "assistant", content: text, ts: Date.now() },
+          ];
+        }
+      }
+      this._cacheMessages();
+      requestAnimationFrame(() => this.requestUpdate());
+      return;
+    }
+
+    if (detail.event === "voice.tool_call") {
+      const name = (detail.payload?.name as string) ?? "unknown";
+      const callId = (detail.payload?.call_id as string) ?? "";
+      const args = (detail.payload?.args as string) ?? "{}";
+      this.dispatchEvent(
+        new CustomEvent("voice-tool-call", {
+          detail: { name, callId, args },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+      return;
+    }
+
     if (detail.event === "voice.audio.done") {
-      this.#playback.markEndOfStream();
+      this.#clearProcessingTimeout();
+      if (this._speaking) {
+        this.#playback.markEndOfStream();
+      } else if (this.voiceStatus !== "listening") {
+        this.voiceStatus = "idle";
+        this.requestUpdate();
+      }
       return;
     }
 
     if (detail.event === "voice.audio.interrupted") {
+      this.#clearProcessingTimeout();
+      this.#playback.interrupt();
+      this._speaking = false;
+      this.voiceStatus = "idle";
+      this.requestUpdate();
+      return;
+    }
+
+    if (detail.event === "voice.generation_complete") {
+      this.#clearProcessingTimeout();
+      if (this._speaking) {
+        this.#playback.markEndOfStream();
+      } else if (this.voiceStatus !== "listening") {
+        this.voiceStatus = "idle";
+        this.requestUpdate();
+      }
+      return;
+    }
+
+    if (detail.event === "voice.tool_cancelled") {
+      const ids = (detail.payload?.ids as string[]) ?? [];
+      if (ids.length > 0) {
+        ScToast.show({
+          message: `Tool call${ids.length > 1 ? "s" : ""} cancelled`,
+          variant: "info",
+        });
+      }
+      this.requestUpdate();
+      return;
+    }
+
+    if (detail.event === "voice.reconnected") {
+      ScToast.show({ message: "Voice session reconnected", variant: "info" });
+      return;
+    }
+
+    if (detail.event === "voice.setup_complete") {
+      this.#clearProcessingTimeout();
+      ScToast.show({ message: "Voice session ready", variant: "info" });
+      return;
+    }
+
+    if (detail.event === "voice.session_resumption") {
+      return;
+    }
+
+    if (detail.event === "voice.goaway") {
+      ScToast.show({ message: "Voice server reconnecting…", variant: "info" });
+      return;
+    }
+
+    if (detail.event === "voice.error") {
+      const msg = (detail.payload?.message as string) ?? "Voice session error";
+      ScToast.show({ message: msg, variant: "error" });
+      this.#clearProcessingTimeout();
+      if (this._recorder.isRecording) {
+        this._recorder.dispose();
+      }
+      const gw = this.gateway;
+      gw?.setOnBinaryChunk?.(null);
+      if (this.#voiceStreaming && gw && typeof gw.voiceSessionStop === "function") {
+        void gw.voiceSessionStop().catch(() => {});
+      }
+      this.#voiceStreaming = false;
+      this.#activeSessionIsGL = false;
       this.#playback.interrupt();
       this._speaking = false;
       this.voiceStatus = "idle";
@@ -615,31 +754,70 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     if (canStream) {
       try {
-        await gw.voiceSessionStart({ sessionKey: SESSION_KEY_VOICE });
+        const startParams: Record<string, unknown> = {
+          sessionKey: SESSION_KEY_VOICE,
+        };
+        if (this._geminiLiveMode) {
+          startParams.mode = "gemini_live";
+        }
+        const result = (await gw.voiceSessionStart(startParams)) as Record<string, unknown>;
+        const isGeminiLive = result?.mode === "gemini_live";
+        const isProviderDuplex = isGeminiLive || result?.mode === "openai_realtime";
+        this.#activeSessionIsGL = isProviderDuplex;
+
         gw.setOnBinaryChunk((ab) => {
+          if (ab.byteLength === 0 || ab.byteLength % 4 !== 0) return;
           const f32 = new Float32Array(ab);
           if (f32.length > 0) {
             this._speaking = true;
-            void this.#playback.pushChunk(f32);
+            void this.#playback.pushChunk(f32).catch(() => {
+              /* AudioContext init failed or was closed */
+            });
           }
           this.requestUpdate();
         });
         this.#silence.reset();
-        await this._recorder.startStreaming(
-          (data) => {
-            try {
-              gw.sendBinary(data);
-            } catch {
-              /* socket closed */
-            }
-          },
-          {
-            onLevel: (rms) => {
-              this._audioLevel = rms;
-              this.#silence.onLevel(rms);
+
+        if (isProviderDuplex) {
+          /* Provider duplex (Gemini Live / OpenAI RT): stream raw PCM16 */
+          const inputRate =
+            (result?.input_sample_rate as number) ??
+            (result?.sample_rate as number) ??
+            (isGeminiLive ? 16000 : 24000);
+          await this._recorder.startRawPcmStreaming(
+            (data) => {
+              try {
+                gw.sendBinary(data);
+              } catch {
+                /* socket closed */
+              }
             },
-          },
-        );
+            {
+              sampleRate: inputRate,
+              onLevel: (rms) => {
+                this._audioLevel = rms;
+                this.#silence.onLevel(rms);
+              },
+            },
+          );
+        } else {
+          /* Standard: stream encoded WebM/Opus to Cartesia pipeline */
+          await this._recorder.startStreaming(
+            (data) => {
+              try {
+                gw.sendBinary(data);
+              } catch {
+                /* socket closed */
+              }
+            },
+            {
+              onLevel: (rms) => {
+                this._audioLevel = rms;
+                this.#silence.onLevel(rms);
+              },
+            },
+          );
+        }
         this.#voiceStreaming = true;
         this.voiceStatus = "listening";
         return;
@@ -655,10 +833,15 @@ export class ScVoiceView extends GatewayAwareLitElement {
           detail = "Reconnect to the gateway, then try again.";
         } else if (low.includes("invalid") || low.includes("argument")) {
           detail = "Voice streaming unavailable (gateway or provider configuration).";
+        } else if (low.includes("gemini") || low.includes("google")) {
+          detail = "Gemini Live session failed: check Google API key in config.";
         }
         ScToast.show({ message: detail, variant: "error" });
         gw.setOnBinaryChunk(null);
         this.#voiceStreaming = false;
+        if (typeof gw.voiceSessionStop === "function") {
+          void gw.voiceSessionStop().catch(() => {});
+        }
       }
     }
 
@@ -684,10 +867,18 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
     if (this.#voiceStreaming) {
       this.voiceStatus = "processing";
+      this.#armProcessingTimeout();
       try {
         await this._recorder.stopStreaming();
-        const mime = this._recorder.streamMimeType || "audio/webm";
-        await gw.voiceAudioEnd({ mimeType: mime, sessionKey: SESSION_KEY_VOICE });
+        if (this.#activeSessionIsGL) {
+          await gw.voiceAudioEnd({ sessionKey: SESSION_KEY_VOICE });
+        } else {
+          const mime = this._recorder.streamMimeType || "audio/webm";
+          await gw.voiceAudioEnd({
+            mime_type: mime,
+            sessionKey: SESSION_KEY_VOICE,
+          });
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Voice stream failed";
         ScToast.show({ message: msg, variant: "error" });
@@ -702,7 +893,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
       const audio = await blobToBase64(blob);
       const result = await gw.request<{ text?: string }>("voice.transcribe", {
         audio,
-        mimeType,
+        mime_type: mimeType,
       });
       if (result.text) {
         this.transcript = result.text;
@@ -824,6 +1015,23 @@ export class ScVoiceView extends GatewayAwareLitElement {
             aria-label="Export conversation"
           >
             Export
+          </hu-button>
+          <hu-button
+            variant=${this._geminiLiveMode ? "tonal" : "ghost"}
+            size="sm"
+            ?disabled=${this.voiceStatus !== "idle"}
+            @click=${() => {
+              this._geminiLiveMode = !this._geminiLiveMode;
+              try {
+                localStorage.setItem("hu-gemini-live", String(this._geminiLiveMode));
+              } catch {
+                /* ignore */
+              }
+            }}
+            aria-label="Toggle Gemini Live"
+            title="Gemini Live: native real-time voice (no STT/TTS pipeline)"
+          >
+            ${this._geminiLiveMode ? "Gemini Live" : "Standard Voice"}
           </hu-button>
           <hu-button
             variant="ghost"

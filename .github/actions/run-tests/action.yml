@@ -1,5 +1,5 @@
 name: Run Human Tests
-description: Execute the human_tests binary with optional ASan options
+description: Execute the human_tests binary with optional ASan options and sharding
 
 inputs:
   build-dir:
@@ -8,6 +8,9 @@ inputs:
   asan-options:
     description: ASAN_OPTIONS environment variable value
     default: ""
+  shard:
+    description: "Shard spec in N/M format (e.g. 1/4). Empty = run all tests."
+    default: ""
 
 runs:
   using: composite
@@ -15,8 +18,12 @@ runs:
     - name: Run tests
       shell: bash
       run: |
+        SHARD_FLAG=""
+        if [ -n "${{ inputs.shard }}" ]; then
+          SHARD_FLAG="--shard=${{ inputs.shard }}"
+        fi
         if [ -n "${{ inputs.asan-options }}" ]; then
-          ASAN_OPTIONS="${{ inputs.asan-options }}" ./${{ inputs.build-dir }}/human_tests 2>&1 | tee /tmp/human_tests_output.txt
+          ASAN_OPTIONS="${{ inputs.asan-options }}" ./${{ inputs.build-dir }}/human_tests $SHARD_FLAG 2>&1 | tee /tmp/human_tests_output.txt
         else
-          ./${{ inputs.build-dir }}/human_tests 2>&1 | tee /tmp/human_tests_output.txt
+          ./${{ inputs.build-dir }}/human_tests $SHARD_FLAG 2>&1 | tee /tmp/human_tests_output.txt
         fi

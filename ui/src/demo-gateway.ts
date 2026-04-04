@@ -1056,6 +1056,7 @@ export class DemoGatewayClient extends EventTarget {
   #interval: ReturnType<typeof setInterval> | null = null;
   #nextId = 100;
   #onBinary: ((data: ArrayBuffer) => void) | null = null;
+  #glMode = false;
 
   private state = {
     sessions: makeSessions(),
@@ -1778,14 +1779,45 @@ export class DemoGatewayClient extends EventTarget {
       case "voice.transcribe":
         return { text: "Demo transcription of your audio" };
 
-      case "voice.session.start":
+      case "voice.session.start": {
+        const reqMode = (params as Record<string, unknown>)?.mode as string | undefined;
+        const isGeminiLive = reqMode === "gemini_live";
+        const isOpenAIRealtime = reqMode === "openai_realtime";
+        this.#glMode = isGeminiLive;
+        if (isGeminiLive) {
+          return {
+            ok: true,
+            session_id: `demo-${Date.now()}`,
+            input_encoding: "pcm_s16le",
+            output_encoding: "pcm_f32le",
+            input_sample_rate: 16000,
+            output_sample_rate: 24000,
+            mode: "gemini_live",
+          };
+        }
+        if (isOpenAIRealtime) {
+          return {
+            ok: true,
+            session_id: `demo-${Date.now()}`,
+            input_encoding: "pcm_s16le",
+            output_encoding: "pcm_f32le",
+            input_sample_rate: 24000,
+            output_sample_rate: 24000,
+            mode: "openai_realtime",
+          };
+        }
         return {
-          sessionId: `demo-${Date.now()}`,
-          sampleRate: 24000,
+          ok: true,
+          session_id: `demo-${Date.now()}`,
+          sample_rate: 24000,
           encoding: "pcm_f32le",
         };
+      }
 
       case "voice.session.stop":
+        return { ok: true };
+
+      case "voice.tool_response":
         return { ok: true };
 
       case "voice.session.interrupt":
@@ -1797,7 +1829,11 @@ export class DemoGatewayClient extends EventTarget {
         return { ok: true };
 
       case "voice.audio.end":
-        this.#scheduleDemoVoicePipeline("Demo transcription from streaming mic");
+        if (this.#glMode) {
+          this.#scheduleDemoGeminiLiveResponse();
+        } else {
+          this.#scheduleDemoVoicePipeline("Demo transcription from streaming mic");
+        }
         return { ok: true };
 
       case "voice.config":
@@ -1944,6 +1980,171 @@ export class DemoGatewayClient extends EventTarget {
             { source: 8, target: 1, type: "relates_to", weight: 0.4 },
             { source: 4, target: 7, type: "relates_to", weight: 0.3 },
           ],
+        };
+
+      case "tasks.list": {
+        const now = Math.floor(Date.now() / 1000);
+        const st =
+          params && typeof (params as { status?: number }).status === "number"
+            ? Math.floor((params as { status: number }).status)
+            : null;
+        const all = [
+          {
+            id: 1,
+            name: "ingest_feed",
+            status: "pending",
+            program_json: '{"name":"ingest","version":1}',
+            trace_json: "[]",
+            created_at: now - 7200,
+            updated_at: now - 7100,
+            parent_task_id: 0,
+          },
+          {
+            id: 2,
+            name: "summarize_digest",
+            status: "running",
+            program_json: '{"name":"digest","version":1}',
+            trace_json: '[{"op":"call","id":"c1"}]',
+            created_at: now - 3600,
+            updated_at: now - 120,
+            parent_task_id: 0,
+          },
+          {
+            id: 3,
+            name: "archive_done",
+            status: "completed",
+            program_json: '{"name":"noop","version":1}',
+            trace_json: "[]",
+            created_at: now - 86400,
+            updated_at: now - 86000,
+            parent_task_id: 2,
+          },
+        ];
+        const tasks =
+          st !== null && st >= 0 && st <= 4
+            ? all.filter((t) => {
+                const map = ["pending", "running", "completed", "failed", "cancelled"] as const;
+                return t.status === map[st];
+              })
+            : all;
+        return { tasks };
+      }
+      case "tasks.get": {
+        const now = Math.floor(Date.now() / 1000);
+        const id =
+          params && typeof (params as { id?: number }).id === "number"
+            ? Math.floor((params as { id: number }).id)
+            : 2;
+        return {
+          task: {
+            id,
+            name: id === 1 ? "ingest_feed" : "summarize_digest",
+            status: id === 1 ? "pending" : "running",
+            program_json: '{"name":"demo","version":1}',
+            trace_json: "[]",
+            created_at: now - 1800,
+            updated_at: now - 60,
+            parent_task_id: 0,
+          },
+        };
+      }
+      case "tasks.cancel": {
+        const id =
+          params && typeof (params as { id?: number }).id === "number"
+            ? Math.floor((params as { id: number }).id)
+            : 3;
+        return { ok: true, id, status: "cancelled" };
+      }
+
+      case "canvas.list":
+        return {
+          canvases: [
+            {
+              canvas_id: "cv_0",
+              title: "Dashboard Mockup",
+              format: "html",
+              content:
+                '<div style="padding:20px;font-family:sans-serif"><h2>Sales Dashboard</h2><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#7ab648">$42,150</div><div style="font-size:12px;opacity:0.6">Revenue today</div></div><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#e8b931">1,234</div><div style="font-size:12px;opacity:0.6">Active users</div></div><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#5b8def">98.7%</div><div style="font-size:12px;opacity:0.6">Uptime</div></div></div></div>',
+              language: "",
+              imports: "",
+              version_seq: 3,
+              version_count: 3,
+            },
+            {
+              canvas_id: "cv_1",
+              title: "Counter App",
+              format: "react",
+              content: `function App() {
+  const [count, setCount] = React.useState(0);
+  return (
+    <div style={{padding: 20, textAlign: "center"}}>
+      <h2>Counter: {count}</h2>
+      <button onClick={() => setCount(c => c + 1)}
+        style={{padding: "8px 24px", fontSize: 16, cursor: "pointer",
+          background: "#7ab648", color: "#fff", border: "none", borderRadius: 6}}>
+        Increment
+      </button>
+    </div>
+  );
+}`,
+              language: "",
+              imports: {},
+              version_seq: 1,
+              version_count: 1,
+            },
+          ],
+        };
+
+      case "canvas.get": {
+        const cid =
+          params && typeof (params as { canvas_id?: string }).canvas_id === "string"
+            ? (params as { canvas_id: string }).canvas_id
+            : "cv_0";
+        return {
+          canvas: {
+            canvas_id: cid,
+            title: cid === "cv_0" ? "Dashboard Mockup" : "Counter App",
+            format: cid === "cv_0" ? "html" : "react",
+            content:
+              cid === "cv_0" ? "<h2>Dashboard</h2>" : "function App() { return <div>Hello</div>; }",
+            version_seq: cid === "cv_0" ? 3 : 1,
+            version_count: cid === "cv_0" ? 3 : 1,
+            user_edit_pending: false,
+          },
+        };
+      }
+
+      case "canvas.edit":
+        return {
+          ok: true,
+          canvas_id:
+            params && typeof (params as { canvas_id?: string }).canvas_id === "string"
+              ? (params as { canvas_id: string }).canvas_id
+              : "cv_0",
+        };
+
+      case "canvas.undo":
+        return {
+          ok: true,
+          canvas_id:
+            params && typeof (params as { canvas_id?: string }).canvas_id === "string"
+              ? (params as { canvas_id: string }).canvas_id
+              : "cv_0",
+          version_seq: 2,
+          content: "<h2>Previous version</h2>",
+          format: "html",
+        };
+
+      case "canvas.redo":
+        return {
+          ok: true,
+          canvas_id:
+            params && typeof (params as { canvas_id?: string }).canvas_id === "string"
+              ? (params as { canvas_id: string }).canvas_id
+              : "cv_0",
+          version_seq: 3,
+          content: "<h2>Next version</h2>",
+          format: "html",
         };
 
       case "hula.traces.list":
@@ -2259,7 +2460,7 @@ export class DemoGatewayClient extends EventTarget {
         return { prompts: [] };
 
       default:
-        return {};
+        return { error: "not available in demo mode", method };
     }
   }
 
@@ -2302,6 +2503,10 @@ export class DemoGatewayClient extends EventTarget {
     return this.request("voice.audio.end", params);
   }
 
+  voiceToolResponse(params: { name: string; call_id: string; result: string }): Promise<unknown> {
+    return this.request("voice.tool_response", params);
+  }
+
   #emitDemoVoicePcmChunks(): void {
     let pcmCount = 0;
     const sendPcm = (): void => {
@@ -2321,6 +2526,32 @@ export class DemoGatewayClient extends EventTarget {
     setTimeout(sendPcm, 180);
   }
 
+  #scheduleDemoGeminiLiveResponse(): void {
+    const e = (event: string, payload: Record<string, unknown> = {}) =>
+      this.dispatchEvent(
+        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, { detail: { event, payload } }),
+      );
+    setTimeout(() => e("voice.vad.speech_started"), 20);
+    setTimeout(() => e("voice.vad.speech_stopped"), 60);
+    setTimeout(() => e("voice.user.transcript", { text: "Demo user speech" }), 80);
+    setTimeout(() => this.#emitDemoVoicePcmChunks(), 100);
+    setTimeout(
+      () =>
+        e("voice.tool_call", {
+          name: "demo_tool",
+          call_id: "demo-call-1",
+          args: '{"query":"demo"}',
+        }),
+      150,
+    );
+    setTimeout(
+      () => e("voice.assistant.transcript", { text: "This is a demo Gemini Live response." }),
+      300,
+    );
+    setTimeout(() => e("voice.generation_complete"), 1500);
+    setTimeout(() => e("voice.audio.done"), 2000);
+  }
+
   #scheduleDemoVoicePipeline(userText: string): void {
     this.dispatchEvent(
       new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
@@ -2334,6 +2565,13 @@ export class DemoGatewayClient extends EventTarget {
         SESSION_KEY_VOICE,
       );
     }, 200);
+    setTimeout(() => {
+      this.dispatchEvent(
+        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
+          detail: { event: "voice.generation_complete", payload: {} },
+        }),
+      );
+    }, 3200);
     setTimeout(() => {
       this.dispatchEvent(
         new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {

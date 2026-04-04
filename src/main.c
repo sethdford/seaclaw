@@ -1253,7 +1253,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         const char *query = (argc >= 4 && argv[3]) ? argv[3] : "";
         hu_skill_registry_entry_t *entries = NULL;
         size_t count = 0;
-        hu_error_t err = hu_skill_registry_search(alloc, query, &entries, &count);
+        hu_error_t err = hu_skill_registry_search(alloc, NULL, query, &entries, &count);
         if (err != HU_OK) {
             hu_log_error("skills", NULL, "skills search: %s", hu_error_string(err));
             return err;
@@ -1277,7 +1277,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
         if (strchr(argv[3], '/') || strchr(argv[3], '.'))
             err = hu_skill_registry_install(alloc, argv[3]);
         else
-            err = hu_skill_registry_install_by_name(alloc, argv[3]);
+            err = hu_skill_registry_install_by_name(alloc, NULL, argv[3]);
         if (err != HU_OK) {
             hu_log_error("skills", NULL, "skills install: %s", hu_error_string(err));
             return err;
@@ -1358,7 +1358,7 @@ static hu_error_t cmd_skills(hu_allocator_t *alloc, int argc, char **argv) {
 
         hu_skill_registry_entry_t *entries = NULL;
         size_t count = 0;
-        err = hu_skill_registry_search(alloc, argv[3], &entries, &count);
+        err = hu_skill_registry_search(alloc, NULL, argv[3], &entries, &count);
         if (err == HU_OK && count > 0) {
             for (size_t i = 0; i < count; i++) {
                 if (entries[i].name && strcmp(entries[i].name, argv[3]) == 0) {

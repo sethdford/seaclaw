@@ -1,9 +1,3 @@
----
-title: IMAP channel with Gmail
-description: Configure Human's IMAP and SMTP channel for Gmail using app passwords
-updated: 2026-04-03
----
-
 # IMAP channel with Gmail
 
 The `imap` channel in `human` uses **libcurl** for **IMAP** (poll) and **SMTP** (send) when built with `HU_ENABLE_CURL` and `HU_HTTP_CURL`.

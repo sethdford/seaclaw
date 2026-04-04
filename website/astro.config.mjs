@@ -9,7 +9,7 @@ export default defineConfig({
   base: "/",
   compressHTML: true,
   build: {
-    inlineStylesheets: "always",
+    inlineStylesheets: "auto",
   },
   prefetch: {
     prefetchAll: false,
@@ -32,6 +32,7 @@ export default defineConfig({
       ],
       customCss: ["./src/styles/global.css"],
       sidebar: [
+        { label: "Welcome", slug: "welcome" },
         {
           label: "Getting Started",
           items: [

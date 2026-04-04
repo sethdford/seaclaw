@@ -20,6 +20,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Config validation**         | `src/config_validate.c`, `src/config_schema.c`                                                                                 | `test_config_validation.c`                      |
 | **Config merge / migrate**    | `src/config_merge.c`, `src/config_migrate.c`                                                                                   | `test_config_migrate.c`                         |
 | **Config getters**            | `src/config_getters.c`, `src/config_serialize.c`                                                                               | `test_config_getters.c`                         |
+| **Config schema generation**  | `src/config_schema.c`, `include/human/config_schema.h`                                         | `test_config_schema.c`, `test_config_validation.c` |
 
 ## Agent
 
@@ -29,7 +30,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Planner / dispatcher**          | `src/agent/planner.c`, `dispatcher.c`                          | `test_agent_extended.c`                                                      |
 | **DAG / LLMCompiler**             | `src/agent/dag.c`, `dag_executor.c`, `llm_compiler.c`          | `test_dag.c`                                                                 |
 | **HuLa (program IR / emergence)** | `src/agent/hula.c`, `hula_compiler.c`, `hula_emergence.c`, `agent_turn.c` (integration); guide: [`docs/guides/hula.md`](guides/hula.md) | `test_hula.c`                                                                |
-| **Metacognition (loop / policy)** | `src/cognition/metacognition.c`, `agent_turn.c`, `spawn.c` (`hu_spawn_config_apply_current_tool_agent`) | `test_metacognition.c`, `test_config_extended.c`; ops: `docs/operations/metacog-hula-production.md` |
+| **Metacognition (loop / policy)** | `src/cognition/metacognition.c`, `src/agent/agent_turn.c`, `src/agent/spawn.c` (`hu_spawn_config_apply_current_tool_agent`) | `test_metacognition.c`, `test_config_extended.c`; ops: `docs/operations/metacog-hula-production.md` |
 | **Tool router**                   | `src/agent/tool_router.c`                                      | `test_tool_router.c`                                                         |
 | **Prompt building**               | `src/agent/prompt.c`, `context_tokens.c`, `memory_loader.c`    | `test_prompt.c`                                                              |
 | **Proactive / governor**          | `src/agent/proactive.c`, `governor.c`, `arbitrator.c`          | `test_proactive.c`, `test_governor.c`, `test_arbitrator.c`                   |
@@ -56,11 +57,16 @@ Use this to find the right files for a given task without searching the full cod
 | **HUML checkpoint (on-device)** | `src/providers/huml.c`, `include/human/providers/huml.h` | `test_ml.c`                          |
 | **Embedded / llama-cli**        | `src/providers/embedded.c`, `include/human/providers/embedded.h` | `test_ml.c`                    |
 
-### Voice session (unified)
+### Voice
 
 | Concept | Primary Source Files | Test Files |
 | --- | --- | --- |
+| **Voice provider vtable** | `include/human/voice/provider.h` | `test_voice_provider.c` |
+| **OpenAI Realtime provider** | `src/voice/realtime.c` | `test_voice_rt_openai.c`, `test_voice_provider.c` |
+| **Gemini Live provider** | `src/voice/gemini_live.c` | `test_gemini_live.c`, `test_voice_provider.c` |
 | **Voice session API** | `src/voice/session.c`, `include/human/voice/session.h` | `test_voice_session.c` |
+| **Duplex turn-taking** | `src/voice/duplex.c`, `src/voice/semantic_eot.c` | `test_voice_duplex.c` |
+| **Gateway voice streaming** | `src/gateway/cp_voice_stream.c` | `test_gateway_voice.c` |
 
 ## Channels
 
@@ -84,6 +90,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Voice cloning (Cartesia)**       | `src/tts/voice_clone.c`, `include/human/tts/voice_clone.h`                  | `test_voice_clone.c`                                 |
 | **Voice clone gateway**            | `src/gateway/cp_voice_clone.c`                                               | `test_gateway_voice.c`                               |
 | **Voice clone tool**               | `src/tools/voice_clone.c`, `include/human/tools/voice_clone.h`              | `test_voice_clone.c`                                 |
+| **Send voice message tool**        | `src/tools/send_voice_message.c`, `include/human/tools/send_voice_message.h`| `test_send_voice_message.c`                          |
 | **Voice clone UI**                 | `ui/src/components/hu-voice-clone.ts`                                        | `—`                                                  |
 
 ## Tools
@@ -97,6 +104,8 @@ Use this to find the right files for a given task without searching the full cod
 | **Cron tools**          | `src/tools/cron_add.c`, `cron_remove.c`, `cron_list.c`, `cron_run.c` | `test_cron.c`                             |
 | **Computer use / LSP**  | `src/tools/computer_use.c`, `lsp.c`                                  | `test_computer_use.c`, `test_lsp.c`       |
 | **Tool result cache (TTL)** | `src/tools/cache_ttl.c`, `include/human/tools/cache_ttl.h`         | `test_sota_wiring.c`                      |
+| **Live Canvas / A2UI**  | `src/tools/canvas.c`, `include/human/tools/canvas.h`, `src/gateway/cp_canvas.c` | `test_canvas_tool.c`, `test_canvas_e2e.c` |
+| **Canvas UI**           | `ui/src/components/hu-canvas.ts`, `hu-canvas-sandbox.ts`, `hu-canvas-editor.ts`, `ui/src/canvas-harness.ts`, `ui/src/views/canvas-view.ts` | — |
 
 ## Memory
 
@@ -198,9 +207,10 @@ Use this to find the right files for a given task without searching the full cod
 | **Session**                                            | `src/session.c`                                                                                                                 | `test_session.c`                                                                   |
 | **WebSocket client**                                   | `src/websocket/websocket.c`                                                                                                     | `test_websocket.c`, `test_ws_integration.c`                                        |
 | **Tunnel**                                             | `src/tunnel/ngrok.c`, `cloudflare.c`, `tailscale.c`                                                                             | `test_tunnel.c`                                                                    |
-| **Voice / TTS / WebRTC**                               | `src/voice.c`, `src/voice_config.c`, `src/voice/realtime.c`, `src/voice/webrtc.c`, `src/tts/audio_pipeline.c`, `emotion_map.c`                        | `test_voice.c`, `test_webrtc.c`, `test_audio_pipeline.c`, `test_emotion_map.c`     |
+| **Voice / TTS / WebRTC**                               | `src/voice.c`, `src/voice_config.c`, `src/voice/realtime.c`, `src/voice/webrtc.c`, `src/tts/audio_pipeline.c`, `src/tts/emotion_map.c`                | `test_voice.c`, `test_webrtc.c`, `test_audio_pipeline.c`, `test_emotion_map.c`     |
 | **Paperclip**                                          | `src/paperclip/client.c`, `heartbeat.c`                                                                                         | `test_paperclip.c`                                                                 |
 | **Eval**                                               | `src/eval.c`, `eval_suites/*.json`, `scripts/adversarial-eval-harness.py`, `scripts/redteam-eval-fleet.sh`, `scripts/redteam-live.sh` | `test_eval.c`, `test_adversarial_detect.c`                                         |
+| **Daemon / worker pool**                         | `src/daemon.c`, `src/gateway/gateway.c`, `scripts/daemon-*`, `.claude/daemon-config.json` | `test_daemon.c` (if exists) |
 | **A2A**                                                | `src/a2a.c`                                                                                                                     | `test_a2a.c`                                                                       |
 
 ## Design system / tokens
@@ -239,6 +249,19 @@ Use this to find the right files for a given task without searching the full cod
 | **PWA bridge**              | `src/pwa/bridge.c`, `context.c`, `drivers.c`, `learner.c`                                                | `test_pwa.c`             |
 | **ML subsystem**            | `src/ml/gpt.c`, `train.c`, `prepare.c`, `tokenizer_bpe.c`, `dataloader.c`, `evaluator.c`, `experiment.c`, `dpo.c`, `lora.c`, `cli.c`, `checkpoint.c`, `agent_trainer.c` | `test_ml.c` |
 | **Research feeds**          | `src/feeds/research.c`, `file_ingest.c`, `gmail.c`, `imessage.c`, `twitter.c`                            | `test_research_feeds.c`  |
+| **Fact extraction**         | `src/memory/fact_extract.c`, `include/human/memory/fact_extract.h`                                       | `test_fact_extract.c`    |
+| **Hallucination guard**     | `src/memory/hallucination_guard.c`, `include/human/memory/hallucination_guard.h`                         | `test_hallucination_guard.c` |
+| **Sycophancy guard**        | `src/security/sycophancy_guard.c`, `include/human/security/sycophancy_guard.h`                           | `test_sycophancy_guard.c` |
+| **Trust calibration**       | `src/cognition/trust.c`, `include/human/cognition/trust.h`                                               | `test_trust_calibration.c` |
+| **Consistency eval**        | `src/eval/consistency.c`, `include/human/eval/consistency.h`                                             | `test_consistency.c`     |
+| **Humor framework**         | `src/persona/humor.c`, `include/human/persona/humor.h`                                                   | `test_humor_fw.c`        |
+| **Markdown persona loader** | `src/persona/markdown_loader.c`, `include/human/persona/markdown_loader.h`                               | `test_markdown_loader.c` |
+| **Self-improve (fidelity)** | `src/agent/self_improve.c`, `include/human/agent/self_improve.h`                                         | `test_self_improve.c`    |
+| **Task store**              | `src/agent/task_store.c`, `src/gateway/cp_tasks.c`, `include/human/agent/task_store.h`                   | `test_task_store.c`      |
+| **Vertex auth (ADC)**       | `src/core/vertex_auth.c`, `include/human/core/vertex_auth.h`                                             | `test_media_gen.c`       |
+| **Vision OCR tool**         | `src/tools/vision_ocr.c`, `vision_ocr_apple.m`, `include/human/tools/vision_ocr.h`                      | `test_vision_ocr.c`      |
+| **Media generation**        | `src/tools/media_image.c`, `media_video.c`, `media_gif.c`                                                | `test_media_gen.c`       |
+| **Send voice message**      | `src/tools/send_voice_message.c`, `include/human/tools/send_voice_message.h`                             | `test_send_voice_message.c` |
 
 ## Native client apps (`apps/`)
 

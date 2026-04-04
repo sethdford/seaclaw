@@ -31,6 +31,7 @@ type PendingReject = (reason: Error) => void;
 
 export class GatewayClient extends EventTarget {
   #url = "";
+  #authToken = "";
   #ws: WebSocket | null = null;
   #onBinaryChunk: ((data: ArrayBuffer) => void) | null = null;
   #pending = new Map<
@@ -59,6 +60,10 @@ export class GatewayClient extends EventTarget {
     return this.#features;
   }
 
+  setAuthToken(token: string): void {
+    this.#authToken = token;
+  }
+
   connect(url: string): void {
     if (this.#ws?.readyState === WebSocket.OPEN) {
       return;
@@ -74,10 +79,12 @@ export class GatewayClient extends EventTarget {
         this.#sendConnect();
       };
       this.#ws.onclose = () => {
+        this.#rejectPending("Connection closed");
         this.#setStatus("disconnected");
         this.#scheduleReconnect();
       };
       this.#ws.onerror = () => {
+        this.#rejectPending("Connection error");
         this.#setStatus("disconnected");
         this.#scheduleReconnect();
       };
@@ -90,19 +97,29 @@ export class GatewayClient extends EventTarget {
 
   async #sendConnect(): Promise<void> {
     try {
+      const connectParams: Record<string, unknown> = {
+        client: "human-ui",
+        version: "0.3.0",
+      };
+      if (this.#authToken) connectParams.token = this.#authToken;
       const res = await this.request<{
         type?: string;
         server?: { version?: string };
         features?: ServerFeatures;
         protocol?: number;
-      }>("connect", { client: "human-ui", version: "0.3.0" });
+      }>("connect", connectParams);
       if (res && typeof res === "object") {
         const payload = res as Record<string, unknown>;
         if (payload.features) this.#features = payload.features as ServerFeatures;
       }
       this.dispatchEvent(new CustomEvent("features", { detail: this.#features }));
-    } catch {
-      /* connect handshake optional — gateway may not require it */
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Handshake failed";
+      this.dispatchEvent(
+        new CustomEvent(GatewayClient.EVENT_GATEWAY, {
+          detail: { event: "error", payload: { message: `Connect: ${msg}` } },
+        }),
+      );
     }
   }
 
@@ -110,6 +127,14 @@ export class GatewayClient extends EventTarget {
     if (this.#status === s) return;
     this.#status = s;
     this.dispatchEvent(new CustomEvent(GatewayClient.EVENT_STATUS, { detail: s }));
+  }
+
+  #rejectPending(reason: string): void {
+    for (const p of this.#pending.values()) {
+      clearTimeout(p.timeout);
+      p.reject(new Error(reason));
+    }
+    this.#pending.clear();
   }
 
   #scheduleReconnect(): void {
@@ -139,9 +164,14 @@ export class GatewayClient extends EventTarget {
     this.#ws.send(payload);
   }
 
-  voiceSessionStart(
-    params?: Record<string, unknown>,
-  ): Promise<{ sessionId?: string; sampleRate?: number; encoding?: string }> {
+  voiceSessionStart(params?: Record<string, unknown>): Promise<{
+    session_id?: string;
+    sample_rate?: number;
+    input_sample_rate?: number;
+    output_sample_rate?: number;
+    encoding?: string;
+    mode?: string;
+  }> {
     return this.request("voice.session.start", params);
   }
 
@@ -155,6 +185,10 @@ export class GatewayClient extends EventTarget {
 
   voiceAudioEnd(params?: Record<string, unknown>): Promise<unknown> {
     return this.request("voice.audio.end", params);
+  }
+
+  voiceToolResponse(params: { name: string; call_id: string; result: string }): Promise<unknown> {
+    return this.request("voice.tool_response", params);
   }
 
   #onMessage(ev: MessageEvent): void {

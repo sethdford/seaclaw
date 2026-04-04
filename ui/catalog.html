@@ -94,6 +94,7 @@
       <a href="#hu-message-branch">hu-message-branch</a>
       <a href="#hu-reasoning-block">hu-reasoning-block</a>
       <a href="#hu-code-block">hu-code-block</a>
+      <a href="#hu-canvas">hu-canvas</a>
       <a href="#hu-latex">hu-latex</a>
       <a href="#hu-shortcut-overlay">hu-shortcut-overlay</a>
       <a href="#hu-context-menu">hu-context-menu</a>
@@ -137,6 +138,12 @@
       <a href="#hu-floating-mic">hu-floating-mic</a>
       <a href="#hu-activity-timeline">hu-activity-timeline</a>
       <a href="#hu-sessions-table">hu-sessions-table</a>
+      <a href="#hu-agent-graph">hu-agent-graph</a>
+      <a href="#hu-approval-gate">hu-approval-gate</a>
+      <a href="#hu-memory-event">hu-memory-event</a>
+      <a href="#hu-web-search-result">hu-web-search-result</a>
+      <a href="#hu-workflow-timeline">hu-workflow-timeline</a>
+      <a href="#hu-workflow-view">hu-workflow-view</a>
     </nav>
     <main class="catalog-main">
       <header class="catalog-header">
@@ -1079,6 +1086,21 @@
         <div class="code-snippet"><pre><code>&lt;hu-code-block code=&quot;...&quot; language=&quot;javascript&quot;&gt;&lt;/hu-code-block&gt;</code></pre></div>
       </section>
 
+      <section class="component-section" id="hu-canvas">
+        <h2>hu-canvas</h2>
+        <p>Live Canvas / A2UI surface: sanitized HTML or SVG, optional device mockup frame, fullscreen control.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 36rem; min-height: 200px;">
+            <hu-canvas
+              title="Preview"
+              format="html"
+              content="&lt;p style=&quot;color:var(--hu-accent)&quot;&gt;Hello from Live Canvas&lt;/p&gt;"
+            ></hu-canvas>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-canvas .title=${&quot;UI&quot;} .format=${&quot;html&quot;} .content=${htmlString}&gt;&lt;/hu-canvas&gt;</code></pre></div>
+      </section>
+
       <section class="component-section" id="hu-latex">
         <h2>hu-latex</h2>
         <div class="playground">
@@ -1689,6 +1711,72 @@
         <div class="code-snippet"><pre><code>&lt;hu-sessions-table .sessions=${sessions} @session-select=${handler}&gt;&lt;/hu-sessions-table&gt;</code></pre></div>
       </section>
 
+      <section class="component-section" id="hu-agent-graph">
+        <h2>hu-agent-graph</h2>
+        <p style="margin-bottom: var(--hu-space-md); color: var(--hu-text-muted);">Visual graph of multi-agent orchestration hierarchy.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 600px;">
+            <hu-agent-graph></hu-agent-graph>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-agent-graph .agents=${agents}&gt;&lt;/hu-agent-graph&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="hu-approval-gate">
+        <h2>hu-approval-gate</h2>
+        <p style="margin-bottom: var(--hu-space-md); color: var(--hu-text-muted);">Interactive approval gate for human-in-the-loop workflows.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 400px;">
+            <hu-approval-gate></hu-approval-gate>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-approval-gate status="pending" @approve=${handler}&gt;&lt;/hu-approval-gate&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="hu-memory-event">
+        <h2>hu-memory-event</h2>
+        <p style="margin-bottom: var(--hu-space-md); color: var(--hu-text-muted);">Displays a memory storage or retrieval event.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 400px;">
+            <hu-memory-event></hu-memory-event>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-memory-event type="store" .content=${"Remembered user preference"}&gt;&lt;/hu-memory-event&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="hu-web-search-result">
+        <h2>hu-web-search-result</h2>
+        <p style="margin-bottom: var(--hu-space-md); color: var(--hu-text-muted);">Renders a web search result with title, URL, and snippet.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 400px;">
+            <hu-web-search-result></hu-web-search-result>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-web-search-result title="Example" url="https://example.com" snippet="A sample result"&gt;&lt;/hu-web-search-result&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="hu-workflow-timeline">
+        <h2>hu-workflow-timeline</h2>
+        <p style="margin-bottom: var(--hu-space-md); color: var(--hu-text-muted);">Timeline view of workflow execution events.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 500px;">
+            <hu-workflow-timeline></hu-workflow-timeline>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-workflow-timeline .events=${events}&gt;&lt;/hu-workflow-timeline&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="hu-workflow-view">
+        <h2>hu-workflow-view</h2>
+        <p style="margin-bottom: var(--hu-space-md); color: var(--hu-text-muted);">Full workflow management view with agent graph, timeline, and approval gates.</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 600px;">
+            <hu-workflow-view></hu-workflow-view>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-workflow-view .workflow=${workflow}&gt;&lt;/hu-workflow-view&gt;</code></pre></div>
+      </section>
+
     <hu-toast></hu-toast>
 
     <script type="module">
@@ -1743,6 +1831,7 @@
       import "/src/components/hu-message-stream.js";
       import "/src/components/hu-reasoning-block.js";
       import "/src/components/hu-code-block.js";
+      import "/src/components/hu-canvas.js";
       import "/src/components/hu-latex.js";
       import "/src/components/hu-shortcut-overlay.js";
       import "/src/components/hu-context-menu.js";

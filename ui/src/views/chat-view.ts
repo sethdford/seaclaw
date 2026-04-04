@@ -220,21 +220,21 @@ export class ScChatView extends GatewayAwareLitElement {
       name: "h-uman Core",
       instructions: "",
       pinned: true,
-      color: "var(--hu-accent)",
+      color: "var(--hu-brand-primary)",
     },
     {
       id: "proj-2",
       name: "UI Dashboard",
       instructions: "",
       pinned: false,
-      color: "var(--hu-accent-secondary)",
+      color: "var(--hu-brand-secondary)",
     },
     {
       id: "proj-3",
       name: "Research",
       instructions: "",
       pinned: false,
-      color: "var(--hu-accent-tertiary)",
+      color: "var(--hu-brand-tertiary)",
     },
   ];
   @state() private _tapback = { open: false, x: 0, y: 0, index: -1, content: "" };
@@ -374,7 +374,6 @@ export class ScChatView extends GatewayAwareLitElement {
     const eventSession =
       (payload.session_key as string | undefined) ?? (payload.sessionKey as string | undefined);
     if (eventSession && eventSession !== this.sessionKey) return;
-    if (!eventSession && detail.event !== "error") return;
     this.chat.handleEvent(detail.event, payload, this.sessionKey);
     this._messageThread?.scrollToBottom();
   }

@@ -30,7 +30,17 @@ typedef struct hu_voice_rt_event {
     size_t audio_base64_len;
     char *transcript; /* text transcript (caller frees) */
     size_t transcript_len;
-    bool done; /* true if this is an end-of-response event */
+    char *tool_call_id;
+    size_t tool_call_id_len;
+    char *tool_name;
+    size_t tool_name_len;
+    char *tool_args_json;
+    size_t tool_args_json_len;
+    bool error;               /* true if this is an error event */
+    int go_away_ms;           /* goAway timeout hint (0 = none) */
+    bool done;                /* true if this is an end-of-response event */
+    bool interrupted;         /* response was interrupted by user */
+    bool generation_complete; /* model finished generating */
 } hu_voice_rt_event_t;
 
 hu_error_t hu_voice_rt_session_create(hu_allocator_t *alloc, const hu_voice_rt_config_t *config,

@@ -171,6 +171,10 @@ export class ScAutomationsView extends GatewayAwareLitElement {
   protected override async load(): Promise<void> {
     const gw = this.gateway;
     if (!gw) return;
+    if (gw.features && gw.features.cron === false) {
+      this.error = "Automations not available on this build";
+      return;
+    }
     this.loading = true;
     this.error = "";
     try {

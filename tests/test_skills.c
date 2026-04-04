@@ -96,7 +96,7 @@ static void test_skill_registry_search_mock(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_skill_registry_entry_t *entries = NULL;
     size_t count = 0;
-    hu_error_t err = hu_skill_registry_search(&alloc, "code", &entries, &count);
+    hu_error_t err = hu_skill_registry_search(&alloc, NULL, "code", &entries, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(entries);
     HU_ASSERT_TRUE(count >= 1);
@@ -112,20 +112,20 @@ static void test_skill_registry_install_mock(void) {
 
 static void test_skill_registry_install_by_name_mock(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_error_t err = hu_skill_registry_install_by_name(&alloc, "code-review");
+    hu_error_t err = hu_skill_registry_install_by_name(&alloc, NULL, "code-review");
     HU_ASSERT_EQ(err, HU_OK);
 }
 
 static void test_skill_registry_install_by_name_null_name_fails(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    hu_error_t err = hu_skill_registry_install_by_name(&alloc, NULL);
+    hu_error_t err = hu_skill_registry_install_by_name(&alloc, NULL, NULL);
     HU_ASSERT(err != HU_OK);
-    err = hu_skill_registry_install_by_name(&alloc, "");
+    err = hu_skill_registry_install_by_name(&alloc, NULL, "");
     HU_ASSERT(err != HU_OK);
 }
 
 static void test_skill_registry_install_by_name_null_alloc_fails(void) {
-    hu_error_t err = hu_skill_registry_install_by_name(NULL, "x");
+    hu_error_t err = hu_skill_registry_install_by_name(NULL, NULL, "x");
     HU_ASSERT(err != HU_OK);
 }
 
@@ -158,7 +158,7 @@ static void test_skill_registry_search_empty_query(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_skill_registry_entry_t *entries = NULL;
     size_t count = 0;
-    hu_error_t err = hu_skill_registry_search(&alloc, "", &entries, &count);
+    hu_error_t err = hu_skill_registry_search(&alloc, NULL, "", &entries, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(entries);
     HU_ASSERT_TRUE(count >= 1);
@@ -169,7 +169,7 @@ static void test_skill_registry_search_null_query(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_skill_registry_entry_t *entries = NULL;
     size_t count = 0;
-    hu_error_t err = hu_skill_registry_search(&alloc, NULL, &entries, &count);
+    hu_error_t err = hu_skill_registry_search(&alloc, NULL, NULL, &entries, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(entries);
     HU_ASSERT_TRUE(count >= 1);
@@ -223,7 +223,7 @@ static void test_skill_registry_search_mock_returns_entries(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_skill_registry_entry_t *entries = NULL;
     size_t count = 0;
-    hu_error_t err = hu_skill_registry_search(&alloc, "code", &entries, &count);
+    hu_error_t err = hu_skill_registry_search(&alloc, NULL, "code", &entries, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(entries);
     HU_ASSERT_EQ(count, 2u);

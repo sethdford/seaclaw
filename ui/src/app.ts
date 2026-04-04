@@ -21,6 +21,7 @@ type TabId =
   | "automations"
   | "skills"
   | "voice"
+  | "canvas"
   | "nodes"
   | "usage"
   | "metrics"
@@ -44,6 +45,7 @@ const VALID_TABS: TabId[] = [
   "automations",
   "skills",
   "voice",
+  "canvas",
   "nodes",
   "usage",
   "metrics",
@@ -59,7 +61,7 @@ const VALID_TABS: TabId[] = [
 const SIDEBAR_KEY = "hu-sidebar-collapsed";
 
 /** Tabs that use list-detail layout (show detail panel at wide breakpoint) */
-const LIST_DETAIL_TABS: TabId[] = ["sessions", "channels", "tools", "nodes"];
+const LIST_DETAIL_TABS: TabId[] = ["sessions", "channels", "tools", "nodes", "canvas"];
 
 const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   overview: () => import("./views/overview-view.js"),
@@ -73,6 +75,7 @@ const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   automations: () => import("./views/automations-view.js"),
   skills: () => import("./views/skills-view.js"),
   voice: () => import("./views/voice-view.js"),
+  canvas: () => import("./views/canvas-view.js"),
   nodes: () => import("./views/nodes-view.js"),
   usage: () => import("./views/usage-view.js"),
   metrics: () => import("./views/metrics-view.js"),
@@ -101,6 +104,10 @@ const MORE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] =
   { id: "automations", label: "Automations", icon: icons.timer },
   { id: "skills", label: "Skills", icon: icons.puzzle },
   { id: "voice", label: "Voice", icon: icons.mic },
+  { id: "canvas", label: "Canvas", icon: icons.monitor },
+  { id: "memory", label: "Memory", icon: icons.brain },
+  { id: "hula", label: "HuLa", icon: icons.zap },
+  { id: "workflow", label: "Workflow", icon: icons.clock },
   { id: "nodes", label: "Nodes", icon: icons.server },
   { id: "usage", label: "Usage", icon: icons["bar-chart"] },
   { id: "metrics", label: "Observability", icon: icons["chart-line"] },
@@ -338,6 +345,34 @@ export class ScApp extends LitElement {
       background: color-mix(in srgb, var(--hu-on-accent) 35%, transparent);
     }
 
+    .demo-fallback-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--hu-space-sm);
+      padding: var(--hu-space-xs) var(--hu-space-md);
+      background: var(--hu-accent-secondary);
+      color: var(--hu-on-accent);
+      font-size: var(--hu-text-sm);
+      font-weight: var(--hu-weight-medium);
+      animation: hu-slide-down var(--hu-duration-normal) var(--hu-ease-out);
+    }
+    .demo-fallback-banner button {
+      background: color-mix(in srgb, var(--hu-on-accent) 20%, transparent);
+      border: 1px solid color-mix(in srgb, var(--hu-on-accent) 40%, transparent);
+      color: var(--hu-on-accent);
+      min-height: 2.75rem;
+      padding: var(--hu-space-xs) var(--hu-space-md);
+      border-radius: var(--hu-radius-sm);
+      font-size: var(--hu-text-xs);
+      font-family: var(--hu-font);
+      cursor: pointer;
+      transition: background var(--hu-duration-fast);
+    }
+    .demo-fallback-banner button:hover {
+      background: color-mix(in srgb, var(--hu-on-accent) 35%, transparent);
+    }
+
     .mobile-nav {
       display: none;
     }
@@ -517,9 +552,16 @@ export class ScApp extends LitElement {
   @state() private moreSheetOpen = false;
   @state() private _viewError: Error | null = null;
   @state() private _inFallbackWindow = false;
+  @state() private _demoFallback = false;
 
   gateway: GatewayClient | null = null;
   private _keyHandler = this._onGlobalKey.bind(this);
+  private _paletteEscapeCapture = ((e: KeyboardEvent) => {
+    if (e.key === "Escape" && this.commandPaletteOpen) {
+      e.stopPropagation();
+      this.commandPaletteOpen = false;
+    }
+  }).bind(this) as EventListener;
   private _hashHandler = this._onHashChange.bind(this);
   private _resizeHandler = this._onResize.bind(this);
   private _pendingGKey = false;
@@ -559,6 +601,7 @@ export class ScApp extends LitElement {
     this.sidebarCollapsed = localStorage.getItem(SIDEBAR_KEY) === "true";
     this._updateViewportBreakpoint();
     window.addEventListener("resize", this._resizeHandler);
+    document.addEventListener("keydown", this._paletteEscapeCapture, true);
     document.addEventListener("keydown", this._keyHandler);
     document.addEventListener(AUTH_FAILED, this._authFailedHandler);
     window.addEventListener("hashchange", this._hashHandler);
@@ -640,6 +683,7 @@ export class ScApp extends LitElement {
       this._navHoverTimer = null;
     }
     document.removeEventListener("keydown", this._moreSheetKeyHandler);
+    document.removeEventListener("keydown", this._paletteEscapeCapture, true);
     document.removeEventListener("keydown", this._keyHandler);
     window.removeEventListener("resize", this._resizeHandler);
     document.removeEventListener(AUTH_FAILED, this._authFailedHandler);
@@ -905,6 +949,7 @@ export class ScApp extends LitElement {
   private _switchToDemo(): void {
     this._fallbackTimer = null;
     this._inFallbackWindow = false;
+    this._demoFallback = true;
     this.gateway?.removeEventListener("status", this._statusHandler);
     this.gateway?.disconnect();
     this._createDemoGateway().then((demo) => {
@@ -1025,6 +1070,12 @@ export class ScApp extends LitElement {
         ? html`<div class="disconnect-banner" role="alert">
             Disconnected from server
             <button @click=${this._reconnect}>Reconnect</button>
+          </div>`
+        : nothing}
+      ${this._demoFallback
+        ? html`<div class="demo-fallback-banner" role="status">
+            Demo mode — gateway not reachable
+            <button @click=${this._reconnect}>Retry</button>
           </div>`
         : nothing}
       <div
@@ -1155,10 +1206,10 @@ export class ScApp extends LitElement {
   }
 
   private _reconnect(): void {
-    if (!this.gateway) return;
-    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${proto}//${window.location.host}/ws`;
-    this.gateway.connect(wsUrl);
+    this._demoFallback = false;
+    this.gateway?.removeEventListener("status", this._statusHandler);
+    this.gateway?.disconnect();
+    this._initGateway();
   }
 
   private _renderView() {
@@ -1185,6 +1236,8 @@ export class ScApp extends LitElement {
         return html`<hu-skills-view></hu-skills-view>`;
       case "voice":
         return html`<hu-voice-view></hu-voice-view>`;
+      case "canvas":
+        return html`<hu-canvas-view></hu-canvas-view>`;
       case "nodes":
         return html`<hu-nodes-view></hu-nodes-view>`;
       case "usage":

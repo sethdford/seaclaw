@@ -63,6 +63,7 @@ import "./hu-branch-tree.js";
 import "./hu-image-viewer.js";
 import "./hu-voice-orb.js";
 import "./hu-voice-conversation.js";
+import "./hu-canvas.js";
 import "./hu-chart.js";
 import "./hu-json-viewer.js";
 import "./hu-pagination.js";
@@ -3803,6 +3804,23 @@ describe("hu-voice-clone", () => {
     await el.updateComplete;
     const shadow = el.shadowRoot!;
     expect(shadow.querySelector(".clone-card")).toBeTruthy();
+    el.remove();
+  });
+});
+
+describe("hu-canvas", () => {
+  it("registers as a custom element", () => {
+    expect(customElements.get("hu-canvas")).toBeDefined();
+  });
+
+  it("renders empty state without content", async () => {
+    const el = document.createElement("hu-canvas") as HTMLElement & {
+      updateComplete: Promise<boolean>;
+    };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    const shadow = el.shadowRoot!;
+    expect(shadow.querySelector(".empty")).toBeTruthy();
     el.remove();
   });
 });

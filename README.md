@@ -22,7 +22,7 @@
 The smallest fully autonomous AI assistant infrastructure — a static C binary that fits on any $5 board, boots in milliseconds, and requires nothing but libc.
 
 ```
-~1750 KB binary · <30 ms startup · 7104+ tests · 97 providers · 38 channels (37 production + 1 experimental) · 85 tools · Pluggable everything
+~1750 KB binary · <30 ms startup · 8,400+ tests · 97 providers · 31 channels · 87 tools · Pluggable everything
 ```
 
 ### Features
@@ -31,7 +31,7 @@ The smallest fully autonomous AI assistant infrastructure — a static C binary 
 - **Near-Zero Memory:** < 6 MB peak RSS. Runs comfortably on the cheapest ARM SBCs and microcontrollers.
 - **Instant Startup:** 6–27 ms on Apple Silicon, sub-50 ms on edge cores.
 - **True Portability:** Single self-contained binary across ARM, x86, and RISC-V. Drop it anywhere, it just runs.
-- **Feature-Complete:** 97 providers (9 core + 88 compatible), 38 channels (37 production + 1 experimental), 85 tools, hybrid vector+FTS5 memory, multi-layer sandbox, tunnels, hardware peripherals, MCP, subagents, streaming, voice — the full stack.
+- **Feature-Complete:** 97 providers (9 core + 88 compatible), 31 channels, 87 tools, hybrid vector+FTS5 memory, multi-layer sandbox, tunnels, hardware peripherals, MCP, subagents, streaming, voice — the full stack.
 - **Interactive TUI:** Full-screen terminal UI with split panes, markdown rendering, multi-session tabs (Ctrl+T), tool approval prompts, streaming output, and input history. Build with `-DHU_ENABLE_TUI=ON` and run with `--tui`.
 - **Performance-Optimized:** Per-turn arena allocator, HTTP connection pooling, HTTP/2, system prompt caching — all benefiting from C-level control.
 - **HuLa programs:** Optional JSON IR for structured multi-step tool plans (`seq` / `par` / `branch` / `delegate` / …) with policy checks and traceable runs — [docs site](https://h-uman.ai/features/hula/) · [repo guide](docs/guides/hula.md).
@@ -62,7 +62,7 @@ Human's verified numbers (measured on macOS arm64, March 2026):
 Binary size:   ~1750 KB (MinSizeRel + LTO, all channels)
 Peak RSS:      ~5.7 MB (--version), ~5.9 MB (test suite)
 Startup:       6–27 ms avg (Apple Silicon M4 Max)
-Tests:         6858+ passing, 0 ASan errors
+Tests:         8,400+ passing, 0 ASan errors
 ```
 
 ### Why Switch from OpenClaw?
@@ -622,7 +622,7 @@ Build and tests require a C11 compiler and CMake 3.20+. One-time setup:
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Debug -DHU_ENABLE_ALL_CHANNELS=ON
 cmake --build .                            # Dev build
-./human_tests                             # 7104+ tests
+./human_tests                             # 8,400+ tests
 cd ..
 ```
 
@@ -682,10 +682,10 @@ Dependencies: libc + optional SQLite, libcurl
 src/
 main.c CLI entry point + command routing
 agent/ Agent loop, context, planner, compaction, dispatcher
-channels/ 38 channel implementations (37 production + 1 experimental) (cli, telegram, discord, ...)
+channels/ 31 channel implementations (cli, telegram, discord, ...)
 providers/ 50+ AI provider implementations
 memory/ SQLite + markdown + LRU backends, embeddings, vector search
-tools/ 85 tool implementations
+tools/ 87 tool implementations
 security/ Policy, pairing, secrets, sandbox backends
 runtime/ Runtime adapters (native, docker, wasm, cloudflare)
 core/ Allocator, arena, error, json, http, string, slice
@@ -701,7 +701,7 @@ config.c Config loading/merging (~/.human/config.json)
 ...
 
 include/human/ Public C headers
-tests/ 336 test files, 7104 tests
+tests/ 414 test files, 8,400+ tests
 asm/ Platform-specific assembly (aarch64, x86_64, generic C)
 
 ui/ Web UI (LitElement + Vite)

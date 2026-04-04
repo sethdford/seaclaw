@@ -255,6 +255,10 @@ export class ScSkillsView extends GatewayAwareLitElement {
 
   protected override async load(): Promise<void> {
     if (!this.gateway) return;
+    if (this.gateway.features && this.gateway.features.skills === false) {
+      this.error = "Skills not available on this build";
+      return;
+    }
     this.loading = true;
     this.error = "";
     try {

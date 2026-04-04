@@ -30,6 +30,10 @@ Read `docs/standards/design/ux-patterns.md` before creating or modifying any vie
 | `logs-view.ts` | Log/Terminal | Controls top -> monospace output fills remaining space |
 | `automations-view.ts` | List-Detail | Dual-pane expanded; single-pane compact |
 | `turing-view.ts` | Dashboard (Feed) | Compact hero -> dimension card grid -> scores table |
+| `metrics-view.ts` | Dashboard (Feed) | Stat cards -> chart grid |
+| `canvas-view.ts` | List-Detail | Canvas list + live preview/editor |
+| `hula-view.ts` | List-Detail | Trace list + detail panel |
+| `workflow-view.ts` | List-Detail | Task list with status badges + cancel action |
 
 ## Required States (All Views)
 

@@ -12,6 +12,8 @@ jmp_buf hu__jmp;
 void run_allocator_tests(void);
 void run_data_loader_tests(void);
 void run_agent_modules_tests(void);
+void run_agent_definition_tests(void);
+void run_agent_git_tests(void);
 void run_compaction_hierarchical_tests(void);
 void run_tot_recursive_tests(void);
 void run_agent_subsystems_tests(void);
@@ -36,6 +38,8 @@ void run_api_key_tests(void);
 void run_channel_tests(void);
 void run_channel_format_tests(void);
 void run_channel_rate_limit_tests(void);
+void run_channel_http_tests(void);
+void run_webhook_channel_tests(void);
 void run_tool_tests(void);
 void run_webhook_tests(void);
 void run_hook_pipeline_tests(void);
@@ -63,7 +67,9 @@ void run_multimodal_video_tests(void);
 void run_voice_duplex_tests(void);
 void run_turn_signal_tests(void);
 void run_voice_rt_openai_tests(void);
+void run_voice_provider_tests(void);
 void run_voice_session_tests(void);
+void run_gemini_live_tests(void);
 void run_autonomy_tests(void);
 void run_retrieval_tests(void);
 void run_vector_tests(void);
@@ -207,6 +213,7 @@ void run_governor_tests(void);
 void run_relationship_dynamics_tests(void);
 void run_model_router_tests(void);
 void run_turing_score_tests(void);
+void run_adversarial_turing_tests(void);
 void run_arbitrator_tests(void);
 void run_planning_tests(void);
 void run_rel_dynamics_tests(void);
@@ -251,6 +258,7 @@ int run_context_engine_rag_tests(void);
 int run_humanness_tests(void);
 int run_opinions_persistence_tests(void);
 void run_visual_content_tests(void);
+void run_media_gen_tests(void);
 void run_opinions_tests(void);
 void run_life_chapters_tests(void);
 void run_social_graph_tests(void);
@@ -310,6 +318,9 @@ void run_paperclip_tests(void);
 #endif
 void run_cartesia_tests(void);
 void run_cartesia_stream_tests(void);
+void run_transcript_prep_tests(void);
+void run_send_voice_message_tests(void);
+void run_voice_message_integration_tests(void);
 void register_voice_clone_tests(void);
 #ifdef HU_ENABLE_CARTESIA
 void run_audio_pipeline_tests(void);
@@ -446,6 +457,8 @@ int main(int argc, char **argv) {
     run_idempotency_tests();
     run_idempotency_hula_integration_tests();
     run_agent_modules_tests();
+    run_agent_definition_tests();
+    run_agent_git_tests();
     run_compaction_hierarchical_tests();
     run_tot_recursive_tests();
     run_agent_subsystems_tests();
@@ -470,6 +483,8 @@ int main(int argc, char **argv) {
     run_channel_tests();
     run_channel_format_tests();
     run_channel_rate_limit_tests();
+    run_channel_http_tests();
+    run_webhook_channel_tests();
     run_tool_tests();
     run_webhook_tests();
     test_vtables_run();
@@ -500,7 +515,9 @@ int main(int argc, char **argv) {
     run_voice_duplex_tests();
     run_turn_signal_tests();
     run_voice_rt_openai_tests();
+    run_voice_provider_tests();
     run_voice_session_tests();
+    run_gemini_live_tests();
     run_autonomy_tests();
     run_retrieval_tests();
     run_multigraph_tests();
@@ -641,6 +658,7 @@ int main(int argc, char **argv) {
     run_relationship_dynamics_tests();
     run_model_router_tests();
     run_turing_score_tests();
+    run_adversarial_turing_tests();
     run_arbitrator_tests();
     run_planning_tests();
     run_rel_dynamics_tests();
@@ -687,6 +705,7 @@ int main(int argc, char **argv) {
     run_humanness_tests();
     run_opinions_persistence_tests();
     run_visual_content_tests();
+    run_media_gen_tests();
     run_opinions_tests();
     run_life_chapters_tests();
     run_social_graph_tests();
@@ -738,6 +757,9 @@ int main(int argc, char **argv) {
 #endif
     run_cartesia_tests();
     run_cartesia_stream_tests();
+    run_transcript_prep_tests();
+    run_send_voice_message_tests();
+    run_voice_message_integration_tests();
     register_voice_clone_tests();
 #ifdef HU_ENABLE_CARTESIA
     run_audio_pipeline_tests();

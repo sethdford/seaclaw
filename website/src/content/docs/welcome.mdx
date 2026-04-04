@@ -1,0 +1,40 @@
+---
+title: Human Documentation
+description: "not quite human. Documentation for human — an open-source AI assistant runtime written in C11."
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+**not quite human.** A minimal, dependency-light AI assistant runtime optimized for small binaries and low memory footprint. It supports 50+ AI providers, 38 messaging channels, and 83+ tools — all in a ~1.7 MB static binary.
+
+<CardGrid stagger>
+  <Card title="Installation" icon="pencil">
+    Build from source in minutes. Requires CMake and a C compiler. [Get started
+    →](/getting-started/installation/)
+  </Card>
+  <Card title="Quick Start" icon="rocket">
+    Get your first chat running with the onboard wizard or a quick config.
+    [Quick start →](/getting-started/quickstart/)
+  </Card>
+  <Card title="Providers" icon="server">
+    OpenAI, Anthropic, Gemini, OpenRouter, Ollama, and 50+ compatible APIs. [See
+    providers →](/providers/overview/)
+  </Card>
+  <Card title="Channels" icon="mail">
+    CLI, Telegram, Discord, Slack, Signal, Nostr, and more. [See channels
+    →](/channels/overview/)
+  </Card>
+  <Card title="HuLa Programs" icon="document">
+    Structured JSON plans for multi-step tool use—policy-checked and traceable.
+    [HuLa guide →](/features/hula/)
+  </Card>
+</CardGrid>
+
+## Quick links
+
+- [Installation](/getting-started/installation/) — Prerequisites and build commands
+- [Quick Start](/getting-started/quickstart/) — First 5 minutes with Human
+- [Configuration](/getting-started/configuration/) — Full config reference
+- [HuLa Programs](/features/hula/) — Structured tool orchestration (JSON IR)
+- [Providers Overview](/providers/overview/) — AI model provider architecture
+- [Gateway API](/api/overview/) — HTTP webhook and pairing endpoints

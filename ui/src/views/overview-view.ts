@@ -385,12 +385,14 @@ export class ScOverviewView extends GatewayAwareLitElement {
   }) as EventListener;
   private _gwEventHandler = ((e: CustomEvent) => {
     const detail = e.detail as { event: string; payload?: unknown };
-    if (
-      detail.event === "activity" &&
-      typeof detail.payload === "object" &&
-      detail.payload != null
-    ) {
-      this.activityEvents = [detail.payload as ActivityEvent, ...this.activityEvents].slice(0, 20);
+    if (!detail?.event || typeof detail.payload !== "object" || !detail.payload) return;
+    const p = detail.payload as Record<string, unknown>;
+    if (detail.event === "activity" || detail.event === "chat" || detail.event === "agent.tool") {
+      const ts = (p.ts as number) ?? (p.timestamp as number) ?? Date.now();
+      const label =
+        (p.summary as string) ?? (p.message as string) ?? (p.state as string) ?? detail.event;
+      const ae: ActivityEvent = { ...p, ts, label } as unknown as ActivityEvent;
+      this.activityEvents = [ae, ...this.activityEvents].slice(0, 20);
     }
   }) as EventListener;
 

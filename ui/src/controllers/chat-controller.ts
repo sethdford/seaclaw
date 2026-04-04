@@ -1,6 +1,7 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { EVENT_NAMES } from "../utils.js";
 import { log } from "../lib/log.js";
+import type { GatewayClient } from "../gateway.js";
 import { ChatCache } from "./chat-cache.js";
 import {
   exportAsJson as exportItemsAsJson,
@@ -116,13 +117,38 @@ export class ChatController implements ReactiveController {
     /* no-op */
   }
 
-  loadEarlier(): void {
+  async loadEarlier(): Promise<void> {
     this.loadingEarlier = true;
     this._requestUpdate();
-    (this.host as unknown as EventTarget).dispatchEvent(
-      new CustomEvent("hu-load-earlier-request", { bubbles: true, composed: true }),
-    );
-    // Stub: gateway integration will clear loadingEarlier when done
+    try {
+      const gw = (this.host as unknown as { _gw?: GatewayClient })._gw;
+      if (gw) {
+        const sessionKey =
+          this.items.length > 0
+            ? ((this.items[0] as Record<string, unknown>).session as string | undefined)
+            : undefined;
+        const before =
+          this.items.length > 0
+            ? ((this.items[0] as Record<string, unknown>).id as string | undefined)
+            : undefined;
+        const res = await gw.request<{ messages?: ChatItem[] }>("chat.history", {
+          session: sessionKey,
+          before,
+          limit: 50,
+        });
+        const msgs = Array.isArray(res?.messages) ? res.messages : [];
+        if (msgs.length > 0) {
+          this.items = [...msgs, ...this.items];
+          this.trimmedCount = Math.max(0, this.trimmedCount - msgs.length);
+        }
+        if (msgs.length === 0) this.trimmedCount = 0;
+      }
+    } catch {
+      /* Gracefully degrade — leave existing items intact */
+    } finally {
+      this.loadingEarlier = false;
+      this._requestUpdate();
+    }
   }
 
   private _trimIfNeeded(): void {
@@ -299,6 +325,32 @@ export class ChatController implements ReactiveController {
 
     if (event === "web_search" || event === "web_search.result") {
       this._handleWebSearch(payload, sessionKey);
+      return;
+    }
+
+    /* Derive enrichment events from agent.tool when the server does not
+     * emit dedicated memory / web_search / artifact event names. */
+    if (event === "agent.tool") {
+      const toolName = (payload.message as string) ?? (payload.name as string) ?? "";
+      const state = (payload.state as string) ?? "";
+      if (
+        toolName === "memory_recall" ||
+        toolName === "memory_store" ||
+        toolName === "memory_forget"
+      ) {
+        const action = toolName.replace("memory_", "") as "recall" | "store" | "forget";
+        this._handleMemory(`memory.${action}`, payload, sessionKey);
+        return;
+      }
+      if (toolName === "web_search" && state === "result") {
+        this._handleWebSearch(payload, sessionKey);
+        return;
+      }
+      if (toolName === "canvas" && state === "result") {
+        this._handleArtifact(payload, sessionKey);
+        return;
+      }
+      this._handleToolCall(payload, sessionKey);
       return;
     }
   }

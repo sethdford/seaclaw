@@ -18,9 +18,12 @@ typedef struct hu_tool_result {
     size_t output_len;
     const char *error_msg;
     size_t error_msg_len;
-    bool output_owned;    /* true = caller must free output; false = static/borrowed */
-    bool error_msg_owned; /* true = caller must free error_msg */
-    bool needs_approval;  /* true = tool needs user approval to proceed */
+    const char *media_path;
+    size_t media_path_len;
+    bool output_owned;     /* true = caller must free output; false = static/borrowed */
+    bool error_msg_owned;  /* true = caller must free error_msg */
+    bool media_path_owned; /* true = caller must free media_path */
+    bool needs_approval;   /* true = tool needs user approval to proceed */
 } hu_tool_result_t;
 
 static inline hu_tool_result_t hu_tool_result_ok(const char *output, size_t len) {
@@ -71,13 +74,32 @@ static inline hu_tool_result_t hu_tool_result_fail_owned(const char *error_msg, 
     };
 }
 
+static inline hu_tool_result_t hu_tool_result_ok_with_media(const char *output,
+                                                            size_t output_len,
+                                                            const char *media_path,
+                                                            size_t media_path_len) {
+    return (hu_tool_result_t){
+        .success = true,
+        .output = output,
+        .output_len = output_len,
+        .media_path = media_path,
+        .media_path_len = media_path_len,
+        .output_owned = true,
+        .error_msg_owned = false,
+        .media_path_owned = true,
+    };
+}
+
 static inline void hu_tool_result_free(hu_allocator_t *alloc, hu_tool_result_t *r) {
     if (r->output_owned && r->output)
         alloc->free(alloc->ctx, (void *)r->output, r->output_len + 1);
     if (r->error_msg_owned && r->error_msg)
         alloc->free(alloc->ctx, (void *)r->error_msg, r->error_msg_len + 1);
+    if (r->media_path_owned && r->media_path)
+        alloc->free(alloc->ctx, (void *)r->media_path, r->media_path_len + 1);
     r->output = NULL;
     r->error_msg = NULL;
+    r->media_path = NULL;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

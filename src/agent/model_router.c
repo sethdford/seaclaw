@@ -85,9 +85,9 @@ static int relationship_weight(const char *rel, size_t rel_len) {
     if (!rel || rel_len == 0)
         return 0;
     if (rel_len == 6 && memcmp(rel, "family", 6) == 0)
-        return 2;
+        return 3;
     if (rel_len >= 5 && memcmp(rel, "close", 5) == 0)
-        return 2;
+        return 3;
     if ((rel_len == 3 && memcmp(rel, "mom", 3) == 0) ||
         (rel_len == 3 && memcmp(rel, "dad", 3) == 0) ||
         (rel_len == 6 && memcmp(rel, "mother", 6) == 0) ||
@@ -95,10 +95,14 @@ static int relationship_weight(const char *rel, size_t rel_len) {
         (rel_len == 6 && memcmp(rel, "sister", 6) == 0) ||
         (rel_len == 7 && memcmp(rel, "brother", 7) == 0) ||
         (rel_len == 6 && memcmp(rel, "spouse", 6) == 0) ||
-        (rel_len == 7 && memcmp(rel, "partner", 7) == 0))
-        return 2;
+        (rel_len == 7 && memcmp(rel, "partner", 7) == 0) ||
+        (rel_len == 4 && memcmp(rel, "wife", 4) == 0) ||
+        (rel_len == 7 && memcmp(rel, "husband", 7) == 0) ||
+        (rel_len == 10 && memcmp(rel, "girlfriend", 10) == 0) ||
+        (rel_len == 9 && memcmp(rel, "boyfriend", 9) == 0))
+        return 3;
     if (rel_len == 6 && memcmp(rel, "friend", 6) == 0)
-        return 1;
+        return 2;
     return 0;
 }
 

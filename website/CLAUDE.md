@@ -13,27 +13,20 @@ src/pages/404.astro     Not found page
 
 ## Homepage Structure
 
-The homepage (`src/pages/index.astro`) is a 15-chapter scroll narrative with dot navigation. `chapterCount` in frontmatter controls the nav dot count.
+The homepage (`src/pages/index.astro`) is a 10-section scroll narrative.
 
-| Chapter | Section |
+| Section | Content |
 | --- | --- |
-| 1 | Capabilities (glass tile grid) |
-| 2 | Benchmarks |
-| 3 | Persona |
-| 4 | Memory |
-| 5 | BTH (beyond the human) |
-| 6 | Intelligence |
-| 7 | Security |
-| 8 | Architecture |
-| 9 | **HuLa** (Programs, Not Prompts) |
-| 10 | Ecosystem (providers/channels) |
-| 11 | Terminal |
-| 12 | Dashboard preview |
-| 13 | Quality (ring gauges) |
-| 14 | Comparison |
-| 15 | CTA (call to action) |
-
-When adding or removing chapters, update `chapterCount` and renumber all subsequent `id="chapter-N"` + `hu-chapter-label` spans.
+| 1 | Hero + Proof Stats (capabilities row) |
+| 2 | Demo (terminal replay) |
+| 3 | The Problem + Contrast |
+| 4 | Crystal Grid |
+| 5 | Device Spectrum + Architecture |
+| 6 | HuLa (Programs, not prompts) |
+| 7 | Ecosystem (Providers, Channels, Tools) |
+| 8 | Terminal + Dashboard |
+| 9 | Quality + Comparison |
+| 10 | CTA (call to action) |
 
 ## Rules
 
@@ -43,6 +36,23 @@ When adding or removing chapters, update `chapterCount` and renumber all subsequ
 - Spacing/radius: `--hu-space-*` and `--hu-radius-*` tokens only.
 - Animation: `--hu-duration-*` and `--hu-ease-*` tokens. Respect `prefers-reduced-motion`.
 - Accessibility: WCAG 2.1 AA minimum (4.5:1 text contrast, 3:1 UI contrast).
+
+## Award Submission Checklist
+
+Once the site is deployed and scoring well on Lighthouse, submit to:
+
+1. **Awwwards** (https://awwwards.com/submit/) — ~$69, rolling, needs 8.5+ on Design/Usability/Creativity/Content
+2. **CSS Design Awards** (https://cssdesignawards.com/submit/) — rolling, scored on UI (40%), UX (30%), Innovation (30%)
+3. **FWA** (https://thefwa.com/submit/) — rolling, creativity-first judging
+4. **Web Marketing Association** — deadline May 29, 2026
+
+Pre-submission checklist:
+- [ ] Deploy to `h-uman.ai` via GitHub Pages
+- [ ] Lighthouse Performance >= 95, Accessibility >= 98, Best Practices >= 95, SEO >= 95
+- [ ] Test on real devices (iPhone SE, iPhone 15, Samsung Galaxy, iPad)
+- [ ] axe-core clean on all pages
+- [ ] Full keyboard navigation verified
+- [ ] CrUX data showing good ratings after 28 days of traffic
 
 ## Commands
 

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <capability android:name="actions.intent.OPEN_APP_FEATURE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="ai.human.app"
+            android:targetClass="ai.human.app.AssistantActivity">
+            <parameter
+                android:name="feature"
+                android:key="query" />
+        </intent>
+    </capability>
+
+    <capability android:name="custom.actions.intent.ASK_HUMAN">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="ai.human.app"
+            android:targetClass="ai.human.app.AssistantActivity">
+            <parameter
+                android:name="query"
+                android:key="query" />
+        </intent>
+    </capability>
+</shortcuts>

@@ -1,23 +1,43 @@
 ---
 import "../styles/global.css";
+import Nav from "../components/Nav.astro";
+
 const rawBase = import.meta.env.BASE_URL;
 const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
 ---
 
-<html lang="en">
+<html lang="en" class="hu-lcp-done">
   <head>
+    <script is:inline>
+      (function () {
+        var s = localStorage.getItem("hu-theme");
+        var m = window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+        document.documentElement.dataset.theme = s || m;
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>404 — not quite found. | h-uman</title>
+    <meta
+      name="description"
+      content="The page you're looking for doesn't exist or has been moved."
+    />
     <meta name="robots" content="noindex" />
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <meta name="theme-color" content="#7AB648" />
   </head>
   <body
     style="background: var(--hu-bg); color: var(--hu-text);"
-    class="antialiased"
+    class="antialiased overflow-x-hidden"
   >
-    <div
-      class="min-h-screen flex flex-col items-center justify-center px-6 text-center"
+    <a href="#main-content" class="skip-link">Skip to content</a>
+    <Nav />
+    <main
+      id="main-content"
+      tabindex="-1"
+      class="min-h-[80vh] flex flex-col items-center justify-center px-6 text-center"
     >
       <img
         src={`${base}human.svg`}
@@ -59,6 +79,48 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
           Read the Docs
         </a>
       </div>
-    </div>
+    </main>
+
+    <footer class="site-footer py-8 sm:py-12 px-6" role="contentinfo">
+      <div
+        class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4"
+      >
+        <div class="flex items-center gap-3">
+          <img
+            src={`${base}human.svg`}
+            alt="h-uman logo"
+            width="512"
+            height="512"
+            class="w-5 h-5"
+            loading="lazy"
+            decoding="async"
+          />
+          <span class="text-[13px]" style="color: var(--hu-text-muted)">
+            h-uman
+          </span>
+        </div>
+        <p
+          class="text-[13px] hidden md:block"
+          style="color: var(--hu-text-muted)"
+        >
+          not quite human.
+        </p>
+        <div
+          class="flex items-center gap-6 text-[13px]"
+          style="color: var(--hu-text-muted)"
+        >
+          <span>MIT License</span>
+          <span>Made with C11</span>
+          <a
+            href="https://github.com/sethdford/h-uman"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:opacity-80 transition-opacity"
+          >
+            GitHub
+          </a>
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

@@ -5,25 +5,40 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pub = join(__dirname, "..", "public");
 
-const logoSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><path fill-rule="evenodd" d="M81 36 64 0 47 36l-1 2-9-10a6 6 0 0 0-9 9l10 10h-2L0 64l36 17h2L28 91a6 6 0 1 0 9 9l9-10 1 2 17 36 17-36v-2l9 10a6 6 0 1 0 9-9l-9-9 2-1 36-17-36-17-2-1 9-9a6 6 0 1 0-9-9l-9 10v-2Zm-17 2-2 5c-4 8-11 15-19 19l-5 2 5 2c8 4 15 11 19 19l2 5 2-5c4-8 11-15 19-19l5-2-5-2c-8-4-15-11-19-19l-2-5Z" clip-rule="evenodd"/><path d="M118 19a6 6 0 0 0-9-9l-3 3a6 6 0 1 0 9 9l3-3Zm-96 4c-2 2-6 2-9 0l-3-3a6 6 0 1 1 9-9l3 3c3 2 3 6 0 9Zm0 82c-2-2-6-2-9 0l-3 3a6 6 0 1 0 9 9l3-3c3-2 3-6 0-9Zm96 4a6 6 0 0 1-9 9l-3-3a6 6 0 1 1 9-9l3 3Z"/></svg>`;
+const orbSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5A9A30"/>
+      <stop offset="100%" stop-color="#47802A"/>
+    </linearGradient>
+    <linearGradient id="e" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f0f0f0"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="40" fill="url(#g)"/>
+  <ellipse cx="36" cy="47" rx="8" ry="10" fill="url(#e)"/>
+  <circle cx="34" cy="43" r="2" fill="white"/>
+  <circle cx="36" cy="45" r="0.8" fill="white" opacity="0.7"/>
+  <ellipse cx="64" cy="47" rx="8" ry="10" fill="url(#e)"/>
+  <circle cx="62" cy="43" r="2" fill="white"/>
+  <circle cx="64" cy="45" r="0.8" fill="white" opacity="0.7"/>
+</svg>`;
 
-const whiteClaw = logoSvg.replace(
-  /<\/svg>/,
-  "<style>path{fill:#fff}</style></svg>",
-);
-const greenClaw = logoSvg.replace(
-  /<\/svg>/,
-  "<style>path{fill:#7AB648}</style></svg>",
-);
+const whiteOrb = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="40" fill="white"/>
+  <ellipse cx="36" cy="47" rx="8" ry="10" fill="#0a0a0a"/>
+  <ellipse cx="64" cy="47" rx="8" ry="10" fill="#0a0a0a"/>
+</svg>`;
 
 async function generateFavicons() {
   for (const size of [16, 32, 48]) {
-    await sharp(Buffer.from(greenClaw))
+    await sharp(Buffer.from(orbSvg))
       .resize(size, size)
       .png()
       .toFile(join(pub, `favicon-${size}.png`));
   }
-  await sharp(Buffer.from(greenClaw))
+  await sharp(Buffer.from(orbSvg))
     .resize(180, 180)
     .png()
     .toFile(join(pub, "apple-touch-icon.png"));
@@ -48,22 +63,22 @@ async function generateOgImage() {
     <rect width="${w}" height="${h}" fill="url(#g1)"/>
     <rect width="${w}" height="${h}" fill="url(#g2)"/>
 
-    <g transform="translate(100,200)">
-      ${whiteClaw.replace('viewBox="0 0 128 128"', 'viewBox="0 0 128 128" width="72" height="72"')}
+    <g transform="translate(100,180)">
+      ${whiteOrb.replace('viewBox="0 0 100 100"', 'viewBox="0 0 100 100" width="80" height="80"')}
     </g>
 
-    <text x="200" y="220" fill="#f5f5f7" font-family="system-ui,-apple-system,sans-serif" font-size="56" font-weight="700" letter-spacing="-2">Bring AI to every</text>
-    <text x="200" y="285" fill="#f5f5f7" font-family="system-ui,-apple-system,sans-serif" font-size="56" font-weight="700" letter-spacing="-2">device on Earth.</text>
+    <text x="210" y="220" fill="#f5f5f7" font-family="system-ui,-apple-system,sans-serif" font-size="56" font-weight="700" letter-spacing="-2">Bring AI to every</text>
+    <text x="210" y="285" fill="#f5f5f7" font-family="system-ui,-apple-system,sans-serif" font-size="56" font-weight="700" letter-spacing="-2">device on Earth.</text>
 
-    <text x="200" y="345" fill="#a1a1a6" font-family="system-ui,-apple-system,sans-serif" font-size="24" letter-spacing="1.5">not quite human.</text>
+    <text x="210" y="345" fill="#a1a1a6" font-family="system-ui,-apple-system,sans-serif" font-size="24" letter-spacing="1.5">not quite human.</text>
 
-    <text x="200" y="400" fill="#86868b" font-family="system-ui,-apple-system,sans-serif" font-size="20">~1.7 MB binary · 50+ providers · 34 channels · 67+ tools</text>
+    <text x="210" y="400" fill="#86868b" font-family="system-ui,-apple-system,sans-serif" font-size="20">~1.7 MB binary · 50+ providers · 38 channels · 83+ tools</text>
 
-    <text x="200" y="450" fill="#7AB648" font-family="system-ui,-apple-system,sans-serif" font-size="20" font-weight="600">h-uman</text>
-    <text x="330" y="450" fill="#6e6e73" font-family="system-ui,-apple-system,sans-serif" font-size="18">Pure C11 · Zero dependencies · MIT licensed</text>
+    <text x="210" y="450" fill="#7AB648" font-family="system-ui,-apple-system,sans-serif" font-size="20" font-weight="600">h-uman</text>
+    <text x="340" y="450" fill="#6e6e73" font-family="system-ui,-apple-system,sans-serif" font-size="18">Pure C11 · Zero dependencies · MIT licensed</text>
 
-    <line x1="200" y1="490" x2="1000" y2="490" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="200" y="530" fill="#86868b" font-family="ui-monospace,monospace" font-size="14">h-uman.ai</text>
+    <line x1="210" y1="490" x2="1000" y2="490" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <text x="210" y="530" fill="#86868b" font-family="ui-monospace,monospace" font-size="14">h-uman.ai</text>
   </svg>`;
 
   await sharp(Buffer.from(svg)).png().toFile(join(pub, "og-image.png"));

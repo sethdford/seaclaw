@@ -22,7 +22,7 @@ Response: `{ "id": "uuid", ...result }` or `{ "id": "uuid", "error": "message" }
 
 All methods follow `noun.verb` convention (e.g., `chat.send`, `sessions.list`).
 
-## Method Catalog (49 methods)
+## Method Catalog (76 methods)
 
 | Namespace    | Methods |
 |-------------|---------|
@@ -30,23 +30,29 @@ All methods follow `noun.verb` convention (e.g., `chat.send`, `sessions.list`).
 | `sessions`  | `list`, `delete`, `patch` |
 | `channels`  | `status` |
 | `tools`     | `catalog` |
-| `models`    | `list` |
+| `models`    | `list`, `decisions` |
 | `config`    | `get`, `set`, `schema`, `apply` |
-| `skills`    | `list`, `search`, `install`, `uninstall`, `enable`, `disable`, `update` |
-| `nodes`     | `list` |
+| `skills`    | `list`, `search`, `install`, `uninstall`, `enable`, `disable`, `update` (ifdef HU_HAS_SKILLS) |
+| `nodes`     | `list`, `action` |
 | `agents`    | `list` |
-| `cron`      | `list`, `add`, `remove`, `update`, `run`, `runs` |
+| `cron`      | `list`, `add`, `remove`, `update`, `run`, `runs` (ifdef HU_HAS_CRON) |
 | `usage`     | `summary` |
 | `activity`  | `recent` |
 | `persona`   | `set` |
-| `update`    | `check`, `run` |
+| `update`    | `check`, `run` (ifdef HU_HAS_UPDATE) |
 | `auth`      | `token`, `oauth.start`, `oauth.callback`, `oauth.refresh` |
 | `exec`      | `approval.resolve` |
-| `push`      | `register`, `unregister` |
-| `memory`    | `status`, `list`, `recall`, `store`, `forget`, `ingest`, `consolidate` |
-| `hula`      | `traces.list`, `traces.get` (+ optional `trace_offset` / `trace_limit`), `traces.delete`, `traces.analytics` (POSIX trace dir) |
+| `push`      | `register`, `unregister` (ifdef HU_HAS_PUSH) |
+| `memory`    | `status`, `list`, `recall`, `store`, `forget`, `ingest`, `consolidate`, `graph` |
+| `hula`      | `traces.list`, `traces.get`, `traces.delete`, `traces.analytics` |
 | `metrics`   | `snapshot` |
-| `turing`    | `dimensions` |
+| `canvas`    | `list`, `get`, `edit`, `undo`, `redo` |
+| `turing`    | `scores`, `trend`, `dimensions`, `contact`, `trajectory`, `ab_tests`, `channel` |
+| `tasks`     | `list`, `get`, `cancel` |
+| `voice`     | `transcribe`, `session.start`, `session.stop`, `session.interrupt`, `audio.end`, `config`, `clone`, `tool_response` |
+| `security`  | `cot.summary` |
+| `mcp`       | `resources.list`, `prompts.list` |
+| `sota`      | `metrics` (alias for `metrics.snapshot`) |
 | Singletons  | `connect`, `health`, `capabilities` |
 
 ## Demo Gateway Rules

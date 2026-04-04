@@ -25,6 +25,7 @@
 #include "human/agent/team.h"
 #include "human/agent/timing.h"
 #include "human/agent/token_budget.h"
+#include "human/agent/workflow_event.h"
 #include "human/agent/worktree.h"
 #include "human/channel.h"
 #include "human/core/allocator.h"
@@ -32,13 +33,17 @@
 #include "human/core/error.h"
 #include "human/core/slice.h"
 #include "human/cost.h"
-#include "human/usage.h"
 #include "human/memory.h"
 #include "human/memory/policy.h"
 #include "human/memory/retrieval.h"
+#include "human/security/delegation.h"
 #include "human/security/escalate.h"
 #include "human/security/delegation.h"
 #include "human/tools/validation.h"
+<<<<<<< HEAD
+=======
+#include "human/usage.h"
+>>>>>>> fix/sota-audit-fixes
 #include "human/webhook.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/meta_learning.h"
@@ -60,9 +65,9 @@
 #include "human/cognition/dual_process.h"
 #include "human/cognition/emotional.h"
 #include "human/cognition/metacognition.h"
-#include "human/provider.h"
 #include "human/hook.h"
 #include "human/permission.h"
+#include "human/provider.h"
 #include "human/security.h"
 #include "human/security/audit.h"
 #include "human/security/policy_engine.h"
@@ -119,6 +124,7 @@ typedef bool (*hu_agent_approval_cb)(void *ctx, const char *tool_name, const cha
 
 struct hu_agent {
     hu_allocator_t *alloc;
+    const struct hu_config *config;
     hu_provider_t provider;
     hu_tool_t *tools;
     size_t tools_count;
@@ -323,11 +329,11 @@ struct hu_agent {
 
     /* Permission tiers */
     hu_permission_level_t permission_level;      /* effective (may be escalated) */
-    hu_permission_level_t permission_base_level;  /* configured base level */
-    bool permission_escalated;                    /* true during temporary escalation */
+    hu_permission_level_t permission_base_level; /* configured base level */
+    bool permission_escalated;                   /* true during temporary escalation */
 
     /* Hook pipeline: pre/post tool execution interception */
-    hu_hook_registry_t *hook_registry;            /* optional; NULL = no hooks */
+    hu_hook_registry_t *hook_registry; /* optional; NULL = no hooks */
 
     /* Instruction file discovery cache */
     hu_instruction_discovery_t *instruction_discovery;
@@ -369,6 +375,13 @@ struct hu_agent {
 
     /* Webhook manager for incoming webhook event handling */
     hu_webhook_manager_t *webhook_manager; /* optional; NULL = no webhooks */
+<<<<<<< HEAD
+=======
+
+    /* Media generation: tool-produced file paths accumulated per turn */
+    char *generated_media[4];
+    size_t generated_media_count;
+>>>>>>> fix/sota-audit-fixes
 };
 
 /* Create agent from minimal config (no full config loader yet).

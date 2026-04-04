@@ -64,7 +64,9 @@ for suite in "${CORE_SUITES[@]}"; do
         FAIL_CORE=$((FAIL_CORE + F))
     fi
 done
-if [ "$FAIL_CORE" -eq 0 ]; then
+if [ "$TOTAL_CORE" -eq 0 ]; then
+    report FAIL "Core tests: 0 tests ran (binary missing or crashed?)"
+elif [ "$FAIL_CORE" -eq 0 ]; then
     report OK "Core tests ($TOTAL_CORE passed across ${#CORE_SUITES[@]} suites)"
 else
     report FAIL "Core tests ($TOTAL_CORE passed, $FAIL_CORE FAILED)"
@@ -84,7 +86,9 @@ fi
 printf "  [4/%d] Running proof-of-closure tests... " "$total"
 PROVE_OUTPUT=$("$BUILD/human_tests" --suite=prove_e2e 2>&1) || true
 PROVE_PASSED=$(echo "$PROVE_OUTPUT" | grep -oE '[0-9]+/[0-9]+ passed' | tail -1)
-if echo "$PROVE_OUTPUT" | grep -qE "[1-9][0-9]* FAILED"; then
+if [ -z "$PROVE_PASSED" ]; then
+    report FAIL "Proof of closure: no tests ran (binary missing or crashed?)"
+elif echo "$PROVE_OUTPUT" | grep -qE "[1-9][0-9]* FAILED"; then
     report FAIL "Proof of closure ($PROVE_PASSED)"
     echo ""
     echo "  Failed proof tests:"

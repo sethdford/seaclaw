@@ -1104,6 +1104,7 @@ export class ScChatComposer extends LitElement {
               : nothing}
             <textarea
               id="composer-textarea"
+              aria-label="Message input"
               .value=${this.value}
               .placeholder=${this.placeholder}
               ?disabled=${this.disabled}

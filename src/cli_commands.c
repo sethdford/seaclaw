@@ -15,6 +15,7 @@
 #include "human/core/process_util.h"
 #include "human/core/string.h"
 #include "human/eval.h"
+#include "human/eval/turing_adversarial.h"
 #include "human/eval_benchmarks.h"
 #include "human/eval_dashboard.h"
 #include "human/memory.h"
@@ -746,7 +747,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
         printf("Usage: human eval "
                "<run|baseline|validate|check-regression|list|compare|dashboard|history|trend|"
-               "benchmark> [args]\n");
+               "benchmark|turing-adversarial> [args]\n");
         printf("  run <suite.json>     Load and run an eval suite, print report JSON\n");
         printf("  baseline [dir]       Run all *.json suites in dir (default: eval_suites/), print "
                "score table\n");
@@ -1767,6 +1768,39 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         printf("{\"benchmark\":\"%s\",\"suite\":\"%s\",\"loaded\":true}\n",
                hu_benchmark_type_name(bench_type), bench_suite.name ? bench_suite.name : "");
         hu_eval_suite_free(alloc, &bench_suite);
+        return HU_OK;
+    }
+
+    if (strcmp(sub, "turing-adversarial") == 0) {
+        int weak[HU_TURING_DIM_COUNT];
+        for (size_t i = 0; i < HU_TURING_DIM_COUNT; i++)
+            weak[i] = 5;
+
+        hu_turing_scenario_t *scenarios = NULL;
+        size_t sc_count = 0;
+        hu_error_t err = hu_turing_adversarial_generate(alloc, weak, &scenarios, &sc_count);
+        if (err != HU_OK) {
+            hu_log_error("eval", NULL, "adversarial generate: %s", hu_error_string(err));
+            return err;
+        }
+
+        hu_self_improve_state_t si_state;
+        memset(&si_state, 0, sizeof(si_state));
+        hu_fidelity_score_t baseline = {.composite = 0.5f};
+        hu_self_improve_set_baseline(&si_state, &baseline);
+
+        size_t mutations = 0;
+        err = hu_turing_adversarial_run_cycle(alloc, &si_state, weak, &mutations);
+        if (err != HU_OK) {
+            hu_log_error("eval", NULL, "adversarial cycle: %s", hu_error_string(err));
+            if (scenarios)
+                alloc->free(alloc->ctx, scenarios, sc_count * sizeof(hu_turing_scenario_t));
+            return err;
+        }
+
+        printf("{\"scenarios\":%zu,\"mutations_applied\":%zu}\n", sc_count, mutations);
+        if (scenarios)
+            alloc->free(alloc->ctx, scenarios, sc_count * sizeof(hu_turing_scenario_t));
         return HU_OK;
     }
 

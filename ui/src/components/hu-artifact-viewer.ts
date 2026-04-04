@@ -236,7 +236,7 @@ export class ScArtifactViewer extends LitElement {
       word-break: break-word;
     }
     .diff-line.added {
-      background: color-mix(in srgb, var(--hu-success, #4caf50) 12%, transparent);
+      background: color-mix(in srgb, var(--hu-success) 12%, transparent);
       color: var(--hu-text);
     }
     .diff-line.removed {

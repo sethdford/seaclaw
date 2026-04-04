@@ -23,6 +23,20 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="human" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+        <activity
+            android:name=".AssistantActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Human">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="human" android:host="assistant" />
+            </intent-filter>
         </activity>
         <receiver
             android:name=".ui.HumanWidgetReceiver"

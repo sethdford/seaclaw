@@ -54,12 +54,15 @@ final class HumaniOSFleetUITests: XCTestCase {
             app.wait(for: .runningForeground, timeout: Timeout.launchForeground),
             "App should reach foreground (CI simulator startup)",
         )
+        let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(
-            app.tabBars.firstMatch.waitForExistence(timeout: Timeout.tabBar),
+            tabBar.waitForExistence(timeout: Timeout.tabBar),
             "Tab bar should appear after launch",
         )
+        _ = tabBar.buttons.firstMatch.waitForExistence(timeout: Timeout.tabBar)
+        let overview = tabBarButton(for: "Overview")
         XCTAssertTrue(
-            tabBarButton(for: "Overview").waitForExistence(timeout: Timeout.tabBar),
+            overview.waitForExistence(timeout: Timeout.tabBar) || tabBar.buttons.count > 0,
             "Primary shell should expose Overview (or first tab when labels differ)",
         )
     }

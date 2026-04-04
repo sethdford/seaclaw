@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
 import Nav from "../components/Nav.astro";
+import AnimatedLogo from "../components/AnimatedLogo.astro";
 
 const rawBase = import.meta.env.BASE_URL;
 const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
@@ -64,8 +65,6 @@ const tools = [
   "Hardware",
   "Delegate",
 ];
-
-const chapterCount = 15;
 ---
 
 <html lang="en">
@@ -84,22 +83,23 @@ const chapterCount = 15;
     <link rel="canonical" href="https://h-uman.ai/" />
     <link
       rel="preload"
-      href="/fonts/avenir/Avenir-Black.woff2"
+      href={`${base}fonts/avenir/Avenir-Black.woff2`}
       as="font"
       type="font/woff2"
       crossorigin
       fetchpriority="high"
     />
+    <link
+      rel="preload"
+      href={`${base}fonts/avenir/Avenir-Book.woff2`}
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <title>h-uman — not quite human.</title>
     <meta
       name="description"
-      content="not quite human. A complete autonomous AI agent runtime in 1,696 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU."
-    />
-    <link
-      rel="preload"
-      href={`${base}human.svg`}
-      as="image"
-      fetchpriority="high"
+      content="not quite human. A complete autonomous AI agent runtime in 1,750 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers. Runs on anything with a CPU."
     />
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
     <link
@@ -114,7 +114,7 @@ const chapterCount = 15;
     <meta property="og:title" content="h-uman — not quite human." />
     <meta
       property="og:description"
-      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 34 channels. 67+ tools. Zero dependencies. Pure C."
+      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 38 channels. 83+ tools. Zero dependencies. Pure C."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://h-uman.ai/" />
@@ -128,7 +128,7 @@ const chapterCount = 15;
     <meta name="twitter:title" content="h-uman — not quite human." />
     <meta
       name="twitter:description"
-      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 34 channels. 67+ tools. Zero dependencies. Pure C."
+      content="Autonomous AI agent runtime. ~1.7 MB binary. 50+ providers. 38 channels. 83+ tools. Zero dependencies. Pure C."
     />
     <meta name="twitter:image" content="https://h-uman.ai/og-image.png" />
 
@@ -144,7 +144,7 @@ const chapterCount = 15;
             name: "h-uman",
             url: "https://h-uman.ai/",
             description:
-              "Autonomous AI agent runtime in 1,696 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers.",
+              "Autonomous AI agent runtime in 1,750 kilobytes of pure C. One static binary. Zero dependencies. 50+ providers.",
             publisher: { "@id": "https://h-uman.ai/#organization" },
           },
           {
@@ -158,7 +158,7 @@ const chapterCount = 15;
             "@type": "SoftwareApplication",
             name: "h-uman",
             description:
-              "not quite human. Autonomous AI agent runtime in 1,696 kilobytes of pure C.",
+              "not quite human. Autonomous AI agent runtime in 1,750 kilobytes of pure C.",
             applicationCategory: "DeveloperApplication",
             operatingSystem: "Cross-platform",
             url: "https://h-uman.ai/",
@@ -172,11 +172,14 @@ const chapterCount = 15;
     <style is:global>
       /* Critical hero CSS — inline for fast LCP (paint before external CSS) */
       :root {
-        --color-bg-inline: #fafaf9;
+        --color-bg-inline: var(--hu-bg, #fafaf9);
+      }
+      [data-theme="dark"] {
+        --color-bg-inline: var(--hu-bg, #0a0a0a);
       }
       @media (prefers-color-scheme: dark) {
-        :root {
-          --color-bg-inline: #0a0a0a;
+        :root:not([data-theme="light"]) {
+          --color-bg-inline: var(--hu-bg, #0a0a0a);
         }
       }
       body {
@@ -286,11 +289,9 @@ const chapterCount = 15;
   </head>
   <body
     style="background: var(--color-bg); color: var(--color-text);"
-    class="antialiased overflow-x-hidden hu-film-grain"
+    class="antialiased overflow-x-hidden"
   >
-    <div class="hu-particles" id="hu-particles" aria-hidden="true"></div>
-    <div class="scroll-progress" id="scroll-progress"></div>
-    <div id="custom-cursor" class="custom-cursor" aria-hidden="true"></div>
+    <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
     <a href="#main-content" class="skip-link">Skip to content</a>
     <Nav />
 
@@ -298,33 +299,21 @@ const chapterCount = 15;
       {/* ═══ HERO ═══ */}
 
       <section
-        class="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 overflow-hidden"
+        id="chapter-1"
+        class="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-20 sm:pt-24 overflow-hidden hu-film-grain"
+        aria-label="Hero"
       >
+        <div class="hu-particles" id="hu-particles" aria-hidden="true"></div>
+        <div id="custom-cursor" class="custom-cursor" aria-hidden="true"></div>
         <canvas id="hero-webgl" class="hero-webgl-canvas" aria-hidden="true"
         ></canvas>
-        <div class="hero-static-constellation" aria-hidden="true"></div>
-        <div class="hero-gradient noise-overlay"></div>
-        <div
-          class="ambient-teal"
-          style="top: 15%; left: 50%; transform: translateX(-50%);"
-        >
-        </div>
-        <div class="ambient-steel" style="top: 30%; right: 10%;"></div>
         <div class="hero-content text-center max-w-4xl mx-auto relative z-10">
+          <div class="hero-orb-wrapper mb-6 md:mb-8">
+            <AnimatedLogo size={220} interactive />
+          </div>
           <div
-            class="hero-wordmark-row hero-logo flex items-center justify-center gap-5 md:gap-7 mb-8"
+            class="hero-wordmark-row hero-logo flex items-center justify-center mb-8"
           >
-            <img
-              src={`${base}human.svg`}
-              alt="human"
-              width="512"
-              height="512"
-              loading="eager"
-              decoding="sync"
-              fetchpriority="high"
-              class="hero-mark w-14 h-14 md:w-20 md:h-20"
-              style={`filter: drop-shadow(0 0 40px var(--color-accent-glow));`}
-            />
             <span
               class="hero-wordmark font-sans"
               style="color: var(--color-text); view-transition-name: page-heading;"
@@ -342,10 +331,10 @@ const chapterCount = 15;
             Bring AI to <span class="text-gradient">every</span> device on Earth.
           </p>
           <div
-            class="hero-proof hero-fade-in flex flex-wrap justify-center gap-x-6 gap-y-2 mb-10"
+            class="hero-proof hero-fade-in flex flex-wrap justify-center gap-x-4 sm:gap-x-6 gap-y-2 mb-8 sm:mb-10"
           >
             <span style="color: var(--color-text-tertiary)"
-              ><strong style="color: var(--color-text)">1,696&nbsp;KB</strong> binary</span
+              ><strong style="color: var(--color-text)">1,750&nbsp;KB</strong> binary</span
             >
             <span style="color: var(--color-text-tertiary)" aria-hidden="true"
               >&middot;</span
@@ -385,7 +374,7 @@ const chapterCount = 15;
           </div>
           <div class="hero-fade-in mt-8 max-w-lg mx-auto">
             <div
-              class="glass glass-enter flex items-center gap-3 pl-5 pr-3 py-3 rounded-xl font-mono text-[13px]"
+              class="glass glass-enter flex items-center gap-3 pl-5 pr-3 py-3 rounded-xl font-mono text-sm"
             >
               <span style="color: var(--color-accent)">$</span>
               <code
@@ -394,6 +383,7 @@ const chapterCount = 15;
                 >git clone https://github.com/sethdford/h-uman.git</code
               >
               <button
+                type="button"
                 class="shrink-0 p-1.5 rounded-lg transition-all hover:scale-110"
                 style="color: var(--color-text-tertiary)"
                 aria-label="Copy to clipboard"
@@ -408,18 +398,57 @@ const chapterCount = 15;
             </div>
           </div>
         </div>
-      </section>
 
-      {/* ═══ SOCIAL PROOF (Built for) ═══ */}
-      <section
-        id="chapter-1"
-        class="social-proof relative hu-chapter-reveal py-16 md:py-20 px-6"
-        aria-label="Capabilities"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">01</span>
-        <div class="max-w-5xl mx-auto">
+        <div
+          class="hero-fade-in max-w-5xl mx-auto w-full mt-12 mb-6 relative z-10 numbers-section"
+        >
+          <div
+            class="numbers-grid glass glass-enter px-4 md:px-8 py-8 md:py-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-0"
+          >
+            {
+              [
+                { count: 1750, suffix: " KB", label: "Binary" },
+                { count: 30, prefix: "<", suffix: " ms", label: "Startup" },
+                { count: 4980, suffix: "+", label: "Tests" },
+                { count: 50, suffix: "+", label: "Providers" },
+                { count: 38, label: "Channels" },
+                { count: 83, suffix: "+", label: "Tools" },
+              ].map((stat, i, arr) => (
+                <div
+                  class={`number-item text-center py-4 sm:py-6 md:py-0 ${i < arr.length - 1 ? "md:border-r" : ""}`}
+                  data-reveal="scale"
+                  style={`--ri: ${i}; border-color: var(--color-border)`}
+                >
+                  <div
+                    class="hu-metric-counter font-sans font-black text-[clamp(2rem,4vw,3rem)] leading-none"
+                    style="color: var(--color-text)"
+                    data-count={stat.count}
+                    data-prefix={stat.prefix || ""}
+                    data-suffix={stat.suffix || ""}
+                  >
+                    {stat.prefix && (
+                      <span class="count-prefix">{stat.prefix}</span>
+                    )}
+                    <span class="count-value">0</span>
+                    {stat.suffix && (
+                      <span class="count-suffix">{stat.suffix}</span>
+                    )}
+                  </div>
+                  <div
+                    class="text-xs font-medium mt-2 uppercase tracking-[0.1em]"
+                    style="color: var(--color-text-tertiary)"
+                  >
+                    {stat.label}
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+
+        <div class="hero-fade-in max-w-5xl mx-auto w-full relative z-10 px-6">
           <p
-            class="social-proof-label text-[11px] font-semibold uppercase tracking-[0.15em] mb-8 text-center"
+            class="social-proof-label text-xs font-semibold uppercase tracking-[0.15em] mb-8 text-center"
             style="color: var(--color-text-tertiary)"
           >
             Built for
@@ -427,132 +456,56 @@ const chapterCount = 15;
           <div
             class="proof-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 md:gap-6"
           >
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 0"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">CLI Automation</span
-              >
-            </div>
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 1"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">DevOps</span
-              >
-            </div>
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 2"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">Security</span
-              >
-            </div>
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 3"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">Research</span
-              >
-            </div>
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 4"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">IoT</span
-              >
-            </div>
-            <div
-              class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
-              data-reveal="scale"
-              style="--ri: 5"
-            >
-              <svg
-                class="w-8 h-8 shrink-0"
-                viewBox="0 0 256 256"
-                fill="currentColor"
-                style="color: var(--color-accent)"
-                aria-hidden="true"
-              >
-                <path
-                  d="M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z"
-                ></path>
-              </svg>
-              <span
-                class="text-[13px] font-medium text-center"
-                style="color: var(--color-text-secondary)">Enterprise</span
-              >
-            </div>
+            {
+              [
+                {
+                  icon: "M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,0,1,45.31,58l72,64A8,8,0,0,1,117.31,134ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z",
+                  label: "CLI Automation",
+                },
+                {
+                  icon: "M208,40H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208ZM208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208Zm-36-40a12,12,0,1,1-12,12A12,12,0,0,1,172,160Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,160Zm36-96a12,12,0,1,1-12,12A12,12,0,0,1,172,64Zm-36,0a12,12,0,1,1-12,12A12,12,0,0,1,136,64Z",
+                  label: "DevOps",
+                },
+                {
+                  icon: "M208,40H48A16,16,0,0,0,32,56V72a16,16,0,0,0,16,16H80V56a8,8,0,0,1,16,0V72h48V56a8,8,0,0,1,16,0V72h32a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V120A16,16,0,0,0,208,104Zm0,64H48a16,16,0,0,0-16,16v16a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V184A16,16,0,0,0,208,168ZM56,112H72v8a8,8,0,0,1-16,0v-8Zm0,64H72v8a8,8,0,0,1-16,0v-8Zm128-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Zm-48-64h16v8a8,8,0,0,1-16,0v-8Zm0,64h16v8a8,8,0,0,1-16,0v-8Z",
+                  label: "IoT",
+                },
+                {
+                  icon: "M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.52-80-30.69-80-109.18V56H208Z",
+                  label: "Security",
+                },
+                {
+                  icon: "M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z",
+                  label: "Research",
+                },
+                {
+                  icon: "M224,200h-8V40a8,8,0,0,0-16,0V200H168V96a8,8,0,0,0-16,0V200H104V136a8,8,0,0,0-16,0v64H40V168a8,8,0,0,0-16,0v32H16a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z",
+                  label: "Enterprise",
+                },
+              ].map(({ icon, label }, i) => (
+                <div
+                  class="proof-item glass glass-enter flex flex-col items-center gap-3 px-4 py-6 rounded-xl"
+                  data-reveal="scale"
+                  style={`--ri: ${i}`}
+                >
+                  <svg
+                    class="w-8 h-8 shrink-0"
+                    viewBox="0 0 256 256"
+                    fill="currentColor"
+                    style="color: var(--color-accent)"
+                    aria-hidden="true"
+                  >
+                    <path d={icon} />
+                  </svg>
+                  <span
+                    class="text-sm font-medium text-center"
+                    style="color: var(--color-text-secondary)"
+                  >
+                    {label}
+                  </span>
+                </div>
+              ))
+            }
           </div>
           <div class="github-badge mt-10 flex justify-center">
             <a
@@ -578,13 +531,12 @@ const chapterCount = 15;
       {/* ═══ INTERACTIVE DEMO (Terminal replay) ═══ */}
       <section
         id="chapter-2"
-        class="demo-section relative hu-chapter-reveal py-20 md:py-28 px-6 cv-defer"
+        class="demo-section relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
         aria-label="Product demo"
       >
-        <span class="hu-chapter-label" aria-hidden="true">02</span>
-        <div class="max-w-4xl mx-auto">
+        <div class="max-w-5xl mx-auto">
           <h2
-            class="font-sans font-extrabold text-[clamp(2rem,5vw,3rem)] mb-8 text-center"
+            class="font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-8 text-center"
             style="color: var(--color-text); letter-spacing: -0.03em;"
             data-reveal
           >
@@ -610,12 +562,12 @@ const chapterCount = 15;
                 class="terminal-dot green w-3 h-3 rounded-full shrink-0"
                 style="background: var(--hu-terminal-maximize)"></span>
               <span
-                class="terminal-title ml-2 text-[13px] font-medium"
+                class="terminal-title ml-2 text-sm font-medium"
                 style="color: var(--hu-text-muted)">human</span
               >
             </div>
             <div
-              class="terminal-body px-6 py-5 font-mono text-[14px] leading-relaxed"
+              class="terminal-body px-4 sm:px-6 py-4 sm:py-5 font-mono text-xs sm:text-base leading-relaxed"
               style="color: var(--hu-text);"
             >
               <div class="terminal-line" style="--line-delay: 0">
@@ -638,73 +590,17 @@ const chapterCount = 15;
         </div>
       </section>
 
-      <hr class="section-divider" />
-
-      {/* ═══ THE NUMBERS ═══ */}
+      {/* ═══ THE PROBLEM + CONTRAST ═══ */}
 
       <section
         id="chapter-3"
-        class="relative hu-chapter-reveal py-16 md:py-24 px-6 cv-defer"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">03</span>
-        <div class="max-w-5xl mx-auto numbers-section">
-          <div
-            class="numbers-grid glass glass-enter px-4 md:px-8 py-8 md:py-10 grid grid-cols-3 md:grid-cols-6 gap-0"
-          >
-            {
-              [
-                { count: 1696, suffix: " KB", label: "Binary" },
-                { count: 30, prefix: "<", suffix: " ms", label: "Startup" },
-                { count: 4980, suffix: "+", label: "Tests" },
-                { count: 50, suffix: "+", label: "Providers" },
-                { count: 34, label: "Channels" },
-                { count: 67, suffix: "+", label: "Tools" },
-              ].map((stat, i, arr) => (
-                <div
-                  class={`number-item text-center py-6 md:py-0 ${i < arr.length - 1 ? "md:border-r" : ""}`}
-                  data-reveal="scale"
-                  style={`--ri: ${i}; border-color: var(--color-border)`}
-                >
-                  <div
-                    class="hu-metric-counter font-sans font-black text-[clamp(2rem,4vw,3rem)] leading-none"
-                    style="color: var(--color-text)"
-                    data-count={stat.count}
-                    data-prefix={stat.prefix || ""}
-                    data-suffix={stat.suffix || ""}
-                  >
-                    {stat.prefix && (
-                      <span class="count-prefix">{stat.prefix}</span>
-                    )}
-                    <span class="count-value">0</span>
-                    {stat.suffix && (
-                      <span class="count-suffix">{stat.suffix}</span>
-                    )}
-                  </div>
-                  <div
-                    class="text-[11px] font-medium mt-2 uppercase tracking-[0.1em]"
-                    style="color: var(--color-text-tertiary)"
-                  >
-                    {stat.label}
-                  </div>
-                </div>
-              ))
-            }
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ THE PROBLEM ═══ */}
-
-      <section
-        id="chapter-4"
         class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">04</span>
         <div class="max-w-5xl mx-auto">
           <div class="grid md:grid-cols-2 gap-16 items-center">
             <div>
               <h2
-                class="bloat-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-6"
+                class="bloat-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-6"
                 data-reveal
                 style="color: var(--color-text); letter-spacing: -0.03em;"
               >
@@ -1040,28 +936,19 @@ const chapterCount = 15;
                   y="396"
                   text-anchor="middle"
                   font-size="9"
-                  data-delay="2200">1,696 KB. That's it.</text
+                  data-delay="2200">1,750 KB. That's it.</text
                 >
               </svg>
             </div>
           </div>
         </div>
-      </section>
-
-      {/* ═══ THE CONTRAST ═══ */}
-
-      <section
-        id="chapter-5"
-        class="relative hu-chapter-reveal py-12 md:py-20 px-6 cv-defer"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">05</span>
-        <div class="max-w-3xl mx-auto">
+        <div class="max-w-3xl mx-auto mt-16">
           <div
-            class="glass glass-enter grid grid-cols-3 gap-0 rounded-2xl overflow-hidden"
+            class="glass glass-enter grid grid-cols-1 sm:grid-cols-3 gap-0 rounded-2xl overflow-hidden"
             data-reveal="scale"
           >
             <div
-              class="text-center py-8 md:py-10 px-4 border-r"
+              class="text-center py-6 sm:py-8 md:py-10 px-4 border-b sm:border-b-0 sm:border-r"
               style="border-color: var(--color-border)"
             >
               <div
@@ -1071,14 +958,14 @@ const chapterCount = 15;
                 118&times;
               </div>
               <div
-                class="text-[11px] uppercase tracking-widest font-medium"
+                class="text-xs uppercase tracking-widest font-medium"
                 style="color: var(--color-text-tertiary)"
               >
                 smaller
               </div>
             </div>
             <div
-              class="text-center py-8 md:py-10 px-4 border-r"
+              class="text-center py-6 sm:py-8 md:py-10 px-4 border-b sm:border-b-0 sm:border-r"
               style="border-color: var(--color-border)"
             >
               <div
@@ -1088,13 +975,13 @@ const chapterCount = 15;
                 50&times;
               </div>
               <div
-                class="text-[11px] uppercase tracking-widest font-medium"
+                class="text-xs uppercase tracking-widest font-medium"
                 style="color: var(--color-text-tertiary)"
               >
                 less RAM
               </div>
             </div>
-            <div class="text-center py-8 md:py-10 px-4">
+            <div class="text-center py-6 sm:py-8 md:py-10 px-4">
               <div
                 class="font-black text-[clamp(2rem,4vw,3rem)] leading-none mb-2"
                 style="color: var(--color-accent)"
@@ -1102,7 +989,7 @@ const chapterCount = 15;
                 Zero
               </div>
               <div
-                class="text-[11px] uppercase tracking-widest font-medium"
+                class="text-xs uppercase tracking-widest font-medium"
                 style="color: var(--color-text-tertiary)"
               >
                 dependencies
@@ -1110,7 +997,7 @@ const chapterCount = 15;
             </div>
           </div>
           <p
-            class="text-center text-[12px] mt-4"
+            class="text-center text-xs mt-4"
             style="color: var(--color-text-tertiary)"
           >
             vs. leading AI agent frameworks
@@ -1118,21 +1005,20 @@ const chapterCount = 15;
         </div>
       </section>
 
-      {/* ═══ CRYSTAL GRID — What's inside 1,696 KB ═══ */}
+      {/* ═══ CRYSTAL GRID + ARCHITECTURE ═══ */}
 
       <section
-        id="chapter-6"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+        id="chapter-4"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">06</span>
-        <div class="max-w-4xl mx-auto text-center">
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
             What's inside <span style="color: var(--color-accent)"
-              >1,696&nbsp;kilobytes?</span
+              >1,750&nbsp;kilobytes?</span
             >
           </h2>
           <p
@@ -1146,7 +1032,7 @@ const chapterCount = 15;
           <div class="crystal-grid mb-8" id="crystalGrid" data-reveal="scale">
           </div>
           <div
-            class="flex gap-6 justify-center text-[12px]"
+            class="flex gap-6 justify-center text-xs"
             data-reveal
             style="color: var(--color-text-secondary)"
           >
@@ -1168,19 +1054,15 @@ const chapterCount = 15;
         </div>
       </section>
 
-      <hr class="section-divider" />
-
-      {/* ═══ DEVICE SPECTRUM — SVG Illustrations ═══ */}
+      {/* ═══ DEVICE SPECTRUM + ARCHITECTURE ═══ */}
 
       <section
-        id="chapter-7"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+        id="use-cases"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span id="use-cases" class="sr-only">Use cases</span>
-        <span class="hu-chapter-label" aria-hidden="true">07</span>
         <div class="max-w-5xl mx-auto">
           <h2
-            class="spectrum-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4 text-center"
+            class="spectrum-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4 text-center"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
@@ -1195,7 +1077,7 @@ const chapterCount = 15;
           </p>
 
           <div
-            class="flex flex-wrap justify-center items-end gap-8 md:gap-12 mb-6"
+            class="flex flex-wrap justify-center items-end gap-6 sm:gap-8 md:gap-12 mb-6"
             data-reveal
           >
             <div class="device-item">
@@ -1312,16 +1194,16 @@ const chapterCount = 15;
                   opacity=".2"></rect>
               </svg>
               <div
-                class="text-[13px] font-semibold"
+                class="text-sm font-semibold"
                 style="color: var(--color-text)"
               >
                 Cloud
               </div>
               <div
-                class="text-[11px] font-mono"
+                class="text-xs font-mono"
                 style="color: var(--color-text-tertiary)"
               >
-                34 channels
+                38 channels
               </div>
             </div>
 
@@ -1376,13 +1258,13 @@ const chapterCount = 15;
                   opacity=".3"></rect>
               </svg>
               <div
-                class="text-[13px] font-semibold"
+                class="text-sm font-semibold"
                 style="color: var(--color-text)"
               >
                 Workstation
               </div>
               <div
-                class="text-[11px] font-mono"
+                class="text-xs font-mono"
                 style="color: var(--color-text-tertiary)"
               >
                 &lt;6 MB RAM
@@ -1495,13 +1377,13 @@ const chapterCount = 15;
                   stroke-width="1.5"></line>
               </svg>
               <div
-                class="text-[13px] font-semibold"
+                class="text-sm font-semibold"
                 style="color: var(--color-text)"
               >
                 Edge
               </div>
               <div
-                class="text-[11px] font-mono"
+                class="text-xs font-mono"
                 style="color: var(--color-text-tertiary)"
               >
                 &lt;30 ms boot
@@ -1653,16 +1535,16 @@ const chapterCount = 15;
                 >
               </svg>
               <div
-                class="text-[13px] font-semibold"
+                class="text-sm font-semibold"
                 style="color: var(--color-text)"
               >
                 Embedded
               </div>
               <div
-                class="text-[11px] font-mono"
+                class="text-xs font-mono"
                 style="color: var(--color-text-tertiary)"
               >
-                1,696 KB
+                1,750 KB
               </div>
             </div>
           </div>
@@ -1694,7 +1576,7 @@ const chapterCount = 15;
             </div>
           </div>
           <div
-            class="flex justify-between max-w-[800px] mx-auto mt-5 text-[11px] uppercase tracking-[0.05em] font-medium"
+            class="flex justify-between max-w-[800px] mx-auto mt-5 text-xs uppercase tracking-[0.05em] font-medium"
             data-reveal
             style="color: var(--color-text-tertiary)"
           >
@@ -1702,21 +1584,10 @@ const chapterCount = 15;
             <span>Minimum footprint</span>
           </div>
         </div>
-      </section>
-
-      {/* ═══ ARCHITECTURE ═══ */}
-
-      <section
-        id="chapter-8"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
-      >
-        <span id="architecture" class="sr-only">Architecture</span>
-        <span class="hu-chapter-label" aria-hidden="true">08</span>
-        <div class="ambient-coral" style="top: 20%; left: 10%;"></div>
-        <div class="ambient-blue" style="bottom: 10%; right: 15%;"></div>
-        <div class="max-w-4xl mx-auto text-center">
+        <!-- Architecture -->
+        <div id="architecture" class="max-w-5xl mx-auto text-center">
           <h2
-            class="arch-title hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="arch-title hu-scroll-reveal font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
             Swap anything. Lock in nothing.
@@ -1734,7 +1605,7 @@ const chapterCount = 15;
             viewBox="0 0 600 600"
             width="600"
             height="600"
-            class="hu-scroll-scale w-full max-w-lg mx-auto"
+            class="hu-scroll-scale w-full max-w-xs sm:max-w-md md:max-w-lg mx-auto"
             style="aspect-ratio: 1;"
             xmlns="http://www.w3.org/2000/svg"
             role="img"
@@ -1752,7 +1623,8 @@ const chapterCount = 15;
                   dx="0"
                   dy="2"
                   stdDeviation="4"
-                  flood-color="rgba(0,0,0,0.06)"></feDropShadow>
+                  flood-color="black"
+                  flood-opacity="0.06"></feDropShadow>
               </filter>
             </defs>
 
@@ -1819,7 +1691,7 @@ const chapterCount = 15;
                   cx: 441,
                   cy: 159,
                   label: "Channels",
-                  tip: "33 messaging channels: Telegram, Discord, Slack, iMessage",
+                  tip: "38 messaging channels: Telegram, Discord, Slack, iMessage",
                 },
                 {
                   cx: 500,
@@ -1831,7 +1703,7 @@ const chapterCount = 15;
                   cx: 441,
                   cy: 441,
                   label: "Tools",
-                  tip: "67+ tools: shell, files, git, browser, web search, hardware",
+                  tip: "83+ tools: shell, files, git, browser, web search, hardware",
                 },
                 {
                   cx: 300,
@@ -1858,7 +1730,13 @@ const chapterCount = 15;
                   tip: "Arduino, STM32, Raspberry Pi peripherals",
                 },
               ].map(({ cx, cy, label, tip }) => (
-                <g class="arch-node opacity-0" style="cursor: pointer;">
+                <g
+                  class="arch-node opacity-0"
+                  style="cursor: pointer;"
+                  tabindex="0"
+                  role="img"
+                  aria-label={`${label}: ${tip}`}
+                >
                   <title>{tip}</title>
                   <circle
                     cx={cx}
@@ -1888,16 +1766,15 @@ const chapterCount = 15;
 
       <hr class="section-divider" />
 
-      {/* ═══ HULA — Programs, Not Prompts ═══ */}
+      {/* ═══ HULA + ECOSYSTEM ═══ */}
 
       <section
-        id="chapter-9"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+        id="chapter-6"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">09</span>
-        <div class="max-w-4xl mx-auto text-center">
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="hu-scroll-reveal font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
             Programs, not prompts.
@@ -1997,7 +1874,7 @@ const chapterCount = 15;
           </div>
 
           <div
-            class="glass rounded-xl p-6 text-left max-w-xl mx-auto"
+            class="glass rounded-xl p-4 sm:p-6 text-left max-w-xl mx-auto"
             data-reveal
           >
             <div
@@ -2012,7 +1889,7 @@ const chapterCount = 15;
           </div>
 
           <a
-            href="/features/hula/"
+            href={`${base}#chapter-6`}
             class="btn-outline mt-8 inline-block"
             data-reveal
           >
@@ -2023,16 +1900,15 @@ const chapterCount = 15;
 
       <hr class="section-divider" />
 
-      {/* ═══ ECOSYSTEM — Categorized Cards ═══ */}
+      {/* ═══ ECOSYSTEM ═══ */}
 
       <section
-        id="chapter-10"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+        id="chapter-7"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">10</span>
-        <div class="max-w-4xl mx-auto text-center">
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="providers-title hu-scroll-reveal font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="providers-title hu-scroll-reveal font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
             An ecosystem, not a walled garden.
@@ -2058,7 +1934,7 @@ const chapterCount = 15;
                 </h3>
               </div>
               <p
-                class="text-[13px] leading-relaxed mb-5"
+                class="text-sm leading-relaxed mb-5"
                 style="color: var(--color-text-secondary)"
               >
                 Cloud APIs and local models. Switch with one line of config.
@@ -2067,7 +1943,7 @@ const chapterCount = 15;
                 {
                   providers.slice(0, 8).map((name) => (
                     <span
-                      class="provider-pill px-3 py-1 rounded-md text-[11px] font-medium"
+                      class="provider-pill px-3 py-1 rounded-md text-xs font-medium"
                       style="color: var(--color-pill-provider); background: var(--color-pill-provider-bg); border: 1px solid var(--color-pill-provider-border)"
                     >
                       {name}
@@ -2075,7 +1951,7 @@ const chapterCount = 15;
                   ))
                 }
                 <span
-                  class="px-3 py-1 rounded-md text-[11px] italic"
+                  class="px-3 py-1 rounded-md text-xs italic"
                   style="color: var(--color-text-tertiary); border: 1px solid var(--color-border)"
                   >+42 more</span
                 >
@@ -2084,7 +1960,7 @@ const chapterCount = 15;
 
             <div class="eco-card text-left" data-reveal="scale" style="--ri: 1">
               <div class="eco-card-header flex items-baseline gap-2 flex-wrap">
-                <span class="eco-num">34</span>
+                <span class="eco-num">38</span>
                 <h3
                   class="text-base font-semibold mb-0"
                   style="color: var(--color-text)"
@@ -2093,7 +1969,7 @@ const chapterCount = 15;
                 </h3>
               </div>
               <p
-                class="text-[13px] leading-relaxed mb-3"
+                class="text-sm leading-relaxed mb-3"
                 style="color: var(--color-text-secondary)"
               >
                 One agent, every platform. Users message you where they already
@@ -2103,7 +1979,7 @@ const chapterCount = 15;
                 {
                   channels.slice(0, 8).map((name) => (
                     <span
-                      class="provider-pill px-3 py-1 rounded-md text-[11px] font-medium"
+                      class="provider-pill px-3 py-1 rounded-md text-xs font-medium"
                       style="color: var(--color-pill-channel); background: var(--color-pill-channel-bg); border: 1px solid var(--color-pill-channel-border)"
                     >
                       {name}
@@ -2111,7 +1987,7 @@ const chapterCount = 15;
                   ))
                 }
                 <span
-                  class="px-3 py-1 rounded-md text-[11px] italic"
+                  class="px-3 py-1 rounded-md text-xs italic"
                   style="color: var(--color-text-tertiary); border: 1px solid var(--color-border)"
                   >+26 more</span
                 >
@@ -2120,7 +1996,7 @@ const chapterCount = 15;
 
             <div class="eco-card text-left" data-reveal="scale" style="--ri: 2">
               <div class="eco-card-header flex items-baseline gap-2 flex-wrap">
-                <span class="eco-num">67+</span>
+                <span class="eco-num">83+</span>
                 <h3
                   class="text-base font-semibold mb-0"
                   style="color: var(--color-text)"
@@ -2129,7 +2005,7 @@ const chapterCount = 15;
                 </h3>
               </div>
               <p
-                class="text-[13px] leading-relaxed mb-3"
+                class="text-sm leading-relaxed mb-3"
                 style="color: var(--color-text-secondary)"
               >
                 Not a chatbot — an agent. Real access to your system.
@@ -2138,7 +2014,7 @@ const chapterCount = 15;
                 {
                   tools.map((name) => (
                     <span
-                      class="provider-pill px-3 py-1 rounded-md text-[11px] font-medium"
+                      class="provider-pill px-3 py-1 rounded-md text-xs font-medium"
                       style="color: var(--color-pill-tool); background: var(--color-pill-tool-bg); border: 1px solid var(--color-pill-tool-border)"
                     >
                       {name}
@@ -2146,7 +2022,7 @@ const chapterCount = 15;
                   ))
                 }
                 <span
-                  class="px-3 py-1 rounded-md text-[11px] italic"
+                  class="px-3 py-1 rounded-md text-xs italic"
                   style="color: var(--color-text-tertiary); border: 1px solid var(--color-border)"
                   >+57 more</span
                 >
@@ -2158,16 +2034,15 @@ const chapterCount = 15;
 
       <hr class="section-divider" />
 
-      {/* ═══ TERMINAL ═══ */}
+      {/* ═══ TERMINAL + DASHBOARD ═══ */}
 
       <section
-        id="chapter-11"
-        class="section-spacing relative hu-chapter-reveal px-6 cv-defer"
+        id="chapter-8"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">11</span>
-        <div class="max-w-3xl mx-auto">
+        <div class="max-w-5xl mx-auto">
           <h2
-            class="terminal-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-6 text-center"
+            class="terminal-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-6 text-center"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
@@ -2201,31 +2076,21 @@ const chapterCount = 15;
                 class="w-3 h-3 rounded-full"
                 style="background: var(--hu-terminal-maximize)"></span>
               <span
-                class="text-[11px] ml-2 font-mono"
+                class="text-xs ml-2 font-mono"
                 style="color: var(--hu-text-muted)">terminal</span
               >
             </div>
             <div
               id="terminal-output"
-              class="p-4 md:p-6 font-mono text-[12px] md:text-sm leading-[1.8] min-h-[240px] md:min-h-[280px] overflow-x-auto"
+              class="p-4 md:p-6 font-mono text-xs md:text-sm leading-[1.8] min-h-[240px] md:min-h-[280px] overflow-x-auto"
             >
             </div>
           </div>
         </div>
-      </section>
-
-      <hr class="section-divider" />
-
-      {/* ═══ DASHBOARD PREVIEW ═══ */}
-
-      <section
-        id="chapter-12"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">12</span>
-        <div class="max-w-4xl mx-auto text-center">
+        <!-- Dashboard Preview -->
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="dash-title font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="dash-title font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
@@ -2258,11 +2123,11 @@ const chapterCount = 15;
                 class="w-3 h-3 rounded-full"
                 style="background: var(--hu-terminal-maximize)"></span>
               <span
-                class="text-[11px] ml-2 font-mono"
+                class="text-xs ml-2 font-mono"
                 style="color: var(--hu-text-muted)">h-uman Dashboard</span
               >
               <span
-                class="ml-auto text-[11px] px-2 py-0.5 rounded-full"
+                class="ml-auto text-xs px-2 py-0.5 rounded-full"
                 style="background: var(--hu-success-dim); color: var(--hu-success);"
                 >Live</span
               >
@@ -2272,14 +2137,14 @@ const chapterCount = 15;
               style="background: var(--color-terminal-bg);"
             >
               <div
-                class="dash-stats-grid grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"
+                class="dash-stats-grid grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6"
               >
                 <div
                   class="text-left p-4 rounded-xl"
                   style="background: color-mix(in srgb, white 4%, transparent); border: 1px solid color-mix(in srgb, white 6%, transparent);"
                 >
                   <div
-                    class="text-[10px] uppercase tracking-wider mb-2"
+                    class="text-2xs uppercase tracking-wider mb-2"
                     style="color: var(--hu-text-muted);"
                   >
                     Providers
@@ -2291,7 +2156,7 @@ const chapterCount = 15;
                     <span class="dash-count" data-target="50">0</span>
                   </div>
                   <div
-                    class="flex items-center gap-1 text-[11px]"
+                    class="flex items-center gap-1 text-xs"
                     style="color: var(--hu-accent);"
                   >
                     <svg
@@ -2311,7 +2176,7 @@ const chapterCount = 15;
                   style="background: color-mix(in srgb, white 4%, transparent); border: 1px solid color-mix(in srgb, white 6%, transparent);"
                 >
                   <div
-                    class="text-[10px] uppercase tracking-wider mb-2"
+                    class="text-2xs uppercase tracking-wider mb-2"
                     style="color: var(--hu-text-muted);"
                   >
                     Channels
@@ -2320,10 +2185,10 @@ const chapterCount = 15;
                     class="hu-metric-counter text-2xl font-bold mb-1"
                     style="color: var(--hu-text);"
                   >
-                    <span class="dash-count" data-target="34">0</span>
+                    <span class="dash-count" data-target="38">0</span>
                   </div>
                   <div
-                    class="flex items-center gap-1 text-[11px]"
+                    class="flex items-center gap-1 text-xs"
                     style="color: var(--hu-accent);"
                   >
                     <svg
@@ -2343,7 +2208,7 @@ const chapterCount = 15;
                   style="background: color-mix(in srgb, white 4%, transparent); border: 1px solid color-mix(in srgb, white 6%, transparent);"
                 >
                   <div
-                    class="text-[10px] uppercase tracking-wider mb-2"
+                    class="text-2xs uppercase tracking-wider mb-2"
                     style="color: var(--hu-text-muted);"
                   >
                     Tools
@@ -2352,10 +2217,10 @@ const chapterCount = 15;
                     class="hu-metric-counter text-2xl font-bold mb-1"
                     style="color: var(--hu-text);"
                   >
-                    <span class="dash-count" data-target="67">0</span>
+                    <span class="dash-count" data-target="83">0</span>
                   </div>
                   <div
-                    class="flex items-center gap-1 text-[11px]"
+                    class="flex items-center gap-1 text-xs"
                     style="color: var(--hu-text-muted);"
                   >
                     <svg
@@ -2375,7 +2240,7 @@ const chapterCount = 15;
                   style="background: color-mix(in srgb, white 4%, transparent); border: 1px solid color-mix(in srgb, white 6%, transparent);"
                 >
                   <div
-                    class="text-[10px] uppercase tracking-wider mb-2"
+                    class="text-2xs uppercase tracking-wider mb-2"
                     style="color: var(--hu-text-muted);"
                   >
                     Sessions
@@ -2387,7 +2252,7 @@ const chapterCount = 15;
                     <span class="dash-count" data-target="5">0</span>
                   </div>
                   <div
-                    class="flex items-center gap-1 text-[11px]"
+                    class="flex items-center gap-1 text-xs"
                     style="color: var(--hu-accent);"
                   >
                     <svg
@@ -2405,7 +2270,7 @@ const chapterCount = 15;
               </div>
               <div
                 id="dash-activity"
-                class="text-left text-[13px] space-y-2"
+                class="text-left text-sm space-y-2"
                 style="color: var(--hu-text-secondary);"
               >
               </div>
@@ -2417,7 +2282,7 @@ const chapterCount = 15;
             style="color: var(--color-text-tertiary)"
           >
             <a
-              href="/?demo=true"
+              href={`${base}#chapter-1`}
               class="underline hover:opacity-80 transition-opacity"
               style="color: var(--color-accent)">Try the live demo</a
             > — no installation required.
@@ -2425,16 +2290,15 @@ const chapterCount = 15;
         </div>
       </section>
 
-      {/* ═══ QUALITY — Ring Gauges ═══ */}
+      {/* ═══ QUALITY + COMPARISON ═══ */}
 
       <section
-        id="chapter-13"
-        class="relative hu-chapter-reveal py-16 md:py-32 px-6 cv-defer"
+        id="chapter-9"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">13</span>
-        <div class="max-w-4xl mx-auto text-center">
+        <div class="max-w-5xl mx-auto text-center">
           <h2
-            class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] mb-4"
+            class="font-sans font-black text-[clamp(2rem,4vw,3rem)] mb-4"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
@@ -2470,7 +2334,7 @@ const chapterCount = 15;
                 Tests
               </h3>
               <p
-                class="text-[13px] leading-relaxed"
+                class="text-sm leading-relaxed"
                 style="color: var(--color-text-secondary)"
               >
                 Unit, integration, and fuzz tests. Full suite runs in under 7
@@ -2497,7 +2361,7 @@ const chapterCount = 15;
                 Memory Leaks
               </h3>
               <p
-                class="text-[13px] leading-relaxed"
+                class="text-sm leading-relaxed"
                 style="color: var(--color-text-secondary)"
               >
                 AddressSanitizer on every build. Every allocation tracked. Every
@@ -2529,7 +2393,7 @@ const chapterCount = 15;
                 Accessibility Score
               </h3>
               <p
-                class="text-[13px] leading-relaxed"
+                class="text-sm leading-relaxed"
                 style="color: var(--color-text-secondary)"
               >
                 WCAG 2.1 AA. Lighthouse 98+. Focus rings, keyboard nav, reduced
@@ -2538,27 +2402,17 @@ const chapterCount = 15;
             </div>
           </div>
         </div>
-      </section>
-
-      <hr class="section-divider" />
-
-      {/* ═══ COMPARISON — Tufte-inspired direct-label bars ═══ */}
-
-      <section
-        id="chapter-14"
-        class="relative hu-chapter-reveal py-16 md:py-24 cv-defer"
-      >
-        <span class="hu-chapter-label" aria-hidden="true">14</span>
-        <div class="max-w-4xl mx-auto px-4">
-          <h2
-            class="font-sans font-extrabold text-[clamp(2rem,5vw,3.5rem)] text-center mb-4"
+        <!-- Comparison -->
+        <div class="max-w-5xl mx-auto">
+          <h3
+            class="font-sans font-black text-[clamp(2rem,4vw,3rem)] text-center mb-4"
             data-reveal
             style="color: var(--color-text); letter-spacing: -0.03em;"
           >
             Orders of magnitude <span style="color: var(--color-accent)"
               >smaller.</span
             >
-          </h2>
+          </h3>
           <p
             class="text-lg mb-14 text-center"
             data-reveal
@@ -2572,7 +2426,7 @@ const chapterCount = 15;
               [
                 {
                   metric: "Binary Size",
-                  human: { val: 1.696, label: "1.7 MB" },
+                  human: { val: 1.75, label: "1.7 MB" },
                   others: [
                     { name: "Claude Code", val: 200, label: "~200 MB" },
                     { name: "OpenAI Codex", val: 50, label: "~50 MB" },
@@ -2613,13 +2467,13 @@ const chapterCount = 15;
                 },
                 {
                   metric: "Channels",
-                  human: { val: 34, label: "34" },
+                  human: { val: 31, label: "31" },
                   others: [
                     { name: "Claude Code", val: 1, label: "1" },
                     { name: "OpenAI Codex", val: 1, label: "1" },
                   ],
                   unit: "",
-                  maxVal: 34,
+                  maxVal: 31,
                   inverted: true,
                 },
               ].map((row, ri) => (
@@ -2637,7 +2491,7 @@ const chapterCount = 15;
                   <div class="space-y-2">
                     <div class="flex items-center gap-3">
                       <span
-                        class="comparison-bar-label text-[12px] w-24 text-right font-medium"
+                        class="comparison-bar-label text-xs sm:text-xs w-16 sm:w-24 text-right font-medium shrink-0"
                         style={`color: var(--color-accent)`}
                       >
                         h-uman
@@ -2652,7 +2506,7 @@ const chapterCount = 15;
                           data-width={`${Math.max(2, (row.human.val / row.maxVal) * 100)}%`}
                         >
                           <span
-                            class="text-[11px] font-bold"
+                            class="text-xs font-bold"
                             style="color: var(--hu-on-accent)"
                           >
                             {row.human.label}
@@ -2663,7 +2517,7 @@ const chapterCount = 15;
                     {row.others.map((other) => (
                       <div class="flex items-center gap-3">
                         <span
-                          class="comparison-bar-label text-[12px] w-24 text-right"
+                          class="comparison-bar-label text-2xs sm:text-xs w-16 sm:w-24 text-right shrink-0"
                           style="color: var(--color-text-tertiary)"
                         >
                           {other.name}
@@ -2678,7 +2532,7 @@ const chapterCount = 15;
                             data-width={`${Math.max(2, (other.val / row.maxVal) * 100)}%`}
                           >
                             <span
-                              class="text-[10px]"
+                              class="text-2xs"
                               style="color: var(--color-text-tertiary)"
                             >
                               {other.label}
@@ -2693,7 +2547,7 @@ const chapterCount = 15;
             }
           </div>
           <p
-            class="text-center text-[12px] mt-8"
+            class="text-center text-xs mt-8"
             style="color: var(--color-text-tertiary);"
           >
             Smaller bars = better for size/memory/dependencies. Larger bars =
@@ -2705,12 +2559,9 @@ const chapterCount = 15;
       {/* ═══ CTA ═══ */}
 
       <section
-        id="chapter-15"
-        class="relative hu-chapter-reveal py-20 md:py-40 px-6 cv-defer"
+        id="chapter-10"
+        class="relative hu-chapter-reveal py-24 md:py-32 px-6 cv-defer"
       >
-        <span class="hu-chapter-label" aria-hidden="true">15</span>
-        <div class="ambient-coral" style="top: 30%; left: 30%;"></div>
-        <div class="ambient-blue" style="top: 40%; right: 20%;"></div>
         <div class="max-w-3xl mx-auto text-center">
           <h2
             class="cta-title hu-scroll-reveal font-sans font-black text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.05] mb-6"
@@ -2740,24 +2591,14 @@ const chapterCount = 15;
           </div>
         </div>
       </section>
-
-      <nav class="chapter-nav" aria-label="Page sections">
-        {
-          Array.from({ length: chapterCount }, (_, i) => i + 1).map((n) => (
-            <a
-              href={`#chapter-${n}`}
-              class="chapter-dot"
-              aria-label={`Section ${n}`}
-            >
-              <span class="chapter-dot-inner" />
-            </a>
-          ))
-        }
-      </nav>
     </main>
 
     {/* ── Footer ── */}
-    <footer class="site-footer py-12 px-6" role="contentinfo" data-reveal>
+    <footer
+      class="site-footer py-8 sm:py-12 px-6"
+      role="contentinfo"
+      data-reveal
+    >
       <div
         class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4"
       >
@@ -2772,18 +2613,18 @@ const chapterCount = 15;
             decoding="async"
             fetchpriority="low"
           />
-          <span class="text-[13px]" style="color: var(--color-text-tertiary)"
+          <span class="text-sm" style="color: var(--color-text-tertiary)"
             >h-uman</span
           >
         </div>
         <p
-          class="text-[13px] hidden md:block"
+          class="text-sm hidden md:block"
           style="color: var(--color-text-tertiary)"
         >
           not quite human.
         </p>
         <div
-          class="flex items-center gap-6 text-[13px]"
+          class="flex items-center gap-6 text-sm"
           style="color: var(--color-text-tertiary)"
         >
           <span>MIT License</span>
@@ -2798,43 +2639,6 @@ const chapterCount = 15;
       </div>
     </footer>
 
-    <script is:inline define:vars={{ chapterCount }}>
-      {
-        var chapterNav = document.querySelector(".chapter-nav");
-        if (chapterNav) {
-          var dots = Array.from(chapterNav.querySelectorAll(".chapter-dot"));
-          var sections = [];
-          for (var i = 1; i <= chapterCount; i++) {
-            var el = document.getElementById("chapter-" + i);
-            if (el) sections.push(el);
-          }
-          if (sections.length && dots.length) {
-            var setActive = function (index) {
-              dots.forEach(function (d, i) {
-                var on = i === index;
-                d.classList.toggle("active", on);
-                var inner = d.querySelector(".chapter-dot-inner");
-                if (inner) inner.classList.toggle("active", on);
-              });
-            };
-            var obs = new IntersectionObserver(
-              function (entries) {
-                entries.forEach(function (entry) {
-                  if (!entry.isIntersecting) return;
-                  var idx = sections.indexOf(entry.target);
-                  if (idx >= 0) setActive(idx);
-                });
-              },
-              { threshold: 0, rootMargin: "-42% 0px -42% 0px" },
-            );
-            sections.forEach(function (s) {
-              obs.observe(s);
-            });
-            setActive(0);
-          }
-        }
-      }
-    </script>
     <script>
       const prefersReducedMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
@@ -2859,7 +2663,7 @@ const chapterCount = 15;
             '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-text)">cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON && cmake --build .</span></div>',
             '<div><span style="color:var(--hu-text-muted)">[100%] Built target human</span></div>',
             '<div><span style="color:var(--color-accent)">$ </span><span style="color:var(--hu-text)">ls -lh human</span></div>',
-            '<div><span style="color:var(--hu-text-muted)">-rwxr-xr-x  1 user  staff  </span><span style="color:var(--color-accent)">1696K</span><span style="color:var(--hu-text-muted)">  human</span></div>',
+            '<div><span style="color:var(--hu-text-muted)">-rwxr-xr-x  1 user  staff  </span><span style="color:var(--color-accent)">1750K</span><span style="color:var(--hu-text-muted)">  human</span></div>',
           ].join("");
         }
 
@@ -2970,355 +2774,431 @@ const chapterCount = 15;
           onScroll();
         }
 
-        // ═══ Count-up numbers (lazy GSAP) ═══
-        const numbersGrid = document.querySelector(".numbers-grid");
-        if (numbersGrid) {
-          const numbersObs = new IntersectionObserver(
-            async (entries) => {
-              if (!entries[0]?.isIntersecting) return;
-              numbersObs.disconnect();
-              const { gsap } = await import("gsap");
-              document.querySelectorAll(".number-item").forEach((item, i) => {
-                const el = item.querySelector("[data-count]") as HTMLElement;
-                if (!el) return;
-                const target = parseInt(el.dataset.count || "0");
-                const valSpan = el.querySelector(".count-value");
-                if (!valSpan) return;
-                const obj = { val: 0 };
-                gsap.to(obj, {
-                  val: target,
-                  duration: 1.5,
-                  ease: "power3.out",
-                  delay: i * 0.08,
-                  onUpdate: () => {
-                    valSpan.textContent =
-                      target > 100
-                        ? Math.round(obj.val).toLocaleString()
-                        : Math.round(obj.val).toString();
-                  },
-                  onComplete: () => {
-                    gsap.fromTo(
-                      item,
-                      { scale: 1 },
-                      {
-                        scale: 1.04,
-                        duration: 0.15,
-                        yoyo: true,
-                        repeat: 1,
-                        ease: "power2.out",
-                      },
-                    );
-                  },
-                });
-              });
-            },
-            { threshold: 0.15 },
-          );
-          numbersObs.observe(numbersGrid);
-        }
-
-        // ═══ Architecture SVG line drawing (lazy GSAP) ═══
-        const archDiagram = document.getElementById("arch-diagram");
-        if (archDiagram) {
-          const archObs = new IntersectionObserver(
-            async (entries) => {
-              if (!entries[0]?.isIntersecting) return;
-              archObs.disconnect();
-              const { gsap } = await import("gsap");
-              const archTl = gsap.timeline({
-                defaults: { ease: "power3.out" },
-              });
-              archTl
-                .to("#arch-core", { opacity: 1, duration: 0.6 })
-                .fromTo(
-                  ".arch-line",
-                  {
-                    attr: {
-                      "stroke-dasharray": "200",
-                      "stroke-dashoffset": "200",
-                    },
-                  },
-                  {
-                    attr: {
-                      "stroke-dashoffset": "0",
-                      stroke: "var(--color-accent)",
-                    },
-                    duration: 0.7,
-                    stagger: 0.06,
-                  },
-                  0.3,
-                )
-                .to(
-                  ".arch-node",
-                  { opacity: 1, duration: 0.5, stagger: 0.08 },
-                  0.6,
-                );
-            },
-            { threshold: 0.15 },
-          );
-          archObs.observe(archDiagram);
-
-          document.querySelectorAll(".arch-node").forEach((node) => {
-            node.addEventListener("mouseenter", () => {
-              const c = node.querySelector("circle");
-              if (c) c.setAttribute("stroke", "var(--color-accent)");
-            });
-            node.addEventListener("mouseleave", () => {
-              const c = node.querySelector("circle");
-              if (c) c.setAttribute("stroke", "var(--color-node-stroke)");
-            });
-          });
-        }
-
-        // ═══ Terminal typewriter (lazy GSAP) ═══
-        const terminalEl = document.getElementById("terminal");
-        const outputEl = document.getElementById("terminal-output");
-        if (terminalEl && outputEl) {
-          const termObs = new IntersectionObserver(
-            async (entries) => {
-              if (!entries[0]?.isIntersecting) return;
-              termObs.disconnect();
-              const { gsap } = await import("gsap");
-              gsap.to(terminalEl, { opacity: 1, duration: 0.6 });
-              typeTerminal(outputEl, gsap);
-            },
-            { threshold: 0.15 },
-          );
-          termObs.observe(terminalEl);
-        }
-
-        interface TermLine {
-          prompt: boolean;
-          text: string;
-          highlights?: Array<{ text: string; cls: string }>;
-        }
-
-        function typeTerminal(container: HTMLElement, gsap: any) {
-          const accentColor = "var(--color-accent)";
-          const lines: TermLine[] = [
-            {
-              prompt: true,
-              text: "git clone https://github.com/sethdford/h-uman.git",
-            },
-            {
-              prompt: true,
-              text: "cd h-uman && mkdir -p build && cd build",
-            },
-            {
-              prompt: true,
-              text: "cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON",
-            },
-            { prompt: true, text: "cmake --build ." },
-            { prompt: false, text: "[100%] Built target human" },
-            { prompt: true, text: "ls -lh human" },
-            {
-              prompt: false,
-              text: "-rwxr-xr-x  1 user  staff  1696K  human",
-              highlights: [{ text: "1696K", cls: accentColor }],
-            },
-            {
-              prompt: true,
-              text: './human agent -m "Hello from a ~1.7 MB binary."',
-            },
-            {
-              prompt: false,
-              text: "Hello! I'm h-uman — a fully autonomous AI assistant",
-              highlights: [{ text: "h-uman", cls: accentColor }],
-            },
-            {
-              prompt: false,
-              text: "running in 1,696 kilobytes. How can I help?",
-            },
-          ];
-
-          let lineIdx = 0;
-          function nextLine() {
-            if (lineIdx >= lines.length) {
-              const cursor = document.createElement("span");
-              cursor.className = "terminal-cursor";
-              container.lastElementChild?.appendChild(cursor);
-              return;
-            }
-            const line = lines[lineIdx];
-            const div = document.createElement("div");
-            div.className = "terminal-line";
-
-            if (line.prompt) {
-              const p = document.createElement("span");
-              p.style.color = "var(--color-accent)";
-              p.textContent = "$ ";
-              div.appendChild(p);
-              const t = document.createElement("span");
-              t.style.color = "var(--hu-text)";
-              div.appendChild(t);
-              container.appendChild(div);
-              let ci = 0;
-              const tc = () => {
-                if (ci < line.text.length) {
-                  t.textContent += line.text[ci];
-                  ci++;
-                  setTimeout(tc, 18);
-                } else {
-                  lineIdx++;
-                  setTimeout(nextLine, 300);
-                }
-              };
-              tc();
-            } else {
-              const w = document.createElement("span");
-              w.style.color = "var(--hu-text-muted)";
-              if (line.highlights?.length) {
-                let rem = line.text;
-                for (const hl of line.highlights) {
-                  const idx = rem.indexOf(hl.text);
-                  if (idx >= 0) {
-                    if (idx > 0)
-                      w.appendChild(document.createTextNode(rem.slice(0, idx)));
-                    const s = document.createElement("span");
-                    s.style.color = hl.cls;
-                    s.textContent = hl.text;
-                    w.appendChild(s);
-                    rem = rem.slice(idx + hl.text.length);
-                  }
-                }
-                if (rem) w.appendChild(document.createTextNode(rem));
-              } else {
-                w.textContent = line.text;
-              }
-              div.appendChild(w);
-              div.style.opacity = "0";
-              container.appendChild(div);
-              gsap.to(div, { opacity: 1, duration: 0.3 });
-              lineIdx++;
-              setTimeout(nextLine, 200);
-            }
+        // ═══ Defer all GSAP animation observers until after LCP ═══
+        function afterLcp(fn: () => void) {
+          if (document.documentElement.classList.contains("hu-lcp-done")) {
+            fn();
+            return;
           }
-          nextLine();
-        }
-
-        // ═══ Dashboard preview (lazy GSAP for count-up + activity) ═══
-        const dashPreview = document.querySelector(".dash-preview");
-        if (dashPreview) {
-          const dashObs = new IntersectionObserver(
-            async (entries) => {
-              if (!entries[0]?.isIntersecting) return;
-              dashObs.disconnect();
-              const { gsap } = await import("gsap");
-              gsap.to(dashPreview, { opacity: 1, duration: 0.6 });
-              document.querySelectorAll(".dash-count").forEach((el, i) => {
-                const target = parseInt(
-                  (el as HTMLElement).dataset.target || "0",
-                );
-                const obj = { val: 0 };
-                gsap.to(obj, {
-                  val: target,
-                  duration: 1.2,
-                  ease: "power3.out",
-                  delay: 0.3 + i * 0.1,
-                  onUpdate: () => {
-                    el.textContent = Math.round(obj.val).toString();
-                  },
-                });
-              });
-              const actContainer = document.getElementById("dash-activity");
-              if (actContainer) {
-                const iconChatCircle =
-                  '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-4-1.08,8.09,8.09,0,0,0-2.53.41L40,216l12.47-37.4a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>';
-                const iconLightning =
-                  '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,12.95l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112-120A8,8,0,0,0,215.79,118.17Z"/></svg>';
-                const iconPlayCircle =
-                  '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm36.44-94.66-48-32A8,8,0,0,0,104,96v64a8,8,0,0,0,12.44,6.66l48-32a8,8,0,0,0,0-13.32ZM120,145.05V111l25.58,17Z"/></svg>';
-                const activities = [
-                  {
-                    icon: iconChatCircle,
-                    text: "Alice via Telegram: Can you review the PR?",
-                    time: "just now",
-                  },
-                  {
-                    icon: iconLightning,
-                    text: "Tool shell: git status",
-                    time: "1m ago",
-                  },
-                  {
-                    icon: iconChatCircle,
-                    text: "Bob via Discord: Deploy looks good",
-                    time: "2m ago",
-                  },
-                  {
-                    icon: iconPlayCircle,
-                    text: 'Session "Code Review" started',
-                    time: "3m ago",
-                  },
-                ];
-                activities.forEach((act, i) => {
-                  setTimeout(
-                    () => {
-                      const div = document.createElement("div");
-                      div.className = "flex items-center gap-2";
-                      div.style.opacity = "0";
-                      div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-[11px]" style="color: var(--hu-text-muted)">${act.time}</span>`;
-                      actContainer.appendChild(div);
-                      requestAnimationFrame(() => {
-                        div.style.transition = "opacity 0.4s ease-out";
-                        div.style.opacity = "1";
-                      });
-                    },
-                    800 + i * 400,
-                  );
-                });
-              }
-            },
-            { threshold: 0.15 },
-          );
-          dashObs.observe(dashPreview);
-        }
-
-        // ═══ Spotlight cards (vanilla JS, no GSAP needed) ═══
-        document.querySelectorAll(".card-spotlight").forEach((card) => {
-          card.addEventListener("mousemove", (e) => {
-            const rect = (card as HTMLElement).getBoundingClientRect();
-            (card as HTMLElement).style.setProperty(
-              "--mouse-x",
-              (e as MouseEvent).clientX - rect.left + "px",
-            );
-            (card as HTMLElement).style.setProperty(
-              "--mouse-y",
-              (e as MouseEvent).clientY - rect.top + "px",
-            );
+          var fired = false;
+          function once() {
+            if (fired) return;
+            fired = true;
+            mo.disconnect();
+            clearTimeout(tid);
+            fn();
+          }
+          const mo = new MutationObserver(() => {
+            if (document.documentElement.classList.contains("hu-lcp-done"))
+              once();
           });
-        });
+          mo.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["class"],
+          });
+          var tid = setTimeout(once, 3000);
+        }
 
-        // ═══ Custom cursor (desktop only, no touch) ═══
+        afterLcp(() => {
+          // ═══ Count-up numbers (lazy GSAP) ═══
+          const numbersGrid = document.querySelector(".numbers-grid");
+          if (numbersGrid) {
+            const numbersObs = new IntersectionObserver(
+              async (entries) => {
+                if (!entries[0]?.isIntersecting) return;
+                numbersObs.disconnect();
+                try {
+                  const { gsap } = await import("gsap");
+                  document
+                    .querySelectorAll(".number-item")
+                    .forEach((item, i) => {
+                      const el = item.querySelector(
+                        "[data-count]",
+                      ) as HTMLElement;
+                      if (!el) return;
+                      const target = parseInt(el.dataset.count || "0");
+                      const valSpan = el.querySelector(".count-value");
+                      if (!valSpan) return;
+                      const obj = { val: 0 };
+                      gsap.to(obj, {
+                        val: target,
+                        duration: 1.5,
+                        ease: "power3.out",
+                        delay: i * 0.08,
+                        onUpdate: () => {
+                          valSpan.textContent =
+                            target > 100
+                              ? Math.round(obj.val).toLocaleString()
+                              : Math.round(obj.val).toString();
+                        },
+                        onComplete: () => {
+                          gsap.fromTo(
+                            item,
+                            { scale: 1 },
+                            {
+                              scale: 1.04,
+                              duration: 0.15,
+                              yoyo: true,
+                              repeat: 1,
+                              ease: "power2.out",
+                            },
+                          );
+                        },
+                      });
+                    });
+                } catch (e) {
+                  void e;
+                  document
+                    .querySelectorAll(".number-item [data-count]")
+                    .forEach((el) => {
+                      const valSpan = el.querySelector(".count-value");
+                      if (valSpan)
+                        valSpan.textContent =
+                          (el as HTMLElement).dataset.count || "0";
+                    });
+                }
+              },
+              { threshold: 0.15 },
+            );
+            numbersObs.observe(numbersGrid);
+          }
+
+          // ═══ Architecture SVG line drawing (lazy GSAP) ═══
+          const archDiagram = document.getElementById("arch-diagram");
+          if (archDiagram) {
+            const archObs = new IntersectionObserver(
+              async (entries) => {
+                if (!entries[0]?.isIntersecting) return;
+                archObs.disconnect();
+                try {
+                  const { gsap } = await import("gsap");
+                  const archTl = gsap.timeline({
+                    defaults: { ease: "power3.out" },
+                  });
+                  archTl
+                    .to("#arch-core", { opacity: 1, duration: 0.6 })
+                    .fromTo(
+                      ".arch-line",
+                      {
+                        attr: {
+                          "stroke-dasharray": "200",
+                          "stroke-dashoffset": "200",
+                        },
+                      },
+                      {
+                        attr: {
+                          "stroke-dashoffset": "0",
+                          stroke: "var(--color-accent)",
+                        },
+                        duration: 0.7,
+                        stagger: 0.06,
+                      },
+                      0.3,
+                    )
+                    .to(
+                      ".arch-node",
+                      { opacity: 1, duration: 0.5, stagger: 0.08 },
+                      0.6,
+                    );
+                } catch (e) {
+                  void e;
+                  document
+                    .querySelectorAll("#arch-core, .arch-line, .arch-node")
+                    .forEach((el) => {
+                      (el as HTMLElement).style.opacity = "1";
+                    });
+                }
+              },
+              { threshold: 0.15 },
+            );
+            archObs.observe(archDiagram);
+
+            document.querySelectorAll(".arch-node").forEach((node) => {
+              const highlight = () => {
+                const c = node.querySelector("circle");
+                if (c) c.setAttribute("stroke", "var(--color-accent)");
+              };
+              const unhighlight = () => {
+                const c = node.querySelector("circle");
+                if (c) c.setAttribute("stroke", "var(--color-node-stroke)");
+              };
+              node.addEventListener("mouseenter", highlight);
+              node.addEventListener("mouseleave", unhighlight);
+              node.addEventListener("focusin", highlight);
+              node.addEventListener("focusout", unhighlight);
+            });
+          }
+
+          // ═══ Terminal typewriter (lazy GSAP) ═══
+          const terminalEl = document.getElementById("terminal");
+          const outputEl = document.getElementById("terminal-output");
+          if (terminalEl && outputEl) {
+            const termObs = new IntersectionObserver(
+              async (entries) => {
+                if (!entries[0]?.isIntersecting) return;
+                termObs.disconnect();
+                try {
+                  const { gsap } = await import("gsap");
+                  gsap.to(terminalEl, { opacity: 1, duration: 0.6 });
+                  typeTerminal(outputEl, gsap);
+                } catch (e) {
+                  void e;
+                  terminalEl.style.opacity = "1";
+                  outputEl.textContent =
+                    '$ ./human agent -m "Hello"\nHello! I\'m h-uman — a fully autonomous AI assistant.';
+                }
+              },
+              { threshold: 0.15 },
+            );
+            termObs.observe(terminalEl);
+          }
+
+          interface TermLine {
+            prompt: boolean;
+            text: string;
+            highlights?: Array<{ text: string; cls: string }>;
+          }
+
+          function typeTerminal(container: HTMLElement, gsap: any) {
+            const accentColor = "var(--color-accent)";
+            const lines: TermLine[] = [
+              {
+                prompt: true,
+                text: "git clone https://github.com/sethdford/h-uman.git",
+              },
+              {
+                prompt: true,
+                text: "cd h-uman && mkdir -p build && cd build",
+              },
+              {
+                prompt: true,
+                text: "cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON",
+              },
+              { prompt: true, text: "cmake --build ." },
+              { prompt: false, text: "[100%] Built target human" },
+              { prompt: true, text: "ls -lh human" },
+              {
+                prompt: false,
+                text: "-rwxr-xr-x  1 user  staff  1750K  human",
+                highlights: [{ text: "1750K", cls: accentColor }],
+              },
+              {
+                prompt: true,
+                text: './human agent -m "Hello from a ~1.7 MB binary."',
+              },
+              {
+                prompt: false,
+                text: "Hello! I'm h-uman — a fully autonomous AI assistant",
+                highlights: [{ text: "h-uman", cls: accentColor }],
+              },
+              {
+                prompt: false,
+                text: "running in 1,750 kilobytes. How can I help?",
+              },
+            ];
+
+            let lineIdx = 0;
+            function nextLine() {
+              if (lineIdx >= lines.length) {
+                const cursor = document.createElement("span");
+                cursor.className = "terminal-cursor";
+                container.lastElementChild?.appendChild(cursor);
+                return;
+              }
+              const line = lines[lineIdx];
+              const div = document.createElement("div");
+              div.className = "terminal-line";
+
+              if (line.prompt) {
+                const p = document.createElement("span");
+                p.style.color = "var(--color-accent)";
+                p.textContent = "$ ";
+                div.appendChild(p);
+                const t = document.createElement("span");
+                t.style.color = "var(--hu-text)";
+                div.appendChild(t);
+                container.appendChild(div);
+                let ci = 0;
+                const tc = () => {
+                  if (ci < line.text.length) {
+                    t.textContent += line.text[ci];
+                    ci++;
+                    setTimeout(tc, 18);
+                  } else {
+                    lineIdx++;
+                    setTimeout(nextLine, 300);
+                  }
+                };
+                tc();
+              } else {
+                const w = document.createElement("span");
+                w.style.color = "var(--hu-text-muted)";
+                if (line.highlights?.length) {
+                  let rem = line.text;
+                  for (const hl of line.highlights) {
+                    const idx = rem.indexOf(hl.text);
+                    if (idx >= 0) {
+                      if (idx > 0)
+                        w.appendChild(
+                          document.createTextNode(rem.slice(0, idx)),
+                        );
+                      const s = document.createElement("span");
+                      s.style.color = hl.cls;
+                      s.textContent = hl.text;
+                      w.appendChild(s);
+                      rem = rem.slice(idx + hl.text.length);
+                    }
+                  }
+                  if (rem) w.appendChild(document.createTextNode(rem));
+                } else {
+                  w.textContent = line.text;
+                }
+                div.appendChild(w);
+                div.style.opacity = "0";
+                container.appendChild(div);
+                gsap.to(div, { opacity: 1, duration: 0.3 });
+                lineIdx++;
+                setTimeout(nextLine, 200);
+              }
+            }
+            nextLine();
+          }
+
+          // ═══ Dashboard preview (lazy GSAP for count-up + activity) ═══
+          const dashPreview = document.querySelector(".dash-preview");
+          if (dashPreview) {
+            const dashObs = new IntersectionObserver(
+              async (entries) => {
+                if (!entries[0]?.isIntersecting) return;
+                dashObs.disconnect();
+                try {
+                  const { gsap } = await import("gsap");
+                  gsap.to(dashPreview, { opacity: 1, duration: 0.6 });
+                  document.querySelectorAll(".dash-count").forEach((el, i) => {
+                    const target = parseInt(
+                      (el as HTMLElement).dataset.target || "0",
+                    );
+                    const obj = { val: 0 };
+                    gsap.to(obj, {
+                      val: target,
+                      duration: 1.2,
+                      ease: "power3.out",
+                      delay: 0.3 + i * 0.1,
+                      onUpdate: () => {
+                        el.textContent = Math.round(obj.val).toString();
+                      },
+                    });
+                  });
+                  const actContainer = document.getElementById("dash-activity");
+                  if (actContainer) {
+                    const iconChatCircle =
+                      '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-4-1.08,8.09,8.09,0,0,0-2.53.41L40,216l12.47-37.4a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></svg>';
+                    const iconLightning =
+                      '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,12.95l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112-120A8,8,0,0,0,215.79,118.17Z"/></svg>';
+                    const iconPlayCircle =
+                      '<svg viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm36.44-94.66-48-32A8,8,0,0,0,104,96v64a8,8,0,0,0,12.44,6.66l48-32a8,8,0,0,0,0-13.32ZM120,145.05V111l25.58,17Z"/></svg>';
+                    const activities = [
+                      {
+                        icon: iconChatCircle,
+                        text: "Alice via Telegram: Can you review the PR?",
+                        time: "just now",
+                      },
+                      {
+                        icon: iconLightning,
+                        text: "Tool shell: git status",
+                        time: "1m ago",
+                      },
+                      {
+                        icon: iconChatCircle,
+                        text: "Bob via Discord: Deploy looks good",
+                        time: "2m ago",
+                      },
+                      {
+                        icon: iconPlayCircle,
+                        text: 'Session "Code Review" started',
+                        time: "3m ago",
+                      },
+                    ];
+                    activities.forEach((act, i) => {
+                      setTimeout(
+                        () => {
+                          const div = document.createElement("div");
+                          div.className = "flex items-center gap-2";
+                          div.style.opacity = "0";
+                          div.innerHTML = `<span class="flex-shrink-0 [&>svg]:block">${act.icon}</span><span style="color: var(--hu-text-secondary); flex: 1;">${act.text}</span><span class="text-xs" style="color: var(--hu-text-muted)">${act.time}</span>`;
+                          actContainer.appendChild(div);
+                          requestAnimationFrame(() => {
+                            div.style.transition = "opacity 0.4s ease-out";
+                            div.style.opacity = "1";
+                          });
+                        },
+                        800 + i * 400,
+                      );
+                    });
+                  }
+                } catch (e) {
+                  void e;
+                  (dashPreview as HTMLElement).style.opacity = "1";
+                  document.querySelectorAll(".dash-count").forEach((el) => {
+                    el.textContent = (el as HTMLElement).dataset.target || "0";
+                  });
+                }
+              },
+              { threshold: 0.15 },
+            );
+            dashObs.observe(dashPreview);
+          }
+        }); // end afterLcp
+
+        // ═══ Custom cursor (hero-only, desktop, no touch) ═══
+        const heroSection = document.getElementById("chapter-1");
         const cursor = document.getElementById("custom-cursor");
-        if (cursor && window.matchMedia("(pointer: fine)").matches) {
+        if (
+          cursor &&
+          heroSection &&
+          window.matchMedia("(pointer: fine)").matches
+        ) {
           let cx = 0,
             cy = 0,
             tx = 0,
             ty = 0;
-          document.addEventListener("mousemove", (e) => {
+          let cursorRaf = 0;
+          let cursorActive = false;
+          heroSection.addEventListener("mousemove", (e) => {
             tx = e.clientX;
             ty = e.clientY;
+          });
+          heroSection.addEventListener("mouseenter", () => {
+            cursorActive = true;
+            cursor.style.opacity = "1";
+            if (!cursorRaf) tick();
+          });
+          heroSection.addEventListener("mouseleave", () => {
+            cursorActive = false;
+            cursor.style.opacity = "0";
+            cancelAnimationFrame(cursorRaf);
+            cursorRaf = 0;
           });
           const tick = () => {
             cx += (tx - cx) * 0.15;
             cy += (ty - cy) * 0.15;
             cursor.style.transform = `translate(${cx - 10}px, ${cy - 10}px)`;
-            requestAnimationFrame(tick);
+            cursorRaf = requestAnimationFrame(tick);
           };
-          tick();
-          cursor.style.opacity = "1";
-          document
-            .querySelectorAll(
-              "a, button, .provider-pill, .arch-node, .comparison-bar",
-            )
-            .forEach((el) => {
-              el.addEventListener("mouseenter", () =>
-                cursor.classList.add("cursor-hover"),
-              );
-              el.addEventListener("mouseleave", () =>
-                cursor.classList.remove("cursor-hover"),
-              );
-            });
+          document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+              cancelAnimationFrame(cursorRaf);
+              cursorRaf = 0;
+            } else if (cursorActive) tick();
+          });
+          heroSection.querySelectorAll("a, button").forEach((el) => {
+            el.addEventListener("mouseenter", () =>
+              cursor.classList.add("cursor-hover"),
+            );
+            el.addEventListener("mouseleave", () =>
+              cursor.classList.remove("cursor-hover"),
+            );
+          });
         }
 
         // ═══ Comparison bar animation ═══
@@ -3330,12 +3210,10 @@ const chapterCount = 15;
               barObs.disconnect();
               document.querySelectorAll(".comparison-bar").forEach((bar, i) => {
                 const el = bar as HTMLElement;
-                const target = el.dataset.width || "0%";
-                el.style.width = "0%";
+                el.style.transform = "scaleX(0)";
                 setTimeout(
                   () => {
-                    el.style.transition = `width 0.8s cubic-bezier(0.22, 1.2, 0.36, 1)`;
-                    el.style.width = target;
+                    el.style.transform = "scaleX(1)";
                   },
                   100 + i * 60,
                 );
@@ -3563,12 +3441,12 @@ const chapterCount = 15;
         const heroCanvas = document.getElementById(
           "hero-webgl",
         ) as HTMLCanvasElement;
-        if (heroCanvas) {
+        const isDesktop = window.matchMedia("(min-width: 769px)").matches;
+        if (heroCanvas && isDesktop) {
           const heroObs = new IntersectionObserver(
             (entries) => {
               if (!entries[0]?.isIntersecting) return;
               heroObs.disconnect();
-              // Defer 725KB Three.js load until main thread idle — avoids blocking LCP/FCP/TTI
               const ric = (
                 window as unknown as {
                   requestIdleCallback?: (
@@ -3583,349 +3461,375 @@ const chapterCount = 15;
             { threshold: 0.01 },
           );
           heroObs.observe(heroCanvas);
+        } else if (heroCanvas) {
+          heroCanvas.style.display = "none";
         }
 
         async function initHeroWebGL(canvas: HTMLCanvasElement) {
-          const THREE = await import("three");
-          const section = canvas.closest("section")!;
-          const w = () => section.clientWidth;
-          const h = () => section.clientHeight;
-          const renderer = new THREE.WebGLRenderer({
-            canvas,
-            alpha: true,
-            antialias: true,
-            powerPreference: "low-power",
-          });
-          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-          renderer.setSize(w(), h());
+          try {
+            const THREE = await import("three");
+            const section = canvas.closest("section")!;
+            const w = () => section.clientWidth;
+            const h = () => section.clientHeight;
+            const renderer = new THREE.WebGLRenderer({
+              canvas,
+              alpha: true,
+              antialias: true,
+              powerPreference: "low-power",
+            });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(w(), h());
 
-          const scene = new THREE.Scene();
-          const camera = new THREE.PerspectiveCamera(60, w() / h(), 0.1, 100);
-          camera.position.z = 30;
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(60, w() / h(), 0.1, 100);
+            camera.position.z = 30;
 
-          const noise3D = createNoise3D();
+            const noise3D = createNoise3D();
 
-          const accentColor =
-            getComputedStyle(document.documentElement)
-              .getPropertyValue("--hu-accent")
-              .trim() || "#7AB648";
-          const accentSecondary =
-            getComputedStyle(document.documentElement)
-              .getPropertyValue("--hu-accent-secondary")
-              .trim() || "#f59e0b";
+            const accentColor =
+              getComputedStyle(document.documentElement)
+                .getPropertyValue("--hu-accent")
+                .trim() || "#7AB648";
+            const accentSecondary =
+              getComputedStyle(document.documentElement)
+                .getPropertyValue("--hu-accent-secondary")
+                .trim() || "#f59e0b";
 
-          // Neural network topology: 5 layers, 8–15 nodes per layer
-          const layerSizes = [10, 12, 10, 12, 10];
-          const layerZ = [-14, -7, 0, 7, 14];
-          const layerWidth = 18;
-          const nodeBasePos: number[][] = [];
-          let idx = 0;
-          for (let L = 0; L < layerSizes.length; L++) {
-            const n = layerSizes[L];
-            const z = layerZ[L];
-            for (let i = 0; i < n; i++) {
-              const t = n > 1 ? i / (n - 1) : 0.5;
-              const x = (t - 0.5) * layerWidth;
-              const y = Math.sin(i * 0.7) * 1.5;
-              nodeBasePos.push([x, y, z]);
-              idx++;
-            }
-          }
-          const nodeCount = nodeBasePos.length;
-
-          // Orbital/breathing params per node
-          const orbitRadius = new Float32Array(nodeCount);
-          const orbitPhase = new Float32Array(nodeCount);
-          const breathPhase = new Float32Array(nodeCount);
-          const isAccent = new Uint8Array(nodeCount);
-          for (let i = 0; i < nodeCount; i++) {
-            orbitRadius[i] = 0.15 + Math.random() * 0.25;
-            orbitPhase[i] = Math.random() * Math.PI * 2;
-            breathPhase[i] = Math.random() * Math.PI * 2;
-            isAccent[i] = Math.random() < 0.2 ? 1 : 0;
-          }
-
-          // Connections between adjacent layers (each node → 2–4 random next-layer nodes)
-          const connections: [number, number][] = [];
-          let layerStart = 0;
-          for (let L = 0; L < layerSizes.length - 1; L++) {
-            const nCur = layerSizes[L];
-            const nNext = layerSizes[L + 1];
-            const nextStart = layerStart + nCur;
-            for (let i = 0; i < nCur; i++) {
-              const src = layerStart + i;
-              const k = 2 + Math.floor(Math.random() * 3);
-              const used = new Set<number>();
-              for (let c = 0; c < Math.min(k, nNext); c++) {
-                let t = Math.floor(Math.random() * nNext);
-                while (used.has(t)) t = (t + 1) % nNext;
-                used.add(t);
-                connections.push([src, nextStart + t]);
+            // Neural network topology: 5 layers, 8–15 nodes per layer
+            const layerSizes = [10, 12, 10, 12, 10];
+            const layerZ = [-14, -7, 0, 7, 14];
+            const layerWidth = 18;
+            const nodeBasePos: number[][] = [];
+            for (let L = 0; L < layerSizes.length; L++) {
+              const n = layerSizes[L];
+              const z = layerZ[L];
+              for (let i = 0; i < n; i++) {
+                const t = n > 1 ? i / (n - 1) : 0.5;
+                const x = (t - 0.5) * layerWidth;
+                const y = Math.sin(i * 0.7) * 1.5;
+                nodeBasePos.push([x, y, z]);
               }
             }
-            layerStart = nextStart;
-          }
+            const nodeCount = nodeBasePos.length;
 
-          const FLOW_TOTAL_CAP = 5000;
-          const flowCount = Math.max(0, FLOW_TOTAL_CAP - nodeCount);
-          const FLOW_WRAP = 20;
-          const flowPosArr = new Float32Array(flowCount * 3);
-          for (let fi = 0; fi < flowCount; fi++) {
-            flowPosArr[fi * 3] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
-            flowPosArr[fi * 3 + 1] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
-            flowPosArr[fi * 3 + 2] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
-          }
-          const flowGeo = new THREE.BufferGeometry();
-          flowGeo.setAttribute(
-            "position",
-            new THREE.BufferAttribute(flowPosArr, 3),
-          );
-          const flowMat = new THREE.PointsMaterial({
-            color: new THREE.Color(accentColor),
-            size: 0.055,
-            sizeAttenuation: true,
-            transparent: true,
-            opacity: 0.22,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-          });
-          const flowPoints = new THREE.Points(flowGeo, flowMat);
-          scene.add(flowPoints);
-
-          const linePositions = new Float32Array(connections.length * 6);
-          const lineColors = new Float32Array(connections.length * 6);
-          const lineGeo = new THREE.BufferGeometry();
-          lineGeo.setAttribute(
-            "position",
-            new THREE.BufferAttribute(linePositions, 3),
-          );
-          lineGeo.setAttribute(
-            "color",
-            new THREE.BufferAttribute(lineColors, 3),
-          );
-          const lineMat = new THREE.LineBasicMaterial({
-            vertexColors: true,
-            transparent: true,
-            opacity: 0.18,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-          });
-          const lines = new THREE.LineSegments(lineGeo, lineMat);
-          scene.add(lines);
-
-          const posArr = new Float32Array(nodeCount * 3);
-          const colorArr = new Float32Array(nodeCount * 3);
-          const geo = new THREE.BufferGeometry();
-          geo.setAttribute("position", new THREE.BufferAttribute(posArr, 3));
-          geo.setAttribute("color", new THREE.BufferAttribute(colorArr, 3));
-
-          const accentCol = new THREE.Color(accentColor);
-          const secondaryCol = new THREE.Color(accentSecondary);
-          const mat = new THREE.PointsMaterial({
-            size: 0.18,
-            vertexColors: true,
-            sizeAttenuation: true,
-            transparent: true,
-            opacity: 0.7,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-          });
-          const points = new THREE.Points(geo, mat);
-          scene.add(points);
-
-          // Mouse interaction
-          const mouse = new THREE.Vector2(-10, -10);
-          const mouse3D = new THREE.Vector3(0, 0, 0);
-          const raycaster = new THREE.Raycaster();
-          const plane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
-          const intersect = new THREE.Vector3();
-          document.addEventListener("mousemove", (e) => {
-            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-          });
-          document.addEventListener("mouseleave", () => {
-            mouse.x = -10;
-            mouse.y = -10;
-          });
-
-          // Mouse glow sprite
-          const glowGeo = new THREE.BufferGeometry();
-          glowGeo.setAttribute(
-            "position",
-            new THREE.Float32BufferAttribute([0, 0, 0], 3),
-          );
-          const glowMat = new THREE.PointsMaterial({
-            size: 4,
-            color: new THREE.Color(accentColor),
-            transparent: true,
-            opacity: 0.15,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            sizeAttenuation: true,
-          });
-          const glowPoint = new THREE.Points(glowGeo, glowMat);
-          glowPoint.visible = false;
-          scene.add(glowPoint);
-
-          const MOUSE_RADIUS = 8;
-          const MOUSE_STRENGTH = 0.015;
-          const FRAME_INTERVAL = 1000 / 60;
-          let lastFrame = 0;
-          let animId: number;
-
-          const animate = (now: number) => {
-            animId = requestAnimationFrame(animate);
-            if (now - lastFrame < FRAME_INTERVAL) return;
-            lastFrame = now;
-            const t = now * 0.001;
-            const breath = 1 + 0.04 * Math.sin(t * 0.8);
-
-            raycaster.setFromCamera(mouse, camera);
-            raycaster.ray.intersectPlane(plane, intersect);
-            mouse3D.copy(intersect);
-            const mouseActive =
-              mouse.x > -2 && mouse.x < 2 && mouse.y > -2 && mouse.y < 2;
-            glowPoint.visible = mouseActive;
-            if (mouseActive) {
-              glowPoint.position.copy(mouse3D);
+            // Orbital/breathing params per node
+            const orbitRadius = new Float32Array(nodeCount);
+            const orbitPhase = new Float32Array(nodeCount);
+            const breathPhase = new Float32Array(nodeCount);
+            const isAccent = new Uint8Array(nodeCount);
+            for (let i = 0; i < nodeCount; i++) {
+              orbitRadius[i] = 0.15 + Math.random() * 0.25;
+              orbitPhase[i] = Math.random() * Math.PI * 2;
+              breathPhase[i] = Math.random() * Math.PI * 2;
+              isAccent[i] = Math.random() < 0.2 ? 1 : 0;
             }
 
-            for (let i = 0; i < nodeCount; i++) {
-              const [bx, by, bz] = nodeBasePos[i];
-              const orb = orbitRadius[i];
-              const ph = orbitPhase[i];
-              const br = breathPhase[i];
-              let x = bx + orb * Math.cos(t * 0.6 + ph) * breath;
-              let y = by + orb * Math.sin(t * 0.5 + ph * 1.1) * breath;
-              let z = bz + orb * 0.5 * Math.sin(t * 0.4 + br) * breath;
-
-              const nScale = 0.4;
-              x += nScale * noise3D(x * 0.15, y * 0.15, t * 0.3);
-              y += nScale * noise3D(y * 0.15, z * 0.15, t * 0.3);
-              z += nScale * noise3D(z * 0.15, x * 0.15, t * 0.3);
-
-              if (mouseActive) {
-                const dx = x - mouse3D.x;
-                const dy = y - mouse3D.y;
-                const dz = z - mouse3D.z;
-                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                if (dist < MOUSE_RADIUS && dist > 0.01) {
-                  const f = (1 - dist / MOUSE_RADIUS) * MOUSE_STRENGTH;
-                  x += (dx / dist) * f;
-                  y += (dy / dist) * f;
-                  z += (dz / dist) * f;
+            // Connections between adjacent layers (each node → 2–4 random next-layer nodes)
+            const connections: [number, number][] = [];
+            let layerStart = 0;
+            for (let L = 0; L < layerSizes.length - 1; L++) {
+              const nCur = layerSizes[L];
+              const nNext = layerSizes[L + 1];
+              const nextStart = layerStart + nCur;
+              for (let i = 0; i < nCur; i++) {
+                const src = layerStart + i;
+                const k = 2 + Math.floor(Math.random() * 3);
+                const used = new Set<number>();
+                for (let c = 0; c < Math.min(k, nNext); c++) {
+                  let t = Math.floor(Math.random() * nNext);
+                  while (used.has(t)) t = (t + 1) % nNext;
+                  used.add(t);
+                  connections.push([src, nextStart + t]);
                 }
               }
-
-              posArr[i * 3] = x;
-              posArr[i * 3 + 1] = y;
-              posArr[i * 3 + 2] = z;
-              const depth = (z + 14) / 28;
-              const col = isAccent[i] ? secondaryCol : accentCol;
-              const alphaMult = 0.4 + 0.6 * depth;
-              const pulseMult = isAccent[i]
-                ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathPhase[i])
-                : 1;
-              colorArr[i * 3] = col.r * alphaMult * pulseMult;
-              colorArr[i * 3 + 1] = col.g * alphaMult * pulseMult;
-              colorArr[i * 3 + 2] = col.b * alphaMult * pulseMult;
+              layerStart = nextStart;
             }
-            geo.attributes.position.needsUpdate = true;
-            geo.attributes.color!.needsUpdate = true;
 
-            const flowStep = 0.038;
+            const FLOW_TOTAL_CAP = 5000;
+            const flowCount = Math.max(0, FLOW_TOTAL_CAP - nodeCount);
+            const FLOW_WRAP = 20;
+            const flowPosArr = new Float32Array(flowCount * 3);
             for (let fi = 0; fi < flowCount; fi++) {
-              let fx = flowPosArr[fi * 3];
-              let fy = flowPosArr[fi * 3 + 1];
-              let fz = flowPosArr[fi * 3 + 2];
-              fx += flowStep * noise3D(fy * 0.15, fz * 0.15, t * 0.3);
-              fy += flowStep * noise3D(fz * 0.15 + 23.1, fx * 0.15, t * 0.3);
-              fz += flowStep * noise3D(fx * 0.15, fy * 0.15 + 61.4, t * 0.3);
-              if (fx > FLOW_WRAP) fx -= FLOW_WRAP * 2;
-              else if (fx < -FLOW_WRAP) fx += FLOW_WRAP * 2;
-              if (fy > FLOW_WRAP) fy -= FLOW_WRAP * 2;
-              else if (fy < -FLOW_WRAP) fy += FLOW_WRAP * 2;
-              if (fz > FLOW_WRAP) fz -= FLOW_WRAP * 2;
-              else if (fz < -FLOW_WRAP) fz += FLOW_WRAP * 2;
-              flowPosArr[fi * 3] = fx;
-              flowPosArr[fi * 3 + 1] = fy;
-              flowPosArr[fi * 3 + 2] = fz;
+              flowPosArr[fi * 3] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
+              flowPosArr[fi * 3 + 1] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
+              flowPosArr[fi * 3 + 2] = (Math.random() - 0.5) * FLOW_WRAP * 1.8;
             }
-            flowGeo.attributes.position.needsUpdate = true;
+            const flowGeo = new THREE.BufferGeometry();
+            flowGeo.setAttribute(
+              "position",
+              new THREE.BufferAttribute(flowPosArr, 3),
+            );
+            const flowMat = new THREE.PointsMaterial({
+              color: new THREE.Color(accentColor),
+              size: 0.055,
+              sizeAttenuation: true,
+              transparent: true,
+              opacity: 0.22,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+            });
+            const flowPoints = new THREE.Points(flowGeo, flowMat);
+            scene.add(flowPoints);
 
-            for (let c = 0; c < connections.length; c++) {
-              const [a, b] = connections[c];
-              const ax = posArr[a * 3];
-              const ay = posArr[a * 3 + 1];
-              const az = posArr[a * 3 + 2];
-              const bx = posArr[b * 3];
-              const by = posArr[b * 3 + 1];
-              const bz = posArr[b * 3 + 2];
-              linePositions[c * 6] = ax;
-              linePositions[c * 6 + 1] = ay;
-              linePositions[c * 6 + 2] = az;
-              linePositions[c * 6 + 3] = bx;
-              linePositions[c * 6 + 4] = by;
-              linePositions[c * 6 + 5] = bz;
+            const linePositions = new Float32Array(connections.length * 6);
+            const lineColors = new Float32Array(connections.length * 6);
+            const lineGeo = new THREE.BufferGeometry();
+            lineGeo.setAttribute(
+              "position",
+              new THREE.BufferAttribute(linePositions, 3),
+            );
+            lineGeo.setAttribute(
+              "color",
+              new THREE.BufferAttribute(lineColors, 3),
+            );
+            const lineMat = new THREE.LineBasicMaterial({
+              vertexColors: true,
+              transparent: true,
+              opacity: 0.18,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+            });
+            const lines = new THREE.LineSegments(lineGeo, lineMat);
+            scene.add(lines);
 
-              const midX = (ax + bx) * 0.5;
-              const midY = (ay + by) * 0.5;
-              const midZ = (az + bz) * 0.5;
-              const distToMouse = mouseActive
-                ? Math.sqrt(
-                    (midX - mouse3D.x) ** 2 +
-                      (midY - mouse3D.y) ** 2 +
-                      (midZ - mouse3D.z) ** 2,
-                  )
-                : 999;
-              const brighten =
-                distToMouse < MOUSE_RADIUS * 1.5
-                  ? 1 + 0.8 * (1 - distToMouse / (MOUSE_RADIUS * 1.5))
-                  : 1;
-              const flowPhase = (t * 3 + c * 0.1) % 1;
-              const flowPulse = 0.6 + 0.4 * Math.sin(flowPhase * Math.PI * 2);
-              const base = Math.min(1, (0.2 + 0.15 * flowPulse) * brighten);
-              lineColors[c * 6] = accentCol.r * base;
-              lineColors[c * 6 + 1] = accentCol.g * base;
-              lineColors[c * 6 + 2] = accentCol.b * base;
-              lineColors[c * 6 + 3] = accentCol.r * base;
-              lineColors[c * 6 + 4] = accentCol.g * base;
-              lineColors[c * 6 + 5] = accentCol.b * base;
-            }
-            lineGeo.attributes.position.needsUpdate = true;
-            lineGeo.attributes.color!.needsUpdate = true;
+            const posArr = new Float32Array(nodeCount * 3);
+            const colorArr = new Float32Array(nodeCount * 3);
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute("position", new THREE.BufferAttribute(posArr, 3));
+            geo.setAttribute("color", new THREE.BufferAttribute(colorArr, 3));
 
-            camera.position.x += (mouse.x * 2 - camera.position.x * 0.3) * 0.02;
-            camera.position.y +=
-              (-mouse.y * 1.5 - camera.position.y * 0.3) * 0.02;
-            camera.lookAt(0, 0, 0);
+            const accentCol = new THREE.Color(accentColor);
+            const secondaryCol = new THREE.Color(accentSecondary);
+            const mat = new THREE.PointsMaterial({
+              size: 0.18,
+              vertexColors: true,
+              sizeAttenuation: true,
+              transparent: true,
+              opacity: 0.7,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+            });
+            const points = new THREE.Points(geo, mat);
+            scene.add(points);
 
-            renderer.render(scene, camera);
-          };
+            // Mouse interaction
+            const mouse = new THREE.Vector2(-10, -10);
+            const mouse3D = new THREE.Vector3(0, 0, 0);
+            const raycaster = new THREE.Raycaster();
+            const plane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+            const intersect = new THREE.Vector3();
+            const onDocMouseMove = (e: MouseEvent) => {
+              mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+              mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            };
+            const onDocMouseLeave = () => {
+              mouse.x = -10;
+              mouse.y = -10;
+            };
+            document.addEventListener("mousemove", onDocMouseMove);
+            document.addEventListener("mouseleave", onDocMouseLeave);
 
-          canvas.style.opacity = "1";
-          canvas.style.transition = "opacity 1.5s ease-out";
-          animate(performance.now());
+            // Mouse glow sprite
+            const glowGeo = new THREE.BufferGeometry();
+            glowGeo.setAttribute(
+              "position",
+              new THREE.Float32BufferAttribute([0, 0, 0], 3),
+            );
+            const glowMat = new THREE.PointsMaterial({
+              size: 4,
+              color: new THREE.Color(accentColor),
+              transparent: true,
+              opacity: 0.15,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+              sizeAttenuation: true,
+            });
+            const glowPoint = new THREE.Points(glowGeo, glowMat);
+            glowPoint.visible = false;
+            scene.add(glowPoint);
 
-          const onResize = () => {
-            camera.aspect = w() / h();
-            camera.updateProjectionMatrix();
-            renderer.setSize(w(), h());
-          };
-          window.addEventListener("resize", onResize);
+            const MOUSE_RADIUS = 8;
+            const MOUSE_STRENGTH = 0.015;
+            const FRAME_INTERVAL = 1000 / 60;
+            let lastFrame = 0;
+            let animId: number;
 
-          const cleanObs = new IntersectionObserver(
-            (entries) => {
-              if (!entries[0]?.isIntersecting) {
-                cancelAnimationFrame(animId);
-              } else {
-                lastFrame = 0;
-                animate(performance.now());
+            const animate = (now: number) => {
+              animId = requestAnimationFrame(animate);
+              if (now - lastFrame < FRAME_INTERVAL) return;
+              lastFrame = now;
+              const t = now * 0.001;
+              const breath = 1 + 0.04 * Math.sin(t * 0.8);
+
+              raycaster.setFromCamera(mouse, camera);
+              raycaster.ray.intersectPlane(plane, intersect);
+              mouse3D.copy(intersect);
+              const mouseActive =
+                mouse.x > -2 && mouse.x < 2 && mouse.y > -2 && mouse.y < 2;
+              glowPoint.visible = mouseActive;
+              if (mouseActive) {
+                glowPoint.position.copy(mouse3D);
               }
-            },
-            { threshold: 0 },
-          );
-          cleanObs.observe(canvas);
+
+              for (let i = 0; i < nodeCount; i++) {
+                const [bx, by, bz] = nodeBasePos[i];
+                const orb = orbitRadius[i];
+                const ph = orbitPhase[i];
+                const br = breathPhase[i];
+                let x = bx + orb * Math.cos(t * 0.6 + ph) * breath;
+                let y = by + orb * Math.sin(t * 0.5 + ph * 1.1) * breath;
+                let z = bz + orb * 0.5 * Math.sin(t * 0.4 + br) * breath;
+
+                const nScale = 0.4;
+                x += nScale * noise3D(x * 0.15, y * 0.15, t * 0.3);
+                y += nScale * noise3D(y * 0.15, z * 0.15, t * 0.3);
+                z += nScale * noise3D(z * 0.15, x * 0.15, t * 0.3);
+
+                if (mouseActive) {
+                  const dx = x - mouse3D.x;
+                  const dy = y - mouse3D.y;
+                  const dz = z - mouse3D.z;
+                  const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                  if (dist < MOUSE_RADIUS && dist > 0.01) {
+                    const f = (1 - dist / MOUSE_RADIUS) * MOUSE_STRENGTH;
+                    x += (dx / dist) * f;
+                    y += (dy / dist) * f;
+                    z += (dz / dist) * f;
+                  }
+                }
+
+                posArr[i * 3] = x;
+                posArr[i * 3 + 1] = y;
+                posArr[i * 3 + 2] = z;
+                const depth = (z + 14) / 28;
+                const col = isAccent[i] ? secondaryCol : accentCol;
+                const alphaMult = 0.4 + 0.6 * depth;
+                const pulseMult = isAccent[i]
+                  ? 0.7 + 0.3 * Math.sin(t * 2.2 + breathPhase[i])
+                  : 1;
+                colorArr[i * 3] = col.r * alphaMult * pulseMult;
+                colorArr[i * 3 + 1] = col.g * alphaMult * pulseMult;
+                colorArr[i * 3 + 2] = col.b * alphaMult * pulseMult;
+              }
+              geo.attributes.position.needsUpdate = true;
+              geo.attributes.color!.needsUpdate = true;
+
+              const flowStep = 0.038;
+              for (let fi = 0; fi < flowCount; fi++) {
+                let fx = flowPosArr[fi * 3];
+                let fy = flowPosArr[fi * 3 + 1];
+                let fz = flowPosArr[fi * 3 + 2];
+                fx += flowStep * noise3D(fy * 0.15, fz * 0.15, t * 0.3);
+                fy += flowStep * noise3D(fz * 0.15 + 23.1, fx * 0.15, t * 0.3);
+                fz += flowStep * noise3D(fx * 0.15, fy * 0.15 + 61.4, t * 0.3);
+                if (fx > FLOW_WRAP) fx -= FLOW_WRAP * 2;
+                else if (fx < -FLOW_WRAP) fx += FLOW_WRAP * 2;
+                if (fy > FLOW_WRAP) fy -= FLOW_WRAP * 2;
+                else if (fy < -FLOW_WRAP) fy += FLOW_WRAP * 2;
+                if (fz > FLOW_WRAP) fz -= FLOW_WRAP * 2;
+                else if (fz < -FLOW_WRAP) fz += FLOW_WRAP * 2;
+                flowPosArr[fi * 3] = fx;
+                flowPosArr[fi * 3 + 1] = fy;
+                flowPosArr[fi * 3 + 2] = fz;
+              }
+              flowGeo.attributes.position.needsUpdate = true;
+
+              for (let c = 0; c < connections.length; c++) {
+                const [a, b] = connections[c];
+                const ax = posArr[a * 3];
+                const ay = posArr[a * 3 + 1];
+                const az = posArr[a * 3 + 2];
+                const bx = posArr[b * 3];
+                const by = posArr[b * 3 + 1];
+                const bz = posArr[b * 3 + 2];
+                linePositions[c * 6] = ax;
+                linePositions[c * 6 + 1] = ay;
+                linePositions[c * 6 + 2] = az;
+                linePositions[c * 6 + 3] = bx;
+                linePositions[c * 6 + 4] = by;
+                linePositions[c * 6 + 5] = bz;
+
+                const midX = (ax + bx) * 0.5;
+                const midY = (ay + by) * 0.5;
+                const midZ = (az + bz) * 0.5;
+                const distToMouse = mouseActive
+                  ? Math.sqrt(
+                      (midX - mouse3D.x) ** 2 +
+                        (midY - mouse3D.y) ** 2 +
+                        (midZ - mouse3D.z) ** 2,
+                    )
+                  : 999;
+                const brighten =
+                  distToMouse < MOUSE_RADIUS * 1.5
+                    ? 1 + 0.8 * (1 - distToMouse / (MOUSE_RADIUS * 1.5))
+                    : 1;
+                const flowPhase = (t * 3 + c * 0.1) % 1;
+                const flowPulse = 0.6 + 0.4 * Math.sin(flowPhase * Math.PI * 2);
+                const base = Math.min(1, (0.2 + 0.15 * flowPulse) * brighten);
+                lineColors[c * 6] = accentCol.r * base;
+                lineColors[c * 6 + 1] = accentCol.g * base;
+                lineColors[c * 6 + 2] = accentCol.b * base;
+                lineColors[c * 6 + 3] = accentCol.r * base;
+                lineColors[c * 6 + 4] = accentCol.g * base;
+                lineColors[c * 6 + 5] = accentCol.b * base;
+              }
+              lineGeo.attributes.position.needsUpdate = true;
+              lineGeo.attributes.color!.needsUpdate = true;
+
+              camera.position.x +=
+                (mouse.x * 2 - camera.position.x * 0.3) * 0.02;
+              camera.position.y +=
+                (-mouse.y * 1.5 - camera.position.y * 0.3) * 0.02;
+              camera.lookAt(0, 0, 0);
+
+              renderer.render(scene, camera);
+            };
+
+            canvas.style.opacity = "1";
+            canvas.style.transition = "opacity 1.5s ease-out";
+            animate(performance.now());
+
+            const onResize = () => {
+              camera.aspect = w() / h();
+              camera.updateProjectionMatrix();
+              renderer.setSize(w(), h());
+            };
+            window.addEventListener("resize", onResize);
+
+            const cleanObs = new IntersectionObserver(
+              (entries) => {
+                if (!entries[0]?.isIntersecting) {
+                  cancelAnimationFrame(animId);
+                } else {
+                  lastFrame = 0;
+                  animate(performance.now());
+                }
+              },
+              { threshold: 0 },
+            );
+            cleanObs.observe(canvas);
+
+            const disposeWebGL = () => {
+              cancelAnimationFrame(animId);
+              cleanObs.disconnect();
+              window.removeEventListener("resize", onResize);
+              document.removeEventListener("mousemove", onDocMouseMove);
+              document.removeEventListener("mouseleave", onDocMouseLeave);
+              renderer.dispose();
+              scene.traverse((obj: any) => {
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) {
+                  if (Array.isArray(obj.material))
+                    obj.material.forEach((m: any) => m.dispose());
+                  else obj.material.dispose();
+                }
+              });
+            };
+            window.addEventListener("pagehide", disposeWebGL, { once: true });
+          } catch (e) {
+            void e;
+            canvas.style.display = "none";
+          }
         }
       }
     </script>
@@ -4061,7 +3965,7 @@ const chapterCount = 15;
           if (!c) return;
           var el = e.target;
           if (!el || typeof el.closest !== "function") return;
-          var card = el.closest(".proof-item, .feature-card");
+          var card = el.closest(".proof-item");
           if (!card) return;
           if (e.relatedTarget instanceof Node && card.contains(e.relatedTarget))
             return;
@@ -4072,5 +3976,29 @@ const chapterCount = 15;
         });
       })();
     </script>
+    <!-- Web Vitals RUM: uncomment and configure sendBeacon endpoint when ready
+    <script is:inline>
+      (function () {
+        if (location.hostname === "localhost") return;
+        var s = document.createElement("script");
+        s.src = "https://unpkg.com/web-vitals@4/dist/web-vitals.iife.js";
+        s.onload = function () {
+          var wv = window.webVitals;
+          if (!wv) return;
+          var send = function (m) {
+            navigator.sendBeacon("/api/vitals", JSON.stringify({
+              name: m.name,
+              value: Math.round(m.name === "CLS" ? m.value * 1000 : m.value),
+              rating: m.rating,
+              path: location.pathname,
+            }));
+          };
+          wv.onCLS(send); wv.onINP(send); wv.onLCP(send);
+          wv.onFCP(send); wv.onTTFB(send);
+        };
+        document.head.appendChild(s);
+      })();
+    </script>
+    -->
   </body>
 </html>

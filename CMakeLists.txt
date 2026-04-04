@@ -251,9 +251,10 @@ if(HU_ENABLE_ALL_CHANNELS)
         src/channels/qq.c
         src/channels/maixcam.c
         src/channels/dispatch.c
-        src/channels/gmail_base64.c
-        src/channels/gmail.c
     )
+    if(NOT HU_ENABLE_GMAIL)
+        list(APPEND CHANNEL_SOURCES src/channels/gmail_base64.c src/channels/gmail.c)
+    endif()
 endif()
 
 # --- Memory engine sources (conditionally added) ---
@@ -306,6 +307,7 @@ set(HU_CORE_SOURCES
     src/core/string.c
     src/core/json.c
     src/core/http.c
+    src/core/vertex_auth.c
     src/core/process_util.c
     src/sse/sse_client.c
     src/websocket/websocket.c
@@ -426,6 +428,8 @@ set(HU_CORE_SOURCES
     src/agent/context.c
     src/agent/prompt.c
     src/agent/memory_loader.c
+    src/agent/agent_definition.c
+    src/agent/agent_git.c
     src/agent/dispatcher.c
     src/agent/compaction.c
     src/agent/spawn.c
@@ -536,6 +540,7 @@ set(HU_CORE_SOURCES
     src/agent/compaction_structured.c
     src/agent/session_persist.c
     src/agent/instruction_discover.c
+    src/agent/self_improve.c
     src/providers/error_classify.c
     src/providers/api_key.c
     src/providers/helpers.c
@@ -663,6 +668,7 @@ set(HU_CORE_SOURCES
     src/tools/report.c
     src/tools/broadcast.c
     src/tools/send_message.c
+    src/tools/send_voice_message.c
     src/tools/calendar.c
     src/tools/skill_write.c
     src/tools/pwa.c
@@ -686,6 +692,9 @@ set(HU_CORE_SOURCES
     src/tools/homeassistant.c
     src/tools/diff.c
     src/tools/voice_clone.c
+    src/tools/media_image.c
+    src/tools/media_video.c
+    src/tools/media_gif.c
     src/tools/factory.c
     src/tools/mcp_resource_tools.c
     src/tools/cron_session_tools.c
@@ -797,6 +806,7 @@ list(APPEND HU_CORE_SOURCES
     src/a2a.c
     src/eval.c
     src/eval/turing_score.c
+    src/eval/turing_adversarial.c
     src/eval_judge.c
     src/eval_benchmarks.c
     src/mcp_resources.c
@@ -824,6 +834,7 @@ list(APPEND HU_CORE_SOURCES
     src/voice/webrtc_dtls.c
     src/voice/webrtc_srtp.c
     src/voice/realtime.c
+    src/voice/gemini_live.c
     src/voice/duplex.c
     src/voice/session.c
     src/voice/turn_signal.c
@@ -926,6 +937,7 @@ endif()
 list(APPEND HU_CORE_SOURCES src/tts/cartesia.c)
 list(APPEND HU_CORE_SOURCES src/tts/cartesia_stream.c)
 list(APPEND HU_CORE_SOURCES src/tts/voice_clone.c)
+list(APPEND HU_CORE_SOURCES src/tts/transcript_prep.c)
 
 # Cartesia full pipeline (requires libcurl for API calls)
 if(HU_ENABLE_CARTESIA)
@@ -992,12 +1004,14 @@ if(HU_ENABLE_SKILLS)
         src/skills.c
         src/skills/skill_scaffold.c
         src/tools/skill_run.c
-        src/intelligence/skills.c
         src/intelligence/reflection.c
         src/intelligence/feedback.c
         src/intelligence/meta_learning.c
         src/intelligence/cycle.c
     )
+    if(NOT HU_ENABLE_SQLITE)
+        list(APPEND HU_CORE_SOURCES src/intelligence/skills.c)
+    endif()
 endif()
 
 # Cron scheduler (cron.c and crontab.c are in HU_CORE_SOURCES unconditionally)
@@ -1111,6 +1125,9 @@ endif()
 set(HU_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${HU_ROOT}/include)
 include_directories(${HU_ROOT}/asm/generic)
+
+# Deduplicate source lists to prevent parallel build races
+list(REMOVE_DUPLICATES HU_CORE_SOURCES)
 
 # --- Core static library ---
 add_library(human_core STATIC ${HU_CORE_SOURCES} ${HU_CRYPTO_SOURCES} ${HU_ASM_SOURCES})
@@ -1914,6 +1931,8 @@ enable_testing()
 
 set(HU_TEST_SOURCES
     tests/test_main.c
+    tests/test_agent_definition.c
+    tests/test_agent_git.c
     tests/test_agent_modules.c
     tests/test_tot_recursive.c
     tests/test_agent_subsystems.c
@@ -1941,6 +1960,8 @@ set(HU_TEST_SOURCES
     tests/test_channel.c
     tests/test_channel_format.c
     tests/test_channel_rate_limit.c
+    tests/test_channel_http.c
+    tests/test_webhook_channel.c
     tests/test_tool.c
     tests/test_webhook.c
     tests/test_peripheral.c
@@ -1992,7 +2013,9 @@ set(HU_TEST_SOURCES
     tests/test_sota_wiring.c
     tests/test_sota_live_wiring.c
     tests/test_voice_rt_openai.c
+    tests/test_voice_provider.c
     tests/test_voice_session.c
+    tests/test_gemini_live.c
     tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c
@@ -2129,6 +2152,7 @@ set(HU_TEST_SOURCES
     tests/test_theory_of_mind.c
     tests/test_anticipatory.c
     tests/test_visual_content.c
+    tests/test_media_gen.c
     tests/test_opinions.c
     tests/test_life_chapters.c
     tests/test_social_graph.c
@@ -2191,6 +2215,9 @@ endif()
 list(APPEND HU_TEST_SOURCES tests/test_cartesia.c)
 list(APPEND HU_TEST_SOURCES tests/test_cartesia_stream.c)
 list(APPEND HU_TEST_SOURCES tests/test_voice_clone.c)
+list(APPEND HU_TEST_SOURCES tests/test_transcript_prep.c)
+list(APPEND HU_TEST_SOURCES tests/test_send_voice_message.c)
+list(APPEND HU_TEST_SOURCES tests/test_voice_message_integration.c)
 if(HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_SOURCES tests/test_audio_pipeline.c tests/test_voice_decision.c tests/test_emotion_map.c)
 endif()
@@ -2224,6 +2251,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_a2a.c
     tests/test_eval.c
     tests/test_turing_score.c
+    tests/test_turing_adversarial.c
     tests/test_eval_judge.c
     tests/test_eval_benchmarks.c
     tests/test_token_budget.c
@@ -2294,7 +2322,8 @@ list(APPEND HU_TEST_SOURCES
 
 add_executable(human_tests ${HU_TEST_SOURCES} wasm/wasm_alloc.c src/bootstrap.c)
 target_link_libraries(human_tests human_core_test)
-target_include_directories(human_tests PRIVATE ${HU_ROOT}/tests ${HU_ROOT}/src/gateway)
+target_include_directories(human_tests PRIVATE ${HU_ROOT}/tests ${HU_ROOT}/src/gateway
+    ${HU_ROOT}/src/channels)
 target_compile_definitions(human_tests PRIVATE "HU_EVAL_SUITES_DIR=\"${HU_ROOT}/eval_suites\"")
 # HU_HAS_PERSONA always set for tests: test lib has persona (main or extra), struct layout must match
 target_compile_definitions(human_tests PRIVATE HU_IS_TEST=1 HU_GATEWAY_TEST_MODE=1 HU_HAS_NONE_ENGINE=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1 HU_HAS_RUNTIME_EXOTIC=1)

@@ -29,7 +29,7 @@ Key extension points:
 - `src/persona/` — persona system (profile loading, prompt builder, example selection)
 - `src/ml/` — on-device ML training (BPE, GPT, DPO, LoRA, feed predictor) — `HU_ENABLE_ML`
 
-Current scale: **1233 source + header files, ~290K lines of C, ~120K lines of tests, 7104 tests, 38 channels**.
+Current scale: **~1,330 source + header files, ~290K lines of C, ~144K lines of tests, 8,500+ tests, 31 channels**.
 
 Performance baseline (macOS aarch64, MinSizeRel+LTO):
 
@@ -77,7 +77,7 @@ These codebase realities should drive every design decision:
    - All code compiles with `-Wall -Wextra -Wpedantic -Werror`.
    - Use `HU_IS_TEST` guards to bypass side effects (spawning, opening URLs, real hardware I/O).
 
-5. **All 7104+ tests must pass at zero ASan errors**
+5. **All 8,500+ tests must pass at zero ASan errors**
    - The test suite uses AddressSanitizer for leak and overflow detection.
    - Every allocation must be freed (`free()` or cleanup function).
    - Use `HU_IS_TEST` mock paths in tests — no network, no process spawning.
@@ -96,9 +96,9 @@ Summary: **KISS** (straightforward control flow, explicit `#ifdef`), **YAGNI** (
 src/
   main.c                CLI entrypoint and command routing
   agent/                agent loop, context, planner, compaction, dispatcher
-  channels/             38 channel implementations (cli, telegram, discord, slack, ...)
+  channels/             31 channel implementations (cli, telegram, discord, slack, ...)
   providers/            50+ AI provider implementations (9 core + 41 compatible services)
-  tools/                83 tool implementations
+  tools/                87 tool implementations
   memory/               SQLite + markdown + LRU + LanceDB + Lucid backends, embeddings, vector search, connections, consolidation, multimodal ingest
   security/             policy, pairing, secrets, sandbox backends (landlock, firejail, bwrap)
   runtime/              runtime adapters (native, docker, wasm, cloudflare)
@@ -119,13 +119,13 @@ src/
 
 include/human/       public C headers
 
-tests/                 336 test files, 7104+ tests
+tests/                 423 test files, 8,500+ tests
 
 apps/                  iOS, macOS, Android, shared (4 app directories)
 
 asm/                   platform-specific assembly (aarch64, x86_64, generic C)
 
-fuzz/                  17 libFuzzer harnesses
+fuzz/                  31 libFuzzer harnesses
 
 archive/zig-reference/ archived Zig source (build.zig, src/)
 ```

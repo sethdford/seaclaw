@@ -47,7 +47,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        PKGS="libsqlite3-dev"
+        PKGS="libsqlite3-dev ccache"
         if [ "${{ inputs.enable-curl }}" = "true" ]; then PKGS="$PKGS libcurl4-openssl-dev"; fi
         if [ -n "${{ inputs.extra-apt }}" ]; then PKGS="$PKGS ${{ inputs.extra-apt }}"; fi
         sudo apt-get install -y $PKGS
@@ -55,7 +55,21 @@ runs:
     - name: Install dependencies (macOS)
       if: runner.os == 'macOS'
       shell: bash
-      run: brew install sqlite3
+      run: brew install sqlite3 ccache
+
+    - name: Cache ccache
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/ccache
+        key: ${{ runner.os }}-ccache-${{ hashFiles('src/**', 'include/**') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
+    - name: Configure ccache
+      shell: bash
+      run: |
+        ccache --set-config=max_size=500M
+        ccache --zero-stats
 
     - name: Configure
       shell: bash
@@ -65,7 +79,7 @@ runs:
         fi
         mkdir -p ${{ inputs.build-dir }} && cd ${{ inputs.build-dir }}
         rm -f CMakeCache.txt
-        CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}"
+        CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=${{ inputs.build-type }} -DCMAKE_C_COMPILER_LAUNCHER=ccache"
         if [ "${{ inputs.enable-asan }}" = "true" ]; then CMAKE_FLAGS="$CMAKE_FLAGS -DHU_ENABLE_ASAN=ON"; fi
         if [ "${{ inputs.enable-curl }}" = "true" ]; then CMAKE_FLAGS="$CMAKE_FLAGS -DHU_ENABLE_CURL=ON"; fi
         if [ "${{ inputs.enable-all-channels }}" = "true" ]; then CMAKE_FLAGS="$CMAKE_FLAGS -DHU_ENABLE_ALL_CHANNELS=ON"; fi
@@ -84,3 +98,7 @@ runs:
         TARGET_FLAG=""
         if [ -n "${{ inputs.target }}" ]; then TARGET_FLAG="--target ${{ inputs.target }}"; fi
         cmake --build ${{ inputs.build-dir }} $TARGET_FLAG -j$(nproc 2>/dev/null || sysctl -n hw.logicalcpu)
+
+    - name: ccache stats
+      shell: bash
+      run: ccache --show-stats

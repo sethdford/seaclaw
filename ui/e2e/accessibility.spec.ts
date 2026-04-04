@@ -70,9 +70,7 @@ test.describe("Accessibility", () => {
     await page.goto("/");
     // Use Meta+k on Mac, Control+k elsewhere (app accepts both)
     await page.keyboard.press(process.platform === "darwin" ? "Meta+k" : "Control+k");
-    await expect(
-      page.locator("hu-command-palette input, hu-command-palette [role='listbox']"),
-    ).toBeVisible({
+    await expect(page.locator("hu-command-palette input[role='combobox']")).toBeVisible({
       timeout: 5000,
     });
     await page.keyboard.type("chat");
@@ -82,12 +80,11 @@ test.describe("Accessibility", () => {
 
   test("modal traps focus", async ({ page }) => {
     await page.goto("/?demo");
+    await page.waitForLoadState("domcontentloaded");
     await page.keyboard.press(process.platform === "darwin" ? "Meta+k" : "Control+k");
-    await expect(
-      page.locator("hu-command-palette input, hu-command-palette [role='listbox']"),
-    ).toBeVisible({
-      timeout: 5000,
-    });
+    const paletteInput = page.locator("hu-command-palette input[role='combobox']");
+    await expect(paletteInput).toBeVisible({ timeout: 5000 });
+    await paletteInput.focus();
     await page.keyboard.press("Escape");
     await expect(page.locator("hu-command-palette input")).not.toBeVisible();
   });

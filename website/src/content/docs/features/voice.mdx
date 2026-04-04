@@ -1,36 +1,82 @@
 ---
 title: Voice Channel
-description: Real-time voice interaction with Human using speech-to-text and text-to-speech
+description: Real-time voice interaction with Human using speech-to-text, text-to-speech, and native multimodal voice
 ---
 
-Human supports real-time voice interaction through the built-in voice channel, enabling hands-free conversations with your AI assistant.
+Human supports real-time voice interaction through the built-in voice channel and the web dashboard, enabling hands-free conversations with your AI assistant.
 
 ## Overview
 
 The voice channel provides:
 
 - **Speech-to-text (STT)** — converts spoken audio to text for processing
-- **Text-to-speech (TTS)** — reads responses aloud
+- **Text-to-speech (TTS)** — reads responses aloud via Cartesia streaming
+- **Gemini Live** — native end-to-end voice via Google's Multimodal Live API (no STT/TTS pipeline)
 - **WebSocket streaming** — low-latency bidirectional audio
-- **VAD (Voice Activity Detection)** — automatic speech boundary detection
+- **Manual VAD** — client-managed voice activity detection for precise turn-taking
+- **Affective dialog** — emotion-aware responses that match user tone (Gemini Live)
+
+## Modes
+
+| Mode                    | How it works                          | Latency |
+| ----------------------- | ------------------------------------- | ------- |
+| **Standard (Cartesia)** | Mic → STT → Agent → TTS → Speaker     | Medium  |
+| **Gemini Live**         | Mic → Gemini 3.1 Flash Live → Speaker | Low     |
+| **Realtime**            | OpenAI Realtime API (full-duplex)     | Low     |
 
 ## Configuration
 
-Enable voice in your `config.json`:
+Voice settings live under the top-level `voice` key in `config.json`:
 
 ```json
 {
-  "channels": {
-    "voice": {
-      "enabled": true,
-      "stt_provider": "whisper",
-      "tts_provider": "openai",
-      "vad_threshold": 0.5,
-      "sample_rate": 16000
-    }
+  "voice": {
+    "mode": "gemini_live",
+    "realtime_model": "gemini-3.1-flash-live-preview",
+    "realtime_voice": "Puck",
+    "tts_provider": "cartesia",
+    "tts_voice": "your-voice-id",
+    "tts_model": "sonic-2",
+    "stt_provider": "whisper",
+    "stt_model": "whisper-1"
   }
 }
 ```
+
+### Gemini Live with Vertex AI
+
+For production use with Vertex AI (recommended):
+
+```json
+{
+  "voice": {
+    "mode": "gemini_live",
+    "realtime_model": "gemini-3.1-flash-live-preview",
+    "realtime_voice": "Kore",
+    "vertex_region": "us-central1",
+    "vertex_project": "your-project-id",
+    "vertex_access_token": ""
+  }
+}
+```
+
+When `vertex_region` and `vertex_project` are set, Human uses the Vertex AI endpoint with Application Default Credentials (ADC). Leave `vertex_access_token` empty to use ADC automatically, or provide a pre-fetched OAuth2 token.
+
+### Voice Configuration Fields
+
+| Field                 | Description                                               | Default                         |
+| --------------------- | --------------------------------------------------------- | ------------------------------- |
+| `mode`                | Voice mode: `gemini_live`, `realtime`, `sonata`, `webrtc` | —                               |
+| `realtime_model`      | Model for Gemini Live or OpenAI Realtime                  | `gemini-3.1-flash-live-preview` |
+| `realtime_voice`      | Voice name for the realtime model                         | `Puck`                          |
+| `tts_provider`        | TTS provider for standard mode                            | —                               |
+| `tts_voice`           | Voice ID for Cartesia TTS                                 | —                               |
+| `tts_model`           | TTS model name                                            | —                               |
+| `stt_provider`        | STT provider for standard mode                            | —                               |
+| `stt_model`           | STT model name                                            | —                               |
+| `vertex_region`       | Vertex AI region (enables Vertex endpoint)                | —                               |
+| `vertex_project`      | Vertex AI project ID                                      | —                               |
+| `vertex_access_token` | Pre-fetched OAuth2 token (empty = use ADC)                | —                               |
 
 ## Build Flag
 
@@ -42,13 +88,14 @@ cmake .. -DHU_ENABLE_VOICE=ON
 
 ## Supported Providers
 
-| Provider       | STT | TTS | Notes           |
-| -------------- | --- | --- | --------------- |
-| OpenAI Whisper | ✓   | —   | Best accuracy   |
-| OpenAI TTS     | —   | ✓   | Multiple voices |
-| Deepgram       | ✓   | —   | Low latency     |
-| ElevenLabs     | —   | ✓   | Premium voices  |
+| Provider       | STT    | TTS    | Notes                                 |
+| -------------- | ------ | ------ | ------------------------------------- |
+| Gemini Live    | Native | Native | End-to-end multimodal, lowest latency |
+| OpenAI Whisper | ✓      | —      | Best transcription accuracy           |
+| Cartesia       | —      | ✓      | Streaming TTS with emotion controls   |
+| OpenAI TTS     | —      | ✓      | Multiple voices                       |
+| Deepgram       | ✓      | —      | Low latency                           |
 
 ## Security
 
-Audio data is streamed directly to the configured provider and is **not** stored locally. All connections use TLS.
+Audio data is streamed directly to the configured provider and is **not** stored locally. All connections use TLS. Gemini Live uses Vertex AI with ADC for production authentication — API keys are supported for development only.
