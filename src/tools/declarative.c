@@ -295,6 +295,7 @@ static hu_error_t decl_execute(void *ctx, hu_allocator_t *alloc, const hu_json_v
         return HU_OK;
 #endif
     }
+    return HU_ERR_NOT_SUPPORTED;
 }
 
 static const hu_tool_vtable_t declarative_vtable = {
