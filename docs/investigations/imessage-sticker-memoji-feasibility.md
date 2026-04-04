@@ -91,3 +91,19 @@ Sending stickers is not feasible. The agent can use emoji, tapbacks, and text al
 ## Conclusion
 
 **Read-side sticker detection is feasible and recommended.** The `balloon_bundle_id` field provides reliable identification. Send-side sticker support is not possible via any public API. Priority: Medium — addresses a real user experience gap in conversations with sticker-heavy users.
+
+---
+
+## Update (2026-04-04)
+
+**Phase 1 (read-side sticker detection) is now implemented:**
+
+- `hu_imessage_poll()` now reads `balloon_bundle_id` from chat.db (column 11 in the poll query)
+- Detection logic: if text is NULL/empty and `balloon_bundle_id` is present:
+  - Contains "Sticker" or "sticker" → content set to `[Sticker]`
+  - Contains "Animoji", "animoji", "Memoji", or "memoji" → content set to `[Memoji]`
+  - Other non-NULL → content set to `[iMessage App]`
+- WHERE clause updated to include `OR (m.balloon_bundle_id IS NOT NULL)` to catch sticker messages
+- Agent now has context to respond appropriately to sticker messages
+
+Phase 2 (send-side) remains not feasible. No change from original conclusion.

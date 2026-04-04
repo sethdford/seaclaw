@@ -41,7 +41,7 @@ Generated from designated initializers in each `src/channels/*.c` vtable. **hist
  * google_chat    |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * google_rcs     |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * imap           |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
- * imessage       |  ✓   |    ✓    |   ✓   |      ✓       |   ·    |     ✓
+ * imessage       |  ✓   |    ✓    |   ✓   |      ✓       |   ✓    |     ✓
  * instagram      |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
  * irc            |  ✓   |    ✓    |   ·   |      ·       |   ·    |     ·
  * lark           |  ✓   |    ·    |   ·   |      ·       |   ·    |     ·
@@ -66,12 +66,17 @@ Generated from designated initializers in each `src/channels/*.c` vtable. **hist
  * whatsapp       |  ✓   |    ·    |   ✓   |      ✓       |   ✓    |     ✓
  *
  * **imap**: `hu_imap_poll` uses libcurl IMAP (SEARCH UNSEEN + FETCH) when `HU_HTTP_CURL`; `send` uses libcurl SMTP when `smtp_host` is configured, else in-memory outbox. `health_check` runs IMAP NOOP (non-test, libcurl builds).
- * **imessage platform limitations** (no public API):
- *   - Typing indicators: no AppleScript/JXA API (IMCore private framework only)
- *   - Inline replies: no AppleScript verb for threaded reply-to-specific-message
+ * **imessage platform capabilities & limitations**:
+ *   - Typing indicators: AX-based (focus Messages.app input via System Events to trigger real "..." bubble; requires Accessibility permission)
+ *   - Sticker/Memoji detection: read-side via balloon_bundle_id in chat.db (poll shows [Sticker], [Memoji], or [iMessage App])
+ *   - Message effects detection: read-side via expressive_send_style_id (poll shows [Sent with Slam], [Sent with Confetti], etc.)
+ *   - Tapback send: JXA+AX (opt-in HU_IMESSAGE_TAPBACK_ENABLED) OR imsg CLI (auto-detected on $PATH, no AX needed)
+ *   - imsg CLI send: opt-in via HU_IMESSAGE_SEND_IMSG, faster (<1s vs 2-5s AppleScript), graceful fallback
+ *   - Inline replies: no AppleScript verb for threaded reply-to-specific-message (read-side works via thread_originator_guid)
  *   - Message editing: no public API (IMCore only; uses *correction pattern instead)
- *   - Unsend: AX/UI automation only, fragile, 2-min window (opt-in via HU_IMESSAGE_TAPBACK_ENABLED)
- *   - Stickers: iMessage sticker packs have no automation API
+ *   - Unsend: AX/UI automation only, fragile, 2-min window (not recommended)
+ *   - Sticker/Memoji send: no automation API (read-side only)
+ *   - Message effects send: no public API (read-side only)
  *   - See docs/investigations/imessage-*.md for detailed feasibility reports
  * Teams typing/react/history stubs are test-mode no-ops unless Microsoft Graph is wired.
  * Channels without human_active_recently: daemon cannot suppress messages

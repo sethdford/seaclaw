@@ -76,10 +76,11 @@ static hu_owned_message_t *build_messages(hu_allocator_t *alloc, const uint8_t *
                 size_t nlen = 8;
                 if (offset + nlen > size) nlen = size - offset;
                 if (nlen > 0) {
-                    msgs[i].tool_calls[0].name = (char *)alloc->alloc(alloc->ctx, nlen + 1);
-                    if (msgs[i].tool_calls[0].name) {
-                        memcpy(msgs[i].tool_calls[0].name, data + offset, nlen);
-                        msgs[i].tool_calls[0].name[nlen] = '\0';
+                    char *tname = (char *)alloc->alloc(alloc->ctx, nlen + 1);
+                    if (tname) {
+                        memcpy(tname, data + offset, nlen);
+                        tname[nlen] = '\0';
+                        msgs[i].tool_calls[0].name = tname;
                         msgs[i].tool_calls[0].name_len = nlen;
                     }
                 }

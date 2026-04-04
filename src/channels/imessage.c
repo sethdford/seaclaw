@@ -111,6 +111,8 @@ typedef struct hu_imessage_ctx {
     size_t sent_ring_idx;
     char typing_last_target[128];
     size_t typing_last_target_len;
+    bool imsg_cli_checked;
+    bool has_imsg_cli;
 #if HU_IS_TEST
     char last_message[4096];
     size_t last_message_len;
@@ -216,6 +218,28 @@ bool hu_imessage_user_responded_recently(void *channel_ctx, const char *handle, 
 }
 #endif
 #endif
+
+/* Check if the imsg CLI (steipete/imsg) is available on $PATH.
+ * Caches the result after first check. Requires HU_IS_TEST=0. */
+static bool imsg_cli_available(hu_imessage_ctx_t *c) {
+    if (!c || !c->alloc)
+        return false;
+    if (c->imsg_cli_checked)
+        return c->has_imsg_cli;
+    c->imsg_cli_checked = true;
+    c->has_imsg_cli = false;
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+    const char *argv[] = {"which", "imsg", NULL};
+    hu_run_result_t result = {0};
+    hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
+    if (err == HU_OK && result.success && result.exit_code == 0)
+        c->has_imsg_cli = true;
+    hu_run_result_free(c->alloc, &result);
+    if (c->has_imsg_cli && getenv("HU_DEBUG"))
+        hu_log_info("imessage", NULL, "imsg CLI detected on $PATH");
+#endif
+    return c->has_imsg_cli;
+}
 
 static hu_error_t imessage_start(void *ctx) {
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
@@ -528,6 +552,31 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
             }
         }
 
+#ifdef HU_IMESSAGE_SEND_IMSG
+        /* Try imsg CLI first for faster, more reliable sending */
+        if (imsg_cli_available(c)) {
+            char tgt_buf[256];
+            size_t tb = tgt_len < sizeof(tgt_buf) - 1 ? tgt_len : sizeof(tgt_buf) - 1;
+            memcpy(tgt_buf, tgt, tb);
+            tgt_buf[tb] = '\0';
+            const char *imsg_argv[] = {
+                "imsg", "send", "--to", tgt_buf, "--text", message,
+                "--service", "imessage", NULL};
+            hu_run_result_t imsg_result = {0};
+            hu_error_t imsg_err =
+                hu_process_run(c->alloc, imsg_argv, NULL, 65536, &imsg_result);
+            bool imsg_ok =
+                (imsg_err == HU_OK && imsg_result.success && imsg_result.exit_code == 0);
+            hu_run_result_free(c->alloc, &imsg_result);
+            if (imsg_ok) {
+                imessage_record_sent(c, message, message_len);
+                goto imsg_media;
+            }
+            if (getenv("HU_DEBUG"))
+                hu_log_info("imessage", NULL,
+                            "imsg send failed, falling back to AppleScript");
+        }
+#endif
         /* Escaped strings: worst case 2x length */
         size_t msg_esc_cap = message_len * 2 + 1;
         size_t tgt_esc_cap = tgt_len * 2 + 1;
@@ -667,6 +716,9 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
     }
 
 #if !HU_IS_TEST
+#ifdef HU_IMESSAGE_SEND_IMSG
+imsg_media:
+#endif
     /* Send media attachments (local file paths only) after text succeeds */
     if (send_err == HU_OK && media && media_count > 0) {
         size_t m_tgt_cap = tgt_len * 2 + 1;
@@ -1238,13 +1290,96 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
     (void)reaction;
     return HU_ERR_NOT_SUPPORTED;
 #elif !defined(HU_IMESSAGE_TAPBACK_ENABLED)
-    (void)ctx;
-    (void)target;
-    (void)target_len;
-    (void)reaction;
-    if (getenv("HU_DEBUG"))
-        hu_log_info("imessage", NULL, "tapback disabled (HU_IMESSAGE_TAPBACK_ENABLED=OFF)");
-    return HU_ERR_NOT_SUPPORTED;
+    {
+        /* Even without JXA tapback enabled, try imsg CLI if available */
+        hu_imessage_ctx_t *c_try = (hu_imessage_ctx_t *)ctx;
+        if (c_try && c_try->alloc && imsg_cli_available(c_try) && message_id > 0) {
+            const char *tapback_name = hu_imessage_reaction_to_tapback_name(reaction);
+            if (tapback_name) {
+                /* Look up chat GUID and message GUID from chat.db */
+                char msg_guid[96] = {0};
+                char chat_guid[128] = {0};
+#if defined(HU_ENABLE_SQLITE)
+                const char *home_env = getenv("HOME");
+                if (home_env) {
+                    char db_p[512];
+                    int dp = snprintf(db_p, sizeof(db_p), "%s/Library/Messages/chat.db",
+                                      home_env);
+                    if (dp > 0 && (size_t)dp < sizeof(db_p)) {
+                        sqlite3 *db = NULL;
+                        if (sqlite3_open_v2(db_p, &db, SQLITE_OPEN_READONLY, NULL) ==
+                            SQLITE_OK) {
+                            sqlite3_stmt *gs = NULL;
+                            if (sqlite3_prepare_v2(
+                                    db, "SELECT m.guid FROM message m WHERE m.ROWID = ?",
+                                    -1, &gs, NULL) == SQLITE_OK) {
+                                sqlite3_bind_int64(gs, 1, message_id);
+                                if (sqlite3_step(gs) == SQLITE_ROW) {
+                                    const char *g =
+                                        (const char *)sqlite3_column_text(gs, 0);
+                                    if (g) {
+                                        size_t gl = strlen(g);
+                                        if (gl >= sizeof(msg_guid))
+                                            gl = sizeof(msg_guid) - 1;
+                                        memcpy(msg_guid, g, gl);
+                                        msg_guid[gl] = '\0';
+                                    }
+                                }
+                                sqlite3_finalize(gs);
+                            }
+                            sqlite3_stmt *cs = NULL;
+                            if (sqlite3_prepare_v2(
+                                    db,
+                                    "SELECT c.guid FROM chat c "
+                                    "JOIN chat_message_join cmj ON cmj.chat_id = c.ROWID "
+                                    "WHERE cmj.message_id = ? LIMIT 1",
+                                    -1, &cs, NULL) == SQLITE_OK) {
+                                sqlite3_bind_int64(cs, 1, message_id);
+                                if (sqlite3_step(cs) == SQLITE_ROW) {
+                                    const char *cg =
+                                        (const char *)sqlite3_column_text(cs, 0);
+                                    if (cg) {
+                                        size_t cgl = strlen(cg);
+                                        if (cgl >= sizeof(chat_guid))
+                                            cgl = sizeof(chat_guid) - 1;
+                                        memcpy(chat_guid, cg, cgl);
+                                        chat_guid[cgl] = '\0';
+                                    }
+                                }
+                                sqlite3_finalize(cs);
+                            }
+                            sqlite3_close(db);
+                        }
+                    }
+                }
+#endif
+                if (msg_guid[0] && chat_guid[0]) {
+                    const char *react_argv[] = {"imsg",       "react",
+                                                "--chat-id",  chat_guid,
+                                                "--message-guid", msg_guid,
+                                                "--reaction", tapback_name,
+                                                NULL};
+                    hu_run_result_t rr = {0};
+                    hu_error_t re =
+                        hu_process_run(c_try->alloc, react_argv, NULL, 65536, &rr);
+                    bool rok = (re == HU_OK && rr.success && rr.exit_code == 0);
+                    hu_run_result_free(c_try->alloc, &rr);
+                    if (rok)
+                        return HU_OK;
+                    if (getenv("HU_DEBUG"))
+                        hu_log_info("imessage", NULL,
+                                    "imsg react failed (exit=%d)", rr.exit_code);
+                }
+            }
+        }
+        (void)target;
+        (void)target_len;
+        if (getenv("HU_DEBUG"))
+            hu_log_info("imessage", NULL,
+                        "tapback: no imsg CLI and JXA disabled "
+                        "(HU_IMESSAGE_TAPBACK_ENABLED=OFF)");
+        return HU_ERR_NOT_SUPPORTED;
+    }
 #else
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
     if (!c || !c->alloc)
@@ -1583,6 +1718,125 @@ static hu_error_t imessage_mark_read(void *ctx, const char *contact_id,
 #endif
 }
 
+/* ── AX-based typing indicators ──────────────────────────────────────
+ * Trigger the real iMessage "..." typing bubble by focusing Messages.app's
+ * input field via System Events and typing a character. This works because
+ * Messages.app itself has the entitlements to signal typing state to
+ * imagent — we just trigger it via UI automation.
+ * Requires Accessibility permission (same as tapback). */
+static hu_error_t imessage_start_typing(void *ctx, const char *recipient,
+                                        size_t recipient_len) {
+#if HU_IS_TEST
+    (void)ctx;
+    (void)recipient;
+    (void)recipient_len;
+    return HU_OK;
+#elif !defined(__APPLE__) || !defined(__MACH__)
+    (void)ctx;
+    (void)recipient;
+    (void)recipient_len;
+    return HU_ERR_NOT_SUPPORTED;
+#else
+    hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
+    if (!c || !c->alloc || !recipient || recipient_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    size_t tgt_esc_cap = recipient_len * 2 + 1;
+    if (tgt_esc_cap > 4096)
+        return HU_ERR_INVALID_ARGUMENT;
+    char *tgt_esc = (char *)c->alloc->alloc(c->alloc->ctx, tgt_esc_cap);
+    if (!tgt_esc)
+        return HU_ERR_OUT_OF_MEMORY;
+    escape_for_applescript(tgt_esc, tgt_esc_cap, recipient, recipient_len);
+
+    bool same_target = (c->typing_last_target_len == recipient_len && recipient_len > 0 &&
+                        memcmp(c->typing_last_target, recipient, recipient_len) == 0);
+    if (recipient_len > 0 && recipient_len < sizeof(c->typing_last_target)) {
+        memcpy(c->typing_last_target, recipient, recipient_len);
+        c->typing_last_target[recipient_len] = '\0';
+        c->typing_last_target_len = recipient_len;
+    }
+
+    char script[1024];
+    int n;
+    if (same_target) {
+        n = snprintf(script, sizeof(script),
+                     "tell application \"Messages\" to activate\n"
+                     "delay 0.2\n"
+                     "tell application \"System Events\" to tell process \"Messages\"\n"
+                     "  keystroke \".\"\n"
+                     "end tell");
+    } else {
+        n = snprintf(script, sizeof(script),
+                     "tell application \"Messages\"\n"
+                     "  activate\n"
+                     "  set targetHandle to \"%s\"\n"
+                     "  set targetChat to missing value\n"
+                     "  repeat with c in every chat\n"
+                     "    try\n"
+                     "      repeat with p in participants of c\n"
+                     "        if handle of p is targetHandle then\n"
+                     "          set targetChat to c\n"
+                     "          exit repeat\n"
+                     "        end if\n"
+                     "      end repeat\n"
+                     "    end try\n"
+                     "    if targetChat is not missing value then exit repeat\n"
+                     "  end repeat\n"
+                     "end tell\n"
+                     "delay 0.3\n"
+                     "tell application \"System Events\" to tell process \"Messages\"\n"
+                     "  keystroke \".\"\n"
+                     "end tell",
+                     tgt_esc);
+    }
+    c->alloc->free(c->alloc->ctx, tgt_esc, tgt_esc_cap);
+    if (n < 0 || (size_t)n >= sizeof(script))
+        return HU_ERR_INTERNAL;
+
+    const char *argv[] = {"osascript", "-e", script, NULL};
+    hu_run_result_t result = {0};
+    hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
+    hu_run_result_free(c->alloc, &result);
+    if (err != HU_OK && getenv("HU_DEBUG"))
+        hu_log_error("imessage", NULL, "start_typing failed (accessibility?)");
+    return err;
+#endif
+}
+
+static hu_error_t imessage_stop_typing(void *ctx, const char *recipient,
+                                       size_t recipient_len) {
+#if HU_IS_TEST
+    (void)ctx;
+    (void)recipient;
+    (void)recipient_len;
+    return HU_OK;
+#elif !defined(__APPLE__) || !defined(__MACH__)
+    (void)ctx;
+    (void)recipient;
+    (void)recipient_len;
+    return HU_ERR_NOT_SUPPORTED;
+#else
+    hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
+    if (!c || !c->alloc)
+        return HU_ERR_INVALID_ARGUMENT;
+    (void)recipient;
+    (void)recipient_len;
+
+    const char *script =
+        "tell application \"System Events\" to tell process \"Messages\"\n"
+        "  keystroke \"a\" using command down\n"
+        "  key code 51\n"
+        "end tell";
+
+    const char *argv[] = {"osascript", "-e", script, NULL};
+    hu_run_result_t result = {0};
+    hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
+    hu_run_result_free(c->alloc, &result);
+    return err;
+#endif
+}
+
 static const hu_channel_vtable_t imessage_vtable = {
     .start = imessage_start,
     .stop = imessage_stop,
@@ -1590,8 +1844,8 @@ static const hu_channel_vtable_t imessage_vtable = {
     .name = imessage_name,
     .health_check = imessage_health_check,
     .send_event = NULL,
-    .start_typing = NULL,
-    .stop_typing = NULL,
+    .start_typing = imessage_start_typing,
+    .stop_typing = imessage_stop_typing,
     .load_conversation_history = imessage_load_conversation_history,
     .get_response_constraints = imessage_get_response_constraints,
     .react = imessage_react,
@@ -1993,7 +2247,9 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio, "
         "  CASE WHEN m.date_edited > 0 THEN 1 ELSE 0 END AS was_edited, "
         "  m.thread_originator_guid, "
-        "  m.attributedBody "
+        "  m.attributedBody, "
+        "  m.balloon_bundle_id, "
+        "  m.expressive_send_style_id "
         "FROM message m "
         "JOIN handle h ON m.handle_id = h.ROWID "
         "WHERE m.is_from_me = 0 AND m.associated_message_type = 0 "
@@ -2010,7 +2266,8 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         "             OR LOWER(a.filename) LIKE '%.m4v') "
         "           OR (LOWER(a.filename) LIKE '%.caf' OR LOWER(a.filename) LIKE '%.m4a' "
         "             OR LOWER(a.filename) LIKE '%.mp3' OR LOWER(a.filename) LIKE '%.aac' "
-        "             OR LOWER(a.filename) LIKE '%.opus'))))) "
+        "             OR LOWER(a.filename) LIKE '%.opus')))) "
+        "     OR (m.balloon_bundle_id IS NOT NULL)) "
         "ORDER BY m.ROWID ASC LIMIT ?";
 
     sqlite3_stmt *stmt = NULL;
@@ -2058,6 +2315,58 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
                     attr_blob, (size_t)attr_len, attr_text_buf, sizeof(attr_text_buf));
                 if (extracted > 0)
                     text = attr_text_buf;
+            }
+        }
+
+        /* Sticker/Memoji detection via balloon_bundle_id (col 11) */
+        const char *balloon_id = (const char *)sqlite3_column_text(stmt, 11);
+        char sticker_buf[64];
+        if (balloon_id && balloon_id[0] && (!text || text[0] == '\0')) {
+            if (strstr(balloon_id, "Sticker") || strstr(balloon_id, "sticker"))
+                snprintf(sticker_buf, sizeof(sticker_buf), "[Sticker]");
+            else if (strstr(balloon_id, "Animoji") || strstr(balloon_id, "animoji") ||
+                     strstr(balloon_id, "Memoji") || strstr(balloon_id, "memoji"))
+                snprintf(sticker_buf, sizeof(sticker_buf), "[Memoji]");
+            else
+                snprintf(sticker_buf, sizeof(sticker_buf), "[iMessage App]");
+            text = sticker_buf;
+        }
+
+        /* Message effect detection via expressive_send_style_id (col 12) */
+        const char *effect_id = (const char *)sqlite3_column_text(stmt, 12);
+        char effect_buf[4200];
+        if (effect_id && effect_id[0] && text && text[0]) {
+            const char *effect_name = NULL;
+            if (strstr(effect_id, "impact"))
+                effect_name = "Slam";
+            else if (strstr(effect_id, "loud"))
+                effect_name = "Loud";
+            else if (strstr(effect_id, "gentle"))
+                effect_name = "Gentle";
+            else if (strstr(effect_id, "invisibleink"))
+                effect_name = "Invisible Ink";
+            else if (strstr(effect_id, "CKConfettiEffect"))
+                effect_name = "Confetti";
+            else if (strstr(effect_id, "CKEchoEffect"))
+                effect_name = "Echo";
+            else if (strstr(effect_id, "CKFireworksEffect"))
+                effect_name = "Fireworks";
+            else if (strstr(effect_id, "CKHappyBirthdayEffect"))
+                effect_name = "Happy Birthday";
+            else if (strstr(effect_id, "CKHeartEffect"))
+                effect_name = "Heart";
+            else if (strstr(effect_id, "CKLasersEffect"))
+                effect_name = "Lasers";
+            else if (strstr(effect_id, "CKShootingStarEffect"))
+                effect_name = "Shooting Star";
+            else if (strstr(effect_id, "CKSparklesEffect"))
+                effect_name = "Sparkles";
+            else if (strstr(effect_id, "CKSpotlightEffect"))
+                effect_name = "Spotlight";
+            if (effect_name) {
+                snprintf(effect_buf, sizeof(effect_buf), "[Sent with %s] %s",
+                         effect_name, text);
+                text = effect_buf;
             }
         }
 

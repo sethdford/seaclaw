@@ -7,6 +7,8 @@ description: "End-to-end test with two human instances conversing over real iMes
 
 Two `human` instances talking to each other over real iMessage, proving the full pipeline works end-to-end: poll → classify → agent turn → send → repeat.
 
+> **Note:** The `human channel e2e-test` subcommand is planned but not yet implemented in `cli_commands.c`. For now, use the manual two-machine E2E procedure described below, or the synthetic test harness at `tests/synthetic/channel_imessage_real.c`.
+
 ## Prerequisites
 
 - **Two Macs** (or one Mac + one Mac VM), each with its own Apple ID
@@ -17,10 +19,12 @@ Two `human` instances talking to each other over real iMessage, proving the full
 
 ## Quick Start
 
-### Mac A (initiator)
+Until `human channel e2e-test` exists, run E2E manually: on **Mac A**, send an opening message to Mac B’s handle (Messages.app or any method), then start `human service-loop` on both machines with the config below. **Mac B** runs the service loop with E2E-friendly daemon settings; **Mac A** does the same so both sides poll and reply. Configure `e2e_max_turns`, `max_consecutive_replies`, and `response_mode` on both sides as in the Config section.
+
+### Mac A (initiator) — when `e2e-test` is implemented
 
 ```bash
-# One command does everything: sends seed, starts listening, auto-stops after 5 turns
+# Planned: one command sends seed, starts listening, auto-stops after 5 turns (not in cli_commands.c yet)
 human channel e2e-test --target +1BBBBBBBBB --turns 5
 ```
 
@@ -31,9 +35,11 @@ human channel e2e-test --target +1BBBBBBBBB --turns 5
 human service-loop
 ```
 
-Mac A sends the seed message, Mac B picks it up and responds, Mac A picks that up and responds, and so on — back and forth over real iMessage until the turn limit is reached.
+With the manual procedure, Mac A’s first outbound message kicks off the loop; Mac B picks it up and responds, Mac A picks that up and responds, and so on — back and forth over real iMessage until you stop the daemons or hit `e2e_max_turns` on the responder.
 
-## CLI Reference
+## CLI Reference (planned)
+
+The following documents the intended `human channel e2e-test` interface once it is implemented:
 
 ```
 human channel e2e-test [options]
@@ -47,7 +53,7 @@ Options:
   --turns <N>              Stop after N agent responses (default: 5)
 ```
 
-The command automatically overrides daemon settings for E2E mode:
+When implemented, the command would automatically override daemon settings for E2E mode:
 - `max_consecutive_replies` → 0 (unlimited)
 - `e2e_max_turns` → N (from `--turns`)
 - `response_mode` → "eager" (respond to everything)
@@ -56,7 +62,7 @@ The command automatically overrides daemon settings for E2E mode:
 
 ### Mac A (initiator)
 
-Mac A uses `human channel e2e-test` which handles config overrides automatically. Minimal config needed:
+Mac A would use `human channel e2e-test` for automatic config overrides once that subcommand exists. For the manual procedure, apply the same daemon overrides as Mac B (or only on the side where you want turn limiting). Minimal config needed:
 
 ```json
 {
@@ -69,6 +75,8 @@ Mac A uses `human channel e2e-test` which handles config overrides automatically
   }
 }
 ```
+
+`use_imsg_cli` is implemented: when `true`, sends prefer the `imsg` CLI when available (with AppleScript fallback), as documented in the iMessage channel and investigation docs.
 
 ### Mac B (responder)
 
@@ -117,7 +125,7 @@ A successful run proves every layer of the stack works in production conditions:
 
 ### Agent goes silent after 3 replies
 
-The consecutive reply limiter is active. Ensure `daemon.max_consecutive_replies` is set to `0` in the responder's config, or use `human channel e2e-test` on the initiator side (it overrides automatically).
+The consecutive reply limiter is active. Ensure `daemon.max_consecutive_replies` is set to `0` in both machines' config (the planned `human channel e2e-test` would override this automatically when it exists).
 
 ### Messages not being picked up
 

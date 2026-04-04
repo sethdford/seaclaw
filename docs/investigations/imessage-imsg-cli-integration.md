@@ -101,6 +101,14 @@ Our current AppleScript send path is stable and well-tested. The imsg send path 
 - Graceful fallback: if imsg fails, falls through to existing AppleScript path
 - Media-only sends (no text) also support imsg with AppleScript fallback
 
+**Update (2026-04-04):** Both the send and react paths are now implemented in C:
+
+- `HU_IMESSAGE_SEND_IMSG` CMake option added; compile definitions wired for all targets
+- Text send via `imsg send --to <target> --text <message> --service imessage` with AppleScript fallback
+- imsg CLI tapback works even without `HU_IMESSAGE_TAPBACK_ENABLED` — auto-detects `imsg` on `$PATH` and tries `imsg react --chat-id <chat-guid> --message-guid <msg-guid> --reaction <type>` before returning `HU_ERR_NOT_SUPPORTED`
+- Chat GUID and message GUID are looked up from chat.db at react time
+- `use_imsg_cli` config key now parsed in `config_parse_channels.c`
+
 ### React Path Command Syntax
 Corrected to named arguments: `imsg react --chat-id <chat-guid> --message-guid <msg-guid> --reaction <type>`
 

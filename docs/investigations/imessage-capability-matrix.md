@@ -23,7 +23,7 @@ Canonical reference for every iMessage platform capability, our implementation s
 | **Custom emoji reaction (send)** | Growing | imsg CLI or private API | Not implemented | Medium | imsg v0.5.0 `react` command supports custom emoji |
 | **Read receipts (read)** | ~77% of users enable | chat.db date_read column | Implemented | — | `hu_imessage_build_read_receipt_context()` |
 | **Read receipts (send)** | — | No public API | Not possible | — | Apple controls this per-contact |
-| **Typing indicator (send)** | High (humanizing) | Broken on macOS 26 | Not implemented | Low | imsg had typing but broken on Tahoe (issue #60, imagent requires private entitlements) |
+| **Typing indicator (send)** | High (humanizing) | System Events AX automation | **Implemented** (AX-based) | — | System Events AX automation: focus Messages.app input field + keystroke to trigger real '...' bubble. No private entitlements needed. Requires Accessibility permission. |
 | **Typing indicator (read)** | — | No public API | Not possible | — | Ephemeral, not stored in chat.db |
 | **Inline reply (read)** | Moderate | chat.db thread_originator_guid | Implemented | — | `hu_imessage_lookup_message_by_guid()` |
 | **Inline reply (send)** | Moderate | No public API | Not possible | — | Neither AppleScript nor imsg support this |
@@ -32,7 +32,9 @@ Canonical reference for every iMessage platform capability, our implementation s
 | **Abandoned typing** | Humanizing pattern | Not feasible (see investigation) | Not implemented | — | See `imessage-abandoned-typing-feasibility.md` |
 | **GIF send** | Common | Tenor API + AppleScript attachment | Implemented | — | `hu_imessage_fetch_gif()` + send as attachment |
 | **GIF tapback tracking** | — | chat.db | Implemented | — | `hu_imessage_count_recent_gif_tapbacks()` (now includes type 2006) |
-| **Sticker/Memoji (read)** | 1B+ Memoji weekly, 40% created | chat.db balloon_bundle_id | Not implemented | Medium | Stickers have `balloon_bundle_id` like `com.apple.Stickers.*` |
+| **Message effects (read)** | Common | chat.db expressive_send_style_id | **Implemented** (this overhaul) | — | Detects all 13 bubble/screen effects (Slam, Loud, Gentle, Invisible Ink, Confetti, Echo, Fireworks, Happy Birthday, Heart, Lasers, Shooting Star, Sparkles, Spotlight) and shows `[Sent with <effect>]` prefix in content. |
+| **Message effects (send)** | Common | No public API | Not possible | — | Neither AppleScript nor imsg CLI supports sending effects. imessage-rs and Advanced iMessage Kit do via private API (requires SIP disabled). |
+| **Sticker/Memoji (read)** | 1B+ Memoji weekly, 40% created | chat.db balloon_bundle_id | **Implemented** (this overhaul) | — | Detects stickers, Memoji, and iMessage apps via `balloon_bundle_id` in poll output. Shows [Sticker], [Memoji], or [iMessage App] in content. |
 | **Sticker/Memoji (send)** | — | No public API | Not possible | — | No AppleScript/CLI path |
 | **Group chat (send)** | High | AppleScript (via chat name) | Implemented | — | Works with group chat identifiers |
 | **Group chat (poll)** | High | chat.db | Implemented | — | Polls from all chats |
@@ -46,7 +48,7 @@ Canonical reference for every iMessage platform capability, our implementation s
 
 | Tool | Tapback Send | Typing | Edit | Unsend | Inline Reply | Speed | API Type |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Our implementation** | JXA+AX (fragile) | No | No | No | No | ~2-5s send | AppleScript |
+| **Our implementation** | JXA+AX (fragile) | Yes (AX) | No | No | No | ~2-5s send | AppleScript |
 | **imsg v0.5.0** | Yes (`react` cmd) | Broken (macOS 26) | No | No | No | <1s send | AppleScript + Swift |
 | **imsg-bridge** | Via imsg | Broken | No | No | No | ~1.2s avg | REST wrapper around imsg |
 | **BlueBubbles** | Yes | Yes | Yes (private API) | Yes (private API) | Yes | ~2s | Private IMCore |
@@ -69,6 +71,7 @@ Canonical reference for every iMessage platform capability, our implementation s
 | Edit messages | `imessage-edit-feasibility.md` (2026-03-08) | Not feasible via public APIs | No — imsg still has no edit |
 | Unsend messages | `imessage-unsend-feasibility.md` (2026-03-08) | Partially feasible (AX automation) | No — imsg has no unsend |
 | Abandoned typing | `imessage-abandoned-typing-feasibility.md` (2026-03-10) | Not feasible | Minor — imsg v0.5.0 had typing but broken on macOS 26 |
+| Typing indicators (AX) | `imessage-abandoned-typing-feasibility.md` (updated 2026-04) | AX workaround now implemented | Yes — AX typing works; abandoned typing still not feasible |
 
 ## Decision Log
 
@@ -81,16 +84,22 @@ Canonical reference for every iMessage platform capability, our implementation s
 | Extract attributedBody parser to shared | Needed by feeds + persona sampler, pure byte parsing | 2026-04 |
 | Evaluate imsg CLI for tapback | Potentially more reliable than JXA, active maintenance | 2026-04 (pending) |
 | Do not implement edit/unsend | Private API only, high maintenance risk | 2026-03 |
-| Do not implement typing | Broken on macOS 26 even via imsg | 2026-04 |
+| Implement AX-based typing indicators | System Events focus + keystroke triggers real "..." bubble; no private entitlements; same AX permission as tapback | 2026-04 |
+| Add sticker/Memoji read-side detection | balloon_bundle_id check in poll; zero risk read-only | 2026-04 |
+| Add message effects read-side detection | expressive_send_style_id check in poll; zero risk read-only | 2026-04 |
+| Wire HU_IMESSAGE_SEND_IMSG CMake flag | imsg CLI opt-in for faster send; graceful AppleScript fallback | 2026-04 |
+| imsg CLI tapback even without JXA enabled | Auto-detect imsg on $PATH; try before returning NOT_SUPPORTED | 2026-04 |
 
 ## Architecture
 
 - **Outbound**: `imessage_send()` → osascript AppleScript → Messages.app
 - **Inbound**: `hu_imessage_poll()` → chat.db SQLite → parse text + attributedBody + attachments + reactions
+- **Outbound typing**: `imessage_start_typing()` → osascript System Events → focus Messages.app input field + keystroke (triggers real "..." typing bubble)
+- **Sticker/effects detection**: `hu_imessage_poll()` reads `balloon_bundle_id` and `expressive_send_style_id` from chat.db
 - **Tapback send**: `imessage_react()` → JXA + System Events AX automation (opt-in)
 - **Feed/persona**: `feeds/imessage.c` and `persona/sampler.c` → chat.db with attributedBody support
 - **GIF**: Tenor API → download to temp file → send as attachment
 
 ## Last Updated
 
-2026-04-03
+2026-04-04

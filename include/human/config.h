@@ -218,6 +218,7 @@ typedef struct hu_imessage_channel_config {
     int poll_interval_sec;
     int user_response_window_sec; /* DEPRECATED: use daemon.user_response_window_sec */
     char *response_mode;          /* DEPRECATED: use daemon.response_mode */
+    bool use_imsg_cli;            /* prefer steipete/imsg CLI for send/react when available */
     hu_channel_daemon_config_t daemon;
 } hu_imessage_channel_config_t;
 

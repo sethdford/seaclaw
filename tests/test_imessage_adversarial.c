@@ -206,8 +206,8 @@ static void imessage_vtable_has_all_expected_hooks(void) {
     HU_ASSERT_NOT_NULL(ch.vtable->get_latest_attachment_path);
     HU_ASSERT_NOT_NULL(ch.vtable->build_reaction_context);
     HU_ASSERT_NOT_NULL(ch.vtable->build_read_receipt_context);
-    HU_ASSERT_NULL(ch.vtable->start_typing);
-    HU_ASSERT_NULL(ch.vtable->stop_typing);
+    HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
+    HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
     hu_imessage_destroy(&ch);
 }
 

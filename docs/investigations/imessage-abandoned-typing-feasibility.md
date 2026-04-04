@@ -98,3 +98,19 @@ New data point from imsg CLI:
 - **Conclusion unchanged**: Typing indicators remain not feasible via any public or third-party approach on current macOS. The IMCore private API path is now even more restricted than when this investigation was written.
 
 Cross-reference: `imessage-capability-matrix.md`, `imessage-imsg-cli-integration.md`
+
+---
+
+## Update (2026-04-04)
+
+**Typing indicators are now implemented** using the Accessibility API workaround:
+
+- `imessage_start_typing()` and `imessage_stop_typing()` are wired into the iMessage vtable
+- Implementation: System Events focuses Messages.app's input field and types a character, triggering the real "..." typing bubble on the recipient's device
+- This works because Messages.app itself has the required `imagent` entitlements — we trigger it through UI automation
+- Same Accessibility permission requirement as tapback sending
+- Caches conversation target to skip expensive chat iteration on repeat uses
+
+**Abandoned typing remains not feasible**: While we can now start AND stop typing indicators, the "started typing then stopped" pattern would require precise timing control and reliable stop_typing. The AX-based stop_typing (select-all + delete) works but is not reliable enough for the subtle abandoned-typing psychological signal.
+
+**Conclusion updated**: Basic typing indicators → implemented. Abandoned typing → still aspirational.

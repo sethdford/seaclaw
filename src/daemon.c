@@ -2009,9 +2009,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     static uint32_t daemon_turn_counter = 0;
     /* Phase 4: Conversation repair signal (persists across turn boundary) */
     static hu_repair_signal_t repair_signal = {0};
-#ifdef HU_ENABLE_SQLITE
-    /* Phase 4: Style drift check counter */
+#if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_PERSONA)
+    /* Phase 4: Style drift check counter (only with persona + sqlite) */
     static unsigned drift_check_counter = 0;
+#endif
+#if !defined(HU_HAS_PERSONA) || !defined(HU_ENABLE_SQLITE)
+    (void)daemon_turn_counter;
+#endif
+#if !defined(HU_HAS_PERSONA)
+    (void)&repair_signal;
 #endif
 
     hu_inbox_watcher_t inbox_watcher = {0};
@@ -4798,7 +4804,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif /* HU_ENABLE_SQLITE anti-sycophancy */
 
                     /* ── Phase 4 pre-turn: style drift correction ─────── */
-#ifdef HU_ENABLE_SQLITE
+#if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_PERSONA)
                     if (++drift_check_counter % 5 == 0 && agent->memory) {
                         hu_style_drift_result_t drift_res = {0};
                         hu_style_fingerprint_t drift_bl = {0};

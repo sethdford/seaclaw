@@ -163,6 +163,8 @@ static void parse_imessage_channel(hu_allocator_t *a, hu_config_t *cfg,
         cfg->channels.imessage.response_mode = hu_strdup(a, rm);
     }
 
+    cfg->channels.imessage.use_imsg_cli = hu_json_get_bool(obj, "use_imsg_cli", false);
+
     parse_daemon_config(a, &cfg->channels.imessage.daemon, obj);
     if (!cfg->channels.imessage.daemon.response_mode && cfg->channels.imessage.response_mode)
         cfg->channels.imessage.daemon.response_mode =
