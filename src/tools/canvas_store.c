@@ -234,7 +234,7 @@ hu_error_t hu_canvas_store_undo(hu_canvas_store_t *store, const char *canvas_id,
         return HU_ERR_NOT_FOUND;
 
     e->undo_pos++;
-    uint32_t slot = (e->version_head - 1 - e->undo_pos) % CANVAS_MAX_VERSIONS;
+    uint32_t slot = (e->version_head - e->undo_pos) % CANVAS_MAX_VERSIONS;
     if (!e->versions[slot].content)
         return HU_ERR_NOT_FOUND;
 
@@ -262,7 +262,7 @@ hu_error_t hu_canvas_store_redo(hu_canvas_store_t *store, const char *canvas_id,
     if (e->undo_pos == 0) {
         slot = (e->version_head - 1) % CANVAS_MAX_VERSIONS;
     } else {
-        slot = (e->version_head - 1 - e->undo_pos) % CANVAS_MAX_VERSIONS;
+        slot = (e->version_head - e->undo_pos) % CANVAS_MAX_VERSIONS;
     }
     if (!e->versions[slot].content)
         return HU_ERR_NOT_FOUND;

@@ -1,6 +1,7 @@
 #include "human/core/log.h"
 #include "human/channels/voice_channel.h"
 #include "human/core/string.h"
+#include "human/voice/provider.h"
 #include "human/voice/realtime.h"
 #include "human/voice/webrtc.h"
 #include <stdio.h>
@@ -31,6 +32,7 @@ typedef struct hu_voice_ctx {
     hu_channel_voice_config_t config;
     bool initialized;
     bool running;
+    hu_voice_provider_t provider;
     hu_voice_rt_session_t *rt_session;
     hu_webrtc_session_t *webrtc_session;
 } hu_voice_ctx_t;
@@ -41,20 +43,27 @@ static hu_error_t voice_start(void *ctx) {
         return HU_ERR_INVALID_ARGUMENT;
 
     if (v->config.mode == HU_VOICE_MODE_REALTIME) {
-        hu_voice_rt_config_t rt_cfg = {0};
-        rt_cfg.sample_rate = (int)v->config.sample_rate;
-        rt_cfg.api_key = v->config.api_key ? v->config.api_key : NULL;
-        rt_cfg.model = v->config.model ? v->config.model : NULL;
-        rt_cfg.voice = v->config.voice ? v->config.voice : NULL;
-        hu_error_t err = hu_voice_rt_session_create(v->alloc, &rt_cfg, &v->rt_session);
+        const char *mode_str = "realtime";
+        if (v->config.model && strstr(v->config.model, "gemini"))
+            mode_str = "gemini_live";
+        hu_voice_provider_extras_t extras = {
+            .api_key = v->config.api_key,
+            .model_id = v->config.model,
+            .voice_id = v->config.voice,
+            .sample_rate = (int)v->config.sample_rate,
+        };
+        hu_error_t err =
+            hu_voice_provider_create_from_extras(v->alloc, mode_str, &extras, &v->provider);
         if (err != HU_OK)
             return err;
-        err = hu_voice_rt_connect(v->rt_session);
+        err = v->provider.vtable->connect(v->provider.ctx);
         if (err != HU_OK) {
-            hu_voice_rt_session_destroy(v->rt_session);
-            v->rt_session = NULL;
+            v->provider.vtable->disconnect(v->provider.ctx, v->alloc);
+            memset(&v->provider, 0, sizeof(v->provider));
             return err;
         }
+        if (strcmp(mode_str, "realtime") == 0)
+            v->rt_session = (hu_voice_rt_session_t *)v->provider.ctx;
         v->running = true;
         return HU_OK;
     }
@@ -96,7 +105,11 @@ static void voice_stop(void *ctx) {
         return;
     v->running = false;
 
-    if (v->rt_session) {
+    if (v->provider.vtable) {
+        v->provider.vtable->disconnect(v->provider.ctx, v->alloc);
+        memset(&v->provider, 0, sizeof(v->provider));
+        v->rt_session = NULL;
+    } else if (v->rt_session) {
         hu_voice_rt_session_destroy(v->rt_session);
         v->rt_session = NULL;
     }
@@ -124,8 +137,12 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
     (void)media;
     (void)media_count;
 
-    if (v->config.mode == HU_VOICE_MODE_REALTIME && v->rt_session) {
-        return hu_voice_rt_send_audio(v->rt_session, message, message_len);
+    if (v->config.mode == HU_VOICE_MODE_REALTIME) {
+        if (v->provider.vtable && v->provider.vtable->send_audio)
+            return v->provider.vtable->send_audio(v->provider.ctx, (const uint8_t *)message,
+                                                   message_len);
+        if (v->rt_session)
+            return hu_voice_rt_send_audio(v->rt_session, message, message_len);
     }
     if (v->config.mode == HU_VOICE_MODE_WEBRTC && v->webrtc_session) {
         return hu_webrtc_send_audio(v->webrtc_session, message, message_len);
@@ -200,9 +217,15 @@ hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc,
     if (!v->running)
         return HU_OK;
 
-    if (v->config.mode == HU_VOICE_MODE_REALTIME && v->rt_session) {
+    if (v->config.mode == HU_VOICE_MODE_REALTIME) {
         hu_voice_rt_event_t event = {0};
-        hu_error_t err = hu_voice_rt_recv_event(v->rt_session, alloc, &event, 100);
+        hu_error_t err;
+        if (v->provider.vtable && v->provider.vtable->recv_event)
+            err = v->provider.vtable->recv_event(v->provider.ctx, alloc, &event, 100);
+        else if (v->rt_session)
+            err = hu_voice_rt_recv_event(v->rt_session, alloc, &event, 100);
+        else
+            return HU_OK;
         if (err == HU_OK && event.transcript && event.transcript_len > 0 && max_msgs > 0) {
             memset(&msgs[0], 0, sizeof(msgs[0]));
             size_t copy_len = event.transcript_len;

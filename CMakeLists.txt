@@ -2010,6 +2010,7 @@ set(HU_TEST_SOURCES
     tests/test_cp_tasks.c
     tests/test_vector_retrieval_remote.c
     tests/test_background_registry.c
+    tests/test_anticipatory_state.c
     tests/test_tool.c
     tests/test_webhook.c
     tests/test_peripheral.c

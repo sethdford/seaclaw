@@ -430,7 +430,21 @@ void run_daemon_proactive_tests(void);
 void run_daemon_trust_tests(void);
 void run_cp_tasks_tests(void);
 void run_vector_retrieval_remote_tests(void);
+void run_anticipatory_state_tests(void);
+void run_canvas_tool_tests(void);
+void run_canvas_e2e_tests(void);
+void run_canvas_persist_tests(void);
+void run_canvas_render_tests(void);
 void run_background_registry_tests(void);
+void run_consistency_tests(void);
+void run_fact_extract_tests(void);
+void run_hallucination_guard_tests(void);
+void run_humor_fw_tests(void);
+void run_self_improve_tests(void);
+void run_sycophancy_guard_tests(void);
+void run_trust_calibration_tests(void);
+void run_vision_ocr_tests(void);
+void run_markdown_loader_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -886,6 +900,20 @@ int main(int argc, char **argv) {
     run_cp_tasks_tests();
     run_vector_retrieval_remote_tests();
     run_background_registry_tests();
+    run_consistency_tests();
+    run_fact_extract_tests();
+    run_hallucination_guard_tests();
+    run_humor_fw_tests();
+    run_self_improve_tests();
+    run_sycophancy_guard_tests();
+    run_trust_calibration_tests();
+    run_vision_ocr_tests();
+    run_markdown_loader_tests();
+    run_anticipatory_state_tests();
+    run_canvas_tool_tests();
+    run_canvas_e2e_tests();
+    run_canvas_persist_tests();
+    run_canvas_render_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();
