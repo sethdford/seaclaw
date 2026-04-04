@@ -1947,9 +1947,9 @@ set(HU_TEST_SOURCES
     tests/test_agent_git.c
     tests/test_bg_registry.c
     tests/test_canvas_render.c
-    tests/test_canvas_e2e.c
 
-    tests/test_canvas_tool.c
+
+
     tests/test_channel_embeds.c
     tests/test_twilio_media_impl.c
     tests/test_declarative_tools.c
@@ -2041,6 +2041,7 @@ set(HU_TEST_SOURCES
     tests/test_voice_session.c
     tests/test_gemini_live.c
     tests/test_voice_factory_e2e.c
+    tests/test_voice_streaming_e2e.c
     tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c

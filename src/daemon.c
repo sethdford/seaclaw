@@ -1080,7 +1080,6 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     }
                     hu_proactive_result_deinit(&event_result, alloc);
                 }
-                hu_event_extract_result_deinit(&extract_result, alloc);
 #ifdef HU_ENABLE_SQLITE
                 if (extract_result.event_count > 0 && agent && agent->memory) {
                     sqlite3 *tev_db = hu_sqlite_memory_get_db(agent->memory);
@@ -1088,10 +1087,12 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                         hu_temporal_events_init_table(tev_db);
                         hu_temporal_events_store_batch(tev_db, cp->contact_id,
                                                        strlen(cp->contact_id),
-                                                       &extract_result, (int64_t)now);
+                                                       &extract_result,
+                                                       (int64_t)now);
                     }
                 }
 #endif
+                hu_event_extract_result_deinit(&extract_result, alloc);
             }
 
 #ifdef HU_ENABLE_SQLITE
