@@ -8,10 +8,71 @@ on:
   workflow_dispatch:
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      c: ${{ steps.filter.outputs.c }}
+      ui: ${{ steps.filter.outputs.ui }}
+      website: ${{ steps.filter.outputs.website }}
+      ios: ${{ steps.filter.outputs.ios }}
+      android: ${{ steps.filter.outputs.android }}
+      macos_app: ${{ steps.filter.outputs.macos_app }}
+      docker: ${{ steps.filter.outputs.docker }}
+      nix: ${{ steps.filter.outputs.nix }}
+      docs: ${{ steps.filter.outputs.docs }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            c:
+              - 'src/**'
+              - 'include/**'
+              - 'CMakeLists.txt'
+              - 'cmake/**'
+              - 'tests/**'
+              - 'fuzz/**'
+            ui:
+              - 'ui/**'
+            website:
+              - 'website/**'
+              - 'design-tokens/**'
+            ios:
+              - 'apps/ios/**'
+              - 'apps/shared/**'
+            android:
+              - 'apps/android/**'
+              - 'apps/shared/**'
+            macos_app:
+              - 'apps/macos/**'
+              - 'apps/shared/**'
+            docker:
+              - 'Dockerfile'
+              - '.dockerignore'
+            nix:
+              - 'flake.nix'
+              - 'flake.lock'
+              - '*.nix'
+            docs:
+              - 'docs/**'
+              - '*.md'
+            ci:
+              - '.github/**'
+
   build-and-test:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        shard: [1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -30,14 +91,18 @@ jobs:
       - uses: ./.github/actions/run-tests
         with:
           asan-options: ${{ runner.os == 'Linux' && 'detect_leaks=0:detect_stack_use_after_return=0' || '' }}
+          shard: ${{ matrix.shard }}/4
       - name: Validate eval suites
+        if: matrix.shard == 1
         run: ./build/human eval validate eval_suites/
       - name: Check eval regression
+        if: matrix.shard == 1
         run: |
           mkdir -p "$HOME/.human"
           echo '{"default_provider":"openai","default_model":"gpt-4o-mini","memory":{"backend":"sqlite"}}' > "$HOME/.human/config.json"
           ./build/human eval check-regression eval_suites/
       - name: Persona CLI smoke test
+        if: matrix.shard == 1
         run: |
           ./build/human persona list
           mkdir -p "$HOME/.human/personas"
@@ -47,16 +112,23 @@ jobs:
       - name: Test count regression guard
         run: |
           COUNT=$(grep -oE '[0-9]+/[0-9]+ passed' /tmp/human_tests_output.txt | tail -1 | cut -d/ -f1)
-          echo "Test count: $COUNT"
-          BASELINE=8500
+          echo "Test count (shard ${{ matrix.shard }}/4): $COUNT"
+          BASELINE=$((8500 / 4))
           if [ "$COUNT" -lt "$BASELINE" ]; then
-            echo "::error::Test count regression: $COUNT < $BASELINE baseline"
+            echo "::error::Test count regression in shard ${{ matrix.shard }}: $COUNT < $BASELINE baseline (8500/4)"
             exit 1
           fi
       - name: Check for untested modules
+        if: matrix.shard == 1
         run: scripts/check-untested.sh
 
   integration-tests:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -77,6 +149,12 @@ jobs:
         run: ./build-integ/human_integration_tests
 
   cross-arm64:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -96,6 +174,12 @@ jobs:
         run: file build-arm64/human | grep -i "aarch64\|ARM"
 
   minimal-build:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -109,6 +193,12 @@ jobs:
         run: ./build-minimal/human_tests
 
   feature-flags:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -137,11 +227,17 @@ jobs:
         continue-on-error: false
 
   preset-check:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        preset: [test, release]
+        preset: [dev, test, release]
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
@@ -152,6 +248,12 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }}
 
   release-size:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -174,6 +276,12 @@ jobs:
           fi
 
   build-ios:
+    needs: changes
+    if: >-
+      needs.changes.outputs.ios == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -192,6 +300,12 @@ jobs:
           result-bundle-path: apps/ios/TestResults
 
   build-android:
+    needs: changes
+    if: >-
+      needs.changes.outputs.android == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -204,12 +318,24 @@ jobs:
         run: cd apps/android && ./gradlew lint test
 
   build-macos:
+    needs: changes
+    if: >-
+      needs.changes.outputs.macos_app == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
       - run: cd apps/macos && swift build
 
   ui:
+    needs: changes
+    if: >-
+      needs.changes.outputs.ui == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -249,8 +375,20 @@ jobs:
             echo "::error::UI test count regression: $COUNT < $BASELINE baseline"
             exit 1
           fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ui-dist
+          path: dist
+          retention-days: 1
 
   ui-e2e:
+    needs: changes
+    if: >-
+      needs.changes.outputs.ui == 'true' ||
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -290,10 +428,15 @@ jobs:
       - name: Start gateway
         run: |
           nohup ./build/human gateway &>/dev/null &
-          sleep 2
-          curl -sf http://127.0.0.1:3000/health || (echo "Gateway failed to start" && exit 1)
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:3000/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:3000/health || { echo "::error::Gateway failed to start after 30s"; exit 1; }
       - name: E2E tests (demo mode)
         run: cd ui && npx playwright test --ignore-snapshots --grep-invert "Visual Regression|Smoke"
+      - name: E2E smoke tests
+        run: cd ui && npx playwright test --config playwright-smoke.config.ts
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
@@ -301,58 +444,13 @@ jobs:
           path: ui/test-results/
           retention-days: 7
 
-  e2e-smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-      - name: Install system deps
-        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev libcurl4-openssl-dev
-      - name: Build gateway
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DHU_BUILD_TESTS=OFF -DHU_ENABLE_CURL=ON
-          cmake --build build -j$(nproc)
-      - name: Install UI deps
-        run: cd ui && npm ci
-      - name: Build UI
-        run: cd ui && npm run build
-      - name: Install Playwright browsers
-        run: cd ui && npx playwright install --with-deps chromium
-      - name: Create gateway config
-        run: |
-          mkdir -p ~/.human
-          UI_DIR="$(pwd)/ui/dist"
-          cat > ~/.human/config.json << CONF
-          {
-            "default_provider": "ollama",
-            "default_model": "test",
-            "gateway": {
-              "port": 3000,
-              "host": "127.0.0.1",
-              "require_pairing": false,
-              "control_ui_dir": "${UI_DIR}",
-              "rate_limit_requests": 1000,
-              "rate_limit_window": 60
-            }
-          }
-          CONF
-      - name: Start gateway
-        run: |
-          nohup ./build/human gateway &>/dev/null &
-          sleep 2
-          curl -sf http://127.0.0.1:3000/health || (echo "Gateway failed to start" && exit 1)
-      - name: E2E smoke tests
-        run: cd ui && npx playwright test --config playwright-smoke.config.ts
-      - uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: smoke-report
-          path: ui/test-results/
-          retention-days: 7
-
   visual-regression:
+    needs: changes
+    if: >-
+      needs.changes.outputs.ui == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -377,6 +475,12 @@ jobs:
           retention-days: 14
 
   build-deb:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -399,6 +503,12 @@ jobs:
           path: "*.deb"
 
   completions:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -413,6 +523,12 @@ jobs:
           done
 
   local-check:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -428,7 +544,10 @@ jobs:
         run: HU_SKIP_FORMAT=1 scripts/check.sh
 
   benchmark:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: changes
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      (needs.changes.outputs.c == 'true' || needs.changes.outputs.ci == 'true')
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -453,6 +572,12 @@ jobs:
           retention-days: 90
 
   static-analysis:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -476,6 +601,12 @@ jobs:
           fi
 
   coverage:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -492,7 +623,7 @@ jobs:
           lcov --remove coverage.info '/usr/*' '*/tests/*' '*/vendor/*' --output-file coverage.info --ignore-errors unused
           lcov --list coverage.info | tail -20
       - name: Upload to Codecov
-        if: env.CODECOV_TOKEN != ''
+        if: ${{ secrets.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -506,6 +637,13 @@ jobs:
           path: coverage.info
 
   docker:
+    needs: changes
+    if: >-
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.docker == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -513,6 +651,12 @@ jobs:
       - run: docker run --rm human:ci-test --version
 
   website:
+    needs: changes
+    if: >-
+      needs.changes.outputs.website == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -530,21 +674,26 @@ jobs:
       - run: cd website && npm run check
       - run: cd website && npm run build
       - run: test -d website/dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: website-dist
+          path: website/dist
+          retention-days: 1
 
   lighthouse:
     runs-on: ubuntu-latest
-    needs: website
+    needs: [changes, website]
+    if: >-
+      needs.changes.outputs.website == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/download-artifact@v4
         with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: |
-            design-tokens/package-lock.json
-            website/package-lock.json
-      - run: cd design-tokens && npm ci --ignore-scripts && npm run build
-      - run: cd website && npm ci && npm run build
+          name: website-dist
+          path: website/dist
       - name: Lighthouse CI (desktop)
         uses: treosh/lighthouse-ci-action@v12
         with:
@@ -562,15 +711,18 @@ jobs:
 
   lighthouse-dashboard:
     runs-on: ubuntu-latest
-    needs: ui
+    needs: [changes, ui]
+    if: >-
+      needs.changes.outputs.ui == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/download-artifact@v4
         with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
-      - run: cd ui && npm ci && npm run build
+          name: ui-dist
+          path: ui/dist
       - name: Lighthouse CI (Dashboard)
         uses: treosh/lighthouse-ci-action@v12
         with:
@@ -580,6 +732,13 @@ jobs:
           artifactName: lighthouse-dashboard
 
   design-tokens:
+    needs: changes
+    if: >-
+      needs.changes.outputs.website == 'true' ||
+      needs.changes.outputs.ui == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -592,6 +751,13 @@ jobs:
       - run: bash design-tokens/check-drift.sh
 
   nix:
+    needs: changes
+    if: >-
+      needs.changes.outputs.nix == 'true' ||
+      needs.changes.outputs.c == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -602,8 +768,11 @@ jobs:
       - run: nix flake check
 
   ollama-integration:
+    needs: changes
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (needs.changes.outputs.c == 'true' || needs.changes.outputs.ci == 'true')
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
@@ -627,6 +796,12 @@ jobs:
         run: ./build/human_tests
 
   docs:
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs == 'true' ||
+      needs.changes.outputs.ci == 'true' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -651,9 +826,11 @@ jobs:
         run: scripts/doc-fleet.sh
 
   quality-score:
-    if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
+    if: >-
+      github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' &&
+      (needs.changes.outputs.c == 'true' || needs.changes.outputs.ui == 'true' || needs.changes.outputs.ci == 'true')
     runs-on: ubuntu-latest
-    needs: [build-and-test, ui]
+    needs: [changes, build-and-test, ui]
     steps:
       - uses: actions/checkout@v6
       - name: Install build deps
@@ -704,8 +881,45 @@ jobs:
             docs/competitive-benchmarks-latest.md
           retention-days: 90
 
+  ci-summary:
+    if: always()
+    needs: [build-and-test, ui, coverage, release-size, website]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: /tmp/ci-artifacts
+        continue-on-error: true
+      - name: Write CI summary
+        run: |
+          {
+            echo "## CI Summary"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+
+            echo "| Build & Test | ${{ needs.build-and-test.result }} |"
+            echo "| UI | ${{ needs.ui.result }} |"
+            echo "| Coverage | ${{ needs.coverage.result }} |"
+            echo "| Release Size | ${{ needs.release-size.result }} |"
+            echo "| Website | ${{ needs.website.result }} |"
+
+            if [ -f /tmp/ci-artifacts/coverage.info ]; then
+              COV_PCT=$(lcov --summary /tmp/ci-artifacts/coverage.info 2>&1 | grep -oP 'lines\.*: \K[0-9.]+' || echo "N/A")
+              echo "| Line Coverage | ${COV_PCT}% |"
+            fi
+
+            echo ""
+            echo "*Generated at $(date -u '+%Y-%m-%d %H:%M UTC')*"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   fuzz:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: changes
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      (needs.changes.outputs.c == 'true' || needs.changes.outputs.ci == 'true')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

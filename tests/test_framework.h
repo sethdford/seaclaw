@@ -16,6 +16,9 @@ extern int hu__suite_active;
 extern const char *hu__suite_filter;
 extern const char *hu__test_filter;
 extern jmp_buf hu__jmp;
+extern int hu__shard_current;
+extern int hu__shard_total;
+extern int hu__shard_counter;
 
 static inline void hu_test_fail(void) {
     longjmp(hu__jmp, 1);
@@ -167,6 +170,9 @@ static inline const char *hu__strcasestr(const char *haystack, const char *needl
 #define HU_TEST_SUITE(name)                                                                       \
     do {                                                                                          \
         hu__suite_active = (!hu__suite_filter || hu__strcasestr(name, hu__suite_filter) != NULL); \
+        if (hu__shard_total > 0 &&                                                                \
+            (hu__shard_counter++ % hu__shard_total) != (hu__shard_current - 1))                   \
+            hu__suite_active = 0;                                                                 \
         if (hu__suite_active)                                                                     \
             printf("\n=== %s ===\n", name);                                                       \
     } while (0)

@@ -8,6 +8,9 @@ int hu__suite_active = 1;
 const char *hu__suite_filter = NULL;
 const char *hu__test_filter = NULL;
 jmp_buf hu__jmp;
+int hu__shard_current = 0;
+int hu__shard_total = 0;
+int hu__shard_counter = 0;
 
 void run_allocator_tests(void);
 void run_data_loader_tests(void);
@@ -437,11 +440,13 @@ static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
     printf("  --suite=<name>   Run only suites whose name contains <name>\n");
     printf("  --filter=<name>  Run only tests whose function name contains <name>\n");
+    printf("  --shard=N/M      Run shard N of M (1-based, for CI parallelism)\n");
     printf("  --help           Show this help message\n");
     printf("\nExamples:\n");
     printf("  %s --suite=config          # run config-related suites\n", prog);
     printf("  %s --filter=json_parse     # run tests matching 'json_parse'\n", prog);
     printf("  %s --suite=security --filter=vault  # combine both\n", prog);
+    printf("  %s --shard=1/4             # run first quarter of suites\n", prog);
 }
 
 int main(int argc, char **argv) {
@@ -450,6 +455,13 @@ int main(int argc, char **argv) {
             hu__suite_filter = argv[i] + 8;
         } else if (strncmp(argv[i], "--filter=", 9) == 0) {
             hu__test_filter = argv[i] + 9;
+        } else if (strncmp(argv[i], "--shard=", 8) == 0) {
+            if (sscanf(argv[i] + 8, "%d/%d", &hu__shard_current, &hu__shard_total) != 2 ||
+                hu__shard_current < 1 || hu__shard_total < 1 ||
+                hu__shard_current > hu__shard_total) {
+                fprintf(stderr, "Invalid --shard format. Use --shard=N/M (1-based)\n");
+                return 1;
+            }
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
             return 0;
@@ -463,6 +475,8 @@ int main(int argc, char **argv) {
         printf("Suite filter: %s\n", hu__suite_filter);
     if (hu__test_filter)
         printf("Test filter:  %s\n", hu__test_filter);
+    if (hu__shard_total > 0)
+        printf("Shard:        %d/%d\n", hu__shard_current, hu__shard_total);
 
     run_allocator_tests();
     run_data_loader_tests();

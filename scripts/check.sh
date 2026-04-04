@@ -87,11 +87,18 @@ fi
 # 4. run tests
 info "Step 4/4: human_tests..."
 if [ -x "$BUILD_DIR/human_tests" ]; then
-    if "$BUILD_DIR/human_tests" >/dev/null 2>&1; then
+    TEST_LOG="/tmp/hu_check_tests.txt"
+    set +e
+    "$BUILD_DIR/human_tests" > "$TEST_LOG" 2>&1
+    TEST_RC=$?
+    set -e
+    grep -E "FAIL|Results:" "$TEST_LOG" || true
+    if [ "$TEST_RC" -eq 0 ]; then
         info "  human_tests: pass"
         PASS=$((PASS + 1))
     else
         warn "  human_tests: fail"
+        grep -E "FAIL" "$TEST_LOG" | head -20
         FAIL=$((FAIL + 1))
     fi
 else
