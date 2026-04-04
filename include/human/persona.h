@@ -306,6 +306,10 @@ typedef struct hu_persona_voice_config {
     bool strip_ssml;          /* false = SSML mode, true = punctuation fallback */
     bool discourse_markers;   /* false = off by default (voiceai learned static fillers degrade) */
     float vulnerability_level; /* 0.0–1.0, EMA-tracked from content */
+    float emotion_intensity;  /* 0.0–1.0; 0 = Cartesia default */
+    char pronunciation_dict_id[64]; /* Cartesia pronunciation dictionary UUID */
+    char language[8];         /* ISO-639-1, e.g. "en"; empty = auto */
+    bool thinking_sounds;     /* prepend brief "hmm"/"well" before complex responses */
 } hu_persona_voice_config_t;
 
 /* Context awareness — calendar, weather, sports, news */

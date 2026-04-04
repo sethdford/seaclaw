@@ -210,23 +210,33 @@ static hu_error_t dispatch_sequential_ex(hu_allocator_t *alloc, hu_tool_t *tools
 #if defined(HU_GATEWAY_POSIX) && !defined(HU_IS_TEST)
     if (timeout_secs > 0) {
         for (size_t i = 0; i < calls_count; i++) {
-            dispatch_worker_ctx_t wctx = {.alloc = alloc,
-                                          .tools = tools,
-                                          .tools_count = tools_count,
-                                          .call = &calls[i],
-                                          .done = 0};
-            memset(&wctx.result, 0, sizeof(hu_tool_result_t));
+            /* Heap-allocate so detached threads don't access stale stack frames */
+            dispatch_worker_ctx_t *wctx =
+                (dispatch_worker_ctx_t *)alloc->alloc(alloc->ctx, sizeof(dispatch_worker_ctx_t));
+            if (!wctx) {
+                results[i] = hu_tool_result_fail("worker alloc failed", 19);
+                continue;
+            }
+            wctx->alloc = alloc;
+            wctx->tools = tools;
+            wctx->tools_count = tools_count;
+            wctx->call = &calls[i];
+            wctx->done = 0;
+            memset(&wctx->result, 0, sizeof(hu_tool_result_t));
             pthread_t tid;
-            if (pthread_create(&tid, NULL, dispatch_worker, &wctx) != 0) {
+            if (pthread_create(&tid, NULL, dispatch_worker, wctx) != 0) {
+                alloc->free(alloc->ctx, wctx, sizeof(dispatch_worker_ctx_t));
                 results[i] = hu_tool_result_fail("thread creation failed", 22);
                 continue;
             }
-            int timed_out = timed_join(tid, timeout_secs, &wctx.done);
+            int timed_out = timed_join(tid, timeout_secs, &wctx->done);
             if (timed_out) {
-                hu_tool_result_free(alloc, &wctx.result);
+                /* Thread is detached and still running; it owns wctx and will
+                 * free it when done (see dispatch_worker). We cannot touch it. */
                 results[i] = hu_tool_result_fail("tool execution timed out", 24);
             } else {
-                results[i] = wctx.result;
+                results[i] = wctx->result;
+                alloc->free(alloc->ctx, wctx, sizeof(dispatch_worker_ctx_t));
             }
         }
     } else
@@ -250,7 +260,14 @@ static hu_error_t dispatch_sequential_ex(hu_allocator_t *alloc, hu_tool_t *tools
 static void *dispatch_worker(void *arg) {
     dispatch_worker_ctx_t *ctx = (dispatch_worker_ctx_t *)arg;
     execute_one_cached(ctx->alloc, ctx->tools, ctx->tools_count, ctx->call, &ctx->result, NULL);
-    ctx->done = 1;
+    /* Mark done atomically before checking if we were detached.
+     * If timed_join already detached us, we own the heap context and must free it. */
+    int was_done = __sync_val_compare_and_swap(&ctx->done, 0, 1);
+    if (was_done == -1) {
+        /* Parent set done=-1 to signal "detached, worker owns cleanup" */
+        hu_tool_result_free(ctx->alloc, &ctx->result);
+        ctx->alloc->free(ctx->alloc->ctx, ctx, sizeof(dispatch_worker_ctx_t));
+    }
     return NULL;
 }
 
@@ -268,8 +285,9 @@ static int timed_join(pthread_t thread, uint32_t timeout_secs, volatile int *don
         clock_gettime(CLOCK_REALTIME, &now);
         if (now.tv_sec > deadline.tv_sec ||
             (now.tv_sec == deadline.tv_sec && now.tv_nsec >= deadline.tv_nsec)) {
-            /* Detach instead of pthread_cancel to avoid corrupting state.
-             * The worker thread will finish naturally; we just stop waiting. */
+            /* Signal the worker that it owns its heap context.
+             * CAS: only set to -1 if worker hasn't already set to 1. */
+            __sync_val_compare_and_swap(done_flag, 0, -1);
             pthread_detach(thread);
             return -1;
         }

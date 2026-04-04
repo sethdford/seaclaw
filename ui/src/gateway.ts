@@ -31,6 +31,7 @@ type PendingReject = (reason: Error) => void;
 
 export class GatewayClient extends EventTarget {
   #url = "";
+  #authToken = "";
   #ws: WebSocket | null = null;
   #onBinaryChunk: ((data: ArrayBuffer) => void) | null = null;
   #pending = new Map<
@@ -57,6 +58,10 @@ export class GatewayClient extends EventTarget {
 
   get features(): ServerFeatures {
     return this.#features;
+  }
+
+  setAuthToken(token: string): void {
+    this.#authToken = token;
   }
 
   connect(url: string): void {
@@ -92,12 +97,17 @@ export class GatewayClient extends EventTarget {
 
   async #sendConnect(): Promise<void> {
     try {
+      const connectParams: Record<string, unknown> = {
+        client: "human-ui",
+        version: "0.3.0",
+      };
+      if (this.#authToken) connectParams.token = this.#authToken;
       const res = await this.request<{
         type?: string;
         server?: { version?: string };
         features?: ServerFeatures;
         protocol?: number;
-      }>("connect", { client: "human-ui", version: "0.3.0" });
+      }>("connect", connectParams);
       if (res && typeof res === "object") {
         const payload = res as Record<string, unknown>;
         if (payload.features) this.#features = payload.features as ServerFeatures;

@@ -853,7 +853,10 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
 
     /* ── toolCall ─────────────────────────────────────────────────── */
     hu_json_value_t *tc = hu_json_object_get(json, "toolCall");
-    if (tc) {
+    if (tc && !sc) {
+        /* If both serverContent and toolCall appear in the same frame, defer
+         * toolCall to a subsequent recv_event via the pending_calls buffer.
+         * This branch only fires when serverContent is absent. */
         gl_copy_event_type("toolCall", out);
         hu_json_value_t *fcs = hu_json_object_get(tc, "functionCalls");
         if (fcs && fcs->type == HU_JSON_ARRAY && fcs->data.array.len > 0) {
@@ -935,6 +938,49 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
         }
     }
 
+    /* If serverContent was present AND toolCall is also present, buffer ALL
+     * functionCalls from the toolCall as pending so they surface on the next recv. */
+    if (tc && sc) {
+        hu_json_value_t *fcs2 = hu_json_object_get(tc, "functionCalls");
+        if (fcs2 && fcs2->type == HU_JSON_ARRAY && fcs2->data.array.len > 0) {
+            size_t cnt = fcs2->data.array.len;
+            hu_gl_pending_tool_call_t *pcs = (hu_gl_pending_tool_call_t *)
+                alloc->alloc(alloc->ctx, cnt * sizeof(hu_gl_pending_tool_call_t));
+            if (pcs) {
+                memset(pcs, 0, cnt * sizeof(hu_gl_pending_tool_call_t));
+                size_t stored = 0;
+                for (size_t fi = 0; fi < cnt; fi++) {
+                    hu_json_value_t *fc = fcs2->data.array.items[fi];
+                    const char *fn = hu_json_get_string(fc, "name");
+                    if (!fn) continue;
+                    pcs[stored].name = hu_strndup(alloc, fn, strlen(fn));
+                    if (!pcs[stored].name) continue;
+                    pcs[stored].name_len = strlen(fn);
+                    const char *fi2 = hu_json_get_string(fc, "id");
+                    if (fi2 && fi2[0]) {
+                        pcs[stored].call_id = hu_strndup(alloc, fi2, strlen(fi2));
+                        pcs[stored].call_id_len = fi2 ? strlen(fi2) : 0;
+                    }
+                    hu_json_value_t *fa = hu_json_object_get(fc, "args");
+                    if (fa) {
+                        char *fas = NULL; size_t fal = 0;
+                        if (hu_json_stringify(alloc, fa, &fas, &fal) == HU_OK && fas) {
+                            pcs[stored].args_json = fas;
+                            pcs[stored].args_json_len = fal;
+                        }
+                    }
+                    stored++;
+                }
+                if (stored > 0) {
+                    session->pending_calls = pcs;
+                    session->pending_calls_count = stored;
+                } else {
+                    alloc->free(alloc->ctx, pcs, cnt * sizeof(hu_gl_pending_tool_call_t));
+                }
+            }
+        }
+    }
+
     /* ── toolCallCancellation ─────────────────────────────────────── */
     hu_json_value_t *tcc = hu_json_object_get(json, "toolCallCancellation");
     if (tcc) {
@@ -965,6 +1011,19 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
                 }
                 hu_json_buf_free(&id_buf);
             }
+        }
+    }
+
+    /* ── error envelope ─────────────────────────────────────────────── */
+    hu_json_value_t *errobj = hu_json_object_get(json, "error");
+    if (errobj) {
+        gl_copy_event_type("error", out);
+        out->error = true;
+        const char *emsg = hu_json_get_string(errobj, "message");
+        if (emsg && emsg[0] && !out->transcript) {
+            size_t elen = strlen(emsg);
+            out->transcript = hu_strndup(alloc, emsg, elen);
+            out->transcript_len = out->transcript ? elen : 0;
         }
     }
 

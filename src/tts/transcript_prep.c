@@ -19,6 +19,557 @@
 /* Forward declaration (defined below) */
 static bool ci_has(const char *hay, size_t hlen, const char *needle);
 
+/* ── Strip junk from TTS transcript ──────────────────────────────────── */
+
+static bool is_emoji_codepoint(const unsigned char *p, size_t remain) {
+    if (remain < 3)
+        return false;
+    /* Common emoji ranges in UTF-8 (3-4 byte sequences) */
+    if (p[0] == 0xE2 && p[1] >= 0x80 && p[1] <= 0xBF)
+        return true; /* misc symbols */
+    if (p[0] == 0xE2 && p[1] == 0x9A && p[2] >= 0x80)
+        return true; /* ⚠⚡⚙ etc */
+    if (p[0] == 0xE2 && p[1] == 0x9C)
+        return true; /* ✓✗✨ etc */
+    if (remain >= 4 && p[0] == 0xF0 && p[1] == 0x9F)
+        return true; /* U+1F000..1FFFF — most emoji */
+    return false;
+}
+
+size_t hu_transcript_strip_junk(const char *text, size_t text_len, char *out, size_t cap) {
+    if (!text || text_len == 0 || !out || cap == 0)
+        return 0;
+
+    size_t pos = 0;
+    size_t i = 0;
+    bool prev_was_space = false;
+
+    while (i < text_len && pos < cap - 1) {
+        /* Stage directions: *action text* */
+        if (text[i] == '*') {
+            size_t close = i + 1;
+            while (close < text_len && text[close] != '*' && text[close] != '\n')
+                close++;
+            if (close < text_len && text[close] == '*') {
+                i = close + 1;
+                while (i < text_len && text[i] == ' ')
+                    i++;
+                continue;
+            }
+        }
+
+        /* Tool JSON blobs: { ... } spanning multiple lines or with "tool" keys */
+        if (text[i] == '{') {
+            int depth = 1;
+            size_t j = i + 1;
+            while (j < text_len && depth > 0) {
+                if (text[j] == '{')
+                    depth++;
+                else if (text[j] == '}')
+                    depth--;
+                j++;
+            }
+            /* Only strip if it looks like a JSON blob (>20 chars or contains quotes) */
+            if (depth == 0 && (j - i > 20 || memchr(text + i, '"', j - i))) {
+                i = j;
+                while (i < text_len && text[i] == ' ')
+                    i++;
+                continue;
+            }
+        }
+
+        /* Emoji-as-icon characters */
+        if ((unsigned char)text[i] >= 0xE0) {
+            size_t remain = text_len - i;
+            if (is_emoji_codepoint((const unsigned char *)text + i, remain)) {
+                size_t skip = ((unsigned char)text[i] >= 0xF0) ? 4 : 3;
+                /* Skip variation selectors and ZWJ sequences */
+                i += skip;
+                while (i + 2 < text_len) {
+                    const unsigned char *p = (const unsigned char *)text + i;
+                    if (p[0] == 0xEF && p[1] == 0xB8 && p[2] == 0x8F) {
+                        i += 3; /* variation selector */
+                    } else if (p[0] == 0xE2 && p[1] == 0x80 && p[2] == 0x8D) {
+                        i += 3; /* ZWJ */
+                        if (i < text_len && is_emoji_codepoint(
+                                (const unsigned char *)text + i, text_len - i)) {
+                            i += ((unsigned char)text[i] >= 0xF0) ? 4 : 3;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                while (i < text_len && text[i] == ' ')
+                    i++;
+                continue;
+            }
+        }
+
+        /* Collapse multiple spaces */
+        if (text[i] == ' ') {
+            if (!prev_was_space && pos > 0) {
+                out[pos++] = ' ';
+                prev_was_space = true;
+            }
+            i++;
+            continue;
+        }
+
+        prev_was_space = false;
+        out[pos++] = text[i++];
+    }
+
+    /* Trim trailing whitespace */
+    while (pos > 0 && out[pos - 1] == ' ')
+        pos--;
+    out[pos] = '\0';
+    return pos;
+}
+
+/* ── Consonant cluster smoothing ─────────────────────────────────────── */
+
+typedef struct {
+    const char *cluster;
+    size_t len;
+    const char *replacement;
+    const char *replacement_strip; /* fallback without SSML */
+} consonant_fix_t;
+
+static const consonant_fix_t CONSONANT_FIXES[] = {
+    {"ngths", 5, "ng<break time=\"50ms\"/>ths", "ng ths"},
+    {"sths",  4, "s<break time=\"50ms\"/>ths",  "s ths"},
+    {"sts ",  4, "sts <break time=\"40ms\"/>",   "sts "},
+    {"ctly",  4, "ct<break time=\"30ms\"/>ly",   "ctly"},
+    {"mpts",  4, "mpts<break time=\"40ms\"/>",   "mpts "},
+};
+#define CONSONANT_FIX_COUNT (sizeof(CONSONANT_FIXES) / sizeof(CONSONANT_FIXES[0]))
+
+size_t hu_transcript_smooth_consonants(const char *text, size_t text_len, char *out, size_t cap,
+                                       bool strip_ssml) {
+    if (!text || text_len == 0 || !out || cap == 0)
+        return 0;
+
+    size_t pos = 0;
+    for (size_t i = 0; i < text_len && pos < cap - 1; i++) {
+        bool matched = false;
+        for (size_t f = 0; f < CONSONANT_FIX_COUNT; f++) {
+            const consonant_fix_t *fix = &CONSONANT_FIXES[f];
+            if (i + fix->len <= text_len && memcmp(text + i, fix->cluster, fix->len) == 0) {
+                const char *rep = strip_ssml ? fix->replacement_strip : fix->replacement;
+                size_t rlen = strlen(rep);
+                if (pos + rlen < cap) {
+                    memcpy(out + pos, rep, rlen);
+                    pos += rlen;
+                    i += fix->len - 1;
+                    matched = true;
+                    break;
+                }
+            }
+        }
+        if (!matched)
+            out[pos++] = text[i];
+    }
+    out[pos] = '\0';
+    return pos;
+}
+
+/* ── Number-to-word tables ────────────────────────────────────────────── */
+
+static const char *const ONES[] = {
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+    "seventeen", "eighteen", "nineteen",
+};
+static const char *const TENS[] = {
+    "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+};
+
+static size_t number_to_words(int n, char *out, size_t cap) {
+    if (n < 0 || n > 999999 || cap < 2)
+        return 0;
+    if (n < 20) {
+        size_t wlen = strlen(ONES[n]);
+        if (wlen < cap) { memcpy(out, ONES[n], wlen); return wlen; }
+        return 0;
+    }
+    if (n < 100) {
+        size_t pos = 0;
+        const char *t = TENS[n / 10];
+        size_t tlen = strlen(t);
+        if (pos + tlen >= cap) return 0;
+        memcpy(out + pos, t, tlen); pos += tlen;
+        if (n % 10 != 0) {
+            if (pos + 1 >= cap) return pos;
+            out[pos++] = '-';
+            const char *o = ONES[n % 10];
+            size_t olen = strlen(o);
+            if (pos + olen >= cap) return pos;
+            memcpy(out + pos, o, olen); pos += olen;
+        }
+        return pos;
+    }
+    if (n < 1000) {
+        size_t pos = 0;
+        size_t hlen = number_to_words(n / 100, out, cap);
+        pos += hlen;
+        const char *hund = " hundred";
+        if (pos + 8 >= cap) return pos;
+        memcpy(out + pos, hund, 8); pos += 8;
+        if (n % 100 != 0) {
+            if (pos + 5 >= cap) return pos;
+            memcpy(out + pos, " and ", 5); pos += 5;
+            pos += number_to_words(n % 100, out + pos, cap - pos);
+        }
+        return pos;
+    }
+    /* 1000-999999 */
+    size_t pos = 0;
+    pos += number_to_words(n / 1000, out, cap);
+    const char *thou = " thousand";
+    if (pos + 9 >= cap) return pos;
+    memcpy(out + pos, thou, 9); pos += 9;
+    if (n % 1000 != 0) {
+        if (pos + 1 >= cap) return pos;
+        out[pos++] = ' ';
+        pos += number_to_words(n % 1000, out + pos, cap - pos);
+    }
+    return pos;
+}
+
+/* Parse unsigned integer from text, returns chars consumed (0 if not a number). */
+static size_t parse_uint(const char *text, size_t len, int *out_val) {
+    if (len == 0 || !is_digit(text[0]))
+        return 0;
+    int val = 0;
+    size_t i = 0;
+    while (i < len && is_digit(text[i]) && i < 7) {
+        val = val * 10 + (text[i] - '0');
+        i++;
+    }
+    *out_val = val;
+    return i;
+}
+
+/* ── Month names ─────────────────────────────────────────────────────── */
+
+static const char *const MONTH_NAMES[] = {
+    "", "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+};
+
+static const char *ordinal_suffix(int day) {
+    if (day == 1 || day == 21 || day == 31) return "st";
+    if (day == 2 || day == 22) return "nd";
+    if (day == 3 || day == 23) return "rd";
+    return "th";
+}
+
+/* ── Speech normalizer ───────────────────────────────────────────────── */
+
+size_t hu_transcript_normalize_for_speech(const char *text, size_t text_len, char *out, size_t cap,
+                                          bool strip_ssml) {
+    if (!text || text_len == 0 || !out || cap < 2)
+        return 0;
+
+    size_t pos = 0;
+    size_t i = 0;
+
+    while (i < text_len && pos < cap - 1) {
+        /* Phone numbers: (XXX) XXX-XXXX or XXX-XXX-XXXX */
+        if (text[i] == '(' && i + 13 <= text_len &&
+            is_digit(text[i + 1]) && is_digit(text[i + 2]) && is_digit(text[i + 3]) &&
+            text[i + 4] == ')' && text[i + 5] == ' ' &&
+            is_digit(text[i + 6]) && is_digit(text[i + 7]) && is_digit(text[i + 8]) &&
+            text[i + 9] == '-' &&
+            is_digit(text[i + 10]) && is_digit(text[i + 11]) &&
+            is_digit(text[i + 12]) && is_digit(text[i + 13])) {
+            if (!strip_ssml) {
+                int n = snprintf(out + pos, cap - pos,
+                    "<spell>%.3s</spell><break time=\"200ms\"/>"
+                    "<spell>%.3s</spell><break time=\"200ms\"/>"
+                    "<spell>%.4s</spell>",
+                    text + i + 1, text + i + 6, text + i + 10);
+                if (n > 0 && pos + (size_t)n < cap) pos += (size_t)n;
+            } else {
+                int n = snprintf(out + pos, cap - pos, "%.3s, %.3s, %.4s",
+                                 text + i + 1, text + i + 6, text + i + 10);
+                if (n > 0 && pos + (size_t)n < cap) pos += (size_t)n;
+            }
+            i += 14;
+            continue;
+        }
+        /* XXX-XXX-XXXX (no parens) */
+        if (is_digit(text[i]) && i + 11 <= text_len &&
+            is_digit(text[i + 1]) && is_digit(text[i + 2]) && text[i + 3] == '-' &&
+            is_digit(text[i + 4]) && is_digit(text[i + 5]) && is_digit(text[i + 6]) &&
+            text[i + 7] == '-' &&
+            is_digit(text[i + 8]) && is_digit(text[i + 9]) &&
+            is_digit(text[i + 10]) && is_digit(text[i + 11])) {
+            /* Make sure it's not inside a longer number */
+            if (i > 0 && is_digit(text[i - 1])) goto not_phone;
+            if (i + 12 < text_len && is_digit(text[i + 12])) goto not_phone;
+            if (!strip_ssml) {
+                int n = snprintf(out + pos, cap - pos,
+                    "<spell>%.3s</spell><break time=\"200ms\"/>"
+                    "<spell>%.3s</spell><break time=\"200ms\"/>"
+                    "<spell>%.4s</spell>",
+                    text + i, text + i + 4, text + i + 8);
+                if (n > 0 && pos + (size_t)n < cap) pos += (size_t)n;
+            } else {
+                int n = snprintf(out + pos, cap - pos, "%.3s, %.3s, %.4s",
+                                 text + i, text + i + 4, text + i + 8);
+                if (n > 0 && pos + (size_t)n < cap) pos += (size_t)n;
+            }
+            i += 12;
+            continue;
+        }
+        not_phone:
+
+        /* Currency: $XX.XX or $X,XXX */
+        if (text[i] == '$' && i + 1 < text_len && is_digit(text[i + 1])) {
+            i++; /* skip $ */
+            int dollars = 0;
+            size_t dlen = parse_uint(text + i, text_len - i, &dollars);
+            i += dlen;
+            /* Skip comma-grouped thousands: $1,234 */
+            while (i + 3 < text_len && text[i] == ',' &&
+                   is_digit(text[i + 1]) && is_digit(text[i + 2]) && is_digit(text[i + 3])) {
+                dollars = dollars * 1000 + (text[i + 1] - '0') * 100 +
+                          (text[i + 2] - '0') * 10 + (text[i + 3] - '0');
+                i += 4;
+            }
+            int cents = 0;
+            if (i + 2 < text_len && text[i] == '.' && is_digit(text[i + 1]) && is_digit(text[i + 2])) {
+                cents = (text[i + 1] - '0') * 10 + (text[i + 2] - '0');
+                i += 3;
+            }
+            char word_buf[128];
+            size_t wpos = number_to_words(dollars, word_buf, sizeof(word_buf));
+            if (wpos > 0 && wpos + 20 < sizeof(word_buf)) {
+                const char *unit = dollars == 1 ? " dollar" : " dollars";
+                size_t ulen = strlen(unit);
+                memcpy(word_buf + wpos, unit, ulen); wpos += ulen;
+                if (cents > 0) {
+                    memcpy(word_buf + wpos, " and ", 5); wpos += 5;
+                    wpos += number_to_words(cents, word_buf + wpos, sizeof(word_buf) - wpos);
+                    const char *cu = cents == 1 ? " cent" : " cents";
+                    size_t culen = strlen(cu);
+                    if (wpos + culen < sizeof(word_buf)) {
+                        memcpy(word_buf + wpos, cu, culen); wpos += culen;
+                    }
+                }
+                if (pos + wpos < cap) {
+                    memcpy(out + pos, word_buf, wpos); pos += wpos;
+                }
+            }
+            continue;
+        }
+
+        /* Percentage: NN% */
+        if (is_digit(text[i])) {
+            size_t digit_start = i;
+            int val = 0;
+            size_t dlen = parse_uint(text + i, text_len - i, &val);
+            if (dlen > 0 && i + dlen < text_len && text[i + dlen] == '%') {
+                char word_buf[64];
+                size_t wpos = number_to_words(val, word_buf, sizeof(word_buf));
+                if (wpos > 0) {
+                    const char *pct = " percent";
+                    if (wpos + 8 < sizeof(word_buf)) {
+                        memcpy(word_buf + wpos, pct, 8); wpos += 8;
+                    }
+                    if (pos + wpos < cap) {
+                        memcpy(out + pos, word_buf, wpos); pos += wpos;
+                    }
+                    i += dlen + 1;
+                    continue;
+                }
+            }
+
+            /* Date: YYYY-MM-DD */
+            if (dlen == 4 && val >= 1900 && val <= 2100 && i + dlen + 5 <= text_len &&
+                text[i + dlen] == '-') {
+                int month = 0, day = 0;
+                size_t mlen = parse_uint(text + i + dlen + 1, text_len - i - dlen - 1, &month);
+                if (mlen > 0 && month >= 1 && month <= 12 &&
+                    i + dlen + 1 + mlen < text_len && text[i + dlen + 1 + mlen] == '-') {
+                    size_t dlen2 = parse_uint(text + i + dlen + 1 + mlen + 1,
+                                              text_len - i - dlen - 1 - mlen - 1, &day);
+                    if (dlen2 > 0 && day >= 1 && day <= 31) {
+                        char dbuf[80];
+                        int dn = snprintf(dbuf, sizeof(dbuf), "%s %d%s, %d",
+                                          MONTH_NAMES[month], day, ordinal_suffix(day), val);
+                        if (dn > 0 && pos + (size_t)dn < cap) {
+                            memcpy(out + pos, dbuf, (size_t)dn); pos += (size_t)dn;
+                        }
+                        i += dlen + 1 + mlen + 1 + dlen2;
+                        continue;
+                    }
+                }
+            }
+
+            /* Date: MM/DD/YYYY */
+            if (dlen <= 2 && val >= 1 && val <= 12 && i + dlen < text_len &&
+                text[i + dlen] == '/') {
+                int month = val;
+                int day = 0;
+                size_t dlen2 = parse_uint(text + i + dlen + 1, text_len - i - dlen - 1, &day);
+                if (dlen2 > 0 && day >= 1 && day <= 31 &&
+                    i + dlen + 1 + dlen2 < text_len && text[i + dlen + 1 + dlen2] == '/') {
+                    int year = 0;
+                    size_t ylen = parse_uint(text + i + dlen + 1 + dlen2 + 1,
+                                             text_len - i - dlen - 1 - dlen2 - 1, &year);
+                    if (ylen == 4 && year >= 1900 && year <= 2100) {
+                        char dbuf[80];
+                        int dn = snprintf(dbuf, sizeof(dbuf), "%s %d%s, %d",
+                                          MONTH_NAMES[month], day, ordinal_suffix(day), year);
+                        if (dn > 0 && pos + (size_t)dn < cap) {
+                            memcpy(out + pos, dbuf, (size_t)dn); pos += (size_t)dn;
+                        }
+                        i += dlen + 1 + dlen2 + 1 + ylen;
+                        continue;
+                    }
+                }
+            }
+
+            /* Time: H:MM AM/PM or HH:MM */
+            if (dlen <= 2 && val >= 1 && val <= 23 && i + dlen + 2 < text_len &&
+                text[i + dlen] == ':' && is_digit(text[i + dlen + 1]) &&
+                is_digit(text[i + dlen + 2])) {
+                int hour = val;
+                int minute = (text[i + dlen + 1] - '0') * 10 + (text[i + dlen + 2] - '0');
+                size_t consumed = dlen + 3;
+                const char *ampm = "";
+                /* Skip optional space + AM/PM */
+                size_t after = i + consumed;
+                if (after < text_len && text[after] == ' ') after++;
+                if (after + 1 < text_len) {
+                    if ((text[after] == 'A' || text[after] == 'a') &&
+                        (text[after + 1] == 'M' || text[after + 1] == 'm')) {
+                        ampm = " AM";
+                        consumed = after + 2 - i;
+                    } else if ((text[after] == 'P' || text[after] == 'p') &&
+                               (text[after + 1] == 'M' || text[after + 1] == 'm')) {
+                        ampm = " PM";
+                        consumed = after + 2 - i;
+                    }
+                }
+                /* Also handle "A.M." and "P.M." */
+                if (ampm[0] == '\0' && after + 3 < text_len && text[after + 1] == '.') {
+                    if ((text[after] == 'A' || text[after] == 'a') &&
+                        (text[after + 2] == 'M' || text[after + 2] == 'm') &&
+                        text[after + 3] == '.') {
+                        ampm = " AM";
+                        consumed = after + 4 - i;
+                    } else if ((text[after] == 'P' || text[after] == 'p') &&
+                               (text[after + 2] == 'M' || text[after + 2] == 'm') &&
+                               text[after + 3] == '.') {
+                        ampm = " PM";
+                        consumed = after + 4 - i;
+                    }
+                }
+                char tbuf[64];
+                int tn;
+                if (minute == 0)
+                    tn = snprintf(tbuf, sizeof(tbuf), "%s o'clock%s", ONES[hour], ampm);
+                else {
+                    char min_words[32];
+                    size_t mwlen = number_to_words(minute, min_words, sizeof(min_words));
+                    min_words[mwlen] = '\0';
+                    if (minute < 10)
+                        tn = snprintf(tbuf, sizeof(tbuf), "%s oh %s%s", ONES[hour], min_words, ampm);
+                    else
+                        tn = snprintf(tbuf, sizeof(tbuf), "%s %s%s", ONES[hour], min_words, ampm);
+                }
+                if (tn > 0 && pos + (size_t)tn < cap) {
+                    memcpy(out + pos, tbuf, (size_t)tn); pos += (size_t)tn;
+                }
+                i += consumed;
+                continue;
+            }
+
+            /* Small standalone integers (0-99) → words */
+            if (dlen > 0 && val <= 99 && dlen <= 2) {
+                bool preceded_by_alnum = (digit_start > 0 &&
+                    ((text[digit_start - 1] >= 'a' && text[digit_start - 1] <= 'z') ||
+                     (text[digit_start - 1] >= 'A' && text[digit_start - 1] <= 'Z') ||
+                     is_digit(text[digit_start - 1])));
+                bool followed_by_alnum = (digit_start + dlen < text_len &&
+                    ((text[digit_start + dlen] >= 'a' && text[digit_start + dlen] <= 'z') ||
+                     (text[digit_start + dlen] >= 'A' && text[digit_start + dlen] <= 'Z') ||
+                     is_digit(text[digit_start + dlen])));
+                /* Only convert truly standalone numbers, not parts of larger tokens */
+                if (!preceded_by_alnum && !followed_by_alnum) {
+                    char word_buf[32];
+                    size_t wpos = number_to_words(val, word_buf, sizeof(word_buf));
+                    if (wpos > 0 && pos + wpos < cap) {
+                        memcpy(out + pos, word_buf, wpos); pos += wpos;
+                        i += dlen;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        /* Default: copy character through */
+        out[pos++] = text[i++];
+    }
+
+    out[pos] = '\0';
+    return pos;
+}
+
+/* ── Break density limiter ───────────────────────────────────────────── */
+
+size_t hu_transcript_limit_breaks(char *buf, size_t len, int max_breaks_per_100_chars) {
+    if (!buf || len == 0 || max_breaks_per_100_chars <= 0)
+        return len;
+
+    /* Count total breaks and compute limit */
+    int total_breaks = 0;
+    const char *p = buf;
+    while ((p = strstr(p, "<break ")) != NULL) {
+        total_breaks++;
+        p += 7;
+    }
+
+    int max_allowed = (int)((len * (size_t)max_breaks_per_100_chars) / 100);
+    if (max_allowed < 2) max_allowed = 2;
+
+    if (total_breaks <= max_allowed)
+        return len;
+
+    /* Remove excess breaks (keep the first N, remove the rest) */
+    int kept = 0;
+    size_t rpos = 0, wpos = 0;
+    while (rpos < len) {
+        if (rpos + 7 <= len && memcmp(buf + rpos, "<break ", 7) == 0) {
+            /* Find end of this break tag */
+            const char *end = strstr(buf + rpos, "/>");
+            if (end) {
+                size_t tag_end = (size_t)(end - buf) + 2;
+                if (kept < max_allowed) {
+                    /* Keep this break — copy it */
+                    size_t tag_len = tag_end - rpos;
+                    if (wpos != rpos)
+                        memmove(buf + wpos, buf + rpos, tag_len);
+                    wpos += tag_len;
+                    kept++;
+                }
+                /* else: skip this break entirely */
+                rpos = tag_end;
+                continue;
+            }
+        }
+        if (wpos != rpos)
+            buf[wpos] = buf[rpos];
+        wpos++;
+        rpos++;
+    }
+    buf[wpos] = '\0';
+    return wpos;
+}
+
 /* ── Abbreviation table (don't split on these periods) ────────────────── */
 
 static const char *const ABBREVIATIONS[] = {
@@ -375,6 +926,39 @@ static const char *pick_nonverbal(const char *sentence, size_t len, const char *
 
 /* ── Main preprocessor ───────────────────────────────────────────────── */
 
+/* ── Thinking sound selection ─────────────────────────────────────────── */
+
+static const char *pick_thinking_sound(const char *transcript, size_t len, uint32_t seed) {
+    if (!transcript || len == 0)
+        return NULL;
+
+    /* Complex responses: questions, long text, emotional content */
+    bool is_complex = len > 120;
+    bool has_question = false;
+    bool has_emotional = false;
+    for (size_t i = 0; i < len && i < 200; i++) {
+        if (transcript[i] == '?')
+            has_question = true;
+    }
+    if (ci_has(transcript, len > 200 ? 200 : len, "feel") ||
+        ci_has(transcript, len > 200 ? 200 : len, "think") ||
+        ci_has(transcript, len > 200 ? 200 : len, "believe") ||
+        ci_has(transcript, len > 200 ? 200 : len, "honestly"))
+        has_emotional = true;
+
+    if (!is_complex && !has_question && !has_emotional)
+        return NULL;
+
+    /* ~40% chance of a thinking sound for qualifying content */
+    if ((seed % 100) >= 40)
+        return NULL;
+
+    static const char *const SOUNDS[] = {
+        "Hmm, ", "Well, ", "So, ", "Okay so, ", "Yeah, ",
+    };
+    return SOUNDS[seed % 5];
+}
+
 hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
                               const hu_prep_config_t *config, hu_prep_result_t *result) {
     if (!transcript || transcript_len == 0 || !config || !result)
@@ -382,15 +966,38 @@ hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
 
     memset(result, 0, sizeof(*result));
 
+    /* Phase 0a: strip junk (stage directions, JSON blobs, emoji icons) */
+    char cleaned[HU_PREP_MAX_OUTPUT];
+    size_t cleaned_len = hu_transcript_strip_junk(transcript, transcript_len,
+                                                   cleaned, sizeof(cleaned));
+    const char *src = cleaned_len > 0 ? cleaned : transcript;
+    size_t src_len = cleaned_len > 0 ? cleaned_len : transcript_len;
+
+    /* Phase 0b: normalize numbers, dates, times, currency for speech */
+    char normalized[HU_PREP_MAX_OUTPUT];
+    size_t norm_len = hu_transcript_normalize_for_speech(src, src_len, normalized,
+                                                         sizeof(normalized), config->strip_ssml);
+    if (norm_len > 0) {
+        src = normalized;
+        src_len = norm_len;
+    }
+
+    /* Phase 0c: consonant cluster smoothing */
+    char smoothed[HU_PREP_MAX_OUTPUT];
+    size_t smoothed_len = hu_transcript_smooth_consonants(src, src_len, smoothed,
+                                                          sizeof(smoothed), config->strip_ssml);
+    if (smoothed_len > 0) {
+        src = smoothed;
+        src_len = smoothed_len;
+    }
+
     /* Segment into sentences */
     result->sentence_count = hu_transcript_segment(
-        transcript, transcript_len, result->sentences, HU_PREP_MAX_SENTENCES);
+        src, src_len, result->sentences, HU_PREP_MAX_SENTENCES);
 
     if (result->sentence_count == 0) {
-        /* No sentence boundaries found — pass through as-is */
-        size_t cp = transcript_len < HU_PREP_MAX_OUTPUT - 1 ? transcript_len
-                                                            : HU_PREP_MAX_OUTPUT - 1;
-        memcpy(result->output, transcript, cp);
+        size_t cp = src_len < HU_PREP_MAX_OUTPUT - 1 ? src_len : HU_PREP_MAX_OUTPUT - 1;
+        memcpy(result->output, src, cp);
         result->output[cp] = '\0';
         result->output_len = cp;
         result->dominant_emotion = config->default_emotion ? config->default_emotion : "content";
@@ -401,6 +1008,13 @@ hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
     float base_speed = config->base_speed > 0.0f ? config->base_speed : 0.95f;
     float pause_factor = config->pause_factor > 0.0f ? config->pause_factor : 1.0f;
 
+    /* Late-night adaptation (22-6): softer, slower, longer pauses */
+    bool late_night = (config->hour_local >= 22 || config->hour_local <= 6);
+    if (late_night) {
+        base_speed *= 0.92f;
+        pause_factor *= 1.25f;
+    }
+
     /* Tag each sentence with emotion and speed */
     for (size_t i = 0; i < result->sentence_count; i++) {
         hu_prep_sentence_t *s = &result->sentences[i];
@@ -409,9 +1023,29 @@ hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
         s->speed_ratio = speed_for_sentence(s->text, s->len, base_speed);
     }
 
-    /* Dominant emotion = first sentence's emotion (sets the tone) */
+    /* Dominant emotion: blend with previous turn for emotional momentum */
     result->dominant_emotion = result->sentences[0].emotion;
+    if (config->prev_turn_emotion && config->prev_turn_emotion[0] &&
+        result->dominant_emotion &&
+        strcmp(config->prev_turn_emotion, result->dominant_emotion) != 0) {
+        /* If previous turn was highly emotional, carry it forward for first sentence
+         * unless the new emotion is strongly different. This creates continuity. */
+        const char *prev = config->prev_turn_emotion;
+        bool prev_intense = (strcmp(prev, "excited") == 0 || strcmp(prev, "sad") == 0 ||
+                             strcmp(prev, "angry") == 0 || strcmp(prev, "sympathetic") == 0);
+        bool new_neutral = (strcmp(result->dominant_emotion, "content") == 0 ||
+                            strcmp(result->dominant_emotion, "calm") == 0);
+        if (prev_intense && new_neutral) {
+            result->dominant_emotion = prev;
+            result->sentences[0].emotion = prev;
+        }
+    }
+
     result->volume = hu_emotion_to_volume(result->dominant_emotion);
+
+    /* Late-night volume reduction */
+    if (late_night && result->volume > 0.85f)
+        result->volume *= 0.90f;
 
     bool strip = config->strip_ssml;
 
@@ -419,6 +1053,32 @@ hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
     char *out = result->output;
     size_t cap = HU_PREP_MAX_OUTPUT - 1;
     size_t pos = 0;
+
+    /* Thinking sound (optional opening filler for complex responses) */
+    if (config->thinking_sounds) {
+        const char *tsnd = pick_thinking_sound(src, src_len, config->seed);
+        if (tsnd) {
+            size_t tlen = strlen(tsnd);
+            if (pos + tlen + 30 < cap) {
+                memcpy(out + pos, tsnd, tlen);
+                pos += tlen;
+                if (!strip) {
+                    int n = snprintf(out + pos, cap - pos, "<break time=\"200ms\"/>");
+                    if (n > 0 && pos + (size_t)n < cap)
+                        pos += (size_t)n;
+                }
+            }
+        }
+    }
+
+    /* Thinking-time opening pause (contextual: longer for complex content) */
+    if (!strip && src_len > 60) {
+        int think_ms = src_len > 200 ? 400 : 250;
+        think_ms = (int)(think_ms * pause_factor);
+        int n = snprintf(out + pos, cap - pos, "<break time=\"%dms\"/>", think_ms);
+        if (n > 0 && pos + (size_t)n < cap)
+            pos += (size_t)n;
+    }
 
     for (size_t i = 0; i < result->sentence_count; i++) {
         hu_prep_sentence_t *s = &result->sentences[i];
@@ -547,5 +1207,13 @@ hu_error_t hu_transcript_prep(const char *transcript, size_t transcript_len,
 
     out[pos] = '\0';
     result->output_len = pos;
+
+    /* Phase final: limit break density to avoid audio artifacts.
+     * Research shows excessive <break> tags cause instability and speed glitches.
+     * Cap at 4 breaks per 100 characters (generous but safe). */
+    if (!strip && pos > 0) {
+        result->output_len = hu_transcript_limit_breaks(result->output, pos, 4);
+    }
+
     return HU_OK;
 }

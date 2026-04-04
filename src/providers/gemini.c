@@ -1160,6 +1160,11 @@ static hu_error_t gemini_stream_chat(void *ctx, hu_allocator_t *alloc,
         alloc->free(alloc->ctx, body, body_len);
         return err;
     }
+    {
+        FILE *dbg = fopen("/tmp/gemini_req.json", "w");
+        if (dbg) { fwrite(body, 1, body_len, dbg); fclose(dbg); }
+        fprintf(stderr, "[gemini] url=%s body_len=%zu\n", url_buf, body_len);
+    }
     err = hu_http_post_json_stream(alloc, url_buf, auth_header, NULL, body, body_len,
                                    gemini_stream_write_cb, &sctx);
     hu_sse_parser_deinit(&sctx.parser);

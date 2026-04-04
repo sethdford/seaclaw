@@ -2342,7 +2342,8 @@ static void test_reliable_create_with_extras(void) {
         .provider = fallback,
     }};
     hu_provider_t prov;
-    hu_error_t err = hu_reliable_create_ex(&alloc, primary, 1, 50, extras, 1, NULL, 0, &prov);
+    hu_error_t err =
+        hu_reliable_create_ex(&alloc, primary, 1, 50, extras, 1, NULL, 0, NULL, &prov);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(prov.ctx);
     HU_ASSERT_STR_EQ(prov.vtable->get_name(prov.ctx), "openai");
@@ -2365,8 +2366,8 @@ static void test_reliable_create_with_model_fallbacks(void) {
         .fallbacks_count = 2,
     }};
     hu_provider_t prov;
-    hu_error_t err =
-        hu_reliable_create_ex(&alloc, inner, 0, 50, NULL, 0, model_fallbacks, 1, &prov);
+    hu_error_t err = hu_reliable_create_ex(&alloc, inner, 0, 50, NULL, 0, model_fallbacks, 1, NULL,
+                                           &prov);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(prov.ctx);
     if (prov.vtable->deinit)
@@ -2382,7 +2383,7 @@ static void test_reliable_chat_with_extras_primary_succeeds(void) {
     hu_reliable_provider_entry_t extras[1] = {
         {.name = "ollama", .name_len = 6, .provider = fallback}};
     hu_provider_t prov;
-    hu_reliable_create_ex(&alloc, primary, 0, 50, extras, 1, NULL, 0, &prov);
+    hu_reliable_create_ex(&alloc, primary, 0, 50, extras, 1, NULL, 0, NULL, &prov);
     hu_chat_message_t msgs[1] = {make_user_msg("hi", 2)};
     hu_chat_request_t req = make_simple_request(msgs, 1);
     hu_chat_response_t resp = {0};

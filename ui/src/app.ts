@@ -1237,7 +1237,7 @@ export class ScApp extends LitElement {
       case "voice":
         return html`<hu-voice-view></hu-voice-view>`;
       case "canvas":
-        return html`<canvas-view></canvas-view>`;
+        return html`<hu-canvas-view></hu-canvas-view>`;
       case "nodes":
         return html`<hu-nodes-view></hu-nodes-view>`;
       case "usage":

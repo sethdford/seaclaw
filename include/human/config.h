@@ -51,6 +51,15 @@ typedef struct hu_runtime_config {
     char *gce_instance;
 } hu_runtime_config_t;
 
+/* Cap rows in reliability.model_fallbacks JSON array */
+#define HU_MAX_RELIABILITY_MODEL_FALLBACK_ROWS 16
+
+typedef struct hu_reliability_model_fallback {
+    char *model;
+    char **fallback_models;
+    size_t fallback_models_len;
+} hu_reliability_model_fallback_t;
+
 typedef struct hu_reliability_config {
     char *primary_provider; /* used when default_provider is "reliable" */
     uint32_t provider_retries;
@@ -61,6 +70,10 @@ typedef struct hu_reliability_config {
     uint32_t scheduler_retries;
     char **fallback_providers;
     size_t fallback_providers_len;
+    hu_reliability_model_fallback_t *model_fallbacks;
+    size_t model_fallbacks_len;
+    uint32_t streaming_retries;
+    bool circuit_breaker_enabled;
 } hu_reliability_config_t;
 
 typedef struct hu_router_config {

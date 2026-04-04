@@ -1,6 +1,7 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { EVENT_NAMES } from "../utils.js";
 import { log } from "../lib/log.js";
+import type { GatewayClient } from "../gateway.js";
 import { ChatCache } from "./chat-cache.js";
 import {
   exportAsJson as exportItemsAsJson,
@@ -116,13 +117,32 @@ export class ChatController implements ReactiveController {
     /* no-op */
   }
 
-  loadEarlier(): void {
+  async loadEarlier(): Promise<void> {
     this.loadingEarlier = true;
     this._requestUpdate();
-    (this.host as unknown as EventTarget).dispatchEvent(
-      new CustomEvent("hu-load-earlier-request", { bubbles: true, composed: true }),
-    );
-    // Stub: gateway integration will clear loadingEarlier when done
+    try {
+      const gw = (this.host as unknown as { _gw?: GatewayClient })._gw;
+      if (gw) {
+        const sessionKey = this.items.length > 0 ? (this.items[0] as Record<string, unknown>).session as string | undefined : undefined;
+        const before = this.items.length > 0 ? (this.items[0] as Record<string, unknown>).id as string | undefined : undefined;
+        const res = await gw.request<{ messages?: ChatItem[] }>("chat.history", {
+          session: sessionKey,
+          before,
+          limit: 50,
+        });
+        const msgs = Array.isArray(res?.messages) ? res.messages : [];
+        if (msgs.length > 0) {
+          this.items = [...msgs, ...this.items];
+          this.trimmedCount = Math.max(0, this.trimmedCount - msgs.length);
+        }
+        if (msgs.length === 0) this.trimmedCount = 0;
+      }
+    } catch {
+      /* Gracefully degrade — leave existing items intact */
+    } finally {
+      this.loadingEarlier = false;
+      this._requestUpdate();
+    }
   }
 
   private _trimIfNeeded(): void {

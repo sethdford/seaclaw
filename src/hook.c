@@ -429,11 +429,12 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
         _exit(127);
     }
 
-    /* Parent: read stdout and wait with timeout */
+    /* Parent: read stdout and wait with timeout.
+     * Defer freeing cmd until after waitpid to avoid any theoretical COW race
+     * with the child's execve(). In practice fork gives the child its own
+     * mapping, but being explicit costs nothing. */
     close(pipefd[1]);
-    alloc->free(alloc->ctx, cmd, cmd_len + 1);
 
-    /* Declare status early for limit check below */
     int status = 0;
 
     /* Read stdout with 1MB limit to prevent DoS */
@@ -472,6 +473,7 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
     if (stdout_limit_exceeded) {
         kill(pid, SIGKILL);
         waitpid(pid, &status, 0);
+        alloc->free(alloc->ctx, cmd, cmd_len + 1);
         if (buf)
             alloc->free(alloc->ctx, buf, buf_cap);
         return HU_ERR_IO;
@@ -498,11 +500,14 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
             kill(pid, SIGKILL);
             waitpid(pid, &status, 0);
         }
+        alloc->free(alloc->ctx, cmd, cmd_len + 1);
         if (buf)
             alloc->free(alloc->ctx, buf, buf_cap);
         *exit_code = -1;
         return HU_ERR_TIMEOUT;
     }
+
+    alloc->free(alloc->ctx, cmd, cmd_len + 1);
 
     if (WIFEXITED(status)) {
         *exit_code = WEXITSTATUS(status);

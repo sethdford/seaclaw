@@ -451,6 +451,7 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
 hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t msg_len,
                                    hu_agent_stream_event_cb on_event, void *event_ctx,
                                    char **response_out, size_t *response_len_out) {
+    fprintf(stderr, "[stream_v2] enter msg_len=%zu\n", msg_len);
     if (!agent || !msg || !response_out)
         return HU_ERR_INVALID_ARGUMENT;
     *response_out = NULL;
@@ -763,15 +764,27 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         if (msgs)
             agent->alloc->free(agent->alloc->ctx, msgs, msgs_count * sizeof(hu_chat_message_t));
 
+        const char *eff_model = agent->model_name;
+        size_t eff_model_len = agent->model_name_len;
+        double eff_temp = agent->temperature;
+        if (agent->turn_model && agent->turn_model_len > 0) {
+            eff_model = agent->turn_model;
+            eff_model_len = agent->turn_model_len;
+        }
+        if (agent->turn_temperature > 0.0)
+            eff_temp = agent->turn_temperature;
+
         hu_chat_request_t req;
         memset(&req, 0, sizeof(req));
         req.messages = all_msgs;
         req.messages_count = total_msgs;
-        req.model = agent->model_name;
-        req.model_len = agent->model_name_len;
-        req.temperature = agent->temperature;
+        req.model = eff_model;
+        req.model_len = eff_model_len;
+        req.temperature = eff_temp;
         req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
         req.tools_count = agent->tool_specs_count;
+        if (agent->turn_thinking_budget > 0)
+            req.thinking_budget = agent->turn_thinking_budget;
 
         /* Stream from the provider (with emotional pacing on first chunk).
          * When quality systems (GVR/Constitutional) are enabled, suppress streaming
@@ -789,8 +802,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         hu_stream_chat_result_t sresp;
         memset(&sresp, 0, sizeof(sresp));
         err = agent->provider.vtable->stream_chat(
-            agent->provider.ctx, agent->alloc, &req, agent->model_name, agent->model_name_len,
-            agent->temperature, stream_chunk_to_event_cb, &wrap, &sresp);
+            agent->provider.ctx, agent->alloc, &req, eff_model, eff_model_len, eff_temp,
+            stream_chunk_to_event_cb, &wrap, &sresp);
 
         agent->alloc->free(agent->alloc->ctx, all_msgs, total_msgs * sizeof(hu_chat_message_t));
 

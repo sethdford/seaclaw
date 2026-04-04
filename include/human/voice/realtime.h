@@ -37,6 +37,9 @@ typedef struct hu_voice_rt_event {
     bool done; /* true if this is an end-of-response event (turnComplete) */
     bool interrupted; /* model response was interrupted by barge-in */
     bool generation_complete; /* model finished generating (may still be playing back) */
+    bool error; /* server-side error event */
+    bool vad_speech_started; /* OpenAI: user speech detected */
+    bool vad_speech_stopped; /* OpenAI: user speech ended */
     int go_away_ms; /* >0: server will disconnect in this many ms (goAway) */
 } hu_voice_rt_event_t;
 

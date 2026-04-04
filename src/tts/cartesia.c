@@ -59,7 +59,9 @@ static hu_error_t append_output_format_json(hu_json_buf_t *jbuf, cartesia_api_co
 
 static void apply_defaults(const hu_cartesia_tts_config_t *config,
     const char **model_id, const char **voice_id, const char **emotion,
-    float *speed, float *volume, bool *nonverbals) {
+    float *speed, float *volume, bool *nonverbals,
+    float *emotion_intensity, const char **pronunciation_dict_id,
+    const char **language) {
     if (config) {
         *model_id = config->model_id && config->model_id[0] ? config->model_id : DEFAULT_MODEL;
         *voice_id = config->voice_id ? config->voice_id : "";
@@ -67,6 +69,9 @@ static void apply_defaults(const hu_cartesia_tts_config_t *config,
         *speed = config->speed > 0.f ? config->speed : DEFAULT_SPEED;
         *volume = config->volume > 0.f ? config->volume : DEFAULT_VOLUME;
         *nonverbals = config->nonverbals;
+        *emotion_intensity = config->emotion_intensity;
+        *pronunciation_dict_id = config->pronunciation_dict_id;
+        *language = config->language;
     } else {
         *model_id = DEFAULT_MODEL;
         *voice_id = "";
@@ -74,6 +79,9 @@ static void apply_defaults(const hu_cartesia_tts_config_t *config,
         *speed = DEFAULT_SPEED;
         *volume = DEFAULT_VOLUME;
         *nonverbals = false;
+        *emotion_intensity = 0.0f;
+        *pronunciation_dict_id = NULL;
+        *language = NULL;
     }
 }
 #endif /* !HU_IS_TEST && HU_HTTP_CURL */
@@ -110,9 +118,11 @@ hu_error_t hu_cartesia_tts_synthesize(hu_allocator_t *alloc,
     return HU_OK;
 #elif defined(HU_HTTP_CURL)
     const char *model_id, *voice_id, *emotion;
-    float speed, volume;
+    float speed, volume, emotion_intensity;
     bool nonverbals;
-    apply_defaults(config, &model_id, &voice_id, &emotion, &speed, &volume, &nonverbals);
+    const char *pronunciation_dict_id, *language;
+    apply_defaults(config, &model_id, &voice_id, &emotion, &speed, &volume, &nonverbals,
+                   &emotion_intensity, &pronunciation_dict_id, &language);
     cartesia_api_container_t api_ct = api_container_for_output_format(output_format);
 
     hu_json_buf_t jbuf;
@@ -160,16 +170,60 @@ hu_error_t hu_cartesia_tts_synthesize(hu_allocator_t *alloc,
     err = hu_json_append_string(&jbuf, emotion, strlen(emotion));
     if (err)
         goto fail;
-    n = snprintf(num_buf, sizeof(num_buf), ",\"volume\":%.2f,\"nonverbals\":%s}",
+    char gc_buf[128];
+    n = snprintf(gc_buf, sizeof(gc_buf), ",\"volume\":%.2f,\"nonverbals\":%s",
         (double)volume, nonverbals ? "true" : "false");
-    if (n <= 0 || (size_t)n >= sizeof(num_buf)) {
+    if (n <= 0 || (size_t)n >= sizeof(gc_buf)) {
         err = HU_ERR_INTERNAL;
         goto fail;
     }
-    err = hu_json_buf_append_raw(&jbuf, num_buf, (size_t)n);
+    err = hu_json_buf_append_raw(&jbuf, gc_buf, (size_t)n);
     if (err)
         goto fail;
-    err = hu_json_buf_append_raw(&jbuf, "}}", 2);
+
+    /* emotion_intensity (0.0-1.0): only include when explicitly set */
+    if (emotion_intensity > 0.001f) {
+        n = snprintf(gc_buf, sizeof(gc_buf), ",\"emotion_intensity\":%.2f",
+                     (double)emotion_intensity);
+        if (n > 0 && (size_t)n < sizeof(gc_buf)) {
+            err = hu_json_buf_append_raw(&jbuf, gc_buf, (size_t)n);
+            if (err)
+                goto fail;
+        }
+    }
+
+    err = hu_json_buf_append_raw(&jbuf, "}", 1);
+    if (err)
+        goto fail;
+
+    /* language (top-level, outside generation_config) */
+    if (language && language[0]) {
+        err = hu_json_buf_append_raw(&jbuf, ",\"language\":\"", 13);
+        if (err)
+            goto fail;
+        err = hu_json_append_string(&jbuf, language, strlen(language));
+        if (err)
+            goto fail;
+        err = hu_json_buf_append_raw(&jbuf, "\"", 1);
+        if (err)
+            goto fail;
+    }
+
+    /* pronunciation_dict_id (top-level context) */
+    if (pronunciation_dict_id && pronunciation_dict_id[0]) {
+        err = hu_json_buf_append_raw(
+            &jbuf, ",\"context\":{\"pronunciation_dict_id\":\"", 38);
+        if (err)
+            goto fail;
+        err = hu_json_append_string(&jbuf, pronunciation_dict_id, strlen(pronunciation_dict_id));
+        if (err)
+            goto fail;
+        err = hu_json_buf_append_raw(&jbuf, "\"}", 2);
+        if (err)
+            goto fail;
+    }
+
+    err = hu_json_buf_append_raw(&jbuf, "}", 1);
     if (err)
         goto fail;
 

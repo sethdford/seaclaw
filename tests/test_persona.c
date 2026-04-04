@@ -2187,7 +2187,11 @@ static void test_persona_load_json_voice_block_parses(void) {
                        "\"default_speed\":0.95,"
                        "\"nonverbals\":true,"
                        "\"strip_ssml\":true,"
-                       "\"discourse_markers\":true"
+                       "\"discourse_markers\":true,"
+                       "\"emotion_intensity\":0.7,"
+                       "\"pronunciation_dict_id\":\"dict-uuid-123\","
+                       "\"language\":\"en\","
+                       "\"thinking_sounds\":true"
                        "}}";
     hu_persona_t p = {0};
     hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &p);
@@ -2200,6 +2204,10 @@ static void test_persona_load_json_voice_block_parses(void) {
     HU_ASSERT_TRUE(p.voice.nonverbals);
     HU_ASSERT_TRUE(p.voice.strip_ssml);
     HU_ASSERT_TRUE(p.voice.discourse_markers);
+    HU_ASSERT_FLOAT_EQ(p.voice.emotion_intensity, 0.7f, 0.001f);
+    HU_ASSERT_STR_EQ(p.voice.pronunciation_dict_id, "dict-uuid-123");
+    HU_ASSERT_STR_EQ(p.voice.language, "en");
+    HU_ASSERT_TRUE(p.voice.thinking_sounds);
     hu_persona_deinit(&alloc, &p);
 }
 
@@ -2218,6 +2226,10 @@ static void test_persona_load_json_voice_defaults_when_absent(void) {
     HU_ASSERT_TRUE(p.voice.nonverbals);
     HU_ASSERT_FALSE(p.voice.strip_ssml);
     HU_ASSERT_FALSE(p.voice.discourse_markers);
+    HU_ASSERT_FLOAT_EQ(p.voice.emotion_intensity, 0.0f, 0.001f);
+    HU_ASSERT_EQ(p.voice.pronunciation_dict_id[0], '\0');
+    HU_ASSERT_EQ(p.voice.language[0], '\0');
+    HU_ASSERT_FALSE(p.voice.thinking_sounds);
     HU_ASSERT_FALSE(p.voice_messages.enabled);
     HU_ASSERT_STR_EQ(p.voice_messages.frequency, "rare");
     HU_ASSERT_EQ(p.voice_messages.max_duration_sec, 30u);
@@ -2582,6 +2594,40 @@ static void test_persona_prompt_includes_voice_rhythm(void) {
     HU_ASSERT_NOT_NULL(strstr(out, "Voice Rhythm"));
     HU_ASSERT_NOT_NULL(strstr(out, "short bursts"));
     HU_ASSERT_NOT_NULL(strstr(out, "quick"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_includes_voice_speech_guidance(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p = {0};
+    p.name = "vgtest";
+    p.name_len = 6;
+    p.identity = "Test";
+    (void)snprintf(p.voice.voice_id, sizeof(p.voice.voice_id), "%.63s", "test-voice-uuid");
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_persona_build_prompt(&alloc, &p, "imessage", 8, NULL, 0, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(strstr(out, "Voice Message Guidance"));
+    HU_ASSERT_NOT_NULL(strstr(out, "contractions"));
+    HU_ASSERT_NOT_NULL(strstr(out, "emoji"));
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
+static void test_persona_prompt_no_voice_guidance_for_text_channel(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p = {0};
+    p.name = "nvtest";
+    p.name_len = 6;
+    p.identity = "Test";
+    (void)snprintf(p.voice.voice_id, sizeof(p.voice.voice_id), "%.63s", "test-voice-uuid");
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_persona_build_prompt(&alloc, &p, "telegram", 8, NULL, 0, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(strstr(out, "Voice Message Guidance") == NULL);
     alloc.free(alloc.ctx, out, out_len + 1);
 }
 
@@ -3899,6 +3945,8 @@ void run_persona_tests(void) {
     HU_RUN_TEST(test_persona_prompt_includes_conflict_style);
     HU_RUN_TEST(test_persona_prompt_includes_emotional_range);
     HU_RUN_TEST(test_persona_prompt_includes_voice_rhythm);
+    HU_RUN_TEST(test_persona_prompt_includes_voice_speech_guidance);
+    HU_RUN_TEST(test_persona_prompt_no_voice_guidance_for_text_channel);
     HU_RUN_TEST(test_persona_prompt_includes_core_anchor);
     HU_RUN_TEST(test_persona_prompt_includes_character_invariants);
     HU_RUN_TEST(test_persona_prompt_includes_intellectual);

@@ -38,7 +38,7 @@ interface CanvasEntry {
   status: "active" | "closed";
 }
 
-@customElement("canvas-view")
+@customElement("hu-canvas-view")
 export class CanvasView extends GatewayAwareLitElement {
   @state() private canvases: CanvasEntry[] = [];
   @state() private selectedId: string | null = null;

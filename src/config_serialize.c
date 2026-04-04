@@ -410,6 +410,26 @@ hu_error_t hu_config_save(const hu_config_t *cfg) {
                     hu_json_object_set(
                         &a, me, "timeout_ms",
                         hu_json_number_new(&a, (double)cfg->mcp_servers[i].timeout_ms));
+                if (cfg->mcp_servers[i].oauth_client_id)
+                    hu_json_object_set(&a, me, "oauth_client_id",
+                                       hu_json_string_new(&a, cfg->mcp_servers[i].oauth_client_id,
+                                                          strlen(cfg->mcp_servers[i].oauth_client_id)));
+                if (cfg->mcp_servers[i].oauth_auth_url)
+                    hu_json_object_set(&a, me, "oauth_auth_url",
+                                       hu_json_string_new(&a, cfg->mcp_servers[i].oauth_auth_url,
+                                                          strlen(cfg->mcp_servers[i].oauth_auth_url)));
+                if (cfg->mcp_servers[i].oauth_token_url)
+                    hu_json_object_set(&a, me, "oauth_token_url",
+                                       hu_json_string_new(&a, cfg->mcp_servers[i].oauth_token_url,
+                                                          strlen(cfg->mcp_servers[i].oauth_token_url)));
+                if (cfg->mcp_servers[i].oauth_scopes)
+                    hu_json_object_set(&a, me, "oauth_scopes",
+                                       hu_json_string_new(&a, cfg->mcp_servers[i].oauth_scopes,
+                                                          strlen(cfg->mcp_servers[i].oauth_scopes)));
+                if (cfg->mcp_servers[i].oauth_redirect_uri)
+                    hu_json_object_set(&a, me, "oauth_redirect_uri",
+                                       hu_json_string_new(&a, cfg->mcp_servers[i].oauth_redirect_uri,
+                                                          strlen(cfg->mcp_servers[i].oauth_redirect_uri)));
                 hu_json_object_set(&a, mcp_obj, cfg->mcp_servers[i].name, me);
             }
             hu_json_object_set(&a, root, "mcp_servers", mcp_obj);

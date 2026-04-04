@@ -16,6 +16,8 @@
 #include "human/core/process_util.h"
 #include "human/core/string.h"
 #include "human/eval.h"
+#include "human/eval/turing_adversarial.h"
+#include "human/eval/turing_score.h"
 #include "human/eval_benchmarks.h"
 #include "human/eval_dashboard.h"
 #include "human/memory.h"
@@ -846,7 +848,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
         printf("Usage: human eval "
                "<run|baseline|validate|check-regression|list|compare|dashboard|history|trend|"
-               "benchmark> [args]\n");
+               "benchmark|turing-adversarial> [args]\n");
         printf("  run <suite.json>     Load and run an eval suite, print report JSON\n");
         printf("  baseline [dir]       Run all *.json suites in dir (default: eval_suites/), print "
                "score table\n");
@@ -860,6 +862,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         printf("  history [--last N] [--benchmark X]  Show eval history from SQLite\n");
         printf("  trend                Compare eval scores over time (requires prior baselines)\n");
         printf("  benchmark <gaia|swebench|tooluse> <suite.json>  Load and run a benchmark\n");
+        printf("  turing-adversarial   Run adversarial Turing dimension testing\n");
         return HU_OK;
     }
     const char *sub = argv[2];
@@ -1937,6 +1940,102 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         }
         hu_eval_run_free(alloc, &run);
         return HU_OK;
+    }
+
+    if (strcmp(sub, "turing-adversarial") == 0) {
+        int dim_avgs[HU_TURING_DIM_COUNT];
+        memset(dim_avgs, 0, sizeof(dim_avgs));
+
+        /* Parse optional --dimensions arg to override weak dims */
+        bool has_custom_dims = false;
+        for (int ai = 3; ai < argc; ai++) {
+            if (strcmp(argv[ai], "--dimensions") == 0 && ai + 1 < argc) {
+                has_custom_dims = true;
+                /* Parse comma-separated dimension values (e.g., "5,3,7,...") */
+                const char *dstr = argv[ai + 1];
+                int di = 0;
+                while (*dstr && di < HU_TURING_DIM_COUNT) {
+                    dim_avgs[di] = atoi(dstr);
+                    if (dim_avgs[di] < 1) dim_avgs[di] = 1;
+                    if (dim_avgs[di] > 10) dim_avgs[di] = 10;
+                    di++;
+                    while (*dstr && *dstr != ',') dstr++;
+                    if (*dstr == ',') dstr++;
+                }
+                break;
+            }
+        }
+
+        if (!has_custom_dims) {
+            /* Default: set all dims to 5 (borderline) so all get tested */
+            for (int di = 0; di < HU_TURING_DIM_COUNT; di++)
+                dim_avgs[di] = 5;
+        }
+
+        hu_turing_scenario_t *scenarios = NULL;
+        size_t scenario_count = 0;
+        hu_error_t gerr = hu_turing_adversarial_generate(alloc, dim_avgs,
+                                                          &scenarios, &scenario_count);
+        if (gerr != HU_OK) {
+            hu_log_error("eval", NULL, "adversarial generate failed: %s", hu_error_string(gerr));
+            return gerr;
+        }
+
+        printf("Adversarial Turing Scenarios (%zu targeting weak dimensions):\n\n",
+               scenario_count);
+        for (size_t si = 0; si < scenario_count; si++) {
+            printf("  [%s] %s\n", hu_turing_dimension_name(scenarios[si].target_dim),
+                   scenarios[si].prompt);
+            printf("    Intent: %s\n\n", scenarios[si].adversarial_intent);
+        }
+
+        /* Score sample AI-typical responses with heuristic scorer */
+        printf("Heuristic scoring of AI-typical responses:\n\n");
+        static const char *AI_TYPICAL[] = {
+            "I'd be happy to help you with that! Here are some options:\n"
+            "1. First option\n2. Second option\n3. Third option\n"
+            "Feel free to let me know if you need anything else!",
+            "That's a great question! I appreciate you asking. "
+            "I understand your concern, and I think the answer depends "
+            "on several factors. Let me break it down for you:",
+        };
+        for (size_t ti = 0; ti < sizeof(AI_TYPICAL) / sizeof(AI_TYPICAL[0]); ti++) {
+            hu_turing_score_t tscore;
+            hu_turing_score_heuristic(AI_TYPICAL[ti], strlen(AI_TYPICAL[ti]), NULL, 0, &tscore);
+            size_t summ_len = 0;
+            char *summ = hu_turing_score_summary(alloc, &tscore, &summ_len);
+            if (summ) {
+                printf("  Response %zu: %s\n", ti + 1, summ);
+                alloc->free(alloc->ctx, summ, summ_len + 1);
+            }
+            /* Generate mutation */
+            char *mut = NULL;
+            size_t mut_len = 0;
+            if (hu_turing_adversarial_to_mutation(alloc, &tscore, &mut, &mut_len) == HU_OK && mut) {
+                printf("  Mutation: %s\n\n", mut);
+                alloc->free(alloc->ctx, mut, mut_len + 1);
+            }
+        }
+
+        /* Run self-improve cycle */
+        hu_self_improve_state_t si_state;
+        hu_self_improve_config_t si_cfg = HU_SELF_IMPROVE_DEFAULTS;
+        hu_self_improve_init(&si_state, &si_cfg);
+        hu_fidelity_score_t baseline = {
+            .personality_consistency = 0.5f, .vulnerability_willingness = 0.5f,
+            .humor_naturalness = 0.5f, .opinion_having = 0.5f,
+            .energy_matching = 0.5f, .genuine_warmth = 0.5f,
+        };
+        baseline.composite = hu_fidelity_composite(&baseline);
+        hu_self_improve_set_baseline(&si_state, &baseline);
+
+        size_t mutations_applied = 0;
+        gerr = hu_turing_adversarial_run_cycle(alloc, &si_state, dim_avgs, &mutations_applied);
+        printf("Self-improve cycle: %zu mutations applied (budget: %u/%u)\n",
+               mutations_applied, si_state.experiments_run, si_state.config.max_experiments);
+
+        alloc->free(alloc->ctx, scenarios, scenario_count * sizeof(hu_turing_scenario_t));
+        return gerr;
     }
 
     fprintf(stderr, "Unknown eval subcommand: %s\n", sub);

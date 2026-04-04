@@ -448,6 +448,231 @@ static void test_prep_discourse_off_by_default(void) {
     HU_ASSERT_TRUE(!found_marker);
 }
 
+/* ── Strip Junk Tests ────────────────────────────────────────────────── */
+
+static void test_strip_junk_removes_stage_directions(void) {
+    char out[256];
+    const char *text = "Hello *waves hand* there friend.";
+    size_t len = hu_transcript_strip_junk(text, strlen(text), out, sizeof(out));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "waves") == NULL);
+    HU_ASSERT_TRUE(strstr(out, "Hello") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "there") != NULL);
+}
+
+static void test_strip_junk_removes_json_blobs(void) {
+    char out[512];
+    const char *text = "Check this out {\"tool\":\"search\",\"query\":\"weather\"} pretty cool.";
+    size_t len = hu_transcript_strip_junk(text, strlen(text), out, sizeof(out));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "tool") == NULL);
+    HU_ASSERT_TRUE(strstr(out, "Check") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "cool") != NULL);
+}
+
+static void test_strip_junk_removes_emoji(void) {
+    char out[256];
+    const char *text = "Great job \xF0\x9F\x91\x8D today!";
+    size_t len = hu_transcript_strip_junk(text, strlen(text), out, sizeof(out));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "Great") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "today") != NULL);
+}
+
+static void test_strip_junk_null_input(void) {
+    char out[64];
+    size_t len = hu_transcript_strip_junk(NULL, 0, out, sizeof(out));
+    HU_ASSERT_EQ(len, (size_t)0);
+}
+
+static void test_strip_junk_preserves_normal_text(void) {
+    char out[256];
+    const char *text = "This is just a normal sentence.";
+    size_t len = hu_transcript_strip_junk(text, strlen(text), out, sizeof(out));
+    HU_ASSERT_EQ(len, strlen(text));
+    HU_ASSERT_TRUE(strcmp(out, text) == 0);
+}
+
+/* ── Consonant Smoothing Tests ───────────────────────────────────────── */
+
+static void test_smooth_consonants_ngths(void) {
+    char out[256];
+    const char *text = "The strengths of this approach.";
+    size_t len = hu_transcript_smooth_consonants(text, strlen(text), out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "<break") != NULL);
+}
+
+static void test_smooth_consonants_strip_mode(void) {
+    char out[256];
+    const char *text = "The strengths of this approach.";
+    size_t len = hu_transcript_smooth_consonants(text, strlen(text), out, sizeof(out), true);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "<break") == NULL);
+}
+
+static void test_smooth_consonants_no_change(void) {
+    char out[256];
+    const char *text = "Hello world.";
+    size_t len = hu_transcript_smooth_consonants(text, strlen(text), out, sizeof(out), false);
+    HU_ASSERT_EQ(len, strlen(text));
+}
+
+/* ── Thinking Sound Tests ────────────────────────────────────────────── */
+
+static void test_thinking_sound_complex_response(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .thinking_sounds = true,
+        .hour_local = 14,
+    };
+    hu_prep_result_t result = {0};
+    bool found_thinking = false;
+    for (uint32_t s = 0; s < 50 && !found_thinking; s++) {
+        cfg.seed = s;
+        memset(&result, 0, sizeof(result));
+        const char *text = "I honestly think and believe that this is really important "
+                           "because it matters to all of us and we need to consider the "
+                           "implications carefully before making any decisions about it.";
+        hu_transcript_prep(text, strlen(text), &cfg, &result);
+        if (strstr(result.output, "Hmm") || strstr(result.output, "Well") ||
+            strstr(result.output, "So,") || strstr(result.output, "Yeah") ||
+            strstr(result.output, "Okay"))
+            found_thinking = true;
+    }
+    HU_ASSERT_TRUE(found_thinking);
+}
+
+static void test_thinking_sound_disabled_by_default(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .thinking_sounds = false,
+        .hour_local = 14,
+    };
+    hu_prep_result_t result = {0};
+    bool found_thinking = false;
+    for (uint32_t s = 0; s < 50 && !found_thinking; s++) {
+        cfg.seed = s;
+        memset(&result, 0, sizeof(result));
+        const char *text = "I honestly think and believe that this is really important "
+                           "because it matters.";
+        hu_transcript_prep(text, strlen(text), &cfg, &result);
+        if (result.output[0] == 'H' && result.output[1] == 'm')
+            found_thinking = true;
+        if (result.output[0] == 'W' && result.output[1] == 'e')
+            found_thinking = true;
+    }
+    HU_ASSERT_TRUE(!found_thinking);
+}
+
+/* ── Thinking Pause Tests ────────────────────────────────────────────── */
+
+static void test_thinking_pause_long_response(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "This is a fairly long response that should trigger "
+                       "a thinking pause at the beginning of the output.";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(strstr(result.output, "<break time=") != NULL);
+}
+
+static void test_thinking_pause_short_response_no_pause(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "Okay sure.";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.output_len > 0);
+}
+
+/* ── Late-Night Adaptation Tests ─────────────────────────────────────── */
+
+static void test_late_night_slower_speed(void) {
+    hu_prep_config_t cfg_day = {
+        .base_speed = 1.0f,
+        .pause_factor = 1.0f,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_config_t cfg_night = {
+        .base_speed = 1.0f,
+        .pause_factor = 1.0f,
+        .hour_local = 23,
+        .seed = 42,
+    };
+    hu_prep_result_t result_day = {0}, result_night = {0};
+    const char *text = "I really feel for you. This is important.";
+    hu_transcript_prep(text, strlen(text), &cfg_day, &result_day);
+    hu_transcript_prep(text, strlen(text), &cfg_night, &result_night);
+    HU_ASSERT_TRUE(result_night.sentences[0].speed_ratio < result_day.sentences[0].speed_ratio);
+}
+
+static void test_late_night_softer_volume(void) {
+    hu_prep_config_t cfg_day = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_config_t cfg_night = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .hour_local = 23,
+        .seed = 42,
+    };
+    hu_prep_result_t result_day = {0}, result_night = {0};
+    const char *text = "Hello there friend. How are you doing tonight?";
+    hu_transcript_prep(text, strlen(text), &cfg_day, &result_day);
+    hu_transcript_prep(text, strlen(text), &cfg_night, &result_night);
+    HU_ASSERT_TRUE(result_night.volume <= result_day.volume);
+}
+
+/* ── Emotional Momentum Tests ────────────────────────────────────────── */
+
+static void test_emotional_momentum_carries_forward(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .prev_turn_emotion = "sad",
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "Yeah I understand. It will be okay.";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.dominant_emotion != NULL);
+    HU_ASSERT_TRUE(strcmp(result.dominant_emotion, "sad") == 0);
+}
+
+static void test_emotional_momentum_null_prev_no_effect(void) {
+    hu_prep_config_t cfg = {
+        .base_speed = 0.95f,
+        .pause_factor = 1.0f,
+        .prev_turn_emotion = NULL,
+        .hour_local = 14,
+        .seed = 42,
+    };
+    hu_prep_result_t result = {0};
+    const char *text = "Hello there. How are you?";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.dominant_emotion != NULL);
+}
+
 /* ── Registration ────────────────────────────────────────────────────── */
 
 void run_transcript_prep_tests(void) {
@@ -490,4 +715,46 @@ void run_transcript_prep_tests(void) {
     HU_RUN_TEST(test_prep_emotional_words_slower);
     HU_RUN_TEST(test_prep_list_words_faster);
     HU_RUN_TEST(test_prep_discourse_off_by_default);
+
+    HU_RUN_TEST(test_strip_junk_removes_stage_directions);
+    HU_RUN_TEST(test_strip_junk_removes_json_blobs);
+    HU_RUN_TEST(test_strip_junk_removes_emoji);
+    HU_RUN_TEST(test_strip_junk_null_input);
+    HU_RUN_TEST(test_strip_junk_preserves_normal_text);
+
+    HU_RUN_TEST(test_smooth_consonants_ngths);
+    HU_RUN_TEST(test_smooth_consonants_strip_mode);
+    HU_RUN_TEST(test_smooth_consonants_no_change);
+
+    HU_RUN_TEST(test_thinking_sound_complex_response);
+    HU_RUN_TEST(test_thinking_sound_disabled_by_default);
+
+    HU_RUN_TEST(test_thinking_pause_long_response);
+    HU_RUN_TEST(test_thinking_pause_short_response_no_pause);
+
+    HU_RUN_TEST(test_late_night_slower_speed);
+    HU_RUN_TEST(test_late_night_softer_volume);
+
+    HU_RUN_TEST(test_emotional_momentum_carries_forward);
+    HU_RUN_TEST(test_emotional_momentum_null_prev_no_effect);
+
+    HU_RUN_TEST(test_normalize_phone_number_parens);
+    HU_RUN_TEST(test_normalize_phone_number_dashes);
+    HU_RUN_TEST(test_normalize_phone_strip_ssml);
+    HU_RUN_TEST(test_normalize_currency_dollars);
+    HU_RUN_TEST(test_normalize_currency_with_cents);
+    HU_RUN_TEST(test_normalize_percentage);
+    HU_RUN_TEST(test_normalize_date_slash);
+    HU_RUN_TEST(test_normalize_date_iso);
+    HU_RUN_TEST(test_normalize_time_pm);
+    HU_RUN_TEST(test_normalize_time_oclock);
+    HU_RUN_TEST(test_normalize_small_number_to_words);
+    HU_RUN_TEST(test_normalize_preserves_normal_text);
+    HU_RUN_TEST(test_normalize_null_input);
+
+    HU_RUN_TEST(test_break_limiter_removes_excess);
+    HU_RUN_TEST(test_break_limiter_keeps_all_under_limit);
+    HU_RUN_TEST(test_break_limiter_null_safe);
+
+    HU_RUN_TEST(test_prep_normalizes_numbers_in_pipeline);
 }

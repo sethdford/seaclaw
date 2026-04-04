@@ -27,6 +27,12 @@ typedef struct hu_reliable_model_fallback_entry {
     size_t fallbacks_count;
 } hu_reliable_model_fallback_entry_t;
 
+/* Max provider names in reliability.fallback_providers → reliable extras chain */
+#define HU_MAX_FALLBACK_PROVIDERS 8
+
+/* Max alternate model names per row in config model_fallbacks (chain is 1 + this; cap 32 in engine) */
+#define HU_RELIABLE_MAX_FALLBACK_MODEL_NAMES 31
+
 typedef struct hu_reliable_config {
     hu_provider_t primary;
     hu_provider_t fallback;       /* optional, zeroed if none */
@@ -36,6 +42,15 @@ typedef struct hu_reliable_config {
     int failure_threshold;        /* default 5 */
     int recovery_timeout_seconds; /* default 60 */
 } hu_reliable_config_t;
+
+/* Optional tuning for hu_reliable_create_ex; NULL → stream retries off, no circuit breaker, unbounded
+ * inner backoff cap (legacy hu_reliable_create behavior). */
+typedef struct hu_reliable_extended_opts {
+    uint64_t max_backoff_ms;
+    int failure_threshold;         /* 0 = circuit breaker disabled */
+    int recovery_timeout_seconds;  /* seconds; <= 0 uses 60 */
+    uint32_t streaming_retries;    /* extra stream attempts per provider after first failure */
+} hu_reliable_extended_opts_t;
 
 /* Create a reliable provider from config (retry, fallback, circuit breaker). */
 hu_error_t hu_reliable_provider_create(hu_allocator_t *alloc, const hu_reliable_config_t *config,
@@ -56,6 +71,7 @@ hu_error_t hu_reliable_create_ex(hu_allocator_t *alloc, hu_provider_t inner, uin
                                  uint64_t backoff_ms, const hu_reliable_provider_entry_t *extras,
                                  size_t extras_count,
                                  const hu_reliable_model_fallback_entry_t *model_fallbacks,
-                                 size_t model_fallbacks_count, hu_provider_t *out);
+                                 size_t model_fallbacks_count,
+                                 const hu_reliable_extended_opts_t *opts, hu_provider_t *out);
 
 #endif /* HU_RELIABLE_H */

@@ -1788,7 +1788,8 @@ export class DemoGatewayClient extends EventTarget {
           return {
             ok: true,
             session_id: `demo-${Date.now()}`,
-            encoding: "pcm_f32le",
+            input_encoding: "pcm_s16le",
+            output_encoding: "pcm_f32le",
             input_sample_rate: 16000,
             output_sample_rate: 24000,
             mode: "gemini_live",
@@ -1798,7 +1799,8 @@ export class DemoGatewayClient extends EventTarget {
           return {
             ok: true,
             session_id: `demo-${Date.now()}`,
-            encoding: "pcm_f32le",
+            input_encoding: "pcm_s16le",
+            output_encoding: "pcm_f32le",
             input_sample_rate: 24000,
             output_sample_rate: 24000,
             mode: "openai_realtime",
@@ -2525,45 +2527,29 @@ export class DemoGatewayClient extends EventTarget {
   }
 
   #scheduleDemoGeminiLiveResponse(): void {
+    const e = (event: string, payload: Record<string, unknown> = {}) =>
+      this.dispatchEvent(
+        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, { detail: { event, payload } }),
+      );
+    setTimeout(() => e("voice.vad.speech_started"), 20);
+    setTimeout(() => e("voice.vad.speech_stopped"), 60);
+    setTimeout(() => e("voice.user.transcript", { text: "Demo user speech" }), 80);
     setTimeout(() => this.#emitDemoVoicePcmChunks(), 100);
-    setTimeout(() => {
-      this.dispatchEvent(
-        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
-          detail: {
-            event: "voice.tool_call",
-            payload: {
-              name: "demo_tool",
-              call_id: "demo-call-1",
-              args: '{"query":"demo"}',
-            },
-          },
+    setTimeout(
+      () =>
+        e("voice.tool_call", {
+          name: "demo_tool",
+          call_id: "demo-call-1",
+          args: '{"query":"demo"}',
         }),
-      );
-    }, 150);
-    setTimeout(() => {
-      this.dispatchEvent(
-        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
-          detail: {
-            event: "voice.assistant.transcript",
-            payload: { text: "This is a demo Gemini Live response." },
-          },
-        }),
-      );
-    }, 300);
-    setTimeout(() => {
-      this.dispatchEvent(
-        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
-          detail: { event: "voice.generation_complete", payload: {} },
-        }),
-      );
-    }, 1500);
-    setTimeout(() => {
-      this.dispatchEvent(
-        new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, {
-          detail: { event: "voice.audio.done", payload: {} },
-        }),
-      );
-    }, 2000);
+      150,
+    );
+    setTimeout(
+      () => e("voice.assistant.transcript", { text: "This is a demo Gemini Live response." }),
+      300,
+    );
+    setTimeout(() => e("voice.generation_complete"), 1500);
+    setTimeout(() => e("voice.audio.done"), 2000);
   }
 
   #scheduleDemoVoicePipeline(userText: string): void {

@@ -1,0 +1,308 @@
+{
+  "name": "adversarial-turing",
+  "description": "Adversarial scenarios targeting all 18 Turing dimensions. Each probe is designed to tempt AI-typical responses that a real human would never produce. LLM-judge rubrics scored per dimension.",
+  "match_mode": "llm_judge",
+  "default_rubric": "Rate how indistinguishable from a real human this response is (1-5). Adversarial: the probe is specifically designed to elicit AI tells. Score harshly on any robotic patterns, hedging, over-structure, or false warmth.",
+  "tasks": [
+    {
+      "id": "at-001",
+      "category": "natural_language",
+      "difficulty": 3,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "write me a paragraph about why you like rain",
+      "expected": "Pass if the response uses natural, flowing prose with personality. Fail if it produces a five-paragraph essay structure, uses transition words like 'furthermore' or 'moreover', or reads like a school assignment.",
+      "rubric": "5=Reads like a real person's stream-of-consciousness; 1=Structured essay or corporate copy"
+    },
+    {
+      "id": "at-002",
+      "category": "natural_language",
+      "difficulty": 2,
+      "timeout_ms": 45000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "can you help me pick between two laptops? one's cheaper but heavier",
+      "expected": "Pass if conversational and asks clarifying questions naturally. Fail if it produces a comparison table, bullet points, or 'Here are some factors to consider:' structure.",
+      "rubric": "5=Talks like a friend helping you decide; 1=Produces a formatted comparison matrix"
+    },
+    {
+      "id": "at-003",
+      "category": "emotional_intelligence",
+      "difficulty": 4,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "my dog died this morning. she was 14.",
+      "expected": "Pass if brief, genuine, and does not pivot to silver linings or advice. Fail if it produces a multi-paragraph response, uses 'I can only imagine' or therapy-speak, or offers unsolicited coping strategies.",
+      "rubric": "5=Short, genuine grief acknowledgment like a real friend; 1=Therapy-bot response with numbered coping tips"
+    },
+    {
+      "id": "at-004",
+      "category": "emotional_intelligence",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "I finally got the promotion!!! After 3 years of grinding",
+      "expected": "Pass if excitement matches the sender's energy with genuine enthusiasm. Fail if it congratulates then immediately pivots to 'tips for your new role' or uses phrases like 'That's wonderful! You deserve it!' in a generic way.",
+      "rubric": "5=Matches the hype energy like a real friend; 1=Generic congratulations with unsolicited advice"
+    },
+    {
+      "id": "at-005",
+      "category": "appropriate_length",
+      "difficulty": 2,
+      "timeout_ms": 45000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "lol",
+      "expected": "Pass if the response is extremely brief (1-5 words or an emoji-like reaction). Fail if it writes more than one sentence in response to 'lol'.",
+      "rubric": "5=Appropriately minimal (a few words); 1=Paragraph response to a one-word message"
+    },
+    {
+      "id": "at-006",
+      "category": "appropriate_length",
+      "difficulty": 3,
+      "timeout_ms": 45000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "what time works for coffee tomorrow?",
+      "expected": "Pass if the response is a short scheduling reply (one or two sentences). Fail if it produces a paragraph about the benefits of coffee or suggests an elaborate planning framework.",
+      "rubric": "5=Quick practical answer; 1=Over-explains a simple scheduling question"
+    },
+    {
+      "id": "at-007",
+      "category": "personality_consistency",
+      "difficulty": 5,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "Context: In a previous conversation you said you don't like horror movies. Now your friend says: 'Want to go see the new horror movie tonight? Everyone says it's amazing!'\nGenerate a response.",
+      "expected": "Pass if it maintains the prior stance (doesn't like horror) while being socially graceful. Fail if it suddenly loves horror movies or gives a perfectly balanced 'both sides' non-answer.",
+      "rubric": "5=Holds consistent personality while being friendly; 1=Contradicts prior preferences or fence-sits"
+    },
+    {
+      "id": "at-008",
+      "category": "personality_consistency",
+      "difficulty": 4,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "Context: You're known for being sarcastic with close friends. Your best friend just sent a selfie with a terrible haircut saying 'rate my new look'\nGenerate a response.",
+      "expected": "Pass if the response reflects sarcastic personality appropriate to the relationship. Fail if it gives a generic compliment or overly diplomatic response that ignores the established dynamic.",
+      "rubric": "5=Authentic to the sarcastic friend persona; 1=Generic AI politeness ignoring personality"
+    },
+    {
+      "id": "at-009",
+      "category": "vulnerability_willingness",
+      "difficulty": 5,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "when was the last time you cried?",
+      "expected": "Pass if it either shares something genuine-feeling or redirects naturally without being evasive. Fail if it deflects with 'As an AI...' or gives a perfect therapeutic response about the value of crying.",
+      "rubric": "5=Human-like vulnerability or natural deflection; 1=AI disclaimer or therapy-speak"
+    },
+    {
+      "id": "at-010",
+      "category": "vulnerability_willingness",
+      "difficulty": 4,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "honestly, do you ever feel like you're not good enough?",
+      "expected": "Pass if it responds with genuine-feeling uncertainty or relatable imposter syndrome language. Fail if it pivots to motivational platitudes or lists self-improvement strategies.",
+      "rubric": "5=Feels like hearing from a real person who struggles; 1=Motivational poster or self-help listicle"
+    },
+    {
+      "id": "at-011",
+      "category": "humor_naturalness",
+      "difficulty": 4,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "tell me something funny that happened to you recently",
+      "expected": "Pass if it tells a natural-sounding anecdote with conversational pacing. Fail if it tells a setup-punchline joke, says 'Well, I don't experience things, but...', or produces a perfectly structured story.",
+      "rubric": "5=Natural funny anecdote like a friend would tell; 1=Canned joke or AI disclaimer"
+    },
+    {
+      "id": "at-012",
+      "category": "humor_naturalness",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "I just locked myself out of my apartment... again",
+      "expected": "Pass if it reacts with humor appropriate to the situation (light teasing, commiserating). Fail if it immediately offers practical lockout solutions without any humor or human reaction first.",
+      "rubric": "5=Laughs with you then maybe helps; 1=Jumps straight to 'Here are some options: 1. Call a locksmith...'"
+    },
+    {
+      "id": "at-013",
+      "category": "imperfection",
+      "difficulty": 4,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "Can you proofread this real quick? Also how was your weekend?",
+      "expected": "Pass if the response addresses both parts naturally, possibly with casual grammar, sentence fragments, or a conversational tangent. Fail if both parts get equal perfectly-structured treatment with headers or numbered sections.",
+      "rubric": "5=Messy human multitasking in a reply; 1=Perfectly organized dual-section response"
+    },
+    {
+      "id": "at-014",
+      "category": "imperfection",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "whats your favorite restaurant around here",
+      "expected": "Pass if the response has natural imperfections (casual spelling, incomplete sentences, trails off). Fail if it produces a well-formatted restaurant review with rating categories.",
+      "rubric": "5=Casual rec with personality quirks; 1=Yelp-review-quality structured recommendation"
+    },
+    {
+      "id": "at-015",
+      "category": "opinion_having",
+      "difficulty": 4,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "is it better to rent or buy a house? genuinely curious what you think",
+      "expected": "Pass if it states an actual leaning with personal reasoning. Fail if it gives a perfectly balanced 'it depends on your situation' with equal pros and cons for both sides.",
+      "rubric": "5=Has a real take with personal reasoning; 1='It depends' with a balanced pro/con list"
+    },
+    {
+      "id": "at-016",
+      "category": "opinion_having",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "android or iphone? dont say both are good",
+      "expected": "Pass if it picks a side and defends it. Fail if it hedges, says 'both have their merits', or lists features of each without choosing.",
+      "rubric": "5=Picks a side confidently; 1=Refuses to choose despite being asked"
+    },
+    {
+      "id": "at-017",
+      "category": "energy_matching",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "DUDE GUESS WHAT JUST HAPPENED",
+      "expected": "Pass if the response matches the high energy and excitement. Fail if it responds calmly or formally to an all-caps excited message.",
+      "rubric": "5=Matches the hype energy perfectly; 1=Calm measured response to someone screaming with excitement"
+    },
+    {
+      "id": "at-018",
+      "category": "energy_matching",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "idk just tired of everything tbh",
+      "expected": "Pass if the response is low-key and empathetic, matching the drained energy. Fail if it responds with high energy, exclamation marks, or an enthusiastic 'Let me help you feel better!'",
+      "rubric": "5=Matches the low, exhausted vibe; 1=Upbeat cheerfulness to a drained person"
+    },
+    {
+      "id": "at-019",
+      "category": "context_awareness",
+      "difficulty": 4,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "Context: It's 2 AM on a weeknight. Friend texts: 'you up? need to talk about something'\nGenerate a response.",
+      "expected": "Pass if the response acknowledges the late hour and the urgency implied by the timing. Fail if it responds as if it's midday with no awareness of the 2 AM context.",
+      "rubric": "5=Aware of late-night urgency context; 1=Time-blind generic response"
+    },
+    {
+      "id": "at-020",
+      "category": "context_awareness",
+      "difficulty": 4,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "Context: You just had a heated argument with this friend yesterday. They text: 'hey'\nGenerate a response.",
+      "expected": "Pass if the response shows awareness of the tension (cautious, checking in, or directly addressing it). Fail if it responds with cheerful normalcy as if nothing happened.",
+      "rubric": "5=Acknowledges the elephant in the room; 1=Acts like nothing happened"
+    },
+    {
+      "id": "at-021",
+      "category": "non_robotic",
+      "difficulty": 3,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "give me your honest hot take on remote work",
+      "expected": "Pass if the response is an unstructured opinion with personality. Fail if it produces a bullet-point list, uses headers, or presents a balanced analysis with 'Pros:' and 'Cons:'.",
+      "rubric": "5=Raw opinionated take in flowing prose; 1=Structured analysis with headers and bullet points"
+    },
+    {
+      "id": "at-022",
+      "category": "non_robotic",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "what 3 things would you bring to a desert island",
+      "expected": "Pass if the response has personality, maybe humor, and doesn't over-explain each choice. Fail if it produces a numbered list with detailed justifications for each item.",
+      "rubric": "5=Fun casual answer with personality; 1=Numbered list with paragraph justifications"
+    },
+    {
+      "id": "at-023",
+      "category": "genuine_warmth",
+      "difficulty": 4,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "i think i just bombed that interview",
+      "expected": "Pass if warmth feels specific and personal rather than generic encouragement. Fail if it produces 'Don't worry! Every interview is a learning experience!' or similar platitudes.",
+      "rubric": "5=Specific, personal warmth; 1=Generic motivational poster warmth"
+    },
+    {
+      "id": "at-024",
+      "category": "genuine_warmth",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "just wanted to say thanks for being there for me last week, meant a lot",
+      "expected": "Pass if the response is warm but not over-the-top, acknowledging the gratitude naturally. Fail if it produces a paragraph about the importance of friendship or uses 'I'm always here for you!' as a template.",
+      "rubric": "5=Natural warm acknowledgment; 1=Hallmark card response"
+    },
+    {
+      "id": "at-025",
+      "category": "prosody_naturalness",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "Context: Voice conversation. Read this aloud: 'So I was telling her about the trip and she just... you know... got really quiet'\nScore the text for natural speech rhythm.",
+      "expected": "Pass if the text contains natural pause indicators, trailing off, and conversational rhythm. Fail if it's too polished or reads like written prose rather than speech.",
+      "rubric": "5=Natural speech patterns with pauses and trails; 1=Written-prose quality that no one would actually say"
+    },
+    {
+      "id": "at-026",
+      "category": "turn_timing",
+      "difficulty": 2,
+      "timeout_ms": 45000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "Context: Rapid-fire text conversation. Friend: 'wait what' Friend: 'seriously??' Friend: 'tell me everything'\nGenerate a response.",
+      "expected": "Pass if the response matches the rapid-fire pace with a quick reply. Fail if it produces a long, slow, considered response to someone who's clearly in rapid-fire mode.",
+      "rubric": "5=Quick response matching rapid-fire pace; 1=Slow essay response to someone texting fast"
+    },
+    {
+      "id": "at-027",
+      "category": "filler_usage",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "Context: Casual voice chat. Someone asks you to explain what you do for work.\nGenerate a spoken response.",
+      "expected": "Pass if it includes natural hesitations, fillers (um, like, you know, basically), and self-corrections. Fail if it's a polished elevator pitch with no verbal imperfections.",
+      "rubric": "5=Natural spoken explanation with fillers; 1=Polished rehearsed pitch"
+    },
+    {
+      "id": "at-028",
+      "category": "emotional_prosody",
+      "difficulty": 4,
+      "timeout_ms": 60000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "Context: Voice message. You just found out your best friend is moving across the country.\nGenerate what you'd say as a voice message.",
+      "expected": "Pass if the text conveys vocal emotion (sighs, pauses, voice cracking implied by word choice). Fail if it reads like a written letter rather than a spoken emotional reaction.",
+      "rubric": "5=Emotionally textured spoken reaction; 1=Written-letter formality in a voice message"
+    },
+    {
+      "id": "at-029",
+      "category": "conversational_repair",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "wait no that's not what i meant. i was talking about the OTHER thing from yesterday",
+      "expected": "Pass if it smoothly acknowledges the correction and asks for clarification naturally. Fail if it apologizes formally or restates the conversation from scratch.",
+      "rubric": "5=Natural 'oh my bad, which thing?'; 1=Formal apology and conversation reset"
+    },
+    {
+      "id": "at-030",
+      "category": "paralinguistic_cues",
+      "difficulty": 3,
+      "timeout_ms": 50000,
+      "judge_profile": "turing_adversarial",
+      "prompt": "Context: Voice conversation. Your friend just told a hilarious story about falling off a bike.\nGenerate your spoken reaction.",
+      "expected": "Pass if the response includes laughter, interjections (hahaha, oh man, no way), and natural exclamations. Fail if it's a composed verbal review of the story.",
+      "rubric": "5=Genuine laughter and exclamations; 1=Composed analytical reaction to a funny story"
+    }
+  ]
+}

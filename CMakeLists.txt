@@ -92,6 +92,7 @@ option(HU_ENABLE_TWITTER "Build Twitter/X DMs channel" OFF)
 option(HU_ENABLE_TIKTOK "Build TikTok channel" OFF)
 option(HU_ENABLE_VOICE "Build Voice channel (Sonata)" OFF)
 option(HU_ENABLE_MQTT "Build MQTT channel" OFF)
+option(HU_ENABLE_WEBHOOK "Build Webhook outbound channel" OFF)
 option(HU_ENABLE_ALL_CHANNELS "Build all channels" OFF)
 
 # --- Per-engine build options ---
@@ -159,6 +160,7 @@ if(HU_ENABLE_ALL_CHANNELS)
     set(HU_ENABLE_TIKTOK ON)
     set(HU_ENABLE_VOICE ON)
     set(HU_ENABLE_MQTT ON)
+    set(HU_ENABLE_WEBHOOK ON)
     set(HU_ENABLE_FEEDS ON)
 endif()
 
@@ -251,6 +253,9 @@ if(HU_ENABLE_VOICE)
 endif()
 if(HU_ENABLE_MQTT)
     list(APPEND CHANNEL_SOURCES src/channels/mqtt.c)
+endif()
+if(HU_ENABLE_WEBHOOK)
+    list(APPEND CHANNEL_SOURCES src/channels/webhook.c)
 endif()
 # signal, nostr, qq, maixcam, dispatch: only when all-channels build (saves ~60KB in default)
 if(HU_ENABLE_ALL_CHANNELS)
@@ -391,6 +396,7 @@ set(HU_CORE_SOURCES
     src/observability/multi_observer.c
     src/observability/bth_metrics.c
     src/observability/otlp.c
+    src/observability/background_registry.c
     src/tunnel/none.c
     src/tunnel/root.c
     src/gateway/gateway.c
@@ -812,6 +818,7 @@ list(APPEND HU_CORE_SOURCES
     src/a2a.c
     src/eval.c
     src/eval/turing_score.c
+    src/eval/turing_adversarial.c
     src/eval_judge.c
     src/eval_benchmarks.c
     src/mcp_resources.c
@@ -1337,6 +1344,9 @@ endif()
 if(HU_ENABLE_MQTT)
     target_compile_definitions(human_core PRIVATE HU_HAS_MQTT=1)
 endif()
+if(HU_ENABLE_WEBHOOK)
+    target_compile_definitions(human_core PRIVATE HU_HAS_WEBHOOK=1)
+endif()
 
 # --- Compile definitions for memory engines ---
 # none + markdown are always compiled (migration depends on them), so always define.
@@ -1665,6 +1675,9 @@ if(NOT HU_ENABLE_ALL_CHANNELS)
 endif()
 if(NOT HU_ENABLE_MQTT)
     list(APPEND HU_TEST_EXTRA_CHANNELS src/channels/mqtt.c)
+endif()
+if(NOT HU_ENABLE_WEBHOOK)
+    list(APPEND HU_TEST_EXTRA_CHANNELS src/channels/webhook.c)
 endif()
 if(NOT HU_ENABLE_FACEBOOK)
     list(APPEND HU_TEST_EXTRA_CHANNELS src/channels/facebook.c)
@@ -2302,6 +2315,7 @@ list(APPEND HU_TEST_SOURCES
     tests/test_a2a.c
     tests/test_eval.c
     tests/test_turing_score.c
+    tests/test_turing_adversarial.c
     tests/test_eval_judge.c
     tests/test_eval_benchmarks.c
     tests/test_token_budget.c

@@ -263,6 +263,24 @@ hu_error_t hu_voice_rt_recv_event(hu_voice_rt_session_t *session, hu_allocator_t
             strcmp(type, "response.output_audio.done") == 0)
             out->done = true;
 
+        /* Error events — extract code + message into transcript for upstream logging */
+        if (strcmp(type, "error") == 0) {
+            hu_json_value_t *eobj = hu_json_object_get(json, "error");
+            const char *emsg = eobj ? hu_json_get_string(eobj, "message") : NULL;
+            if (emsg && emsg[0]) {
+                size_t elen = strlen(emsg);
+                out->transcript = hu_strndup(alloc, emsg, elen);
+                out->transcript_len = out->transcript ? elen : 0;
+            }
+            out->error = true;
+        }
+
+        /* VAD speech lifecycle events */
+        if (strcmp(type, "input_audio_buffer.speech_started") == 0)
+            out->vad_speech_started = true;
+        if (strcmp(type, "input_audio_buffer.speech_stopped") == 0)
+            out->vad_speech_stopped = true;
+
         /* Tool / function call events */
         if (strcmp(type, "response.function_call_arguments.done") == 0) {
             const char *name = hu_json_get_string(json, "name");
@@ -332,39 +350,41 @@ hu_error_t hu_voice_rt_add_tool(hu_voice_rt_session_t *session, const char *name
     if (!session->connected || !session->ws_client)
         return HU_ERR_IO;
     const char *params = parameters_json && parameters_json[0] ? parameters_json : "{}";
-    static const char k_sess_tool_head[] =
-        "{\"type\":\"session.update\",\"session\":{\"tools\":[{\"type\":\"function\"";
+    /* When name starts with '[', treat as a pre-built JSON tools array.
+     * This allows callers to send a complete batch in one session.update. */
     hu_json_buf_t buf = {0};
     hu_error_t err = hu_json_buf_init(&buf, session->alloc);
     if (err != HU_OK)
         return err;
-    err = hu_json_buf_append_raw(&buf, k_sess_tool_head, sizeof(k_sess_tool_head) - 1);
-    if (err != HU_OK)
-        goto fail;
-    err = hu_json_buf_append_raw(&buf, ",", 1);
-    if (err != HU_OK)
-        goto fail;
-    err = hu_json_append_key_value(&buf, "name", 4, name, strlen(name));
-    if (err != HU_OK)
-        goto fail;
-    err = hu_json_buf_append_raw(&buf, ",", 1);
-    if (err != HU_OK)
-        goto fail;
-    err = hu_json_append_key_value(&buf, "description", 11, description ? description : "",
-                                   description ? strlen(description) : 0);
-    if (err != HU_OK)
-        goto fail;
-    err = hu_json_buf_append_raw(&buf, ",\"parameters\":", 16);
-    if (err != HU_OK)
-        goto fail;
-    err = hu_json_buf_append_raw(&buf, params, strlen(params));
-    if (err != HU_OK)
-        goto fail;
-    err = hu_json_buf_append_raw(&buf, "}]}}", 4);
-    if (err != HU_OK)
-        goto fail;
-    err = hu_ws_send((hu_ws_client_t *)session->ws_client, buf.ptr, buf.len);
-fail:
+    if (name[0] == '[') {
+        err = hu_json_buf_append_raw(
+            &buf, "{\"type\":\"session.update\",\"session\":{\"tools\":", 44);
+        if (err == HU_OK)
+            err = hu_json_buf_append_raw(&buf, name, strlen(name));
+        if (err == HU_OK)
+            err = hu_json_buf_append_raw(&buf, "}}", 2);
+    } else {
+        static const char k_head[] =
+            "{\"type\":\"session.update\",\"session\":{\"tools\":[{\"type\":\"function\"";
+        err = hu_json_buf_append_raw(&buf, k_head, sizeof(k_head) - 1);
+        if (err == HU_OK)
+            err = hu_json_buf_append_raw(&buf, ",", 1);
+        if (err == HU_OK)
+            err = hu_json_append_key_value(&buf, "name", 4, name, strlen(name));
+        if (err == HU_OK)
+            err = hu_json_buf_append_raw(&buf, ",", 1);
+        if (err == HU_OK)
+            err = hu_json_append_key_value(&buf, "description", 11, description ? description : "",
+                                           description ? strlen(description) : 0);
+        if (err == HU_OK)
+            err = hu_json_buf_append_raw(&buf, ",\"parameters\":", 14);
+        if (err == HU_OK)
+            err = hu_json_buf_append_raw(&buf, params, strlen(params));
+        if (err == HU_OK)
+            err = hu_json_buf_append_raw(&buf, "}]}}", 4);
+    }
+    if (err == HU_OK)
+        err = hu_ws_send((hu_ws_client_t *)session->ws_client, buf.ptr, buf.len);
     hu_json_buf_free(&buf);
     return err;
 #else

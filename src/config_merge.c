@@ -120,6 +120,10 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->reliability.scheduler_retries = 2;
     cfg->reliability.fallback_providers = NULL;
     cfg->reliability.fallback_providers_len = 0;
+    cfg->reliability.model_fallbacks = NULL;
+    cfg->reliability.model_fallbacks_len = 0;
+    cfg->reliability.streaming_retries = 1;
+    cfg->reliability.circuit_breaker_enabled = true;
     cfg->router.fast = NULL;
     cfg->router.standard = NULL;
     cfg->router.powerful = NULL;

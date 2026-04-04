@@ -531,19 +531,54 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
             return rerr;
         }
 
-        /* Register agent tools with OpenAI Realtime session */
-        if (app && app->tools && sl->provider.vtable->add_tool) {
-            for (size_t ti = 0; ti < app->tools_count; ti++) {
-                hu_tool_t *t = &app->tools[ti];
-                if (!t->vtable || !t->vtable->name)
-                    continue;
-                const char *tn = t->vtable->name(t->ctx);
-                if (!tn)
-                    continue;
-                const char *td = t->vtable->description ? t->vtable->description(t->ctx) : "";
-                const char *tp =
-                    t->vtable->parameters_json ? t->vtable->parameters_json(t->ctx) : "{}";
-                (void)sl->provider.vtable->add_tool(sl->provider.ctx, tn, td, tp);
+        /* Build complete tools array and register in one session.update */
+        if (app && app->tools && app->tools_count > 0 && sl->provider.vtable->add_tool) {
+            hu_json_buf_t tbuf = {0};
+            hu_error_t terr = hu_json_buf_init(&tbuf, alloc);
+            if (terr == HU_OK) {
+                terr = hu_json_buf_append_raw(&tbuf, "[", 1);
+                size_t added = 0;
+                for (size_t ti = 0; ti < app->tools_count && terr == HU_OK; ti++) {
+                    hu_tool_t *t = &app->tools[ti];
+                    if (!t->vtable || !t->vtable->name)
+                        continue;
+                    const char *tn = t->vtable->name(t->ctx);
+                    if (!tn)
+                        continue;
+                    const char *td = t->vtable->description ? t->vtable->description(t->ctx) : "";
+                    const char *tp =
+                        t->vtable->parameters_json ? t->vtable->parameters_json(t->ctx) : "{}";
+                    if (added > 0)
+                        terr = hu_json_buf_append_raw(&tbuf, ",", 1);
+                    if (terr == HU_OK)
+                        terr = hu_json_buf_append_raw(&tbuf,
+                            "{\"type\":\"function\",\"name\":", 26);
+                    if (terr == HU_OK)
+                        terr = hu_json_append_string(&tbuf, tn, strlen(tn));
+                    if (terr == HU_OK)
+                        terr = hu_json_buf_append_raw(&tbuf, ",\"description\":", 15);
+                    if (terr == HU_OK)
+                        terr = hu_json_append_string(&tbuf, td, strlen(td));
+                    if (terr == HU_OK)
+                        terr = hu_json_buf_append_raw(&tbuf, ",\"parameters\":", 14);
+                    if (terr == HU_OK)
+                        terr = hu_json_buf_append_raw(&tbuf, tp && tp[0] ? tp : "{}",
+                                                      strlen(tp && tp[0] ? tp : "{}"));
+                    if (terr == HU_OK)
+                        terr = hu_json_buf_append_raw(&tbuf, "}", 1);
+                    if (terr == HU_OK)
+                        added++;
+                }
+                if (terr == HU_OK)
+                    terr = hu_json_buf_append_raw(&tbuf, "]", 1);
+                if (terr == HU_OK && tbuf.len > 2) {
+                    char *tools_arr = hu_strndup(alloc, tbuf.ptr, tbuf.len);
+                    if (tools_arr) {
+                        (void)sl->provider.vtable->add_tool(sl->provider.ctx, tools_arr, NULL, NULL);
+                        alloc->free(alloc->ctx, tools_arr, tbuf.len + 1);
+                    }
+                }
+                hu_json_buf_free(&tbuf);
             }
         }
 
@@ -855,12 +890,13 @@ void hu_voice_stream_poll_gemini_live(void) {
             if ((uint64_t)vs_now_ms() >= sl->goaway_reconnect_at_ms) {
                 sl->goaway_reconnect_at_ms = 0;
                 hu_error_t rerr = sl->provider.vtable->reconnect(sl->provider.ctx);
-                if (rerr == HU_OK)
+                if (rerr == HU_OK) {
                     hu_control_send_event_to_conn(s_proto, sl->conn, "voice.reconnected", "{}");
-                else {
+                } else {
+                    /* Keep slot alive — user can retry or stop explicitly.
+                     * Tearing down on transient failure is too aggressive. */
                     hu_control_send_event_to_conn(s_proto, sl->conn, "voice.error",
                                                   "{\"message\":\"reconnect failed\"}");
-                    vs_free_slot(sl, s_proto->alloc);
                 }
             }
             continue;

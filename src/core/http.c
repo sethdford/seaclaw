@@ -462,14 +462,20 @@ static hu_error_t hu_http_post_json_stream_impl(hu_allocator_t *alloc, const cha
     curl_setup_common(curl);
 
     CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
     curl_slist_free_all(headers);
     curl_pool_release(curl);
 
+    if (http_code >= 400)
+        fprintf(stderr, "[http_stream] HTTP %ld from %.80s\n", http_code, url);
     if (res != CURLE_OK) {
         if (res == CURLE_OPERATION_TIMEDOUT)
             return HU_ERR_TIMEOUT;
         return HU_ERR_IO;
     }
+    if (http_code >= 400)
+        return HU_ERR_IO;
     return HU_OK;
 }
 #else

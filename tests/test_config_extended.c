@@ -1293,6 +1293,22 @@ static void test_config_parse_scheduler_poll(void) {
     free_config(cfg);
 }
 
+static void test_config_parse_reliability_streaming_circuit_model_fallbacks(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *j = "{\"reliability\":{\"streaming_retries\":2,\"circuit_breaker_enabled\":false,"
+                    "\"model_fallbacks\":[{\"model\":\"gpt-4\",\"fallback_models\":[\"gpt-3.5-turbo\"]}]"
+                    "}}";
+    hu_config_parse_json(cfg, j, strlen(j));
+    HU_ASSERT_EQ(cfg->reliability.streaming_retries, 2u);
+    HU_ASSERT_FALSE(cfg->reliability.circuit_breaker_enabled);
+    HU_ASSERT_EQ(cfg->reliability.model_fallbacks_len, 1u);
+    HU_ASSERT_NOT_NULL(cfg->reliability.model_fallbacks);
+    HU_ASSERT_STR_EQ(cfg->reliability.model_fallbacks[0].model, "gpt-4");
+    HU_ASSERT_EQ(cfg->reliability.model_fallbacks[0].fallback_models_len, 1u);
+    HU_ASSERT_STR_EQ(cfg->reliability.model_fallbacks[0].fallback_models[0], "gpt-3.5-turbo");
+    free_config(cfg);
+}
+
 static void test_config_deinit_idempotent(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_config_t cfg = {0};
@@ -1463,6 +1479,7 @@ void run_config_extended_tests(void) {
     HU_RUN_TEST(test_config_parse_gateway_host);
     HU_RUN_TEST(test_config_parse_single_provider);
     HU_RUN_TEST(test_config_parse_fallback_providers_single);
+    HU_RUN_TEST(test_config_parse_reliability_streaming_circuit_model_fallbacks);
     HU_RUN_TEST(test_config_parse_diagnostics_log_receipts);
     HU_RUN_TEST(test_config_parse_diagnostics_log_llm_io);
     HU_RUN_TEST(test_config_parse_agent_session_idle);

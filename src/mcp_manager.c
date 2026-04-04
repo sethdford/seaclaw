@@ -168,12 +168,12 @@ hu_error_t hu_mcp_manager_create(hu_allocator_t *alloc,
         slot->oauth_token_url = dup_str(alloc, e->oauth_token_url);
         slot->oauth_scopes = dup_str(alloc, e->oauth_scopes);
         slot->oauth_redirect_uri = dup_str(alloc, e->oauth_redirect_uri);
+        memset(&slot->oauth_token, 0, sizeof(slot->oauth_token));
         if ((e->oauth_client_id && !slot->oauth_client_id) ||
             (e->oauth_token_url && !slot->oauth_token_url)) {
             mgr->slot_count++;
             goto fail;
         }
-        memset(&slot->oauth_token, 0, sizeof(slot->oauth_token));
 
         mgr->slot_count++;
     }
@@ -391,6 +391,8 @@ static hu_error_t mgr_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         hu_error_t jerr = hu_mcp_jsonrpc_build_tools_call(alloc, rpc_id,
             w->original_name, args_json, &request, &request_len);
         if (jerr != HU_OK) {
+            if (args_allocated && args_json)
+                alloc->free(alloc->ctx, args_json, args_len + 1);
             *out = hu_tool_result_fail("Failed to build JSON-RPC request", 32);
             return HU_OK;
         }

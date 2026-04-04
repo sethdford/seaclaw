@@ -1,6 +1,8 @@
 #include "test_framework.h"
 #include "human/webhook.h"
 #include "human/tools/webhook_tools.h"
+#include "human/channels/webhook.h"
+#include "human/channel.h"
 #include "human/core/allocator.h"
 #include "human/tool.h"
 #include <string.h>
@@ -301,9 +303,70 @@ static void test_webhook_poll_tool(void) {
     cleanup_test();
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Webhook channel (outbound + gateway JSON parse)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+static void test_webhook_channel_create_valid_config(void) {
+    setup_test();
+    hu_webhook_channel_config_t cfg = {.name = "webhook/myapp",
+                                       .callback_url = "https://example.com/hook",
+                                       .secret = "test-secret",
+                                       .message_field = NULL,
+                                       .sender_field = NULL,
+                                       .max_message_len = 512};
+    hu_channel_t ch = {0};
+    hu_error_t err = hu_webhook_channel_create(&alloc, &cfg, &ch);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(ch.vtable);
+    HU_ASSERT_NOT_NULL(ch.ctx);
+    HU_ASSERT_STR_EQ(ch.vtable->name(ch.ctx), "webhook/myapp");
+    HU_ASSERT(ch.vtable->health_check(ch.ctx));
+    err = ch.vtable->start(ch.ctx);
+    HU_ASSERT_EQ(err, HU_OK);
+    err = ch.vtable->send(ch.ctx, "session", 7, "hello", 5, NULL, 0);
+    HU_ASSERT_EQ(err, HU_OK);
+    ch.vtable->stop(ch.ctx);
+    hu_webhook_channel_destroy(&ch, &alloc);
+    cleanup_test();
+}
+
+static void test_webhook_on_message_parses_default_fields(void) {
+    setup_test();
+    hu_webhook_channel_config_t cfg = {0};
+    const char *json = "{\"message\":\"ping\",\"sender\":\"user_a\"}";
+    char sender[64];
+    char message[128];
+    hu_error_t err =
+        hu_webhook_on_message(json, strlen(json), &cfg, sender, sizeof(sender), message, sizeof(message));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(sender, "user_a");
+    HU_ASSERT_STR_EQ(message, "ping");
+    cleanup_test();
+}
+
+static void test_webhook_on_message_custom_field_names(void) {
+    setup_test();
+    char msg_key[] = "body";
+    char snd_key[] = "from";
+    hu_webhook_channel_config_t cfg = {.message_field = msg_key, .sender_field = snd_key};
+    const char *json = "{\"from\":\"bot-1\",\"body\":\"status ok\"}";
+    char sender[64];
+    char message[128];
+    hu_error_t err =
+        hu_webhook_on_message(json, strlen(json), &cfg, sender, sizeof(sender), message, sizeof(message));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(sender, "bot-1");
+    HU_ASSERT_STR_EQ(message, "status ok");
+    cleanup_test();
+}
+
 void run_webhook_tests(void) {
     HU_TEST_SUITE("webhook");
 
+    HU_RUN_TEST(test_webhook_channel_create_valid_config);
+    HU_RUN_TEST(test_webhook_on_message_parses_default_fields);
+    HU_RUN_TEST(test_webhook_on_message_custom_field_names);
     HU_RUN_TEST(test_webhook_manager_create_destroy);
     HU_RUN_TEST(test_webhook_register_single);
     HU_RUN_TEST(test_webhook_register_multiple);

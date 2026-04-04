@@ -2,6 +2,7 @@
 #include "human/config.h"
 #include "human/core/log.h"
 #include "human/core/string.h"
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -582,7 +583,8 @@ static hu_error_t parse_mcp_servers(hu_allocator_t *a, hu_config_t *cfg,
                                     const hu_json_value_t *obj) {
     if (!obj || obj->type != HU_JSON_OBJECT)
         return HU_OK;
-    cfg->mcp_servers_len = 0;
+    /* Append to existing entries rather than wiping — config may be merged
+     * from multiple sources (top-level mcp_servers + mcp.servers). */
     for (size_t i = 0; i < obj->data.object.len && cfg->mcp_servers_len < HU_MCP_SERVERS_MAX; i++) {
         hu_json_pair_t *p = &obj->data.object.pairs[i];
         if (!p->key || !p->value || p->value->type != HU_JSON_OBJECT)
@@ -762,6 +764,111 @@ static hu_error_t parse_heartbeat(hu_allocator_t *a, hu_config_t *cfg, const hu_
     return HU_OK;
 }
 
+static void free_reliability_model_fallbacks(hu_allocator_t *a, hu_config_t *cfg) {
+    if (!cfg->reliability.model_fallbacks)
+        return;
+    for (size_t i = 0; i < cfg->reliability.model_fallbacks_len; i++) {
+        hu_reliability_model_fallback_t *row = &cfg->reliability.model_fallbacks[i];
+        if (row->model) {
+            a->free(a->ctx, row->model, strlen(row->model) + 1);
+            row->model = NULL;
+        }
+        if (row->fallback_models) {
+            for (size_t j = 0; j < row->fallback_models_len; j++) {
+                if (row->fallback_models[j])
+                    a->free(a->ctx, row->fallback_models[j],
+                            strlen(row->fallback_models[j]) + 1);
+            }
+            a->free(a->ctx, row->fallback_models, row->fallback_models_len * sizeof(char *));
+            row->fallback_models = NULL;
+            row->fallback_models_len = 0;
+        }
+    }
+    a->free(a->ctx, cfg->reliability.model_fallbacks,
+            cfg->reliability.model_fallbacks_len * sizeof(hu_reliability_model_fallback_t));
+    cfg->reliability.model_fallbacks = NULL;
+    cfg->reliability.model_fallbacks_len = 0;
+}
+
+static hu_error_t parse_reliability_model_fallbacks(hu_allocator_t *a, hu_config_t *cfg,
+                                                  const hu_json_value_t *arr) {
+    if (!arr || arr->type != HU_JSON_ARRAY)
+        return HU_OK;
+    free_reliability_model_fallbacks(a, cfg);
+
+    size_t cap = arr->data.array.len;
+    if (cap > HU_MAX_RELIABILITY_MODEL_FALLBACK_ROWS)
+        cap = HU_MAX_RELIABILITY_MODEL_FALLBACK_ROWS;
+    if (cap == 0)
+        return HU_OK;
+
+    hu_reliability_model_fallback_t *rows =
+        (hu_reliability_model_fallback_t *)a->alloc(a->ctx, cap * sizeof(*rows));
+    if (!rows)
+        return HU_ERR_OUT_OF_MEMORY;
+    memset(rows, 0, cap * sizeof(*rows));
+
+    size_t count = 0;
+    for (size_t i = 0; i < arr->data.array.len && count < cap; i++) {
+        const hu_json_value_t *item = arr->data.array.items[i];
+        if (!item || item->type != HU_JSON_OBJECT)
+            continue;
+        const char *model = hu_json_get_string(item, "model");
+        if (!model || !model[0])
+            continue;
+        rows[count].model = hu_strdup(a, model);
+        if (!rows[count].model) {
+            for (size_t k = 0; k < count; k++) {
+                if (rows[k].model)
+                    a->free(a->ctx, rows[k].model, strlen(rows[k].model) + 1);
+                if (rows[k].fallback_models) {
+                    for (size_t j = 0; j < rows[k].fallback_models_len; j++) {
+                        if (rows[k].fallback_models[j])
+                            a->free(a->ctx, rows[k].fallback_models[j],
+                                    strlen(rows[k].fallback_models[j]) + 1);
+                    }
+                    a->free(a->ctx, rows[k].fallback_models,
+                            rows[k].fallback_models_len * sizeof(char *));
+                }
+            }
+            a->free(a->ctx, rows, cap * sizeof(*rows));
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        hu_json_value_t *fba = hu_json_object_get(item, "fallback_models");
+        rows[count].fallback_models = NULL;
+        rows[count].fallback_models_len = 0;
+        if (fba && fba->type == HU_JSON_ARRAY) {
+            hu_error_t pe = parse_string_array(a, &rows[count].fallback_models,
+                                               &rows[count].fallback_models_len, fba);
+            if (pe != HU_OK) {
+                for (size_t k = 0; k <= count; k++) {
+                    if (rows[k].model)
+                        a->free(a->ctx, rows[k].model, strlen(rows[k].model) + 1);
+                    if (rows[k].fallback_models) {
+                        for (size_t j = 0; j < rows[k].fallback_models_len; j++) {
+                            if (rows[k].fallback_models[j])
+                                a->free(a->ctx, rows[k].fallback_models[j],
+                                        strlen(rows[k].fallback_models[j]) + 1);
+                        }
+                        a->free(a->ctx, rows[k].fallback_models,
+                                rows[k].fallback_models_len * sizeof(char *));
+                    }
+                }
+                a->free(a->ctx, rows, cap * sizeof(*rows));
+                return pe;
+            }
+        }
+        count++;
+    }
+    if (count == 0) {
+        a->free(a->ctx, rows, cap * sizeof(*rows));
+        return HU_OK;
+    }
+    cfg->reliability.model_fallbacks = rows;
+    cfg->reliability.model_fallbacks_len = count;
+    return HU_OK;
+}
+
 static hu_error_t parse_reliability(hu_allocator_t *a, hu_config_t *cfg,
                                     const hu_json_value_t *obj) {
     if (!obj || obj->type != HU_JSON_OBJECT)
@@ -795,6 +902,18 @@ static hu_error_t parse_reliability(hu_allocator_t *a, hu_config_t *cfg,
     double sr = hu_json_get_number(obj, "scheduler_retries", cfg->reliability.scheduler_retries);
     if (sr >= 0 && sr <= 20)
         cfg->reliability.scheduler_retries = (uint32_t)sr;
+    double str_r =
+        hu_json_get_number(obj, "streaming_retries", (double)cfg->reliability.streaming_retries);
+    if (str_r >= 0 && str_r <= 20)
+        cfg->reliability.streaming_retries = (uint32_t)str_r;
+    cfg->reliability.circuit_breaker_enabled =
+        hu_json_get_bool(obj, "circuit_breaker_enabled", cfg->reliability.circuit_breaker_enabled);
+    hu_json_value_t *mf = hu_json_object_get(obj, "model_fallbacks");
+    if (mf && mf->type == HU_JSON_ARRAY) {
+        hu_error_t mfe = parse_reliability_model_fallbacks(a, cfg, mf);
+        if (mfe != HU_OK)
+            return mfe;
+    }
     hu_json_value_t *fp = hu_json_object_get(obj, "fallback_providers");
     if (fp && fp->type == HU_JSON_ARRAY) {
         if (cfg->reliability.fallback_providers) {

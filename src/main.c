@@ -814,9 +814,41 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
 #endif /* HU_HAS_CRON */
 
 static hu_error_t cmd_onboard(hu_allocator_t *alloc, int argc, char **argv) {
-    (void)argc;
-    (void)argv;
-    return hu_onboard_run(alloc);
+    hu_onboard_opts_t ob = {0};
+    for (int i = 2; i < argc; i++) {
+        if (!argv[i])
+            continue;
+        if (strcmp(argv[i], "--non-interactive") == 0)
+            ob.non_interactive = true;
+        else if (strcmp(argv[i], "--start-gateway") == 0)
+            ob.start_gateway = true;
+        else if (strcmp(argv[i], "--api-key") == 0 && i + 1 < argc && argv[i + 1]) {
+            ob.api_key = argv[++i];
+        } else if (strcmp(argv[i], "--provider") == 0 && i + 1 < argc && argv[i + 1]) {
+            ob.provider = argv[++i];
+        } else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc && argv[i + 1]) {
+            ob.model = argv[++i];
+        } else if (strcmp(argv[i], "--channel") == 0 && i + 1 < argc && argv[i + 1]) {
+            ob.channel = argv[++i];
+        } else if (strcmp(argv[i], "--workspace") == 0 && i + 1 < argc && argv[i + 1]) {
+            ob.workspace = argv[++i];
+        } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            printf("Usage: human onboard [options]\n");
+            printf("  --api-key <key>\n");
+            printf("  --provider <name>\n");
+            printf("  --model <id>\n");
+            printf("  --channel <telegram|discord|slack|whatsapp|imessage>\n");
+            printf("  --workspace <path>\n");
+            printf("  --non-interactive\n");
+            printf("  --start-gateway\n");
+            return HU_OK;
+        } else {
+            fprintf(stderr, "[%s] onboard: unknown option %s (try --help)\n", HU_CODENAME,
+                    argv[i]);
+            return HU_ERR_INVALID_ARGUMENT;
+        }
+    }
+    return hu_onboard_run_with_opts(alloc, &ob);
 }
 
 static hu_error_t cmd_service(hu_allocator_t *alloc, int argc, char **argv) {
