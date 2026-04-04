@@ -43,6 +43,7 @@ AGENTS.md                <- Full engineering protocol
 | [human-in-the-loop.md](ai/human-in-the-loop.md)               | Approval tiers, confirmation flow, security policy integration, escalation triggers        | Tool execution, security-sensitive actions |
 | [disclosure.md](ai/disclosure.md)                             | AI identity disclosure, expertise boundaries, directional language, claims to avoid        | Agent responses, persona design            |
 | [responsible-ai.md](ai/responsible-ai.md)                     | Model governance, selection criteria, bias detection, output monitoring, incident response | Model selection, provider evaluation       |
+| [voice-providers.md](ai/voice-providers.md)                   | Voice provider vtable contract, duplex turn-taking, audio emotion, lifecycle              | Implementing or modifying voice providers  |
 
 ## Brand
 
@@ -78,6 +79,9 @@ AGENTS.md                <- Full engineering protocol
 | [cross-platform.md](engineering/cross-platform.md)           | Platform detection, abstractions, guards, hardcoded paths       | Platform-specific code            |
 | [dependencies.md](engineering/dependencies.md)               | Dependency tiers, version pinning, vulnerability scanning, SBOM | Adding dependencies, supply chain |
 | [error-handling.md](engineering/error-handling.md)           | Error propagation, reporting, recovery patterns, anti-patterns  | Error handling, debugging         |
+| [config-schema.md](engineering/config-schema.md)             | Config schema design, parsing, validation, upgrade paths        | Config changes, schema evolution  |
+| [gateway-events.md](engineering/gateway-events.md)           | Gateway event naming, payload schemas, WebSocket/webhook design | Gateway events, control protocol  |
+| [memory-lifecycle.md](engineering/memory-lifecycle.md)       | Memory tiers, consolidation, forgetting curve, RAG safety       | Memory system changes             |
 
 ## Quality
 
@@ -96,6 +100,7 @@ AGENTS.md                <- Full engineering protocol
 | [incident-response.md](operations/incident-response.md) | Severity levels, triage workflow, postmortem template, runbooks     | When things break            |
 | [monitoring.md](operations/monitoring.md)               | Structured logging, health checks, alerting, AI-specific metrics    | All deployed services        |
 | [observability.md](operations/observability.md)         | SLI/SLO definitions, structured logging, metrics, trace propagation | Observability, SLOs, metrics |
+| [daemon.md](operations/daemon.md)                       | Daemon service loop, worker pooling, job scheduling, lifecycle      | Daemon operations, service loop  |
 
 ## Security
 
@@ -106,3 +111,4 @@ AGENTS.md                <- Full engineering protocol
 | [ai-safety.md](security/ai-safety.md)       | Prompt injection, output validation, safe tool execution          | AI agent behavior, tool security     |
 | [data-privacy.md](security/data-privacy.md) | Data classification, lifecycle, retention, user rights, isolation | Data handling, memory, logging       |
 | [compliance.md](security/compliance.md)     | GDPR, CCPA/CPRA compliance mapping, DPA requirements, audit trail | Data privacy compliance, deployments |
+| [canvas-security.md](security/canvas-security.md) | Live Canvas sandbox model, iframe isolation, CSP, threat mitigations | Canvas rendering, security review    |

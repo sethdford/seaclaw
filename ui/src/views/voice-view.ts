@@ -220,6 +220,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private _audioLevel = 0;
   @state() private _showClonePanel = false;
   @state() private _geminiLiveMode = false;
+  @state() private _userVadSpeaking = false;
   private _durationTimer: ReturnType<typeof setInterval> | null = null;
   private _recorder = new AudioRecorder();
   readonly #playback = new AudioPlaybackEngine(24000);

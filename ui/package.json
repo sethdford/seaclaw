@@ -40,6 +40,7 @@
     "@codemirror/language": "^6.12.3",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.41.0",
+    "chart.js": "^4.5.1",
     "dompurify": "^3.3.2",
     "katex": "^0.16.37",
     "lit": "^3.2.0",

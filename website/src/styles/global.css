@@ -1249,9 +1249,7 @@
 }
 
 body.hu-ambient-ready {
-  filter: sepia(var(--hu-ambient-warmth))
-    saturate(calc(1 + var(--hu-ambient-warmth) * 0.3));
-  transition: filter 2s ease;
+  transition: background-color 2s ease;
 }
 
 .section-divider {
