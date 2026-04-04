@@ -420,6 +420,12 @@ void run_daemon_lifecycle_tests(void);
 void run_daemon_routing_tests(void);
 void run_daemon_proactive_tests(void);
 void run_daemon_trust_tests(void);
+void run_cp_tasks_tests(void);
+void run_vector_retrieval_remote_tests(void);
+void run_background_registry_tests(void);
+void run_cp_tasks_tests(void);
+void run_vector_retrieval_remote_tests(void);
+void run_background_registry_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
@@ -864,6 +870,12 @@ int main(int argc, char **argv) {
     run_daemon_routing_tests();
     run_daemon_proactive_tests();
     run_daemon_trust_tests();
+    run_cp_tasks_tests();
+    run_vector_retrieval_remote_tests();
+    run_background_registry_tests();
+    run_cp_tasks_tests();
+    run_vector_retrieval_remote_tests();
+    run_background_registry_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();
