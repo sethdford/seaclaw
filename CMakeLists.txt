@@ -251,9 +251,10 @@ if(HU_ENABLE_ALL_CHANNELS)
         src/channels/qq.c
         src/channels/maixcam.c
         src/channels/dispatch.c
-        src/channels/gmail_base64.c
-        src/channels/gmail.c
     )
+    if(NOT HU_ENABLE_GMAIL)
+        list(APPEND CHANNEL_SOURCES src/channels/gmail_base64.c src/channels/gmail.c)
+    endif()
 endif()
 
 # --- Memory engine sources (conditionally added) ---
@@ -831,6 +832,7 @@ list(APPEND HU_CORE_SOURCES
     src/voice/webrtc_dtls.c
     src/voice/webrtc_srtp.c
     src/voice/realtime.c
+    src/voice/gemini_live.c
     src/voice/duplex.c
     src/voice/session.c
     src/voice/turn_signal.c
@@ -1000,12 +1002,14 @@ if(HU_ENABLE_SKILLS)
         src/skills.c
         src/skills/skill_scaffold.c
         src/tools/skill_run.c
-        src/intelligence/skills.c
         src/intelligence/reflection.c
         src/intelligence/feedback.c
         src/intelligence/meta_learning.c
         src/intelligence/cycle.c
     )
+    if(NOT HU_ENABLE_SQLITE)
+        list(APPEND HU_CORE_SOURCES src/intelligence/skills.c)
+    endif()
 endif()
 
 # Cron scheduler (cron.c and crontab.c are in HU_CORE_SOURCES unconditionally)
@@ -1114,6 +1118,9 @@ endif()
 set(HU_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${HU_ROOT}/include)
 include_directories(${HU_ROOT}/asm/generic)
+
+# Deduplicate source lists to prevent parallel build races
+list(REMOVE_DUPLICATES HU_CORE_SOURCES)
 
 # --- Core static library ---
 add_library(human_core STATIC ${HU_CORE_SOURCES} ${HU_CRYPTO_SOURCES} ${HU_ASM_SOURCES})
