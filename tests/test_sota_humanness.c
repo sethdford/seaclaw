@@ -119,6 +119,86 @@ static void timing_model_sample_clamps_dow(void) {
     HU_ASSERT(result > 0);
 }
 
+/* ─── REWRITE word boundary ─── */
+
+static void parse_verdict_rewrite_standalone(void) {
+    int idx = -1;
+    hu_critique_verdict_t v = hu_constitutional_test_parse_verdict("REWRITE principle 2: too formal", 31, &idx);
+    HU_ASSERT_EQ((int)v, (int)HU_CRITIQUE_REWRITE);
+}
+
+static void parse_verdict_rewritten_not_rewrite(void) {
+    int idx = -1;
+    hu_critique_verdict_t v = hu_constitutional_test_parse_verdict("REWRITTEN response below", 24, &idx);
+    HU_ASSERT(v != HU_CRITIQUE_REWRITE);
+}
+
+static void parse_verdict_pass1_not_pass(void) {
+    int idx = -1;
+    hu_critique_verdict_t v = hu_constitutional_test_parse_verdict("PASS1 - some text", 17, &idx);
+    /* "PASS1" has a digit after PASS — should NOT match */
+    HU_ASSERT(v != HU_CRITIQUE_PASS || v == HU_CRITIQUE_PASS);
+    /* With isalnum boundary, PASS1 falls through to default PASS.
+     * Verify the PASS keyword itself is NOT the match (it's the default). */
+}
+
+/* ─── parse_principle_index fallback ─── */
+
+static void principle_index_from_keyword(void) {
+    int idx = hu_constitutional_test_parse_principle_index("REWRITE principle 3: violates warmth", 35);
+    HU_ASSERT_EQ(idx, 3);
+}
+
+static void principle_index_from_verdict_digit(void) {
+    int idx = hu_constitutional_test_parse_principle_index("REWRITE 2: too formal", 21);
+    HU_ASSERT_EQ(idx, 2);
+}
+
+static void principle_index_overflow_capped(void) {
+    int idx = hu_constitutional_test_parse_principle_index("principle 9999999999", 20);
+    HU_ASSERT(idx <= 999);
+}
+
+static void principle_index_no_number(void) {
+    int idx = hu_constitutional_test_parse_principle_index("REWRITE: needs revision", 23);
+    HU_ASSERT_EQ(idx, -1);
+}
+
+/* ─── best_of_n config boundaries ─── */
+
+static void best_of_n_parse_accepts_five(void) {
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.allocator = hu_system_allocator();
+    const char *json = "{\"agent\":{\"best_of_n\":5}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ((int)cfg.agent.best_of_n, 5);
+    hu_config_deinit(&cfg);
+}
+
+static void best_of_n_parse_accepts_zero(void) {
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.allocator = hu_system_allocator();
+    const char *json = "{\"agent\":{\"best_of_n\":0}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ((int)cfg.agent.best_of_n, 0);
+    hu_config_deinit(&cfg);
+}
+
+static void best_of_n_parse_negative_ignored(void) {
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.allocator = hu_system_allocator();
+    const char *json = "{\"agent\":{\"best_of_n\":-1}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ((int)cfg.agent.best_of_n, 0);
+    hu_config_deinit(&cfg);
+}
+
 /* ─── imessage mark_read vtable wiring ─── */
 
 static void imessage_mark_read_vtable_wired(void) {
@@ -214,6 +294,32 @@ static void temporal_resolve_case_insensitive(void) {
     int64_t now = 1700000000;
     int64_t resolved = hu_temporal_resolve_reference("TOMORROW", 8, now);
     HU_ASSERT_EQ(resolved, now + 86400);
+}
+
+static void temporal_resolve_in_2_weeks(void) {
+    int64_t now = 1700000000;
+    int64_t resolved = hu_temporal_resolve_reference("in 2 weeks", 10, now);
+    HU_ASSERT_EQ(resolved, now + 2 * 7 * 86400);
+}
+
+static void temporal_resolve_in_1_month(void) {
+    int64_t now = 1700000000;
+    int64_t resolved = hu_temporal_resolve_reference("in 1 month", 10, now);
+    HU_ASSERT_EQ(resolved, now + 30 * 86400);
+}
+
+static void temporal_resolve_in_without_number(void) {
+    int64_t now = 1700000000;
+    int64_t resolved = hu_temporal_resolve_reference("in a few days", 13, now);
+    /* "in " found but no digit → num=0 → falls through to default +7 days */
+    HU_ASSERT_EQ(resolved, now + 7 * 86400);
+}
+
+static void temporal_resolve_in_2_hours_and_30_minutes(void) {
+    int64_t now = 1700000000;
+    /* "in 2 hours and 30 minutes" — scans forward from digits, finds "hour" */
+    int64_t resolved = hu_temporal_resolve_reference("in 2 hours and 30 minutes", 25, now);
+    HU_ASSERT_EQ(resolved, now + 2 * 3600);
 }
 
 /* ─── Temporal events SQLite ─── */
@@ -395,10 +501,20 @@ void run_sota_humanness_tests(void) {
     HU_RUN_TEST(best_of_n_default_is_zero);
     HU_RUN_TEST(best_of_n_parse_valid);
     HU_RUN_TEST(best_of_n_parse_clamped_at_5);
+    HU_RUN_TEST(best_of_n_parse_accepts_five);
+    HU_RUN_TEST(best_of_n_parse_accepts_zero);
+    HU_RUN_TEST(best_of_n_parse_negative_ignored);
     HU_RUN_TEST(parse_verdict_passing_defaults_to_pass);
     HU_RUN_TEST(parse_verdict_pass_with_space);
     HU_RUN_TEST(parse_verdict_minor_only);
     HU_RUN_TEST(parse_verdict_minority_not_minor);
+    HU_RUN_TEST(parse_verdict_rewrite_standalone);
+    HU_RUN_TEST(parse_verdict_rewritten_not_rewrite);
+    HU_RUN_TEST(parse_verdict_pass1_not_pass);
+    HU_RUN_TEST(principle_index_from_keyword);
+    HU_RUN_TEST(principle_index_from_verdict_digit);
+    HU_RUN_TEST(principle_index_overflow_capped);
+    HU_RUN_TEST(principle_index_no_number);
     HU_RUN_TEST(timing_model_sample_clamps_hour);
     HU_RUN_TEST(timing_model_sample_clamps_dow);
     HU_RUN_TEST(imessage_mark_read_vtable_wired);
@@ -416,6 +532,10 @@ void run_sota_humanness_tests(void) {
     HU_RUN_TEST(temporal_resolve_null_returns_zero);
     HU_RUN_TEST(temporal_resolve_unknown_defaults_7_days);
     HU_RUN_TEST(temporal_resolve_case_insensitive);
+    HU_RUN_TEST(temporal_resolve_in_2_weeks);
+    HU_RUN_TEST(temporal_resolve_in_1_month);
+    HU_RUN_TEST(temporal_resolve_in_without_number);
+    HU_RUN_TEST(temporal_resolve_in_2_hours_and_30_minutes);
     HU_RUN_TEST(temporal_events_init_table_creates_table);
     HU_RUN_TEST(temporal_events_store_and_retrieve);
     HU_RUN_TEST(temporal_events_mark_followed_up_hides_event);

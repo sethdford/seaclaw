@@ -2427,7 +2427,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
-
+#endif /* HU_ENABLE_ML */
+#ifdef HU_ENABLE_SQLITE
                 /* DPO consolidation — train on preference pairs every 24 hours */
                 {
                     static int64_t last_dpo_train = 0;
@@ -2490,11 +2491,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         hu_self_improve_apply_structured_patch(&rlaif_si,
                                                                                &style_patch);
                                         hu_self_improve_deinit(&rlaif_si);
+                                        hu_log_info("human", agent ? agent->observer : NULL,
+                                                    "rlaif nightly: applied style patch from %zu DPO pairs (loss=%.4f)",
+                                                    rlaif_result.pairs_evaluated, rlaif_result.loss);
+                                    } else {
+                                        hu_log_info("human", agent ? agent->observer : NULL,
+                                                    "rlaif nightly: failed to create self-improve engine");
                                     }
                                 }
-                                hu_log_info("human", agent ? agent->observer : NULL,
-                                            "rlaif nightly: applied style patch from %zu DPO pairs (loss=%.4f)",
-                                            rlaif_result.pairs_evaluated, rlaif_result.loss);
                                 alloc->free(alloc->ctx, best_frag, best_frag_len + 1);
                             }
                         }
@@ -2502,7 +2506,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (rlaif_lt && rlaif_lt->tm_hour != 3)
                         rlaif_nightly_done_today = false;
                 }
-#endif
+#endif /* HU_ENABLE_SQLITE (DPO + RLAIF) */
 #ifdef HU_HAS_PERSONA
                 {
                     static bool tuned_today = false;
@@ -2711,7 +2715,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 hu_self_improve_t si_engine = {0};
                                 if (hu_self_improve_create(alloc, tdb, &si_engine) == HU_OK) {
                                     hu_self_improve_init_tables(&si_engine);
-                                    for (int d = 0; d < 12; d++) {
+                                    for (int d = 0; d < HU_TURING_DIM_COUNT; d++) {
                                         if (dim_avgs[d] <= 0 || dim_avgs[d] >= 6)
                                             continue;
                                         const char *dname =
@@ -2796,7 +2800,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 if (hu_turing_get_channel_dimensions(tdb, turing_channels[ch],
                                                                      ch_len, ch_dims) == HU_OK) {
                                     int ch_sum = 0, ch_count = 0;
-                                    for (int d = 0; d < 12; d++) {
+                                    for (int d = 0; d < HU_TURING_DIM_COUNT; d++) {
                                         if (ch_dims[d] > 0) {
                                             ch_sum += ch_dims[d];
                                             ch_count++;
@@ -8465,7 +8469,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (hu_turing_get_contact_dimensions(ljdb, batch_key, key_len,
                                                                  contact_dims) == HU_OK) {
                                 int csum = 0, ccnt = 0;
-                                for (int d = 0; d < 12; d++) {
+                                for (int d = 0; d < HU_TURING_DIM_COUNT; d++) {
                                     if (contact_dims[d] > 0) {
                                         csum += contact_dims[d];
                                         ccnt++;

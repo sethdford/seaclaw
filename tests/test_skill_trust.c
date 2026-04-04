@@ -58,17 +58,17 @@ static void skill_trust_shell_integration_blocks_dangerous(void) {
     HU_ASSERT_EQ(hu_shell_create(&alloc, "/tmp", 4, NULL, &shell), HU_OK);
 
     hu_json_value_t *args = NULL;
-    HU_ASSERT_EQ(hu_json_parse(&alloc, "{\"command\":\"rm -rf /\"}", 21, &args), HU_OK);
+    const char *json = "{\"command\":\"rm -rf /\"}";
+    HU_ASSERT_EQ(hu_json_parse(&alloc, json, strlen(json), &args), HU_OK);
     HU_ASSERT_NOT_NULL(args);
 
     hu_tool_result_t result = {0};
     hu_error_t err = shell.vtable->execute(shell.ctx, &alloc, args, &result);
     HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_NOT_NULL(result.output);
-    HU_ASSERT(strstr(result.output, "blocked by skill trust") != NULL);
+    HU_ASSERT(!result.success);
+    HU_ASSERT_NOT_NULL(result.error_msg);
+    HU_ASSERT(strstr(result.error_msg, "blocked by skill trust") != NULL);
 
-    if (result.output)
-        alloc.free(alloc.ctx, (void *)result.output, result.output_len);
     hu_json_free(&alloc, args);
     if (shell.vtable->deinit)
         shell.vtable->deinit(shell.ctx, &alloc);
@@ -80,16 +80,16 @@ static void skill_trust_shell_integration_allows_safe(void) {
     HU_ASSERT_EQ(hu_shell_create(&alloc, "/tmp", 4, NULL, &shell), HU_OK);
 
     hu_json_value_t *args = NULL;
-    HU_ASSERT_EQ(hu_json_parse(&alloc, "{\"command\":\"echo hello\"}", 23, &args), HU_OK);
+    const char *json = "{\"command\":\"echo hello\"}";
+    HU_ASSERT_EQ(hu_json_parse(&alloc, json, strlen(json), &args), HU_OK);
     HU_ASSERT_NOT_NULL(args);
 
     hu_tool_result_t result = {0};
     hu_error_t err = shell.vtable->execute(shell.ctx, &alloc, args, &result);
     HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_NOT_NULL(result.output);
-    HU_ASSERT(strstr(result.output, "blocked") == NULL);
+    HU_ASSERT(result.success);
 
-    if (result.output)
+    if (result.output_owned && result.output)
         alloc.free(alloc.ctx, (void *)result.output, result.output_len);
     hu_json_free(&alloc, args);
     if (shell.vtable->deinit)
