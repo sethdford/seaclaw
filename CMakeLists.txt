@@ -377,6 +377,7 @@ set(HU_CORE_SOURCES
     src/security/adversarial.c
     src/security/sensitivity.c
     src/security/sandbox.c
+    src/security/skill_trust.c
     src/observability.c
     src/observability/log_observer.c
     src/observability/metrics_observer.c
@@ -698,12 +699,16 @@ set(HU_CORE_SOURCES
     src/tools/media_video.c
     src/tools/media_gif.c
     src/tools/factory.c
+    src/tools/canvas_render.c
+    src/tools/declarative.c
     src/tools/mcp_resource_tools.c
     src/tools/cron_session_tools.c
     src/mcp_server.c
     src/channels/thread_binding.c
     src/channels/format.c
     src/channels/rate_limit.c
+    src/channels/channel_embed.c
+    src/channels/twilio_media.c
     src/channels/channel_http.c
     src/channels/webhook.c
     src/security/policy_engine.c
@@ -1938,6 +1943,12 @@ set(HU_TEST_SOURCES
     tests/test_main.c
     tests/test_agent_definition.c
     tests/test_agent_git.c
+    tests/test_bg_registry.c
+    tests/test_canvas_render.c
+    tests/test_channel_embeds.c
+    tests/test_twilio_media_impl.c
+    tests/test_declarative_tools.c
+    tests/test_skill_trust.c
     tests/test_agent_modules.c
     tests/test_tot_recursive.c
     tests/test_agent_subsystems.c
@@ -1969,8 +1980,7 @@ set(HU_TEST_SOURCES
     tests/test_webhook_channel.c
     tests/test_cp_tasks.c
     tests/test_vector_retrieval_remote.c
-    tests/test_cp_tasks.c
-    tests/test_vector_retrieval_remote.c
+    tests/test_background_registry.c
     tests/test_tool.c
     tests/test_webhook.c
     tests/test_peripheral.c
@@ -2045,6 +2055,7 @@ set(HU_TEST_SOURCES
     tests/test_channel_integration.c
     tests/test_gmail.c
     tests/test_imessage_extended.c
+    tests/test_imessage_chatdb_fixture.c
     tests/test_imessage_adversarial.c
     tests/test_config_extended.c
     tests/test_config_getters.c
