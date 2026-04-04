@@ -264,6 +264,8 @@ hu_error_t hu_humor_audience_load(sqlite3 *db, const char *contact_id, hu_humor_
     return HU_OK;
 }
 
+#endif /* HU_ENABLE_SQLITE */
+
 hu_humor_type_t hu_humor_audience_preferred_type(const hu_humor_audience_t *audience) {
     if (!audience)
         return HU_HUMOR_OBSERVATIONAL;
@@ -279,8 +281,6 @@ hu_humor_type_t hu_humor_audience_preferred_type(const hu_humor_audience_t *audi
     }
     return best;
 }
-
-#endif /* HU_ENABLE_SQLITE */
 
 /* ================================================================
  * Task 2: Timing + appropriateness

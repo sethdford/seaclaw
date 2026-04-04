@@ -60,9 +60,6 @@ const VALID_TABS: TabId[] = [
 
 const SIDEBAR_KEY = "hu-sidebar-collapsed";
 
-/** Tabs that use list-detail layout (show detail panel at wide breakpoint) */
-const LIST_DETAIL_TABS: TabId[] = ["sessions", "channels", "tools", "nodes", "canvas"];
-
 const VIEW_IMPORTS: Record<TabId, () => Promise<unknown>> = {
   overview: () => import("./views/overview-view.js"),
   chat: () => import("./views/chat-view.js"),
