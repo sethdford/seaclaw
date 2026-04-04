@@ -16,9 +16,11 @@
 
 #define HU_CANVAS_PATH_MAX 4096
 
+#if defined(HU_IS_TEST) && HU_IS_TEST
 static const unsigned char hu_canvas_png_sig[8] = {
     0x89u, 0x50u, 0x4Eu, 0x47u, 0x0Du, 0x0Au, 0x1Au, 0x0Au,
 };
+#endif
 
 static bool hu_canvas_path_shell_safe(const char *p) {
     if (!p)
