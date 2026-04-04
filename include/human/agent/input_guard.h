@@ -1,5 +1,6 @@
 #ifndef HU_INPUT_GUARD_H
 #define HU_INPUT_GUARD_H
+#include "human/core/allocator.h"
 #include "human/core/error.h"
 #include <stddef.h>
 typedef enum hu_injection_risk {
@@ -9,4 +10,7 @@ typedef enum hu_injection_risk {
 } hu_injection_risk_t;
 hu_error_t hu_input_guard_check(const char *message, size_t message_len,
                                 hu_injection_risk_t *out_risk);
+/* Load externalized guard patterns from data files. Gracefully falls back to defaults. */
+hu_error_t hu_input_guard_data_init(hu_allocator_t *alloc);
+void hu_input_guard_data_cleanup(hu_allocator_t *alloc);
 #endif

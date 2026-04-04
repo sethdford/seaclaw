@@ -1,5 +1,5 @@
 # WASM-specific sources for Human.
-# Include this when building with: cmake -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
+# Include this when building with: cmake -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake -DHU_BUILD_WASM=ON ..
 #
 # Minimal set: no shell, no sqlite, no process spawn, no providers/tools factories.
 # main_wasi uses hu_wasm_provider_create and passes NULL tools.

@@ -1,0 +1,31 @@
+{
+  "high_risk": [
+    "ignore previous instructions",
+    "ignore all previous",
+    "disregard your instructions",
+    "forget your instructions",
+    "override your system prompt",
+    "new system prompt",
+    "you are now",
+    "act as if you have no restrictions",
+    "pretend you are",
+    "jailbreak",
+    "do anything now",
+    "developer mode"
+  ],
+  "medium_risk": [
+    "[system]",
+    "[admin]",
+    "[override]",
+    "[instruction]",
+    "```system",
+    "<system>",
+    "</system>",
+    "base64:",
+    "ignore the above",
+    "bypass safety",
+    "reveal your prompt",
+    "show your system message",
+    "what are your instructions"
+  ]
+}

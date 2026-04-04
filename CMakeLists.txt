@@ -1070,6 +1070,11 @@ list(APPEND HU_CORE_SOURCES
     src/data/data_persona_relationship_stages_json.c
     src/data/data_security_command_lists_json.c
     src/data/data_agent_commitment_patterns_json.c
+    src/data/data_agent_conversation_plan_words_json.c
+    src/data/data_agent_input_guard_patterns_json.c
+    src/data/data_agent_multistep_indicators_json.c
+    src/data/data_agent_sentiment_words_json.c
+    src/data/data_cognition_dual_process_words_json.c
     src/data/data_memory_emotion_adjectives_json.c
     src/data/data_memory_relationship_words_json.c
     src/data/data_memory_topic_patterns_json.c
@@ -2067,6 +2072,7 @@ set(HU_TEST_SOURCES
     tests/test_episodic.c
     tests/test_reflection.c
     tests/test_input_guard.c
+    tests/test_externalization.c
     tests/test_conversation.c
     tests/test_vision.c
     tests/test_ab_response.c
@@ -2487,7 +2493,7 @@ if(HU_ENABLE_INTEGRATION_TESTS)
 endif()
 
 # --- WASM/WASI target (optional, use with wasm32-wasi toolchain) ---
-# Usage: cmake -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake -DSC_BUILD_WASM=ON ..
+# Usage: cmake -DCMAKE_TOOLCHAIN_FILE=cmake/wasm32-wasi.cmake -DHU_BUILD_WASM=ON ..
 if(HU_BUILD_WASM)
     include(cmake/wasm_sources.cmake)
     add_executable(human.wasm

@@ -1,0 +1,20 @@
+{
+  "greetings": [
+    "hi", "hey", "hello", "yo", "sup", "morning",
+    "good morning", "good evening", "good night",
+    "thanks", "thank you", "ok", "okay", "cool",
+    "bye", "goodbye", "see ya", "lol", "haha",
+    "yes", "no", "yep", "nope", "sure", "got it"
+  ],
+  "question_words": [
+    "how ", "what ", "why ", "where ", "when ", "which ",
+    "can you", "could you", "would you", "please ",
+    "explain", "describe", "help me", "analyze"
+  ],
+  "complexity_words": [
+    "implement", "architect", "design", "refactor",
+    "compare", "evaluate", "trade-off", "pros and cons",
+    "step by step", "plan", "strategy", "debug",
+    "investigate", "research", "analyze in depth"
+  ]
+}

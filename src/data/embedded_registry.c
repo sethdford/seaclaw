@@ -4,8 +4,18 @@
 /* Forward declarations for embedded data arrays */
 extern const unsigned char data_agent_commitment_patterns_json[];
 extern const size_t data_agent_commitment_patterns_json_len;
+extern const unsigned char data_agent_conversation_plan_words_json[];
+extern const size_t data_agent_conversation_plan_words_json_len;
+extern const unsigned char data_agent_input_guard_patterns_json[];
+extern const size_t data_agent_input_guard_patterns_json_len;
+extern const unsigned char data_agent_multistep_indicators_json[];
+extern const size_t data_agent_multistep_indicators_json_len;
+extern const unsigned char data_agent_sentiment_words_json[];
+extern const size_t data_agent_sentiment_words_json_len;
 extern const unsigned char data_channels_telegram_commands_txt[];
 extern const size_t data_channels_telegram_commands_txt_len;
+extern const unsigned char data_cognition_dual_process_words_json[];
+extern const size_t data_cognition_dual_process_words_json_len;
 extern const unsigned char data_conversation_ai_disclosure_patterns_json[];
 extern const size_t data_conversation_ai_disclosure_patterns_json_len;
 extern const unsigned char data_conversation_backchannel_phrases_json[];
@@ -103,7 +113,12 @@ typedef struct {
 
 static const hu_embedded_data_entry_t hu_embedded_data_registry[] = {
     { "agent/commitment_patterns.json", data_agent_commitment_patterns_json, &data_agent_commitment_patterns_json_len },
+    { "agent/conversation_plan_words.json", data_agent_conversation_plan_words_json, &data_agent_conversation_plan_words_json_len },
+    { "agent/input_guard_patterns.json", data_agent_input_guard_patterns_json, &data_agent_input_guard_patterns_json_len },
+    { "agent/multistep_indicators.json", data_agent_multistep_indicators_json, &data_agent_multistep_indicators_json_len },
+    { "agent/sentiment_words.json", data_agent_sentiment_words_json, &data_agent_sentiment_words_json_len },
     { "channels/telegram_commands.txt", data_channels_telegram_commands_txt, &data_channels_telegram_commands_txt_len },
+    { "cognition/dual_process_words.json", data_cognition_dual_process_words_json, &data_cognition_dual_process_words_json_len },
     { "conversation/ai_disclosure_patterns.json", data_conversation_ai_disclosure_patterns_json, &data_conversation_ai_disclosure_patterns_json_len },
     { "conversation/backchannel_phrases.json", data_conversation_backchannel_phrases_json, &data_conversation_backchannel_phrases_json_len },
     { "conversation/contractions.json", data_conversation_contractions_json, &data_conversation_contractions_json_len },
@@ -137,7 +152,7 @@ static const hu_embedded_data_entry_t hu_embedded_data_registry[] = {
     { NULL, NULL, NULL }  /* Sentinel */
 };
 
-static const size_t hu_embedded_data_count = 32;  /* excluding sentinel */
+static const size_t hu_embedded_data_count = 37;  /* excluding sentinel */
 
 typedef struct {
     const char *path;

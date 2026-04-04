@@ -1,0 +1,6 @@
+{
+  "needles": [
+    " first ", " then ", " finally", " step ", " steps ", "step 1",
+    "step 2", "\n1.", "\n2.", "1) ", "2) "
+  ]
+}

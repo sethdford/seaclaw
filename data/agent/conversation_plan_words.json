@@ -1,0 +1,9 @@
+{
+  "emotional_keywords": [
+    "sad", "happy", "angry", "frustrated", "worried", "anxious", "excited",
+    "disappointed", "stressed", "overwhelmed", "lonely", "scared", "hurt"
+  ],
+  "new_topic_patterns": [
+    "new ", "about ", "tell me", "what about", "regarding "
+  ]
+}
