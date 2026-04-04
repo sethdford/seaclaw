@@ -32,7 +32,7 @@ cp_internal.h          Internal shared definitions
 ## Wire Protocol
 
 - **Format**: JSON-RPC envelope with `noun.verb` method naming
-- **Examples**: `chat.send`, `admin.status`, `memory.recall`, `config.get`
+- **Examples**: `chat.send`, `health`, `memory.recall`, `config.get`
 - **Responses**: always valid JSON, even for errors
 - **Never** leak internal error details or stack traces to clients
 

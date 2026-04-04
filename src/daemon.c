@@ -10984,7 +10984,6 @@ if (graph)
 if (agent && agent->outcomes == &daemon_outcomes)
     agent->outcomes = NULL;
 return HU_OK;
-#endif /* HU_IS_TEST */
 }
 
 /* Daemon management, PID files, and platform install moved to daemon_lifecycle.c.

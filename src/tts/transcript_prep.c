@@ -236,6 +236,8 @@ static size_t number_to_words(int n, char *out, size_t cap) {
     return pos;
 }
 
+static bool is_digit(char c) { return c >= '0' && c <= '9'; }
+
 /* Parse unsigned integer from text, returns chars consumed (0 if not a number). */
 static size_t parse_uint(const char *text, size_t len, int *out_val) {
     if (len == 0 || !is_digit(text[0]))
@@ -590,8 +592,6 @@ static bool ends_with_abbreviation(const char *text, size_t pos) {
     }
     return false;
 }
-
-static bool is_digit(char c) { return c >= '0' && c <= '9'; }
 
 /* ── Sentence segmenter ──────────────────────────────────────────────── */
 
