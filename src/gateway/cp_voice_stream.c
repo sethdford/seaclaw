@@ -9,6 +9,7 @@
 #include "human/multimodal.h"
 #include "human/platform.h"
 #include "human/tts/cartesia_stream.h"
+#include "human/tts/transcript_prep.h"
 #include "human/voice.h"
 #include "human/voice/audio_emotion.h"
 #include "human/voice/duplex.h"
@@ -16,8 +17,6 @@
 #include "human/voice/provider.h"
 #include "human/voice/semantic_eot.h"
 #include "human/voice/turn_signal.h"
-#include "human/voice/provider.h"
-#include "human/tts/transcript_prep.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -175,8 +174,9 @@ static void *vs_recv_pump_thread(void *arg) {
             if (ev.audio_base64 && ev.audio_base64_len > 0) {
                 void *pcm = NULL;
                 size_t pcm_len = 0;
-                if (hu_multimodal_decode_base64(&alloc, ev.audio_base64, ev.audio_base64_len,
-                                                &pcm, &pcm_len) == HU_OK && pcm && pcm_len > 0) {
+                if (hu_multimodal_decode_base64(&alloc, ev.audio_base64, ev.audio_base64_len, &pcm,
+                                                &pcm_len) == HU_OK &&
+                    pcm && pcm_len > 0) {
                     vs_pcm16_to_f32_send(sl, pcm, pcm_len);
                     alloc.free(alloc.ctx, pcm, pcm_len);
                 }
@@ -604,12 +604,18 @@ hu_error_t cp_voice_session_start(hu_allocator_t *alloc, hu_app_context_t *app, 
     if (api_key_override)
         key = api_key_override;
     if (!key || !key[0])
-        return HU_ERR_INVALID_ARGUMENT;
+        key = getenv("CARTESIA_API_KEY");
+    if (!key || !key[0])
+        return HU_ERR_GATEWAY_AUTH;
 
     if (!voice_id || !voice_id[0])
         voice_id = cfg->voice.tts_voice;
+    if (!voice_id || !voice_id[0])
+        voice_id = getenv("FERNI_VOICE_ID");
     if (!model_id || !model_id[0])
         model_id = cfg->voice.tts_model;
+    if (!model_id || !model_id[0])
+        model_id = getenv("CARTESIA_MODEL");
 
     if (sl->tts) {
         hu_cartesia_stream_close(sl->tts, alloc);
@@ -890,9 +896,9 @@ hu_error_t cp_voice_audio_end(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     return err;
 }
 
-hu_error_t cp_voice_tool_response(hu_allocator_t *alloc, hu_app_context_t *app,
-                                  hu_ws_conn_t *conn, const hu_control_protocol_t *proto,
-                                  const hu_json_value_t *root, char **out, size_t *out_len) {
+hu_error_t cp_voice_tool_response(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                  const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                  char **out, size_t *out_len) {
     (void)proto;
     *out = NULL;
     *out_len = 0;
@@ -911,8 +917,7 @@ hu_error_t cp_voice_tool_response(hu_allocator_t *alloc, hu_app_context_t *app,
     if (!name || !call_id || !response)
         return HU_ERR_INVALID_ARGUMENT;
     vs_slot_t *sl = vs_find_slot_by_conn(conn);
-    if (sl && sl->provider_active && sl->provider.vtable &&
-        sl->provider.vtable->send_tool_response)
+    if (sl && sl->provider_active && sl->provider.vtable && sl->provider.vtable->send_tool_response)
         (void)sl->provider.vtable->send_tool_response(sl->provider.ctx, name, call_id, response);
     hu_json_value_t *res = hu_json_object_new(alloc);
     if (!res)
@@ -1009,9 +1014,9 @@ void hu_voice_stream_on_conn_close(hu_ws_conn_t *conn) {
     (void)conn;
 }
 
-hu_error_t cp_voice_tool_response(hu_allocator_t *alloc, hu_app_context_t *app,
-                                  hu_ws_conn_t *conn, const hu_control_protocol_t *proto,
-                                  const hu_json_value_t *root, char **out, size_t *out_len) {
+hu_error_t cp_voice_tool_response(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                  const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                  char **out, size_t *out_len) {
     (void)alloc;
     (void)app;
     (void)conn;
