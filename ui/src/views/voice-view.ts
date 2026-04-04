@@ -20,6 +20,7 @@ import "../components/hu-status-dot.js";
 import "../components/hu-voice-orb.js";
 import "../components/hu-voice-conversation.js";
 import "../components/hu-voice-clone.js";
+import "../components/hu-input.js";
 
 type VoiceStatus = "idle" | "listening" | "processing" | "unsupported";
 
@@ -221,6 +222,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private _showClonePanel = false;
   @state() private _geminiLiveMode = false;
   @state() private _userVadSpeaking = false;
+  @state() private _voiceMode: "standard" | "gemini_live" | "openai_realtime" = "standard";
+  @state() private _stsApiKey = "";
+  @state() private _showCredPanel = false;
   private _durationTimer: ReturnType<typeof setInterval> | null = null;
   private _recorder = new AudioRecorder();
   readonly #playback = new AudioPlaybackEngine(24000);
@@ -320,7 +324,16 @@ export class ScVoiceView extends GatewayAwareLitElement {
         });
       }
       try {
-        this._geminiLiveMode = localStorage.getItem("hu-gemini-live") === "true";
+        const savedMode = localStorage.getItem("hu-voice-mode");
+        if (savedMode === "gemini_live" || savedMode === "openai_realtime") {
+          this._voiceMode = savedMode;
+          this._geminiLiveMode = savedMode === "gemini_live";
+        } else {
+          this._geminiLiveMode = localStorage.getItem("hu-gemini-live") === "true";
+          if (this._geminiLiveMode) this._voiceMode = "gemini_live";
+        }
+        const savedKey = localStorage.getItem("hu-sts-api-key");
+        if (savedKey) this._stsApiKey = savedKey;
       } catch {
         /* ignore */
       }
@@ -661,6 +674,30 @@ export class ScVoiceView extends GatewayAwareLitElement {
       return;
     }
 
+    if (detail.event === "voice.vad.speech_started") {
+      this._userVadSpeaking = true;
+      this.requestUpdate();
+      return;
+    }
+
+    if (detail.event === "voice.vad.speech_stopped") {
+      this._userVadSpeaking = false;
+      this.requestUpdate();
+      return;
+    }
+
+    if (detail.event === "voice.user.transcript") {
+      const text = (detail.payload?.text as string) ?? "";
+      if (text) {
+        const wasEmpty = this._messages.length === 0;
+        this._messages = [...this._messages, { role: "user", content: text, ts: Date.now() }];
+        if (wasEmpty) this._startDurationTimer();
+        this._cacheMessages();
+      }
+      this.requestUpdate();
+      return;
+    }
+
     if (detail.event === "voice.session_resumption") {
       return;
     }
@@ -758,12 +795,15 @@ export class ScVoiceView extends GatewayAwareLitElement {
         const startParams: Record<string, unknown> = {
           sessionKey: SESSION_KEY_VOICE,
         };
-        if (this._geminiLiveMode) {
-          startParams.mode = "gemini_live";
+        if (this._voiceMode !== "standard") {
+          startParams.mode = this._voiceMode;
+        }
+        if (this._stsApiKey.trim()) {
+          startParams.apiKey = this._stsApiKey.trim();
         }
         const result = (await gw.voiceSessionStart(startParams)) as Record<string, unknown>;
         const isGeminiLive = result?.mode === "gemini_live";
-        const isProviderDuplex = isGeminiLive || result?.mode === "openai_realtime";
+        const isProviderDuplex = isGeminiLive || result?.mode === "openai_realtime" || result?.mode === "realtime";
         this.#activeSessionIsGL = isProviderDuplex;
 
         gw.setOnBinaryChunk((ab) => {
@@ -959,6 +999,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
         ${this._showClonePanel
           ? html`<hu-voice-clone .gateway=${this.gateway ?? this._boundGateway}></hu-voice-clone>`
           : nothing}
+        ${this._showCredPanel ? this._renderCredPanel() : nothing}
         <hu-voice-conversation
           .items=${this._chatItems}
           .isWaiting=${this.voiceStatus === "processing"}
@@ -1018,21 +1059,43 @@ export class ScVoiceView extends GatewayAwareLitElement {
             Export
           </hu-button>
           <hu-button
-            variant=${this._geminiLiveMode ? "tonal" : "ghost"}
+            variant=${this._voiceMode !== "standard" ? "tonal" : "ghost"}
             size="sm"
             ?disabled=${this.voiceStatus !== "idle"}
             @click=${() => {
-              this._geminiLiveMode = !this._geminiLiveMode;
+              const modes: Array<"standard" | "gemini_live" | "openai_realtime"> = [
+                "standard",
+                "gemini_live",
+                "openai_realtime",
+              ];
+              const idx = modes.indexOf(this._voiceMode);
+              this._voiceMode = modes[(idx + 1) % modes.length];
+              this._geminiLiveMode = this._voiceMode === "gemini_live";
               try {
-                localStorage.setItem("hu-gemini-live", String(this._geminiLiveMode));
+                localStorage.setItem("hu-voice-mode", this._voiceMode);
               } catch {
                 /* ignore */
               }
             }}
-            aria-label="Toggle Gemini Live"
-            title="Gemini Live: native real-time voice (no STT/TTS pipeline)"
+            aria-label="Cycle voice mode"
+            title="Voice mode: standard (Cartesia), gemini_live, openai_realtime"
           >
-            ${this._geminiLiveMode ? "Gemini Live" : "Standard Voice"}
+            ${this._voiceMode === "gemini_live"
+              ? "Gemini Live"
+              : this._voiceMode === "openai_realtime"
+                ? "OpenAI Realtime"
+                : "Standard Voice"}
+          </hu-button>
+          <hu-button
+            variant=${this._showCredPanel ? "tonal" : "ghost"}
+            size="sm"
+            @click=${() => {
+              this._showCredPanel = !this._showCredPanel;
+            }}
+            aria-label="API credentials"
+            title="Enter API keys for voice providers"
+          >
+            API Keys
           </hu-button>
           <hu-button
             variant="ghost"
@@ -1065,6 +1128,69 @@ export class ScVoiceView extends GatewayAwareLitElement {
         <hu-button variant="ghost" size="sm" @click=${this._retrySend} aria-label="Retry">
           Retry
         </hu-button>
+      </div>
+    `;
+  }
+
+  private _renderCredPanel() {
+    return html`
+      <div
+        style="padding: var(--hu-space-md); background: var(--hu-surface-container); border-bottom: 1px solid var(--hu-border-subtle); display: flex; flex-direction: column; gap: var(--hu-space-sm); flex-shrink: 0;"
+      >
+        <div
+          style="font-size: var(--hu-text-sm); font-weight: var(--hu-weight-medium); color: var(--hu-text);"
+        >
+          Voice Provider Credentials
+        </div>
+        <div style="font-size: var(--hu-text-xs); color: var(--hu-text-secondary);">
+          ${this._voiceMode === "gemini_live"
+            ? "Enter your Google AI / Vertex AI API key for Gemini Live."
+            : this._voiceMode === "openai_realtime"
+              ? "Enter your OpenAI API key for Realtime voice."
+              : "Enter your Cartesia API key (or leave blank to use server config)."}
+        </div>
+        <div style="display: flex; gap: var(--hu-space-sm); align-items: flex-end;">
+          <hu-input
+            type="password"
+            placeholder="API key"
+            .value=${this._stsApiKey}
+            @hu-input=${(e: CustomEvent<{ value: string }>) => {
+              this._stsApiKey = e.detail.value;
+            }}
+            style="flex: 1;"
+            .accessibleLabel=${"Voice provider API key"}
+          ></hu-input>
+          <hu-button
+            variant="ghost"
+            size="sm"
+            @click=${() => {
+              this._stsApiKey = "";
+              try {
+                localStorage.removeItem("hu-sts-api-key");
+              } catch {
+                /* ignore */
+              }
+              ScToast.show({ message: "API key cleared", variant: "info" });
+            }}
+          >
+            Clear
+          </hu-button>
+          <hu-button
+            variant="tonal"
+            size="sm"
+            @click=${() => {
+              try {
+                localStorage.setItem("hu-sts-api-key", this._stsApiKey);
+              } catch {
+                /* ignore */
+              }
+              this._showCredPanel = false;
+              ScToast.show({ message: "API key saved for this session", variant: "success" });
+            }}
+          >
+            Save
+          </hu-button>
+        </div>
       </div>
     `;
   }

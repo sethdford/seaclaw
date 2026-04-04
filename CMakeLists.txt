@@ -845,6 +845,7 @@ list(APPEND HU_CORE_SOURCES
     src/voice/webrtc_srtp.c
     src/voice/realtime.c
     src/voice/gemini_live.c
+    src/voice/provider_factory.c
     src/voice/duplex.c
     src/voice/session.c
     src/voice/turn_signal.c
@@ -2035,6 +2036,7 @@ set(HU_TEST_SOURCES
     tests/test_voice_provider.c
     tests/test_voice_session.c
     tests/test_gemini_live.c
+    tests/test_voice_factory_e2e.c
     tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c

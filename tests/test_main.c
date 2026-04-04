@@ -76,6 +76,7 @@ void run_voice_rt_openai_tests(void);
 void run_voice_provider_tests(void);
 void run_voice_session_tests(void);
 void run_gemini_live_tests(void);
+void run_voice_factory_e2e_tests(void);
 void run_autonomy_tests(void);
 void run_retrieval_tests(void);
 void run_vector_tests(void);
@@ -534,6 +535,7 @@ int main(int argc, char **argv) {
     run_voice_provider_tests();
     run_voice_session_tests();
     run_gemini_live_tests();
+    run_voice_factory_e2e_tests();
     run_autonomy_tests();
     run_retrieval_tests();
     run_multigraph_tests();
