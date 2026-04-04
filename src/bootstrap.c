@@ -4,18 +4,16 @@
  * channel creation, and agent creation into a single module.
  */
 
+#include "human/core/log.h"
 #include "human/bootstrap.h"
 #include "human/agent/agent_comm.h"
-#include "human/agent/instruction_discover.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/spawn.h"
 #include "human/cognition/metacognition.h"
 #include "human/config.h"
 #include "human/context_engine.h"
-#include "human/core/log.h"
-#include "human/data/loader.h"
 #include "human/hook.h"
-#include "human/mcp_manager.h"
+#include "human/data/loader.h"
 #include "human/memory.h"
 #include "human/memory/engines.h"
 #include "human/memory/factory.h"
@@ -24,7 +22,6 @@
 #include "human/memory/vector/embedder_gemini_adapter.h"
 #include "human/memory/vector/embeddings_gemini.h"
 #include "human/observability/log_observer.h"
-#include "human/permission.h"
 #include "human/plugin.h"
 #include "human/plugin_discovery.h"
 #include "human/plugin_loader.h"
@@ -35,8 +32,12 @@
 #include "human/security/sandbox_internal.h"
 #include "human/tool.h"
 #include "human/tools/factory.h"
-#include "human/tools/webhook_tools.h"
 #include "human/voice.h"
+#include "human/hook.h"
+#include "human/permission.h"
+#include "human/mcp_manager.h"
+#include "human/agent/instruction_discover.h"
+#include "human/tools/webhook_tools.h"
 #include "human/webhook.h"
 #ifdef HU_HAS_VOICE_CHANNEL
 #include "human/channels/voice_channel.h"
@@ -63,9 +64,6 @@
 #endif
 #if HU_HAS_TELEGRAM
 #include "human/channels/telegram.h"
-#endif
-#if HU_HAS_SIGNAL
-#include "human/channels/signal.h"
 #endif
 #if HU_HAS_DISCORD
 #include "human/channels/discord.h"
@@ -103,9 +101,6 @@
 #if HU_HAS_MATRIX
 #include "human/channels/matrix.h"
 #endif
-#if HU_HAS_MATTERMOST
-#include "human/channels/mattermost.h"
-#endif
 #if HU_HAS_IRC
 #include "human/channels/irc.h"
 #endif
@@ -129,9 +124,6 @@
 #endif
 #if HU_HAS_QQ
 #include "human/channels/qq.h"
-#endif
-#if HU_HAS_MAIXCAM
-#include "human/channels/maixcam.h"
 #endif
 
 #ifdef HU_HAS_CRON
@@ -188,13 +180,6 @@ static void destroy_imap_wrap(hu_channel_t *ch, hu_allocator_t *a) {
 static void destroy_telegram_wrap(hu_channel_t *ch, hu_allocator_t *a) {
     (void)a;
     hu_telegram_destroy(ch);
-    (void)ch;
-}
-#endif
-#if HU_HAS_SIGNAL
-static void destroy_signal_wrap(hu_channel_t *ch, hu_allocator_t *a) {
-    (void)a;
-    hu_signal_destroy(ch);
     (void)ch;
 }
 #endif
@@ -280,13 +265,6 @@ static void destroy_matrix_wrap(hu_channel_t *ch, hu_allocator_t *a) {
     (void)ch;
 }
 #endif
-#if HU_HAS_MATTERMOST
-static void destroy_mattermost_wrap(hu_channel_t *ch, hu_allocator_t *a) {
-    (void)a;
-    hu_mattermost_destroy(ch);
-    (void)ch;
-}
-#endif
 #if HU_HAS_IRC
 static void destroy_irc_wrap(hu_channel_t *ch, hu_allocator_t *a) {
     (void)a;
@@ -340,13 +318,6 @@ static void destroy_onebot_wrap(hu_channel_t *ch, hu_allocator_t *a) {
 static void destroy_qq_wrap(hu_channel_t *ch, hu_allocator_t *a) {
     (void)a;
     hu_qq_destroy(ch);
-    (void)ch;
-}
-#endif
-#if HU_HAS_MAIXCAM
-static void destroy_maixcam_wrap(hu_channel_t *ch, hu_allocator_t *a) {
-    (void)a;
-    hu_maixcam_destroy(ch);
     (void)ch;
 }
 #endif
@@ -417,8 +388,6 @@ typedef struct hu_bootstrap_internal {
 
     hu_plugin_hook_ctx_t plugin_hook_ctx;
 
-    hu_mcp_manager_t *mcp_mgr; /* kept alive so MCP tool wrappers can call back */
-
     bool provider_ok;
     bool agent_ok;
 } hu_bootstrap_internal_t;
@@ -484,11 +453,10 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         goto fail;
     ctx->cfg = &bi->cfg;
 
-    if (bi->cfg.runtime_paths.data_dir && bi->cfg.runtime_paths.data_dir[0])
-        hu_data_set_dir(bi->cfg.runtime_paths.data_dir);
+    if (bi->cfg.data_dir && bi->cfg.data_dir[0])
+        hu_data_set_dir(bi->cfg.data_dir);
 
-    const char *ws =
-        bi->cfg.runtime_paths.workspace_dir ? bi->cfg.runtime_paths.workspace_dir : ".";
+    const char *ws = bi->cfg.workspace_dir ? bi->cfg.workspace_dir : ".";
 
     bi->plugin_reg = hu_plugin_registry_create(alloc, 16);
     ctx->plugin_reg = bi->plugin_reg;
@@ -608,25 +576,6 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         fl.max_spawn_depth = bi->cfg.agent.fleet_max_spawn_depth;
         fl.max_total_spawns = bi->cfg.agent.fleet_max_total_spawns;
         fl.budget_limit_usd = bi->cfg.agent.fleet_budget_usd;
-        if (bi->cfg.agent.fleet_depth_model_overrides_count > 0 &&
-            bi->cfg.agent.fleet_depth_model_overrides) {
-            size_t n = bi->cfg.agent.fleet_depth_model_overrides_count;
-            fl.depth_model_overrides = (hu_depth_model_override_t *)alloc->alloc(
-                alloc->ctx, n * sizeof(hu_depth_model_override_t));
-            if (fl.depth_model_overrides) {
-                fl.depth_model_overrides_count = n;
-                for (size_t di = 0; di < n; di++) {
-                    fl.depth_model_overrides[di].min_depth =
-                        bi->cfg.agent.fleet_depth_model_overrides[di].min_depth;
-                    fl.depth_model_overrides[di].max_depth =
-                        bi->cfg.agent.fleet_depth_model_overrides[di].max_depth;
-                    fl.depth_model_overrides[di].model =
-                        bi->cfg.agent.fleet_depth_model_overrides[di].model;
-                    fl.depth_model_overrides[di].provider =
-                        bi->cfg.agent.fleet_depth_model_overrides[di].provider;
-                }
-            }
-        }
         hu_agent_pool_set_fleet_limits(bi->agent_pool, &fl);
     }
     bi->mailbox = hu_mailbox_create(alloc, 64);
@@ -688,22 +637,23 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
     /* MCP eager startup: create manager, auto-connect, and load tools */
     if (bi->cfg.mcp_servers_len > 0) {
         hu_mcp_manager_t *mcp_mgr = NULL;
-        hu_error_t mcp_err =
-            hu_mcp_manager_create(alloc, bi->cfg.mcp_servers, bi->cfg.mcp_servers_len, &mcp_mgr);
+        hu_error_t mcp_err = hu_mcp_manager_create(alloc, bi->cfg.mcp_servers,
+                                                   bi->cfg.mcp_servers_len, &mcp_mgr);
         if (mcp_err == HU_OK && mcp_mgr) {
             /* Connect all servers marked with auto_connect=true */
             hu_error_t connect_err = hu_mcp_manager_connect_auto(mcp_mgr);
             if (connect_err != HU_OK) {
                 hu_log_error("bootstrap", NULL, "warning: MCP auto-connect failed: %s",
-                             hu_error_string(connect_err));
+                        hu_error_string(connect_err));
             }
 
             /* Load tools from connected MCP servers */
             hu_tool_t *mcp_tools = NULL;
             size_t mcp_tools_count = 0;
-            hu_error_t load_err =
-                hu_mcp_manager_load_tools(mcp_mgr, alloc, &mcp_tools, &mcp_tools_count);
+            hu_error_t load_err = hu_mcp_manager_load_tools(mcp_mgr, alloc, &mcp_tools,
+                                                            &mcp_tools_count);
             if (load_err == HU_OK && mcp_tools_count > 0) {
+                /* Merge MCP tools with existing tools */
                 hu_tool_t *merged = (hu_tool_t *)alloc->alloc(
                     alloc->ctx, (bi->tools_count + mcp_tools_count) * sizeof(hu_tool_t));
                 if (merged) {
@@ -715,23 +665,16 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                     bi->tools_count += mcp_tools_count;
                     ctx->tools = bi->tools;
                     ctx->tools_count = bi->tools_count;
-                    /* Tools are now owned by bi->tools; free only the container array.
-                     * Manager stays alive — wrappers reference it via w->mgr. */
-                    alloc->free(alloc->ctx, mcp_tools, mcp_tools_count * sizeof(hu_tool_t));
-                    bi->mcp_mgr = mcp_mgr;
-                    mcp_mgr = NULL; /* prevent destroy below */
-                } else {
-                    hu_mcp_manager_free_tools(alloc, mcp_tools, mcp_tools_count);
                 }
+                hu_mcp_manager_free_tools(alloc, mcp_tools, mcp_tools_count);
             } else if (load_err != HU_OK) {
                 hu_log_error("bootstrap", NULL, "warning: MCP tool loading failed: %s",
-                             hu_error_string(load_err));
+                        hu_error_string(load_err));
             }
-            if (mcp_mgr)
-                hu_mcp_manager_destroy(mcp_mgr);
+            hu_mcp_manager_destroy(mcp_mgr);
         } else if (mcp_err != HU_OK) {
             hu_log_error("bootstrap", NULL, "warning: MCP manager creation failed: %s",
-                         hu_error_string(mcp_err));
+                    hu_error_string(mcp_err));
         }
     }
 
@@ -744,16 +687,13 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             hu_tool_t webhook_tools[3] = {0};
             size_t webhook_count = 0;
 
-            if (hu_webhook_register_tool_create(alloc, webhook_mgr,
-                                                &webhook_tools[webhook_count]) == HU_OK) {
+            if (hu_webhook_register_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) == HU_OK) {
                 webhook_count++;
             }
-            if (hu_webhook_poll_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) ==
-                HU_OK) {
+            if (hu_webhook_poll_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) == HU_OK) {
                 webhook_count++;
             }
-            if (hu_webhook_list_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) ==
-                HU_OK) {
+            if (hu_webhook_list_tool_create(alloc, webhook_mgr, &webhook_tools[webhook_count]) == HU_OK) {
                 webhook_count++;
             }
 
@@ -828,56 +768,16 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         ctx->provider = &bi->provider;
         ctx->provider_ok = true;
 
-        const char *cfg_emb = bi->cfg.memory.embedding_provider;
-        const char *cfg_gem = bi->cfg.memory.embedding_api_key;
-        const char *env_gem = getenv("GEMINI_API_KEY");
-        const char *gem_use = (cfg_gem && cfg_gem[0]) ? cfg_gem : env_gem;
-
-        if (cfg_emb && strcmp(cfg_emb, "local") == 0) {
+        const char *gemini_key = getenv("GEMINI_API_KEY");
+        if (gemini_key && gemini_key[0]) {
+            hu_embedding_provider_t gem_provider =
+                hu_embedding_gemini_create(alloc, gemini_key, NULL, 0);
+            bi->embedder = hu_embedder_gemini_adapter_create(alloc, gem_provider);
+        }
+        if (!bi->embedder.ctx) {
             bi->embedder = hu_embedder_local_create(alloc);
-        } else if (cfg_emb && strcmp(cfg_emb, "gemini") == 0) {
-            if (gem_use && gem_use[0]) {
-                hu_embedding_provider_t gem_provider =
-                    hu_embedding_gemini_create(alloc, gem_use, NULL, 0);
-                bi->embedder = hu_embedder_gemini_adapter_create(alloc, gem_provider);
-            }
-            if (!bi->embedder.ctx)
-                bi->embedder = hu_embedder_local_create(alloc);
-        } else {
-            if (gem_use && gem_use[0]) {
-                hu_embedding_provider_t gem_provider =
-                    hu_embedding_gemini_create(alloc, gem_use, NULL, 0);
-                bi->embedder = hu_embedder_gemini_adapter_create(alloc, gem_provider);
-            }
-            if (!bi->embedder.ctx)
-                bi->embedder = hu_embedder_local_create(alloc);
         }
-
-        size_t vdim = HU_EMBEDDING_DIM;
-        if (bi->cfg.memory.vector_dimensions > 0)
-            vdim = (size_t)bi->cfg.memory.vector_dimensions;
-        if (bi->embedder.vtable && bi->embedder.vtable->dimensions) {
-            size_t ed = bi->embedder.vtable->dimensions(bi->embedder.ctx);
-            if (ed > 0)
-                vdim = ed;
-        }
-
-        const char *vback = bi->cfg.memory.vector_store;
-        if (vback && strcmp(vback, "qdrant") == 0 && bi->cfg.memory.vector_qdrant_url &&
-            bi->cfg.memory.vector_qdrant_url[0] && bi->cfg.memory.vector_qdrant_collection &&
-            bi->cfg.memory.vector_qdrant_collection[0]) {
-            bi->vector_store = hu_vector_store_qdrant_retrieval_create(
-                alloc, bi->cfg.memory.vector_qdrant_url, bi->cfg.memory.vector_qdrant_api_key,
-                bi->cfg.memory.vector_qdrant_collection, vdim);
-        }
-        if ((!bi->vector_store.vtable) && vback && strcmp(vback, "pgvector") == 0 &&
-            bi->cfg.memory.postgres_url && bi->cfg.memory.postgres_url[0]) {
-            const char *pgt = bi->cfg.memory.vector_pgvector_table;
-            bi->vector_store = hu_vector_store_pgvector_retrieval_create(
-                alloc, bi->cfg.memory.postgres_url, pgt ? pgt : "memory_vectors", vdim);
-        }
-        if (!bi->vector_store.vtable)
-            bi->vector_store = hu_vector_store_mem_create(alloc);
+        bi->vector_store = hu_vector_store_mem_create(alloc);
         bi->retrieval_engine =
             hu_retrieval_create_with_vector(alloc, &bi->memory, &bi->embedder, &bi->vector_store);
         ctx->embedder = &bi->embedder;
@@ -911,7 +811,6 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             .speculative_cache = bi->cfg.agent.speculative_cache,
             .tool_routing_enabled = bi->cfg.agent.tool_routing_enabled,
             .multi_agent = bi->cfg.agent.multi_agent,
-            .compaction_use_structured = bi->cfg.agent.compaction_use_structured,
         };
         hu_observer_t *obs = bi->observer.vtable ? &bi->observer : NULL;
         err = hu_agent_from_config(
@@ -919,12 +818,10 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             bi->memory.vtable ? &bi->memory : NULL,
             bi->session_store.vtable ? &bi->session_store : NULL, obs, &bi->policy, model,
             strlen(model), prov_name, prov_name_len, temp, ws, strlen(ws), max_iters, max_hist,
-            bi->cfg.memory.auto_save, bi->cfg.security.autonomy_level, NULL, 0,
-            bi->cfg.agent.persona, bi->cfg.agent.persona ? strlen(bi->cfg.agent.persona) : 0,
-            &ctx_cfg);
+            bi->cfg.memory.auto_save, 2, NULL, 0, bi->cfg.agent.persona,
+            bi->cfg.agent.persona ? strlen(bi->cfg.agent.persona) : 0, &ctx_cfg);
         if (err != HU_OK)
             goto fail;
-        bi->agent.config = &bi->cfg;
         hu_metacognition_apply_config(&bi->agent.metacognition, &bi->cfg.agent.metacognition);
         memset(&bi->voice_cfg, 0, sizeof(bi->voice_cfg));
         (void)hu_voice_config_from_settings(&bi->cfg, &bi->voice_cfg);
@@ -1015,11 +912,9 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                 hreg = bi->plugin_hook_ctx.hook_registry;
             } else {
                 /* Merge plugin hooks into config hooks registry */
-                size_t plugin_hook_count =
-                    hu_hook_registry_count(bi->plugin_hook_ctx.hook_registry);
+                size_t plugin_hook_count = hu_hook_registry_count(bi->plugin_hook_ctx.hook_registry);
                 for (size_t i = 0; i < plugin_hook_count; i++) {
-                    const hu_hook_entry_t *phook =
-                        hu_hook_registry_get(bi->plugin_hook_ctx.hook_registry, i);
+                    const hu_hook_entry_t *phook = hu_hook_registry_get(bi->plugin_hook_ctx.hook_registry, i);
                     if (phook) {
                         hu_hook_registry_add(hreg, alloc, phook);
                     }
@@ -1036,7 +931,8 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         /* Instruction file discovery */
         if (bi->cfg.agent.discover_instructions) {
             hu_instruction_discovery_t *disc = NULL;
-            hu_error_t disc_err = hu_instruction_discovery_run(alloc, ws, strlen(ws), &disc);
+            hu_error_t disc_err =
+                hu_instruction_discovery_run(alloc, ws, strlen(ws), &disc);
             if (disc_err == HU_OK && disc)
                 bi->agent.instruction_discovery = disc;
         }
@@ -1051,8 +947,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         (void)cfg;
 
 #if HU_HAS_EMAIL
-        if (cfg->channels.email.smtp_host && cfg->channels.email.from_address &&
-            ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
+        if (cfg->channels.email.smtp_host && cfg->channels.email.from_address) {
             err = hu_email_create(
                 alloc, cfg->channels.email.smtp_host, strlen(cfg->channels.email.smtp_host),
                 cfg->channels.email.smtp_port ? cfg->channels.email.smtp_port : 587,
@@ -1083,11 +978,6 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
 #endif
 
 #if HU_HAS_IMESSAGE
-        if (!cfg->channels.imessage.default_target && cfg->channels.imessage.allow_from_count > 0) {
-            hu_log_warn("bootstrap", NULL,
-                        "iMessage: allow_from configured without default_target — "
-                        "channel will not be created (set default_target to enable)");
-        }
         if (cfg->channels.imessage.default_target && ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
             err = hu_imessage_create(alloc, cfg->channels.imessage.default_target,
                                      strlen(cfg->channels.imessage.default_target),
@@ -1095,8 +985,6 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                                      cfg->channels.imessage.allow_from_count,
                                      &bi->channel_slots[ch_count]);
             if (err == HU_OK) {
-                if (cfg->channels.imessage.use_imsg_cli)
-                    hu_imessage_set_use_imsg_cli(&bi->channel_slots[ch_count], true);
                 bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
                 bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
                 bi->channels[ch_count].poll_fn = hu_imessage_poll;
@@ -1115,9 +1003,8 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         }
 #else
         if (cfg->channels.imessage.default_target)
-            hu_log_error("bootstrap", NULL,
-                         "WARNING: iMessage configured in config but binary was built "
-                         "without HU_ENABLE_IMESSAGE — rebuild with -DHU_ENABLE_IMESSAGE=ON");
+            hu_log_error("bootstrap", NULL, "WARNING: iMessage configured in config but binary was built "
+                    "without HU_ENABLE_IMESSAGE — rebuild with -DHU_ENABLE_IMESSAGE=ON");
 #endif
 
 #if HU_HAS_PWA
@@ -1212,29 +1099,6 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                 bi->channels[ch_count].interval_ms = 1000;
                 bi->channels[ch_count].last_poll_ms = 0;
                 bi->channel_destroys[ch_count] = destroy_telegram_wrap;
-                ch_count++;
-            }
-        }
-#endif
-
-#if HU_HAS_SIGNAL
-        if (cfg->channels.signal.http_url && cfg->channels.signal.account &&
-            ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
-            err = hu_signal_create(
-                alloc, cfg->channels.signal.http_url, strlen(cfg->channels.signal.http_url),
-                cfg->channels.signal.account, strlen(cfg->channels.signal.account),
-                &bi->channel_slots[ch_count]);
-            if (err == HU_OK) {
-                bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
-                bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
-                bi->channels[ch_count].poll_fn = hu_signal_poll;
-                bi->channels[ch_count].webhook_fn = NULL;
-                bi->channels[ch_count].interval_ms =
-                    (uint32_t)(cfg->channels.signal.daemon.poll_interval_sec > 0
-                                   ? cfg->channels.signal.daemon.poll_interval_sec * 1000
-                                   : 2000);
-                bi->channels[ch_count].last_poll_ms = 0;
-                bi->channel_destroys[ch_count] = destroy_signal_wrap;
                 ch_count++;
             }
         }
@@ -1489,29 +1353,6 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         }
 #endif
 
-#if HU_HAS_MATTERMOST
-        if (cfg->channels.mattermost.url && cfg->channels.mattermost.token &&
-            ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
-            err = hu_mattermost_create(
-                alloc, cfg->channels.mattermost.url, strlen(cfg->channels.mattermost.url),
-                cfg->channels.mattermost.token, strlen(cfg->channels.mattermost.token),
-                &bi->channel_slots[ch_count]);
-            if (err == HU_OK) {
-                bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
-                bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
-                bi->channels[ch_count].poll_fn = hu_mattermost_poll;
-                bi->channels[ch_count].webhook_fn = NULL;
-                bi->channels[ch_count].interval_ms =
-                    (uint32_t)(cfg->channels.mattermost.daemon.poll_interval_sec > 0
-                                   ? cfg->channels.mattermost.daemon.poll_interval_sec * 1000
-                                   : 3000);
-                bi->channels[ch_count].last_poll_ms = 0;
-                bi->channel_destroys[ch_count] = destroy_mattermost_wrap;
-                ch_count++;
-            }
-        }
-#endif
-
 #if HU_HAS_IRC
         if (cfg->channels.irc.server && ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
             err = hu_irc_create(alloc, cfg->channels.irc.server, strlen(cfg->channels.irc.server),
@@ -1692,41 +1533,13 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         }
 #endif
 
-#if HU_HAS_MAIXCAM
-        if (cfg->channels.maixcam.host && cfg->channels.maixcam.host[0] != '\0' &&
-            ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
-            err = hu_maixcam_create(alloc, cfg->channels.maixcam.host,
-                                    strlen(cfg->channels.maixcam.host), cfg->channels.maixcam.port,
-                                    &bi->channel_slots[ch_count]);
-            if (err == HU_OK) {
-                bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
-                bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
-                bi->channels[ch_count].poll_fn = NULL;
-                bi->channels[ch_count].webhook_fn = NULL;
-                bi->channels[ch_count].interval_ms = 0;
-                bi->channels[ch_count].last_poll_ms = 0;
-                bi->channel_destroys[ch_count] = destroy_maixcam_wrap;
-                ch_count++;
-            }
-        }
-#endif
-
 #ifdef HU_HAS_VOICE_CHANNEL
         if (cfg->voice.mode && cfg->voice.mode[0] && ch_count < HU_BOOTSTRAP_CHANNELS_MAX) {
             hu_channel_voice_config_t vcfg = {0};
             bool want = false;
-            if (strcmp(cfg->voice.mode, "realtime") == 0 ||
-                strcmp(cfg->voice.mode, "openai_realtime") == 0) {
+            if (strcmp(cfg->voice.mode, "realtime") == 0) {
                 vcfg.mode = HU_VOICE_MODE_REALTIME;
                 vcfg.api_key = hu_config_get_provider_key(cfg, "openai");
-                vcfg.model = cfg->voice.realtime_model;
-                vcfg.voice = cfg->voice.realtime_voice;
-                want = true;
-            } else if (strcmp(cfg->voice.mode, "gemini_live") == 0) {
-                vcfg.mode = HU_VOICE_MODE_GEMINI_LIVE;
-                vcfg.api_key = hu_config_get_provider_key(cfg, "google");
-                if (!vcfg.api_key || !vcfg.api_key[0])
-                    vcfg.api_key = hu_config_get_provider_key(cfg, "gemini");
                 vcfg.model = cfg->voice.realtime_model;
                 vcfg.voice = cfg->voice.realtime_voice;
                 want = true;
@@ -1744,10 +1557,8 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                     bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
                     bi->channels[ch_count].poll_fn = hu_voice_poll;
                     bi->channels[ch_count].webhook_fn = NULL;
-                    bi->channels[ch_count].interval_ms = (vcfg.mode == HU_VOICE_MODE_REALTIME ||
-                                                          vcfg.mode == HU_VOICE_MODE_GEMINI_LIVE)
-                                                             ? 200u
-                                                             : 1000u;
+                    bi->channels[ch_count].interval_ms =
+                        vcfg.mode == HU_VOICE_MODE_REALTIME ? 200u : 1000u;
                     bi->channels[ch_count].last_poll_ms = 0;
                     bi->channel_destroys[ch_count] = destroy_voice_wrap;
                     ch_count++;
@@ -1785,12 +1596,7 @@ void hu_app_teardown(hu_app_ctx_t *ctx) {
     if (!bi)
         return;
 
-    /* Stop then destroy channels (stop first for clean lifecycle) */
-    for (size_t i = 0; i < bi->channel_count && i < HU_BOOTSTRAP_CHANNELS_MAX; i++) {
-        if (bi->channel_slots[i].vtable && bi->channel_slots[i].vtable->stop &&
-            bi->channel_slots[i].ctx)
-            bi->channel_slots[i].vtable->stop(bi->channel_slots[i].ctx);
-    }
+    /* Channels (reverse order, though order typically doesn't matter) */
     for (size_t i = 0; i < bi->channel_count && i < HU_BOOTSTRAP_CHANNELS_MAX; i++) {
         if (bi->channel_destroys[i] && bi->channel_slots[i].ctx)
             bi->channel_destroys[i](&bi->channel_slots[i], alloc);
@@ -1804,8 +1610,6 @@ void hu_app_teardown(hu_app_ctx_t *ctx) {
         bi->provider.ctx = NULL;
     }
     hu_tools_destroy_default(alloc, bi->tools, bi->tools_count);
-    if (bi->mcp_mgr)
-        hu_mcp_manager_destroy(bi->mcp_mgr);
     if (bi->cron)
         hu_cron_destroy(bi->cron, alloc);
     if (bi->observer.vtable && bi->observer.vtable->deinit)

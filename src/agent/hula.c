@@ -1,11 +1,9 @@
 #include "human/agent/hula.h"
-#include "human/agent.h"
 #include "human/agent/idempotency.h"
 #include "human/agent/planner.h"
 #include "human/agent/dag.h"
 #include "human/agent/registry.h"
 #include "human/agent/spawn.h"
-#include "human/agent/tool_context.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/observer.h"
@@ -1217,19 +1215,10 @@ static hu_error_t exec_call(hu_hula_exec_t *exec, hu_hula_node_t *n) {
         return HU_OK;
     }
 
-    if (tr.success) {
+    if (tr.success)
         set_result(exec, n, HU_HULA_DONE, tr.output, tr.output_len, NULL, 0);
-        if (tr.media_path && tr.media_path_len > 0) {
-            hu_agent_t *cur_agent = hu_agent_get_current_for_tools();
-            if (cur_agent && cur_agent->generated_media_count < 4) {
-                char *mp = hu_strndup(&exec->alloc, tr.media_path, tr.media_path_len);
-                if (mp)
-                    cur_agent->generated_media[cur_agent->generated_media_count++] = mp;
-            }
-        }
-    } else {
+    else
         set_result(exec, n, HU_HULA_FAILED, NULL, 0, tr.error_msg, tr.error_msg_len);
-    }
 
     hu_tool_result_free(&exec->alloc, &tr);
     return HU_OK;

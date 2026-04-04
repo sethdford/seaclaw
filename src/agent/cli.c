@@ -333,7 +333,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     }
 
     const char *model = cfg.default_model ? cfg.default_model : "";
-    const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
+    const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
     double temp = cfg.temperature > 0.0 ? cfg.temperature : 0.7;
     uint32_t max_iters = cfg.agent.max_tool_iterations > 0 ? cfg.agent.max_tool_iterations : 25;
     uint32_t max_hist = cfg.agent.max_history_messages > 0 ? cfg.agent.max_history_messages : 100;
@@ -450,25 +450,6 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         fl.max_spawn_depth = cfg.agent.fleet_max_spawn_depth;
         fl.max_total_spawns = cfg.agent.fleet_max_total_spawns;
         fl.budget_limit_usd = cfg.agent.fleet_budget_usd;
-        if (cfg.agent.fleet_depth_model_overrides_count > 0 &&
-            cfg.agent.fleet_depth_model_overrides) {
-            size_t n = cfg.agent.fleet_depth_model_overrides_count;
-            fl.depth_model_overrides = (hu_depth_model_override_t *)alloc->alloc(
-                alloc->ctx, n * sizeof(hu_depth_model_override_t));
-            if (fl.depth_model_overrides) {
-                fl.depth_model_overrides_count = n;
-                for (size_t di = 0; di < n; di++) {
-                    fl.depth_model_overrides[di].min_depth =
-                        cfg.agent.fleet_depth_model_overrides[di].min_depth;
-                    fl.depth_model_overrides[di].max_depth =
-                        cfg.agent.fleet_depth_model_overrides[di].max_depth;
-                    fl.depth_model_overrides[di].model =
-                        cfg.agent.fleet_depth_model_overrides[di].model;
-                    fl.depth_model_overrides[di].provider =
-                        cfg.agent.fleet_depth_model_overrides[di].provider;
-                }
-            }
-        }
         hu_agent_pool_set_fleet_limits(cli_agent_pool, &fl);
     }
     hu_mailbox_t *cli_mailbox = hu_mailbox_create(alloc, 64);
@@ -578,14 +559,6 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         if (strcmp(cfg.voice.mode, "realtime") == 0) {
             vcfg.mode = HU_VOICE_MODE_REALTIME;
             vcfg.api_key = hu_config_get_provider_key(&cfg, "openai");
-            vcfg.model = cfg.voice.realtime_model;
-            vcfg.voice = cfg.voice.realtime_voice;
-            want_voice = true;
-        } else if (strcmp(cfg.voice.mode, "gemini_live") == 0) {
-            vcfg.mode = HU_VOICE_MODE_GEMINI_LIVE;
-            vcfg.api_key = hu_config_get_provider_key(&cfg, "google");
-            if (!vcfg.api_key || !vcfg.api_key[0])
-                vcfg.api_key = hu_config_get_provider_key(&cfg, "gemini");
             vcfg.model = cfg.voice.realtime_model;
             vcfg.voice = cfg.voice.realtime_voice;
             want_voice = true;
@@ -1070,11 +1043,12 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                     jm = cfg.agent.mr_judge_model;
                     jm_len = strlen(cfg.agent.mr_judge_model);
                 }
-                sel = hu_model_route_with_judge(&mr_cfg, line, line_len, NULL, 0, hour,
-                                                agent.history_count, &agent.provider, jm, jm_len,
-                                                agent.alloc, &cli_judge_cache);
+                sel = hu_model_route_with_judge(
+                    &mr_cfg, line, line_len, NULL, 0, hour, agent.history_count,
+                    &agent.provider, jm, jm_len, agent.alloc, &cli_judge_cache);
             } else {
-                sel = hu_model_route(&mr_cfg, line, line_len, NULL, 0, hour, agent.history_count);
+                sel = hu_model_route(&mr_cfg, line, line_len, NULL, 0, hour,
+                                     agent.history_count);
             }
             agent.turn_model = sel.model;
             agent.turn_model_len = sel.model_len;

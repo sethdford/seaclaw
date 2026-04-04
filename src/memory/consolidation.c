@@ -3,8 +3,6 @@
 #include "human/core/error.h"
 #include "human/core/string.h"
 #include "human/memory/connections.h"
-#include "human/memory/deep_extract.h"
-#include "human/memory/fact_extract.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,17 +116,7 @@ static time_t parse_iso_timestamp(const char *ts, size_t ts_len) {
         tm_buf.tm_hour = (int)strtol(ts + 11, NULL, 10);
         tm_buf.tm_min = (int)strtol(ts + 14, NULL, 10);
         tm_buf.tm_sec = (int)strtol(ts + 17, NULL, 10);
-        /* ISO strings with 'Z' suffix or '+' offset are UTC; use timegm to
-         * avoid local-timezone skew. Fall back to mktime for ambiguous input. */
-        bool is_utc = false;
-        if (ts_len >= 20 && (ts[19] == 'Z' || ts[19] == '+' || ts[19] == '-'))
-            is_utc = true;
-#if defined(__APPLE__) || defined(__unix__)
-        return is_utc ? timegm(&tm_buf) : mktime(&tm_buf);
-#else
-        (void)is_utc;
         return mktime(&tm_buf);
-#endif
     }
     long raw = strtol(ts, NULL, 10);
     return raw > 0 ? (time_t)raw : 0;
@@ -275,124 +263,6 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
                     }
                 }
                 alloc->free(alloc->ctx, surv, surviving * sizeof(hu_memory_entry_t));
-            }
-        }
-    }
-
-    /* ── PlugMem-style propositional fact extraction ───────────────────── */
-    if (config->extract_facts) {
-        size_t surviving = 0;
-        for (size_t i = 0; i < count; i++)
-            if (!to_forget[i])
-                surviving++;
-
-        if (surviving > 0) {
-            /* Build concatenated text from surviving entries */
-            size_t text_cap = 0;
-            for (size_t i = 0; i < count; i++)
-                if (!to_forget[i])
-                    text_cap += entries[i].content_len + 2;
-
-            char *text = (char *)alloc->alloc(alloc->ctx, text_cap + 1);
-            if (text) {
-                size_t pos = 0;
-                for (size_t i = 0; i < count; i++) {
-                    if (to_forget[i] || !entries[i].content)
-                        continue;
-                    memcpy(text + pos, entries[i].content, entries[i].content_len);
-                    pos += entries[i].content_len;
-                    text[pos++] = '\n';
-                }
-                text[pos] = '\0';
-
-                hu_deep_extract_result_t de_result = {0};
-                hu_error_t de_err;
-
-                if (config->provider && config->provider->vtable &&
-                    config->provider->vtable->chat_with_system) {
-                    char *prompt = NULL;
-                    size_t prompt_len = 0;
-                    de_err = hu_deep_extract_build_prompt(alloc, text, pos, &prompt, &prompt_len);
-                    if (de_err == HU_OK && prompt) {
-                        char *response = NULL;
-                        size_t response_len = 0;
-                        de_err = config->provider->vtable->chat_with_system(
-                            config->provider->ctx, alloc, "Return JSON only.", 17, prompt,
-                            prompt_len, config->model, config->model_len, 0.2, &response,
-                            &response_len);
-                        if (de_err == HU_OK && response) {
-                            (void)hu_deep_extract_parse(alloc, response, response_len, &de_result);
-                            alloc->free(alloc->ctx, response, response_len + 1);
-                        }
-                        alloc->free(alloc->ctx, prompt, prompt_len + 1);
-                    }
-                } else {
-                    de_err = hu_deep_extract_lightweight(alloc, text, pos, &de_result);
-                }
-
-                float threshold = config->fact_confidence_threshold;
-                if (threshold <= 0.0f)
-                    threshold = 0.5f;
-
-                if (de_err == HU_OK && de_result.fact_count > 0) {
-                    char ts_buf[32];
-                    time_t now = time(NULL);
-                    struct tm *tm = gmtime(&now);
-                    if (tm)
-                        strftime(ts_buf, sizeof(ts_buf), "%Y-%m-%dT%H:%M:%SZ", tm);
-                    else
-                        snprintf(ts_buf, sizeof(ts_buf), "%lld", (long long)now);
-
-                    for (size_t f = 0; f < de_result.fact_count; f++) {
-                        hu_extracted_fact_t *fact = &de_result.facts[f];
-                        if (fact->confidence < (double)threshold)
-                            continue;
-                        if (!fact->subject || !fact->predicate || !fact->object)
-                            continue;
-
-                        char key_buf[256];
-                        snprintf(key_buf, sizeof(key_buf), "fact:%s:%s:%s", fact->subject,
-                                 fact->predicate, fact->object);
-
-                        char val_buf[512];
-                        int vlen = snprintf(val_buf, sizeof(val_buf),
-                                            "%s %s %s (confidence: %.2f)", fact->subject,
-                                            fact->predicate, fact->object, fact->confidence);
-                        if (vlen > 0) {
-                            hu_memory_category_t cat = {.tag = HU_MEMORY_CATEGORY_INSIGHT};
-                            (void)memory->vtable->store(memory->ctx, key_buf, strlen(key_buf),
-                                                        val_buf, (size_t)vlen, &cat, NULL, 0);
-                        }
-                    }
-                }
-
-                hu_deep_extract_result_deinit(&de_result, alloc);
-
-                /* Heuristic fact extraction (PlugMem-style) — runs alongside LLM extract
-                 * to capture structured propositional/prescriptive facts from first-person
-                 * statements that LLM extraction might miss or paraphrase. */
-                hu_fact_extract_result_t fe_result = {0};
-                if (hu_fact_extract(text, pos, &fe_result) == HU_OK && fe_result.fact_count > 0) {
-                    for (size_t f = 0; f < fe_result.fact_count; f++) {
-                        hu_heuristic_fact_t *efact = &fe_result.facts[f];
-                        if (efact->confidence < (double)threshold)
-                            continue;
-                        char *fe_key = NULL;
-                        size_t fe_key_len = 0;
-                        char *fe_val = NULL;
-                        size_t fe_val_len = 0;
-                        if (hu_fact_format_for_store(alloc, efact, &fe_key, &fe_key_len,
-                                                     &fe_val, &fe_val_len) == HU_OK) {
-                            hu_memory_category_t fe_cat = {.tag = HU_MEMORY_CATEGORY_INSIGHT};
-                            (void)memory->vtable->store(memory->ctx, fe_key, fe_key_len,
-                                                        fe_val, fe_val_len, &fe_cat, NULL, 0);
-                            alloc->free(alloc->ctx, fe_key, fe_key_len + 1);
-                            alloc->free(alloc->ctx, fe_val, fe_val_len + 1);
-                        }
-                    }
-                }
-
-                alloc->free(alloc->ctx, text, text_cap + 1);
             }
         }
     }

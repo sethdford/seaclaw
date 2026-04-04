@@ -3,7 +3,6 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
-#include "human/provider.h"
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -112,24 +111,5 @@ hu_error_t hu_vulnerability_assess(const hu_vulnerability_input_t *input,
                                    hu_vulnerability_result_t *result);
 
 const char *hu_vulnerability_level_name(hu_vulnerability_level_t level);
-
-/* ── SHIELD-010: LLM safety supervisor (optional second-pass) ───── */
-
-typedef struct hu_safety_judge_result {
-    bool safe;          /* false = response should be blocked or rewritten */
-    double confidence;  /* 0.0-1.0 judge confidence */
-    char reason[256];   /* brief explanation if unsafe */
-    char rewrite[1024]; /* suggested safe rewrite (empty if safe) */
-} hu_safety_judge_result_t;
-
-/** Run an LLM safety judge on a candidate response.
- *  Uses `provider` + `model` to classify the response. Falls back to the
- *  rule-based companion_safety_check when provider is NULL or in test mode.
- *
- *  Returns HU_OK on success. The `result` struct is filled regardless. */
-hu_error_t hu_safety_judge_check(hu_allocator_t *alloc, hu_provider_t *provider, const char *model,
-                                 size_t model_len, const char *user_msg, size_t user_msg_len,
-                                 const char *response, size_t response_len,
-                                 hu_safety_judge_result_t *result);
 
 #endif

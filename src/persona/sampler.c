@@ -11,10 +11,8 @@ hu_error_t hu_persona_sampler_imessage_query(char *buf, size_t cap, size_t *out_
     if (!buf || !out_len || cap < 64)
         return HU_ERR_INVALID_ARGUMENT;
     int n = snprintf(buf, cap,
-                     "SELECT text, handle_id, date, is_from_me, attributedBody FROM message "
-                     "WHERE is_from_me = 1 AND "
-                     "((text IS NOT NULL AND text != '') "
-                     "OR (attributedBody IS NOT NULL AND LENGTH(attributedBody) > 0)) "
+                     "SELECT text, handle_id, date, is_from_me FROM message "
+                     "WHERE is_from_me = 1 AND text IS NOT NULL AND text != '' "
                      "ORDER BY date DESC LIMIT %zu",
                      limit);
     if (n < 0 || (size_t)n >= cap)
@@ -146,15 +144,13 @@ hu_error_t hu_persona_sampler_imessage_conversation_query(const char *handle_id,
     sanitized[out_pos] = '\0';
 
     int n = snprintf(buf, cap,
-                     "SELECT m.text, m.is_from_me, m.date, m.attributedBody "
+                     "SELECT m.text, m.is_from_me, m.date "
                      "FROM message m "
                      "JOIN chat_message_join cmj ON cmj.message_id = m.ROWID "
                      "JOIN chat c ON c.ROWID = cmj.chat_id "
                      "JOIN chat_handle_join chj ON chj.chat_id = c.ROWID "
                      "JOIN handle h ON h.ROWID = chj.handle_id "
-                     "WHERE h.id = '%s' AND "
-                     "((m.text IS NOT NULL AND m.text != '') "
-                     "OR (m.attributedBody IS NOT NULL AND LENGTH(m.attributedBody) > 0)) "
+                     "WHERE h.id = '%s' AND m.text IS NOT NULL AND m.text != '' "
                      "ORDER BY m.date ASC LIMIT %zu",
                      sanitized, limit);
     if (n < 0 || (size_t)n >= cap)

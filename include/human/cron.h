@@ -26,8 +26,6 @@ typedef struct hu_cron_job {
     bool one_shot;
     bool enabled;
     int64_t created_at_s;
-    char **allowed_tools;       /* agent jobs: restrict to these tools, or NULL for all */
-    size_t allowed_tools_count;
 } hu_cron_job_t;
 
 typedef struct hu_cron_run {
@@ -54,14 +52,6 @@ hu_error_t hu_cron_add_job(hu_cron_scheduler_t *sched, hu_allocator_t *alloc,
 hu_error_t hu_cron_add_agent_job(hu_cron_scheduler_t *sched, hu_allocator_t *alloc,
                                  const char *expression, const char *prompt, const char *channel,
                                  const char *name, uint64_t *out_id);
-
-/* Add an agent-type cron job with a per-job tool allowlist.
- * allowed_tools may be NULL (all tools allowed). */
-hu_error_t hu_cron_add_agent_job_with_tools(hu_cron_scheduler_t *sched, hu_allocator_t *alloc,
-                                             const char *expression, const char *prompt,
-                                             const char *channel, const char *name,
-                                             const char *const *allowed_tools,
-                                             size_t allowed_tools_count, uint64_t *out_id);
 
 hu_error_t hu_cron_remove_job(hu_cron_scheduler_t *sched, uint64_t job_id);
 hu_error_t hu_cron_update_job(hu_cron_scheduler_t *sched, hu_allocator_t *alloc, uint64_t job_id,

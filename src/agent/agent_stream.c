@@ -20,17 +20,12 @@
 #include "human/experience.h"
 #include "human/humanness.h"
 #ifdef HU_ENABLE_SQLITE
-#include "human/feeds/findings.h"
 #include "human/intelligence/online_learning.h"
 #include "human/intelligence/self_improve.h"
 #include "human/intelligence/value_learning.h"
-#include "human/intelligence/world_model.h"
 #include "human/memory.h"
 #include <sqlite3.h>
 #endif
-#include "human/agent/commitment.h"
-#include "human/agent/reflection.h"
-#include "human/eval/turing_score.h"
 #include "human/provider.h"
 #include "human/voice.h"
 #include <stdio.h>
@@ -427,7 +422,7 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
             if (!*response_out)
                 return HU_ERR_OUT_OF_MEMORY;
             if (response_len_out)
-                *response_len_out = strlen(*response_out);
+                *response_len_out = sresp.content_len;
         }
         hu_agent_clear_current_for_tools();
         return HU_OK;
@@ -451,7 +446,6 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
 hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t msg_len,
                                    hu_agent_stream_event_cb on_event, void *event_ctx,
                                    char **response_out, size_t *response_len_out) {
-    fprintf(stderr, "[stream_v2] enter msg_len=%zu\n", msg_len);
     if (!agent || !msg || !response_out)
         return HU_ERR_INVALID_ARGUMENT;
     *response_out = NULL;
@@ -502,41 +496,6 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
     if (err != HU_OK) {
         hu_agent_clear_current_for_tools();
         return err;
-    }
-
-    /* Detect commitments from user message (e.g. "I'll send that tomorrow") */
-    {
-        hu_commitment_detect_result_t cdr;
-        memset(&cdr, 0, sizeof(cdr));
-        if (hu_commitment_detect(agent->alloc, msg, msg_len, "user", 4, &cdr) == HU_OK &&
-            cdr.count > 0) {
-#ifdef HU_ENABLE_SQLITE
-            if (agent->memory) {
-                sqlite3 *cdb = hu_sqlite_memory_get_db(agent->memory);
-                if (cdb) {
-                    for (size_t ci = 0; ci < cdr.count; ci++) {
-                        hu_commitment_t *cm = &cdr.commitments[ci];
-                        if (cm->statement && cm->statement_len > 0) {
-                            sqlite3_stmt *cstmt = NULL;
-                            if (sqlite3_prepare_v2(
-                                    cdb,
-                                    "INSERT OR IGNORE INTO commitments(role,text,detected_at) "
-                                    "VALUES(?1,?2,?3)",
-                                    -1, &cstmt, NULL) == SQLITE_OK) {
-                                sqlite3_bind_text(cstmt, 1, "user", 4, SQLITE_STATIC);
-                                sqlite3_bind_text(cstmt, 2, cm->statement, (int)cm->statement_len,
-                                                  SQLITE_STATIC);
-                                sqlite3_bind_int64(cstmt, 3, (int64_t)time(NULL));
-                                sqlite3_step(cstmt);
-                                sqlite3_finalize(cstmt);
-                            }
-                        }
-                    }
-                }
-            }
-#endif
-            hu_commitment_detect_result_deinit(&cdr, agent->alloc);
-        }
     }
 
     /* Build system prompt (memory, persona, awareness, outcomes) */
@@ -636,20 +595,6 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     hu_value_engine_deinit(&ve);
                 }
             }
-            /* Feed findings: recent research findings from feed processor */
-#if defined(HU_ENABLE_FEEDS)
-            {
-                char *fctx = NULL;
-                size_t fctx_len = 0;
-                if (hu_findings_build_context(agent->alloc, idb, 5, &fctx, &fctx_len) == HU_OK &&
-                    fctx && fctx_len > 0) {
-                    int n = snprintf(ip + ipo, sizeof(ip) - ipo, "### %.*s\n", (int)fctx_len, fctx);
-                    if (n > 0 && ipo + (size_t)n < sizeof(ip))
-                        ipo += (size_t)n;
-                    agent->alloc->free(agent->alloc->ctx, fctx, fctx_len + 1);
-                }
-            }
-#endif
             if (ipo > 0) {
                 intelligence_ctx = hu_strndup(agent->alloc, ip, ipo);
                 intelligence_ctx_len = ipo;
@@ -764,27 +709,15 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         if (msgs)
             agent->alloc->free(agent->alloc->ctx, msgs, msgs_count * sizeof(hu_chat_message_t));
 
-        const char *eff_model = agent->model_name;
-        size_t eff_model_len = agent->model_name_len;
-        double eff_temp = agent->temperature;
-        if (agent->turn_model && agent->turn_model_len > 0) {
-            eff_model = agent->turn_model;
-            eff_model_len = agent->turn_model_len;
-        }
-        if (agent->turn_temperature > 0.0)
-            eff_temp = agent->turn_temperature;
-
         hu_chat_request_t req;
         memset(&req, 0, sizeof(req));
         req.messages = all_msgs;
         req.messages_count = total_msgs;
-        req.model = eff_model;
-        req.model_len = eff_model_len;
-        req.temperature = eff_temp;
+        req.model = agent->model_name;
+        req.model_len = agent->model_name_len;
+        req.temperature = agent->temperature;
         req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
         req.tools_count = agent->tool_specs_count;
-        if (agent->turn_thinking_budget > 0)
-            req.thinking_budget = agent->turn_thinking_budget;
 
         /* Stream from the provider (with emotional pacing on first chunk).
          * When quality systems (GVR/Constitutional) are enabled, suppress streaming
@@ -802,8 +735,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         hu_stream_chat_result_t sresp;
         memset(&sresp, 0, sizeof(sresp));
         err = agent->provider.vtable->stream_chat(
-            agent->provider.ctx, agent->alloc, &req, eff_model, eff_model_len, eff_temp,
-            stream_chunk_to_event_cb, &wrap, &sresp);
+            agent->provider.ctx, agent->alloc, &req, agent->model_name, agent->model_name_len,
+            agent->temperature, stream_chunk_to_event_cb, &wrap, &sresp);
 
         agent->alloc->free(agent->alloc->ctx, all_msgs, total_msgs * sizeof(hu_chat_message_t));
 
@@ -827,7 +760,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     hu_log_error("agent_stream_v2", NULL, "append_history failed: %s",
                                  hu_error_string(hist_err));
                 final_content = hu_strndup(agent->alloc, sresp.content, sresp.content_len);
-                final_content_len = final_content ? strlen(final_content) : 0;
+                final_content_len = sresp.content_len;
             }
             hu_stream_chat_result_free(agent->alloc, &sresp);
             break;
@@ -860,14 +793,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 }
                 if (args) {
                     result = hu_tool_result_fail("invalid arguments", 16);
-                    hu_policy_action_t stream_pa =
-                        hu_agent_internal_evaluate_tool_policy(
-                            agent, call->name,
-                            call->arguments ? call->arguments : "{}");
-                    if (stream_pa == HU_POLICY_DENY ||
-                        stream_pa == HU_POLICY_REQUIRE_APPROVAL) {
-                        result = hu_tool_result_fail("blocked by policy", 17);
-                    } else if (tool->vtable->execute_streaming && on_event) {
+                    /* Prefer streaming execution for progressive output */
+                    if (tool->vtable->execute_streaming && on_event) {
                         tool_stream_bridge_t bridge = {
                             .on_event = on_event,
                             .event_ctx = event_ctx,
@@ -887,14 +814,6 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 }
             }
 
-            /* Capture generated media paths (streaming path) */
-            if (result.success && result.media_path && result.media_path_len > 0 &&
-                agent->generated_media_count < 4) {
-                char *mp = hu_strndup(agent->alloc, result.media_path, result.media_path_len);
-                if (mp)
-                    agent->generated_media[agent->generated_media_count++] = mp;
-            }
-
             /* Build result text for history */
             const char *result_text = result.success ? result.output : result.error_msg;
             size_t result_text_len = result.success ? result.output_len : result.error_msg_len;
@@ -905,51 +824,6 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
 
             hu_agent_internal_append_history(agent, HU_ROLE_TOOL, result_text, result_text_len,
                                              call->name, call->name_len, call->id, call->id_len);
-
-            /* Record tool outcome to intelligence subsystems */
-#ifdef HU_ENABLE_SQLITE
-            if (agent->memory) {
-                sqlite3 *rec_db = hu_sqlite_memory_get_db(agent->memory);
-                if (rec_db) {
-                    /* Online learning signal */
-                    hu_online_learning_t ol;
-                    if (hu_online_learning_create(agent->alloc, rec_db, 0.1, &ol) == HU_OK) {
-                        hu_learning_signal_t sig = {
-                            .type =
-                                result.success ? HU_SIGNAL_TOOL_SUCCESS : HU_SIGNAL_TOOL_FAILURE,
-                            .magnitude = 1.0,
-                            .timestamp = (int64_t)time(NULL),
-                        };
-                        sig.tool_name_len = call->name_len < sizeof(sig.tool_name)
-                                                ? call->name_len
-                                                : sizeof(sig.tool_name) - 1;
-                        memcpy(sig.tool_name, call->name, sig.tool_name_len);
-                        hu_online_learning_record(&ol, &sig);
-                        hu_online_learning_deinit(&ol);
-                    }
-                    /* World model outcome */
-                    hu_world_model_t wm;
-                    if (hu_world_model_create(agent->alloc, rec_db, &wm) == HU_OK) {
-                        double conf = result.success ? 0.8 : 0.3;
-                        size_t out_cap = result_text_len > 512 ? 512 : result_text_len;
-                        (void)hu_world_record_outcome(&wm, call->name, call->name_len, result_text,
-                                                      out_cap, conf, (int64_t)time(NULL));
-                        hu_world_model_deinit(&wm);
-                    }
-                    /* Experience record */
-                    hu_experience_store_t exp;
-                    if (hu_experience_store_init(agent->alloc, agent->memory, &exp) == HU_OK) {
-                        exp.db = rec_db;
-                        double score = result.success ? 0.9 : 0.2;
-                        (void)hu_experience_record(&exp, call->name, call->name_len,
-                                                   call->arguments ? call->arguments : "",
-                                                   call->arguments_len, result_text,
-                                                   result_text_len, score);
-                        hu_experience_store_deinit(&exp);
-                    }
-                }
-            }
-#endif
 
             /* Emit TOOL_RESULT event to the callback */
             if (on_event) {
@@ -987,11 +861,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * Skip when persona is active — GVR's generic verifier rejects
          * persona-style responses (casual, terse) and rewrites them into
          * bland AI-speak, which is worse. */
-        bool persona_active = false;
-#ifdef HU_HAS_PERSONA
-        persona_active = (agent->persona != NULL);
-#endif
-        if (agent->gvr_config.enabled && !persona_active) {
+        if (agent->gvr_config.enabled && !agent->persona) {
             hu_gvr_pipeline_result_t gvr_result;
             memset(&gvr_result, 0, sizeof(gvr_result));
             hu_error_t gvr_err = hu_gvr_pipeline(
@@ -1016,7 +886,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * Short + in-persona + has follow-up question = good, skip rethink.
          * Short + formal/no-question = needs help, do rethink. */
         bool needs_rethink = false;
-        if (persona_active && final_content_len > 0 && final_content_len < 100 && msg_len > 15 &&
+        if (agent->persona && final_content_len > 0 && final_content_len < 100 && msg_len > 15 &&
             agent->provider.vtable && agent->provider.vtable->chat_with_system) {
             bool has_question = (memchr(final_content, '?', final_content_len) != NULL);
             bool starts_lowercase = (final_content[0] >= 'a' && final_content[0] <= 'z');
@@ -1035,14 +905,9 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         }
         if (needs_rethink) {
             /* Build rethink prompt with persona context for style fidelity */
-            const char *persona_name = "the persona";
-            const char *persona_identity = "";
-#ifdef HU_HAS_PERSONA
-            if (agent->persona) {
-                persona_name = agent->persona->name ? agent->persona->name : persona_name;
-                persona_identity = agent->persona->identity ? agent->persona->identity : "";
-            }
-#endif
+            const char *persona_name = agent->persona ? agent->persona->name : "the persona";
+            const char *persona_identity =
+                (agent->persona && agent->persona->identity) ? agent->persona->identity : "";
             char rethink_sys[2048];
             snprintf(rethink_sys, sizeof(rethink_sys),
                      "You are %s. %.*s\n\n"
@@ -1124,42 +989,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             }
         }
 
-        /* 4. Turing score: heuristic evaluation of response naturalness */
-#ifdef HU_ENABLE_SQLITE
-        if (agent->memory && final_content_len > 10) {
-            hu_turing_score_t tscore;
-            memset(&tscore, 0, sizeof(tscore));
-            if (hu_turing_score_heuristic(final_content, final_content_len, msg, msg_len,
-                                          &tscore) == HU_OK &&
-                tscore.overall > 0.0) {
-                sqlite3 *tdb = hu_sqlite_memory_get_db(agent->memory);
-                if (tdb) {
-                    sqlite3_stmt *ts = NULL;
-                    if (sqlite3_prepare_v2(
-                            tdb,
-                            "INSERT INTO turing_scores(score,response_len,timestamp) "
-                            "VALUES(?1,?2,?3)",
-                            -1, &ts, NULL) == SQLITE_OK) {
-                        sqlite3_bind_double(ts, 1, tscore.overall);
-                        sqlite3_bind_int(ts, 2, (int)final_content_len);
-                        sqlite3_bind_int64(ts, 3, (int64_t)time(NULL));
-                        sqlite3_step(ts);
-                        sqlite3_finalize(ts);
-                    }
-                }
-            }
-        }
-#endif
-
-        /* 5. Heuristic reflection: quick quality check (no LLM call) */
-        {
-            hu_reflection_config_t rcfg = {.enabled = true, .use_llm = false};
-            hu_reflection_quality_t rq =
-                hu_reflection_evaluate(msg, msg_len, final_content, final_content_len, &rcfg);
-            if (rq == HU_QUALITY_NEEDS_RETRY)
-                hu_log_info("human", NULL, "[reflection] response quality: NEEDS_RETRY");
-        }
-
+        /* Update final_content pointer if it was replaced by quality pipeline */
         (void)content_owned;
     }
 #endif /* !HU_IS_TEST */

@@ -1,9 +1,3 @@
-#if defined(__unix__) || defined(__APPLE__)
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-#endif
-
 #include "human/tts/voice_clone.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
@@ -16,7 +10,6 @@
 
 #if defined(__unix__) || defined(__APPLE__)
 #include <sys/stat.h>
-#include <stdlib.h>
 #include <unistd.h>
 #endif
 

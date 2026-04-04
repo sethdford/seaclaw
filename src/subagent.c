@@ -85,8 +85,7 @@ static void *subagent_thread_fn(void *arg) {
             const char *model = mgr->cfg->default_model ? mgr->cfg->default_model : "";
             size_t model_len = strlen(model);
             double temp = mgr->cfg->temperature > 0.0 ? mgr->cfg->temperature : 0.7;
-            const char *ws =
-                mgr->cfg->runtime_paths.workspace_dir ? mgr->cfg->runtime_paths.workspace_dir : ".";
+            const char *ws = mgr->cfg->workspace_dir ? mgr->cfg->workspace_dir : ".";
             size_t ws_len = strlen(ws);
 
             hu_agent_t agent = {0};

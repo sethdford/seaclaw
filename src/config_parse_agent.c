@@ -72,38 +72,6 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
     double fbu = hu_json_get_number(obj, "fleet_budget_usd", cfg->agent.fleet_budget_usd);
     if (fbu >= 0.0 && fbu <= 1.0e9)
         cfg->agent.fleet_budget_usd = fbu;
-    hu_json_value_t *dmo_arr = hu_json_object_get(obj, "fleet_depth_model_overrides");
-    if (dmo_arr && dmo_arr->type == HU_JSON_ARRAY && dmo_arr->data.array.len > 0) {
-        size_t n = dmo_arr->data.array.len;
-        cfg->agent.fleet_depth_model_overrides =
-            a->alloc(a->ctx, n * sizeof(*cfg->agent.fleet_depth_model_overrides));
-        if (cfg->agent.fleet_depth_model_overrides) {
-            memset(cfg->agent.fleet_depth_model_overrides, 0,
-                   n * sizeof(*cfg->agent.fleet_depth_model_overrides));
-            cfg->agent.fleet_depth_model_overrides_count = n;
-            for (size_t di = 0; di < n; di++) {
-                hu_json_value_t *item = dmo_arr->data.array.items[di];
-                if (!item || item->type != HU_JSON_OBJECT)
-                    continue;
-                hu_json_value_t *depth_arr = hu_json_object_get(item, "depth");
-                if (depth_arr && depth_arr->type == HU_JSON_ARRAY &&
-                    depth_arr->data.array.len >= 2) {
-                    hu_json_value_t *lo = depth_arr->data.array.items[0];
-                    hu_json_value_t *hi = depth_arr->data.array.items[1];
-                    if (lo && lo->type == HU_JSON_NUMBER)
-                        cfg->agent.fleet_depth_model_overrides[di].min_depth = (uint32_t)lo->data.number;
-                    if (hi && hi->type == HU_JSON_NUMBER)
-                        cfg->agent.fleet_depth_model_overrides[di].max_depth = (uint32_t)hi->data.number;
-                }
-                const char *m = hu_json_get_string(item, "model");
-                if (m)
-                    cfg->agent.fleet_depth_model_overrides[di].model = hu_strdup(a, m);
-                const char *p = hu_json_get_string(item, "provider");
-                if (p)
-                    cfg->agent.fleet_depth_model_overrides[di].provider = hu_strdup(a, p);
-            }
-        }
-    }
     const char *dp = hu_json_get_string(obj, "default_profile");
     if (dp) {
         if (cfg->agent.default_profile)

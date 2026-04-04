@@ -22,21 +22,6 @@ void hu_config_deinit(hu_config_t *cfg) {
         a->free(a->ctx, cfg->ensemble.strategy, strlen(cfg->ensemble.strategy) + 1);
         cfg->ensemble.strategy = NULL;
     }
-    if (cfg->agent.fleet_depth_model_overrides) {
-        for (size_t i = 0; i < cfg->agent.fleet_depth_model_overrides_count; i++) {
-            if (cfg->agent.fleet_depth_model_overrides[i].model)
-                a->free(a->ctx, cfg->agent.fleet_depth_model_overrides[i].model,
-                        strlen(cfg->agent.fleet_depth_model_overrides[i].model) + 1);
-            if (cfg->agent.fleet_depth_model_overrides[i].provider)
-                a->free(a->ctx, cfg->agent.fleet_depth_model_overrides[i].provider,
-                        strlen(cfg->agent.fleet_depth_model_overrides[i].provider) + 1);
-        }
-        a->free(a->ctx, cfg->agent.fleet_depth_model_overrides,
-                cfg->agent.fleet_depth_model_overrides_count *
-                    sizeof(*cfg->agent.fleet_depth_model_overrides));
-        cfg->agent.fleet_depth_model_overrides = NULL;
-        cfg->agent.fleet_depth_model_overrides_count = 0;
-    }
     if (cfg->arena) {
         /* Arena holds most config strings (e.g. cfg->voice.* including mode, realtime_model,
          * realtime_voice); bulk-freed here. */

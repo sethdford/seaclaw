@@ -673,6 +673,152 @@ static void test_emotional_momentum_null_prev_no_effect(void) {
     HU_ASSERT_TRUE(result.dominant_emotion != NULL);
 }
 
+
+/* ---- Speech normalization tests ---- */
+
+static void test_normalize_phone_number_parens(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("(555) 123-4567", 14, out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "<spell>") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "555") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "4567") != NULL);
+}
+
+static void test_normalize_phone_number_dashes(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("555-123-4567", 12, out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "<spell>") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "555") != NULL);
+}
+
+static void test_normalize_phone_strip_ssml(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("(555) 123-4567", 14, out, sizeof(out), true);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "<spell>") == NULL);
+    HU_ASSERT_TRUE(strstr(out, "555") != NULL);
+}
+
+static void test_normalize_currency_dollars(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("$42", 3, out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "forty") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "dollar") != NULL);
+}
+
+static void test_normalize_currency_with_cents(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("$42.50", 6, out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "forty") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "dollar") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "cent") != NULL);
+}
+
+static void test_normalize_percentage(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("85%%", 3, out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "eighty") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "percent") != NULL);
+}
+
+static void test_normalize_date_slash(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("4/3/2026", 8, out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "April") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "2026") != NULL);
+}
+
+static void test_normalize_date_iso(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("2026-04-03", 10, out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "April") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "2026") != NULL);
+}
+
+static void test_normalize_time_pm(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("7:30 PM", 7, out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "seven") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "thirty") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "PM") != NULL);
+}
+
+static void test_normalize_time_oclock(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("7:00 PM", 7, out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "seven") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "o\'clock") != NULL);
+}
+
+static void test_normalize_small_number_to_words(void) {
+    char out[256];
+    size_t len = hu_transcript_normalize_for_speech("I have 42 items", 15, out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(out, "forty") != NULL);
+}
+
+static void test_normalize_preserves_normal_text(void) {
+    char out[256];
+    const char *text = "Hello there";
+    size_t len = hu_transcript_normalize_for_speech(text, strlen(text), out, sizeof(out), false);
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_EQ(memcmp(out, "Hello there", 11), 0);
+}
+
+static void test_normalize_null_input(void) {
+    char out[64];
+    size_t len = hu_transcript_normalize_for_speech(NULL, 0, out, sizeof(out), false);
+    HU_ASSERT_EQ(len, (size_t)0);
+}
+
+static void test_break_limiter_removes_excess(void) {
+    char buf[512];
+    snprintf(buf, sizeof(buf),
+        "Hello<break time=\"200ms\"/>world<break time=\"200ms\"/>"
+        "test<break time=\"200ms\"/>a<break time=\"200ms\"/>"
+        "b<break time=\"200ms\"/>c<break time=\"200ms\"/>"
+        "d<break time=\"200ms\"/>e<break time=\"200ms\"/>"
+        "f<break time=\"200ms\"/>g<break time=\"200ms\"/>"
+        "end");
+    size_t orig_len = strlen(buf);
+    size_t new_len = hu_transcript_limit_breaks(buf, orig_len, 2);
+    HU_ASSERT_TRUE(new_len <= orig_len);
+}
+
+static void test_break_limiter_keeps_all_under_limit(void) {
+    char buf[256];
+    snprintf(buf, sizeof(buf), "Hello<break time=\"200ms\"/>world");
+    size_t orig_len = strlen(buf);
+    size_t new_len = hu_transcript_limit_breaks(buf, orig_len, 10);
+    HU_ASSERT_EQ(new_len, orig_len);
+}
+
+static void test_break_limiter_null_safe(void) {
+    size_t len = hu_transcript_limit_breaks(NULL, 0, 5);
+    HU_ASSERT_EQ(len, (size_t)0);
+}
+
+static void test_prep_normalizes_numbers_in_pipeline(void) {
+    hu_prep_config_t cfg = {0};
+    cfg.base_speed = 1.0f;
+    cfg.pause_factor = 1.0f;
+    hu_prep_result_t result = {0};
+    const char *text = "I have 42 apples";
+    hu_error_t err = hu_transcript_prep(text, strlen(text), &cfg, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.output_len > 0);
+    HU_ASSERT_TRUE(strstr(result.output, "forty") != NULL);
+}
+
 /* ── Registration ────────────────────────────────────────────────────── */
 
 void run_transcript_prep_tests(void) {

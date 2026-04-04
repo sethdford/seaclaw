@@ -120,10 +120,6 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->reliability.scheduler_retries = 2;
     cfg->reliability.fallback_providers = NULL;
     cfg->reliability.fallback_providers_len = 0;
-    cfg->reliability.model_fallbacks = NULL;
-    cfg->reliability.model_fallbacks_len = 0;
-    cfg->reliability.streaming_retries = 1;
-    cfg->reliability.circuit_breaker_enabled = true;
     cfg->router.fast = NULL;
     cfg->router.standard = NULL;
     cfg->router.powerful = NULL;
@@ -337,8 +333,8 @@ static hu_error_t config_load_impl(hu_allocator_t *backing, hu_config_t *out,
         int n =
             snprintf(path_buf, sizeof(path_buf), "%s/%s/%s", home, HU_CONFIG_DIR, HU_CONFIG_FILE);
         if (n <= 0 || (size_t)n >= sizeof(path_buf)) {
-            out->runtime_paths.config_path = hu_strdup(&a, "");
-            out->runtime_paths.workspace_dir = hu_strdup(&a, ".");
+            out->config_path = hu_strdup(&a, "");
+            out->workspace_dir = hu_strdup(&a, ".");
             sync_flat_fields(out);
             return hu_config_validate(out);
         }
@@ -354,8 +350,8 @@ static hu_error_t config_load_impl(hu_allocator_t *backing, hu_config_t *out,
         workspace_dir[sizeof(workspace_dir) - 1] = '\0';
     }
 
-    out->runtime_paths.config_path = hu_strdup(&a, global_path);
-    out->runtime_paths.workspace_dir = hu_strdup(&a, workspace_dir);
+    out->config_path = hu_strdup(&a, global_path);
+    out->workspace_dir = hu_strdup(&a, workspace_dir);
 
     hu_error_t err = load_json_file(out, global_path);
     if (err == HU_ERR_CONFIG_NOT_FOUND) {
@@ -398,8 +394,8 @@ static hu_error_t config_load_impl(hu_allocator_t *backing, hu_config_t *out,
         const char *strict_env = getenv("HUMAN_STRICT_CONFIG");
         bool strict = (strict_env != NULL && strict_env[0] != '\0' && strict_env[0] != '0');
         hu_json_value_t *validation_root = NULL;
-        if (out->runtime_paths.config_path) {
-            FILE *vf = fopen(out->runtime_paths.config_path, "rb");
+        if (out->config_path) {
+            FILE *vf = fopen(out->config_path, "rb");
             if (vf) {
                 fseek(vf, 0, SEEK_END);
                 long vsz = ftell(vf);
@@ -484,7 +480,7 @@ void hu_config_apply_env_overrides(hu_config_t *cfg) {
 
     v = getenv("HUMAN_WORKSPACE");
     if (v && !strstr(v, ".."))
-        hu_config_apply_env_str(a, &cfg->runtime_paths.workspace_dir, v);
+        hu_config_apply_env_str(a, &cfg->workspace_dir, v);
 
     v = getenv("HUMAN_ALLOW_PUBLIC_BIND");
     if (v)

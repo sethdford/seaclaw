@@ -9,18 +9,6 @@
 #include <sqlite3.h>
 #endif
 
-static bool dbi_is_safe_identifier(const char *s) {
-    if (!s || !s[0])
-        return false;
-    for (size_t i = 0; s[i]; i++) {
-        char c = s[i];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-              (c >= '0' && c <= '9') || c == '_'))
-            return false;
-    }
-    return true;
-}
-
 #define TOOL_NAME "db_schema"
 #define TOOL_DESC "Inspect database schema — list tables, columns, indexes, foreign keys"
 #define TOOL_PARAMS                                                                  \
@@ -91,28 +79,28 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
             return HU_OK;
         }
 
-        hu_json_buf_t jb = {0};
-        if (hu_json_buf_init(&jb, alloc) != HU_OK) {
+        size_t cap = 4096;
+        char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+        if (!buf) {
             sqlite3_finalize(stmt);
             sqlite3_close(db);
-            *out = hu_tool_result_fail("out of memory", 13);
             return HU_ERR_OUT_OF_MEMORY;
         }
 
-        hu_json_buf_append_raw(&jb, "{\"tables\":[", 11);
+        size_t off = 0;
+        off += (size_t)snprintf(buf + off, cap - off, "{\"tables\":[");
         int first = 1;
 
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             const char *nm = (const char *)sqlite3_column_text(stmt, 0);
-            if (!first)
-                hu_json_buf_append_raw(&jb, ",", 1);
-            const char *safe = nm ? nm : "";
-            hu_json_append_string(&jb, safe, strlen(safe));
+            if (!first && off < cap - 2)
+                buf[off++] = ',';
+            off += (size_t)snprintf(buf + off, cap - off - 1, "\"%s\"", nm ? nm : "");
             first = 0;
         }
 
-        hu_json_buf_append_raw(&jb, "]}", 2);
-        *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+        off += (size_t)snprintf(buf + off, cap - off - 1, "]}");
+        *out = hu_tool_result_ok_owned(buf, off);
         sqlite3_finalize(stmt);
 
     } else if (strcmp(action, "columns") == 0) {
@@ -122,11 +110,6 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
             return HU_OK;
         }
 
-        if (!dbi_is_safe_identifier(table)) {
-            sqlite3_close(db);
-            *out = hu_tool_result_fail("invalid table name", 18);
-            return HU_OK;
-        }
         char query[512];
         snprintf(query, sizeof(query), "PRAGMA table_info(%s)", table);
         sqlite3_stmt *stmt = NULL;
@@ -136,13 +119,16 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
             return HU_OK;
         }
 
-        hu_json_buf_t jb = {0};
-        if (hu_json_buf_init(&jb, alloc) != HU_OK) {
+        size_t cap = 8192;
+        char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+        if (!buf) {
             sqlite3_finalize(stmt);
             sqlite3_close(db);
             return HU_ERR_OUT_OF_MEMORY;
         }
-        hu_json_buf_append_raw(&jb, "{\"columns\":[", 12);
+
+        size_t off = 0;
+        off += (size_t)snprintf(buf + off, cap - off, "{\"columns\":[");
         int first = 1;
 
         while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -151,23 +137,17 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
             int col_notnull = sqlite3_column_int(stmt, 3);
             int col_pk = sqlite3_column_int(stmt, 5);
 
-            if (!first)
-                hu_json_buf_append_raw(&jb, ",", 1);
-            hu_json_buf_append_raw(&jb, "{\"name\":", 8);
-            const char *cn = col_name ? col_name : "";
-            hu_json_append_string(&jb, cn, strlen(cn));
-            hu_json_buf_append_raw(&jb, ",\"type\":", 8);
-            const char *ct = col_type ? col_type : "";
-            hu_json_append_string(&jb, ct, strlen(ct));
-            char nums[64];
-            int nn = snprintf(nums, sizeof(nums), ",\"notnull\":%d,\"pk\":%d}", col_notnull, col_pk);
-            if (nn > 0)
-                hu_json_buf_append_raw(&jb, nums, (size_t)nn);
+            if (!first && off < cap - 2)
+                buf[off++] = ',';
+            off += (size_t)snprintf(buf + off, cap - off - 1,
+                                    "{\"name\":\"%s\",\"type\":\"%s\",\"notnull\":%d,\"pk\":%d}",
+                                    col_name ? col_name : "", col_type ? col_type : "", col_notnull,
+                                    col_pk);
             first = 0;
         }
 
-        hu_json_buf_append_raw(&jb, "]}", 2);
-        *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+        off += (size_t)snprintf(buf + off, cap - off - 1, "]}");
+        *out = hu_tool_result_ok_owned(buf, off);
         sqlite3_finalize(stmt);
 
     } else if (strcmp(action, "indexes") == 0) {
@@ -177,11 +157,6 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
             return HU_OK;
         }
 
-        if (!dbi_is_safe_identifier(table)) {
-            sqlite3_close(db);
-            *out = hu_tool_result_fail("invalid table name", 18);
-            return HU_OK;
-        }
         char query[512];
         snprintf(query, sizeof(query), "PRAGMA index_list(%s)", table);
         sqlite3_stmt *stmt = NULL;
@@ -191,33 +166,31 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
             return HU_OK;
         }
 
-        hu_json_buf_t jb = {0};
-        if (hu_json_buf_init(&jb, alloc) != HU_OK) {
+        size_t cap = 8192;
+        char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+        if (!buf) {
             sqlite3_finalize(stmt);
             sqlite3_close(db);
             return HU_ERR_OUT_OF_MEMORY;
         }
-        hu_json_buf_append_raw(&jb, "{\"indexes\":[", 12);
+
+        size_t off = 0;
+        off += (size_t)snprintf(buf + off, cap - off, "{\"indexes\":[");
         int first = 1;
 
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             const char *idx_name = (const char *)sqlite3_column_text(stmt, 1);
             int idx_unique = sqlite3_column_int(stmt, 2);
 
-            if (!first)
-                hu_json_buf_append_raw(&jb, ",", 1);
-            hu_json_buf_append_raw(&jb, "{\"name\":", 8);
-            const char *in = idx_name ? idx_name : "";
-            hu_json_append_string(&jb, in, strlen(in));
-            char uniq[32];
-            int un = snprintf(uniq, sizeof(uniq), ",\"unique\":%d}", idx_unique);
-            if (un > 0)
-                hu_json_buf_append_raw(&jb, uniq, (size_t)un);
+            if (!first && off < cap - 2)
+                buf[off++] = ',';
+            off += (size_t)snprintf(buf + off, cap - off - 1, "{\"name\":\"%s\",\"unique\":%d}",
+                                    idx_name ? idx_name : "", idx_unique);
             first = 0;
         }
 
-        hu_json_buf_append_raw(&jb, "]}", 2);
-        *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+        off += (size_t)snprintf(buf + off, cap - off - 1, "]}");
+        *out = hu_tool_result_ok_owned(buf, off);
         sqlite3_finalize(stmt);
 
     } else if (strcmp(action, "foreign_keys") == 0) {
@@ -227,11 +200,6 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
             return HU_OK;
         }
 
-        if (!dbi_is_safe_identifier(table)) {
-            sqlite3_close(db);
-            *out = hu_tool_result_fail("invalid table name", 18);
-            return HU_OK;
-        }
         char query[512];
         snprintf(query, sizeof(query), "PRAGMA foreign_key_list(%s)", table);
         sqlite3_stmt *stmt = NULL;
@@ -241,13 +209,16 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
             return HU_OK;
         }
 
-        hu_json_buf_t jb = {0};
-        if (hu_json_buf_init(&jb, alloc) != HU_OK) {
+        size_t cap = 8192;
+        char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+        if (!buf) {
             sqlite3_finalize(stmt);
             sqlite3_close(db);
             return HU_ERR_OUT_OF_MEMORY;
         }
-        hu_json_buf_append_raw(&jb, "{\"foreign_keys\":[", 17);
+
+        size_t off = 0;
+        off += (size_t)snprintf(buf + off, cap - off, "{\"foreign_keys\":[");
         int first = 1;
 
         while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -256,26 +227,17 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
             const char *fk_from = (const char *)sqlite3_column_text(stmt, 3);
             const char *fk_to = (const char *)sqlite3_column_text(stmt, 4);
 
-            if (!first)
-                hu_json_buf_append_raw(&jb, ",", 1);
-            char id_hdr[32];
-            int ihn = snprintf(id_hdr, sizeof(id_hdr), "{\"id\":%d,\"table\":", fk_id);
-            if (ihn > 0)
-                hu_json_buf_append_raw(&jb, id_hdr, (size_t)ihn);
-            const char *ft = fk_table ? fk_table : "";
-            hu_json_append_string(&jb, ft, strlen(ft));
-            hu_json_buf_append_raw(&jb, ",\"from\":", 8);
-            const char *ff = fk_from ? fk_from : "";
-            hu_json_append_string(&jb, ff, strlen(ff));
-            hu_json_buf_append_raw(&jb, ",\"to\":", 6);
-            const char *fto = fk_to ? fk_to : "";
-            hu_json_append_string(&jb, fto, strlen(fto));
-            hu_json_buf_append_raw(&jb, "}", 1);
+            if (!first && off < cap - 2)
+                buf[off++] = ',';
+            off += (size_t)snprintf(buf + off, cap - off - 1,
+                                    "{\"id\":%d,\"table\":\"%s\",\"from\":\"%s\",\"to\":\"%s\"}", fk_id,
+                                    fk_table ? fk_table : "", fk_from ? fk_from : "",
+                                    fk_to ? fk_to : "");
             first = 0;
         }
 
-        hu_json_buf_append_raw(&jb, "]}", 2);
-        *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+        off += (size_t)snprintf(buf + off, cap - off - 1, "]}");
+        *out = hu_tool_result_ok_owned(buf, off);
         sqlite3_finalize(stmt);
 
     } else {

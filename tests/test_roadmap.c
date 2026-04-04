@@ -244,7 +244,7 @@ static void test_agent_query_tool(void) {
 static void test_canvas_tool(void) {
     hu_allocator_t a = hu_system_allocator();
     hu_tool_t tool = {0};
-    HU_ASSERT_EQ(hu_canvas_tool_create(&a, &tool), HU_OK);
+    HU_ASSERT_EQ(hu_canvas_create(&a, &tool), HU_OK);
     HU_ASSERT_STR_EQ(tool.vtable->name(tool.ctx), "canvas");
     if (tool.vtable->deinit)
         tool.vtable->deinit(tool.ctx, &a);
@@ -599,7 +599,7 @@ static void test_fleet_budget_requires_tracker(void) {
 static void test_canvas_description(void) {
     hu_allocator_t a = hu_system_allocator();
     hu_tool_t tool = {0};
-    HU_ASSERT_EQ(hu_canvas_tool_create(&a, &tool), HU_OK);
+    HU_ASSERT_EQ(hu_canvas_create(&a, &tool), HU_OK);
     HU_ASSERT_NOT_NULL(tool.vtable->description(tool.ctx));
     HU_ASSERT_NOT_NULL(tool.vtable->parameters_json(tool.ctx));
     if (tool.vtable->deinit)

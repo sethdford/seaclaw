@@ -24,6 +24,7 @@ typedef struct {
 
 static hu_error_t webhook_register_execute(void *ctx, hu_allocator_t *alloc,
                                            const hu_json_value_t *args, hu_tool_result_t *out) {
+    webhook_register_ctx_t *c = (webhook_register_ctx_t *)ctx;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;
     if (!args) {
@@ -38,12 +39,15 @@ static hu_error_t webhook_register_execute(void *ctx, hu_allocator_t *alloc,
     }
 
 #if HU_IS_TEST
-    (void)ctx;
+    (void)c;
     char *result = hu_sprintf(alloc, "{\"id\":\"webhook_test_12345\"}");
     *out = hu_tool_result_ok_owned(result, result ? strlen(result) : 0);
     return HU_OK;
 #else
-    webhook_register_ctx_t *c = (webhook_register_ctx_t *)ctx;
+    if (!c || !c->mgr) {
+        *out = hu_tool_result_fail("webhook manager not configured", 30);
+        return HU_OK;
+    }
     char *webhook_id = NULL;
     hu_error_t err = hu_webhook_register(alloc, c->mgr, path, &webhook_id);
     if (err != HU_OK) {
@@ -125,6 +129,7 @@ typedef struct {
 
 static hu_error_t webhook_poll_execute(void *ctx, hu_allocator_t *alloc,
                                        const hu_json_value_t *args, hu_tool_result_t *out) {
+    webhook_poll_ctx_t *c = (webhook_poll_ctx_t *)ctx;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;
     if (!args) {
@@ -139,12 +144,10 @@ static hu_error_t webhook_poll_execute(void *ctx, hu_allocator_t *alloc,
     }
 
 #if HU_IS_TEST
-    (void)ctx;
     char *result = hu_sprintf(alloc, "{\"events\":[]}");
     *out = hu_tool_result_ok_owned(result, result ? strlen(result) : 0);
     return HU_OK;
 #else
-    webhook_poll_ctx_t *c = (webhook_poll_ctx_t *)ctx;
     hu_webhook_event_t *events = NULL;
     size_t event_count = 0;
     hu_error_t err = hu_webhook_poll(alloc, c->mgr, webhook_id, &events, &event_count);
@@ -239,17 +242,16 @@ typedef struct {
 
 static hu_error_t webhook_list_execute(void *ctx, hu_allocator_t *alloc,
                                        const hu_json_value_t *args, hu_tool_result_t *out) {
+    webhook_list_ctx_t *c = (webhook_list_ctx_t *)ctx;
     (void)args;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;
 
 #if HU_IS_TEST
-    (void)ctx;
     char *result = hu_sprintf(alloc, "{\"webhooks\":[]}");
     *out = hu_tool_result_ok_owned(result, result ? strlen(result) : 0);
     return HU_OK;
 #else
-    webhook_list_ctx_t *c = (webhook_list_ctx_t *)ctx;
     hu_webhook_t *webhooks = NULL;
     size_t webhook_count = 0;
     hu_error_t err = hu_webhook_list(alloc, c->mgr, &webhooks, &webhook_count);

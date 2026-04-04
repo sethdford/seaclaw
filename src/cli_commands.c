@@ -7,7 +7,6 @@
 #include "human/agent/spawn.h"
 #include "human/bootstrap.h"
 #include "human/calibration.h"
-#include "human/context/conversation.h"
 #include "human/calibration/clone.h"
 #include "human/config.h"
 #include "human/core/error.h"
@@ -16,8 +15,6 @@
 #include "human/core/process_util.h"
 #include "human/core/string.h"
 #include "human/eval.h"
-#include "human/eval/turing_adversarial.h"
-#include "human/eval/turing_score.h"
 #include "human/eval_benchmarks.h"
 #include "human/eval_dashboard.h"
 #include "human/memory.h"
@@ -185,9 +182,6 @@ hu_error_t cmd_setup(hu_allocator_t *alloc, int argc, char **argv) {
 }
 
 /* ── channel ─────────────────────────────────────────────────────────────── */
-
-static hu_error_t cmd_channel_e2e_test(hu_allocator_t *alloc, int argc, char **argv);
-
 hu_error_t cmd_channel(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3 || strcmp(argv[2], "list") == 0) {
         hu_config_t cfg;
@@ -206,104 +200,8 @@ hu_error_t cmd_channel(hu_allocator_t *alloc, int argc, char **argv) {
         printf("  cli: ok\n");
         return HU_OK;
     }
-    if (strcmp(argv[2], "e2e-test") == 0)
-        return cmd_channel_e2e_test(alloc, argc, argv);
     fprintf(stderr, "Unknown channel subcommand: %s\n", argv[2]);
     return HU_ERR_INVALID_ARGUMENT;
-}
-
-/* ── channel e2e-test ────────────────────────────────────────────────────── */
-
-static hu_error_t cmd_channel_e2e_test(hu_allocator_t *alloc, int argc, char **argv) {
-    const char *target = NULL;
-    const char *seed = "Hey! Just testing our connection — how's everything going?";
-    int turns = 5;
-
-    for (int i = 3; i < argc && argv[i]; i++) {
-        if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
-            target = argv[++i];
-        } else if (strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
-            seed = argv[++i];
-        } else if (strcmp(argv[i], "--turns") == 0 && i + 1 < argc) {
-            turns = atoi(argv[++i]);
-            if (turns < 1)
-                turns = 1;
-        }
-    }
-
-    hu_app_ctx_t app_ctx;
-    hu_error_t err = hu_app_bootstrap(&app_ctx, alloc, NULL, true, true);
-    if (err != HU_OK) {
-        fprintf(stderr, "bootstrap failed: %s\n", hu_error_string(err));
-        return err;
-    }
-
-    if (!target && app_ctx.cfg->channels.imessage.default_target)
-        target = app_ctx.cfg->channels.imessage.default_target;
-    if (!target) {
-        fprintf(stderr,
-                "No target specified. Use --target <phone/email> or "
-                "configure channels.imessage.default_target.\n");
-        hu_app_teardown(&app_ctx);
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-
-    /* Override daemon config for E2E: disable consecutive limiter, set turn cap */
-    app_ctx.cfg->channels.imessage.daemon.max_consecutive_replies = 0;
-    app_ctx.cfg->channels.imessage.daemon.e2e_max_turns = turns;
-    app_ctx.cfg->channels.imessage.daemon.response_mode =
-        hu_strdup(&app_ctx.cfg->allocator, "eager");
-
-    printf("[e2e] iMessage agent-to-agent test\n");
-    printf("[e2e] target:  %s\n", target);
-    printf("[e2e] seed:    %.60s%s\n", seed, strlen(seed) > 60 ? "..." : "");
-    printf("[e2e] turns:   %d\n", turns);
-    printf("[e2e] Sending seed message...\n");
-
-    /* Send the seed message via the iMessage channel */
-    hu_channel_t *imsg_ch = NULL;
-    for (size_t i = 0; i < app_ctx.channel_count; i++) {
-        if (!app_ctx.channels[i].channel || !app_ctx.channels[i].channel->vtable ||
-            !app_ctx.channels[i].channel->vtable->name)
-            continue;
-        const char *name = app_ctx.channels[i].channel->vtable->name(
-            app_ctx.channels[i].channel->ctx);
-        if (name && strcmp(name, "imessage") == 0) {
-            imsg_ch = app_ctx.channels[i].channel;
-            break;
-        }
-    }
-
-    if (!imsg_ch) {
-        fprintf(stderr, "[e2e] iMessage channel not found. Is it configured?\n");
-        hu_app_teardown(&app_ctx);
-        return HU_ERR_NOT_FOUND;
-    }
-
-#ifndef HU_IS_TEST
-    err = imsg_ch->vtable->send(imsg_ch->ctx, target, strlen(target), seed, strlen(seed), NULL, 0);
-    if (err != HU_OK) {
-        fprintf(stderr, "[e2e] Failed to send seed message: %s\n", hu_error_string(err));
-        hu_app_teardown(&app_ctx);
-        return err;
-    }
-    printf("[e2e] Seed sent. Starting service loop (will stop after %d turns)...\n", turns);
-#else
-    (void)err;
-    printf("[e2e] (test mode) Seed message would be sent to %s\n", target);
-    printf("[e2e] (test mode) Service loop skipped.\n");
-    hu_app_teardown(&app_ctx);
-    return HU_OK;
-#endif
-
-    hu_conversation_data_init(alloc);
-
-    err = hu_service_run(alloc, 1000, app_ctx.channels, app_ctx.channel_count, app_ctx.agent,
-                         app_ctx.cfg);
-
-    printf("[e2e] Service loop finished (err=%s).\n", hu_error_string(err));
-    hu_app_teardown(&app_ctx);
-    return err;
 }
 
 /* ── hardware ────────────────────────────────────────────────────────────── */
@@ -364,7 +262,7 @@ hu_error_t cmd_memory(hu_allocator_t *alloc, int argc, char **argv) {
         hu_log_error("config", NULL, "Config error: %s", hu_error_string(err));
         return err;
     }
-    const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
+    const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
     hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
     if (!mem.vtable) {
         printf("Memory backend: none (not configured)\n");
@@ -463,7 +361,7 @@ done:
 hu_error_t cmd_workspace(hu_allocator_t *alloc, int argc, char **argv) {
     hu_config_t cfg;
     hu_error_t err = hu_config_load(alloc, &cfg);
-    const char *ws = (err == HU_OK && cfg.runtime_paths.workspace_dir) ? cfg.runtime_paths.workspace_dir : ".";
+    const char *ws = (err == HU_OK && cfg.workspace_dir) ? cfg.workspace_dir : ".";
 
     if (argc < 3 || strcmp(argv[2], "show") == 0) {
         printf("Current workspace: %s\n", ws);
@@ -714,7 +612,7 @@ hu_error_t cmd_sandbox(hu_allocator_t *alloc, int argc, char **argv) {
         return err;
     }
 
-    const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
+    const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
     hu_sandbox_backend_t backend = cfg.security.sandbox_config.backend;
 
     printf("Sandbox Configuration\n");
@@ -848,7 +746,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
     if (argc < 3) {
         printf("Usage: human eval "
                "<run|baseline|validate|check-regression|list|compare|dashboard|history|trend|"
-               "benchmark|turing-adversarial> [args]\n");
+               "benchmark> [args]\n");
         printf("  run <suite.json>     Load and run an eval suite, print report JSON\n");
         printf("  baseline [dir]       Run all *.json suites in dir (default: eval_suites/), print "
                "score table\n");
@@ -862,27 +760,16 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         printf("  history [--last N] [--benchmark X]  Show eval history from SQLite\n");
         printf("  trend                Compare eval scores over time (requires prior baselines)\n");
         printf("  benchmark <gaia|swebench|tooluse> <suite.json>  Load and run a benchmark\n");
-        printf("  turing-adversarial   Run adversarial Turing dimension testing\n");
         return HU_OK;
     }
     const char *sub = argv[2];
 
     if (strcmp(sub, "run") == 0) {
         if (argc < 4) {
-            fprintf(stderr, "Usage: human eval run <suite.json> [--trials N]\n");
+            fprintf(stderr, "Usage: human eval run <suite.json>\n");
             return HU_ERR_INVALID_ARGUMENT;
         }
         const char *path = argv[3];
-        size_t trial_count = 1;
-        for (int ti = 4; ti < argc - 1; ti++) {
-            if (strcmp(argv[ti], "--trials") == 0) {
-                trial_count = (size_t)atoi(argv[ti + 1]);
-                if (trial_count < 1)
-                    trial_count = 1;
-                if (trial_count > 100)
-                    trial_count = 100;
-            }
-        }
         hu_eval_suite_t suite = {0};
         hu_error_t err;
 #ifdef HU_IS_TEST
@@ -906,13 +793,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         }
 
         hu_eval_run_t run = {0};
-        hu_eval_multi_trial_result_t mt = {0};
 #ifdef HU_IS_TEST
-        if (trial_count > 1)
-            err = hu_eval_run_suite_trials(alloc, NULL, "mock", 4, &suite, HU_EVAL_CONTAINS,
-                                           trial_count, &mt, &run);
-        else
-            err = hu_eval_run_suite(alloc, NULL, "mock", 4, &suite, HU_EVAL_CONTAINS, &run);
+        err = hu_eval_run_suite(alloc, NULL, "mock", 4, &suite, HU_EVAL_CONTAINS, &run);
 #else
         {
             hu_config_t cfg;
@@ -934,12 +816,8 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 hu_log_error("eval", NULL, "provider error: %s", hu_error_string(err));
                 return err;
             }
-            if (trial_count > 1)
-                err = hu_eval_run_suite_trials(alloc, &provider, model, model_len, &suite,
-                                               HU_EVAL_CONTAINS, trial_count, &mt, &run);
-            else
-                err = hu_eval_run_suite(alloc, &provider, model, model_len, &suite,
-                                        HU_EVAL_CONTAINS, &run);
+            err = hu_eval_run_suite(alloc, &provider, model, model_len, &suite, HU_EVAL_CONTAINS,
+                                    &run);
             if (provider.vtable && provider.vtable->deinit)
                 provider.vtable->deinit(provider.ctx, alloc);
             hu_config_deinit(&cfg);
@@ -951,14 +829,6 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             return err;
         }
 
-        if (trial_count > 1) {
-            printf("{\"trials\":%u,\"mean_pass_rate\":%.4f,\"stddev\":%.4f,"
-                   "\"worst\":%.4f,\"best\":%.4f,\"mean_score\":%.4f,"
-                   "\"total_elapsed_ms\":%lld}\n",
-                   (unsigned)mt.trials_run, mt.mean_pass_rate, mt.stddev_pass_rate,
-                   mt.worst_pass_rate, mt.best_pass_rate, mt.mean_score,
-                   (long long)mt.total_elapsed_ms);
-        }
         char *report = NULL;
         size_t report_len = 0;
         err = hu_eval_report_json(alloc, &run, &report, &report_len);
@@ -971,7 +841,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
         {
             hu_config_t store_cfg;
             if (hu_config_load(alloc, &store_cfg) == HU_OK) {
-                const char *ws = store_cfg.runtime_paths.workspace_dir ? store_cfg.runtime_paths.workspace_dir : ".";
+                const char *ws = store_cfg.workspace_dir ? store_cfg.workspace_dir : ".";
                 hu_memory_t mem = hu_memory_create_from_config(alloc, &store_cfg, ws);
                 sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
                 if (db) {
@@ -1133,7 +1003,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                 {
                     hu_config_t store_cfg;
                     if (hu_config_load(alloc, &store_cfg) == HU_OK) {
-                        const char *ws = store_cfg.runtime_paths.workspace_dir ? store_cfg.runtime_paths.workspace_dir : ".";
+                        const char *ws = store_cfg.workspace_dir ? store_cfg.workspace_dir : ".";
                         hu_memory_t mem = hu_memory_create_from_config(alloc, &store_cfg, ws);
                         sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
                         if (db && hu_eval_init_tables(db) == HU_OK)
@@ -1334,7 +1204,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
                              "eval check-regression: could not load config for history DB");
                 return HU_ERR_CONFIG_NOT_FOUND;
             }
-            const char *ws = store_cfg.runtime_paths.workspace_dir ? store_cfg.runtime_paths.workspace_dir : ".";
+            const char *ws = store_cfg.workspace_dir ? store_cfg.workspace_dir : ".";
             hu_memory_t mem = hu_memory_create_from_config(alloc, &store_cfg, ws);
             sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
             if (!db || hu_eval_init_tables(db) != HU_OK) {
@@ -1667,7 +1537,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             hu_log_error("eval", NULL, "eval history: config error");
             return cfg_err;
         }
-        const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
+        const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
         hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
         sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
         if (!db) {
@@ -1730,7 +1600,7 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             hu_log_error("eval", NULL, "eval trend: config error");
             return cfg_err;
         }
-        const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
+        const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
         hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
         sqlite3 *db = mem.vtable ? hu_sqlite_memory_get_db(&mem) : NULL;
         if (!db) {
@@ -1894,148 +1764,10 @@ hu_error_t cmd_eval(hu_allocator_t *alloc, int argc, char **argv) {
             return berr;
         }
 
-        hu_eval_run_t run = {0};
-#ifdef HU_IS_TEST
-        berr = hu_eval_run_suite(alloc, NULL, "mock", 4, &bench_suite, HU_EVAL_CONTAINS, &run);
-#else
-        {
-            hu_config_t cfg;
-            hu_error_t cfg_err = hu_config_load(alloc, &cfg);
-            if (cfg_err != HU_OK) {
-                hu_eval_suite_free(alloc, &bench_suite);
-                hu_log_error("eval", NULL, "config error: %s", hu_error_string(cfg_err));
-                return cfg_err;
-            }
-            const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
-            size_t prov_len = strlen(prov);
-            const char *mdl = cfg.default_model ? cfg.default_model : "";
-            size_t mdl_len = mdl ? strlen(mdl) : 0;
-            hu_provider_t provider = {0};
-            berr = hu_provider_create_from_config(alloc, &cfg, prov, prov_len, &provider);
-            if (berr != HU_OK) {
-                hu_eval_suite_free(alloc, &bench_suite);
-                hu_config_deinit(&cfg);
-                hu_log_error("eval", NULL, "provider error: %s", hu_error_string(berr));
-                return berr;
-            }
-            berr = hu_eval_run_suite(alloc, &provider, mdl, mdl_len, &bench_suite,
-                                     HU_EVAL_CONTAINS, &run);
-            if (provider.vtable && provider.vtable->deinit)
-                provider.vtable->deinit(provider.ctx, alloc);
-            hu_config_deinit(&cfg);
-        }
-#endif
+        printf("{\"benchmark\":\"%s\",\"suite\":\"%s\",\"loaded\":true}\n",
+               hu_benchmark_type_name(bench_type), bench_suite.name ? bench_suite.name : "");
         hu_eval_suite_free(alloc, &bench_suite);
-        if (berr != HU_OK) {
-            hu_log_error("eval", NULL, "benchmark run failed: %s", hu_error_string(berr));
-            return berr;
-        }
-
-        char *report = NULL;
-        size_t report_len = 0;
-        berr = hu_eval_report_json(alloc, &run, &report, &report_len);
-        if (berr == HU_OK && report) {
-            printf("%.*s\n", (int)report_len, report);
-            alloc->free(alloc->ctx, report, report_len + 1);
-        }
-        hu_eval_run_free(alloc, &run);
         return HU_OK;
-    }
-
-    if (strcmp(sub, "turing-adversarial") == 0) {
-        int dim_avgs[HU_TURING_DIM_COUNT];
-        memset(dim_avgs, 0, sizeof(dim_avgs));
-
-        /* Parse optional --dimensions arg to override weak dims */
-        bool has_custom_dims = false;
-        for (int ai = 3; ai < argc; ai++) {
-            if (strcmp(argv[ai], "--dimensions") == 0 && ai + 1 < argc) {
-                has_custom_dims = true;
-                /* Parse comma-separated dimension values (e.g., "5,3,7,...") */
-                const char *dstr = argv[ai + 1];
-                int di = 0;
-                while (*dstr && di < HU_TURING_DIM_COUNT) {
-                    dim_avgs[di] = atoi(dstr);
-                    if (dim_avgs[di] < 1) dim_avgs[di] = 1;
-                    if (dim_avgs[di] > 10) dim_avgs[di] = 10;
-                    di++;
-                    while (*dstr && *dstr != ',') dstr++;
-                    if (*dstr == ',') dstr++;
-                }
-                break;
-            }
-        }
-
-        if (!has_custom_dims) {
-            /* Default: set all dims to 5 (borderline) so all get tested */
-            for (int di = 0; di < HU_TURING_DIM_COUNT; di++)
-                dim_avgs[di] = 5;
-        }
-
-        hu_turing_scenario_t *scenarios = NULL;
-        size_t scenario_count = 0;
-        hu_error_t gerr = hu_turing_adversarial_generate(alloc, dim_avgs,
-                                                          &scenarios, &scenario_count);
-        if (gerr != HU_OK) {
-            hu_log_error("eval", NULL, "adversarial generate failed: %s", hu_error_string(gerr));
-            return gerr;
-        }
-
-        printf("Adversarial Turing Scenarios (%zu targeting weak dimensions):\n\n",
-               scenario_count);
-        for (size_t si = 0; si < scenario_count; si++) {
-            printf("  [%s] %s\n", hu_turing_dimension_name(scenarios[si].target_dim),
-                   scenarios[si].prompt);
-            printf("    Intent: %s\n\n", scenarios[si].adversarial_intent);
-        }
-
-        /* Score sample AI-typical responses with heuristic scorer */
-        printf("Heuristic scoring of AI-typical responses:\n\n");
-        static const char *AI_TYPICAL[] = {
-            "I'd be happy to help you with that! Here are some options:\n"
-            "1. First option\n2. Second option\n3. Third option\n"
-            "Feel free to let me know if you need anything else!",
-            "That's a great question! I appreciate you asking. "
-            "I understand your concern, and I think the answer depends "
-            "on several factors. Let me break it down for you:",
-        };
-        for (size_t ti = 0; ti < sizeof(AI_TYPICAL) / sizeof(AI_TYPICAL[0]); ti++) {
-            hu_turing_score_t tscore;
-            hu_turing_score_heuristic(AI_TYPICAL[ti], strlen(AI_TYPICAL[ti]), NULL, 0, &tscore);
-            size_t summ_len = 0;
-            char *summ = hu_turing_score_summary(alloc, &tscore, &summ_len);
-            if (summ) {
-                printf("  Response %zu: %s\n", ti + 1, summ);
-                alloc->free(alloc->ctx, summ, summ_len + 1);
-            }
-            /* Generate mutation */
-            char *mut = NULL;
-            size_t mut_len = 0;
-            if (hu_turing_adversarial_to_mutation(alloc, &tscore, &mut, &mut_len) == HU_OK && mut) {
-                printf("  Mutation: %s\n\n", mut);
-                alloc->free(alloc->ctx, mut, mut_len + 1);
-            }
-        }
-
-        /* Run self-improve cycle */
-        hu_self_improve_state_t si_state;
-        hu_self_improve_config_t si_cfg = HU_SELF_IMPROVE_DEFAULTS;
-        hu_self_improve_init(&si_state, &si_cfg);
-        hu_fidelity_score_t baseline = {
-            .personality_consistency = 0.5f, .vulnerability_willingness = 0.5f,
-            .humor_naturalness = 0.5f, .opinion_having = 0.5f,
-            .energy_matching = 0.5f, .genuine_warmth = 0.5f,
-        };
-        baseline.composite = hu_fidelity_composite(&baseline);
-        hu_self_improve_set_baseline(&si_state, &baseline);
-
-        size_t mutations_applied = 0;
-        gerr = hu_turing_adversarial_run_cycle(alloc, &si_state, dim_avgs, &mutations_applied);
-        printf("Self-improve cycle: %zu mutations applied (budget: %u/%u)\n",
-               mutations_applied, si_state.experiments_run, si_state.config.max_experiments);
-
-        alloc->free(alloc->ctx, scenarios, scenario_count * sizeof(hu_turing_scenario_t));
-        return gerr;
     }
 
     fprintf(stderr, "Unknown eval subcommand: %s\n", sub);
@@ -2161,7 +1893,7 @@ hu_error_t cmd_feed(hu_allocator_t *alloc, int argc, char **argv) {
         hu_log_error("config", NULL, "Config error: %s", hu_error_string(err));
         return err;
     }
-    const char *ws = cfg.runtime_paths.workspace_dir ? cfg.runtime_paths.workspace_dir : ".";
+    const char *ws = cfg.workspace_dir ? cfg.workspace_dir : ".";
     hu_memory_t mem = hu_memory_create_from_config(alloc, &cfg, ws);
     if (!mem.vtable) {
         hu_log_error("feed", NULL, "no memory backend configured");
@@ -2650,7 +2382,7 @@ static hu_error_t hula_cli_run_program_json(hu_allocator_t *alloc, const char *j
             return err;
         }
         have_cfg = true;
-        const char *ws = (cfg.runtime_paths.workspace_dir && cfg.runtime_paths.workspace_dir[0]) ? cfg.runtime_paths.workspace_dir : ".";
+        const char *ws = (cfg.workspace_dir && cfg.workspace_dir[0]) ? cfg.workspace_dir : ".";
         uint32_t pool_n = cfg.agent.pool_max_concurrent ? cfg.agent.pool_max_concurrent : 8u;
         agent_pool = hu_agent_pool_create(alloc, pool_n);
         if (!agent_pool) {

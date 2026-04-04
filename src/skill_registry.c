@@ -6,7 +6,12 @@
 #include "human/core/http.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/crypto.h"
+#include "human/update.h"
+#include <ctype.h>
 #include <errno.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +34,8 @@ static void entry_free(hu_allocator_t *a, hu_skill_registry_entry_t *e) {
         a->free(a->ctx, e->author, strlen(e->author) + 1);
     if (e->url)
         a->free(a->ctx, e->url, strlen(e->url) + 1);
+    if (e->sha256)
+        a->free(a->ctx, e->sha256, strlen(e->sha256) + 1);
     if (e->tags)
         a->free(a->ctx, e->tags, strlen(e->tags) + 1);
     memset(e, 0, sizeof(*e));
@@ -66,8 +73,10 @@ void hu_skill_registry_resolve_tags_string(hu_json_value_t *tags_val, char *tags
 
 #ifdef HU_IS_TEST
 /* Mock implementations — no network, no filesystem */
-hu_error_t hu_skill_registry_search(hu_allocator_t *alloc, const char *query,
-                                    hu_skill_registry_entry_t **out_entries, size_t *out_count) {
+hu_error_t hu_skill_registry_search(hu_allocator_t *alloc, const char *registry_url,
+                                    const char *query, hu_skill_registry_entry_t **out_entries,
+                                    size_t *out_count) {
+    (void)registry_url;
     (void)query;
     if (!alloc || !out_entries || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
@@ -118,7 +127,25 @@ hu_error_t hu_skill_registry_install(hu_allocator_t *alloc, const char *source_p
     return HU_OK;
 }
 
-hu_error_t hu_skill_registry_install_by_name(hu_allocator_t *alloc, const char *name) {
+hu_error_t hu_skill_registry_install_by_name(hu_allocator_t *alloc, const char *registry_url,
+                                             const char *name) {
+    (void)registry_url;
+    if (!alloc || !name || !name[0])
+        return HU_ERR_INVALID_ARGUMENT;
+    return HU_OK;
+}
+
+hu_error_t hu_skill_registry_verify(hu_allocator_t *alloc, const char *registry_url,
+                                    const char *name) {
+    (void)registry_url;
+    if (!alloc || !name || !name[0])
+        return HU_ERR_INVALID_ARGUMENT;
+    return HU_OK;
+}
+
+hu_error_t hu_skill_registry_upgrade(hu_allocator_t *alloc, const char *registry_url,
+                                     const char *name) {
+    (void)registry_url;
     if (!alloc || !name || !name[0])
         return HU_ERR_INVALID_ARGUMENT;
     return HU_OK;

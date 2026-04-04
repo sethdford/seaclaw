@@ -596,13 +596,6 @@ static void test_onboard_run_returns_ok_in_test_mode(void) {
     HU_ASSERT_EQ(err, HU_OK);
 }
 
-static void test_onboard_run_with_opts_returns_ok_in_test_mode(void) {
-    hu_allocator_t alloc = hu_system_allocator();
-    hu_onboard_opts_t ob = {.non_interactive = true, .start_gateway = true};
-    hu_error_t err = hu_onboard_run_with_opts(&alloc, &ob);
-    HU_ASSERT_EQ(err, HU_OK);
-}
-
 static void test_onboard_check_first_run_invoked(void) {
     bool r = hu_onboard_check_first_run();
     (void)r; /* Result depends on env; we verify it doesn't crash */
@@ -1754,7 +1747,6 @@ void run_new_modules_tests(void) {
 
     /* Onboard */
     HU_RUN_TEST(test_onboard_run_returns_ok_in_test_mode);
-    HU_RUN_TEST(test_onboard_run_with_opts_returns_ok_in_test_mode);
     HU_RUN_TEST(test_onboard_check_first_run_invoked);
     HU_RUN_TEST(test_onboard_run_with_null_alloc);
 

@@ -28,19 +28,9 @@ typedef struct hu_voice_rt_event {
     char type[64]; /* event type: "response.audio.delta", "response.audio.done", etc. */
     char *audio_base64; /* base64-encoded audio delta (caller frees via hu_voice_rt_event_free) */
     size_t audio_base64_len;
-    char *transcript; /* text transcript or tool function name (caller frees) */
+    char *transcript; /* text transcript (caller frees) */
     size_t transcript_len;
-    char *tool_call_id; /* function call ID for sending responses back (caller frees) */
-    size_t tool_call_id_len;
-    char *tool_args_json; /* stringified function call arguments JSON (caller frees) */
-    size_t tool_args_json_len;
-    bool done; /* true if this is an end-of-response event (turnComplete) */
-    bool interrupted; /* model response was interrupted by barge-in */
-    bool generation_complete; /* model finished generating (may still be playing back) */
-    bool error; /* server-side error event */
-    bool vad_speech_started; /* OpenAI: user speech detected */
-    bool vad_speech_stopped; /* OpenAI: user speech ended */
-    int go_away_ms; /* >0: server will disconnect in this many ms (goAway) */
+    bool done; /* true if this is an end-of-response event */
 } hu_voice_rt_event_t;
 
 hu_error_t hu_voice_rt_session_create(hu_allocator_t *alloc, const hu_voice_rt_config_t *config,

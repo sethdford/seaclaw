@@ -206,9 +206,8 @@ static void imessage_vtable_has_all_expected_hooks(void) {
     HU_ASSERT_NOT_NULL(ch.vtable->get_latest_attachment_path);
     HU_ASSERT_NOT_NULL(ch.vtable->build_reaction_context);
     HU_ASSERT_NOT_NULL(ch.vtable->build_read_receipt_context);
-    HU_ASSERT_NOT_NULL(ch.vtable->send_event);
-    HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
-    HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
+    HU_ASSERT_NULL(ch.vtable->start_typing);
+    HU_ASSERT_NULL(ch.vtable->stop_typing);
     hu_imessage_destroy(&ch);
 }
 
@@ -305,28 +304,6 @@ static void imessage_start_stop_idempotent(void) {
     ch.vtable->stop(ch.ctx);
     hu_imessage_destroy(&ch);
 }
-
-static void imessage_stop_then_poll_yields_zero(void) {
-    hu_allocator_t alloc = hu_system_allocator();
-    hu_channel_t ch;
-    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
-    ch.vtable->stop(ch.ctx);
-    hu_channel_loop_msg_t msgs[4];
-    size_t count = 99;
-    HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
-    HU_ASSERT_EQ(count, 0u);
-    hu_imessage_destroy(&ch);
-}
-
-static void imessage_send_after_stop_returns_not_supported(void) {
-    hu_allocator_t alloc = hu_system_allocator();
-    hu_channel_t ch;
-    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
-    ch.vtable->stop(ch.ctx);
-    hu_error_t err = ch.vtable->send(ch.ctx, "+15551234567", 12, "hello", 5, NULL, 0);
-    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
-    hu_imessage_destroy(&ch);
-}
 #endif /* HU_IS_TEST */
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -387,7 +364,6 @@ static void imessage_tapback_mapping_all_types(void) {
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_HAHA), "laugh");
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_EMPHASIS), "emphasize");
     HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_QUESTION), "question");
-    HU_ASSERT_STR_EQ(hu_imessage_reaction_to_tapback_name(HU_REACTION_CUSTOM_EMOJI), "emoji");
     HU_ASSERT_NULL(hu_imessage_reaction_to_tapback_name((hu_reaction_type_t)99));
 }
 
@@ -890,8 +866,6 @@ void run_imessage_adversarial_tests(void) {
     HU_RUN_TEST(imessage_fetch_gif_stub_returns_null);
     HU_RUN_TEST(imessage_lookup_guid_not_supported_under_test);
     HU_RUN_TEST(imessage_start_stop_idempotent);
-    HU_RUN_TEST(imessage_stop_then_poll_yields_zero);
-    HU_RUN_TEST(imessage_send_after_stop_returns_not_supported);
 #endif
 
     /* Part 3: AppleScript escaping */

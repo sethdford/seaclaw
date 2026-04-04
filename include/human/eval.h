@@ -81,24 +81,6 @@ hu_error_t hu_eval_suites_validate_dir(hu_allocator_t *alloc, const char *dir, F
 hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, const char *model,
                              size_t model_len, hu_eval_suite_t *suite, hu_eval_match_mode_t mode,
                              hu_eval_run_t *out);
-
-typedef struct hu_eval_multi_trial_result {
-    double mean_pass_rate;
-    double stddev_pass_rate;
-    double mean_score;     /* mean of per-task scores across trials */
-    double worst_pass_rate;
-    double best_pass_rate;
-    uint32_t trials_run;
-    int64_t total_elapsed_ms;
-    int total_tokens;
-} hu_eval_multi_trial_result_t;
-
-/** Run a suite `trials` times, reporting mean/stddev/worst pass rate.
- *  `best_run` receives the single best trial result (caller frees). */
-hu_error_t hu_eval_run_suite_trials(hu_allocator_t *alloc, hu_provider_t *provider,
-                                    const char *model, size_t model_len, hu_eval_suite_t *suite,
-                                    hu_eval_match_mode_t mode, uint32_t trials,
-                                    hu_eval_multi_trial_result_t *out, hu_eval_run_t *best_run);
 hu_error_t hu_eval_check(hu_allocator_t *alloc, const char *actual, size_t actual_len,
                          const char *expected, size_t expected_len, hu_eval_match_mode_t mode,
                          bool *passed);

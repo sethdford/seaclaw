@@ -70,34 +70,16 @@ hu_error_t hu_audio_mp3_to_caf(hu_allocator_t *alloc, const unsigned char *mp3_b
         return HU_ERR_IO;
     }
 
-    /* 4. Encode to Opus-in-CAF via ffmpeg for native iMessage voice bubble.
-     * iMessage renders native waveform UI for Opus-in-CAF @ 24kHz.
-     * Falls back to afconvert AAC, then raw MP3. */
-    bool ok = false;
-
-    /* Try ffmpeg → Opus-in-CAF (native voice bubble format) */
-    {
-        const char *argv[] = {"ffmpeg",  "-y",     "-i",      mp3_path,
-                              "-c:a",    "libopus", "-ar",    "24000",
-                              "-ac",     "1",       "-b:a",   "24000",
-                              "-f",      "caf",     caf_path, NULL};
-        hu_run_result_t result = {0};
-        hu_error_t run_err = hu_process_run(alloc, argv, NULL, 4096, &result);
-        ok = (run_err == HU_OK && result.success);
-        hu_run_result_free(alloc, &result);
-    }
-
-    /* Fallback: afconvert → AAC-in-CAF (plays but no waveform UI) */
-    if (!ok) {
-        const char *argv[] = {"afconvert", "-f",     "caff", "-d",     "aac", "-b",
-                              "128000",    mp3_path, "-o",   caf_path, NULL};
-        hu_run_result_t result = {0};
-        hu_error_t run_err = hu_process_run(alloc, argv, NULL, 4096, &result);
-        ok = (run_err == HU_OK && result.success);
-        hu_run_result_free(alloc, &result);
-    }
+    /* 4. Run afconvert: -f caff -d aac -b 128000 input.mp3 -o output.caf */
+    const char *argv[] = {"afconvert", "-f",     "caff", "-d",     "aac", "-b",
+                          "128000",    mp3_path, "-o",   caf_path, NULL};
+    hu_run_result_t result = {0};
+    hu_error_t run_err = hu_process_run(alloc, argv, NULL, 4096, &result);
+    bool ok = (run_err == HU_OK && result.success);
+    hu_run_result_free(alloc, &result);
 
     if (ok) {
+        /* 5. Success: copy caf_path to out, unlink mp3 */
         unlink(mp3_path);
         int n_out = snprintf(out_audio_path, out_path_cap, "%s", caf_path);
         if (n_out < 0 || (size_t)n_out >= out_path_cap)
@@ -105,7 +87,7 @@ hu_error_t hu_audio_mp3_to_caf(hu_allocator_t *alloc, const unsigned char *mp3_b
         return HU_OK;
     }
 
-    /* Last resort: send MP3 directly (iMessage accepts it as attachment) */
+    /* 6. Fallback: copy mp3_path to out (iMessage accepts MP3 too) */
     unlink(caf_path);
     int n_out = snprintf(out_audio_path, out_path_cap, "%s", mp3_path);
     if (n_out < 0 || (size_t)n_out >= out_path_cap)

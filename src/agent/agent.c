@@ -95,55 +95,6 @@ hu_agent_t *hu_agent_get_current_for_tools(void) {
     return hu__current_agent_for_tools;
 }
 
-/* Pending voice message state — set by send_voice_message tool */
-static _Thread_local bool hu__pending_voice_requested;
-static _Thread_local char hu__pending_voice_emotion[32];
-static _Thread_local char hu__pending_voice_transcript[4096];
-static _Thread_local size_t hu__pending_voice_transcript_len;
-
-void hu_agent_request_voice_send(const char *emotion, const char *transcript,
-                                 size_t transcript_len) {
-    hu__pending_voice_requested = true;
-    hu__pending_voice_emotion[0] = '\0';
-    if (emotion && emotion[0]) {
-        size_t elen = strlen(emotion);
-        if (elen >= sizeof(hu__pending_voice_emotion))
-            elen = sizeof(hu__pending_voice_emotion) - 1;
-        memcpy(hu__pending_voice_emotion, emotion, elen);
-        hu__pending_voice_emotion[elen] = '\0';
-    }
-    hu__pending_voice_transcript[0] = '\0';
-    hu__pending_voice_transcript_len = 0;
-    if (transcript && transcript_len > 0) {
-        if (transcript_len >= sizeof(hu__pending_voice_transcript))
-            transcript_len = sizeof(hu__pending_voice_transcript) - 1;
-        memcpy(hu__pending_voice_transcript, transcript, transcript_len);
-        hu__pending_voice_transcript[transcript_len] = '\0';
-        hu__pending_voice_transcript_len = transcript_len;
-    }
-}
-
-bool hu_agent_has_pending_voice(void) {
-    return hu__pending_voice_requested;
-}
-
-const char *hu_agent_pending_voice_emotion(void) {
-    return hu__pending_voice_emotion[0] ? hu__pending_voice_emotion : NULL;
-}
-
-const char *hu_agent_pending_voice_transcript(size_t *out_len) {
-    if (out_len)
-        *out_len = hu__pending_voice_transcript_len;
-    return hu__pending_voice_transcript_len > 0 ? hu__pending_voice_transcript : NULL;
-}
-
-void hu_agent_clear_pending_voice(void) {
-    hu__pending_voice_requested = false;
-    hu__pending_voice_emotion[0] = '\0';
-    hu__pending_voice_transcript[0] = '\0';
-    hu__pending_voice_transcript_len = 0;
-}
-
 void hu_agent_internal_record_cost(hu_agent_t *agent, const hu_token_usage_t *usage) {
     if (!agent || !usage)
         return;
@@ -836,14 +787,6 @@ void hu_agent_deinit(hu_agent_t *agent) {
                            sizeof(hu_speculative_cache_t));
         agent->speculative_cache = NULL;
     }
-    for (size_t gm = 0; gm < agent->generated_media_count && gm < 4; gm++) {
-        if (agent->generated_media[gm]) {
-            agent->alloc->free(agent->alloc->ctx, agent->generated_media[gm],
-                               strlen(agent->generated_media[gm]) + 1);
-            agent->generated_media[gm] = NULL;
-        }
-    }
-    agent->generated_media_count = 0;
     if (agent->instruction_discovery) {
         hu_instruction_discovery_destroy(agent->alloc, agent->instruction_discovery);
         agent->instruction_discovery = NULL;
@@ -1123,19 +1066,6 @@ hu_policy_action_t hu_agent_internal_evaluate_tool_policy(hu_agent_t *agent, con
 }
 
 hu_tool_t *hu_agent_internal_find_tool(hu_agent_t *agent, const char *name, size_t name_len) {
-    if (agent->cron_tool_allowlist && agent->cron_tool_allowlist_count > 0) {
-        bool allowed = false;
-        for (size_t j = 0; j < agent->cron_tool_allowlist_count; j++) {
-            if (agent->cron_tool_allowlist[j] &&
-                strlen(agent->cron_tool_allowlist[j]) == name_len &&
-                memcmp(agent->cron_tool_allowlist[j], name, name_len) == 0) {
-                allowed = true;
-                break;
-            }
-        }
-        if (!allowed)
-            return NULL;
-    }
     for (size_t i = 0; i < agent->tools_count; i++) {
         const char *n = agent->tools[i].vtable->name(agent->tools[i].ctx);
         if (n && name_len == strlen(n) && memcmp(n, name, name_len) == 0) {
@@ -1327,8 +1257,6 @@ hu_error_t hu_agent_reload_config(hu_agent_t *agent, char **summary_out, size_t 
                 hu_hook_event_t ev = HU_HOOK_PRE_TOOL_EXECUTE;
                 if (strcmp(hce->event, "post_tool_execute") == 0)
                     ev = HU_HOOK_POST_TOOL_EXECUTE;
-                else if (strcmp(hce->event, "before_reply") == 0)
-                    ev = HU_HOOK_BEFORE_REPLY;
                 hu_hook_entry_t he = {0};
                 he.name = hce->name;
                 he.name_len = hce->name ? strlen(hce->name) : 0;

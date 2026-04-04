@@ -8,9 +8,6 @@ int hu__suite_active = 1;
 const char *hu__suite_filter = NULL;
 const char *hu__test_filter = NULL;
 jmp_buf hu__jmp;
-int hu__shard_current = 0;
-int hu__shard_total = 0;
-int hu__shard_counter = 0;
 
 void run_allocator_tests(void);
 void run_data_loader_tests(void);
@@ -66,8 +63,6 @@ void run_multimodal_video_tests(void);
 void run_voice_duplex_tests(void);
 void run_turn_signal_tests(void);
 void run_voice_rt_openai_tests(void);
-void run_voice_provider_tests(void);
-void run_gemini_live_tests(void);
 void run_voice_session_tests(void);
 void run_autonomy_tests(void);
 void run_retrieval_tests(void);
@@ -99,11 +94,7 @@ void run_voice_maturity_tests(void);
 void run_style_learner_tests(void);
 void run_temporal_tests(void);
 void run_inner_world_tests(void);
-void run_humor_fw_tests(void);
-void run_markdown_loader_tests(void);
 #endif
-void hu_test_permission(void);
-void test_session_persist(void);
 void run_lifecycle_tests(void);
 void run_observer_tests(void);
 void run_session_tests(void);
@@ -141,12 +132,8 @@ void run_cron_tests(void);
 void run_cron_session_tools_tests(void);
 void run_subagent_tests(void);
 void run_task_manager_tests(void);
-void run_task_store_tests(void);
 void run_task_tools_tests(void);
 void run_tool_ask_user_tests(void);
-void run_canvas_tool_tests(void);
-void run_canvas_e2e_tests(void);
-void run_sota_e2e_tests(void);
 void run_mcp_tests(void);
 void run_mcp_jsonrpc_tests(void);
 void run_mcp_manager_tests(void);
@@ -166,13 +153,13 @@ void run_channel_loop_tests(void);
 void run_util_modules_tests(void);
 void run_roadmap_tests(void);
 void run_new_features_tests(void);
+void run_oauth_tests(void);
 void run_ollama_integration_tests(void);
 void run_plugin_tests(void);
 void run_tenant_tests(void);
 void run_gmail_tests(void);
 void run_imessage_extended_tests(void);
 void run_imessage_adversarial_tests(void);
-void run_imessage_chatdb_fixture_tests(void);
 void run_intelligence_tests(void);
 void run_protective_tests(void);
 void run_humor_tests(void);
@@ -253,7 +240,6 @@ void run_mood_tests(void);
 void run_style_tracker_tests(void);
 void run_theory_of_mind_tests(void);
 void run_anticipatory_tests(void);
-void run_anticipatory_state_tests(void);
 void run_context_engine_tests(void);
 void run_exec_env_tests(void);
 int run_channel_monitor_tests(void);
@@ -321,15 +307,9 @@ void run_pwa_tests(void);
 #ifdef HU_ENABLE_CURL
 void run_paperclip_tests(void);
 #endif
-#ifdef HU_ENABLE_MEDIA_GEN
-void run_media_gen_tests(void);
-#endif
 void run_cartesia_tests(void);
 void run_cartesia_stream_tests(void);
 void register_voice_clone_tests(void);
-void run_send_voice_message_tests(void);
-void run_voice_message_integration_tests(void);
-void run_transcript_prep_tests(void);
 #ifdef HU_ENABLE_CARTESIA
 void run_audio_pipeline_tests(void);
 void run_voice_decision_tests(void);
@@ -385,7 +365,6 @@ void run_moderation_tests(void);
 void run_companion_safety_tests(void);
 void run_code_sandbox_tests(void);
 void run_computer_use_tests(void);
-void run_vision_ocr_tests(void);
 void run_image_gen_tests(void);
 void run_visual_grounding_tests(void);
 void run_browser_use_tests(void);
@@ -429,24 +408,16 @@ void run_daemon_lifecycle_tests(void);
 void run_daemon_routing_tests(void);
 void run_daemon_proactive_tests(void);
 void run_daemon_trust_tests(void);
-void run_hallucination_guard_tests(void);
-void run_consistency_tests(void);
-void run_sycophancy_guard_tests(void);
-void run_trust_calibration_tests(void);
-void run_fact_extract_tests(void);
-void run_self_improve_tests(void);
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n", prog);
     printf("  --suite=<name>   Run only suites whose name contains <name>\n");
     printf("  --filter=<name>  Run only tests whose function name contains <name>\n");
-    printf("  --shard=N/M      Run shard N of M (1-based, for CI parallelism)\n");
     printf("  --help           Show this help message\n");
     printf("\nExamples:\n");
     printf("  %s --suite=config          # run config-related suites\n", prog);
     printf("  %s --filter=json_parse     # run tests matching 'json_parse'\n", prog);
     printf("  %s --suite=security --filter=vault  # combine both\n", prog);
-    printf("  %s --shard=1/4             # run first quarter of suites\n", prog);
 }
 
 int main(int argc, char **argv) {
@@ -455,13 +426,6 @@ int main(int argc, char **argv) {
             hu__suite_filter = argv[i] + 8;
         } else if (strncmp(argv[i], "--filter=", 9) == 0) {
             hu__test_filter = argv[i] + 9;
-        } else if (strncmp(argv[i], "--shard=", 8) == 0) {
-            if (sscanf(argv[i] + 8, "%d/%d", &hu__shard_current, &hu__shard_total) != 2 ||
-                hu__shard_current < 1 || hu__shard_total < 1 ||
-                hu__shard_current > hu__shard_total) {
-                fprintf(stderr, "Invalid --shard format. Use --shard=N/M (1-based)\n");
-                return 1;
-            }
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
             return 0;
@@ -475,8 +439,6 @@ int main(int argc, char **argv) {
         printf("Suite filter: %s\n", hu__suite_filter);
     if (hu__test_filter)
         printf("Test filter:  %s\n", hu__test_filter);
-    if (hu__shard_total > 0)
-        printf("Shard:        %d/%d\n", hu__shard_current, hu__shard_total);
 
     run_allocator_tests();
     run_data_loader_tests();
@@ -537,8 +499,6 @@ int main(int argc, char **argv) {
     run_voice_duplex_tests();
     run_turn_signal_tests();
     run_voice_rt_openai_tests();
-    run_voice_provider_tests();
-    run_gemini_live_tests();
     run_voice_session_tests();
     run_autonomy_tests();
     run_retrieval_tests();
@@ -572,11 +532,7 @@ int main(int argc, char **argv) {
     run_style_learner_tests();
     run_temporal_tests();
     run_inner_world_tests();
-    run_humor_fw_tests();
-    run_markdown_loader_tests();
 #endif
-    hu_test_permission();
-    test_session_persist();
     run_lifecycle_tests();
     run_observer_tests();
     run_session_tests();
@@ -630,13 +586,13 @@ int main(int argc, char **argv) {
     run_util_modules_tests();
     run_roadmap_tests();
     run_new_features_tests();
+    run_oauth_tests();
     run_ollama_integration_tests();
     run_plugin_tests();
     run_tenant_tests();
     run_gmail_tests();
     run_imessage_extended_tests();
     run_imessage_adversarial_tests();
-    run_imessage_chatdb_fixture_tests();
     run_intelligence_tests();
     run_protective_tests();
     run_humor_tests();
@@ -719,7 +675,6 @@ int main(int argc, char **argv) {
     run_style_tracker_tests();
     run_theory_of_mind_tests();
     run_anticipatory_tests();
-    run_anticipatory_state_tests();
     run_context_engine_tests();
     run_exec_env_tests();
     run_channel_monitor_tests();
@@ -779,15 +734,9 @@ int main(int argc, char **argv) {
 #ifdef HU_ENABLE_CURL
     run_paperclip_tests();
 #endif
-#ifdef HU_ENABLE_MEDIA_GEN
-    run_media_gen_tests();
-#endif
     run_cartesia_tests();
     run_cartesia_stream_tests();
     register_voice_clone_tests();
-    run_send_voice_message_tests();
-    run_voice_message_integration_tests();
-    run_transcript_prep_tests();
 #ifdef HU_ENABLE_CARTESIA
     run_audio_pipeline_tests();
     run_voice_decision_tests();
@@ -842,7 +791,6 @@ int main(int argc, char **argv) {
     run_companion_safety_tests();
     run_code_sandbox_tests();
     run_computer_use_tests();
-    run_vision_ocr_tests();
     run_image_gen_tests();
     run_visual_grounding_tests();
     run_browser_use_tests();
@@ -882,12 +830,8 @@ int main(int argc, char **argv) {
     run_config_reload_tests();
     run_plugin_hooks_tests();
     run_task_manager_tests();
-    run_task_store_tests();
     run_task_tools_tests();
     run_tool_ask_user_tests();
-    run_canvas_tool_tests();
-    run_canvas_e2e_tests();
-    run_sota_e2e_tests();
     run_approval_gate_tests();
     run_workflow_commands_tests();
     run_repair_tests();
@@ -896,12 +840,6 @@ int main(int argc, char **argv) {
     run_daemon_routing_tests();
     run_daemon_proactive_tests();
     run_daemon_trust_tests();
-    run_hallucination_guard_tests();
-    run_consistency_tests();
-    run_sycophancy_guard_tests();
-    run_trust_calibration_tests();
-    run_fact_extract_tests();
-    run_self_improve_tests();
 
     HU_TEST_REPORT();
     HU_TEST_EXIT();

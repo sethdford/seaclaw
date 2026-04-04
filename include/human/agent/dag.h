@@ -26,8 +26,6 @@ typedef struct hu_dag_node {
     hu_dag_node_status_t status;
     char *result;
     size_t result_len;
-    char *media_path;
-    size_t media_path_len;
 } hu_dag_node_t;
 
 typedef struct hu_dag {

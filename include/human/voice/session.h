@@ -6,6 +6,7 @@
 #include "human/core/error.h"
 #include "human/voice/duplex.h"
 #include "human/voice/provider.h"
+#include "human/voice/realtime.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -14,10 +15,11 @@
 #define HU_VOICE_TARGET_ROUND_TRIP_MS 500
 #define HU_VOICE_TARGET_INTERRUPT_MS  100
 
-/** Unified duplex FSM + vtable-based voice provider. */
+/** Unified duplex FSM + optional OpenAI Realtime WebSocket session. */
 typedef struct hu_voice_session {
     hu_duplex_session_t duplex;
-    hu_voice_provider_t provider; /* vtable-based voice backend */
+    hu_voice_rt_session_t *rt;       /* legacy direct pointer (NULL when using provider) */
+    hu_voice_provider_t provider;    /* vtable-based voice backend (preferred) */
     hu_turn_action_t last_action;
     bool active;
     int64_t started_at;
@@ -41,7 +43,6 @@ typedef struct hu_voice_session {
     bool latency_first_byte_pending;
     int64_t latency_interrupt_mark_ms;
     bool latency_await_interrupt_silence;
-    bool gl_vad_active; /* manual VAD activity window open for Gemini Live */
 } hu_voice_session_t;
 
 hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *session,

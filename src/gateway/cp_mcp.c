@@ -10,8 +10,6 @@ hu_error_t cp_mcp_resources_list(hu_allocator_t *alloc, hu_app_context_t *app, h
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
     if (!app || !app->mcp_resources) {
         static const char empty[] = "{\"resources\":[],\"templates\":[]}";
         *out_len = sizeof(empty) - 1;
@@ -30,8 +28,6 @@ hu_error_t cp_mcp_prompts_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
     if (!app || !app->mcp_prompts) {
         static const char empty[] = "{\"prompts\":[]}";
         *out_len = sizeof(empty) - 1;

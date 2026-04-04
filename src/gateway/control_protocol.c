@@ -77,7 +77,6 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"voice.audio.end", cp_voice_audio_end},
     {"voice.config", cp_voice_config},
     {"voice.clone", cp_voice_clone},
-    {"voice.tool_response", cp_voice_tool_response},
     {"usage.summary", cp_admin_usage_summary},
     {"metrics.snapshot", cp_admin_metrics_snapshot},
     {"activity.recent", cp_admin_activity_recent},
@@ -93,9 +92,6 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"hula.traces.get", cp_hula_traces_get},
     {"hula.traces.delete", cp_hula_traces_delete},
     {"hula.traces.analytics", cp_hula_traces_analytics},
-    {"tasks.list", cp_tasks_list},
-    {"tasks.get", cp_tasks_get},
-    {"tasks.cancel", cp_tasks_cancel},
 #ifdef HU_HAS_PUSH
     {"push.register", cp_admin_push_register},
     {"push.unregister", cp_admin_push_unregister},
@@ -111,11 +107,6 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"sota.metrics", cp_admin_metrics_snapshot},
     {"mcp.resources.list", cp_mcp_resources_list},
     {"mcp.prompts.list", cp_mcp_prompts_list},
-    {"canvas.list", cp_canvas_list},
-    {"canvas.get", cp_canvas_get},
-    {"canvas.edit", cp_canvas_edit},
-    {"canvas.undo", cp_canvas_undo},
-    {"canvas.redo", cp_canvas_redo},
     {NULL, NULL},
 };
 
@@ -310,13 +301,12 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
     }
 
     if (payload) {
-        size_t id_len = strlen(id);
-        size_t res_cap = 256 + id_len * 2 + payload_len;
+        size_t res_cap = 256 + payload_len;
         char *res_buf = (char *)proto->alloc->alloc(proto->alloc->ctx, res_cap);
         if (res_buf) {
             size_t pos = 0;
-            int n = snprintf(res_buf, res_cap, "{\"type\":\"res\",\"id\":\"");
-            pos += (n > 0 && (size_t)n < res_cap) ? (size_t)n : 0;
+            pos += (size_t)snprintf(res_buf, res_cap, "{\"type\":\"res\",\"id\":\"");
+            size_t id_len = strlen(id);
             size_t esc_len = id_len * 2 + 16;
             char *id_esc = (char *)proto->alloc->alloc(proto->alloc->ctx, esc_len);
             if (id_esc) {
@@ -331,9 +321,7 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
                     }
                 }
                 id_esc[j] = '\0';
-                n = snprintf(res_buf + pos, res_cap - pos, "%s\"", id_esc);
-                if (n > 0 && (size_t)n < res_cap - pos)
-                    pos += (size_t)n;
+                pos += (size_t)snprintf(res_buf + pos, res_cap - pos, "%s\"", id_esc);
                 proto->alloc->free(proto->alloc->ctx, id_esc, esc_len);
             } else {
                 for (size_t i = 0; i < id_len && pos + 4 < res_cap; i++) {
@@ -345,12 +333,9 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
                 if (pos < res_cap)
                     res_buf[pos++] = '"';
             }
-            n = snprintf(res_buf + pos, res_cap - pos, ",\"ok\":%s,\"payload\":",
-                         ok ? "true" : "false");
-            if (n > 0 && (size_t)n < res_cap - pos)
-                pos += (size_t)n;
-            if (pos + payload_len < res_cap)
-                memcpy(res_buf + pos, payload, payload_len);
+            pos += (size_t)snprintf(res_buf + pos, res_cap - pos,
+                                    ",\"ok\":%s,\"payload\":", ok ? "true" : "false");
+            memcpy(res_buf + pos, payload, payload_len);
             pos += payload_len;
             res_buf[pos++] = '}';
             res_buf[pos] = '\0';

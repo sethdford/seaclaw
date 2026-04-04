@@ -22,8 +22,7 @@ static void default_hula_trace_dir(char *buf, size_t cap) {
     (void)snprintf(buf, cap, "%s/.human/hula_traces", h);
 }
 
-/* Prefer HU_HULA_TRACE_DIR (same as CLI `human hula run`) so dashboard lists match persist
- * location. */
+/* Prefer HU_HULA_TRACE_DIR (same as CLI `human hula run`) so dashboard lists match persist location. */
 static void resolve_hula_trace_dir(char *buf, size_t cap) {
     if (!buf || cap == 0)
         return;
@@ -143,7 +142,9 @@ hu_error_t cp_hula_traces_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_
     if (!d) {
         hu_json_object_set(alloc, obj, "traces", arr);
         hu_json_object_set(alloc, obj, "directory", hu_json_string_new(alloc, dir, strlen(dir)));
-        return cp_respond_json(alloc, obj, out, out_len);
+        hu_error_t er = hu_json_stringify(alloc, obj, out, out_len);
+        hu_json_free(alloc, obj);
+        return er;
     }
 
     struct dirent *de;
@@ -171,7 +172,9 @@ hu_error_t cp_hula_traces_list(hu_allocator_t *alloc, hu_app_context_t *app, hu_
 
     hu_json_object_set(alloc, obj, "traces", arr);
     hu_json_object_set(alloc, obj, "directory", hu_json_string_new(alloc, dir, strlen(dir)));
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 #endif
 }
 
@@ -238,7 +241,9 @@ hu_error_t cp_hula_traces_get(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
         hu_json_object_set(alloc, obj, "raw", hu_json_string_new(alloc, buf, rd));
     alloc->free(alloc->ctx, buf, (size_t)sz + 1);
 
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 #endif
 }
 
@@ -275,13 +280,15 @@ hu_error_t cp_hula_traces_delete(hu_allocator_t *alloc, hu_app_context_t *app, h
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
     hu_json_object_set(alloc, obj, "deleted", hu_json_bool_new(alloc, true));
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 #endif
 }
 
-hu_error_t cp_hula_traces_analytics(hu_allocator_t *alloc, hu_app_context_t *app,
-                                    hu_ws_conn_t *conn, const hu_control_protocol_t *proto,
-                                    const hu_json_value_t *root, char **out, size_t *out_len) {
+hu_error_t cp_hula_traces_analytics(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                                    const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                                    char **out, size_t *out_len) {
     (void)app;
     (void)conn;
     (void)proto;
@@ -312,7 +319,9 @@ hu_error_t cp_hula_traces_analytics(hu_allocator_t *alloc, hu_app_context_t *app
     else
         cp_json_set_str(alloc, obj, "summary_raw", payload ? payload : "");
     hu_str_free(alloc, payload);
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t ser = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return ser;
 #endif
 }
 

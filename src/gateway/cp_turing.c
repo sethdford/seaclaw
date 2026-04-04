@@ -15,10 +15,6 @@ hu_error_t cp_turing_scores(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
     sqlite3 *db = hu_sqlite_memory_get_db(app->agent->memory);
@@ -70,7 +66,9 @@ hu_error_t cp_turing_scores(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
     }
 
     hu_json_object_set(alloc, obj, "scores", arr);
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 }
 
 hu_error_t cp_turing_trend(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -79,10 +77,6 @@ hu_error_t cp_turing_trend(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
     sqlite3 *db = hu_sqlite_memory_get_db(app->agent->memory);
@@ -122,7 +116,9 @@ hu_error_t cp_turing_trend(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     }
 
     hu_json_object_set(alloc, obj, "trend", arr);
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 }
 
 hu_error_t cp_turing_dimensions(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -131,10 +127,6 @@ hu_error_t cp_turing_dimensions(hu_allocator_t *alloc, hu_app_context_t *app, hu
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
     sqlite3 *db = hu_sqlite_memory_get_db(app->agent->memory);
@@ -144,8 +136,7 @@ hu_error_t cp_turing_dimensions(hu_allocator_t *alloc, hu_app_context_t *app, hu
         return HU_ERR_IO;
 
     int dim_avgs[HU_TURING_DIM_COUNT];
-    if (hu_turing_get_weakest_dimensions(db, dim_avgs) != HU_OK)
-        return HU_ERR_IO;
+    hu_turing_get_weakest_dimensions(db, dim_avgs);
 
     hu_json_value_t *obj = hu_json_object_new(alloc);
     if (!obj)
@@ -162,7 +153,9 @@ hu_error_t cp_turing_dimensions(hu_allocator_t *alloc, hu_app_context_t *app, hu
     }
 
     hu_json_object_set(alloc, obj, "dimensions", dims);
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 }
 
 hu_error_t cp_turing_contact(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -170,10 +163,6 @@ hu_error_t cp_turing_contact(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws
                              char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
     sqlite3 *db = hu_sqlite_memory_get_db(app->agent->memory);
@@ -222,7 +211,9 @@ hu_error_t cp_turing_contact(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws
         alloc->free(alloc->ctx, hint, hint_len + 1);
     }
 
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 }
 
 hu_error_t cp_turing_trajectory(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -231,10 +222,6 @@ hu_error_t cp_turing_trajectory(hu_allocator_t *alloc, hu_app_context_t *app, hu
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
     sqlite3 *db = hu_sqlite_memory_get_db(app->agent->memory);
@@ -267,7 +254,9 @@ hu_error_t cp_turing_trajectory(hu_allocator_t *alloc, hu_app_context_t *app, hu
     hu_json_object_set(alloc, obj, "stability", hu_json_number_new(alloc, (double)traj.stability));
     hu_json_object_set(alloc, obj, "overall", hu_json_number_new(alloc, (double)traj.overall));
 
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 }
 
 hu_error_t cp_turing_ab_tests(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -276,10 +265,6 @@ hu_error_t cp_turing_ab_tests(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
     sqlite3 *db = hu_sqlite_memory_get_db(app->agent->memory);
@@ -326,7 +311,9 @@ hu_error_t cp_turing_ab_tests(hu_allocator_t *alloc, hu_app_context_t *app, hu_w
     }
 
     hu_json_object_set(alloc, obj, "tests", arr);
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 }
 
 hu_error_t cp_turing_channel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -334,10 +321,6 @@ hu_error_t cp_turing_channel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws
                              char **out, size_t *out_len) {
     (void)conn;
     (void)proto;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
     if (!app || !app->agent || !app->agent->memory)
         return HU_ERR_NOT_SUPPORTED;
     sqlite3 *db = hu_sqlite_memory_get_db(app->agent->memory);
@@ -378,7 +361,9 @@ hu_error_t cp_turing_channel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws
     hu_json_object_set(alloc, obj, "channel", hu_json_string_new(alloc, channel, channel_len));
     hu_json_object_set(alloc, obj, "dimensions", dims);
 
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 }
 
 #else /* !HU_ENABLE_SQLITE */
@@ -386,98 +371,91 @@ hu_error_t cp_turing_channel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws
 hu_error_t cp_turing_scores(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                             const hu_control_protocol_t *proto, const hu_json_value_t *root,
                             char **out, size_t *out_len) {
+    (void)alloc;
     (void)app;
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
+    (void)out;
+    (void)out_len;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_turing_trend(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                            const hu_control_protocol_t *proto, const hu_json_value_t *root,
                            char **out, size_t *out_len) {
+    (void)alloc;
     (void)app;
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
+    (void)out;
+    (void)out_len;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_turing_dimensions(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                                 const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                 char **out, size_t *out_len) {
+    (void)alloc;
     (void)app;
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
+    (void)out;
+    (void)out_len;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_turing_contact(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                              const hu_control_protocol_t *proto, const hu_json_value_t *root,
                              char **out, size_t *out_len) {
+    (void)alloc;
     (void)app;
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
+    (void)out;
+    (void)out_len;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_turing_trajectory(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                                 const hu_control_protocol_t *proto, const hu_json_value_t *root,
                                 char **out, size_t *out_len) {
+    (void)alloc;
     (void)app;
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
+    (void)out;
+    (void)out_len;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_turing_ab_tests(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                               const hu_control_protocol_t *proto, const hu_json_value_t *root,
                               char **out, size_t *out_len) {
+    (void)alloc;
     (void)app;
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
+    (void)out;
+    (void)out_len;
     return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t cp_turing_channel(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                              const hu_control_protocol_t *proto, const hu_json_value_t *root,
                              char **out, size_t *out_len) {
+    (void)alloc;
     (void)app;
     (void)conn;
     (void)proto;
     (void)root;
-    if (!alloc || !out || !out_len)
-        return HU_ERR_INVALID_ARGUMENT;
-    *out = NULL;
-    *out_len = 0;
+    (void)out;
+    (void)out_len;
     return HU_ERR_NOT_SUPPORTED;
 }
 

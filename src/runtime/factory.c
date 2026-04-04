@@ -17,8 +17,7 @@ hu_error_t hu_runtime_from_config(const struct hu_config *cfg, hu_runtime_t *out
         if (cfg->security.resource_limits.max_memory_mb > 0)
             mem_mb = (uint64_t)cfg->security.resource_limits.max_memory_mb;
         const char *image = cfg->runtime.docker_image;
-        const char *workspace =
-            cfg->runtime_paths.workspace_dir ? cfg->runtime_paths.workspace_dir : ".";
+        const char *workspace = cfg->workspace_dir ? cfg->workspace_dir : ".";
         *out = hu_runtime_docker(true, mem_mb, image, workspace);
         return HU_OK;
     }

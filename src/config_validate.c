@@ -1,8 +1,8 @@
 /* Strict config schema validation — unknown keys, type checks, value validation. */
+#include "human/core/log.h"
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
-#include "human/core/log.h"
 #include "human/providers/factory.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -47,7 +47,6 @@ static const char *const hu_config_top_keys[] = {
     "secrets",
     "identity",
     "feeds",
-    "media_gen",
     "voice",
     "provider",
     "model",
@@ -57,8 +56,6 @@ static const char *const hu_config_top_keys[] = {
     "data_dir",
     "temp_dir",
     "behavior",
-    "mcp",
-    "hooks",
 };
 static const size_t hu_config_top_keys_len =
     sizeof(hu_config_top_keys) / sizeof(hu_config_top_keys[0]);
@@ -97,19 +94,10 @@ static const char *const hu_ensemble_keys[] = {
 static const size_t hu_ensemble_keys_len = sizeof(hu_ensemble_keys) / sizeof(hu_ensemble_keys[0]);
 
 static const char *const hu_voice_keys[] = {
-    "local_stt_endpoint",  "local_tts_endpoint", "stt_provider",  "tts_provider",
-    "tts_voice",           "tts_model",          "stt_model",     "mode",
-    "realtime_model",      "realtime_voice",     "vertex_region", "vertex_project",
-    "vertex_access_token",
+    "local_stt_endpoint", "local_tts_endpoint", "stt_provider", "tts_provider",   "tts_voice",
+    "tts_model",          "stt_model",          "mode",         "realtime_model", "realtime_voice",
 };
 static const size_t hu_voice_keys_len = sizeof(hu_voice_keys) / sizeof(hu_voice_keys[0]);
-
-static const char *const hu_media_gen_keys[] = {
-    "default_image_model", "default_video_model", "vertex_project",
-    "vertex_region",       "veo_storage_uri",
-};
-static const size_t hu_media_gen_keys_len =
-    sizeof(hu_media_gen_keys) / sizeof(hu_media_gen_keys[0]);
 
 static const char *const hu_security_keys[] = {
     "autonomy_level", "sandbox", "sandbox_config", "resources", "audit",
@@ -274,10 +262,6 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
         if (voice)
             check_unknown_nested_keys(voice, "voice", hu_voice_keys, hu_voice_keys_len, strict,
                                       &has_error);
-        hu_json_value_t *mg = hu_json_object_get(root, "media_gen");
-        if (mg)
-            check_unknown_nested_keys(mg, "media_gen", hu_media_gen_keys, hu_media_gen_keys_len,
-                                      strict, &has_error);
     }
 
     /* Type checking */
@@ -308,19 +292,18 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
     }
     if (cfg->default_provider && !is_provider_valid(cfg->default_provider)) {
         hu_log_info("config", NULL, "unknown provider: '%s'",
-                    cfg->default_provider ? cfg->default_provider : "(empty)");
+                cfg->default_provider ? cfg->default_provider : "(empty)");
         if (strict)
             has_error = true;
     }
     if (cfg->max_tokens != 0 && (cfg->max_tokens < 1 || cfg->max_tokens > 1000000)) {
-        hu_log_error("config", NULL, "max_tokens (%u) outside 1–1000000 (warning)",
-                     cfg->max_tokens);
+        hu_log_error("config", NULL, "max_tokens (%u) outside 1–1000000 (warning)", cfg->max_tokens);
         if (strict)
             has_error = true;
     }
     if (cfg->agent.max_tool_iterations > 10000) {
         hu_log_error("config", NULL, "agent.max_tool_iterations (%u) outside 1–10000 (warning)",
-                     cfg->agent.max_tool_iterations);
+                cfg->agent.max_tool_iterations);
         if (strict)
             has_error = true;
     }
@@ -345,20 +328,19 @@ hu_error_t hu_config_validate_strict(const hu_config_t *cfg, const hu_json_value
         if (url && strlen(url) >= 8 && !starts_with(url, "https://") &&
             !starts_with(url, "http://localhost") && !starts_with(url, "http://127.0.0.1")) {
             hu_log_info("config", NULL, "providers[%zu].base_url must use https:// (or localhost)",
-                        i);
+                    i);
             if (strict)
                 has_error = true;
         }
     }
 
     /* Path traversal */
-    if (cfg->runtime_paths.workspace_dir && has_path_traversal(cfg->runtime_paths.workspace_dir)) {
+    if (cfg->workspace_dir && has_path_traversal(cfg->workspace_dir)) {
         hu_log_info("config", NULL, "workspace_dir must not contain '..'");
         if (strict)
             has_error = true;
     }
-    if (cfg->runtime_paths.dpo_export_dir &&
-        has_path_traversal(cfg->runtime_paths.dpo_export_dir)) {
+    if (cfg->dpo_export_dir && has_path_traversal(cfg->dpo_export_dir)) {
         hu_log_info("config", NULL, "dpo_export_dir must not contain '..'");
         if (strict)
             has_error = true;

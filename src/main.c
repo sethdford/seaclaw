@@ -19,7 +19,6 @@
 #include "human/agent/outcomes.h"
 #include "human/agent/registry.h"
 #include "human/agent/spawn.h"
-#include "human/agent/task_store.h"
 #include "human/bootstrap.h"
 #include "human/bus.h"
 #include "human/channel.h"
@@ -61,7 +60,6 @@
 #include "human/session.h"
 #include "human/skill_registry.h"
 #include "human/skill_scaffold.h"
-#include "human/tools/canvas.h"
 #ifdef HU_HAS_SKILLS
 #include "human/skillforge.h"
 #endif
@@ -233,7 +231,6 @@ static hu_error_t cmd_ml(hu_allocator_t *alloc, int argc, char **argv) {
                         "  dpo-train               Run DPO preference training step\n"
                         "  lora-persona            Train LoRA adapter from persona examples\n"
                         "  train-feed-predictor    Train topic/trend predictor from feed data\n"
-                        "  train-agent             Run agent trajectory training step\n"
                         "  status                  Show experiment results\n");
         return HU_ERR_INVALID_ARGUMENT;
     }
@@ -254,8 +251,6 @@ static hu_error_t cmd_ml(hu_allocator_t *alloc, int argc, char **argv) {
         return hu_ml_cli_lora_persona(alloc, argc - 2, (const char **)(argv + 2));
     if (strcmp(sub, "train-feed-predictor") == 0)
         return hu_ml_cli_train_feed_predictor(alloc, argc - 2, (const char **)(argv + 2));
-    if (strcmp(sub, "train-agent") == 0)
-        return hu_ml_cli_train_agent(alloc, argc - 2, (const char **)(argv + 2));
     if (strcmp(sub, "--help") == 0 || strcmp(sub, "help") == 0) {
         printf("Usage: human ml <subcommand>\n\n"
                "Subcommands:\n"
@@ -266,7 +261,6 @@ static hu_error_t cmd_ml(hu_allocator_t *alloc, int argc, char **argv) {
                "  dpo-train               Run DPO preference training step\n"
                "  lora-persona            Train LoRA adapter from persona examples\n"
                "  train-feed-predictor    Train topic/trend predictor from feed data\n"
-               "  train-agent             Run agent trajectory training step\n"
                "  status                  Show experiment results\n");
         return HU_OK;
     }
@@ -592,9 +586,7 @@ static hu_error_t cmd_doctor(hu_allocator_t *alloc, int argc, char **argv) {
     }
 
     printf("  config        ok       loaded from %s\n",
-           cfg.runtime_paths.config_path && cfg.runtime_paths.config_path[0]
-               ? cfg.runtime_paths.config_path
-               : "defaults");
+           cfg.config_path && cfg.config_path[0] ? cfg.config_path : "defaults");
 
     const char *prov = cfg.default_provider ? cfg.default_provider : "openai";
     if (hu_config_provider_requires_api_key(prov)) {
@@ -814,41 +806,9 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
 #endif /* HU_HAS_CRON */
 
 static hu_error_t cmd_onboard(hu_allocator_t *alloc, int argc, char **argv) {
-    hu_onboard_opts_t ob = {0};
-    for (int i = 2; i < argc; i++) {
-        if (!argv[i])
-            continue;
-        if (strcmp(argv[i], "--non-interactive") == 0)
-            ob.non_interactive = true;
-        else if (strcmp(argv[i], "--start-gateway") == 0)
-            ob.start_gateway = true;
-        else if (strcmp(argv[i], "--api-key") == 0 && i + 1 < argc && argv[i + 1]) {
-            ob.api_key = argv[++i];
-        } else if (strcmp(argv[i], "--provider") == 0 && i + 1 < argc && argv[i + 1]) {
-            ob.provider = argv[++i];
-        } else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc && argv[i + 1]) {
-            ob.model = argv[++i];
-        } else if (strcmp(argv[i], "--channel") == 0 && i + 1 < argc && argv[i + 1]) {
-            ob.channel = argv[++i];
-        } else if (strcmp(argv[i], "--workspace") == 0 && i + 1 < argc && argv[i + 1]) {
-            ob.workspace = argv[++i];
-        } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            printf("Usage: human onboard [options]\n");
-            printf("  --api-key <key>\n");
-            printf("  --provider <name>\n");
-            printf("  --model <id>\n");
-            printf("  --channel <telegram|discord|slack|whatsapp|imessage>\n");
-            printf("  --workspace <path>\n");
-            printf("  --non-interactive\n");
-            printf("  --start-gateway\n");
-            return HU_OK;
-        } else {
-            fprintf(stderr, "[%s] onboard: unknown option %s (try --help)\n", HU_CODENAME,
-                    argv[i]);
-            return HU_ERR_INVALID_ARGUMENT;
-        }
-    }
-    return hu_onboard_run_with_opts(alloc, &ob);
+    (void)argc;
+    (void)argv;
+    return hu_onboard_run(alloc);
 }
 
 static hu_error_t cmd_service(hu_allocator_t *alloc, int argc, char **argv) {
@@ -1160,7 +1120,6 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
     hu_app_context_t svc_app_ctx;
     memset(&svc_app_ctx, 0, sizeof(svc_app_ctx));
     hu_graph_t *svc_graph = NULL;
-    hu_task_store_t *svc_task_store = NULL;
     gw_agent_bridge_t svc_agent_bridge = {0};
     if (with_gateway) {
         hu_gateway_config_from_cfg(&app_ctx.cfg->gateway, &gw_config);
@@ -1204,25 +1163,6 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
         }
         svc_app_ctx.mcp_resources = &svc_mcp_resources;
         svc_app_ctx.mcp_prompts = &svc_mcp_prompts;
-
-        if (app_ctx.agent) {
-            void *svc_task_db = NULL;
-#ifdef HU_ENABLE_SQLITE
-            if (app_ctx.memory)
-                svc_task_db = (void *)hu_sqlite_memory_get_db(app_ctx.memory);
-#endif
-            if (hu_task_store_create(alloc, svc_task_db, &svc_task_store) == HU_OK)
-                svc_app_ctx.task_store = svc_task_store;
-        }
-
-        for (size_t ci = 0; ci < app_ctx.tools_count && app_ctx.tools; ci++) {
-            hu_tool_t *ct = &app_ctx.tools[ci];
-            if (ct->vtable && ct->vtable->name &&
-                strcmp(ct->vtable->name(ct->ctx), "canvas") == 0) {
-                svc_app_ctx.canvas_store = (struct hu_canvas_store *)hu_canvas_store_from_tool(ct);
-                break;
-            }
-        }
 
         gw_config.app_ctx = &svc_app_ctx;
 
@@ -1268,10 +1208,6 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
         hu_bus_unsubscribe(&svc_bus, svc_agent_on_message_locked, &svc_agent_bridge);
         if (gw_tid) {
             pthread_join(gw_tid, NULL);
-        }
-        if (svc_task_store) {
-            hu_task_store_destroy(svc_task_store, alloc);
-            svc_task_store = NULL;
         }
         if (svc_graph) {
             hu_graph_close(svc_graph, alloc);
@@ -2501,8 +2437,7 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
         return err;
     }
 
-    const char *ws =
-        app.cfg->runtime_paths.workspace_dir ? app.cfg->runtime_paths.workspace_dir : ".";
+    const char *ws = app.cfg->workspace_dir ? app.cfg->workspace_dir : ".";
 
     /* ── Gateway-specific subsystems (not in bootstrap) ──────────────────── */
     hu_session_manager_t sessions;
@@ -2557,7 +2492,6 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
     hu_awareness_t gw_awareness = {0};
 
     hu_graph_t *gw_graph = NULL;
-    hu_task_store_t *gw_task_store = NULL;
 #ifdef HU_ENABLE_SQLITE
     {
         const char *home = getenv("HOME");
@@ -2634,27 +2568,10 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
 
     hu_gateway_config_t gw_config;
     hu_gateway_config_from_cfg(&app.cfg->gateway, &gw_config);
-    for (size_t ci = 0; ci < app.tools_count && app.tools; ci++) {
-        hu_tool_t *ct = &app.tools[ci];
-        if (ct->vtable && ct->vtable->name && strcmp(ct->vtable->name(ct->ctx), "canvas") == 0) {
-            gw_app_ctx.canvas_store = (struct hu_canvas_store *)hu_canvas_store_from_tool(ct);
-            break;
-        }
-    }
-
     gw_config.app_ctx = &gw_app_ctx;
 
     if (with_agent && app.agent_ok && app.agent) {
         gw_app_ctx.agent = app.agent;
-        {
-            void *gw_task_db = NULL;
-#ifdef HU_ENABLE_SQLITE
-            if (app.agent->memory)
-                gw_task_db = (void *)hu_sqlite_memory_get_db(app.agent->memory);
-#endif
-            if (hu_task_store_create(alloc, gw_task_db, &gw_task_store) == HU_OK)
-                gw_app_ctx.task_store = gw_task_store;
-        }
         hu_error_t init_err = hu_awareness_init(&gw_awareness, &bus);
         if (init_err != HU_OK)
             hu_log_error("main", NULL, "awareness init failed: %s", hu_error_string(init_err));
@@ -2663,7 +2580,6 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
         agent_bridge.agent = app.agent;
         agent_bridge.bus = &bus;
         agent_bridge.thread_binding = gw_thread_binding;
-        app.agent->ui_event_bus = &bus;
         hu_bus_subscribe(&bus, gw_agent_on_message, &agent_bridge, HU_BUS_MESSAGE_RECEIVED);
         hu_log_info("human", NULL, "gateway+agent mode (provider=%s tools=%zu)",
                     app.cfg->default_provider ? app.cfg->default_provider : "openai",
@@ -2681,13 +2597,8 @@ static hu_error_t cmd_gateway(hu_allocator_t *alloc, int argc, char **argv) {
 
     /* ── Cleanup: gateway-specific first, then bootstrap ───────────────── */
     if (with_agent && app.agent_ok && app.agent) {
-        app.agent->ui_event_bus = NULL;
         hu_awareness_deinit(&gw_awareness);
         hu_bus_unsubscribe(&bus, gw_agent_on_message, &agent_bridge);
-    }
-    if (gw_task_store) {
-        hu_task_store_destroy(gw_task_store, alloc);
-        gw_task_store = NULL;
     }
     if (gw_graph) {
         hu_graph_close(gw_graph, alloc);

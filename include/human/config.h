@@ -51,15 +51,6 @@ typedef struct hu_runtime_config {
     char *gce_instance;
 } hu_runtime_config_t;
 
-/* Cap rows in reliability.model_fallbacks JSON array */
-#define HU_MAX_RELIABILITY_MODEL_FALLBACK_ROWS 16
-
-typedef struct hu_reliability_model_fallback {
-    char *model;
-    char **fallback_models;
-    size_t fallback_models_len;
-} hu_reliability_model_fallback_t;
-
 typedef struct hu_reliability_config {
     char *primary_provider; /* used when default_provider is "reliable" */
     uint32_t provider_retries;
@@ -70,10 +61,6 @@ typedef struct hu_reliability_config {
     uint32_t scheduler_retries;
     char **fallback_providers;
     size_t fallback_providers_len;
-    hu_reliability_model_fallback_t *model_fallbacks;
-    size_t model_fallbacks_len;
-    uint32_t streaming_retries;
-    bool circuit_breaker_enabled;
 } hu_reliability_config_t;
 
 typedef struct hu_router_config {
@@ -123,14 +110,6 @@ typedef struct hu_agent_config {
     uint32_t fleet_max_spawn_depth;  /* 0 = unlimited; default from merge */
     uint32_t fleet_max_total_spawns; /* 0 = unlimited lifetime spawns per pool */
     double fleet_budget_usd;         /* 0 = unlimited; requires shared cost tracker */
-    /* Per-depth model tier overrides for child agent spawning. */
-    struct hu_config_depth_model_override {
-        uint32_t min_depth;
-        uint32_t max_depth;
-        char *provider; /* may be NULL */
-        char *model;    /* required */
-    } *fleet_depth_model_overrides;
-    size_t fleet_depth_model_overrides_count;
     char *default_profile;
     char *persona;
     hu_persona_channel_entry_t *persona_channels;
@@ -146,18 +125,17 @@ typedef struct hu_agent_config {
     char *mr_analytical_model;           /* model router: capable reasoning model */
     char *mr_deep_model;                 /* model router: most capable model */
     bool mr_judge_enabled;               /* model router: enable LLM-as-Judge classification */
-    char *mr_judge_model;      /* model router: model to use for judge (default: reflexive) */
-    char *s3_local_model;      /* dedicated model for S3 (private) content; NULL = use degradation
-                                  fallback */
-    bool prompt_cache_enabled; /* enable cross-turn system prompt dedup (default true) */
-    bool agent_comm_enabled;   /* enable ACP inter-agent messaging (default false) */
-    char *context_engine_type; /* "legacy" (default) or "rag" */
+    char *mr_judge_model;                /* model router: model to use for judge (default: reflexive) */
+    char *s3_local_model;                /* dedicated model for S3 (private) content; NULL = use degradation fallback */
+    bool prompt_cache_enabled;           /* enable cross-turn system prompt dedup (default true) */
+    bool agent_comm_enabled;             /* enable ACP inter-agent messaging (default false) */
+    char *context_engine_type;           /* "legacy" (default) or "rag" */
     /* Claude Code feature integration */
-    uint8_t permission_level;       /* 0=ReadOnly, 1=WorkspaceWrite, 2=DangerFullAccess */
-    bool session_auto_save;         /* auto-save session after each turn */
-    char *session_dir;              /* directory for session JSON files */
-    bool discover_instructions;     /* discover .human.md/HUMAN.md files */
-    bool compaction_use_structured; /* use XML structured summaries */
+    uint8_t permission_level;          /* 0=ReadOnly, 1=WorkspaceWrite, 2=DangerFullAccess */
+    bool session_auto_save;            /* auto-save session after each turn */
+    char *session_dir;                 /* directory for session JSON files */
+    bool discover_instructions;        /* discover .human.md/HUMAN.md files */
+    bool compaction_use_structured;    /* use XML structured summaries */
 } hu_agent_config_t;
 
 typedef struct hu_policy_config {
@@ -178,7 +156,6 @@ typedef struct hu_feeds_config {
     char *gmail_client_secret;
     char *gmail_refresh_token;
     char *twitter_bearer_token;
-    char *google_photos_access_token;
     char *interests;
     double relevance_threshold;
     uint32_t poll_interval_rss;
@@ -208,8 +185,6 @@ typedef struct hu_channel_daemon_config {
     int user_response_window_sec; /* 0 = use default (120s) */
     int poll_interval_sec;        /* 0 = use channel-specific default (see bootstrap) */
     bool voice_enabled;           /* enable TTS on this channel */
-    int max_consecutive_replies;  /* 0 = use default (3) */
-    int e2e_max_turns;            /* 0 = use default (10) */
 } hu_channel_daemon_config_t;
 
 typedef struct hu_email_channel_config {
@@ -240,7 +215,6 @@ typedef struct hu_imessage_channel_config {
     char **allow_from;
     size_t allow_from_count;
     int poll_interval_sec;
-    bool use_imsg_cli;
     int user_response_window_sec; /* DEPRECATED: use daemon.user_response_window_sec */
     char *response_mode;          /* DEPRECATED: use daemon.response_mode */
     hu_channel_daemon_config_t daemon;
@@ -288,9 +262,9 @@ typedef struct hu_mcp_server_entry {
     char *command;        /* stdio: binary path */
     char *args[HU_MCP_SERVER_ARGS_MAX];
     size_t args_count;
-    char *url; /* sse/http: endpoint URL */
+    char *url;            /* sse/http: endpoint URL */
     bool auto_connect;
-    uint32_t timeout_ms; /* 0 = use default (30s) */
+    uint32_t timeout_ms;  /* 0 = use default (30s) */
     /* OAuth2 PKCE authentication (optional, for HTTP/SSE servers) */
     char *oauth_client_id;
     char *oauth_auth_url;
@@ -315,21 +289,8 @@ typedef struct hu_whatsapp_channel_config {
 } hu_whatsapp_channel_config_t;
 
 typedef struct hu_signal_channel_config {
-    char *http_url;
-    char *account;
     hu_channel_daemon_config_t daemon;
 } hu_signal_channel_config_t;
-
-typedef struct hu_mattermost_channel_config {
-    char *url;
-    char *token;
-    hu_channel_daemon_config_t daemon;
-} hu_mattermost_channel_config_t;
-
-typedef struct hu_maixcam_channel_config {
-    char *host;
-    uint16_t port;
-} hu_maixcam_channel_config_t;
 
 typedef struct hu_line_channel_config {
     char *channel_token;
@@ -455,8 +416,6 @@ typedef struct hu_channels_config {
     hu_telegram_channel_config_t telegram;
     hu_slack_channel_config_t slack;
     hu_signal_channel_config_t signal;
-    hu_mattermost_channel_config_t mattermost;
-    hu_maixcam_channel_config_t maixcam;
     hu_whatsapp_channel_config_t whatsapp;
     hu_line_channel_config_t line;
     hu_google_chat_channel_config_t google_chat;
@@ -499,16 +458,6 @@ typedef struct hu_memory_config {
     char *api_base_url;
     char *api_key;
     uint32_t api_timeout_ms;
-    /* Hybrid retrieval: vector store for semantic search ("mem", "qdrant", "pgvector"). */
-    char *vector_store;
-    char *vector_qdrant_url;
-    char *vector_qdrant_api_key;
-    char *vector_qdrant_collection;
-    char *vector_pgvector_table;
-    uint32_t vector_dimensions; /* 0 = match embedder default */
-    /* Embedder: "local", "gemini", or NULL (GEMINI_API_KEY env then local). */
-    char *embedding_provider;
-    char *embedding_api_key;
 } hu_memory_config_t;
 
 typedef struct hu_tunnel_config {
@@ -569,19 +518,16 @@ typedef struct hu_tools_config {
 } hu_tools_config_t;
 
 typedef struct hu_voice_settings {
-    char *local_stt_endpoint;  /* e.g. "http://localhost:8000/v1/audio/transcriptions" */
-    char *local_tts_endpoint;  /* e.g. "http://localhost:8880/v1/audio/speech" */
-    char *stt_provider;        /* "gemini", "groq", "local" — NULL = auto */
-    char *tts_provider;        /* "openai", "cartesia", "local" — NULL = auto */
-    char *tts_voice;           /* voice name, NULL = default */
-    char *tts_model;           /* model name, NULL = default */
-    char *stt_model;           /* model name, NULL = default */
-    char *mode;                /* "sonata", "realtime", "webrtc", "gemini_live" — NULL = sonata */
-    char *realtime_model;      /* Model for Realtime/GL, e.g. "gemini-3.1-flash-live-preview" */
-    char *realtime_voice;      /* Voice for Realtime/GL, e.g. "Puck", "alloy" */
-    char *vertex_region;       /* Vertex AI region for Gemini Live; NULL = use Google AI endpoint */
-    char *vertex_project;      /* Vertex AI project ID; required when vertex_region is set */
-    char *vertex_access_token; /* OAuth2 bearer token for Vertex AI; NULL = use api_key */
+    char *local_stt_endpoint; /* e.g. "http://localhost:8000/v1/audio/transcriptions" */
+    char *local_tts_endpoint; /* e.g. "http://localhost:8880/v1/audio/speech" */
+    char *stt_provider;       /* "gemini", "groq", "local" — NULL = auto */
+    char *tts_provider;       /* "openai", "cartesia", "local" — NULL = auto */
+    char *tts_voice;          /* voice name, NULL = default */
+    char *tts_model;          /* model name, NULL = default */
+    char *stt_model;          /* model name, NULL = default */
+    char *mode;           /* "sonata", "realtime", "webrtc" — NULL = sonata (default pipeline) */
+    char *realtime_model; /* OpenAI Realtime model, e.g. "gpt-4o-realtime-preview" */
+    char *realtime_voice; /* Voice for Realtime, e.g. "alloy" */
 } hu_voice_settings_t;
 
 typedef struct hu_identity_config {
@@ -595,15 +541,6 @@ typedef struct hu_cost_config {
     uint8_t warn_at_percent;
     bool allow_override;
 } hu_cost_config_t;
-
-typedef struct hu_media_gen_config {
-    char *default_image_model; /* "gemini" (default), "imagen4", "imagen4_fast", "imagen4_ultra" */
-    char *default_video_model; /* "veo_3.1" (default), "veo_3.1_fast", "veo_3.1_lite" */
-    char *vertex_project;      /* Vertex AI project ID; NULL = env GOOGLE_CLOUD_PROJECT */
-    char *vertex_region;   /* Vertex AI region; NULL = env GOOGLE_CLOUD_LOCATION or "us-central1" */
-    char *veo_storage_uri; /* GCS URI for Veo output; NULL = env HU_VEO_STORAGE_URI or
-                              gs://{project}-human-media/veo/ */
-} hu_media_gen_config_t;
 
 typedef struct hu_peripherals_config {
     bool enabled;
@@ -620,7 +557,8 @@ typedef struct hu_hardware_config {
 
 #define HU_CONFIG_VERSION_CURRENT 2
 
-typedef struct hu_config_runtime_paths {
+typedef struct hu_config {
+    int config_version; /* schema version for migration; default 1 */
     char *workspace_dir;
     char *config_path;
     char *workspace_dir_override;
@@ -628,11 +566,6 @@ typedef struct hu_config_runtime_paths {
     char *dpo_export_dir;
     char *data_dir; /* overrides ~/.human/data/ for hu_data_load() */
     char *temp_dir; /* overrides platform temp dir */
-} hu_config_runtime_paths_t;
-
-typedef struct hu_config {
-    int config_version; /* schema version for migration; default 1 */
-    hu_config_runtime_paths_t runtime_paths;
     char *api_key;
     hu_provider_entry_t *providers;
     size_t providers_len;
@@ -684,7 +617,6 @@ typedef struct hu_config {
     hu_policy_config_t policy;
     hu_plugins_config_t plugins;
     hu_feeds_config_t feeds;
-    hu_media_gen_config_t media_gen;
     char *auto_update;                    /* "off" (default), "check", or "apply" */
     uint32_t update_check_interval_hours; /* default 24; 0 = use default */
     hu_arena_t *arena;

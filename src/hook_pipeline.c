@@ -17,9 +17,8 @@ static hu_hook_decision_t hu_hook_exit_code_to_decision(int exit_code) {
         return HU_HOOK_DENY;
     case 3:
         return HU_HOOK_WARN;
-    case 4:
-        return HU_HOOK_SHORT_CIRCUIT;
     default:
+        /* Unknown exit code: treat as allow with warning */
         return HU_HOOK_ALLOW;
     }
 }
@@ -35,9 +34,10 @@ hu_error_t hu_hook_pipeline_execute(const hu_hook_registry_t *registry,
     if (!alloc || !ctx || !result)
         return HU_ERR_INVALID_ARGUMENT;
 
-    /* Default to allow — zero all fields to prevent stack garbage in early returns */
-    memset(result, 0, sizeof(*result));
+    /* Default to allow */
     result->decision = HU_HOOK_ALLOW;
+    result->message = NULL;
+    result->message_len = 0;
 
     if (!registry)
         return HU_OK;
@@ -90,7 +90,7 @@ hu_error_t hu_hook_pipeline_execute(const hu_hook_registry_t *registry,
         hu_hook_decision_t decision = hu_hook_exit_code_to_decision(exit_code);
 
         /* Handle unknown exit codes */
-        if (exit_code != 0 && exit_code != 2 && exit_code != 3 && exit_code != 4) {
+        if (exit_code != 0 && exit_code != 2 && exit_code != 3) {
             hu_log_info("hook_pipeline", NULL, "hook '%.*s' returned unexpected exit code %d "
                     "(treating as allow)",
                     (int)(entry->name_len ? entry->name_len : 7),
@@ -102,20 +102,9 @@ hu_error_t hu_hook_pipeline_execute(const hu_hook_registry_t *registry,
             }
         }
 
-        if (decision == HU_HOOK_SHORT_CIRCUIT) {
-            result->decision = HU_HOOK_SHORT_CIRCUIT;
-            if (stdout_buf && stdout_len > 0) {
-                result->synthetic_response = stdout_buf;
-                result->synthetic_response_len = stdout_len;
-            } else {
-                if (stdout_buf)
-                    alloc->free(alloc->ctx, stdout_buf, stdout_len + 1);
-            }
-            return HU_OK;
-        }
-
         if (decision == HU_HOOK_DENY) {
             result->decision = HU_HOOK_DENY;
+            /* Capture stdout as the deny message */
             if (stdout_buf && stdout_len > 0) {
                 result->message = stdout_buf;
                 result->message_len = stdout_len;
@@ -130,7 +119,7 @@ hu_error_t hu_hook_pipeline_execute(const hu_hook_registry_t *registry,
                     result->message_len = deny_len;
                 }
             }
-            return HU_OK;
+            return HU_OK; /* First deny stops pipeline */
         }
 
         if (decision == HU_HOOK_WARN) {
@@ -188,20 +177,5 @@ hu_error_t hu_hook_pipeline_post_tool(const hu_hook_registry_t *registry,
     ctx.result_output = result_output;
     ctx.result_output_len = result_output_len;
     ctx.result_success = result_success;
-    return hu_hook_pipeline_execute(registry, alloc, &ctx, result);
-}
-
-hu_error_t hu_hook_pipeline_before_reply(const hu_hook_registry_t *registry,
-                                         hu_allocator_t *alloc,
-                                         const char *user_message, size_t user_message_len,
-                                         const char *channel, size_t channel_len,
-                                         hu_hook_result_t *result) {
-    hu_hook_context_t ctx;
-    memset(&ctx, 0, sizeof(ctx));
-    ctx.event = HU_HOOK_BEFORE_REPLY;
-    ctx.user_message = user_message;
-    ctx.user_message_len = user_message_len;
-    ctx.channel = channel;
-    ctx.channel_len = channel_len;
     return hu_hook_pipeline_execute(registry, alloc, &ctx, result);
 }

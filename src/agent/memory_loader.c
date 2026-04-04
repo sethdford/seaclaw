@@ -211,7 +211,7 @@ hu_error_t hu_memory_loader_load(hu_memory_loader_t *loader, const char *query, 
             goto cleanup;
         }
         if (out_context_len)
-            *out_context_len = strlen(*out_context);
+            *out_context_len = buf.len;
     }
 
 cleanup:

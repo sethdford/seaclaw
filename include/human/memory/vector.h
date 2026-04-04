@@ -81,15 +81,6 @@ void hu_vector_entries_free(hu_allocator_t *alloc, hu_vector_entry_t *entries, s
 /* Factory: in-memory vector store */
 hu_vector_store_t hu_vector_store_mem_create(hu_allocator_t *alloc);
 
-/* Remote vector stores for retrieval (vector.h vtable; content stored in Qdrant payload / PG metadata).
- */
-hu_vector_store_t hu_vector_store_qdrant_retrieval_create(hu_allocator_t *alloc, const char *url,
-                                                          const char *api_key, const char *collection,
-                                                          size_t dimensions);
-hu_vector_store_t hu_vector_store_pgvector_retrieval_create(hu_allocator_t *alloc,
-                                                            const char *connection_url,
-                                                            const char *table_name, size_t dimensions);
-
 /* Factory: local TF-IDF style embedder */
 hu_embedder_t hu_embedder_local_create(hu_allocator_t *alloc);
 

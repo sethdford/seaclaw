@@ -18,7 +18,6 @@ static void test_free_wrapper(void *ctx, void *ptr, size_t size) {
 }
 
 /* Test allocator */
-__attribute__((unused))
 static hu_allocator_t test_alloc = {
     .ctx = NULL,
     .alloc = test_alloc_wrapper,

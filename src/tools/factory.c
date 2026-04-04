@@ -28,7 +28,6 @@
 #include "human/tools/cron_remove.h"
 #include "human/tools/cron_run.h"
 #include "human/tools/cron_runs.h"
-#include "human/tools/cron_session_tools.h"
 #include "human/tools/cron_update.h"
 #endif
 #include "human/tools/browser_use.h"
@@ -88,12 +87,6 @@
 #ifdef HU_ENABLE_CURL
 #include "human/tools/paperclip.h"
 #endif
-#ifdef HU_ENABLE_MEDIA_GEN
-#include "human/tools/media_gif.h"
-#include "human/tools/media_image.h"
-#include "human/tools/media_video.h"
-#endif
-#include "human/tools/send_voice_message.h"
 #include "human/tools/pwa.h"
 #include "human/tools/schema.h"
 #include "human/tools/send_message.h"
@@ -105,12 +98,7 @@
 #include "human/tools/tool_search.h"
 #include "human/tools/skill_write.h"
 #include "human/tools/spawn.h"
-#ifdef HU_ENABLE_CARTESIA
-#include "human/tools/send_voice_message.h"
 #include "human/tools/voice_clone.h"
-#endif
-#include "human/tools/mcp_resource_tools.h"
-#include "human/tools/vision_ocr.h"
 #include "human/tools/web_fetch.h"
 #include "human/tools/web_search.h"
 #include "human/tools/ask_user.h"
@@ -123,7 +111,7 @@
 #define HU_WEB_FETCH_MAX_CHARS 100000
 
 #ifdef HU_HAS_CRON
-#define HU_TOOLS_CRON_COUNT 10
+#define HU_TOOLS_CRON_COUNT 7
 #else
 #define HU_TOOLS_CRON_COUNT 0
 #endif
@@ -133,20 +121,15 @@
 #define HU_TOOLS_PERSONA_COUNT 0
 #endif
 #ifdef HU_ENABLE_CARTESIA
-#define HU_TOOLS_CARTESIA_COUNT 2
+#define HU_TOOLS_CARTESIA_COUNT 1
 #else
 #define HU_TOOLS_CARTESIA_COUNT 0
 #endif
-#define HU_TOOLS_WEBHOOK_COUNT 0  /* webhooks registered in bootstrap, not factory */
+#define HU_TOOLS_WEBHOOK_COUNT 3  /* webhook_register, webhook_poll, webhook_list */
 #define HU_TOOLS_DB_INTROSPECT_COUNT 1  /* db_introspect */
-#ifdef HU_HAS_SKILLS
-#define HU_TOOLS_SKILL_COUNT 1
-#else
-#define HU_TOOLS_SKILL_COUNT 0
-#endif
-/* Base: 59 (core) + 5 (ask_user + 4 task) + db_introspect + cron + skill + persona + cartesia + webhook */
+/* Base: 56 (core tools incl. lsp + tool_search) + 5 (ask_user + 4 task tools) + 1 (db_introspect) + cron - 1 (skill_run conditional) + persona + cartesia + webhook */
 #define HU_TOOLS_COUNT_BASE \
-    (59 + 5 + HU_TOOLS_DB_INTROSPECT_COUNT + HU_TOOLS_CRON_COUNT + HU_TOOLS_SKILL_COUNT + HU_TOOLS_PERSONA_COUNT + HU_TOOLS_CARTESIA_COUNT + HU_TOOLS_WEBHOOK_COUNT)
+    (56 + 5 + HU_TOOLS_DB_INTROSPECT_COUNT + HU_TOOLS_CRON_COUNT - 1 + HU_TOOLS_PERSONA_COUNT + HU_TOOLS_CARTESIA_COUNT + HU_TOOLS_WEBHOOK_COUNT)
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -167,14 +150,9 @@
 #else
 #define HU_TOOLS_PAPERCLIP_COUNT 0
 #endif
-#ifdef HU_ENABLE_MEDIA_GEN
-#define HU_TOOLS_MEDIA_GEN_COUNT 3
-#else
-#define HU_TOOLS_MEDIA_GEN_COUNT 0
-#endif
 #define HU_TOOLS_COUNT                                                                            \
     (HU_TOOLS_COUNT_BASE + HU_TOOLS_BROWSER_COUNT + HU_TOOLS_ADVANCED_COUNT + HU_TOOLS_HW_COUNT + \
-     HU_TOOLS_PAPERCLIP_COUNT + HU_TOOLS_MEDIA_GEN_COUNT)
+     HU_TOOLS_PAPERCLIP_COUNT)
 
 static hu_error_t add_tool_ws(hu_allocator_t *alloc, hu_tool_t *tools, size_t *idx, const char *ws,
                               size_t ws_len, hu_security_policy_t *policy,
@@ -247,16 +225,6 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     idx++;
 
     err = hu_web_fetch_create(alloc, HU_WEB_FETCH_MAX_CHARS, &tools[idx]);
-    if (err != HU_OK)
-        goto fail;
-    idx++;
-
-    err = hu_mcp_resource_list_tool_create(alloc, &tools[idx]);
-    if (err != HU_OK)
-        goto fail;
-    idx++;
-
-    err = hu_mcp_resource_read_tool_create(alloc, &tools[idx]);
     if (err != HU_OK)
         goto fail;
     idx++;
@@ -368,21 +336,6 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     if (err != HU_OK)
         goto fail;
     idx++;
-
-    err = hu_cron_create_session_tool_create(alloc, cron, &tools[idx]);
-    if (err != HU_OK)
-        goto fail;
-    idx++;
-
-    err = hu_cron_delete_session_tool_create(alloc, cron, &tools[idx]);
-    if (err != HU_OK)
-        goto fail;
-    idx++;
-
-    err = hu_cron_list_session_tool_create(alloc, cron, &tools[idx]);
-    if (err != HU_OK)
-        goto fail;
-    idx++;
 #endif
 
 #ifdef HU_HAS_TOOLS_BROWSER
@@ -432,11 +385,6 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     idx++;
 
     err = hu_image_gen_create(alloc, &tools[idx]);
-    if (err != HU_OK)
-        goto fail;
-    idx++;
-
-    err = hu_vision_ocr_tool_create(alloc, &tools[idx]);
     if (err != HU_OK)
         goto fail;
     idx++;
@@ -494,7 +442,7 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
         goto fail;
     idx++;
 
-    err = hu_canvas_tool_create(alloc, &tools[idx]);
+    err = hu_canvas_create(alloc, &tools[idx]);
     if (err != HU_OK)
         goto fail;
     idx++;
@@ -640,28 +588,6 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
                       hu_voice_clone_tool_create);
     if (err != HU_OK)
         goto fail;
-
-    err = hu_send_voice_message_create(alloc, &tools[idx]);
-    if (err != HU_OK)
-        goto fail;
-    idx++;
-#endif
-
-#ifdef HU_ENABLE_MEDIA_GEN
-    err = hu_media_image_create(alloc, &tools[idx]);
-    if (err != HU_OK)
-        goto fail;
-    idx++;
-
-    err = hu_media_video_create(alloc, &tools[idx]);
-    if (err != HU_OK)
-        goto fail;
-    idx++;
-
-    err = hu_media_gif_create(alloc, &tools[idx]);
-    if (err != HU_OK)
-        goto fail;
-    idx++;
 #endif
 
     tools[idx] = hu_lsp_tool_create(alloc);

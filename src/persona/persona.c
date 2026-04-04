@@ -2,7 +2,6 @@
 #include "human/core/json.h"
 #include "human/core/log.h"
 #include "human/core/string.h"
-#include "human/persona/markdown_loader.h"
 #include "human/persona/persona_fuse.h"
 #include "human/persona/relationship.h"
 #include <stdio.h>
@@ -1860,18 +1859,6 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                            s);
         out->voice.default_speed = (float)hu_json_get_number(voice_obj, "default_speed", 0.95);
         out->voice.nonverbals = hu_json_get_bool(voice_obj, "nonverbals", true);
-        out->voice.strip_ssml = hu_json_get_bool(voice_obj, "strip_ssml", false);
-        out->voice.discourse_markers = hu_json_get_bool(voice_obj, "discourse_markers", false);
-        out->voice.emotion_intensity =
-            (float)hu_json_get_number(voice_obj, "emotion_intensity", 0.0);
-        out->voice.thinking_sounds = hu_json_get_bool(voice_obj, "thinking_sounds", false);
-        s = hu_json_get_string(voice_obj, "pronunciation_dict_id");
-        if (s && s[0])
-            (void)snprintf(out->voice.pronunciation_dict_id,
-                           sizeof(out->voice.pronunciation_dict_id), "%.63s", s);
-        s = hu_json_get_string(voice_obj, "language");
-        if (s && s[0])
-            (void)snprintf(out->voice.language, sizeof(out->voice.language), "%.7s", s);
     }
 
     /* Phase 5: voice_messages (defaults: enabled=false, frequency="rare", max_duration_sec=30) */
@@ -2450,13 +2437,8 @@ hu_error_t hu_persona_load(hu_allocator_t *alloc, const char *name, size_t name_
     if (n <= 0 || (size_t)n >= sizeof(path))
         return HU_ERR_INVALID_ARGUMENT;
     FILE *f = fopen(path, "rb");
-    if (!f) {
-        /* Fallback: try markdown persona definition */
-        n = snprintf(path, sizeof(path), "%s/%.*s.md", base, (int)name_len, name);
-        if (n > 0 && (size_t)n < sizeof(path))
-            return hu_persona_load_markdown(alloc, path, out);
+    if (!f)
         return HU_ERR_NOT_FOUND;
-    }
     if (fseek(f, 0, SEEK_END) != 0) {
         fclose(f);
         return HU_ERR_IO;
@@ -4425,38 +4407,6 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
         err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
         if (err != HU_OK)
             goto fail;
-    }
-
-    /* Voice/speech guidance: when channel is voice-capable, guide the LLM
-     * to produce output that sounds natural when spoken aloud by TTS. */
-    if (channel && channel_len > 0) {
-        bool is_voice_channel = false;
-        if (channel_len == 8 && memcmp(channel, "imessage", 8) == 0)
-            is_voice_channel = true;
-        else if (channel_len == 5 && memcmp(channel, "voice", 5) == 0)
-            is_voice_channel = true;
-        else if (channel_len >= 5 && memcmp(channel, "phone", 5) == 0)
-            is_voice_channel = true;
-
-        if (is_voice_channel && persona->voice.voice_id[0]) {
-            static const char speech_hdr[] =
-                "\n--- Voice Message Guidance (your response may be spoken aloud) ---\n";
-            err = append_prompt(alloc, &buf, &len, &cap, speech_hdr, sizeof(speech_hdr) - 1);
-            if (err != HU_OK)
-                goto fail;
-            static const char speech_rules[] =
-                "- Write as if speaking, not typing. Use contractions (I'm, don't, we'll).\n"
-                "- Avoid markdown, bullet points, numbered lists, URLs, and code blocks.\n"
-                "- Keep sentences short-to-medium. Break long thoughts with natural pauses.\n"
-                "- Use conversational connectors: 'so', 'anyway', 'but yeah', 'you know'.\n"
-                "- Spell out numbers under 100 and abbreviations (say 'two hundred', not '200').\n"
-                "- Never include emoji, asterisk actions, or stage directions.\n"
-                "- Vary sentence length and structure — monotone lists sound robotic.\n"
-                "- End with warmth, not formality. 'Talk soon' over 'Best regards'.\n";
-            err = append_prompt(alloc, &buf, &len, &cap, speech_rules, sizeof(speech_rules) - 1);
-            if (err != HU_OK)
-                goto fail;
-        }
     }
 
     if (len > HU_PERSONA_PROMPT_MAX_BYTES) {

@@ -32,10 +32,7 @@ typedef struct hu_cartesia_tts_config {
     const char *emotion;  /* "content", "excited", etc. */
     float speed;         /* 0.6–1.5; default 0.95 */
     float volume;       /* 0.5–2.0; default 1.0 */
-    float emotion_intensity; /* 0.0–1.0; 0 = use default (~0.5) */
     bool nonverbals;
-    const char *pronunciation_dict_id; /* Cartesia pronunciation dictionary UUID; NULL = none */
-    const char *language; /* ISO-639-1 e.g. "en"; NULL = auto */
 } hu_cartesia_tts_config_t;
 
 /* output_format: "mp3", "wav", "ogg", or "caf". NULL or "" -> "mp3".

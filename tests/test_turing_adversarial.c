@@ -21,8 +21,8 @@ static void adversarial_bank_get_returns_valid_scenario(void) {
 static void adversarial_bank_get_out_of_range(void) {
     hu_turing_scenario_t s;
     size_t sz = hu_turing_adversarial_bank_size();
-    HU_ASSERT_EQ(hu_turing_adversarial_bank_get(sz, &s), HU_ERR_OUT_OF_RANGE);
-    HU_ASSERT_EQ(hu_turing_adversarial_bank_get(sz + 100, &s), HU_ERR_OUT_OF_RANGE);
+    HU_ASSERT_EQ(hu_turing_adversarial_bank_get(sz, &s), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_turing_adversarial_bank_get(sz + 100, &s), HU_ERR_INVALID_ARGUMENT);
 }
 
 static void adversarial_bank_get_null_rejected(void) {
@@ -42,7 +42,7 @@ static void adversarial_scenario_bank_covers_all_dimensions(void) {
         }
     }
     for (int d = 0; d < HU_TURING_DIM_COUNT; d++) {
-        HU_ASSERT_MSG(covered[d], "Missing coverage for Turing dimension");
+        HU_ASSERT(covered[d]);
     }
 }
 
@@ -59,12 +59,12 @@ static void adversarial_scenario_bank_min_two_per_dimension(void) {
         }
     }
     for (int d = 0; d < HU_TURING_DIM_COUNT; d++) {
-        HU_ASSERT_MSG(counts[d] >= 2, "Need at least 2 scenarios per dimension");
+        HU_ASSERT(counts[d] >= 2);
     }
 }
 
 static void adversarial_generate_targets_weak_dimensions(void) {
-    hu_allocator_t alloc = hu_allocator_default();
+    hu_allocator_t alloc = hu_system_allocator();
     int dims[HU_TURING_DIM_COUNT];
     for (int d = 0; d < HU_TURING_DIM_COUNT; d++)
         dims[d] = 8;
@@ -97,7 +97,7 @@ static void adversarial_generate_targets_weak_dimensions(void) {
 }
 
 static void adversarial_generate_all_strong_covers_broadly(void) {
-    hu_allocator_t alloc = hu_allocator_default();
+    hu_allocator_t alloc = hu_system_allocator();
     int dims[HU_TURING_DIM_COUNT];
     for (int d = 0; d < HU_TURING_DIM_COUNT; d++)
         dims[d] = 9;
@@ -110,7 +110,7 @@ static void adversarial_generate_all_strong_covers_broadly(void) {
 }
 
 static void adversarial_generate_null_rejected(void) {
-    hu_allocator_t alloc = hu_allocator_default();
+    hu_allocator_t alloc = hu_system_allocator();
     int dims[HU_TURING_DIM_COUNT] = {0};
     hu_turing_scenario_t *s = NULL;
     size_t c = 0;
@@ -141,7 +141,7 @@ static void adversarial_score_passes_human_responses(void) {
 }
 
 static void adversarial_to_mutation_produces_targeted_patches(void) {
-    hu_allocator_t alloc = hu_allocator_default();
+    hu_allocator_t alloc = hu_system_allocator();
     hu_turing_score_t score;
     memset(&score, 0, sizeof(score));
     for (int d = 0; d < HU_TURING_DIM_COUNT; d++)
@@ -161,7 +161,7 @@ static void adversarial_to_mutation_produces_targeted_patches(void) {
 }
 
 static void adversarial_to_mutation_all_good_returns_not_found(void) {
-    hu_allocator_t alloc = hu_allocator_default();
+    hu_allocator_t alloc = hu_system_allocator();
     hu_turing_score_t score;
     memset(&score, 0, sizeof(score));
     for (int d = 0; d < HU_TURING_DIM_COUNT; d++)
@@ -178,7 +178,7 @@ static void adversarial_to_mutation_all_good_returns_not_found(void) {
 }
 
 static void adversarial_to_mutation_null_rejected(void) {
-    hu_allocator_t alloc = hu_allocator_default();
+    hu_allocator_t alloc = hu_system_allocator();
     hu_turing_score_t score = {0};
     char *mut = NULL;
     size_t mut_len = 0;
@@ -189,7 +189,7 @@ static void adversarial_to_mutation_null_rejected(void) {
 }
 
 static void adversarial_feedback_loop_improves_baseline(void) {
-    hu_allocator_t alloc = hu_allocator_default();
+    hu_allocator_t alloc = hu_system_allocator();
 
     hu_self_improve_state_t state;
     hu_self_improve_config_t cfg = HU_SELF_IMPROVE_DEFAULTS;
@@ -220,7 +220,7 @@ static void adversarial_feedback_loop_improves_baseline(void) {
 }
 
 static void adversarial_run_cycle_null_rejected(void) {
-    hu_allocator_t alloc = hu_allocator_default();
+    hu_allocator_t alloc = hu_system_allocator();
     hu_self_improve_state_t state;
     int dims[HU_TURING_DIM_COUNT] = {0};
     size_t m = 0;
@@ -233,7 +233,7 @@ static void adversarial_run_cycle_null_rejected(void) {
 }
 
 static void adversarial_run_cycle_budget_exhausted_no_mutations(void) {
-    hu_allocator_t alloc = hu_allocator_default();
+    hu_allocator_t alloc = hu_system_allocator();
     hu_self_improve_state_t state;
     hu_self_improve_config_t cfg = HU_SELF_IMPROVE_DEFAULTS;
     cfg.max_experiments = 0;
@@ -252,7 +252,7 @@ static void adversarial_run_cycle_budget_exhausted_no_mutations(void) {
 }
 
 static void adversarial_multi_turn_consistency_dimension_targeted(void) {
-    hu_allocator_t alloc = hu_allocator_default();
+    hu_allocator_t alloc = hu_system_allocator();
     int dims[HU_TURING_DIM_COUNT];
     for (int d = 0; d < HU_TURING_DIM_COUNT; d++)
         dims[d] = 9;
@@ -272,7 +272,8 @@ static void adversarial_multi_turn_consistency_dimension_targeted(void) {
     alloc.free(alloc.ctx, scenarios, count * sizeof(hu_turing_scenario_t));
 }
 
-HU_TEST_SUITE("Adversarial Turing") {
+void run_adversarial_turing_tests(void) {
+    HU_TEST_SUITE("Adversarial Turing");
     HU_RUN_TEST(adversarial_bank_size_is_positive);
     HU_RUN_TEST(adversarial_bank_get_returns_valid_scenario);
     HU_RUN_TEST(adversarial_bank_get_out_of_range);

@@ -131,7 +131,7 @@ static void test_get_provider_key_from_provider_entry(void) {
     free_config(cfg);
 }
 
-static void test_get_provider_key_named_empty_returns_null(void) {
+static void test_get_provider_key_falls_back_to_api_key(void) {
     hu_config_t *cfg = make_config_with_arena();
     cfg->api_key = hu_strdup(&cfg->allocator, "global-key");
     hu_provider_entry_t *p = (hu_provider_entry_t *)cfg->allocator.alloc(
@@ -142,9 +142,9 @@ static void test_get_provider_key_named_empty_returns_null(void) {
     p->api_key = NULL;
     cfg->providers = p;
     cfg->providers_len = 1;
-    /* Named provider found but key empty — should NOT fall back to global */
     const char *key = hu_config_get_provider_key(cfg, "openai");
-    HU_ASSERT_NULL(key);
+    HU_ASSERT_NOT_NULL(key);
+    HU_ASSERT_STR_EQ(key, "global-key");
     free_config(cfg);
 }
 
@@ -152,7 +152,6 @@ static void test_get_provider_key_unknown_provider_uses_api_key(void) {
     hu_config_t cfg = {0};
     char api_key[] = "sk-global";
     cfg.api_key = api_key;
-    /* Unknown name → falls back to global key */
     const char *key = hu_config_get_provider_key(&cfg, "nonexistent");
     HU_ASSERT_NOT_NULL(key);
     HU_ASSERT_STR_EQ(key, "sk-global");
@@ -434,7 +433,7 @@ void run_config_getters_tests(void) {
     HU_RUN_TEST(test_get_provider_key_null_cfg_returns_null);
     HU_RUN_TEST(test_get_provider_key_null_name_returns_null);
     HU_RUN_TEST(test_get_provider_key_from_provider_entry);
-    HU_RUN_TEST(test_get_provider_key_named_empty_returns_null);
+    HU_RUN_TEST(test_get_provider_key_falls_back_to_api_key);
     HU_RUN_TEST(test_get_provider_key_unknown_provider_uses_api_key);
     HU_RUN_TEST(test_get_provider_key_unknown_no_api_key_returns_null);
     HU_RUN_TEST(test_default_provider_key_null_cfg_returns_null);

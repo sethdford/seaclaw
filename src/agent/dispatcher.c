@@ -45,11 +45,8 @@ static bool tool_cache_lookup(hu_tool_cache_t *cache, hu_allocator_t *alloc,
     size_t slot = (size_t)(h % HU_TOOL_CACHE_SLOTS);
     if (cache->slots[slot].occupied && cache->slots[slot].hash == h) {
         hu_tool_result_t *cached = &cache->slots[slot].result;
-        char *dup = hu_strndup(alloc, cached->output, cached->output_len);
-        if (!dup && cached->output && cached->output_len > 0)
-            return false;
-        out->output = dup;
-        out->output_len = dup ? cached->output_len : 0;
+        out->output = hu_strndup(alloc, cached->output, cached->output_len);
+        out->output_len = cached->output_len;
         out->output_owned = true;
         out->success = cached->success;
         cache->hits++;
@@ -178,21 +175,6 @@ typedef struct dispatch_worker_ctx {
     volatile int done;
 } dispatch_worker_ctx_t;
 
-typedef struct dispatch_stream_worker_ctx {
-    hu_allocator_t *alloc;
-    hu_tool_t *tools;
-    size_t tools_count;
-    const hu_tool_call_t *call;
-    hu_tool_result_t result;
-    hu_tool_cache_t *cache;
-    void (*on_chunk)(void *ctx, const char *data, size_t len);
-    void *cb_ctx;
-    pthread_mutex_t *chunk_mutex;
-    uint32_t max_retries;
-    uint32_t retry_base_ms;
-    volatile int done;
-} dispatch_stream_worker_ctx_t;
-
 static void *dispatch_worker(void *arg);
 static int timed_join(pthread_t thread, uint32_t timeout_secs, volatile int *done_flag);
 #endif
@@ -210,33 +192,23 @@ static hu_error_t dispatch_sequential_ex(hu_allocator_t *alloc, hu_tool_t *tools
 #if defined(HU_GATEWAY_POSIX) && !defined(HU_IS_TEST)
     if (timeout_secs > 0) {
         for (size_t i = 0; i < calls_count; i++) {
-            /* Heap-allocate so detached threads don't access stale stack frames */
-            dispatch_worker_ctx_t *wctx =
-                (dispatch_worker_ctx_t *)alloc->alloc(alloc->ctx, sizeof(dispatch_worker_ctx_t));
-            if (!wctx) {
-                results[i] = hu_tool_result_fail("worker alloc failed", 19);
-                continue;
-            }
-            wctx->alloc = alloc;
-            wctx->tools = tools;
-            wctx->tools_count = tools_count;
-            wctx->call = &calls[i];
-            wctx->done = 0;
-            memset(&wctx->result, 0, sizeof(hu_tool_result_t));
+            dispatch_worker_ctx_t wctx = {.alloc = alloc,
+                                          .tools = tools,
+                                          .tools_count = tools_count,
+                                          .call = &calls[i],
+                                          .done = 0};
+            memset(&wctx.result, 0, sizeof(hu_tool_result_t));
             pthread_t tid;
-            if (pthread_create(&tid, NULL, dispatch_worker, wctx) != 0) {
-                alloc->free(alloc->ctx, wctx, sizeof(dispatch_worker_ctx_t));
+            if (pthread_create(&tid, NULL, dispatch_worker, &wctx) != 0) {
                 results[i] = hu_tool_result_fail("thread creation failed", 22);
                 continue;
             }
-            int timed_out = timed_join(tid, timeout_secs, &wctx->done);
+            int timed_out = timed_join(tid, timeout_secs, &wctx.done);
             if (timed_out) {
-                /* Thread is detached and still running; it owns wctx and will
-                 * free it when done (see dispatch_worker). We cannot touch it. */
+                hu_tool_result_free(alloc, &wctx.result);
                 results[i] = hu_tool_result_fail("tool execution timed out", 24);
             } else {
-                results[i] = wctx->result;
-                alloc->free(alloc->ctx, wctx, sizeof(dispatch_worker_ctx_t));
+                results[i] = wctx.result;
             }
         }
     } else
@@ -260,14 +232,7 @@ static hu_error_t dispatch_sequential_ex(hu_allocator_t *alloc, hu_tool_t *tools
 static void *dispatch_worker(void *arg) {
     dispatch_worker_ctx_t *ctx = (dispatch_worker_ctx_t *)arg;
     execute_one_cached(ctx->alloc, ctx->tools, ctx->tools_count, ctx->call, &ctx->result, NULL);
-    /* Mark done atomically before checking if we were detached.
-     * If timed_join already detached us, we own the heap context and must free it. */
-    int was_done = __sync_val_compare_and_swap(&ctx->done, 0, 1);
-    if (was_done == -1) {
-        /* Parent set done=-1 to signal "detached, worker owns cleanup" */
-        hu_tool_result_free(ctx->alloc, &ctx->result);
-        ctx->alloc->free(ctx->alloc->ctx, ctx, sizeof(dispatch_worker_ctx_t));
-    }
+    ctx->done = 1;
     return NULL;
 }
 
@@ -285,10 +250,8 @@ static int timed_join(pthread_t thread, uint32_t timeout_secs, volatile int *don
         clock_gettime(CLOCK_REALTIME, &now);
         if (now.tv_sec > deadline.tv_sec ||
             (now.tv_sec == deadline.tv_sec && now.tv_nsec >= deadline.tv_nsec)) {
-            /* Signal the worker that it owns its heap context.
-             * CAS: only set to -1 if worker hasn't already set to 1. */
-            __sync_val_compare_and_swap(done_flag, 0, -1);
-            pthread_detach(thread);
+            pthread_cancel(thread);
+            pthread_join(thread, NULL);
             return -1;
         }
         struct timespec sleep_ts = {.tv_sec = 0, .tv_nsec = 50000000};
@@ -358,100 +321,6 @@ static hu_error_t dispatch_parallel(hu_dispatcher_t *d, hu_allocator_t *alloc, h
 
     alloc->free(alloc->ctx, threads, calls_count * sizeof(pthread_t));
     alloc->free(alloc->ctx, ctxs, calls_count * sizeof(dispatch_worker_ctx_t));
-
-    out->results = results;
-    out->count = calls_count;
-    return HU_OK;
-}
-
-static void stream_chunk_locked(void *ctx, const char *data, size_t len) {
-    dispatch_stream_worker_ctx_t *wctx = (dispatch_stream_worker_ctx_t *)ctx;
-    pthread_mutex_lock(wctx->chunk_mutex);
-    wctx->on_chunk(wctx->cb_ctx, data, len);
-    pthread_mutex_unlock(wctx->chunk_mutex);
-}
-
-static void *dispatch_stream_worker(void *arg) {
-    dispatch_stream_worker_ctx_t *ctx = (dispatch_stream_worker_ctx_t *)arg;
-    execute_one_retried(ctx->alloc, ctx->tools, ctx->tools_count, ctx->call, &ctx->result,
-                        ctx->cache, stream_chunk_locked, ctx, ctx->max_retries, ctx->retry_base_ms);
-    ctx->done = 1;
-    return NULL;
-}
-
-static hu_error_t dispatch_parallel_streaming(hu_dispatcher_t *d, hu_allocator_t *alloc,
-                                              hu_tool_t *tools, size_t tools_count,
-                                              const hu_tool_call_t *calls, size_t calls_count,
-                                              void (*on_chunk)(void *ctx, const char *data,
-                                                               size_t len),
-                                              void *cb_ctx, hu_dispatch_result_t *out) {
-    if (calls_count == 0) {
-        out->results = NULL;
-        out->count = 0;
-        return HU_OK;
-    }
-
-    pthread_mutex_t chunk_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-    dispatch_stream_worker_ctx_t *ctxs = (dispatch_stream_worker_ctx_t *)alloc->alloc(
-        alloc->ctx, calls_count * sizeof(dispatch_stream_worker_ctx_t));
-    if (!ctxs)
-        return HU_ERR_OUT_OF_MEMORY;
-
-    pthread_t *threads = (pthread_t *)alloc->alloc(alloc->ctx, calls_count * sizeof(pthread_t));
-    if (!threads) {
-        alloc->free(alloc->ctx, ctxs, calls_count * sizeof(dispatch_stream_worker_ctx_t));
-        return HU_ERR_OUT_OF_MEMORY;
-    }
-
-    for (size_t i = 0; i < calls_count; i++) {
-        ctxs[i].alloc = alloc;
-        ctxs[i].tools = tools;
-        ctxs[i].tools_count = tools_count;
-        ctxs[i].call = &calls[i];
-        ctxs[i].cache = NULL;
-        ctxs[i].on_chunk = on_chunk;
-        ctxs[i].cb_ctx = cb_ctx;
-        ctxs[i].chunk_mutex = &chunk_mutex;
-        ctxs[i].max_retries = d->max_retries;
-        ctxs[i].retry_base_ms = d->retry_base_ms;
-        ctxs[i].done = 0;
-        memset(&ctxs[i].result, 0, sizeof(hu_tool_result_t));
-
-        int rc = pthread_create(&threads[i], NULL, dispatch_stream_worker, &ctxs[i]);
-        if (rc != 0) {
-            for (size_t j = 0; j < i; j++)
-                pthread_join(threads[j], NULL);
-            alloc->free(alloc->ctx, threads, calls_count * sizeof(pthread_t));
-            alloc->free(alloc->ctx, ctxs, calls_count * sizeof(dispatch_stream_worker_ctx_t));
-            pthread_mutex_destroy(&chunk_mutex);
-            return HU_ERR_OUT_OF_MEMORY;
-        }
-    }
-
-    for (size_t i = 0; i < calls_count; i++) {
-        int timed_out = timed_join(threads[i], d->timeout_secs, &ctxs[i].done);
-        if (timed_out) {
-            hu_tool_result_free(alloc, &ctxs[i].result);
-            ctxs[i].result = hu_tool_result_fail("tool execution timed out", 24);
-        }
-    }
-
-    hu_tool_result_t *results =
-        (hu_tool_result_t *)alloc->alloc(alloc->ctx, calls_count * sizeof(hu_tool_result_t));
-    if (!results) {
-        alloc->free(alloc->ctx, threads, calls_count * sizeof(pthread_t));
-        alloc->free(alloc->ctx, ctxs, calls_count * sizeof(dispatch_stream_worker_ctx_t));
-        pthread_mutex_destroy(&chunk_mutex);
-        return HU_ERR_OUT_OF_MEMORY;
-    }
-
-    for (size_t i = 0; i < calls_count; i++)
-        results[i] = ctxs[i].result;
-
-    alloc->free(alloc->ctx, threads, calls_count * sizeof(pthread_t));
-    alloc->free(alloc->ctx, ctxs, calls_count * sizeof(dispatch_stream_worker_ctx_t));
-    pthread_mutex_destroy(&chunk_mutex);
 
     out->results = results;
     out->count = calls_count;
@@ -529,12 +398,6 @@ hu_error_t hu_dispatcher_dispatch_streaming(hu_dispatcher_t *d, hu_allocator_t *
         return HU_OK;
     if (!on_chunk)
         return hu_dispatcher_dispatch(d, alloc, tools, tools_count, calls, calls_count, out);
-
-#if !defined(HU_IS_TEST) && defined(HU_GATEWAY_POSIX)
-    if (d->max_parallel > 1 && calls_count > 1)
-        return dispatch_parallel_streaming(d, alloc, tools, tools_count, calls, calls_count,
-                                           on_chunk, cb_ctx, out);
-#endif
 
     hu_tool_result_t *results =
         (hu_tool_result_t *)alloc->alloc(alloc->ctx, calls_count * sizeof(hu_tool_result_t));

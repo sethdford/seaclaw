@@ -306,7 +306,6 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
     /* Calendar awareness: inject today's events when calendar_enabled */
     char *calendar_ctx = NULL;
     size_t calendar_ctx_len = 0;
-#ifdef HU_HAS_PERSONA
     if (agent && agent->persona && agent->persona->context_awareness.calendar_enabled) {
 #if defined(__APPLE__)
         char *events_json = NULL;
@@ -334,7 +333,6 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
         }
 #endif
     }
-#endif /* HU_HAS_PERSONA calendar */
 
     /* F51: Weather awareness — inject notable weather for proactive context */
     char *weather_ctx = NULL;
@@ -363,12 +361,10 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
     }
 #endif /* HU_HAS_PERSONA weather */
 
+#ifdef HU_ENABLE_SQLITE
     /* Recent feeds → natural bring-up hooks for this contact (high relevance only). */
     char *feed_aware_ctx = NULL;
     size_t feed_aware_ctx_len = 0;
-    (void)feed_aware_ctx;
-    (void)feed_aware_ctx_len;
-#if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_PERSONA)
     if (memory && agent && agent->persona) {
         sqlite3 *fdb = hu_sqlite_memory_get_db(memory);
         if (fdb) {
@@ -429,7 +425,7 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
             }
         }
     }
-#endif /* HU_ENABLE_SQLITE && HU_HAS_PERSONA feed awareness */
+#endif /* HU_ENABLE_SQLITE feed awareness */
 
     static const char HU_DEFAULT_PROACTIVE_RULES[] =
         "\nRules: "

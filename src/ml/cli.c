@@ -16,7 +16,6 @@
 #include "human/ml/prepare.h"
 #include "human/ml/tokenizer_ml.h"
 #include "human/ml/train.h"
-#include "human/ml/agent_trainer.h"
 #include "human/persona.h"
 #include "human/provider.h"
 #include "human/providers/factory.h"
@@ -992,67 +991,5 @@ done_collect:
     (void)rmdir(tmp_dir);
 
     return err;
-#endif
-}
-
-hu_error_t hu_ml_cli_train_agent(hu_allocator_t *alloc, int argc, const char **argv) {
-    const char *path = NULL;
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--help") == 0) {
-            printf("Usage: human ml train-agent --trajectory <path> [--help]\n");
-            return HU_OK;
-        }
-        const char *v = get_opt(argv, argc, i, "--trajectory");
-        if (v)
-            path = v;
-    }
-#ifdef HU_IS_TEST
-    (void)alloc;
-    (void)path;
-    return HU_OK;
-#else
-    if (!path) {
-        fprintf(stderr, "train-agent: --trajectory <file> required\n");
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-    FILE *f = fopen(path, "rb");
-    if (!f) {
-        hu_log_error("ml", NULL, "Cannot open trajectory: %s", path);
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-    fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (sz <= 0 || sz > 4 * 1024 * 1024) {
-        fclose(f);
-        hu_log_error("ml", NULL, "Trajectory file invalid size: %s", path);
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-    char *buf = (char *)alloc->alloc(alloc->ctx, (size_t)sz + 1);
-    if (!buf) {
-        fclose(f);
-        return HU_ERR_OUT_OF_MEMORY;
-    }
-    if (fread(buf, 1, (size_t)sz, f) != (size_t)sz) {
-        fclose(f);
-        alloc->free(alloc->ctx, buf, (size_t)sz + 1);
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-    fclose(f);
-    buf[sz] = '\0';
-
-    hu_agent_training_config_t tc = hu_training_config_default();
-    hu_training_metrics_t met = {0};
-    hu_error_t err = hu_agent_train_step(alloc, &tc, buf, (size_t)sz, &met);
-    alloc->free(alloc->ctx, buf, (size_t)sz + 1);
-    if (err != HU_OK) {
-        hu_log_error("ml", NULL, "train-agent step failed");
-        return err;
-    }
-    char rep[384];
-    size_t rlen = 0;
-    if (hu_training_metrics_report(alloc, &met, rep, sizeof(rep), &rlen) == HU_OK && rlen > 0)
-        printf("%.*s\n", (int)rlen, rep);
-    return HU_OK;
 #endif
 }

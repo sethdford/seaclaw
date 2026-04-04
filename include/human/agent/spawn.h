@@ -62,20 +62,11 @@ typedef struct hu_spawn_config {
     uint64_t parent_agent_id;         /* parent's agent_id for delegation token issuance */
 } hu_spawn_config_t;
 
-typedef struct hu_depth_model_override {
-    uint32_t min_depth;
-    uint32_t max_depth;
-    char *provider; /* may be NULL to keep default provider */
-    char *model;    /* required */
-} hu_depth_model_override_t;
-
 /* Limits for the agent pool ("fleet") — concurrent slots still use max_concurrent. */
 typedef struct hu_fleet_limits {
     uint32_t max_spawn_depth;   /* 0 = unlimited nested spawns */
     uint32_t max_total_spawns;  /* 0 = unlimited lifetime spawns started in this pool */
     double budget_limit_usd;    /* 0 = unlimited; else need shared_cost_tracker or pool bind */
-    hu_depth_model_override_t *depth_model_overrides;
-    size_t depth_model_overrides_count;
 } hu_fleet_limits_t;
 
 typedef struct hu_fleet_status {

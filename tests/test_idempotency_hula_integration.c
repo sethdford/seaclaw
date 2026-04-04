@@ -46,8 +46,7 @@ static const hu_tool_vtable_t mock_echo_vtable = {
     .execute_streaming = NULL,
 };
 
-/* Test: HuLa CALL with idempotency dedup (WIP — not yet wired into suite runner) */
-__attribute__((unused))
+/* Test: HuLa CALL with idempotency dedup */
 static void test_hula_call_with_idempotency_dedup(void) {
     hu_allocator_t alloc = hu_system_allocator();
 
@@ -122,8 +121,7 @@ static void test_hula_call_with_idempotency_dedup(void) {
     hu_hula_program_deinit(&prog);
 }
 
-/* Test: HuLa SEQ with mixed cache hits/misses (WIP — not yet wired into suite runner) */
-__attribute__((unused))
+/* Test: HuLa SEQ with mixed cache hits/misses */
 static void test_hula_seq_with_idempotency(void) {
     hu_allocator_t alloc = hu_system_allocator();
 

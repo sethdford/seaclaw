@@ -57,49 +57,27 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
     session->connected = true;
 
     {
+        char session_update[1024];
         const char *mdl = (session->config.model && session->config.model[0])
                               ? session->config.model
                               : "gpt-4o-realtime-preview";
-        const char *voice =
-            (session->config.voice && session->config.voice[0]) ? session->config.voice : "alloy";
-        const char *td = session->config.vad_enabled
-                             ? "\"turn_detection\":{\"type\":\"server_vad\",\"threshold\":0.5,"
-                               "\"prefix_padding_ms\":300,\"silence_duration_ms\":500}"
-                             : "\"turn_detection\":null";
-        hu_json_buf_t subuf = {0};
-        hu_error_t suerr = hu_json_buf_init(&subuf, session->alloc);
-        if (suerr != HU_OK) {
-            hu_ws_client_free(ws, session->alloc);
-            session->ws_client = NULL;
-            session->connected = false;
-            return suerr;
-        }
-        hu_json_buf_append_raw(&subuf, "{\"type\":\"session.update\",\"session\":{\"model\":", 45);
-        hu_json_append_string(&subuf, mdl, strlen(mdl));
-        hu_json_buf_append_raw(&subuf, ",\"modalities\":[\"text\",\"audio\"],\"voice\":", 40);
-        hu_json_append_string(&subuf, voice, strlen(voice));
-        hu_json_buf_append_raw(&subuf,
-            ",\"input_audio_format\":\"pcm16\","
-            "\"output_audio_format\":\"pcm16\","
-            "\"input_audio_transcription\":{\"model\":\"whisper-1\"},", 107);
-        hu_json_buf_append_raw(&subuf, td, strlen(td));
-        hu_json_buf_append_raw(&subuf, "}}", 2);
-        int su = (subuf.ptr && subuf.len > 0) ? (int)subuf.len : -1;
-        if (su <= 0) {
-            hu_json_buf_free(&subuf);
-            hu_ws_client_free(ws, session->alloc);
-            session->ws_client = NULL;
-            session->connected = false;
-            return HU_ERR_IO;
-        }
-        hu_error_t su_err = hu_ws_send(ws, subuf.ptr, subuf.len);
-        hu_json_buf_free(&subuf);
-        if (su_err != HU_OK) {
-            hu_ws_client_free(ws, session->alloc);
-            session->ws_client = NULL;
-            session->connected = false;
-            return su_err;
-        }
+        const char *voice = (session->config.voice && session->config.voice[0])
+                                ? session->config.voice
+                                : "alloy";
+        int su = snprintf(session_update, sizeof(session_update),
+                          "{\"type\":\"session.update\",\"session\":{"
+                          "\"model\":\"%s\","
+                          "\"modalities\":[\"text\",\"audio\"],"
+                          "\"voice\":\"%s\","
+                          "\"input_audio_format\":\"pcm16\","
+                          "\"output_audio_format\":\"pcm16\","
+                          "\"input_audio_transcription\":{\"model\":\"whisper-1\"},"
+                          "\"turn_detection\":{\"type\":\"server_vad\",\"threshold\":0.5,"
+                          "\"prefix_padding_ms\":300,\"silence_duration_ms\":500}"
+                          "}}",
+                          mdl, voice);
+        if (su > 0 && (size_t)su < sizeof(session_update))
+            (void)hu_ws_send(ws, session_update, (size_t)su);
     }
     return HU_OK;
 #else
@@ -107,8 +85,7 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
 #endif
 }
 
-hu_error_t hu_voice_rt_send_audio(hu_voice_rt_session_t *session, const void *data,
-                                  size_t data_len) {
+hu_error_t hu_voice_rt_send_audio(hu_voice_rt_session_t *session, const void *data, size_t data_len) {
     if (!session || !data)
         return HU_ERR_INVALID_ARGUMENT;
 #if HU_IS_TEST
@@ -262,56 +239,6 @@ hu_error_t hu_voice_rt_recv_event(hu_voice_rt_session_t *session, hu_allocator_t
         if (strcmp(type, "response.audio.done") == 0 || strcmp(type, "response.done") == 0 ||
             strcmp(type, "response.output_audio.done") == 0)
             out->done = true;
-
-        /* Error events — extract code + message into transcript for upstream logging */
-        if (strcmp(type, "error") == 0) {
-            hu_json_value_t *eobj = hu_json_object_get(json, "error");
-            const char *emsg = eobj ? hu_json_get_string(eobj, "message") : NULL;
-            if (emsg && emsg[0]) {
-                size_t elen = strlen(emsg);
-                out->transcript = hu_strndup(alloc, emsg, elen);
-                out->transcript_len = out->transcript ? elen : 0;
-            }
-            out->error = true;
-        }
-
-        /* VAD speech lifecycle events */
-        if (strcmp(type, "input_audio_buffer.speech_started") == 0)
-            out->vad_speech_started = true;
-        if (strcmp(type, "input_audio_buffer.speech_stopped") == 0)
-            out->vad_speech_stopped = true;
-
-        /* Tool / function call events */
-        if (strcmp(type, "response.function_call_arguments.done") == 0) {
-            const char *name = hu_json_get_string(json, "name");
-            const char *call_id = hu_json_get_string(json, "call_id");
-            const char *arguments = hu_json_get_string(json, "arguments");
-            if (name && call_id) {
-                size_t nlen = strlen(name);
-                size_t clen = strlen(call_id);
-                char *n_dup = hu_strndup(alloc, name, nlen);
-                char *c_dup = hu_strndup(alloc, call_id, clen);
-                if (!n_dup || !c_dup) {
-                    if (n_dup)
-                        alloc->free(alloc->ctx, n_dup, nlen + 1);
-                    if (c_dup)
-                        alloc->free(alloc->ctx, c_dup, clen + 1);
-                    hu_json_free(alloc, json);
-                    alloc->free(alloc->ctx, msg, msg_len + 1);
-                    return HU_ERR_OUT_OF_MEMORY;
-                }
-                out->transcript = n_dup;
-                out->transcript_len = nlen;
-                out->tool_call_id = c_dup;
-                out->tool_call_id_len = clen;
-                if (arguments) {
-                    size_t alen = strlen(arguments);
-                    out->tool_args_json = hu_strndup(alloc, arguments, alen);
-                    out->tool_args_json_len = out->tool_args_json ? alen : 0;
-                }
-                copy_event_type("response.function_call", out);
-            }
-        }
     }
 
     hu_json_free(alloc, json);
@@ -331,10 +258,6 @@ void hu_voice_rt_event_free(hu_allocator_t *alloc, hu_voice_rt_event_t *event) {
         alloc->free(alloc->ctx, event->audio_base64, event->audio_base64_len + 1);
     if (event->transcript)
         alloc->free(alloc->ctx, event->transcript, event->transcript_len + 1);
-    if (event->tool_call_id)
-        alloc->free(alloc->ctx, event->tool_call_id, event->tool_call_id_len + 1);
-    if (event->tool_args_json)
-        alloc->free(alloc->ctx, event->tool_args_json, event->tool_args_json_len + 1);
     memset(event, 0, sizeof(*event));
 }
 
@@ -350,41 +273,39 @@ hu_error_t hu_voice_rt_add_tool(hu_voice_rt_session_t *session, const char *name
     if (!session->connected || !session->ws_client)
         return HU_ERR_IO;
     const char *params = parameters_json && parameters_json[0] ? parameters_json : "{}";
-    /* When name starts with '[', treat as a pre-built JSON tools array.
-     * This allows callers to send a complete batch in one session.update. */
+    static const char k_sess_tool_head[] =
+        "{\"type\":\"session.update\",\"session\":{\"tools\":[{\"type\":\"function\"";
     hu_json_buf_t buf = {0};
     hu_error_t err = hu_json_buf_init(&buf, session->alloc);
     if (err != HU_OK)
         return err;
-    if (name[0] == '[') {
-        err = hu_json_buf_append_raw(
-            &buf, "{\"type\":\"session.update\",\"session\":{\"tools\":", 44);
-        if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, name, strlen(name));
-        if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, "}}", 2);
-    } else {
-        static const char k_head[] =
-            "{\"type\":\"session.update\",\"session\":{\"tools\":[{\"type\":\"function\"";
-        err = hu_json_buf_append_raw(&buf, k_head, sizeof(k_head) - 1);
-        if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, ",", 1);
-        if (err == HU_OK)
-            err = hu_json_append_key_value(&buf, "name", 4, name, strlen(name));
-        if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, ",", 1);
-        if (err == HU_OK)
-            err = hu_json_append_key_value(&buf, "description", 11, description ? description : "",
-                                           description ? strlen(description) : 0);
-        if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, ",\"parameters\":", 14);
-        if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, params, strlen(params));
-        if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, "}]}}", 4);
-    }
-    if (err == HU_OK)
-        err = hu_ws_send((hu_ws_client_t *)session->ws_client, buf.ptr, buf.len);
+    err = hu_json_buf_append_raw(&buf, k_sess_tool_head, sizeof(k_sess_tool_head) - 1);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_buf_append_raw(&buf, ",", 1);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_append_key_value(&buf, "name", 4, name, strlen(name));
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_buf_append_raw(&buf, ",", 1);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_append_key_value(&buf, "description", 11, description ? description : "",
+                                   description ? strlen(description) : 0);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_buf_append_raw(&buf, ",\"parameters\":", 16);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_buf_append_raw(&buf, params, strlen(params));
+    if (err != HU_OK)
+        goto fail;
+    err = hu_json_buf_append_raw(&buf, "}]}}", 4);
+    if (err != HU_OK)
+        goto fail;
+    err = hu_ws_send((hu_ws_client_t *)session->ws_client, buf.ptr, buf.len);
+fail:
     hu_json_buf_free(&buf);
     return err;
 #else
@@ -408,13 +329,13 @@ static hu_error_t openai_vp_send_audio(void *ctx, const void *pcm16, size_t len)
     return hu_voice_rt_send_audio((hu_voice_rt_session_t *)ctx, pcm16, len);
 }
 
-static hu_error_t openai_vp_recv_event(void *ctx, hu_allocator_t *alloc, hu_voice_rt_event_t *out,
-                                       int timeout_ms) {
+static hu_error_t openai_vp_recv_event(void *ctx, hu_allocator_t *alloc,
+                                        hu_voice_rt_event_t *out, int timeout_ms) {
     return hu_voice_rt_recv_event((hu_voice_rt_session_t *)ctx, alloc, out, timeout_ms);
 }
 
 static hu_error_t openai_vp_add_tool(void *ctx, const char *name, const char *description,
-                                     const char *parameters_json) {
+                                      const char *parameters_json) {
     return hu_voice_rt_add_tool((hu_voice_rt_session_t *)ctx, name, description, parameters_json);
 }
 
@@ -432,58 +353,6 @@ static const char *openai_vp_get_name(void *ctx) {
     return "openai_realtime";
 }
 
-static hu_error_t openai_vp_noop(void *ctx) {
-    (void)ctx;
-    return HU_OK;
-}
-
-static hu_error_t openai_vp_reconnect(void *ctx) {
-    (void)ctx;
-    return HU_ERR_NOT_SUPPORTED;
-}
-
-static hu_error_t openai_vp_send_tool_response(void *ctx, const char *name, const char *call_id,
-                                               const char *response_json) {
-    (void)name;
-    hu_voice_rt_session_t *session = (hu_voice_rt_session_t *)ctx;
-    if (!session || !call_id)
-        return HU_ERR_INVALID_ARGUMENT;
-#if HU_IS_TEST
-    (void)response_json;
-    return HU_OK;
-#elif defined(HU_HTTP_CURL)
-    if (!session->connected || !session->ws_client)
-        return HU_ERR_IO;
-    const char *output = (response_json && response_json[0]) ? response_json : "{}";
-    hu_json_buf_t buf = {0};
-    hu_error_t err = hu_json_buf_init(&buf, session->alloc);
-    if (err != HU_OK)
-        return err;
-    err = hu_json_buf_append_raw(&buf,
-        "{\"type\":\"conversation.item.create\",\"item\":{"
-        "\"type\":\"function_call_output\",\"call_id\":", 91);
-    if (err == HU_OK)
-        err = hu_json_append_string(&buf, call_id, strlen(call_id));
-    if (err == HU_OK)
-        err = hu_json_buf_append_raw(&buf, ",\"output\":", 10);
-    if (err == HU_OK)
-        err = hu_json_append_string(&buf, output, strlen(output));
-    if (err == HU_OK)
-        err = hu_json_buf_append_raw(&buf, "}}", 2);
-    if (err == HU_OK)
-        err = hu_ws_send((hu_ws_client_t *)session->ws_client, buf.ptr, buf.len);
-    hu_json_buf_free(&buf);
-    if (err != HU_OK)
-        return err;
-    /* Prompt model to continue generating after receiving tool output */
-    static const char resp_create[] = "{\"type\":\"response.create\"}";
-    return hu_ws_send((hu_ws_client_t *)session->ws_client, resp_create, sizeof(resp_create) - 1);
-#else
-    (void)response_json;
-    return HU_ERR_NOT_SUPPORTED;
-#endif
-}
-
 static const hu_voice_provider_vtable_t openai_voice_vtable = {
     .connect = openai_vp_connect,
     .send_audio = openai_vp_send_audio,
@@ -492,16 +361,11 @@ static const hu_voice_provider_vtable_t openai_voice_vtable = {
     .cancel_response = openai_vp_cancel_response,
     .disconnect = openai_vp_disconnect,
     .get_name = openai_vp_get_name,
-    .send_activity_start = openai_vp_noop,
-    .send_activity_end = openai_vp_noop,
-    .send_audio_stream_end = openai_vp_noop,
-    .reconnect = openai_vp_reconnect,
-    .send_tool_response = openai_vp_send_tool_response,
 };
 
 hu_error_t hu_voice_provider_openai_create(hu_allocator_t *alloc,
-                                           const hu_voice_rt_config_t *config,
-                                           hu_voice_provider_t *out) {
+                                            const hu_voice_rt_config_t *config,
+                                            hu_voice_provider_t *out) {
     if (!alloc || !out)
         return HU_ERR_INVALID_ARGUMENT;
     hu_voice_rt_session_t *session = NULL;

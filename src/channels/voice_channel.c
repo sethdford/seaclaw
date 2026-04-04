@@ -1,8 +1,7 @@
-#include "human/channels/voice_channel.h"
 #include "human/core/log.h"
+#include "human/channels/voice_channel.h"
 #include "human/core/string.h"
-#include "human/voice/gemini_live.h"
-#include "human/voice/provider.h"
+#include "human/voice/realtime.h"
 #include "human/voice/webrtc.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,8 +10,7 @@
 /* Voice channel with configurable mode:
  *   HU_VOICE_MODE_SONATA (default) — Sonata TTS/STT pipeline
  *   HU_VOICE_MODE_REALTIME — OpenAI Realtime API (full-duplex WebSocket)
- *   HU_VOICE_MODE_WEBRTC — WebRTC voice (SDP exchange + audio streaming)
- *   HU_VOICE_MODE_GEMINI_LIVE — Gemini Live (Multimodal Live API) */
+ *   HU_VOICE_MODE_WEBRTC — WebRTC voice (SDP exchange + audio streaming) */
 
 #ifdef HU_HAS_SONATA
 /* FFI declarations for Sonata Rust pipeline.
@@ -33,9 +31,8 @@ typedef struct hu_voice_ctx {
     hu_channel_voice_config_t config;
     bool initialized;
     bool running;
-    hu_voice_provider_t provider; /* vtable-based voice backend (Realtime or Gemini Live) */
+    hu_voice_rt_session_t *rt_session;
     hu_webrtc_session_t *webrtc_session;
-    bool vad_active; /* tracks activityStart/End for manual VAD */
 } hu_voice_ctx_t;
 
 static hu_error_t voice_start(void *ctx) {
@@ -43,26 +40,19 @@ static hu_error_t voice_start(void *ctx) {
     if (!v)
         return HU_ERR_INVALID_ARGUMENT;
 
-    if (v->config.mode == HU_VOICE_MODE_REALTIME || v->config.mode == HU_VOICE_MODE_GEMINI_LIVE) {
-        const char *mode =
-            v->config.mode == HU_VOICE_MODE_REALTIME ? "openai_realtime" : "gemini_live";
-        hu_voice_provider_extras_t extras = {
-            .api_key = v->config.api_key,
-            .model_id = v->config.model,
-            .voice_id = v->config.voice,
-            .vertex_region = v->config.vertex_region,
-            .vertex_project = v->config.vertex_project,
-            .vertex_access_token = v->config.vertex_access_token,
-            .sample_rate = (int)v->config.sample_rate,
-        };
-        hu_error_t err =
-            hu_voice_provider_create_from_extras(v->alloc, mode, &extras, &v->provider);
+    if (v->config.mode == HU_VOICE_MODE_REALTIME) {
+        hu_voice_rt_config_t rt_cfg = {0};
+        rt_cfg.sample_rate = (int)v->config.sample_rate;
+        rt_cfg.api_key = v->config.api_key ? v->config.api_key : NULL;
+        rt_cfg.model = v->config.model ? v->config.model : NULL;
+        rt_cfg.voice = v->config.voice ? v->config.voice : NULL;
+        hu_error_t err = hu_voice_rt_session_create(v->alloc, &rt_cfg, &v->rt_session);
         if (err != HU_OK)
             return err;
-        err = v->provider.vtable->connect(v->provider.ctx);
+        err = hu_voice_rt_connect(v->rt_session);
         if (err != HU_OK) {
-            v->provider.vtable->disconnect(v->provider.ctx, v->alloc);
-            memset(&v->provider, 0, sizeof(v->provider));
+            hu_voice_rt_session_destroy(v->rt_session);
+            v->rt_session = NULL;
             return err;
         }
         v->running = true;
@@ -71,9 +61,7 @@ static hu_error_t voice_start(void *ctx) {
 
     if (v->config.mode == HU_VOICE_MODE_WEBRTC) {
 #if !HU_IS_TEST
-        hu_log_info("voice-channel", NULL,
-                    "voice_channel: WebRTC uses native ICE/DTLS/SRTP; configure STUN/TURN and "
-                    "signaling_endpoint");
+        hu_log_info("voice-channel", NULL, "voice_channel: WebRTC uses native ICE/DTLS/SRTP; configure STUN/TURN and signaling_endpoint");
 #endif
 #if HU_IS_TEST
         v->running = true;
@@ -81,19 +69,9 @@ static hu_error_t voice_start(void *ctx) {
 #else
         hu_webrtc_config_t wc_cfg = {0};
         wc_cfg.audio_enabled = true;
-        wc_cfg.api_key = (char *)v->config.api_key;
         hu_error_t err = hu_webrtc_session_create(v->alloc, &wc_cfg, &v->webrtc_session);
         if (err != HU_OK)
             return err;
-        err = hu_webrtc_connect(v->webrtc_session, NULL);
-        if (err != HU_OK) {
-            hu_log_error("voice-channel", NULL,
-                         "WebRTC connect failed (configure signaling_endpoint): %s",
-                         hu_error_string(err));
-            hu_webrtc_session_destroy(v->webrtc_session);
-            v->webrtc_session = NULL;
-            return err;
-        }
         v->running = true;
         return HU_OK;
 #endif
@@ -118,13 +96,9 @@ static void voice_stop(void *ctx) {
         return;
     v->running = false;
 
-    if (v->provider.vtable) {
-        if (v->vad_active)
-            (void)v->provider.vtable->send_activity_end(v->provider.ctx);
-        (void)v->provider.vtable->send_audio_stream_end(v->provider.ctx);
-        v->vad_active = false;
-        v->provider.vtable->disconnect(v->provider.ctx, v->alloc);
-        memset(&v->provider, 0, sizeof(v->provider));
+    if (v->rt_session) {
+        hu_voice_rt_session_destroy(v->rt_session);
+        v->rt_session = NULL;
     }
     if (v->webrtc_session) {
         hu_webrtc_session_destroy(v->webrtc_session);
@@ -150,13 +124,8 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
     (void)media;
     (void)media_count;
 
-    if ((v->config.mode == HU_VOICE_MODE_REALTIME || v->config.mode == HU_VOICE_MODE_GEMINI_LIVE) &&
-        v->provider.vtable) {
-        if (!v->vad_active) {
-            (void)v->provider.vtable->send_activity_start(v->provider.ctx);
-            v->vad_active = true;
-        }
-        return v->provider.vtable->send_audio(v->provider.ctx, message, message_len);
+    if (v->config.mode == HU_VOICE_MODE_REALTIME && v->rt_session) {
+        return hu_voice_rt_send_audio(v->rt_session, message, message_len);
     }
     if (v->config.mode == HU_VOICE_MODE_WEBRTC && v->webrtc_session) {
         return hu_webrtc_send_audio(v->webrtc_session, message, message_len);
@@ -170,8 +139,7 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
     float *audio_buf = (float *)v->alloc->alloc(v->alloc->ctx, buf_bytes);
     if (!audio_buf) {
 #if !HU_IS_TEST
-        hu_log_error("voice-channel", NULL,
-                     "voice_channel: failed to allocate audio buffer (%zu bytes)", buf_bytes);
+        hu_log_error("voice-channel", NULL, "voice_channel: failed to allocate audio buffer (%zu bytes)", buf_bytes);
 #endif
         return HU_ERR_OUT_OF_MEMORY;
     }
@@ -183,8 +151,7 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
                              (const uint8_t *)v->config.speaker_id, exag, audio_buf, &audio_len);
     if (err != 0) {
 #if !HU_IS_TEST
-        hu_log_error("voice-channel", NULL, "voice_channel: sonata_tts failed (err=%d [sonata])",
-                     (int)err);
+        hu_log_error("voice-channel", NULL, "voice_channel: sonata_tts failed (err=%d [sonata])", (int)err);
 #endif
         v->alloc->free(v->alloc->ctx, audio_buf, buf_bytes);
         return HU_ERR_CHANNEL_SEND;
@@ -207,8 +174,7 @@ static hu_error_t voice_send(void *ctx, const char *target, size_t target_len, c
 #if HU_IS_TEST
     return HU_OK;
 #else
-    hu_log_info("voice-channel", NULL,
-                "voice_channel: no TTS backend available (Sonata not built, no audio callback)");
+    hu_log_info("voice-channel", NULL, "voice_channel: no TTS backend available (Sonata not built, no audio callback)");
     return HU_ERR_NOT_SUPPORTED;
 #endif
 #endif
@@ -224,8 +190,8 @@ static bool voice_health_check(void *ctx) {
     return v && v->running;
 }
 
-hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_loop_msg_t *msgs,
-                         size_t max_msgs, size_t *out_count) {
+hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc,
+                         hu_channel_loop_msg_t *msgs, size_t max_msgs, size_t *out_count) {
     hu_voice_ctx_t *v = (hu_voice_ctx_t *)channel_ctx;
     if (!v || !alloc || !msgs || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
@@ -234,41 +200,21 @@ hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_lo
     if (!v->running)
         return HU_OK;
 
-    if ((v->config.mode == HU_VOICE_MODE_REALTIME || v->config.mode == HU_VOICE_MODE_GEMINI_LIVE) &&
-        v->provider.vtable) {
-        const char *skey = v->config.mode == HU_VOICE_MODE_REALTIME ? "voice-rt" : "voice-gl";
+    if (v->config.mode == HU_VOICE_MODE_REALTIME && v->rt_session) {
         hu_voice_rt_event_t event = {0};
-        hu_error_t err = v->provider.vtable->recv_event(v->provider.ctx, alloc, &event, 100);
-        if (err != HU_OK && err != HU_ERR_TIMEOUT)
-            hu_log_warn("voice-channel", NULL, "recv_event error: %s", hu_error_string(err));
-        if (err == HU_OK) {
-            /* Audio data from provider is base64-encoded PCM; only forward as
-             * text when an audio-ready callback is not registered (cloud fallback
-             * path where external TTS handles raw data). When on_audio_ready is
-             * registered the daemon should decode and play — not yet wired. */
-            if (event.audio_base64 && event.audio_base64_len > 0 &&
-                !v->config.on_audio_ready && v->config.on_text_ready) {
-                v->config.on_text_ready(event.audio_base64, event.audio_base64_len,
-                                        v->config.callback_user_data);
-            }
-            if (event.transcript && event.transcript_len > 0 && max_msgs > 0) {
-                memset(&msgs[0], 0, sizeof(msgs[0]));
-                size_t copy_len = event.transcript_len;
-                if (copy_len >= sizeof(msgs[0].content))
-                    copy_len = sizeof(msgs[0].content) - 1;
-                memcpy(msgs[0].content, event.transcript, copy_len);
-                msgs[0].content[copy_len] = '\0';
-                size_t skey_len = strlen(skey);
-                memcpy(msgs[0].session_key, skey, skey_len);
-                msgs[0].session_key[skey_len] = '\0';
-                msgs[0].is_group = false;
-                msgs[0].message_id = -1;
-                *out_count = 1;
-            }
-            if (event.done && v->vad_active) {
-                (void)v->provider.vtable->send_activity_end(v->provider.ctx);
-                v->vad_active = false;
-            }
+        hu_error_t err = hu_voice_rt_recv_event(v->rt_session, alloc, &event, 100);
+        if (err == HU_OK && event.transcript && event.transcript_len > 0 && max_msgs > 0) {
+            memset(&msgs[0], 0, sizeof(msgs[0]));
+            size_t copy_len = event.transcript_len;
+            if (copy_len >= sizeof(msgs[0].content))
+                copy_len = sizeof(msgs[0].content) - 1;
+            memcpy(msgs[0].content, event.transcript, copy_len);
+            msgs[0].content[copy_len] = '\0';
+            memcpy(msgs[0].session_key, "voice-rt", 8);
+            msgs[0].session_key[8] = '\0';
+            msgs[0].is_group = false;
+            msgs[0].message_id = -1;
+            *out_count = 1;
         }
         hu_voice_rt_event_free(alloc, &event);
         return HU_OK;
@@ -317,15 +263,13 @@ hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_lo
         float audio_buf[VOICE_MAX_SAMPLES];
         size_t samples = 0;
         if (v->config.on_audio_input_request(audio_buf, VOICE_MAX_SAMPLES, &samples,
-                                             v->config.callback_user_data) &&
+                                              v->config.callback_user_data) &&
             samples > 0) {
             memset(&msgs[0], 0, sizeof(msgs[0]));
             int n = snprintf(msgs[0].content, sizeof(msgs[0].content),
                              "[voice:%zu samples, needs external STT]", samples);
             if (n > 0)
-                msgs[0].content[(size_t)n < sizeof(msgs[0].content) ? (size_t)n
-                                                                    : sizeof(msgs[0].content) - 1] =
-                    '\0';
+                msgs[0].content[(size_t)n < sizeof(msgs[0].content) ? (size_t)n : sizeof(msgs[0].content) - 1] = '\0';
             memcpy(msgs[0].session_key, "voice-user", 10);
             msgs[0].session_key[10] = '\0';
             msgs[0].is_group = false;

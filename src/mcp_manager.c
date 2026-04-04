@@ -162,18 +162,13 @@ hu_error_t hu_mcp_manager_create(hu_allocator_t *alloc,
         slot->connected = false;
         slot->tool_count = 0;
 
-        /* Copy OAuth2 config (if present). Fail if any required field alloc fails. */
+        /* Copy OAuth2 config (if present) */
         slot->oauth_client_id = dup_str(alloc, e->oauth_client_id);
         slot->oauth_auth_url = dup_str(alloc, e->oauth_auth_url);
         slot->oauth_token_url = dup_str(alloc, e->oauth_token_url);
         slot->oauth_scopes = dup_str(alloc, e->oauth_scopes);
         slot->oauth_redirect_uri = dup_str(alloc, e->oauth_redirect_uri);
         memset(&slot->oauth_token, 0, sizeof(slot->oauth_token));
-        if ((e->oauth_client_id && !slot->oauth_client_id) ||
-            (e->oauth_token_url && !slot->oauth_token_url)) {
-            mgr->slot_count++;
-            goto fail;
-        }
 
         mgr->slot_count++;
     }
@@ -315,18 +310,15 @@ hu_error_t hu_mcp_manager_connect_auto(hu_mcp_manager_t *mgr) {
     if (!mgr)
         return HU_ERR_INVALID_ARGUMENT;
 
-    hu_error_t last_err = HU_OK;
     for (size_t i = 0; i < mgr->slot_count; i++) {
         if (!mgr->slots[i].auto_connect)
             continue;
         hu_error_t err = connect_slot(mgr->alloc, &mgr->slots[i]);
-        if (err != HU_OK) {
+        if (err != HU_OK)
             hu_log_error("mcp-manager", NULL, "mcp_manager: failed to connect server '%s': %d",
                     mgr->slots[i].name ? mgr->slots[i].name : "?", (int)err);
-            last_err = err;
-        }
     }
-    return last_err;
+    return HU_OK;
 }
 
 hu_error_t hu_mcp_manager_connect_server(hu_mcp_manager_t *mgr, const char *server_name) {
@@ -391,8 +383,6 @@ static hu_error_t mgr_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         hu_error_t jerr = hu_mcp_jsonrpc_build_tools_call(alloc, rpc_id,
             w->original_name, args_json, &request, &request_len);
         if (jerr != HU_OK) {
-            if (args_allocated && args_json)
-                alloc->free(alloc->ctx, args_json, args_len + 1);
             *out = hu_tool_result_fail("Failed to build JSON-RPC request", 32);
             return HU_OK;
         }
@@ -403,11 +393,9 @@ static hu_error_t mgr_tool_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         if (slot->oauth_token.access_token && !hu_mcp_oauth_token_is_expired(&slot->oauth_token)) {
             int written = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s",
                                    slot->oauth_token.access_token);
-            if (written <= 0 || (size_t)written >= sizeof(auth_buf)) {
-                *out = hu_tool_result_fail("OAuth token too large for auth header", 36);
-                return HU_OK;
+            if (written > 0 && (size_t)written < sizeof(auth_buf)) {
+                auth_header = auth_buf;
             }
-            auth_header = auth_buf;
         }
 
         /* HTTP POST to server URL */
@@ -564,6 +552,12 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
         if (!slot->connected)
             continue;
 
+        if (!slot->server) {
+            hu_log_info("mcp-manager", NULL, "mcp_manager: tool discovery not yet supported for %s transport",
+                    slot->transport_type ? slot->transport_type : "unknown");
+            continue;
+        }
+
         char **names = NULL, **descs = NULL, **params = NULL;
         size_t n = 0;
         hu_error_t err;
@@ -579,9 +573,8 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
             uint32_t rpc_id = mgr->next_rpc_id++;
             err = hu_mcp_jsonrpc_build_tools_list(alloc, rpc_id, &request, &request_len);
             if (err != HU_OK) {
-                hu_log_warn("mcp-manager", NULL,
-                            "failed to build tools/list request for %s",
-                            slot->name ? slot->name : "?");
+                fprintf(stderr, "mcp_manager: failed to build tools/list request for %s\n",
+                        slot->name ? slot->name : "?");
                 continue;
             }
 
@@ -592,11 +585,8 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
                 !hu_mcp_oauth_token_is_expired(&slot->oauth_token)) {
                 int aw = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s",
                                   slot->oauth_token.access_token);
-                if (aw <= 0 || (size_t)aw >= sizeof(auth_buf)) {
-                    hu_log_error("mcp-manager", NULL, "OAuth token too large for auth buffer");
-                    continue;
-                }
-                auth_header = auth_buf;
+                if (aw > 0 && (size_t)aw < sizeof(auth_buf))
+                    auth_header = auth_buf;
             }
 
             hu_http_response_t response = {0};
@@ -605,9 +595,8 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
             alloc->free(alloc->ctx, request, request_len + 1);
 
             if (http_err != HU_OK || response.status_code < 200 || response.status_code >= 300) {
-                hu_log_warn("mcp-manager", NULL,
-                            "HTTP tools/list failed for %s (status %ld)",
-                            slot->name ? slot->name : "?", response.status_code);
+                fprintf(stderr, "mcp_manager: HTTP tools/list failed for %s (status %ld)\n",
+                        slot->name ? slot->name : "?", response.status_code);
                 hu_http_response_free(alloc, &response);
                 continue;
             }
@@ -623,9 +612,8 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
 
             if (err != HU_OK || is_error || !result_json) {
                 if (result_json) alloc->free(alloc->ctx, result_json, result_len + 1);
-                hu_log_warn("mcp-manager", NULL,
-                            "tools/list RPC error for %s",
-                            slot->name ? slot->name : "?");
+                fprintf(stderr, "mcp_manager: tools/list RPC error for %s\n",
+                        slot->name ? slot->name : "?");
                 continue;
             }
 
@@ -636,9 +624,8 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
             alloc->free(alloc->ctx, result_json, result_len + 1);
 
             if (err != HU_OK || !root) {
-                hu_log_warn("mcp-manager", NULL,
-                            "failed to parse tools/list result for %s",
-                            slot->name ? slot->name : "?");
+                fprintf(stderr, "mcp_manager: failed to parse tools/list result for %s\n",
+                        slot->name ? slot->name : "?");
                 continue;
             }
 
@@ -688,24 +675,16 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
                 /* inputSchema as JSON string */
                 hu_json_value_t *schema = hu_json_object_get(tool_obj, "inputSchema");
                 if (schema) {
-                    char *schema_str = NULL;
-                    size_t schema_len = 0;
-                    if (hu_json_stringify(alloc, schema, &schema_str, &schema_len) == HU_OK &&
-                        schema_str) {
-                        params[ti] = schema_str;
-                    } else {
-                        params[ti] = (char *)alloc->alloc(alloc->ctx, 3);
-                        if (params[ti]) { memcpy(params[ti], "{}", 3); }
-                    }
+                    params[ti] = (char *)alloc->alloc(alloc->ctx, 3);
+                    if (params[ti]) { memcpy(params[ti], "{}", 3); }
                 }
             }
             hu_json_free(alloc, root);
             err = HU_OK;
 #endif /* HU_ENABLE_CURL */
         } else {
-            hu_log_warn("mcp-manager", NULL,
-                        "tool discovery not supported for %s (no server or URL)",
-                        slot->name ? slot->name : "?");
+            fprintf(stderr, "mcp_manager: tool discovery not supported for %s (no server or URL)\n",
+                    slot->name ? slot->name : "?");
             continue;
         }
         if (err != HU_OK || n == 0)
@@ -738,12 +717,8 @@ hu_error_t hu_mcp_manager_load_tools(hu_mcp_manager_t *mgr, hu_allocator_t *allo
         }
 
         for (size_t j = 0; j < n; j++) {
-            if (!names[j]) {
-                free_str(alloc, descs[j]);
-                if (params[j])
-                    free_str(alloc, params[j]);
+            if (!names[j])
                 continue;
-            }
 
             /* Build prefixed name: mcp__<server_name>__<tool_name> */
             const char *srv_name = slot->name ? slot->name : "unknown";
@@ -871,11 +846,8 @@ hu_error_t hu_mcp_manager_call_tool(hu_mcp_manager_t *mgr, hu_allocator_t *alloc
                 !hu_mcp_oauth_token_is_expired(&slot->oauth_token)) {
                 int aw = snprintf(auth_buf, sizeof(auth_buf), "Bearer %s",
                                   slot->oauth_token.access_token);
-                if (aw <= 0 || (size_t)aw >= sizeof(auth_buf)) {
-                    alloc->free(alloc->ctx, request, request_len + 1);
-                    return HU_ERR_INVALID_ARGUMENT;
-                }
-                auth_header = auth_buf;
+                if (aw > 0 && (size_t)aw < sizeof(auth_buf))
+                    auth_header = auth_buf;
             }
 
             hu_http_response_t response = {0};

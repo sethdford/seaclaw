@@ -65,33 +65,36 @@ hu_error_t hu_voice_session_start(hu_allocator_t *alloc, hu_voice_session_t *ses
     session->started_at = voice_session_now_ms();
     session->active = true;
 
-    /* Determine mode from config */
-    const char *mode = config->voice.mode;
     const char *tp = config->voice.tts_provider;
-    if (!mode || !mode[0]) {
-        if (tp && (strcmp(tp, "gemini_live") == 0 || strcmp(tp, "gemini") == 0))
-            mode = "gemini_live";
-        else if (tp && (strcmp(tp, "realtime") == 0 || strcmp(tp, "openai_realtime") == 0))
-            mode = "openai_realtime";
+    const char *rt_model = (config->voice.realtime_model && config->voice.realtime_model[0])
+                               ? config->voice.realtime_model
+                               : config->voice.tts_model;
+    const char *rt_voice = (config->voice.realtime_voice && config->voice.realtime_voice[0])
+                               ? config->voice.realtime_voice
+                               : config->voice.tts_voice;
+    bool realtime_mode = (config->voice.mode && strcmp(config->voice.mode, "realtime") == 0) ||
+                         (tp && strcmp(tp, "realtime") == 0);
+    if (realtime_mode) {
+        const char *key = hu_config_get_provider_key(config, "openai");
+        if (key && key[0]) {
+            hu_voice_rt_config_t rtc = {.model = rt_model,
+                                        .voice = rt_voice,
+                                        .api_key = key,
+                                        .sample_rate = 24000,
+                                        .vad_enabled = true};
+            /* Use provider vtable abstraction (preferred path). */
+            hu_voice_provider_t vp = {0};
+            if (hu_voice_provider_openai_create(alloc, &rtc, &vp) == HU_OK && vp.vtable) {
+                if (vp.vtable->connect(vp.ctx) == HU_OK) {
+                    session->provider = vp;
+                    /* Keep legacy rt pointer for backwards compat with existing callers */
+                    session->rt = (hu_voice_rt_session_t *)vp.ctx;
+                } else {
+                    vp.vtable->disconnect(vp.ctx, alloc);
+                }
+            }
+        }
     }
-    if (!mode || !mode[0]) {
-        session->active = false;
-        return HU_ERR_PROVIDER_UNAVAILABLE;
-    }
-
-    hu_voice_provider_t vp = {0};
-    hu_error_t err = hu_voice_provider_create_from_config(alloc, config, mode, NULL, &vp);
-    if (err != HU_OK || !vp.vtable) {
-        session->active = false;
-        return err == HU_OK ? HU_ERR_PROVIDER_UNAVAILABLE : err;
-    }
-    err = vp.vtable->connect(vp.ctx);
-    if (err != HU_OK) {
-        vp.vtable->disconnect(vp.ctx, alloc);
-        session->active = false;
-        return err;
-    }
-    session->provider = vp;
     return HU_OK;
 #endif
 }
@@ -100,15 +103,16 @@ hu_error_t hu_voice_session_stop(hu_voice_session_t *session) {
     if (!session)
         return HU_ERR_INVALID_ARGUMENT;
     if (session->provider.vtable) {
-        if (session->gl_vad_active && session->provider.vtable->send_activity_end)
-            (void)session->provider.vtable->send_activity_end(session->provider.ctx);
         session->provider.vtable->disconnect(session->provider.ctx, NULL);
         session->provider.ctx = NULL;
         session->provider.vtable = NULL;
+        session->rt = NULL;
+    } else if (session->rt) {
+        hu_voice_rt_session_destroy(session->rt);
+        session->rt = NULL;
     }
     (void)hu_duplex_session_init(&session->duplex);
     session->last_action = HU_TURN_ACTION_NONE;
-    session->gl_vad_active = false;
     session->active = false;
     session->started_at = 0;
     session->last_audio_ms = 0;
@@ -158,13 +162,10 @@ hu_error_t hu_voice_session_send_audio(hu_voice_session_t *session, const uint8_
     session->latency_first_byte_pending = true;
 #endif
 
-    if (session->provider.vtable) {
-        if (!session->gl_vad_active && session->provider.vtable->send_activity_start) {
-            (void)session->provider.vtable->send_activity_start(session->provider.ctx);
-            session->gl_vad_active = true;
-        }
+    if (session->provider.vtable)
         return session->provider.vtable->send_audio(session->provider.ctx, pcm16, pcm16_len);
-    }
+    if (session->rt && session->rt->connected)
+        return hu_voice_rt_send_audio(session->rt, pcm16, pcm16_len);
     return HU_OK;
 }
 
@@ -184,13 +185,10 @@ hu_error_t hu_voice_session_on_interrupt(hu_voice_session_t *session) {
     session->latency_await_interrupt_silence = true;
 #endif
 
-    if (session->provider.vtable) {
-        if (session->gl_vad_active && session->provider.vtable->send_activity_end) {
-            (void)session->provider.vtable->send_activity_end(session->provider.ctx);
-            session->gl_vad_active = false;
-        }
+    if (session->provider.vtable)
         return session->provider.vtable->cancel_response(session->provider.ctx);
-    }
+    if (session->rt && session->rt->connected)
+        return hu_voice_rt_response_cancel(session->rt);
     return HU_OK;
 }
 
@@ -213,14 +211,8 @@ void hu_voice_session_note_response_first_byte(hu_voice_session_t *session) {
 void hu_voice_session_note_response_complete(hu_voice_session_t *session) {
     if (!session || !session->active)
         return;
-    /* Clear VAD so next mic chunk re-opens activity */
-    if (session->gl_vad_active && session->provider.vtable &&
-        session->provider.vtable->send_activity_end) {
-        (void)session->provider.vtable->send_activity_end(session->provider.ctx);
-        session->gl_vad_active = false;
-    }
 #if HU_IS_TEST
-    (void)0;
+    (void)session;
 #else
     int64_t now = voice_session_now_ms();
     int64_t dt = now - session->latency_rt_mark_ms;

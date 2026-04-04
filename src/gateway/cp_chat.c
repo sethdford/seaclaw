@@ -1,7 +1,7 @@
 /* Chat-related control protocol handlers: chat.send, chat.history, chat.abort */
 #include "cp_internal.h"
-#include "human/bus.h"
 #include "human/core/log.h"
+#include "human/bus.h"
 #include "human/security/moderation.h"
 #include "human/session.h"
 #include <stdio.h>
@@ -33,7 +33,9 @@ hu_error_t cp_chat_send(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn
             return HU_ERR_OUT_OF_MEMORY;
         cp_json_set_str(alloc, obj, "status", "rejected");
         cp_json_set_str(alloc, obj, "error", "message is required");
-        return cp_respond_json(alloc, obj, out, out_len);
+        hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+        hu_json_free(alloc, obj);
+        return err;
     }
 
     /* SHIELD-004: Inbound moderation gate — check user message before processing.
@@ -43,9 +45,8 @@ hu_error_t cp_chat_send(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn
         memset(&mod, 0, sizeof(mod));
         size_t msg_len = strlen(message);
         if (hu_moderation_check(alloc, message, msg_len, &mod) == HU_OK && mod.self_harm) {
-            hu_log_error("cp_chat", NULL,
-                         "inbound self-harm detected (score=%.2f), injecting crisis",
-                         mod.self_harm_score);
+            hu_log_error("cp_chat", NULL, "inbound self-harm detected (score=%.2f), injecting crisis",
+                    mod.self_harm_score);
             hu_json_value_t *obj = hu_json_object_new(alloc);
             if (!obj)
                 return HU_ERR_OUT_OF_MEMORY;
@@ -55,7 +56,8 @@ hu_error_t cp_chat_send(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn
                             "988 Suicide & Crisis Lifeline (call/text 988), "
                             "Crisis Text Line (text HOME to 741741)");
             cp_json_set_str(alloc, obj, "sessionKey", session_key);
-            hu_error_t err = cp_respond_json(alloc, obj, out, out_len);
+            hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+            hu_json_free(alloc, obj);
             /* Still publish the message so the agent can respond supportively */
             if (app && app->bus) {
                 hu_bus_event_t ev;
@@ -95,7 +97,9 @@ hu_error_t cp_chat_send(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn
         return HU_ERR_OUT_OF_MEMORY;
     cp_json_set_str(alloc, obj, "status", "queued");
     cp_json_set_str(alloc, obj, "sessionKey", session_key);
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 }
 
 hu_error_t cp_chat_history(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -133,7 +137,9 @@ hu_error_t cp_chat_history(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_c
     }
 
     hu_json_object_set(alloc, obj, "messages", msgs);
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 }
 
 hu_error_t cp_chat_abort(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
@@ -151,5 +157,7 @@ hu_error_t cp_chat_abort(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_con
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
     hu_json_object_set(alloc, obj, "aborted", hu_json_bool_new(alloc, aborted));
-    return cp_respond_json(alloc, obj, out, out_len);
+    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
+    hu_json_free(alloc, obj);
+    return err;
 }

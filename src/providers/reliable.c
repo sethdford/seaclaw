@@ -35,7 +35,6 @@ typedef struct hu_reliable_ctx {
     int cb_recovery_seconds;
     int cb_failures;
     time_t cb_open_until;
-    uint32_t streaming_retries;
 } hu_reliable_ctx_t;
 
 /* Circuit breaker: true if primary should be skipped (circuit open) */
@@ -256,61 +255,6 @@ static hu_error_t try_chat(hu_reliable_ctx_t *r, hu_allocator_t *alloc, hu_provi
     return final_failure(r);
 }
 
-static hu_error_t try_stream_chat(hu_reliable_ctx_t *r, hu_allocator_t *alloc, hu_provider_t *prov,
-                                  const hu_chat_request_t *request, const char *model,
-                                  size_t model_len, double temperature,
-                                  hu_stream_callback_t callback, void *callback_ctx,
-                                  hu_stream_chat_result_t *out) {
-    const hu_provider_vtable_t *vt = prov->vtable;
-    if (!vt || !vt->stream_chat)
-        return HU_ERR_NOT_SUPPORTED;
-
-    uint64_t backoff_ms = r->base_backoff_ms;
-    if (backoff_ms < 50)
-        backoff_ms = 50;
-
-    hu_error_t last = HU_ERR_NOT_SUPPORTED;
-    for (uint32_t attempt = 0; attempt <= r->streaming_retries; attempt++) {
-        memset(out, 0, sizeof(*out));
-        hu_error_t err =
-            vt->stream_chat(prov->ctx, alloc, request, model, model_len, temperature, callback,
-                            callback_ctx, out);
-        if (err == HU_OK)
-            return HU_OK;
-        last = err;
-        store_error(r, err);
-        const char *msg = r->last_error_msg;
-        size_t len = r->last_error_len;
-        if (hu_error_is_non_retryable(msg, len)) {
-            hu_stream_chat_result_free(alloc, out);
-            memset(out, 0, sizeof(*out));
-            return err;
-        }
-        hu_stream_chat_result_free(alloc, out);
-        memset(out, 0, sizeof(*out));
-        if (attempt < r->streaming_retries) {
-            uint64_t wait = compute_backoff(r, backoff_ms);
-#ifndef HU_IS_TEST
-#ifdef HU_GATEWAY_POSIX
-            if (wait > 0) {
-                struct timespec ts = {.tv_sec = (time_t)(wait / 1000),
-                                      .tv_nsec = (long)((wait % 1000) * 1000000)};
-                nanosleep(&ts, NULL);
-            }
-#endif
-#else
-            (void)wait;
-#endif
-            backoff_ms *= 2;
-            if (r->max_backoff_ms > 0 && backoff_ms > r->max_backoff_ms)
-                backoff_ms = r->max_backoff_ms;
-            else if (r->max_backoff_ms == 0 && backoff_ms > 10000)
-                backoff_ms = 10000;
-        }
-    }
-    return last;
-}
-
 static hu_error_t reliable_chat_with_system(void *ctx, hu_allocator_t *alloc,
                                             const char *system_prompt, size_t system_prompt_len,
                                             const char *message, size_t message_len,
@@ -482,44 +426,26 @@ static hu_error_t reliable_stream_chat(void *ctx, hu_allocator_t *alloc,
                                        hu_stream_callback_t callback, void *callback_ctx,
                                        hu_stream_chat_result_t *out) {
     hu_reliable_ctx_t *r = (hu_reliable_ctx_t *)ctx;
-    memset(out, 0, sizeof(*out));
-
-    hu_model_ref_t *chain = NULL;
-    size_t chain_count = 0;
-    hu_error_t err = model_chain(r, alloc, model, model_len, &chain, &chain_count);
-    if (err != HU_OK)
-        return err;
-
-    hu_error_t last = HU_ERR_NOT_SUPPORTED;
-    for (size_t m = 0; m < chain_count; m++) {
-        const char *cur_model = chain[m].model;
-        size_t cur_len = chain[m].model_len;
-
-        if (!circuit_skip_primary(r)) {
-            err = try_stream_chat(r, alloc, &r->inner, request, cur_model, cur_len, temperature,
-                                  callback, callback_ctx, out);
-            if (err == HU_OK) {
-                circuit_record_success(r);
-                alloc->free(alloc->ctx, chain, chain_count * sizeof(hu_model_ref_t));
+    /* Try inner provider first (fail-fast: no partial-stream replay) */
+    if (r->inner.vtable && r->inner.vtable->stream_chat) {
+        hu_error_t err = r->inner.vtable->stream_chat(r->inner.ctx, alloc, request, model,
+                                                       model_len, temperature, callback,
+                                                       callback_ctx, out);
+        if (err == HU_OK)
+            return HU_OK;
+    }
+    /* Cascade to extras on failure */
+    for (size_t e = 0; e < r->extras_count; e++) {
+        hu_provider_t *ep = &r->extras[e].provider;
+        if (ep->vtable && ep->vtable->stream_chat) {
+            hu_error_t err = ep->vtable->stream_chat(ep->ctx, alloc, request, model,
+                                                      model_len, temperature, callback,
+                                                      callback_ctx, out);
+            if (err == HU_OK)
                 return HU_OK;
-            }
-            circuit_record_failure(r);
-            last = err;
-        }
-
-        for (size_t e = 0; e < r->extras_count; e++) {
-            err = try_stream_chat(r, alloc, &r->extras[e].provider, request, cur_model, cur_len,
-                                  temperature, callback, callback_ctx, out);
-            if (err == HU_OK) {
-                alloc->free(alloc->ctx, chain, chain_count * sizeof(hu_model_ref_t));
-                return HU_OK;
-            }
-            last = err;
         }
     }
-
-    alloc->free(alloc->ctx, chain, chain_count * sizeof(hu_model_ref_t));
-    return last;
+    return HU_ERR_NOT_SUPPORTED;
 }
 
 static const hu_provider_vtable_t reliable_vtable = {
@@ -552,30 +478,31 @@ hu_error_t hu_reliable_provider_create(hu_allocator_t *alloc, const hu_reliable_
         extras_count = 1;
     }
 
-    hu_reliable_extended_opts_t ext = {
-        .max_backoff_ms = (uint64_t)(config->max_delay_ms > 0 ? config->max_delay_ms : 30000),
-        .failure_threshold = config->failure_threshold > 0 ? config->failure_threshold : 5,
-        .recovery_timeout_seconds =
-            config->recovery_timeout_seconds > 0 ? config->recovery_timeout_seconds : 60,
-        .streaming_retries = 0,
-    };
-    return hu_reliable_create_ex(
+    hu_error_t err = hu_reliable_create_ex(
         alloc, config->primary, (uint32_t)(config->max_retries > 0 ? config->max_retries : 3),
         (uint64_t)(config->base_delay_ms > 0 ? config->base_delay_ms : 1000),
-        extras_count ? &extra : NULL, extras_count, NULL, 0, &ext, out);
+        extras_count ? &extra : NULL, extras_count, NULL, 0, out);
+    if (err != HU_OK)
+        return err;
+
+    hu_reliable_ctx_t *r = (hu_reliable_ctx_t *)out->ctx;
+    r->max_backoff_ms = (uint64_t)(config->max_delay_ms > 0 ? config->max_delay_ms : 30000);
+    r->cb_failure_threshold = config->failure_threshold > 0 ? config->failure_threshold : 5;
+    r->cb_recovery_seconds =
+        config->recovery_timeout_seconds > 0 ? config->recovery_timeout_seconds : 60;
+    return HU_OK;
 }
 
 hu_error_t hu_reliable_create(hu_allocator_t *alloc, hu_provider_t inner, uint32_t max_retries,
                               uint64_t backoff_ms, hu_provider_t *out) {
-    return hu_reliable_create_ex(alloc, inner, max_retries, backoff_ms, NULL, 0, NULL, 0, NULL, out);
+    return hu_reliable_create_ex(alloc, inner, max_retries, backoff_ms, NULL, 0, NULL, 0, out);
 }
 
 hu_error_t hu_reliable_create_ex(hu_allocator_t *alloc, hu_provider_t inner, uint32_t max_retries,
                                  uint64_t backoff_ms, const hu_reliable_provider_entry_t *extras,
                                  size_t extras_count,
                                  const hu_reliable_model_fallback_entry_t *model_fallbacks,
-                                 size_t model_fallbacks_count,
-                                 const hu_reliable_extended_opts_t *opts, hu_provider_t *out) {
+                                 size_t model_fallbacks_count, hu_provider_t *out) {
     if (!alloc || !out)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -609,14 +536,6 @@ hu_error_t hu_reliable_create_ex(hu_allocator_t *alloc, hu_provider_t inner, uin
         memcpy(r->model_fallbacks, model_fallbacks,
                model_fallbacks_count * sizeof(hu_reliable_model_fallback_entry_t));
         r->model_fallbacks_count = model_fallbacks_count;
-    }
-
-    if (opts) {
-        r->max_backoff_ms = opts->max_backoff_ms;
-        r->cb_failure_threshold = opts->failure_threshold;
-        r->cb_recovery_seconds =
-            opts->recovery_timeout_seconds > 0 ? opts->recovery_timeout_seconds : 60;
-        r->streaming_retries = opts->streaming_retries;
     }
 
     out->ctx = r;

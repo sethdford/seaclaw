@@ -54,8 +54,8 @@ static void test_config_load_from_custom_nonexistent_uses_defaults(void) {
     hu_error_t err = hu_config_load_from(&backing, "/nonexistent/custom/config.json", &cfg);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(cfg.default_provider);
-    HU_ASSERT_NOT_NULL(cfg.runtime_paths.config_path);
-    HU_ASSERT_STR_EQ(cfg.runtime_paths.config_path, "/nonexistent/custom/config.json");
+    HU_ASSERT_NOT_NULL(cfg.config_path);
+    HU_ASSERT_STR_EQ(cfg.config_path, "/nonexistent/custom/config.json");
     hu_config_deinit(&cfg);
 }
 
@@ -292,10 +292,10 @@ static void test_config_validate_ok_minimal(void) {
 
 static void test_config_parse_workspace_override(void) {
     hu_config_t *cfg = make_config_with_arena();
-    cfg->runtime_paths.workspace_dir = hu_strdup(&cfg->allocator, "/original");
+    cfg->workspace_dir = hu_strdup(&cfg->allocator, "/original");
     const char *json = "{\"workspace\":\"/tmp/override\"}";
     hu_config_parse_json(cfg, json, strlen(json));
-    HU_ASSERT_STR_EQ(cfg->runtime_paths.workspace_dir, "/tmp/override");
+    HU_ASSERT_STR_EQ(cfg->workspace_dir, "/tmp/override");
     free_config(cfg);
 }
 
@@ -554,13 +554,12 @@ static void test_config_parse_agent_context_pressure(void) {
 
 static void test_config_parse_agent_metacognition(void) {
     hu_config_t *cfg = make_config_with_arena();
-    const char *j =
-        "{\"agent\":{\"metacognition\":{"
-        "\"enabled\":true,\"confidence_threshold\":0.25,\"coherence_threshold\":0.15,"
-        "\"repetition_threshold\":0.55,\"max_reflects\":3,\"max_regen\":2,"
-        "\"hysteresis_min\":4,\"use_calibrated_risk\":false,\"risk_high_threshold\":0.71,"
-        "\"w_low_confidence\":0.11,\"w_low_coherence\":0.12,\"w_repetition\":0.13,"
-        "\"w_stuck\":0.14,\"w_low_satisfaction\":0.15,\"w_low_trajectory\":0.16}}}";
+    const char *j = "{\"agent\":{\"metacognition\":{"
+                    "\"enabled\":true,\"confidence_threshold\":0.25,\"coherence_threshold\":0.15,"
+                    "\"repetition_threshold\":0.55,\"max_reflects\":3,\"max_regen\":2,"
+                    "\"hysteresis_min\":4,\"use_calibrated_risk\":false,\"risk_high_threshold\":0.71,"
+                    "\"w_low_confidence\":0.11,\"w_low_coherence\":0.12,\"w_repetition\":0.13,"
+                    "\"w_stuck\":0.14,\"w_low_satisfaction\":0.15,\"w_low_trajectory\":0.16}}}";
     hu_error_t err = hu_config_parse_json(cfg, j, strlen(j));
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(cfg->agent.metacognition.enabled);
@@ -773,7 +772,7 @@ static void test_config_parse_malformed_invalid_escape(void) {
 static void test_config_parse_empty_string_value(void) {
     hu_config_t *cfg = make_config_with_arena();
     hu_config_parse_json(cfg, "{\"workspace\":\"\"}", 17);
-    HU_ASSERT_NOT_NULL(cfg->runtime_paths.workspace_dir);
+    HU_ASSERT_NOT_NULL(cfg->workspace_dir);
     free_config(cfg);
 }
 
@@ -826,7 +825,7 @@ static void test_config_env_override_workspace(void) {
     cfg->default_model = hu_strdup(&cfg->allocator, "gpt-4");
     setenv("HUMAN_WORKSPACE", "/custom/ws", 1);
     hu_config_apply_env_overrides(cfg);
-    HU_ASSERT_STR_EQ(cfg->runtime_paths.workspace_dir, "/custom/ws");
+    HU_ASSERT_STR_EQ(cfg->workspace_dir, "/custom/ws");
     unsetenv("HUMAN_WORKSPACE");
     free_config(cfg);
 }
@@ -847,39 +846,6 @@ static void test_config_parse_security_audit(void) {
     hu_config_parse_json(cfg, j, strlen(j));
     HU_ASSERT_TRUE(cfg->security.audit.enabled);
     HU_ASSERT_STR_EQ(cfg->security.audit.log_path, "/tmp/audit.log");
-    free_config(cfg);
-}
-
-static void test_config_parse_autonomy_allowed_paths(void) {
-    hu_config_t *cfg = make_config_with_arena();
-    const char *j = "{\"autonomy\":{\"allowed_paths\":[\"/home\",\"/tmp\"]}}";
-    hu_config_parse_json(cfg, j, strlen(j));
-    HU_ASSERT_EQ(cfg->autonomy.allowed_paths_len, 2u);
-    HU_ASSERT_STR_EQ(cfg->autonomy.allowed_paths[0], "/home");
-    HU_ASSERT_STR_EQ(cfg->autonomy.allowed_paths[1], "/tmp");
-    free_config(cfg);
-}
-
-static void test_config_parse_session_identity_links(void) {
-    hu_config_t *cfg = make_config_with_arena();
-    const char *j = "{\"session\":{\"identity_links\":["
-                    "{\"canonical\":\"alice\",\"peers\":[\"alice_tg\",\"alice_discord\"]}"
-                    "]}}";
-    hu_config_parse_json(cfg, j, strlen(j));
-    HU_ASSERT_EQ(cfg->session.identity_links_len, 1u);
-    HU_ASSERT_STR_EQ(cfg->session.identity_links[0].canonical, "alice");
-    HU_ASSERT_EQ(cfg->session.identity_links[0].peers_len, 2u);
-    HU_ASSERT_STR_EQ(cfg->session.identity_links[0].peers[0], "alice_tg");
-    HU_ASSERT_STR_EQ(cfg->session.identity_links[0].peers[1], "alice_discord");
-    free_config(cfg);
-}
-
-static void test_config_parse_security_audit_max_size_mb(void) {
-    hu_config_t *cfg = make_config_with_arena();
-    const char *j = "{\"security\":{\"audit\":{\"enabled\":true,\"max_size_mb\":50}}}";
-    hu_config_parse_json(cfg, j, strlen(j));
-    HU_ASSERT_TRUE(cfg->security.audit.enabled);
-    HU_ASSERT_EQ(cfg->security.audit.max_size_mb, 50u);
     free_config(cfg);
 }
 
@@ -958,8 +924,7 @@ static void test_config_parse_default_model_provider_prefix(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_config_t cfg = {0};
     hu_config_load(&backing, &cfg);
-    const char *j =
-        "{\"default_provider\":\"gemini\",\"default_model\":\"gemini-3.1-flash-lite-preview\"}";
+    const char *j = "{\"default_provider\":\"gemini\",\"default_model\":\"gemini-3.1-flash-lite-preview\"}";
     hu_config_parse_json(&cfg, j, strlen(j));
     HU_ASSERT_STR_EQ(cfg.default_provider, "gemini");
     HU_ASSERT_STR_EQ(cfg.default_model, "gemini-3.1-flash-lite-preview");
@@ -974,7 +939,7 @@ static void test_config_parse_default_model_provider_prefix(void) {
 static void test_config_parse_workspace_path_with_slash(void) {
     hu_config_t *cfg = make_config_with_arena();
     hu_config_parse_json(cfg, "{\"workspace\":\"/home/user/project\"}", 34);
-    HU_ASSERT_STR_EQ(cfg->runtime_paths.workspace_dir, "/home/user/project");
+    HU_ASSERT_STR_EQ(cfg->workspace_dir, "/home/user/project");
     free_config(cfg);
 }
 
@@ -1174,7 +1139,7 @@ static void test_config_parse_unicode_value(void) {
     hu_config_t *cfg = make_config_with_arena();
     const char *j = "{\"workspace\":\"/path/\u0442\u0435\u0441\u0442\"}";
     hu_config_parse_json(cfg, j, strlen(j));
-    HU_ASSERT_NOT_NULL(cfg->runtime_paths.workspace_dir);
+    HU_ASSERT_NOT_NULL(cfg->workspace_dir);
     free_config(cfg);
 }
 
@@ -1293,22 +1258,6 @@ static void test_config_parse_scheduler_poll(void) {
     free_config(cfg);
 }
 
-static void test_config_parse_reliability_streaming_circuit_model_fallbacks(void) {
-    hu_config_t *cfg = make_config_with_arena();
-    const char *j = "{\"reliability\":{\"streaming_retries\":2,\"circuit_breaker_enabled\":false,"
-                    "\"model_fallbacks\":[{\"model\":\"gpt-4\",\"fallback_models\":[\"gpt-3.5-turbo\"]}]"
-                    "}}";
-    hu_config_parse_json(cfg, j, strlen(j));
-    HU_ASSERT_EQ(cfg->reliability.streaming_retries, 2u);
-    HU_ASSERT_FALSE(cfg->reliability.circuit_breaker_enabled);
-    HU_ASSERT_EQ(cfg->reliability.model_fallbacks_len, 1u);
-    HU_ASSERT_NOT_NULL(cfg->reliability.model_fallbacks);
-    HU_ASSERT_STR_EQ(cfg->reliability.model_fallbacks[0].model, "gpt-4");
-    HU_ASSERT_EQ(cfg->reliability.model_fallbacks[0].fallback_models_len, 1u);
-    HU_ASSERT_STR_EQ(cfg->reliability.model_fallbacks[0].fallback_models[0], "gpt-3.5-turbo");
-    free_config(cfg);
-}
-
 static void test_config_deinit_idempotent(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_config_t cfg = {0};
@@ -1335,10 +1284,11 @@ static void test_config_parse_very_long_key_value(void) {
 
 static void test_config_parse_model_router_judge(void) {
     hu_config_t *cfg = make_config_with_arena();
-    const char *json = "{\"agent\":{\"model_router\":{\"judge_enabled\":true,"
-                       "\"judge_model\":\"gemini-3.1-flash-lite-preview\","
-                       "\"reflexive_model\":\"gemini-3.1-flash-lite-preview\","
-                       "\"deep_model\":\"gemini-3.1-pro-preview\"}}}";
+    const char *json =
+        "{\"agent\":{\"model_router\":{\"judge_enabled\":true,"
+        "\"judge_model\":\"gemini-3.1-flash-lite-preview\","
+        "\"reflexive_model\":\"gemini-3.1-flash-lite-preview\","
+        "\"deep_model\":\"gemini-3.1-pro-preview\"}}}";
     hu_error_t err = hu_config_parse_json(cfg, json, strlen(json));
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(cfg->agent.mr_judge_enabled);
@@ -1437,10 +1387,7 @@ void run_config_extended_tests(void) {
     HU_RUN_TEST(test_config_get_provider_native_tools);
     HU_RUN_TEST(test_config_env_override_workspace);
     HU_RUN_TEST(test_config_parse_autonomy_allowed_commands);
-    HU_RUN_TEST(test_config_parse_autonomy_allowed_paths);
-    HU_RUN_TEST(test_config_parse_session_identity_links);
     HU_RUN_TEST(test_config_parse_security_audit);
-    HU_RUN_TEST(test_config_parse_security_audit_max_size_mb);
     HU_RUN_TEST(test_config_parse_provider_native_tools_false);
     HU_RUN_TEST(test_config_parse_tunnel_provider);
     HU_RUN_TEST(test_config_parse_heartbeat_interval);
@@ -1479,7 +1426,6 @@ void run_config_extended_tests(void) {
     HU_RUN_TEST(test_config_parse_gateway_host);
     HU_RUN_TEST(test_config_parse_single_provider);
     HU_RUN_TEST(test_config_parse_fallback_providers_single);
-    HU_RUN_TEST(test_config_parse_reliability_streaming_circuit_model_fallbacks);
     HU_RUN_TEST(test_config_parse_diagnostics_log_receipts);
     HU_RUN_TEST(test_config_parse_diagnostics_log_llm_io);
     HU_RUN_TEST(test_config_parse_agent_session_idle);

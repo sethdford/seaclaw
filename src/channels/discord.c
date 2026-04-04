@@ -1,5 +1,4 @@
 #include "human/channels/discord.h"
-#include "channel_http.h"
 #include "human/channel.h"
 #include "human/channel_loop.h"
 #include "human/core/allocator.h"
@@ -137,7 +136,8 @@ static hu_error_t discord_send(void *ctx, const char *target, size_t target_len,
         return err;
 
     char auth_buf[256];
-    n = hu_channel_http_build_auth(auth_buf, sizeof(auth_buf), "Bot", c->token, c->token_len);
+    n = snprintf(auth_buf, sizeof(auth_buf), "Authorization: Bot %.*s", (int)c->token_len,
+                 c->token);
     if (n <= 0 || (size_t)n >= sizeof(auth_buf)) {
         if (body)
             c->alloc->free(c->alloc->ctx, body, body_len + 1);
@@ -435,8 +435,8 @@ static hu_error_t discord_start_typing(void *ctx, const char *recipient, size_t 
 #endif
 }
 
-static hu_error_t discord_react(void *ctx, const char *target, size_t target_len,
-                                int64_t message_id, hu_reaction_type_t reaction) {
+static hu_error_t discord_react(void *ctx, const char *target, size_t target_len, int64_t message_id,
+                                hu_reaction_type_t reaction) {
     hu_discord_ctx_t *c = (hu_discord_ctx_t *)ctx;
     if (!c || !c->alloc)
         return HU_ERR_INVALID_ARGUMENT;
@@ -458,8 +458,9 @@ static hu_error_t discord_react(void *ctx, const char *target, size_t target_len
         return HU_ERR_INTERNAL;
 
     char url_buf[640];
-    int nu = snprintf(url_buf, sizeof(url_buf), "%s/%.*s/messages/%" PRId64 "/reactions/%s/@me",
-                      DISCORD_API_BASE, (int)target_len, target, message_id, emoji_enc);
+    int nu = snprintf(url_buf, sizeof(url_buf),
+                      "%s/%.*s/messages/%" PRId64 "/reactions/%s/@me", DISCORD_API_BASE,
+                      (int)target_len, target, message_id, emoji_enc);
     if (nu < 0 || (size_t)nu >= sizeof(url_buf))
         return HU_ERR_INTERNAL;
 
@@ -647,8 +648,8 @@ static char *discord_get_attachment_path(void *ctx, hu_allocator_t *alloc, int64
             continue;
 
         char url_buf[512];
-        int nu =
-            snprintf(url_buf, sizeof(url_buf), "%s/%s/messages/%s", DISCORD_API_BASE, ch_id, mid);
+        int nu = snprintf(url_buf, sizeof(url_buf), "%s/%s/messages/%s", DISCORD_API_BASE, ch_id,
+                          mid);
         if (nu < 0 || (size_t)nu >= sizeof(url_buf))
             continue;
 

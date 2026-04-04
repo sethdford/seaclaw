@@ -1,13 +1,13 @@
+#include "human/core/log.h"
 #include "human/agent/spawn.h"
 #include "human/agent.h"
+#include "human/agent/tool_context.h"
+#include "human/cost.h"
+#include "human/core/error.h"
 #include "human/agent/mailbox.h"
 #include "human/agent/team.h"
-#include "human/agent/tool_context.h"
 #include "human/agent/worktree.h"
-#include "human/core/error.h"
-#include "human/core/log.h"
 #include "human/core/string.h"
-#include "human/cost.h"
 #include "human/providers/factory.h"
 #include "human/security.h"
 #include "human/security/delegation.h"
@@ -173,12 +173,13 @@ static void *spawn_thread(void *arg) {
             goto done;
         }
         memset(ag, 0, sizeof(*ag));
-        if (hu_agent_from_config(
-                ag, a, prov, s->inherit_tools, s->inherit_tools_count,
-                (hu_memory_t *)s->inherit_memory, (hu_session_store_t *)s->inherit_session,
-                (hu_observer_t *)s->inherit_observer, s->policy, mdl, strlen(mdl), pn, strlen(pn),
-                temp, ws, strlen(ws), mi, 50, false, s->inherit_autonomy, sys, strlen(sys),
-                s->persona_name, s->persona_name ? strlen(s->persona_name) : 0, NULL) != HU_OK) {
+        if (hu_agent_from_config(ag, a, prov, s->inherit_tools, s->inherit_tools_count,
+                                 (hu_memory_t *)s->inherit_memory,
+                                 (hu_session_store_t *)s->inherit_session,
+                                 (hu_observer_t *)s->inherit_observer, s->policy, mdl,
+                                 strlen(mdl), pn, strlen(pn), temp, ws, strlen(ws), mi, 50, false,
+                                 s->inherit_autonomy, sys, strlen(sys), s->persona_name,
+                                 s->persona_name ? strlen(s->persona_name) : 0, NULL) != HU_OK) {
             a->free(a->ctx, ag, sizeof(*ag));
             result = hu_strndup(a, "(agent create failed)", 21);
             goto done;
@@ -200,11 +201,9 @@ static void *spawn_thread(void *arg) {
 
         /* Issue delegation token from parent to child if parent has delegation registry */
         if (s->parent_delegation_registry) {
-            hu_delegation_registry_t *parent_reg =
-                (hu_delegation_registry_t *)s->parent_delegation_registry;
+            hu_delegation_registry_t *parent_reg = (hu_delegation_registry_t *)s->parent_delegation_registry;
             char parent_id_str[64];
-            snprintf(parent_id_str, sizeof(parent_id_str), "%llu",
-                     (unsigned long long)s->parent_agent_id);
+            snprintf(parent_id_str, sizeof(parent_id_str), "%llu", (unsigned long long)s->parent_agent_id);
             char child_id_str[64];
             snprintf(child_id_str, sizeof(child_id_str), "%llu", (unsigned long long)s->agent_id);
 
@@ -215,8 +214,8 @@ static void *spawn_thread(void *arg) {
             caveat.value = "*"; /* unrestricted tool access by default */
             caveat.value_len = 1;
 
-            const char *token_id =
-                hu_delegation_issue(parent_reg, a, parent_id_str, child_id_str, 3600, &caveat, 1);
+            const char *token_id = hu_delegation_issue(parent_reg, a, parent_id_str, child_id_str,
+                                                      3600, &caveat, 1);
             if (token_id && strlen(token_id) < 64) {
                 strncpy(ag->delegation_token_id, token_id, 63);
                 ag->delegation_token_id[63] = '\0';
@@ -249,12 +248,13 @@ static void *spawn_thread(void *arg) {
         pthread_mutex_unlock(&pool->mu);
     } else {
         hu_agent_t ag = {0};
-        if (hu_agent_from_config(
-                &ag, a, prov, s->inherit_tools, s->inherit_tools_count,
-                (hu_memory_t *)s->inherit_memory, (hu_session_store_t *)s->inherit_session,
-                (hu_observer_t *)s->inherit_observer, s->policy, mdl, strlen(mdl), pn, strlen(pn),
-                temp, ws, strlen(ws), mi, 50, false, s->inherit_autonomy, sys, strlen(sys),
-                s->persona_name, s->persona_name ? strlen(s->persona_name) : 0, NULL) != HU_OK) {
+        if (hu_agent_from_config(&ag, a, prov, s->inherit_tools, s->inherit_tools_count,
+                                 (hu_memory_t *)s->inherit_memory,
+                                 (hu_session_store_t *)s->inherit_session,
+                                 (hu_observer_t *)s->inherit_observer, s->policy, mdl,
+                                 strlen(mdl), pn, strlen(pn), temp, ws, strlen(ws), mi, 50, false,
+                                 s->inherit_autonomy, sys, strlen(sys), s->persona_name,
+                                 s->persona_name ? strlen(s->persona_name) : 0, NULL) != HU_OK) {
             result = hu_strndup(a, "(agent create failed)", 21);
             goto done;
         }
@@ -275,11 +275,9 @@ static void *spawn_thread(void *arg) {
 
         /* Issue delegation token from parent to child if parent has delegation registry */
         if (s->parent_delegation_registry) {
-            hu_delegation_registry_t *parent_reg =
-                (hu_delegation_registry_t *)s->parent_delegation_registry;
+            hu_delegation_registry_t *parent_reg = (hu_delegation_registry_t *)s->parent_delegation_registry;
             char parent_id_str[64];
-            snprintf(parent_id_str, sizeof(parent_id_str), "%llu",
-                     (unsigned long long)s->parent_agent_id);
+            snprintf(parent_id_str, sizeof(parent_id_str), "%llu", (unsigned long long)s->parent_agent_id);
             char child_id_str[64];
             snprintf(child_id_str, sizeof(child_id_str), "%llu", (unsigned long long)s->agent_id);
 
@@ -289,8 +287,8 @@ static void *spawn_thread(void *arg) {
             caveat.value = "*";
             caveat.value_len = 1;
 
-            const char *token_id =
-                hu_delegation_issue(parent_reg, a, parent_id_str, child_id_str, 3600, &caveat, 1);
+            const char *token_id = hu_delegation_issue(parent_reg, a, parent_id_str, child_id_str,
+                                                      3600, &caveat, 1);
             if (token_id && strlen(token_id) < 64) {
                 strncpy(ag.delegation_token_id, token_id, 63);
                 ag.delegation_token_id[63] = '\0';
@@ -390,8 +388,6 @@ void hu_agent_pool_set_fleet_limits(hu_agent_pool_t *pool, const hu_fleet_limits
         pool->fleet_limits.max_spawn_depth = 8;
         pool->fleet_limits.max_total_spawns = 0;
         pool->fleet_limits.budget_limit_usd = 0.0;
-        pool->fleet_limits.depth_model_overrides = NULL;
-        pool->fleet_limits.depth_model_overrides_count = 0;
     } else {
         pool->fleet_limits = *limits;
     }
@@ -470,10 +466,6 @@ void hu_agent_pool_destroy(hu_agent_pool_t *pool) {
     pthread_mutex_unlock(&pool->mu);
     pthread_mutex_destroy(&pool->mu);
 #endif
-    if (pool->fleet_limits.depth_model_overrides)
-        pool->alloc->free(pool->alloc->ctx, pool->fleet_limits.depth_model_overrides,
-                          pool->fleet_limits.depth_model_overrides_count *
-                              sizeof(hu_depth_model_override_t));
     pool->alloc->free(pool->alloc->ctx, pool, sizeof(*pool));
 }
 
@@ -483,7 +475,6 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
     if (!pool || !cfg || !out_id)
         return HU_ERR_INVALID_ARGUMENT;
     hu_allocator_t *a = pool->alloc;
-    hu_spawn_config_t eff_cfg = *cfg;
 
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
     pthread_mutex_lock(&pool->mu);
@@ -497,24 +488,6 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
 #endif
             return HU_ERR_FLEET_DEPTH_EXCEEDED;
         }
-        /* Apply per-depth model tier override (mutable copy; cfg is const). */
-        if (pool->fleet_limits.depth_model_overrides &&
-            pool->fleet_limits.depth_model_overrides_count > 0u) {
-            for (size_t dmi = 0; dmi < pool->fleet_limits.depth_model_overrides_count; dmi++) {
-                hu_depth_model_override_t *dmo = &pool->fleet_limits.depth_model_overrides[dmi];
-                if (child_depth >= dmo->min_depth && child_depth <= dmo->max_depth) {
-                    if (dmo->model) {
-                        eff_cfg.model = dmo->model;
-                        eff_cfg.model_len = strlen(dmo->model);
-                    }
-                    if (dmo->provider) {
-                        eff_cfg.provider = dmo->provider;
-                        eff_cfg.provider_len = strlen(dmo->provider);
-                    }
-                    break;
-                }
-            }
-        }
         if (pool->fleet_limits.max_total_spawns > 0u &&
             pool->fleet_spawns_started >= pool->fleet_limits.max_total_spawns) {
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
@@ -522,8 +495,8 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
 #endif
             return HU_ERR_FLEET_SPAWN_CAP;
         }
-        hu_cost_tracker_t *acct =
-            cfg->shared_cost_tracker ? cfg->shared_cost_tracker : pool->fleet_cost_tracker;
+        hu_cost_tracker_t *acct = cfg->shared_cost_tracker ? cfg->shared_cost_tracker
+                                                           : pool->fleet_cost_tracker;
         if (pool->fleet_limits.budget_limit_usd > 0.0) {
             if (!acct) {
 #if !defined(HU_IS_TEST) || HU_IS_TEST == 0
@@ -567,10 +540,10 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
     s->temperature = cfg->temperature;
     s->max_iterations = cfg->max_iterations;
     s->policy = cfg->policy;
-    s->provider_name = dup_opt(a, eff_cfg.provider, eff_cfg.provider_len);
+    s->provider_name = dup_opt(a, cfg->provider, cfg->provider_len);
     s->api_key = dup_opt(a, cfg->api_key, cfg->api_key_len);
     s->base_url = dup_opt(a, cfg->base_url, cfg->base_url_len);
-    s->model = dup_opt(a, eff_cfg.model, eff_cfg.model_len);
+    s->model = dup_opt(a, cfg->model, cfg->model_len);
     if (pool->worktree_mgr) {
         const char *wt_path = NULL;
         const char *lbl = (label && label[0]) ? label : "agent";
@@ -596,8 +569,8 @@ hu_error_t hu_agent_pool_spawn(hu_agent_pool_t *pool, const hu_spawn_config_t *c
     s->inherit_observer = cfg->observer;
     s->inherit_autonomy = cfg->autonomy_level > 0 ? cfg->autonomy_level : 2;
     s->child_spawn_depth = cfg->caller_spawn_depth + 1u;
-    s->inherit_cost_tracker =
-        cfg->shared_cost_tracker ? cfg->shared_cost_tracker : pool->fleet_cost_tracker;
+    s->inherit_cost_tracker = cfg->shared_cost_tracker ? cfg->shared_cost_tracker
+                                                       : pool->fleet_cost_tracker;
     s->inherit_metacognition_policy = cfg->metacognition_policy;
     s->parent_delegation_registry = cfg->parent_delegation_registry;
     s->parent_agent_id = cfg->parent_agent_id;

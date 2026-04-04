@@ -2,17 +2,11 @@
 #include "human/core/log.h"
 #include "human/memory/vector.h"
 #ifdef HU_ENABLE_FEEDS
-#include "human/feeds/apple.h"
-#include "human/feeds/email.h"
 #include "human/feeds/file_ingest.h"
 #include "human/feeds/gmail.h"
-#include "human/feeds/google.h"
 #include "human/feeds/imessage.h"
 #include "human/feeds/news.h"
 #include "human/feeds/twitter.h"
-#endif
-#ifdef HU_ENABLE_SOCIAL
-#include "human/feeds/social.h"
 #endif
 #include "human/core/string.h"
 #include <ctype.h>

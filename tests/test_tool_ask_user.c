@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static hu_allocator_t *test_alloc;
+
 static void test_ask_user_create(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_tool_t tool = hu_tool_ask_user_create(&alloc, NULL);
