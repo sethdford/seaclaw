@@ -861,7 +861,7 @@ list(APPEND HU_CORE_SOURCES
     src/voice/provider_factory.c
     src/voice/duplex.c
     src/voice/session.c
-    src/voice/provider_factory.c
+    src/voice/opus.c
     src/voice/turn_signal.c
     src/voice/semantic_eot.c
     src/providers/embedded.c
@@ -1975,7 +1975,7 @@ set(HU_TEST_SOURCES
     tests/test_trust_calibration.c
     tests/test_vision_ocr.c
     tests/test_channel_embeds.c
-    tests/test_twilio_media_impl.c
+    tests/test_twilio_media.c
     tests/test_declarative_tools.c
     tests/test_skill_trust.c
     tests/test_agent_modules.c

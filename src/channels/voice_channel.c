@@ -1,6 +1,7 @@
 #include "human/core/log.h"
 #include "human/channels/voice_channel.h"
 #include "human/core/string.h"
+#include "human/multimodal.h"
 #include "human/voice/provider.h"
 #include "human/voice/realtime.h"
 #include "human/voice/webrtc.h"
@@ -226,6 +227,25 @@ hu_error_t hu_voice_poll(void *channel_ctx, hu_allocator_t *alloc,
             err = hu_voice_rt_recv_event(v->rt_session, alloc, &event, 100);
         else
             return HU_OK;
+        if (err == HU_OK && event.audio_base64 && event.audio_base64_len > 0 &&
+            v->config.on_audio_ready) {
+            void *pcm = NULL;
+            size_t pcm_len = 0;
+            if (hu_multimodal_decode_base64(alloc, event.audio_base64, event.audio_base64_len, &pcm,
+                                            &pcm_len) == HU_OK &&
+                pcm && pcm_len > 0) {
+                size_t ns = pcm_len / 2;
+                float *f32 = (float *)alloc->alloc(alloc->ctx, ns * sizeof(float));
+                if (f32) {
+                    const int16_t *s = (const int16_t *)pcm;
+                    for (size_t i = 0; i < ns; i++)
+                        f32[i] = (float)s[i] / 32768.0f;
+                    v->config.on_audio_ready(f32, ns, v->config.callback_user_data);
+                    alloc->free(alloc->ctx, f32, ns * sizeof(float));
+                }
+                alloc->free(alloc->ctx, pcm, pcm_len);
+            }
+        }
         if (err == HU_OK && event.transcript && event.transcript_len > 0 && max_msgs > 0) {
             memset(&msgs[0], 0, sizeof(msgs[0]));
             size_t copy_len = event.transcript_len;

@@ -92,4 +92,11 @@ hu_error_t hu_voice_session_agent_turn_signal(hu_voice_session_t *session, hu_tu
 /** Retrieve the action recommended by the most recent FSM transition. */
 hu_turn_action_t hu_voice_session_last_action(const hu_voice_session_t *session);
 
+hu_error_t hu_voice_session_recv_event(hu_voice_session_t *session, hu_allocator_t *alloc,
+                                       hu_voice_rt_event_t *out, int timeout_ms);
+hu_error_t hu_voice_session_activity_start(hu_voice_session_t *session);
+hu_error_t hu_voice_session_activity_end(hu_voice_session_t *session);
+hu_error_t hu_voice_session_send_tool_response(hu_voice_session_t *session, const char *name,
+                                               const char *call_id, const char *response_json);
+
 #endif

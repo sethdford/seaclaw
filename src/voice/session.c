@@ -321,3 +321,50 @@ hu_turn_action_t hu_voice_session_last_action(const hu_voice_session_t *session)
         return HU_TURN_ACTION_NONE;
     return session->last_action;
 }
+
+hu_error_t hu_voice_session_recv_event(hu_voice_session_t *session, hu_allocator_t *alloc,
+                                       hu_voice_rt_event_t *out, int timeout_ms) {
+    if (!session || !alloc || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!session->active || !session->provider.vtable || !session->provider.vtable->recv_event)
+        return HU_ERR_NOT_SUPPORTED;
+    hu_error_t err =
+        session->provider.vtable->recv_event(session->provider.ctx, alloc, out, timeout_ms);
+    if (err == HU_OK && out->audio_base64 && out->audio_base64_len > 0 &&
+        session->latency_first_byte_pending) {
+        session->latency.first_byte_ms = voice_session_now_ms() - session->latency_send_mark_ms;
+        session->latency_first_byte_pending = false;
+        session->latency.measurements++;
+        double n = (double)session->latency.measurements;
+        session->latency.avg_first_byte_ms =
+            session->latency.avg_first_byte_ms * ((n - 1.0) / n) +
+            (double)session->latency.first_byte_ms / n;
+    }
+    return err;
+}
+
+hu_error_t hu_voice_session_activity_start(hu_voice_session_t *session) {
+    if (!session || !session->active)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!session->provider.vtable || !session->provider.vtable->send_activity_start)
+        return HU_ERR_NOT_SUPPORTED;
+    return session->provider.vtable->send_activity_start(session->provider.ctx);
+}
+
+hu_error_t hu_voice_session_activity_end(hu_voice_session_t *session) {
+    if (!session || !session->active)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!session->provider.vtable || !session->provider.vtable->send_activity_end)
+        return HU_ERR_NOT_SUPPORTED;
+    return session->provider.vtable->send_activity_end(session->provider.ctx);
+}
+
+hu_error_t hu_voice_session_send_tool_response(hu_voice_session_t *session, const char *name,
+                                               const char *call_id, const char *response_json) {
+    if (!session || !session->active || !name || !call_id || !response_json)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!session->provider.vtable || !session->provider.vtable->send_tool_response)
+        return HU_ERR_NOT_SUPPORTED;
+    return session->provider.vtable->send_tool_response(session->provider.ctx, name, call_id,
+                                                        response_json);
+}

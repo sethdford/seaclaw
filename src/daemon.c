@@ -1157,6 +1157,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     prompt = merged;
                     prompt_len = prompt_len + 1 + commitment_ctx_len;
                 }
+                alloc->free(alloc->ctx, commitment_ctx, commitment_ctx_len + 1);
+                commitment_ctx = NULL;
             }
             /* F23: Topic absence — 20% chance to inject when they haven't mentioned usual topics */
             {
@@ -2430,6 +2432,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (agent && agent->memory && agent->sota.sota_initialized &&
                         (last_dpo_train == 0 || ((int64_t)t - last_dpo_train) >= dpo_interval)) {
                         sqlite3 *dpo_db = hu_sqlite_memory_get_db(agent->memory);
+                        last_dpo_train = (int64_t)t;
                         if (dpo_db) {
                             hu_dpo_train_result_t dpo_result = {0};
                             hu_error_t dpo_err = hu_dpo_train_step(
@@ -2441,7 +2444,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             "pairs=%zu",
                                             dpo_result.loss, dpo_result.alignment_score,
                                             dpo_result.pairs_evaluated);
-                            last_dpo_train = (int64_t)t;
                         }
                     }
                 }
@@ -2455,8 +2457,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #else
                     struct tm *rlaif_lt = localtime_r(&t, &rlaif_tm);
 #endif
+<<<<<<< HEAD
                     if (rlaif_lt && rlaif_lt->tm_hour == 3 && !rlaif_nightly_done_today &&
                         agent && agent->memory && agent->sota.sota_initialized) {
+=======
+                    if (rlaif_lt && rlaif_lt->tm_hour == 3 && !rlaif_nightly_done_today && agent &&
+                        agent->memory && agent->sota.sota_initialized) {
+                        rlaif_nightly_done_today = true;
+>>>>>>> 1c94875d (feat(voice): merge real-time voice streaming pipeline e2e)
                         sqlite3 *rlaif_db = hu_sqlite_memory_get_db(agent->memory);
                         if (rlaif_db) {
                             hu_dpo_train_result_t rlaif_result = {0};
@@ -2491,7 +2499,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             rlaif_result.pairs_evaluated, rlaif_result.loss);
                                 alloc->free(alloc->ctx, best_frag, best_frag_len + 1);
                             }
-                            rlaif_nightly_done_today = true;
                         }
                     }
                     if (rlaif_lt && rlaif_lt->tm_hour != 3)
@@ -3546,9 +3553,20 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                                 /* Seen behavior: model realistic "read then wait" patterns */
 #ifndef HU_IS_TEST
+<<<<<<< HEAD
                     /* Trigger read receipt before response delay */
                     if (ch->channel->vtable->mark_read)
                         ch->channel->vtable->mark_read(ch->channel->ctx, batch_key, key_len);
+=======
+                /* Trigger read receipt with human-like delay */
+                if (ch->channel->vtable->mark_read) {
+                    uint32_t read_seed =
+                        (uint32_t)time(NULL) * 1103515245u + 12345u + (uint32_t)(uintptr_t)batch_key;
+                    uint32_t read_delay_ms = 500 + (read_seed >> 16u) % 2001u;
+                    usleep(read_delay_ms * 1000u);
+                    ch->channel->vtable->mark_read(ch->channel->ctx, batch_key, key_len);
+                }
+>>>>>>> 1c94875d (feat(voice): merge real-time voice streaming pipeline e2e)
                 {
                     uint32_t seen_seed =
                         (uint32_t)time(NULL) * 1103515245u + (uint32_t)(uintptr_t)combined;
@@ -8185,12 +8203,29 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         int best_score = best_ts.overall;
                         double orig_temp = agent->turn_temperature;
                         for (uint32_t ci = 0; ci < n_extra; ci++) {
+<<<<<<< HEAD
                             agent->turn_temperature = (orig_temp > 0.0 ? orig_temp : agent->temperature) + 0.1 * (double)(ci + 1);
                             if (agent->turn_temperature > 1.5) agent->turn_temperature = 1.5;
                             char *cand = NULL; size_t cand_len = 0;
                             hu_agent_clear_history(agent);
                             hu_error_t cerr = hu_agent_turn(agent, combined, combined_len, &cand, &cand_len);
                             if (cerr != HU_OK || !cand || cand_len == 0) { if (cand) alloc->free(alloc->ctx, cand, cand_len + 1); continue; }
+=======
+                            agent->turn_temperature =
+                                (orig_temp > 0.0 ? orig_temp : agent->temperature) +
+                                0.1 * (double)(ci + 1);
+                            if (agent->turn_temperature > 1.5)
+                                agent->turn_temperature = 1.5;
+                            char *cand = NULL;
+                            size_t cand_len = 0;
+                            hu_error_t cerr =
+                                hu_agent_turn(agent, combined, combined_len, &cand, &cand_len);
+                            if (cerr != HU_OK || !cand || cand_len == 0) {
+                                if (cand)
+                                    alloc->free(alloc->ctx, cand, cand_len + 1);
+                                continue;
+                            }
+>>>>>>> 1c94875d (feat(voice): merge real-time voice streaming pipeline e2e)
                             hu_turing_score_t cand_ts;
                             hu_turing_score_heuristic(cand, cand_len, combined, combined_len, &cand_ts);
                             if (agent->active_channel) hu_turing_apply_channel_weights(&cand_ts, agent->active_channel, agent->active_channel_len);
