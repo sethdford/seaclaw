@@ -241,14 +241,20 @@ hu_error_t hu_agent_from_config(
     out->custom_instructions_len = 0;
     if (custom_instructions && custom_instructions_len > 0) {
         out->custom_instructions = hu_strndup(alloc, custom_instructions, custom_instructions_len);
-        if (!out->custom_instructions)
+        if (!out->custom_instructions) {
+            alloc->free(alloc->ctx, out->timing_model, sizeof(hu_timing_model_t));
             return HU_ERR_OUT_OF_MEMORY;
+        }
         out->custom_instructions_len = custom_instructions_len;
     }
 
     out->model_name = hu_strndup(alloc, model_name, model_name_len);
-    if (!out->model_name)
+    if (!out->model_name) {
+        if (out->custom_instructions)
+            alloc->free(alloc->ctx, out->custom_instructions, out->custom_instructions_len + 1);
+        alloc->free(alloc->ctx, out->timing_model, sizeof(hu_timing_model_t));
         return HU_ERR_OUT_OF_MEMORY;
+    }
     out->model_name_len = model_name_len;
 
     out->default_provider =
@@ -256,6 +262,9 @@ hu_error_t hu_agent_from_config(
                    default_provider_len ? default_provider_len : strlen("openai"));
     if (!out->default_provider) {
         alloc->free(alloc->ctx, out->model_name, out->model_name_len + 1);
+        if (out->custom_instructions)
+            alloc->free(alloc->ctx, out->custom_instructions, out->custom_instructions_len + 1);
+        alloc->free(alloc->ctx, out->timing_model, sizeof(hu_timing_model_t));
         return HU_ERR_OUT_OF_MEMORY;
     }
     out->default_provider_len = default_provider_len ? default_provider_len : strlen("openai");
@@ -265,6 +274,9 @@ hu_error_t hu_agent_from_config(
     if (!out->workspace_dir) {
         alloc->free(alloc->ctx, out->default_provider, out->default_provider_len + 1);
         alloc->free(alloc->ctx, out->model_name, out->model_name_len + 1);
+        if (out->custom_instructions)
+            alloc->free(alloc->ctx, out->custom_instructions, out->custom_instructions_len + 1);
+        alloc->free(alloc->ctx, out->timing_model, sizeof(hu_timing_model_t));
         return HU_ERR_OUT_OF_MEMORY;
     }
     out->workspace_dir_len = workspace_dir_len ? workspace_dir_len : 1;
@@ -296,8 +308,12 @@ hu_error_t hu_agent_from_config(
         if (ctx_cfg->speculative_cache) {
             hu_speculative_cache_t *cache =
                 (hu_speculative_cache_t *)alloc->alloc(alloc->ctx, sizeof(hu_speculative_cache_t));
-            if (cache && hu_speculative_cache_init(cache, alloc) == HU_OK)
-                out->infra.speculative_cache = cache;
+            if (cache) {
+                if (hu_speculative_cache_init(cache, alloc) == HU_OK)
+                    out->infra.speculative_cache = cache;
+                else
+                    alloc->free(alloc->ctx, cache, sizeof(hu_speculative_cache_t));
+            }
         }
     }
 
@@ -308,6 +324,9 @@ hu_error_t hu_agent_from_config(
             alloc->free(alloc->ctx, out->workspace_dir, out->workspace_dir_len + 1);
             alloc->free(alloc->ctx, out->default_provider, out->default_provider_len + 1);
             alloc->free(alloc->ctx, out->model_name, out->model_name_len + 1);
+            if (out->custom_instructions)
+                alloc->free(alloc->ctx, out->custom_instructions, out->custom_instructions_len + 1);
+            alloc->free(alloc->ctx, out->timing_model, sizeof(hu_timing_model_t));
             return HU_ERR_OUT_OF_MEMORY;
         }
         memcpy(out->tools, tools, tools_count * sizeof(hu_tool_t));
@@ -319,6 +338,9 @@ hu_error_t hu_agent_from_config(
             alloc->free(alloc->ctx, out->workspace_dir, out->workspace_dir_len + 1);
             alloc->free(alloc->ctx, out->default_provider, out->default_provider_len + 1);
             alloc->free(alloc->ctx, out->model_name, out->model_name_len + 1);
+            if (out->custom_instructions)
+                alloc->free(alloc->ctx, out->custom_instructions, out->custom_instructions_len + 1);
+            alloc->free(alloc->ctx, out->timing_model, sizeof(hu_timing_model_t));
             return HU_ERR_OUT_OF_MEMORY;
         }
         out->tool_specs_count = tools_count;
@@ -397,20 +419,25 @@ hu_error_t hu_agent_from_config(
     if (!out->undo_stack) {
         hu_arena_destroy(out->turn_arena);
         out->turn_arena = NULL;
+        hu_agent_deinit(out);
         return HU_ERR_OUT_OF_MEMORY;
     }
 
     {
         const char *session_id = "default";
         hu_error_t serr = hu_stm_init(&out->stm, *alloc, session_id, 7);
-        if (serr != HU_OK)
+        if (serr != HU_OK) {
+            hu_agent_deinit(out);
             return serr;
+        }
     }
 
     {
         hu_error_t rerr = hu_pattern_radar_init(&out->radar, *alloc);
-        if (rerr != HU_OK)
+        if (rerr != HU_OK) {
+            hu_agent_deinit(out);
             return rerr;
+        }
     }
 
 #ifdef HU_HAS_PERSONA

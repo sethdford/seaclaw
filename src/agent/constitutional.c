@@ -236,7 +236,10 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
     result->verdict = verdict;
     result->reasoning = reasoning;
     result->reasoning_len = reasoning_len;
-    result->principle_index = principle_idx;
+    if (principle_idx >= 1 && (size_t)principle_idx <= config->principle_count)
+        result->principle_index = principle_idx;
+    else
+        result->principle_index = -1;
 
     /* If REWRITE and rewrite_enabled, call provider again for revision */
     if (verdict == HU_CRITIQUE_REWRITE && config->rewrite_enabled && provider->vtable->chat) {

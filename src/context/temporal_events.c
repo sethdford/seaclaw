@@ -138,22 +138,24 @@ int64_t hu_temporal_resolve_reference(const char *temporal_ref, size_t ref_len, 
     if (strstr(lower, "soon")) return now_ts + 3 * 86400;
     if (strstr(lower, "next week")) return now_ts + 7 * 86400;
     if (strstr(lower, "next month")) return now_ts + 30 * 86400;
-    if (strstr(lower, "in ")) {
-        int num = 0;
-        for (size_t i = 0; i < clen; i++) {
-            if (lower[i] >= '0' && lower[i] <= '9') {
-                num = (int)(lower[i] - '0');
-                if (i + 1 < clen && lower[i+1] >= '0' && lower[i+1] <= '9')
-                    num = num * 10 + (int)(lower[i+1] - '0');
-                break;
+    {
+        const char *in_ptr = strstr(lower, "in ");
+        if (in_ptr) {
+            const char *p = in_ptr + 3;
+            int num = 0;
+            while (p < lower + clen && *p == ' ') p++;
+            while (p < lower + clen && *p >= '0' && *p <= '9') {
+                num = num * 10 + (int)(*p - '0');
+                p++;
             }
-        }
-        if (num > 0) {
-            if (strstr(lower, "hour")) return now_ts + num * 3600;
-            if (strstr(lower, "day")) return now_ts + num * 86400;
-            if (strstr(lower, "week")) return now_ts + num * 7 * 86400;
-            if (strstr(lower, "month")) return now_ts + num * 30 * 86400;
-            return now_ts + num * 86400;
+            if (num > 0) {
+                if (strstr(lower, "minute")) return now_ts + num * 60;
+                if (strstr(lower, "hour")) return now_ts + num * 3600;
+                if (strstr(lower, "day")) return now_ts + num * 86400;
+                if (strstr(lower, "week")) return now_ts + num * 7 * 86400;
+                if (strstr(lower, "month")) return now_ts + num * 30 * 86400;
+                return now_ts + num * 3600;
+            }
         }
     }
     return now_ts + 7 * 86400;

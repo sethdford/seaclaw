@@ -296,16 +296,11 @@ static void timing_fill_bucket(hu_timing_bucket_t *b, double *samples, size_t n)
     b->mean = 0;
     for (size_t i = 0; i < n; i++) b->mean += samples[i];
     b->mean /= (double)n;
-    size_t p10i = n <= 1 ? 0 : (size_t)((n - 1) * 0.10 + 0.5);
-    size_t p25i = n <= 1 ? 0 : (size_t)((n - 1) * 0.25 + 0.5);
-    size_t p50i = n <= 1 ? 0 : (n - 1) / 2;
-    size_t p75i = n <= 1 ? 0 : (size_t)((n - 1) * 0.75 + 0.5);
-    size_t p90i = n <= 1 ? 0 : (size_t)((n - 1) * 0.90 + 0.5);
-    b->p10 = samples[p10i];
-    b->p25 = samples[p25i];
-    b->p50 = samples[p50i];
-    b->p75 = samples[p75i];
-    b->p90 = samples[p90i];
+    b->p10 = samples[perc_idx(n, 10)];
+    b->p25 = samples[perc_idx(n, 25)];
+    b->p50 = samples[perc_idx(n, 50)];
+    b->p75 = samples[perc_idx(n, 75)];
+    b->p90 = samples[perc_idx(n, 90)];
 }
 
 hu_error_t hu_timing_model_learn_from_db(hu_timing_model_t *model, sqlite3 *db,
@@ -313,7 +308,7 @@ hu_error_t hu_timing_model_learn_from_db(hu_timing_model_t *model, sqlite3 *db,
     if (!model || !db || !contact_id) return HU_ERR_INVALID_ARGUMENT;
     const char *sql =
         "SELECT sent_ts, is_from_me, msg_len FROM ("
-        "  SELECT m1.date/1000000000 + 978307200 AS sent_ts, "
+        "  SELECT DISTINCT m1.ROWID, m1.date/1000000000 + 978307200 AS sent_ts, "
         "         m1.is_from_me, LENGTH(m1.text) AS msg_len "
         "  FROM message m1 "
         "  JOIN chat_message_join cmj ON cmj.message_id = m1.ROWID "

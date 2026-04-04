@@ -105,6 +105,18 @@ static void temporal_resolve_soon_defaults_3_days(void) {
     HU_ASSERT_EQ(resolved, now + 3 * 86400);
 }
 
+static void temporal_resolve_in_30_minutes(void) {
+    int64_t now = 1700000000;
+    int64_t resolved = hu_temporal_resolve_reference("in 30 minutes", 13, now);
+    HU_ASSERT_EQ(resolved, now + 30 * 60);
+}
+
+static void temporal_resolve_in_n_scans_after_in(void) {
+    int64_t now = 1700000000;
+    int64_t resolved = hu_temporal_resolve_reference("meet at 3pm in 2 days", 21, now);
+    HU_ASSERT_EQ(resolved, now + 2 * 86400);
+}
+
 static void temporal_resolve_null_returns_zero(void) {
     HU_ASSERT_EQ(hu_temporal_resolve_reference(NULL, 0, 1700000000), 0);
     HU_ASSERT_EQ(hu_temporal_resolve_reference("", 0, 1700000000), 0);
@@ -313,6 +325,8 @@ void run_sota_humanness_tests(void) {
     HU_RUN_TEST(temporal_resolve_in_2_days);
     HU_RUN_TEST(temporal_resolve_next_month);
     HU_RUN_TEST(temporal_resolve_soon_defaults_3_days);
+    HU_RUN_TEST(temporal_resolve_in_30_minutes);
+    HU_RUN_TEST(temporal_resolve_in_n_scans_after_in);
     HU_RUN_TEST(temporal_resolve_null_returns_zero);
     HU_RUN_TEST(temporal_resolve_unknown_defaults_7_days);
     HU_RUN_TEST(temporal_resolve_case_insensitive);

@@ -291,7 +291,7 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
     hu_json_value_t *bon = hu_json_object_get(obj, "best_of_n");
     if (bon && bon->type == HU_JSON_NUMBER) {
         double bv = bon->data.number;
-        if (bv >= 0.0 && bv <= 10.0)
+        if (bv >= 0.0 && bv <= 5.0)
             cfg->agent.best_of_n = (uint32_t)bv;
     }
 

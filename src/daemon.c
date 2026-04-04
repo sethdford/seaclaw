@@ -27,6 +27,14 @@
 #include "human/daemon/platform_facade.h"
 #include "human/daemon/voice_facade.h"
 
+/* Plan 2: Background observer registry */
+#include "human/background_observer.h"
+/* Core utilities */
+#include "human/core/error.h"
+#include "human/core/log.h"
+#include "human/core/process_util.h"
+#include "human/core/string.h"
+
 /* Security */
 #include "human/security/adversarial.h"
 #include "human/security/companion_safety.h"
@@ -1856,6 +1864,28 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
         }
     }
     int64_t chan_monitor_last_ts = 0;
+
+    /* Plan 2: Background observer registry — periodic health, memory, security, etc. */
+    hu_bg_registry_t bg_registry;
+    hu_bg_registry_init(&bg_registry);
+    {
+        hu_bg_observer_t obs;
+        if (hu_bg_health_monitor_create(alloc, &obs) == HU_OK)
+            hu_bg_registry_register(&bg_registry, obs);
+        if (hu_bg_memory_consolidation_create(alloc, &obs) == HU_OK)
+            hu_bg_registry_register(&bg_registry, obs);
+        if (hu_bg_security_audit_create(alloc, &obs) == HU_OK)
+            hu_bg_registry_register(&bg_registry, obs);
+        if (hu_bg_feed_processor_create(alloc, &obs) == HU_OK)
+            hu_bg_registry_register(&bg_registry, obs);
+        if (hu_bg_dpo_export_create(alloc, &obs) == HU_OK)
+            hu_bg_registry_register(&bg_registry, obs);
+        if (hu_bg_intelligence_cycle_create(alloc, &obs) == HU_OK)
+            hu_bg_registry_register(&bg_registry, obs);
+        if (hu_bg_email_digest_create(alloc, &obs) == HU_OK)
+            hu_bg_registry_register(&bg_registry, obs);
+    }
+    int64_t bg_last_tick_epoch = 0;
 
     hu_bus_t daemon_outbound_bus;
     hu_bus_init(&daemon_outbound_bus);
@@ -10306,6 +10336,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
             }
         }
 
+        /* Plan 2: Background observer registry tick */
+        {
+            int64_t bg_now = (int64_t)time(NULL);
+            if (bg_now - bg_last_tick_epoch >= 60) {
+                hu_bg_registry_tick_all(&bg_registry, alloc, NULL);
+                bg_last_tick_epoch = bg_now;
+            }
+        }
+
         struct timespec sleep_ts = {.tv_sec = tick_interval_ms / 1000,
                                     .tv_nsec = (long)(tick_interval_ms % 1000) * 1000000L};
         nanosleep(&sleep_ts, NULL);
@@ -10323,6 +10362,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     hu_bus_unsubscribe(&daemon_outbound_bus, daemon_outbound_bus_cb, &daemon_out_bus_bridge);
     hu_bus_deinit(&daemon_outbound_bus);
     hu_inbox_deinit(&inbox_watcher);
+    hu_bg_registry_deinit(&bg_registry, alloc);
     if (chan_monitor)
         hu_channel_monitor_destroy(chan_monitor);
     if (agent)
