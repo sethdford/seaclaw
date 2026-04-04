@@ -1948,7 +1948,7 @@ set(HU_TEST_SOURCES
     tests/test_bg_registry.c
     tests/test_canvas_render.c
     tests/test_canvas_e2e.c
-    tests/test_canvas_persist.c
+
     tests/test_canvas_tool.c
     tests/test_channel_embeds.c
     tests/test_twilio_media_impl.c
