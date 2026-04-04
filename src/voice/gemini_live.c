@@ -13,7 +13,7 @@
 static const char *DEFAULT_MODEL = "gemini-3.1-flash-live-preview";
 static const char *DEFAULT_VOICE = "Puck";
 
-#if !HU_IS_TEST
+#if !HU_IS_TEST && defined(HU_HTTP_CURL)
 static const char *GOOGLE_AI_WS_BASE =
     "wss://generativelanguage.googleapis.com/ws/"
     "google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
@@ -41,14 +41,12 @@ static size_t gl_url_encode(const char *src, char *dst, size_t dst_cap) {
     else if (dst_cap > 0) dst[dst_cap - 1] = '\0';
     return w;
 }
-#endif
 
 /*
  * Build WebSocket URL.
  * Google AI: ...?key=API_KEY
  * Vertex AI: wss://{region}-aiplatform.googleapis.com/ws/...?access_token=TOKEN
  */
-#if !HU_IS_TEST && defined(HU_HTTP_CURL)
 static int build_ws_url(const hu_gemini_live_config_t *cfg, char *buf, size_t cap) {
     if (cfg->region && cfg->region[0] && cfg->project_id && cfg->project_id[0]) {
         const char *token = cfg->access_token ? cfg->access_token : "";
