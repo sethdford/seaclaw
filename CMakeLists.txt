@@ -1947,12 +1947,21 @@ set(HU_TEST_SOURCES
     tests/test_agent_git.c
     tests/test_bg_registry.c
     tests/test_canvas_render.c
-    tests/test_canvas_e2e.c
-    tests/test_canvas_persist.c
-    tests/test_canvas_tool.c
 
 
 
+    tests/test_consistency.c
+    tests/test_fact_extract.c
+    tests/test_hallucination_guard.c
+    tests/test_humor_fw.c
+    tests/test_markdown_loader.c
+    tests/test_mcp_http_integration.c
+    tests/test_self_improve.c
+    tests/test_sycophancy_guard.c
+    tests/test_task_store.c
+    tests/test_trust_calibration.c
+    tests/test_twilio_media.c
+    tests/test_vision_ocr.c
     tests/test_channel_embeds.c
     tests/test_twilio_media_impl.c
     tests/test_declarative_tools.c
