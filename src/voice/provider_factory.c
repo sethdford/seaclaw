@@ -40,7 +40,7 @@ hu_error_t hu_voice_provider_create_from_config(hu_allocator_t *alloc, const hu_
                                                                   : config->voice.vertex_project;
         bool has_vertex = (vtok && vtok[0] && vregion && vregion[0] && vproject && vproject[0]);
         if ((!key || !key[0]) && !has_vertex)
-            return HU_ERR_INVALID_ARGUMENT;
+            return HU_ERR_GATEWAY_AUTH; /* no Google AI key or Vertex AI credentials */
 
         if (!rt_model || !rt_model[0])
             rt_model = "gemini-3.1-flash-live-preview";
@@ -77,7 +77,7 @@ hu_error_t hu_voice_provider_create_from_config(hu_allocator_t *alloc, const hu_
                               ? extras->api_key
                               : hu_config_get_provider_key(config, "openai");
         if (!key || !key[0])
-            return HU_ERR_INVALID_ARGUMENT;
+            return HU_ERR_GATEWAY_AUTH; /* no OpenAI API key */
 
         if (!rt_model || !rt_model[0])
             rt_model = "gpt-4o-realtime-preview";

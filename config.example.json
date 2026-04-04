@@ -13,6 +13,14 @@
     {
       "name": "openai",
       "api_key": "YOUR_OPENAI_API_KEY"
+    },
+    {
+      "name": "google",
+      "api_key": "YOUR_GOOGLE_AI_API_KEY"
+    },
+    {
+      "name": "cartesia",
+      "api_key": "YOUR_CARTESIA_API_KEY"
     }
   ],
 
@@ -108,6 +116,14 @@
     "audit": {
       "enabled": true
     }
+  },
+
+  "voice": {
+    "mode": "gemini_live",
+    "realtime_model": "gemini-3.1-flash-live-preview",
+    "realtime_voice": "Puck",
+    "vertex_region": "us-central1",
+    "vertex_project": "YOUR_GCP_PROJECT"
   },
 
   "tools": {
