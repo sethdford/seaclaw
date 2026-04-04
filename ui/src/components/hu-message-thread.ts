@@ -23,11 +23,11 @@ const SCROLL_AUTO_FOLLOW_PX = 80;
 
 function getTimeGreeting(): string {
   const hour = new Date().getHours();
-  if (hour < 5) return "Late night session?";
-  if (hour < 12) return "Good morning.";
-  if (hour < 17) return "Good afternoon.";
-  if (hour < 21) return "Good evening.";
-  return "Burning the midnight oil?";
+  if (hour < 5) return "Night owl session";
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  if (hour < 21) return "Good evening";
+  return "Evening";
 }
 
 const HERO_SUGGESTIONS = [
@@ -458,15 +458,16 @@ export class ScMessageThread extends LitElement {
       }
     }
 
-    /* Empty state hero */
+    /* Empty state hero — centered like claude.ai/ChatGPT */
     .hero {
       flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: var(--hu-space-xl);
+      gap: var(--hu-space-lg);
       padding: var(--hu-space-2xl) var(--hu-space-lg);
+      padding-bottom: 20vh;
       text-align: center;
       animation: hu-hero-enter var(--hu-duration-slow) var(--hu-ease-out) both;
     }
@@ -482,17 +483,14 @@ export class ScMessageThread extends LitElement {
     }
     .hero-greeting {
       font-family: var(--hu-font);
-      font-size: var(--hu-text-3xl, 1.875rem);
-      font-weight: var(--hu-weight-semibold);
+      font-size: clamp(1.5rem, 4vw, 2.25rem);
+      font-weight: var(--hu-weight-medium, 500);
       color: var(--hu-text);
-      letter-spacing: -0.02em;
-      line-height: 1.2;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
     }
     .hero-sub {
-      font-family: var(--hu-font);
-      font-size: var(--hu-text-base);
-      color: var(--hu-text-secondary);
-      max-width: var(--hu-toast-max-width, 400px);
+      display: none;
     }
     .hero-suggestions {
       display: flex;

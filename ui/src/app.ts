@@ -207,6 +207,11 @@ export class ScApp extends LitElement {
       background: var(--hu-accent);
       transform-origin: left;
       flex-shrink: 0;
+      opacity: 0;
+      transition: opacity var(--hu-duration-normal, 200ms);
+    }
+    main:has(:is([data-scrollable="true"])) .scroll-progress {
+      opacity: 1;
     }
     @supports (animation-timeline: scroll()) {
       .scroll-progress {
@@ -252,40 +257,7 @@ export class ScApp extends LitElement {
       }
     }
 
-    /* Ambient ocean lighting — living teal atmosphere with subtle drift */
-    main::before {
-      content: "";
-      position: fixed;
-      top: -15%;
-      left: -10%;
-      width: 55%;
-      height: 55%;
-      background: radial-gradient(
-        ellipse 70% 60% at 40% 30%,
-        color-mix(in srgb, var(--hu-accent) 7%, transparent),
-        transparent 70%
-      );
-      pointer-events: none;
-      z-index: 0;
-      animation: hu-ambient-drift var(--hu-duration-ambient) var(--hu-ease-in-out) infinite;
-    }
-    main::after {
-      content: "";
-      position: fixed;
-      bottom: -20%;
-      right: -10%;
-      width: 50%;
-      height: 50%;
-      background: radial-gradient(
-        ellipse 60% 50% at 60% 60%,
-        color-mix(in srgb, var(--hu-accent) 4%, transparent),
-        transparent 70%
-      );
-      pointer-events: none;
-      z-index: 0;
-      animation: hu-ambient-drift var(--hu-duration-ambient-slow) var(--hu-ease-in-out) infinite
-        reverse;
-    }
+    /* Ambient lighting removed — clean background like claude.ai */
 
     .view-enter {
       flex: 1;
