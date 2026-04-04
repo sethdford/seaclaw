@@ -2507,6 +2507,16 @@ export class DemoGatewayClient extends EventTarget {
     return this.request("voice.tool_response", params);
   }
 
+  voiceValidate(params: {
+    mode: string;
+    apiKey: string;
+  }): Promise<{ ok: boolean; mode?: string; error?: string }> {
+    if (!params.apiKey || params.apiKey.trim().length === 0) {
+      return Promise.resolve({ ok: false, error: "API key required" });
+    }
+    return Promise.resolve({ ok: true, mode: params.mode });
+  }
+
   #emitDemoVoicePcmChunks(): void {
     let pcmCount = 0;
     const sendPcm = (): void => {

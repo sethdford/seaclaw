@@ -191,6 +191,17 @@ export class GatewayClient extends EventTarget {
     return this.request("voice.tool_response", params);
   }
 
+  voiceValidate(params: {
+    mode: string;
+    apiKey: string;
+  }): Promise<{ ok: boolean; mode?: string; error?: string }> {
+    return this.request("voice.validate", params) as Promise<{
+      ok: boolean;
+      mode?: string;
+      error?: string;
+    }>;
+  }
+
   #onMessage(ev: MessageEvent): void {
     if (ev.data instanceof ArrayBuffer) {
       this.#onBinaryChunk?.(ev.data);

@@ -200,6 +200,9 @@ hu_error_t cp_voice_tool_response(hu_allocator_t *alloc, hu_app_context_t *app,
 hu_error_t cp_voice_clone(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
                           const hu_control_protocol_t *proto, const hu_json_value_t *root,
                           char **out, size_t *out_len);
+hu_error_t cp_voice_validate(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                             const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                             char **out, size_t *out_len);
 
 /* Memory handlers */
 hu_error_t cp_memory_status(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,

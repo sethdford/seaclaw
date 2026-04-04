@@ -861,6 +861,7 @@ list(APPEND HU_CORE_SOURCES
     src/voice/provider_factory.c
     src/voice/duplex.c
     src/voice/session.c
+    src/voice/provider_factory.c
     src/voice/turn_signal.c
     src/voice/semantic_eot.c
     src/providers/embedded.c

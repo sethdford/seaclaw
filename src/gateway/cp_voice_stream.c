@@ -13,6 +13,7 @@
 #include "human/voice/audio_emotion.h"
 #include "human/voice/duplex.h"
 #include "human/voice/emotion_voice_map.h"
+#include "human/voice/provider.h"
 #include "human/voice/semantic_eot.h"
 #include "human/voice/turn_signal.h"
 #include "human/voice/provider.h"
@@ -920,6 +921,69 @@ hu_error_t cp_voice_tool_response(hu_allocator_t *alloc, hu_app_context_t *app,
     hu_error_t err = hu_json_stringify(alloc, res, out, out_len);
     hu_json_free(alloc, res);
     return err;
+}
+
+hu_error_t cp_voice_validate(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_conn_t *conn,
+                             const hu_control_protocol_t *proto, const hu_json_value_t *root,
+                             char **out, size_t *out_len) {
+    *out = NULL;
+    *out_len = 0;
+    (void)conn;
+    (void)proto;
+    if (!alloc || !app || !app->config || !root)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    const hu_config_t *cfg = (const hu_config_t *)app->config;
+    hu_json_value_t *params = hu_json_object_get((hu_json_value_t *)root, "params");
+    const char *mode = params ? hu_json_get_string(params, "mode") : NULL;
+    if (!mode || !mode[0])
+        mode = "gemini_live";
+    const char *api_key = params ? hu_json_get_string(params, "apiKey") : NULL;
+
+    hu_voice_provider_extras_t extras = {0};
+    if (api_key && api_key[0])
+        extras.api_key = api_key;
+
+    hu_voice_provider_t provider = {0};
+    hu_error_t verr = hu_voice_provider_create_from_config(alloc, cfg, mode, &extras, &provider);
+    if (verr != HU_OK) {
+        hu_json_value_t *vres = hu_json_object_new(alloc);
+        if (!vres)
+            return HU_ERR_OUT_OF_MEMORY;
+        hu_json_object_set(alloc, vres, "ok", hu_json_bool_new(alloc, false));
+        const char *msg = (verr == HU_ERR_GATEWAY_AUTH)
+                              ? "Missing API key — check your provider credentials"
+                          : (verr == HU_ERR_NOT_SUPPORTED) ? "Unsupported voice mode"
+                                                           : "Provider configuration error";
+        cp_json_set_str(alloc, vres, "error", msg);
+        hu_error_t jerr = hu_json_stringify(alloc, vres, out, out_len);
+        hu_json_free(alloc, vres);
+        return jerr;
+    }
+
+    verr = provider.vtable->connect(provider.ctx);
+    if (verr != HU_OK) {
+        provider.vtable->disconnect(provider.ctx, alloc);
+        hu_json_value_t *vres = hu_json_object_new(alloc);
+        if (!vres)
+            return HU_ERR_OUT_OF_MEMORY;
+        hu_json_object_set(alloc, vres, "ok", hu_json_bool_new(alloc, false));
+        cp_json_set_str(alloc, vres, "error", "Connection failed — check your API key and network");
+        hu_error_t jerr = hu_json_stringify(alloc, vres, out, out_len);
+        hu_json_free(alloc, vres);
+        return jerr;
+    }
+
+    provider.vtable->disconnect(provider.ctx, alloc);
+
+    hu_json_value_t *res = hu_json_object_new(alloc);
+    if (!res)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_json_object_set(alloc, res, "ok", hu_json_bool_new(alloc, true));
+    cp_json_set_str(alloc, res, "mode", mode);
+    hu_error_t jerr = hu_json_stringify(alloc, res, out, out_len);
+    hu_json_free(alloc, res);
+    return jerr;
 }
 
 #else /* !HU_GATEWAY_POSIX */

@@ -1,7 +1,7 @@
-#include "human/core/log.h"
 #include "human/gateway/control_protocol.h"
 #include "human/core/allocator.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/security.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -78,6 +78,7 @@ static const hu_rpc_entry_t s_rpc_table[] = {
     {"voice.tool_response", cp_voice_tool_response},
     {"voice.config", cp_voice_config},
     {"voice.clone", cp_voice_clone},
+    {"voice.validate", cp_voice_validate},
     {"usage.summary", cp_admin_usage_summary},
     {"metrics.snapshot", cp_admin_metrics_snapshot},
     {"activity.recent", cp_admin_activity_recent},
@@ -343,7 +344,7 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
             hu_error_t send_err = hu_ws_server_send(proto->ws, conn, res_buf, pos);
             if (send_err != HU_OK) {
                 hu_log_error("control", NULL, "send response failed: %s",
-                              hu_error_string(send_err));
+                             hu_error_string(send_err));
             }
             proto->alloc->free(proto->alloc->ctx, res_buf, res_cap);
         }

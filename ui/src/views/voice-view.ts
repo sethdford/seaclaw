@@ -225,6 +225,12 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private _voiceMode: "standard" | "gemini_live" | "openai_realtime" = "standard";
   @state() private _stsApiKey = "";
   @state() private _showCredPanel = false;
+  @state() private _showSetup = false;
+  @state() private _setupMode = "gemini_live";
+  @state() private _setupKey = "";
+  @state() private _setupValidating = false;
+  @state() private _setupError = "";
+  @state() private _setupSuccess = false;
   private _durationTimer: ReturnType<typeof setInterval> | null = null;
   private _recorder = new AudioRecorder();
   readonly #playback = new AudioPlaybackEngine(24000);
@@ -353,6 +359,13 @@ export class ScVoiceView extends GatewayAwareLitElement {
         gw.addEventListener(GatewayClientClass.EVENT_STATUS, this.statusHandler as EventListener);
       }
       this._loading = false;
+      /* Show setup banner if no provider key is configured */
+      try {
+        const hasKey = localStorage.getItem("hu-voice-api-key");
+        if (!hasKey) this._showSetup = true;
+      } catch {
+        /* ignore */
+      }
     });
   }
 
@@ -991,11 +1004,147 @@ export class ScVoiceView extends GatewayAwareLitElement {
     }
   }
 
+  private _renderSetupBanner() {
+    const providers = [
+      {
+        id: "gemini_live",
+        label: "Gemini Live (Google)",
+        help: "Get a key at aistudio.google.com/apikey",
+      },
+      {
+        id: "openai_realtime",
+        label: "OpenAI Realtime",
+        help: "Get a key at platform.openai.com/api-keys",
+      },
+      {
+        id: "standard",
+        label: "Standard (Cartesia TTS)",
+        help: "Get a key at play.cartesia.ai",
+      },
+    ];
+    const selected = providers.find((p) => p.id === this._setupMode) ?? providers[0];
+    return html`
+      <div class="setup-banner" role="region" aria-label="Voice setup">
+        <h3 style="margin:0 0 var(--hu-space-sm) 0;font:var(--hu-font-heading-sm)">Voice Setup</h3>
+        <p style="margin:0 0 var(--hu-space-md) 0;color:var(--hu-text-secondary);font:var(--hu-font-body-sm)">
+          Choose a voice provider and enter your API key to start talking.
+        </p>
+        <fieldset
+          style="border:none;padding:0;margin:0 0 var(--hu-space-md) 0;display:flex;flex-direction:column;gap:var(--hu-space-xs)"
+          role="radiogroup"
+          aria-label="Voice provider"
+        >
+          ${providers.map(
+            (p) => html`
+              <label
+                style="display:flex;align-items:center;gap:var(--hu-space-xs);cursor:pointer;font:var(--hu-font-body-sm)"
+              >
+                <input
+                  type="radio"
+                  name="voice-provider"
+                  .value=${p.id}
+                  .checked=${this._setupMode === p.id}
+                  @change=${() => {
+                    this._setupMode = p.id;
+                    this._setupError = "";
+                    this._setupSuccess = false;
+                  }}
+                  style="accent-color:var(--hu-accent)"
+                />
+                ${p.label}
+              </label>
+            `,
+          )}
+        </fieldset>
+        <p style="margin:0 0 var(--hu-space-sm) 0;color:var(--hu-text-tertiary);font:var(--hu-font-body-xs)">
+          ${selected.help}
+        </p>
+        <div style="display:flex;gap:var(--hu-space-xs);align-items:center;margin-bottom:var(--hu-space-sm)">
+          <input
+            type="password"
+            placeholder="Paste API key"
+            aria-label="API key"
+            .value=${this._setupKey}
+            @input=${(e: InputEvent) => {
+              this._setupKey = (e.target as HTMLInputElement).value;
+              this._setupError = "";
+            }}
+            style="flex:1;padding:var(--hu-space-xs) var(--hu-space-sm);border-radius:var(--hu-radius-sm);border:1px solid var(--hu-border);background:var(--hu-bg-surface);color:var(--hu-text-primary);font:var(--hu-font-body-sm)"
+          />
+          <button
+            aria-label="Test connection"
+            ?disabled=${this._setupValidating || !this._setupKey.trim()}
+            @click=${() => void this._testVoiceConnection()}
+            style="padding:var(--hu-space-xs) var(--hu-space-md);border-radius:var(--hu-radius-sm);border:1px solid var(--hu-border);background:var(--hu-accent);color:var(--hu-on-accent);font:var(--hu-font-body-sm);cursor:pointer"
+          >
+            ${this._setupValidating ? "Testing\u2026" : "Test"}
+          </button>
+        </div>
+        ${this._setupError
+          ? html`<p style="margin:0 0 var(--hu-space-xs) 0;color:var(--hu-error);font:var(--hu-font-body-xs)">${this._setupError}</p>`
+          : nothing}
+        ${this._setupSuccess
+          ? html`<p style="margin:0 0 var(--hu-space-xs) 0;color:var(--hu-success);font:var(--hu-font-body-xs)">Connected successfully. Ready to talk.</p>`
+          : nothing}
+      </div>
+    `;
+  }
+
+  private async _testVoiceConnection() {
+    this._setupValidating = true;
+    this._setupError = "";
+    this._setupSuccess = false;
+    try {
+      const gw = this.gateway ?? this._boundGateway;
+      if (!gw || typeof (gw as Record<string, unknown>).voiceValidate !== "function") {
+        this._setupError = "Gateway not connected";
+        return;
+      }
+      const result = await (
+        gw as unknown as {
+          voiceValidate: (p: {
+            mode: string;
+            apiKey: string;
+          }) => Promise<{ ok: boolean; error?: string }>;
+        }
+      ).voiceValidate({
+        mode: this._setupMode,
+        apiKey: this._setupKey.trim(),
+      });
+      if (result.ok) {
+        this._setupSuccess = true;
+        try {
+          localStorage.setItem("hu-voice-api-key", this._setupKey.trim());
+          localStorage.setItem("hu-voice-mode", this._setupMode);
+          if (this._setupMode === "gemini_live") {
+            localStorage.setItem("hu-gemini-live", "true");
+            this._geminiLiveMode = true;
+          } else {
+            localStorage.removeItem("hu-gemini-live");
+            this._geminiLiveMode = false;
+          }
+        } catch {
+          /* localStorage may be blocked */
+        }
+        setTimeout(() => {
+          this._showSetup = false;
+        }, 1200);
+      } else {
+        this._setupError = result.error ?? "Connection failed";
+      }
+    } catch (e) {
+      this._setupError = e instanceof Error ? e.message : "Connection failed";
+    } finally {
+      this._setupValidating = false;
+    }
+  }
+
   override render() {
     if (this._loading) return this._renderSkeleton();
     return html`
       <div class="container hu-mesh-gradient">
         ${this._renderStatusBar()} ${this._renderErrorBanner()}
+        ${this._showSetup ? this._renderSetupBanner() : nothing}
         ${this._showClonePanel
           ? html`<hu-voice-clone .gateway=${this.gateway ?? this._boundGateway}></hu-voice-clone>`
           : nothing}
