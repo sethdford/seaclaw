@@ -56,6 +56,9 @@ export class ScChatView extends GatewayAwareLitElement {
         display: flex;
         flex-direction: column;
         min-height: 0;
+        max-width: 48rem;
+        margin-inline: auto;
+        width: 100%;
       }
       .status-bar {
         display: flex;
@@ -94,8 +97,14 @@ export class ScChatView extends GatewayAwareLitElement {
         color: var(--hu-text);
         line-height: 1;
       }
+      .retry-btn-wrap {
+        display: flex;
+        justify-content: center;
+        padding: var(--hu-space-sm) 0;
+        flex-shrink: 0;
+      }
       .retry-btn {
-        margin-top: var(--hu-space-xs);
+        flex-shrink: 0;
       }
       .error-banner {
         display: flex;
@@ -161,6 +170,8 @@ export class ScChatView extends GatewayAwareLitElement {
         gap: var(--hu-space-lg);
         padding: var(--hu-space-md);
         flex: 1;
+        min-height: 0;
+        overflow: hidden;
       }
       .skeleton-bubble {
         max-width: 75%;
@@ -173,6 +184,13 @@ export class ScChatView extends GatewayAwareLitElement {
       }
       .skeleton-composer {
         width: 100%;
+      }
+      hu-chat-composer {
+        flex-shrink: 0;
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+        background: var(--hu-bg-surface);
       }
       @container (max-width: 640px) /* --hu-breakpoint-md */ {
         .container {
@@ -513,6 +531,8 @@ export class ScChatView extends GatewayAwareLitElement {
       ScToast.show({ message: msg, variant: "error" });
     }
     this._messageThread?.scrollToBottom();
+    await this.updateComplete;
+    this._composer?.focus?.();
   }
 
   private _onSessionSelect(e: CustomEvent<{ id: string }>): void {
@@ -881,15 +901,17 @@ export class ScChatView extends GatewayAwareLitElement {
 
   private _renderRetryButton() {
     if (!this.chat.lastFailedMessage) return nothing;
-    return html`<hu-button
-      variant="ghost"
-      size="sm"
-      @click=${this._retry}
-      aria-label="Retry last message"
-      class="retry-btn"
-    >
-      Retry last message
-    </hu-button>`;
+    return html`<div class="retry-btn-wrap">
+      <hu-button
+        variant="ghost"
+        size="sm"
+        @click=${this._retry}
+        aria-label="Retry last message"
+        class="retry-btn"
+      >
+        Retry last message
+      </hu-button>
+    </div>`;
   }
 
   private _renderSkeleton() {

@@ -18,6 +18,8 @@ const FIVE_MIN_MS = 5 * 60 * 1000;
 const SWIPE_START_THRESHOLD = 10;
 const SWIPE_ACTION_THRESHOLD = 60;
 const SWIPE_RESISTANCE = 0.6;
+const SCROLL_AT_BOTTOM_PX = 80;
+const SCROLL_AUTO_FOLLOW_PX = 80;
 
 function getTimeGreeting(): string {
   const hour = new Date().getHours();
@@ -98,7 +100,7 @@ export class ScMessageThread extends LitElement {
   private _scrollHandler = (): void => {
     const el = this.scrollContainer;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_AT_BOTTOM_PX;
     if (this.showScrollPill === atBottom) this.showScrollPill = !atBottom;
   };
 
@@ -116,17 +118,19 @@ export class ScMessageThread extends LitElement {
       flex: 1;
       overflow-y: auto;
       padding: var(--hu-space-md);
+      padding-bottom: calc(var(--hu-space-3xl, 48px) + 100px);
       display: flex;
       flex-direction: column;
-      gap: var(--hu-space-lg);
+      gap: var(--hu-space-xl);
       scroll-behavior: smooth;
       overscroll-behavior: contain;
-      scroll-snap-type: y proximity;
       scroll-padding-top: var(--hu-space-xl);
     }
     .message-wrapper {
       position: relative;
       overflow: hidden;
+      content-visibility: auto;
+      contain-intrinsic-size: auto 4rem;
     }
     .swipe-content {
       position: relative;
@@ -162,6 +166,14 @@ export class ScMessageThread extends LitElement {
     }
     .bubble-wrapper {
       position: relative;
+      max-width: 42rem;
+      animation: message-enter var(--hu-duration-normal, 200ms) var(--hu-ease-spring-gentle, ease-out) both;
+    }
+    .bubble-wrapper.user {
+      margin-left: auto;
+    }
+    .bubble-wrapper.assistant {
+      margin-right: auto;
     }
     .bubble-wrapper:hover hu-message-actions {
       opacity: 1;
@@ -171,6 +183,17 @@ export class ScMessageThread extends LitElement {
       .bubble-wrapper hu-message-actions {
         opacity: var(--hu-opacity-overlay-heavy);
         transform: translateY(0);
+      }
+    }
+    @keyframes message-enter {
+      from {
+        opacity: 0;
+        transform: translateY(var(--hu-space-sm, 8px));
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bubble-wrapper {
+        animation: none;
       }
     }
     .time-divider {
@@ -673,7 +696,8 @@ export class ScMessageThread extends LitElement {
     if (changed.has("items") || changed.has("isWaiting")) {
       const el = this.scrollContainer;
       if (!el) return;
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) this.scrollToBottom();
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_AUTO_FOLLOW_PX)
+        this.scrollToBottom();
     }
   }
 
@@ -682,11 +706,11 @@ export class ScMessageThread extends LitElement {
       const el = this.scrollContainer;
       if (!el) return;
       if (this._smoothScrollRaf) cancelAnimationFrame(this._smoothScrollRaf);
-      const target = el.scrollHeight - el.clientHeight;
+      const target = el.scrollHeight - el.clientHeight + 100;
       const start = el.scrollTop;
       const distance = target - start;
       if (Math.abs(distance) < 2) {
-        el.scrollTop = target;
+        el.scrollTop = Math.min(el.scrollHeight - el.clientHeight, target);
         return;
       }
       const startTime = performance.now();
@@ -695,7 +719,7 @@ export class ScMessageThread extends LitElement {
         const elapsed = now - startTime;
         const progress = Math.min(1, elapsed / duration);
         const ease = 1 - Math.pow(1 - progress, 3);
-        el.scrollTop = start + distance * ease;
+        el.scrollTop = Math.min(el.scrollHeight - el.clientHeight, start + distance * ease);
         if (progress < 1) {
           this._smoothScrollRaf = requestAnimationFrame(step);
         } else {
@@ -768,8 +792,8 @@ export class ScMessageThread extends LitElement {
         break;
       case "End":
         e.preventDefault();
-        nextIdx = indices[indices.length - 1];
-        break;
+        this.scrollToBottom();
+        return;
       case "E":
         if (this._focusedMessageIndex >= 0 && !e.metaKey && !e.ctrlKey && !e.altKey) {
           const item = this.items[this._focusedMessageIndex];
@@ -1036,7 +1060,7 @@ export class ScMessageThread extends LitElement {
               <div class="swipe-action left" aria-hidden="true">Reply</div>
               <div class="swipe-action right" aria-hidden="true">Copy</div>
               <div class="swipe-content">
-                <div class="bubble-wrapper">
+                <div class="bubble-wrapper ${item.role}">
                   <hu-message-actions
                     .role=${item.role}
                     .content=${item.content}
@@ -1312,7 +1336,7 @@ export class ScMessageThread extends LitElement {
             <button
               class="scroll-bottom-pill"
               @click=${() => this.scrollToBottom()}
-              aria-label="Scroll to latest messages"
+              aria-label="Scroll to latest message"
             >
               <span class="pill-icon">${icons["arrow-down"]}</span> New messages
             </button>

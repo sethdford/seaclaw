@@ -89,10 +89,10 @@ export class ScChatComposer extends LitElement {
       display: flex;
       flex-direction: column;
       gap: var(--hu-space-xs);
-      padding: var(--hu-space-sm) var(--hu-space-md);
+      padding: var(--hu-space-md) var(--hu-space-lg);
       background: color-mix(in srgb, var(--hu-surface-container) 65%, transparent);
-      backdrop-filter: blur(var(--hu-space-md));
-      -webkit-backdrop-filter: blur(var(--hu-space-md));
+      backdrop-filter: blur(var(--hu-blur-md));
+      -webkit-backdrop-filter: blur(var(--hu-blur-md));
       border: 1px solid var(--hu-border-subtle);
       border-radius: var(--hu-radius-xl);
       transition:
