@@ -163,8 +163,10 @@ static hu_error_t http_request_execute(void *ctx, hu_allocator_t *alloc,
     if (!method_valid(method)) {
         char err[64];
         int n = snprintf(err, sizeof(err), "Unsupported HTTP method: %s", method);
-        char *e = hu_strndup(alloc, err, (size_t)n);
-        *out = e ? hu_tool_result_fail_owned(e, (size_t)n)
+        if (n < 0) n = 0;
+        size_t elen = (size_t)n < sizeof(err) ? (size_t)n : sizeof(err) - 1;
+        char *e = hu_strndup(alloc, err, elen);
+        *out = e ? hu_tool_result_fail_owned(e, elen)
                  : hu_tool_result_fail("Unsupported method", 18);
         return HU_OK;
     }

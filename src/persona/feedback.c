@@ -1,3 +1,6 @@
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/persona.h"
@@ -77,18 +80,19 @@ hu_error_t hu_persona_feedback_record(hu_allocator_t *alloc, const char *persona
     if (feedback->corrected_response && feedback->corrected_response_len > 0) {
         const char *c = feedback->corrected_response;
         size_t cl = feedback->corrected_response_len;
-        if (strstr(c, "listen") || strstr(c, "heard") || strstr(c, "validat"))
+#define FB_HAS(kw) (memmem(c, cl, kw, sizeof(kw) - 1) != NULL)
+        if (FB_HAS("listen") || FB_HAS("heard") || FB_HAS("validat"))
             { cat = "listening"; cat_len = 9; }
-        else if (strstr(c, "sorry") || strstr(c, "repair") || strstr(c, "misunderst"))
+        else if (FB_HAS("sorry") || FB_HAS("repair") || FB_HAS("misunderst"))
             { cat = "repair"; cat_len = 6; }
-        else if (strstr(c, "tone") || strstr(c, "formal") || strstr(c, "casual") ||
-                 strstr(c, "mirror"))
+        else if (FB_HAS("tone") || FB_HAS("formal") || FB_HAS("casual") ||
+                 FB_HAS("mirror"))
             { cat = "mirroring"; cat_len = 9; }
-        else if (strstr(c, "conflict") || strstr(c, "pushback") || strstr(c, "boundar"))
+        else if (FB_HAS("conflict") || FB_HAS("pushback") || FB_HAS("boundar"))
             { cat = "conflict"; cat_len = 8; }
-        else if (strstr(c, "emoji") || strstr(c, "short") || strstr(c, "long"))
+        else if (FB_HAS("emoji") || FB_HAS("short") || FB_HAS("long"))
             { cat = "voice"; cat_len = 5; }
-        (void)cl;
+#undef FB_HAS
     }
     hu_json_append_key_value(&buf, "category", 8, cat, cat_len);
 

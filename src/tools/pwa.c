@@ -64,9 +64,7 @@ static hu_error_t action_list_apps(hu_allocator_t *alloc, hu_tool_result_t *out)
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-    int n = snprintf(buf, buf_size, "Available PWA drivers (%zu apps):\n", count);
-    if (n > 0)
-        pos += (size_t)n;
+    pos = hu_buf_appendf(buf, buf_size, pos, "Available PWA drivers (%zu apps):\n", count);
 
     /* The drivers array is contiguous but accessed via pointer array.
      * We iterate using hu_pwa_driver_find by index. */
@@ -77,13 +75,11 @@ static hu_error_t action_list_apps(hu_allocator_t *alloc, hu_tool_result_t *out)
         const hu_pwa_driver_t *d = hu_pwa_driver_resolve(apps[i]);
         if (!d)
             continue;
-        n = snprintf(buf + pos, buf_size - pos,
-                     "  - %s (%s) [%s] %s%s\n",
-                     d->app_name, d->display_name, d->url_pattern,
-                     d->send_message_js ? "send " : "",
-                     d->read_messages_js ? "read" : "");
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(buf, buf_size, pos,
+                             "  - %s (%s) [%s] %s%s\n",
+                             d->app_name, d->display_name, d->url_pattern,
+                             d->send_message_js ? "send " : "",
+                             d->read_messages_js ? "read" : "");
     }
     buf[pos] = '\0';
     *out = hu_tool_result_ok_owned(buf, pos);
@@ -119,20 +115,16 @@ static hu_error_t action_list_tabs(hu_allocator_t *alloc, hu_pwa_tool_ctx_t *ctx
     }
 
     size_t pos = 0;
-    int n = snprintf(buf, buf_size, "Open tabs (%zu found in %s):\n",
-                     count, hu_pwa_browser_name(ctx->browser));
-    if (n > 0)
-        pos += (size_t)n;
+    pos = hu_buf_appendf(buf, buf_size, pos, "Open tabs (%zu found in %s):\n",
+                         count, hu_pwa_browser_name(ctx->browser));
 
     for (size_t i = 0; i < count && pos < buf_size - 128; i++) {
         const hu_pwa_driver_t *drv = tabs[i].url ? hu_pwa_driver_find_by_url(tabs[i].url) : NULL;
-        n = snprintf(buf + pos, buf_size - pos, "  [%d:%d] %s — %s%s\n",
-                     tabs[i].window_idx, tabs[i].tab_idx,
-                     tabs[i].title ? tabs[i].title : "?",
-                     tabs[i].url ? tabs[i].url : "?",
-                     drv ? " [PWA]" : "");
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(buf, buf_size, pos, "  [%d:%d] %s — %s%s\n",
+                             tabs[i].window_idx, tabs[i].tab_idx,
+                             tabs[i].title ? tabs[i].title : "?",
+                             tabs[i].url ? tabs[i].url : "?",
+                             drv ? " [PWA]" : "");
     }
     buf[pos] = '\0';
 

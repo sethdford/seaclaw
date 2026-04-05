@@ -244,13 +244,13 @@ hu_pair_attempt_result_t hu_pairing_guard_attempt_pair(hu_pairing_guard_t *guard
         return HU_PAIR_INVALID_CODE;
     }
 
-    guard->failed_count = 0;
-    guard->lockout_until = 0;
-    guard->pairing_code[0] = '\0';
-
     char token[HU_TOKEN_TOTAL_LEN + 1];
     if (generate_token(token) != 0)
         return HU_PAIR_INTERNAL_ERROR;
+
+    guard->failed_count = 0;
+    guard->lockout_until = 0;
+    guard->pairing_code[0] = '\0';
 
     char hash_buf[65];
     hash_token_sha256(token, hash_buf);

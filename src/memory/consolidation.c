@@ -286,6 +286,8 @@ hu_error_t hu_memory_consolidate(hu_allocator_t *alloc, hu_memory_t *memory,
     alloc->free(alloc->ctx, entries, count * sizeof(hu_memory_entry_t));
 
     size_t new_count = 0;
+    if (!memory->vtable->count)
+        return HU_OK;
     err = memory->vtable->count(memory->ctx, &new_count);
     if (err != HU_OK)
         return HU_OK;

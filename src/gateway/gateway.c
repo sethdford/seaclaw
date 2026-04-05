@@ -1263,20 +1263,26 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             state_len = sizeof(state_buf) - 1;
         memcpy(state_buf, state, state_len);
         state_buf[state_len] = '\0';
-        const char *verifier = oauth_pending_lookup(gw, state_buf);
-        oauth_pending_remove(gw, state_buf);
-        if (!verifier) {
+        const char *verifier_ptr = oauth_pending_lookup(gw, state_buf);
+        if (!verifier_ptr) {
             (void)send_json(fd, 401, "{\"error\":\"invalid or expired state\"}");
             return;
         }
+        char verifier_buf[HU_OAUTH_VERIFIER_LEN];
+        size_t verifier_len = strlen(verifier_ptr);
+        if (verifier_len >= sizeof(verifier_buf))
+            verifier_len = sizeof(verifier_buf) - 1;
+        memcpy(verifier_buf, verifier_ptr, verifier_len);
+        verifier_buf[verifier_len] = '\0';
+        oauth_pending_remove(gw, state_buf);
         char code_buf[512];
         if (code_len >= sizeof(code_buf))
             code_len = sizeof(code_buf) - 1;
         memcpy(code_buf, code, code_len);
         code_buf[code_len] = '\0';
         hu_oauth_session_t session = {0};
-        hu_error_t err = hu_oauth_exchange_code(oauth_ctx, code_buf, code_len, verifier,
-                                                strlen(verifier), &session);
+        hu_error_t err = hu_oauth_exchange_code(oauth_ctx, code_buf, code_len, verifier_buf,
+                                                verifier_len, &session);
         if (err != HU_OK) {
             (void)send_json(fd, 401, "{\"error\":\"token exchange failed\"}");
             return;

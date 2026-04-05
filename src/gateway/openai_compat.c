@@ -9,6 +9,7 @@
 #include "human/provider.h"
 #include "human/providers/factory.h"
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -240,6 +241,11 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
 
     /* Convert messages to hu_chat_message_t */
     size_t msg_count = messages_val->data.array.len;
+    if (msg_count > SIZE_MAX / sizeof(hu_chat_message_t)) {
+        hu_json_free(alloc, root);
+        error_response(alloc, 500, "Out of memory", out_status, out_body, out_body_len);
+        return;
+    }
     hu_chat_message_t *msgs =
         (hu_chat_message_t *)alloc->alloc(alloc->ctx, msg_count * sizeof(hu_chat_message_t));
     if (!msgs) {

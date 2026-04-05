@@ -221,7 +221,7 @@ char *hu_daemon_build_callback_context(hu_allocator_t *alloc, hu_memory_t *memor
     char buf[2048];
     size_t pos = 0;
     int w = snprintf(buf, sizeof(buf), "\nCONTEXT FROM YOUR SHARED HISTORY:\n");
-    if (w > 0)
+    if (w > 0 && (size_t)w < sizeof(buf))
         pos = (size_t)w;
 
     size_t usable = 0;
@@ -399,9 +399,11 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
                         if (need > 96) {
                             char *abuf = (char *)alloc->alloc(alloc->ctx, need);
                             if (abuf) {
-                                size_t ap = (size_t)snprintf(abuf, need,
-                                                             "FEED AWARENESS — optional natural "
-                                                             "bring-up (high relevance):\n");
+                                int n0 = snprintf(abuf, need,
+                                                  "FEED AWARENESS — optional natural "
+                                                  "bring-up (high relevance):\n");
+                                size_t ap =
+                                    (n0 > 0 && (size_t)n0 < need) ? (size_t)n0 : 0;
                                 for (size_t ti = 0; ti < tcount; ti++) {
                                     if (topics[ti].relevance < 0.65)
                                         continue;

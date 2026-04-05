@@ -1874,7 +1874,7 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
         "$.exit(0);"
         "}catch(e){$.exit(1);}";
 
-    size_t script_cap = 1280 + content_esc_len + strlen(tapback_esc);
+    size_t script_cap = 2560 + content_esc_len + strlen(tapback_esc);
     char *script = (char *)c->alloc->alloc(c->alloc->ctx, script_cap);
     if (!script) {
         c->alloc->free(c->alloc->ctx, tapback_esc, tapback_esc_cap);

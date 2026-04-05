@@ -2,6 +2,7 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/string.h"
 #include "human/intelligence/skills.h"
 #include <sqlite3.h>
 #include <stdbool.h>
@@ -394,15 +395,11 @@ hu_error_t hu_skill_build_contact_context(hu_allocator_t *alloc, sqlite3 *db,
     }
 
     size_t pos = 0;
-    int n = snprintf(buf + pos, cap - pos, "### Learned skills (contact-specific)\n");
-    if (n > 0)
-        pos += (size_t)n;
+    pos = hu_buf_appendf(buf, cap, pos, "### Learned skills (contact-specific)\n");
 
     for (size_t i = 0; i < count && pos < cap - 1; i++) {
-        n = snprintf(buf + pos, cap - pos, "- %s: %.*s\n", skills[i].name,
-                     (int)skills[i].strategy_len, skills[i].strategy);
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(buf, cap, pos, "- %s: %.*s\n", skills[i].name,
+                             (int)skills[i].strategy_len, skills[i].strategy);
     }
     buf[pos] = '\0';
 

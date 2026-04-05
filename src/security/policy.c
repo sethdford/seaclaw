@@ -247,7 +247,7 @@ static const char *basename_ptr(const char *path) {
 
 static bool is_high_risk_command(const char *base) {
     for (size_t i = 0; i < s_high_risk_count; i++) {
-        if (strcasecmp(base, s_high_risk_commands[i]) == 0)
+        if (s_high_risk_commands[i] && strcasecmp(base, s_high_risk_commands[i]) == 0)
             return true;
     }
     return false;

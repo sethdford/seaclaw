@@ -174,16 +174,17 @@ static bool compute_accept_key(const char *client_key, char *out, size_t out_siz
 
 static bool extract_header(const char *req, size_t req_len, const char *name, char *out,
                            size_t out_size) {
-    (void)req_len;
+    const char *req_end = req + req_len;
     const char *p = req;
     size_t name_len = strlen(name);
-    while (*p) {
-        if (strncasecmp(p, name, name_len) == 0 && p[name_len] == ':') {
+    while (p < req_end) {
+        if (name_len < (size_t)(req_end - p) && strncasecmp(p, name, name_len) == 0 &&
+            p[name_len] == ':') {
             const char *v = p + name_len + 1;
-            while (*v == ' ')
+            while (v < req_end && *v == ' ')
                 v++;
             const char *end = v;
-            while (*end && *end != '\r' && *end != '\n')
+            while (end < req_end && *end && *end != '\r' && *end != '\n')
                 end++;
             size_t vlen = (size_t)(end - v);
             if (vlen >= out_size)
@@ -192,9 +193,9 @@ static bool extract_header(const char *req, size_t req_len, const char *name, ch
             out[vlen] = '\0';
             return true;
         }
-        while (*p && *p != '\n')
+        while (p < req_end && *p && *p != '\n')
             p++;
-        if (*p == '\n')
+        if (p < req_end && *p == '\n')
             p++;
     }
     return false;
@@ -365,6 +366,8 @@ hu_error_t hu_ws_server_upgrade(hu_ws_server_t *srv, int fd, const char *req, si
                      "Sec-WebSocket-Accept: %s\r\n"
                      "\r\n",
                      accept);
+    if (n < 0 || (size_t)n > sizeof(resp))
+        return HU_ERR_INTERNAL;
 
     size_t sent = 0;
     while (sent < (size_t)n) {
@@ -438,6 +441,8 @@ hu_error_t hu_ws_server_send(hu_ws_server_t *srv, hu_ws_conn_t *conn, const char
     (void)data_len;
     return HU_ERR_NOT_SUPPORTED;
 #else
+    if (data_len > SIZE_MAX - 14)
+        return HU_ERR_OUT_OF_MEMORY;
     size_t frame_cap = data_len + 14;
     hu_allocator_t *alloc = srv->alloc;
     char *buf = (char *)alloc->alloc(alloc->ctx, frame_cap);
@@ -471,6 +476,8 @@ hu_error_t hu_ws_server_send_binary(hu_ws_server_t *srv, hu_ws_conn_t *conn, con
     (void)data_len;
     return HU_ERR_NOT_SUPPORTED;
 #else
+    if (data_len > SIZE_MAX - 14)
+        return HU_ERR_OUT_OF_MEMORY;
     size_t frame_cap = data_len + 14;
     hu_allocator_t *alloc = srv->alloc;
     char *buf = (char *)alloc->alloc(alloc->ctx, frame_cap);

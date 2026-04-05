@@ -204,7 +204,7 @@ static void gemini_process_sse_json(gemini_stream_ctx_t *s, const char *json_str
     }
 
     hu_json_value_t *first = candidates->data.array.items[0];
-    if (first->type != HU_JSON_OBJECT) {
+    if (!first || first->type != HU_JSON_OBJECT) {
         hu_json_free(s->alloc, parsed);
         return;
     }

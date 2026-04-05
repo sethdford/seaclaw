@@ -1,4 +1,5 @@
 #include "human/agent/prompt_optimizer.h"
+#include "human/core/string.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -77,44 +78,29 @@ hu_error_t hu_prompt_optimizer_compile(hu_prompt_optimizer_t *opt, char *out_pro
         return HU_ERR_INVALID_ARGUMENT;
 
     size_t pos = 0;
-    int n;
 
     if (opt->signature.instruction[0] != '\0') {
-        n = snprintf(out_prompt + pos, out_size - pos, "%s\n\n", opt->signature.instruction);
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(out_prompt, out_size, pos, "%s\n\n", opt->signature.instruction);
     }
 
     if (opt->signature.input_count > 0) {
-        n = snprintf(out_prompt + pos, out_size - pos, "Inputs:\n");
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(out_prompt, out_size, pos, "Inputs:\n");
         for (size_t i = 0; i < opt->signature.input_count; i++) {
             const hu_prompt_field_t *f = &opt->signature.inputs[i];
-            n = snprintf(out_prompt + pos, out_size - pos, "- %s%s: %s\n", f->name,
-                         f->required ? " (required)" : "", f->description);
-            if (n > 0)
-                pos += (size_t)n;
+            pos = hu_buf_appendf(out_prompt, out_size, pos, "- %s%s: %s\n", f->name,
+                                 f->required ? " (required)" : "", f->description);
         }
-        n = snprintf(out_prompt + pos, out_size - pos, "\n");
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(out_prompt, out_size, pos, "\n");
     }
 
     if (opt->signature.output_count > 0) {
-        n = snprintf(out_prompt + pos, out_size - pos, "Outputs:\n");
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(out_prompt, out_size, pos, "Outputs:\n");
         for (size_t i = 0; i < opt->signature.output_count; i++) {
             const hu_prompt_field_t *f = &opt->signature.outputs[i];
-            n = snprintf(out_prompt + pos, out_size - pos, "- %s%s: %s\n", f->name,
-                         f->required ? " (required)" : "", f->description);
-            if (n > 0)
-                pos += (size_t)n;
+            pos = hu_buf_appendf(out_prompt, out_size, pos, "- %s%s: %s\n", f->name,
+                                 f->required ? " (required)" : "", f->description);
         }
-        n = snprintf(out_prompt + pos, out_size - pos, "\n");
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(out_prompt, out_size, pos, "\n");
     }
 
     size_t best_idx = 0;
@@ -127,17 +113,16 @@ hu_error_t hu_prompt_optimizer_compile(hu_prompt_optimizer_t *opt, char *out_pro
     }
 
     if (opt->example_count > 0 && best_score > 0.0) {
-        n = snprintf(out_prompt + pos, out_size - pos, "Example:\nInput: %.*s\nOutput: %.*s\n\n",
-                     (int)(opt->examples[best_idx].input_len < 500
-                               ? opt->examples[best_idx].input_len
-                               : 500),
-                     opt->examples[best_idx].input,
-                     (int)(opt->examples[best_idx].expected_output_len < 500
-                               ? opt->examples[best_idx].expected_output_len
-                               : 500),
-                     opt->examples[best_idx].expected_output);
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(out_prompt, out_size, pos,
+                             "Example:\nInput: %.*s\nOutput: %.*s\n\n",
+                             (int)(opt->examples[best_idx].input_len < 500
+                                       ? opt->examples[best_idx].input_len
+                                       : 500),
+                             opt->examples[best_idx].input,
+                             (int)(opt->examples[best_idx].expected_output_len < 500
+                                       ? opt->examples[best_idx].expected_output_len
+                                       : 500),
+                             opt->examples[best_idx].expected_output);
     }
 
     *out_len = pos;

@@ -156,6 +156,7 @@ hu_error_t hu_voice_session_send_audio(hu_voice_session_t *session, const uint8_
     session->latency_avg_interrupt_ms = 50.0;
     session->latency_round_trip_measurements = 1;
     session->latency_interrupt_measurements = 1;
+    return HU_OK;
 #else
     session->latency_send_mark_ms = now;
     session->latency_rt_mark_ms = now;
@@ -166,7 +167,7 @@ hu_error_t hu_voice_session_send_audio(hu_voice_session_t *session, const uint8_
         return session->provider.vtable->send_audio(session->provider.ctx, pcm16, pcm16_len);
     if (session->rt && session->rt->connected)
         return hu_voice_rt_send_audio(session->rt, pcm16, pcm16_len);
-    return HU_OK;
+    return HU_ERR_NOT_SUPPORTED;
 }
 
 hu_error_t hu_voice_session_on_interrupt(hu_voice_session_t *session) {

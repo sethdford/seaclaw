@@ -5,6 +5,7 @@
  */
 #include "human/feeds/trends.h"
 #ifdef HU_ENABLE_SQLITE
+#include "human/core/string.h"
 #include <sqlite3.h>
 #include <stdio.h>
 #include <string.h>
@@ -132,18 +133,15 @@ hu_error_t hu_feed_trends_build_section(hu_allocator_t *alloc,
     if (!buf) return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-    int n = snprintf(buf + pos, need - pos, "## Trending Topics\n\n");
-    if (n > 0) pos += (size_t)n;
+    pos = hu_buf_appendf(buf, need, pos, "## Trending Topics\n\n");
 
     for (size_t i = 0; i < count && i < 10; i++) {
-        n = snprintf(buf + pos, need - pos,
-                     "- **%s**: %d mentions in 6h (%.1fx normal, %d in 24h, %d in 7d)\n",
-                     trends[i].keyword, trends[i].count_6h, trends[i].spike_ratio,
-                     trends[i].count_24h, trends[i].count_7d);
-        if (n > 0) pos += (size_t)n;
+        pos = hu_buf_appendf(buf, need, pos,
+                             "- **%s**: %d mentions in 6h (%.1fx normal, %d in 24h, %d in 7d)\n",
+                             trends[i].keyword, trends[i].count_6h, trends[i].spike_ratio,
+                             trends[i].count_24h, trends[i].count_7d);
     }
-    n = snprintf(buf + pos, need - pos, "\n");
-    if (n > 0) pos += (size_t)n;
+    pos = hu_buf_appendf(buf, need, pos, "\n");
 
     *out = buf;
     *out_len = pos;

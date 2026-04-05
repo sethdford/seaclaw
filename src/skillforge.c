@@ -875,19 +875,15 @@ hu_error_t hu_skillforge_build_prompt_catalog(hu_allocator_t *alloc, hu_skillfor
     size_t pos = 0;
     for (size_t p = 0; p < pick; p++) {
         size_t i = ranks[p].idx;
-        int n = snprintf(buf + pos, cap - pos, "- %s: %s\n",
-                         sf->skills[i].name ? sf->skills[i].name : "",
-                         sf->skills[i].description ? sf->skills[i].description : "");
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(buf, cap, pos, "- %s: %s\n",
+                             sf->skills[i].name ? sf->skills[i].name : "",
+                             sf->skills[i].description ? sf->skills[i].description : "");
     }
     if (omitted > 0) {
-        int n = snprintf(buf + pos, cap - pos,
-                         "\n(%zu more skills installed; use skill_run with a skill name for full "
-                         "instructions.)\n",
-                         omitted);
-        if (n > 0)
-            pos += (size_t)n;
+        pos = hu_buf_appendf(buf, cap, pos,
+                             "\n(%zu more skills installed; use skill_run with a skill name for full "
+                             "instructions.)\n",
+                             omitted);
     }
     buf[pos] = '\0';
     *out = buf;

@@ -330,8 +330,11 @@ hu_error_t hu_secret_store_encrypt(hu_secret_store_t *store, hu_allocator_t *all
     }
 
     uint8_t *ciphertext = (uint8_t *)alloc->alloc(alloc->ctx, plen + HU_HMAC_LEN);
-    if (!ciphertext)
+    if (!ciphertext) {
+        hu_secure_zero(key, HU_KEY_LEN);
+        hu_secure_zero(nonce, HU_NONCE_LEN);
         return HU_ERR_OUT_OF_MEMORY;
+    }
 
     hu_chacha20_encrypt(key, nonce, 1, (const uint8_t *)plaintext, ciphertext, plen);
 
@@ -455,8 +458,10 @@ hu_error_t hu_secret_store_decrypt(hu_secret_store_t *store, hu_allocator_t *all
     }
 
     uint8_t plain_buf[8192];
-    if (ct_len > sizeof(plain_buf))
+    if (ct_len > sizeof(plain_buf)) {
+        hu_secure_zero(key, HU_KEY_LEN);
         return HU_ERR_CRYPTO_DECRYPT;
+    }
 
     hu_chacha20_decrypt(key, blob, 1, blob + HU_NONCE_LEN, plain_buf, ct_len);
 

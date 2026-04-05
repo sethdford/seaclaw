@@ -125,7 +125,56 @@ static hu_error_t compatible_build_chat_json(hu_allocator_t *alloc,
             role_str = "tool";
         hu_json_object_set(alloc, obj, "role",
                            hu_json_string_new(alloc, role_str, strlen(role_str)));
-        if (m->content && m->content_len > 0) {
+        if (m->content_parts && m->content_parts_count > 0) {
+            hu_json_value_t *parts_arr = hu_json_array_new(alloc);
+            if (parts_arr) {
+                for (size_t p = 0; p < m->content_parts_count; p++) {
+                    const hu_content_part_t *cp = &m->content_parts[p];
+                    hu_json_value_t *part = hu_json_object_new(alloc);
+                    if (!part) break;
+                    if (cp->tag == HU_CONTENT_PART_TEXT) {
+                        hu_json_object_set(alloc, part, "type",
+                                           hu_json_string_new(alloc, "text", 4));
+                        hu_json_object_set(alloc, part, "text",
+                            hu_json_string_new(alloc, cp->data.text.ptr, cp->data.text.len));
+                    } else if (cp->tag == HU_CONTENT_PART_IMAGE_BASE64) {
+                        hu_json_object_set(alloc, part, "type",
+                                           hu_json_string_new(alloc, "image_url", 9));
+                        char url_buf[32];
+                        int ulen = snprintf(url_buf, sizeof(url_buf), "data:%.*s;base64,",
+                            (int)cp->data.image_base64.media_type_len,
+                            cp->data.image_base64.media_type);
+                        size_t total = (ulen > 0 ? (size_t)ulen : 0) + cp->data.image_base64.data_len;
+                        char *data_url = (char *)alloc->alloc(alloc->ctx, total + 1);
+                        if (data_url) {
+                            memcpy(data_url, url_buf, (size_t)ulen);
+                            memcpy(data_url + ulen, cp->data.image_base64.data,
+                                   cp->data.image_base64.data_len);
+                            data_url[total] = '\0';
+                            hu_json_value_t *iu = hu_json_object_new(alloc);
+                            if (iu) {
+                                hu_json_object_set(alloc, iu, "url",
+                                    hu_json_string_new(alloc, data_url, total));
+                                hu_json_object_set(alloc, part, "image_url", iu);
+                            }
+                            alloc->free(alloc->ctx, data_url, total + 1);
+                        }
+                    } else if (cp->tag == HU_CONTENT_PART_IMAGE_URL) {
+                        hu_json_object_set(alloc, part, "type",
+                                           hu_json_string_new(alloc, "image_url", 9));
+                        hu_json_value_t *iu = hu_json_object_new(alloc);
+                        if (iu) {
+                            hu_json_object_set(alloc, iu, "url",
+                                hu_json_string_new(alloc, cp->data.image_url.url,
+                                                   cp->data.image_url.url_len));
+                            hu_json_object_set(alloc, part, "image_url", iu);
+                        }
+                    }
+                    hu_json_array_push(alloc, parts_arr, part);
+                }
+                hu_json_object_set(alloc, obj, "content", parts_arr);
+            }
+        } else if (m->content && m->content_len > 0) {
             hu_json_object_set(alloc, obj, "content",
                                hu_json_string_new(alloc, m->content, m->content_len));
         }
@@ -649,6 +698,11 @@ static bool compatible_supports_streaming(void *ctx) {
     return true;
 }
 
+static bool compatible_supports_vision(void *ctx) {
+    (void)ctx;
+    return true;
+}
+
 static hu_error_t compatible_stream_chat(void *ctx, hu_allocator_t *alloc,
                                          const hu_chat_request_t *request, const char *model,
                                          size_t model_len, double temperature,
@@ -895,7 +949,7 @@ static const hu_provider_vtable_t compatible_vtable = {
     .warmup = NULL,
     .chat_with_tools = NULL,
     .supports_streaming = compatible_supports_streaming,
-    .supports_vision = NULL,
+    .supports_vision = compatible_supports_vision,
     .supports_vision_for_model = NULL,
     .stream_chat = compatible_stream_chat,
 };

@@ -814,6 +814,7 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
                 } else {
                     if (out->transcript_len > SIZE_MAX - 2 ||
                         tlen > SIZE_MAX - 2 - out->transcript_len) {
+                        hu_voice_rt_event_free(alloc, out);
                         hu_json_free(alloc, json);
                         alloc->free(alloc->ctx, msg, msg_len + 1);
                         return HU_ERR_OUT_OF_MEMORY;
@@ -830,6 +831,7 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
                         out->transcript = combined;
                         out->transcript_len = combined_len;
                     } else {
+                        hu_voice_rt_event_free(alloc, out);
                         hu_json_free(alloc, json);
                         alloc->free(alloc->ctx, msg, msg_len + 1);
                         return HU_ERR_OUT_OF_MEMORY;

@@ -59,19 +59,53 @@ def load_model(model_name):
     print(f"Model loaded in {time.time() - t0:.1f}s — ready to serve", flush=True)
 
 
+def _extract_content(content):
+    """Extract text and image data from a message content field.
+    Content can be a string or an array of parts (OpenAI vision format)."""
+    if isinstance(content, str):
+        return content, []
+    if not isinstance(content, list):
+        return str(content) if content else "", []
+
+    text_parts = []
+    images = []
+    for part in content:
+        ptype = part.get("type", "")
+        if ptype == "text":
+            text_parts.append(part.get("text", ""))
+        elif ptype == "image_url":
+            url = part.get("image_url", {}).get("url", "")
+            if url.startswith("data:"):
+                import base64
+                from io import BytesIO
+                try:
+                    header, b64data = url.split(",", 1)
+                    raw = base64.b64decode(b64data)
+                    from PIL import Image
+                    img = Image.open(BytesIO(raw)).convert("RGB")
+                    images.append(img)
+                except Exception as e:
+                    text_parts.append(f"[Image decode failed: {e}]")
+            elif url.startswith("http"):
+                text_parts.append(f"[Image URL: {url}]")
+    return " ".join(text_parts), images
+
+
 def prepare_prompt(messages):
     """Format messages into the model's chat template."""
     from mlx_vlm.prompt_utils import apply_chat_template
 
     system_parts = []
     conversation = []
+    all_images = []
     for msg in messages:
         role = msg.get("role", "user")
-        content = msg.get("content", "")
+        text, images = _extract_content(msg.get("content", ""))
+        all_images.extend(images)
         if role == "system":
-            system_parts.append(content)
+            system_parts.append(text)
         else:
-            conversation.append(msg)
+            conversation.append({"role": role, "content": text})
 
     if system_parts:
         system_text = "\n".join(system_parts)
@@ -85,7 +119,7 @@ def prepare_prompt(messages):
     else:
         prompt_text = ""
 
-    return apply_chat_template(processor, config, prompt_text, num_images=0)
+    return apply_chat_template(processor, config, prompt_text, num_images=len(all_images)), all_images
 
 
 def strip_stop_tokens(text):
@@ -111,8 +145,10 @@ def generate_response(messages, max_tokens=256, temperature=0.7):
     """Non-streaming: generate the full response at once."""
     from mlx_vlm import generate as vlm_generate
 
-    formatted = prepare_prompt(messages)
+    formatted, images = prepare_prompt(messages)
     extra = _stream_kwargs()
+    if images:
+        extra["images"] = images
     result = vlm_generate(
         model, processor, formatted,
         max_tokens=max_tokens, verbose=False,
@@ -126,10 +162,12 @@ def stream_response(messages, max_tokens=256, temperature=0.7):
     """Streaming generator: yield (text_chunk, prompt_toks, gen_toks) per token."""
     from mlx_vlm import stream_generate as vlm_stream_generate
 
-    formatted = prepare_prompt(messages)
+    formatted, images = prepare_prompt(messages)
     prompt_toks = 0
     gen_toks = 0
     extra = _stream_kwargs()
+    if images:
+        extra["images"] = images
 
     for chunk in vlm_stream_generate(
         model, processor, formatted,

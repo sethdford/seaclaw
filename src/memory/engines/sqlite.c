@@ -921,20 +921,22 @@ static hu_error_t impl_recall(void *ctx, hu_allocator_t *alloc, const char *quer
                 if (count > 2) {
                     hu_entropy_gate_config_t eg_cfg = hu_entropy_gate_config_default();
                     eg_cfg.threshold = 0.15;
+                    size_t echunks_count = count;
                     hu_memory_chunk_t *echunks = (hu_memory_chunk_t *)alloc->alloc(
-                        alloc->ctx, count * sizeof(hu_memory_chunk_t));
+                        alloc->ctx, echunks_count * sizeof(hu_memory_chunk_t));
                     if (echunks) {
-                        for (size_t ei = 0; ei < count; ei++) {
+                        for (size_t ei = 0; ei < echunks_count; ei++) {
                             echunks[ei].text = entries[ei].content;
                             echunks[ei].text_len = entries[ei].content_len;
                             echunks[ei].entropy = 0.0;
                             echunks[ei].passed = true;
                         }
                         size_t passed = 0;
-                        if (hu_entropy_gate_filter(&eg_cfg, echunks, count, &passed) == HU_OK &&
-                            passed > 0 && passed < count) {
+                        if (hu_entropy_gate_filter(&eg_cfg, echunks, echunks_count, &passed) ==
+                                HU_OK &&
+                            passed > 0 && passed < echunks_count) {
                             size_t wp = 0;
-                            for (size_t ei = 0; ei < count; ei++) {
+                            for (size_t ei = 0; ei < echunks_count; ei++) {
                                 if (echunks[ei].passed) {
                                     if (wp != ei)
                                         entries[wp] = entries[ei];
@@ -945,7 +947,8 @@ static hu_error_t impl_recall(void *ctx, hu_allocator_t *alloc, const char *quer
                             }
                             count = wp;
                         }
-                        alloc->free(alloc->ctx, echunks, count * sizeof(hu_memory_chunk_t));
+                        alloc->free(alloc->ctx, echunks,
+                                    echunks_count * sizeof(hu_memory_chunk_t));
                     }
                 }
 

@@ -1524,11 +1524,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     char *em_ctx = (char *)agent->alloc->alloc(agent->alloc->ctx, em_len);
                     if (em_ctx) {
                         size_t pos = 0;
-                        int n = snprintf(em_ctx + pos, em_len - pos,
-                                         "[Emotional check-in due] They shared something difficult "
-                                         "1–3 days ago. Consider a natural check-in:\n");
-                        if (n > 0)
-                            pos += (size_t)n;
+                        pos = hu_buf_appendf(em_ctx, em_len, pos,
+                                             "[Emotional check-in due] They shared something difficult "
+                                             "1–3 days ago. Consider a natural check-in:\n");
                         for (size_t d = 0; d < due_count && pos < em_len - 1; d++) {
                             bool match = (strcmp(due[d].contact_id, agent->memory_session_id) == 0);
                             if (!match) {
@@ -1537,11 +1535,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                     match = true;
                             }
                             if (match) {
-                                n = snprintf(em_ctx + pos, em_len - pos,
-                                             "- Topic: %s, emotion: %s\n", due[d].topic,
-                                             due[d].emotion);
-                                if (n > 0)
-                                    pos += (size_t)n;
+                                pos = hu_buf_appendf(em_ctx, em_len, pos,
+                                                     "- Topic: %s, emotion: %s\n", due[d].topic,
+                                                     due[d].emotion);
                             }
                         }
                         em_ctx[pos] = '\0';

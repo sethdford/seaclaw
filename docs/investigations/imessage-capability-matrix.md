@@ -30,7 +30,7 @@ Canonical reference for every iMessage platform capability, our implementation s
 | **Edit message (send)** | 1 in 50 messages | Not feasible (see investigation) | Not implemented | — | See `imessage-edit-feasibility.md`. IMCore private API only. |
 | **Unsend message** | 1 in 50 messages | Partially feasible (AX automation) | Not implemented | Low | See `imessage-unsend-feasibility.md`. 2-minute window, fragile. |
 | **Abandoned typing** | Humanizing pattern | Not feasible (see investigation) | Not implemented | — | See `imessage-abandoned-typing-feasibility.md` |
-| **Music preview send (30s)** | Common | iTunes Search API + AppleScript attachment | **Implemented** | — | `hu_music_search()` + `hu_music_download_preview()` → 30s .m4a audio attachment + rich Apple Music link card. See `src/music.c`. |
+| **Music preview send (30s)** | Common | iTunes/Spotify API + AppleScript attachment | **Implemented** | — | iTunes .m4a preview + optional album art + Spotify/Apple Music rich link (auto-detected from user preference). Taste learning tracks reactions. See `src/music.c`. |
 | **GIF send** | Common | Tenor API + AppleScript attachment | Implemented | — | `hu_imessage_fetch_gif()` + send as attachment |
 | **GIF tapback tracking** | — | chat.db | Implemented | — | `hu_imessage_count_recent_gif_tapbacks()` (now includes type 2006) |
 | **Message effects (read)** | Common | chat.db expressive_send_style_id | **Implemented** (this overhaul) | — | Detects all 13 bubble/screen effects (Slam, Loud, Gentle, Invisible Ink, Confetti, Echo, Fireworks, Happy Birthday, Heart, Lasers, Shooting Star, Sparkles, Spotlight) and shows `[Sent with <effect>]` prefix in content. |
@@ -90,7 +90,7 @@ Canonical reference for every iMessage platform capability, our implementation s
 | Add message effects read-side detection | expressive_send_style_id check in poll; zero risk read-only | 2026-04 |
 | Wire HU_IMESSAGE_SEND_IMSG CMake flag | imsg CLI opt-in for faster send; graceful AppleScript fallback | 2026-04 |
 | imsg CLI tapback even without JXA enabled | Auto-detect imsg on $PATH; try before returning NOT_SUPPORTED | 2026-04 |
-| Implement 30s music preview attachments | iTunes Search API (no auth) → .m4a download → send as audio attachment + rich link card. LLM picks song, API provides real metadata. | 2026-04 |
+| Implement 30s music preview attachments | iTunes + Spotify dual-service: .m4a preview, album art, auto-detect Spotify/Apple preference from history, taste learning via tapback reactions. | 2026-04 |
 
 ## Architecture
 
@@ -100,7 +100,7 @@ Canonical reference for every iMessage platform capability, our implementation s
 - **Sticker/effects detection**: `hu_imessage_poll()` reads `balloon_bundle_id` and `expressive_send_style_id` from chat.db
 - **Tapback send**: `imessage_react()` → JXA + System Events AX automation (opt-in)
 - **Feed/persona**: `feeds/imessage.c` and `persona/sampler.c` → chat.db with attributedBody support
-- **Music preview**: LLM picks song → `hu_music_search()` (iTunes API) → `hu_music_download_preview()` (.m4a) → send text + audio attachment
+- **Music preview**: taste prompt → LLM picks song → detect user preference (Spotify/Apple Music) → iTunes search (for .m4a) + optional Spotify search (for share link) → download preview + album art → send text + audio + artwork attachments → record for taste learning
 - **GIF**: Tenor API → download to temp file → send as attachment
 
 ## Last Updated

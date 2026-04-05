@@ -592,7 +592,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
     char *system_prompt = NULL;
     size_t system_prompt_len = 0;
     if (agent->cached_static_prompt && !persona_prompt && !awareness_ctx &&
-        !somatic_ctx && !trust_ctx && !humor_dir && !tone_hint && !syc_friction_ctx) {
+        !somatic_ctx && !trust_ctx && !humor_dir && !tone_hint && !syc_friction_ctx &&
+        !intelligence_ctx && !outcome_ctx) {
         err = hu_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
@@ -858,9 +859,12 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     if (pe != HU_OK)
                         args = NULL;
                 }
+                if (!args) {
+                    /* Empty or missing args: create empty object for parameterless tools */
+                    hu_json_parse(agent->alloc, "{}", 2, &args);
+                }
                 if (args) {
                     result = hu_tool_result_fail("invalid arguments", 16);
-                    /* Prefer streaming execution for progressive output */
                     if (tool->vtable->execute_streaming && on_event) {
                         tool_stream_bridge_t bridge = {
                             .on_event = on_event,

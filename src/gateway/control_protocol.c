@@ -324,14 +324,26 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
     }
 
     if (payload) {
+        if (payload_len > SIZE_MAX - 256) {
+            if (err == HU_OK)
+                proto->alloc->free(proto->alloc->ctx, payload, payload_len + 1);
+            else
+                proto->alloc->free(proto->alloc->ctx, payload, 64);
+            proto->alloc->free(proto->alloc->ctx, id, id_slen + 1);
+            return;
+        }
         size_t res_cap = 256 + payload_len;
         char *res_buf = (char *)proto->alloc->alloc(proto->alloc->ctx, res_cap);
         if (res_buf) {
             size_t pos = 0;
             pos = hu_buf_appendf(res_buf, res_cap, pos, "{\"type\":\"res\",\"id\":\"");
             size_t id_len = strlen(id);
-            size_t esc_len = id_len * 2 + 16;
-            char *id_esc = (char *)proto->alloc->alloc(proto->alloc->ctx, esc_len);
+            char *id_esc = NULL;
+            size_t esc_len = 0;
+            if (id_len <= SIZE_MAX / 2 - 8U) {
+                esc_len = id_len * 2 + 16;
+                id_esc = (char *)proto->alloc->alloc(proto->alloc->ctx, esc_len);
+            }
             if (id_esc) {
                 size_t j = 0;
                 for (size_t i = 0; i < id_len && j + 4 < esc_len; i++) {
@@ -401,6 +413,10 @@ void hu_control_send_event(hu_control_protocol_t *proto, const char *event_name,
     size_t payload_len = strlen(payload);
     size_t event_len = strlen(event_name);
 
+    if (event_len > SIZE_MAX - 128)
+        return;
+    if (payload_len > SIZE_MAX - 128 - event_len)
+        return;
     size_t cap = 128 + event_len + payload_len;
     char *buf = (char *)proto->alloc->alloc(proto->alloc->ctx, cap);
     if (!buf)
@@ -427,6 +443,10 @@ void hu_control_send_event_to_conn(hu_control_protocol_t *proto, hu_ws_conn_t *c
     size_t payload_len = strlen(payload);
     size_t event_len = strlen(event_name);
 
+    if (event_len > SIZE_MAX - 128)
+        return;
+    if (payload_len > SIZE_MAX - 128 - event_len)
+        return;
     size_t cap = 128 + event_len + payload_len;
     char *buf = (char *)proto->alloc->alloc(proto->alloc->ctx, cap);
     if (!buf)
@@ -454,7 +474,15 @@ hu_error_t hu_control_send_response(hu_control_protocol_t *proto, hu_ws_conn_t *
     const char *payload = payload_json ? payload_json : "{}";
     size_t payload_len = strlen(payload);
     size_t id_len = strlen(id);
-    size_t cap = 96 + id_len * 2 + payload_len;
+    if (id_len > SIZE_MAX / 2)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t id_esc_max = id_len * 2;
+    if (id_esc_max > SIZE_MAX - 96)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t sum96 = 96 + id_esc_max;
+    if (payload_len > SIZE_MAX - sum96)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t cap = sum96 + payload_len;
 
     char *buf = (char *)alloc->alloc(alloc->ctx, cap);
     if (!buf)

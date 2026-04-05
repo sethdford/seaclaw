@@ -272,7 +272,8 @@ hu_error_t hu_events_build_prompt(hu_allocator_t *alloc, const hu_current_event_
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
 
-    size_t pos = (size_t)snprintf(buf, total, "[CURRENT EVENTS you're aware of]:");
+    int n0 = snprintf(buf, total, "[CURRENT EVENTS you're aware of]:");
+    size_t pos = (n0 > 0 && (size_t)n0 < total) ? (size_t)n0 : 0;
     for (size_t i = 0; i < count && pos + 16 < total; i++) {
         const char *topic = events[i].topic ? events[i].topic : "";
         size_t topic_len = events[i].topic_len;

@@ -378,7 +378,7 @@ static void cross_channel_format_when(char *out, size_t out_sz, const char *ts) 
         return;
     out[0] = '\0';
     if (!ts || !ts[0]) {
-        if (out_sz > 7)
+        if (out_sz >= 7)
             memcpy(out, "recent", 7);
         return;
     }
@@ -3371,11 +3371,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             } else if (agent->provider.vtable->supports_vision &&
                                        agent->provider.vtable->supports_vision(
                                            agent->provider.ctx)) {
+                                hu_log_info("human", agent ? agent->observer : NULL,
+                                            "vision: describing image %.*s", (int)plen, path);
                                 char *desc = NULL;
                                 size_t desc_len = 0;
                                 hu_error_t verr =
                                     hu_vision_describe_image(alloc, &agent->provider, path, plen,
                                                              model, model_len, &desc, &desc_len);
+                                hu_log_info("human", agent ? agent->observer : NULL,
+                                            "vision: result=%s desc_len=%zu",
+                                            hu_error_string(verr), desc_len);
                                 if (verr == HU_OK && desc && desc_len > 0) {
                                     char attachment_augmented[4096];
                                     size_t desc_copy = desc_len > 3800 ? 3800 : desc_len;
@@ -5178,7 +5183,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     size_t prosp_pos = 0;
                                     int n = snprintf(prosp_buf, sizeof(prosp_buf),
                                                      "[PROSPECTIVE MEMORY: Remember to: ");
-                                    if (n > 0)
+                                    if (n > 0 && (size_t)n < sizeof(prosp_buf))
                                         prosp_pos = (size_t)n;
                                     for (size_t pi = 0; pi < prosp_count && pi < 3 &&
                                                         prosp_pos < sizeof(prosp_buf) - 64;
@@ -5311,7 +5316,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         "[SHARED HISTORY with this person — reference specific "
                                         "details when relevant, not generic empathy: ";
                                     int n = snprintf(ep_buf, sizeof(ep_buf), "%s", ep_hdr);
-                                    if (n > 0)
+                                    if (n > 0 && (size_t)n < sizeof(ep_buf))
                                         ep_pos = (size_t)n;
                                     for (size_t ei = 0;
                                          ei < ep_count && ep_pos < sizeof(ep_buf) - 64; ei++) {
@@ -10938,7 +10943,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* Music teaser: share a song with 30s preview when conversation mood fits */
+                /* Music teaser: share a song with 30s preview + artwork */
                 if (combined_len > 0 && ch->channel->vtable->send && !gif_sent_this_turn) {
                     float music_prob = 0.05f;
 #ifdef HU_HAS_PERSONA
@@ -10948,13 +10953,33 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                          : 0.05f;
                     }
 #endif
+                    /* Boost probability if taste hit rate is high for this contact */
+                    float taste_rate =
+                        hu_music_taste_hit_rate(batch_key, key_len);
+                    if (taste_rate > 0.5f && music_prob < 0.15f)
+                        music_prob = 0.15f;
+
                     uint32_t music_seed =
                         (uint32_t)time(NULL) * 16807u + (uint32_t)(uintptr_t)combined;
                     if (hu_conversation_should_send_music(combined, combined_len, history_entries,
                                                           history_count, music_seed, music_prob)) {
-                        char music_prompt[512];
+                        /* Build taste-enriched prompt */
+                        char taste_snippet[256] = {0};
+                        size_t taste_len = hu_music_taste_build_prompt(
+                            batch_key, key_len, taste_snippet, sizeof(taste_snippet));
+
+                        char music_prompt[768];
                         size_t mp_len = hu_conversation_build_music_prompt(
                             combined, combined_len, music_prompt, sizeof(music_prompt));
+
+                        /* Append taste context to prompt if available */
+                        if (taste_len > 0 && mp_len > 0 && mp_len + taste_len + 2 < sizeof(music_prompt)) {
+                            music_prompt[mp_len++] = '\n';
+                            memcpy(music_prompt + mp_len, taste_snippet, taste_len);
+                            mp_len += taste_len;
+                            music_prompt[mp_len] = '\0';
+                        }
+
                         if (mp_len > 0 && agent->provider.vtable &&
                             agent->provider.vtable->chat_with_system) {
                             char *music_suggestion = NULL;
@@ -10992,17 +11017,59 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     sizeof(search_query), casual_msg, sizeof(casual_msg));
 
                                 if (parsed && search_query[0] != '\0') {
-                                    hu_music_result_t song = {0};
-                                    hu_error_t search_err = hu_music_search(
-                                        alloc, search_query, strlen(search_query), &song);
+                                    /* Detect user's streaming preference from history */
+                                    hu_music_source_t pref = HU_MUSIC_SOURCE_ITUNES;
+                                    if (history_entries && history_count > 0) {
+                                        const char (*texts)[512] =
+                                            (const char (*)[512])history_entries[0].text;
+                                        pref = hu_music_detect_preference(texts, history_count);
+                                    }
 
-                                    if (search_err == HU_OK && song.track_view_url) {
+                                    /* Always search iTunes (for the .m4a preview) */
+                                    hu_music_result_t song = {0};
+                                    size_t sq_len = strlen(search_query);
+                                    hu_error_t search_err =
+                                        hu_music_search(alloc, search_query, sq_len, &song);
+
+                                    /* If user prefers Spotify, try to get the Spotify share link */
+                                    hu_music_result_t spotify_song = {0};
+                                    bool has_spotify = false;
+                                    if (pref == HU_MUSIC_SOURCE_SPOTIFY) {
+                                        const char *sp_cred = config
+                                            ? hu_config_get_provider_key(config, "spotify")
+                                            : NULL;
+                                        if (sp_cred) {
+                                            /* Expect "client_id:client_secret" format */
+                                            const char *colon = strchr(sp_cred, ':');
+                                            if (colon) {
+                                                char sp_id[128] = {0};
+                                                size_t id_len = (size_t)(colon - sp_cred);
+                                                if (id_len < sizeof(sp_id)) {
+                                                    memcpy(sp_id, sp_cred, id_len);
+                                                    has_spotify =
+                                                        hu_music_search_spotify(
+                                                            alloc, sp_id, colon + 1,
+                                                            search_query, sq_len,
+                                                            &spotify_song) == HU_OK;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    /* Use Spotify URL if available, iTunes preview for audio */
+                                    hu_music_result_t *link_song =
+                                        has_spotify ? &spotify_song : &song;
+
+                                    if (search_err == HU_OK && (song.track_view_url ||
+                                        (has_spotify && spotify_song.track_view_url))) {
                                         char share_text[512];
                                         size_t casual_len = strlen(casual_msg);
                                         size_t st_len = hu_music_build_share_text(
-                                            &song, casual_len > 0 ? casual_msg : NULL, casual_len,
+                                            link_song,
+                                            casual_len > 0 ? casual_msg : NULL, casual_len,
                                             share_text, sizeof(share_text));
 
+                                        /* Download 30s preview (always from iTunes) */
                                         char preview_path[256] = {0};
                                         bool has_preview = false;
                                         if (song.preview_url) {
@@ -11013,37 +11080,62 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                 HU_OK;
                                         }
 
+                                        /* Download album artwork */
+                                        char artwork_path[256] = {0};
+                                        bool has_artwork = false;
+                                        const char *art_url = link_song->artwork_url
+                                            ? link_song->artwork_url : song.artwork_url;
+                                        if (art_url) {
+                                            has_artwork =
+                                                hu_music_download_artwork(alloc, art_url,
+                                                                         artwork_path,
+                                                                         sizeof(artwork_path)) ==
+                                                HU_OK;
+                                        }
+
                                         usleep(3000000 + (music_seed % 4000000));
 
-                                        if (st_len > 0 && has_preview) {
-                                            const char *media[] = {preview_path};
-                                            ch->channel->vtable->send(ch->channel->ctx, batch_key,
-                                                                      key_len, share_text, st_len,
-                                                                      media, 1);
+                                        /* Send with up to 2 attachments: preview + artwork */
+                                        if (st_len > 0) {
+                                            int media_count = 0;
+                                            const char *media[2];
+                                            if (has_preview)
+                                                media[media_count++] = preview_path;
+                                            if (has_artwork)
+                                                media[media_count++] = artwork_path;
+
+                                            ch->channel->vtable->send(
+                                                ch->channel->ctx, batch_key, key_len,
+                                                share_text, st_len,
+                                                media_count > 0 ? media : NULL,
+                                                (size_t)media_count);
+
                                             hu_log_info("human", agent ? agent->observer : NULL,
-                                                        "sent music preview: %s - %s (%s)",
+                                                        "sent music %s: %s - %s [%s%s]",
+                                                        has_preview ? "preview" : "link",
                                                         song.artist_name ? song.artist_name : "?",
                                                         song.track_name ? song.track_name : "?",
-                                                        preview_path);
-                                        } else if (st_len > 0) {
-                                            ch->channel->vtable->send(ch->channel->ctx, batch_key,
-                                                                      key_len, share_text, st_len,
-                                                                      NULL, 0);
-                                            hu_log_info("human", agent ? agent->observer : NULL,
-                                                        "sent music link: %s - %s",
-                                                        song.artist_name ? song.artist_name : "?",
-                                                        song.track_name ? song.track_name : "?");
+                                                        has_spotify ? "spotify" : "itunes",
+                                                        has_artwork ? "+art" : "");
+
+                                            /* Record for taste learning */
+                                            hu_music_taste_record_send(
+                                                batch_key, key_len,
+                                                song.artist_name, song.track_name);
                                         }
 
                                         if (has_preview)
                                             (void)unlink(preview_path);
-                                        hu_music_result_free(alloc, &song);
+                                        if (has_artwork)
+                                            (void)unlink(artwork_path);
                                     } else {
-                                        hu_music_result_free(alloc, &song);
                                         hu_log_info(
                                             "human", agent ? agent->observer : NULL,
-                                            "iTunes search failed for: %s", search_query);
+                                            "music search failed for: %s", search_query);
                                     }
+                                    hu_music_result_free(alloc, &song);
+                                    if (has_spotify)
+                                        hu_music_result_free(alloc, &spotify_song);
                                 }
                             }
                             if (music_suggestion)
