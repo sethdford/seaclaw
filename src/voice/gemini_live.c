@@ -145,7 +145,8 @@ hu_error_t hu_gemini_live_build_setup_json(hu_allocator_t *alloc,
         goto fail;
 
     /* thinkingConfig inside generationConfig */
-    if (config->thinking_level != HU_GL_THINKING_DEFAULT) {
+    if (config->thinking_level > HU_GL_THINKING_DEFAULT &&
+        config->thinking_level <= HU_GL_THINKING_HIGH) {
         static const char *level_strings[] = {
             [HU_GL_THINKING_NONE] = "none", [HU_GL_THINKING_MINIMAL] = "minimal",
             [HU_GL_THINKING_LOW] = "low",   [HU_GL_THINKING_MEDIUM] = "medium",

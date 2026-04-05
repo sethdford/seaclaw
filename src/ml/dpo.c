@@ -314,7 +314,8 @@ hu_error_t hu_dpo_get_best_examples(hu_dpo_collector_t *collector, hu_allocator_
                 (int)(strlen(chosen) < 300 ? strlen(chosen) : 300), chosen);
         }
         if (n > 0) {
-            err = hu_json_buf_append_raw(&buf, entry, (size_t)n);
+            size_t append_len = (size_t)n >= sizeof(entry) ? sizeof(entry) - 1 : (size_t)n;
+            err = hu_json_buf_append_raw(&buf, entry, append_len);
             if (err != HU_OK) {
                 hu_json_buf_free(&buf);
                 sqlite3_finalize(stmt);

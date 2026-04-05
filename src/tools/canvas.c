@@ -123,6 +123,8 @@ static void canvas_load_from_disk(canvas_ctx_t *c) {
             *tab = '\0';
             title_str = tab + 1;
         }
+        if (!canvas_id_is_safe(id_str))
+            continue;
         char path[1024];
         snprintf(path, sizeof(path), "%s/%s.md", c->persist_dir, id_str);
         FILE *f = fopen(path, "r");

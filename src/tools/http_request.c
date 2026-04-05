@@ -66,6 +66,8 @@ static bool header_value_safe(const char *s, size_t len) {
 /* Build extra_headers string from JSON object. Caller frees. */
 static hu_error_t parse_headers(hu_allocator_t *alloc, const hu_json_value_t *headers_val,
                                 char **out, size_t *out_len) {
+    if (!out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
     if (!headers_val || headers_val->type != HU_JSON_OBJECT || headers_val->data.object.len == 0) {
         *out = NULL;
         *out_len = 0;
@@ -212,7 +214,7 @@ static hu_error_t http_request_execute(void *ctx, hu_allocator_t *alloc,
         return HU_ERR_OUT_OF_MEMORY;
     }
     int n = snprintf(output, 128, "Status: %ld\n\nResponse Body:\n", (long)status);
-    size_t out_len = (n > 0 ? (size_t)n : 0);
+    size_t out_len = (n > 0 && (size_t)n < 128) ? (size_t)n : (n > 0 ? 127 : 0);
     if (resp.body && body_sz > 0) {
         memcpy(output + out_len, resp.body, body_sz);
         out_len += body_sz;

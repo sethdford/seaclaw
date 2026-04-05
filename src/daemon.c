@@ -184,7 +184,10 @@ static void hu_daemon_parse_director_result(const char *raw, size_t len,
     const char *drp = strstr(raw, "direction:");
     if (drp) {
         const char *dv = drp + 10;
-        size_t rem = len - (size_t)(dv - raw);
+        size_t offset = (size_t)(dv - raw);
+        if (offset > len)
+            return;
+        size_t rem = len - offset;
         size_t cp = rem < sizeof(out->direction) - 1 ? rem : sizeof(out->direction) - 1;
         memcpy(out->direction, dv, cp);
         out->direction[cp] = '\0';
@@ -1427,7 +1430,10 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                         }
                     }
                     alloc->free(alloc->ctx, growth_pro, growth_pro_len);
+                    growth_pro = NULL;
                 }
+                if (growth_pro)
+                    alloc->free(alloc->ctx, growth_pro, growth_pro_len);
             }
             /* F30: Spontaneous curiosity — 10–15% chance, inject random question from micro-moments
              */
@@ -2036,6 +2042,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     g_stop_flag = 0;
     signal(SIGTERM, service_signal_handler);
     signal(SIGINT, service_signal_handler);
+    signal(SIGPIPE, SIG_IGN);
     setlinebuf(stderr);
     setlinebuf(stdout);
 #endif
@@ -2334,7 +2341,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 #ifndef HU_IS_TEST
                 /* Periodic memory consolidation */
-                if (config->consolidation_interval_hours > 0 && agent && agent->memory) {
+                if (config && config->consolidation_interval_hours > 0 && agent && agent->memory) {
                     static int64_t last_consolidation_ms = 0;
                     int64_t interval_ms = (int64_t)config->consolidation_interval_hours * 3600000LL;
                     struct timespec ts_cons;
@@ -5075,13 +5082,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             else if (temp_dir)
                                 alloc->free(alloc->ctx, temp_dir, temp_dir_len + 1);
 
-                            /* Free anniversary labels (allocated by
-                             * hu_temporal_check_anniversaries)
-                             */
-                            for (size_t ai = 0; ai < ann_count; ai++) {
-                                if (ann_buf[ai].label)
-                                    free(ann_buf[ai].label);
-                            }
+                            /* ann_buf[].label is borrowed from persona important_dates — do NOT free */
                         }
                     }
 #endif /* HU_HAS_PERSONA temporal */
@@ -8291,10 +8292,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         int64_t msg_id = msgs[batch_end].message_id;
                         if (msg_id > 0 && director_result.reaction != HU_REACTION_NONE) {
                             hu_log_info("human", agent ? agent->observer : NULL,
-                                        "director: tapback reaction=%d",
-                                        (int)director_result.reaction);
-                            ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len,
-                                                       msg_id, director_result.reaction);
+                                        "director: tapback reaction=%d msg_id=%lld",
+                                        (int)director_result.reaction, (long long)msg_id);
+                            hu_error_t react_err = ch->channel->vtable->react(
+                                ch->channel->ctx, batch_key, key_len,
+                                msg_id, director_result.reaction);
+                            hu_log_info("human", agent ? agent->observer : NULL,
+                                        "tapback result: %s", hu_error_string(react_err));
                             if (agent->bth_metrics)
                                 agent->bth_metrics->reactions_sent++;
                         }
@@ -8566,7 +8570,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             char *new_convo =
                                 (char *)alloc->alloc(alloc->ctx, new_len);
                             if (new_convo) {
-                                memcpy(new_convo, convo_ctx, convo_ctx_len);
+                                if (convo_ctx && convo_ctx_len > 0)
+                                    memcpy(new_convo, convo_ctx, convo_ctx_len);
                                 memcpy(new_convo + convo_ctx_len, dn_hdr, sizeof(dn_hdr) - 1);
                                 memcpy(new_convo + convo_ctx_len + sizeof(dn_hdr) - 1,
                                        director_result.direction, dn_len);
@@ -8956,7 +8961,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     (llm_decides && g_classify_provider_ok)
                                         ? g_classify_model_len
                                         : agent->model_name_len;
-                                if (high_stakes && judge_prov->vtable->chat) {
+                                if (high_stakes && judge_prov->vtable &&
+                                    judge_prov->vtable->chat) {
                                     hu_turing_score_t llm_tscore;
                                     hu_error_t llm_terr = hu_turing_score_llm(
                                         alloc, judge_prov, judge_model,
@@ -9917,10 +9923,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                          * `voice.tts_provider`: "realtime"). */
                         hu_voice_session_t unified_voice = {0};
                         bool unified_voice_active = false;
-                        bool cfg_realtime =
-                            (config->voice.mode && strcmp(config->voice.mode, "realtime") == 0) ||
-                            (config->voice.tts_provider &&
-                             strcmp(config->voice.tts_provider, "realtime") == 0);
+                        bool cfg_realtime = config &&
+                            ((config->voice.mode && strcmp(config->voice.mode, "realtime") == 0) ||
+                             (config->voice.tts_provider &&
+                              strcmp(config->voice.tts_provider, "realtime") == 0));
                         if (voice_channel_ok && config && chn_voice && cfg_realtime) {
                             size_t chn_len = strlen(chn_voice);
                             if (hu_voice_session_start(alloc, &unified_voice, chn_voice, chn_len,

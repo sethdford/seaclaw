@@ -43,10 +43,14 @@ hu_error_t hu_voice_rt_connect(hu_voice_rt_session_t *session) {
     if (n <= 0 || (size_t)n >= sizeof(url))
         return HU_ERR_INVALID_ARGUMENT;
 
+    const char *key = session->config.api_key ? session->config.api_key : "";
+    for (const char *p = key; *p; p++) {
+        if (*p == '\r' || *p == '\n')
+            return HU_ERR_INVALID_ARGUMENT;
+    }
     char headers[512];
     (void)snprintf(headers, sizeof(headers),
-                   "Authorization: Bearer %s\r\nOpenAI-Beta: realtime=v1\r\n",
-                   session->config.api_key ? session->config.api_key : "");
+                   "Authorization: Bearer %s\r\nOpenAI-Beta: realtime=v1\r\n", key);
 
     hu_ws_client_t *ws = NULL;
     hu_error_t err = hu_ws_connect_with_headers(session->alloc, url, headers, &ws);

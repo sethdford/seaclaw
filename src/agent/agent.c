@@ -1308,6 +1308,8 @@ hu_error_t hu_agent_run_single(hu_agent_t *agent, const char *system_prompt,
                                size_t *response_len_out) {
     if (!agent || !response_out)
         return HU_ERR_INVALID_ARGUMENT;
+    if (!agent->provider.vtable || !agent->provider.vtable->chat)
+        return HU_ERR_INVALID_ARGUMENT;
     *response_out = NULL;
     if (response_len_out)
         *response_len_out = 0;

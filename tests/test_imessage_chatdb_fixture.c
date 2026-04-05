@@ -635,7 +635,219 @@ static void test_chatdb_gif_tapback_count_query(void) {
     sqlite3_close(db);
 }
 
-/* History loading is implemented via imessage_load_conversation_history vtable. */
+static void test_chatdb_latest_sent_rowid_query(void) {
+    sqlite3 *db = open_fixture();
+    HU_ASSERT_NOT_NULL(db);
+
+    /* Same SQL as hu_imessage_get_latest_sent_rowid */
+    const char *sql =
+        "SELECT MAX(m.ROWID) FROM message m "
+        "JOIN handle h ON m.handle_id = h.ROWID "
+        "WHERE m.is_from_me = 1 AND h.id = ?1";
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    sqlite3_bind_text(stmt, 1, "+15559999999", -1, NULL);
+
+    HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    HU_ASSERT_TRUE(sqlite3_column_type(stmt, 0) != SQLITE_NULL);
+    int64_t rowid = sqlite3_column_int64(stmt, 0);
+    HU_ASSERT_EQ(rowid, 2); /* MSG-002 is our only is_from_me=1 message */
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
+
+static void test_chatdb_voice_msg_has_attachment_flag(void) {
+    sqlite3 *db = open_fixture();
+    HU_ASSERT_NOT_NULL(db);
+
+    /* Verify that the poll query sets has_audio=1 for voice.caf (ROWID 6),
+     * which should cause has_attachment=true in production (has_image || has_audio). */
+    const char *sql =
+        "SELECT "
+        "  (SELECT COUNT(*) FROM message_attachment_join maj3 "
+        "   JOIN attachment a3 ON maj3.attachment_id = a3.ROWID "
+        "   WHERE maj3.message_id = m.ROWID AND a3.filename IS NOT NULL "
+        "   AND (LOWER(a3.filename) LIKE '%.caf' OR LOWER(a3.filename) LIKE '%.m4a' "
+        "     OR LOWER(a3.filename) LIKE '%.mp3' OR LOWER(a3.filename) LIKE '%.aac' "
+        "     OR LOWER(a3.filename) LIKE '%.opus')) > 0 AS has_audio, "
+        "  (SELECT COUNT(*) FROM message_attachment_join maj "
+        "   JOIN attachment a ON maj.attachment_id = a.ROWID "
+        "   WHERE maj.message_id = m.ROWID AND a.filename IS NOT NULL "
+        "   AND (LOWER(a.filename) LIKE '%.jpg' OR LOWER(a.filename) LIKE '%.jpeg' "
+        "     OR LOWER(a.filename) LIKE '%.png' OR LOWER(a.filename) LIKE '%.heic' "
+        "     OR LOWER(a.filename) LIKE '%.gif' OR LOWER(a.filename) LIKE '%.webp')) "
+        "   > 0 AS has_image "
+        "FROM message m WHERE m.ROWID = 6";
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    int has_audio = sqlite3_column_int(stmt, 0);
+    int has_image = sqlite3_column_int(stmt, 1);
+    HU_ASSERT_EQ(has_audio, 1);
+    HU_ASSERT_EQ(has_image, 0);
+    /* Production: has_attachment = (has_image != 0 || has_audio != 0) → true */
+    HU_ASSERT_TRUE(has_image != 0 || has_audio != 0);
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
+
+static void test_chatdb_inline_reply_guid_lookup(void) {
+    sqlite3 *db = open_fixture();
+    HU_ASSERT_NOT_NULL(db);
+
+    /* Add a reply that references MSG-001 via thread_originator_guid */
+    const char *extra =
+        "INSERT INTO message (guid, text, handle_id, date, is_from_me,"
+        "  associated_message_type, thread_originator_guid)"
+        "  VALUES ('MSG-REPLY', 'I agree!', 1, 700000012000000000, 0, 0, 'MSG-001');"
+        "INSERT INTO chat_message_join (chat_id, message_id) VALUES (1,"
+        "  (SELECT ROWID FROM message WHERE guid = 'MSG-REPLY'));";
+    char *err = NULL;
+    sqlite3_exec(db, extra, NULL, NULL, &err);
+    if (err) sqlite3_free(err);
+
+    /* Look up the original message text by GUID (same pattern as
+     * hu_imessage_lookup_message_by_guid) */
+    const char *sql = "SELECT m.text FROM message m WHERE m.guid = ?1 LIMIT 1";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    sqlite3_bind_text(stmt, 1, "MSG-001", -1, NULL);
+
+    HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    const char *text = (const char *)sqlite3_column_text(stmt, 0);
+    HU_ASSERT_STR_EQ(text, "Hello there");
+
+    sqlite3_finalize(stmt);
+
+    /* Also verify the reply's thread_originator_guid is set */
+    const char *sql2 = "SELECT m.thread_originator_guid FROM message m "
+                       "WHERE m.guid = 'MSG-REPLY'";
+    sqlite3_stmt *stmt2 = NULL;
+    rc = sqlite3_prepare_v2(db, sql2, -1, &stmt2, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    HU_ASSERT_EQ(sqlite3_step(stmt2), SQLITE_ROW);
+    const char *reply_to = (const char *)sqlite3_column_text(stmt2, 0);
+    HU_ASSERT_STR_EQ(reply_to, "MSG-001");
+
+    sqlite3_finalize(stmt2);
+    sqlite3_close(db);
+}
+
+static void test_chatdb_voice_message_coalesce_text(void) {
+    sqlite3 *db = open_fixture();
+    HU_ASSERT_NOT_NULL(db);
+
+    /* Verify COALESCE produces "[Voice Message]" for ROWID 6 (voice.caf, no text) */
+    const char *sql =
+        "SELECT COALESCE(m.text, "
+        "  (SELECT CASE "
+        "     WHEN (SELECT COUNT(*) FROM message_attachment_join maja "
+        "           JOIN attachment aa ON maja.attachment_id = aa.ROWID "
+        "           WHERE maja.message_id = m.ROWID AND aa.filename IS NOT NULL "
+        "           AND (LOWER(aa.filename) LIKE '%.caf' OR LOWER(aa.filename) LIKE '%.m4a' "
+        "             OR LOWER(aa.filename) LIKE '%.mp3' OR LOWER(aa.filename) LIKE '%.aac' "
+        "             OR LOWER(aa.filename) LIKE '%.opus')) > 0 "
+        "     THEN '[Voice Message]' "
+        "     WHEN (SELECT COUNT(*) FROM message_attachment_join majv "
+        "           JOIN attachment av ON majv.attachment_id = av.ROWID "
+        "           WHERE majv.message_id = m.ROWID AND av.filename IS NOT NULL "
+        "           AND (LOWER(av.filename) LIKE '%.mov' OR LOWER(av.filename) LIKE '%.mp4' "
+        "             OR LOWER(av.filename) LIKE '%.m4v')) > 0 "
+        "     THEN '[Video]' ELSE '[Photo]' END)) AS text "
+        "FROM message m WHERE m.ROWID = 6";
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    const char *text = (const char *)sqlite3_column_text(stmt, 0);
+    HU_ASSERT_STR_EQ(text, "[Voice Message]");
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
+
+static void test_chatdb_retracted_detection(void) {
+    sqlite3 *db = open_fixture();
+    HU_ASSERT_NOT_NULL(db);
+
+    /* Add a retracted message */
+    const char *extra =
+        "INSERT INTO message (guid, text, handle_id, date, is_from_me,"
+        "  associated_message_type, date_retracted)"
+        "  VALUES ('MSG-UNSEND', 'oops', 1, 700000013000000000, 0, 0, 700000013500000000);";
+    char *err = NULL;
+    sqlite3_exec(db, extra, NULL, NULL, &err);
+    if (err) sqlite3_free(err);
+
+    const char *sql = "SELECT CASE WHEN date_retracted > 0 THEN 1 ELSE 0 END "
+                      "FROM message WHERE guid = 'MSG-UNSEND'";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    int was_unsent = sqlite3_column_int(stmt, 0);
+    HU_ASSERT_EQ(was_unsent, 1);
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
+
+static void test_chatdb_edited_detection(void) {
+    sqlite3 *db = open_fixture();
+    HU_ASSERT_NOT_NULL(db);
+
+    /* Add an edited message */
+    const char *extra =
+        "INSERT INTO message (guid, text, handle_id, date, is_from_me,"
+        "  associated_message_type, date_edited)"
+        "  VALUES ('MSG-EDIT', 'corrected text', 1, 700000014000000000, 0, 0, "
+        "700000014500000000);";
+    char *err = NULL;
+    sqlite3_exec(db, extra, NULL, NULL, &err);
+    if (err) sqlite3_free(err);
+
+    const char *sql = "SELECT CASE WHEN date_edited > 0 THEN 1 ELSE 0 END "
+                      "FROM message WHERE guid = 'MSG-EDIT'";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    int was_edited = sqlite3_column_int(stmt, 0);
+    HU_ASSERT_EQ(was_edited, 1);
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
+
+static void test_chatdb_no_sent_rowid_for_unknown_handle(void) {
+    sqlite3 *db = open_fixture();
+    HU_ASSERT_NOT_NULL(db);
+
+    const char *sql =
+        "SELECT MAX(m.ROWID) FROM message m "
+        "JOIN handle h ON m.handle_id = h.ROWID "
+        "WHERE m.is_from_me = 1 AND h.id = ?1";
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+    sqlite3_bind_text(stmt, 1, "+15550000000", -1, NULL);
+
+    HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    /* NULL result for unknown handle */
+    HU_ASSERT_EQ(sqlite3_column_type(stmt, 0), SQLITE_NULL);
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
 
 void run_imessage_chatdb_fixture_tests(void) {
     HU_TEST_SUITE("iMessage ChatDB Fixture");
@@ -653,6 +865,13 @@ void run_imessage_chatdb_fixture_tests(void) {
     HU_RUN_TEST(test_chatdb_tapback_context_query);
     HU_RUN_TEST(test_chatdb_read_receipt_query);
     HU_RUN_TEST(test_chatdb_gif_tapback_count_query);
+    HU_RUN_TEST(test_chatdb_latest_sent_rowid_query);
+    HU_RUN_TEST(test_chatdb_voice_msg_has_attachment_flag);
+    HU_RUN_TEST(test_chatdb_inline_reply_guid_lookup);
+    HU_RUN_TEST(test_chatdb_voice_message_coalesce_text);
+    HU_RUN_TEST(test_chatdb_retracted_detection);
+    HU_RUN_TEST(test_chatdb_edited_detection);
+    HU_RUN_TEST(test_chatdb_no_sent_rowid_for_unknown_handle);
 }
 #else
 void run_imessage_chatdb_fixture_tests(void) {

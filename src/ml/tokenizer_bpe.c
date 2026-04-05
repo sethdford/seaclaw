@@ -409,6 +409,11 @@ hu_error_t hu_bpe_tokenizer_decode(const hu_bpe_tokenizer_t *tok, const int32_t 
             *text_len_out = 0;
             return HU_ERR_INVALID_ARGUMENT;
         }
+        if (total > SIZE_MAX - t->vocab_lens[id] - 1) {
+            *text_out = NULL;
+            *text_len_out = 0;
+            return HU_ERR_OUT_OF_MEMORY;
+        }
         total += t->vocab_lens[id];
     }
 

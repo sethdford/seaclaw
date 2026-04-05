@@ -317,6 +317,11 @@ static hu_error_t cache_alloc(hu_gpt_t *g, size_t B, size_t S)
     const hu_gpt_config_t *cfg = &g->config;
     size_t E = cfg->n_embd, V = cfg->vocab_size, L = cfg->n_layer;
     size_t nh = cfg->n_head, nkv = cfg->n_kv_head, hd = cfg->head_dim, nm = 4 * E;
+    if (B == 0 || S == 0 || E == 0 || V == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (B > SIZE_MAX / S || B * S > SIZE_MAX / V || B * S > SIZE_MAX / E ||
+        B * S * V > SIZE_MAX / 4 || B * S * E > SIZE_MAX / 4)
+        return HU_ERR_OUT_OF_MEMORY;
     c->B = B; c->S = S;
     CA(c->ids, B*S*sizeof(int32_t));
     CA(c->x_embed, B*S*E*4); CA(c->x0, B*S*E*4);

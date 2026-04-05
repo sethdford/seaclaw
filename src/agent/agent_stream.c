@@ -70,6 +70,8 @@ typedef struct v2_stream_wrap {
 } v2_stream_wrap_t;
 
 static bool stream_chunk_to_event_cb(void *ctx, const hu_stream_chunk_t *chunk) {
+    if (!chunk)
+        return false;
     v2_stream_wrap_t *w = (v2_stream_wrap_t *)ctx;
     if (!w->on_event || chunk->is_final)
         return true;
@@ -157,6 +159,8 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
                                 char **response_out, size_t *response_len_out) {
     if (!agent || !msg || !response_out)
         return HU_ERR_INVALID_ARGUMENT;
+    if (!agent->provider.vtable)
+        return HU_ERR_INVALID_ARGUMENT;
     *response_out = NULL;
     if (response_len_out)
         *response_len_out = 0;
@@ -243,6 +247,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                                    hu_agent_stream_event_cb on_event, void *event_ctx,
                                    char **response_out, size_t *response_len_out) {
     if (!agent || !msg || !response_out)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!agent->provider.vtable)
         return HU_ERR_INVALID_ARGUMENT;
     *response_out = NULL;
     if (response_len_out)

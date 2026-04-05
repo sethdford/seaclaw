@@ -250,7 +250,7 @@ hu_error_t hu_replay_buffer_add(hu_replay_buffer_t *buf, const hu_training_tripl
 hu_error_t hu_replay_buffer_sample(const hu_replay_buffer_t *buf, size_t batch_size,
                                     double reward_weight,
                                     hu_training_triple_t *out, size_t *out_count) {
-    if (!buf || !out || !out_count || !buf->entries || buf->count == 0)
+    if (!buf || !out || !out_count || !buf->entries || buf->count == 0 || batch_size == 0)
         return HU_ERR_INVALID_ARGUMENT;
 
     if (batch_size > buf->count)

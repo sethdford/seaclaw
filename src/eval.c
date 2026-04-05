@@ -880,11 +880,13 @@ hu_error_t hu_eval_report_json(hu_allocator_t *alloc, const hu_eval_run_t *run, 
         run->total_elapsed_ms);
     if (n < 0)
         return HU_ERR_INVALID_ARGUMENT;
-    *out = alloc->alloc(alloc->ctx, (size_t)n + 1);
+    size_t copy_len = (size_t)n < sizeof(buf) ? (size_t)n : sizeof(buf) - 1;
+    *out = alloc->alloc(alloc->ctx, copy_len + 1);
     if (!*out)
         return HU_ERR_OUT_OF_MEMORY;
-    memcpy(*out, buf, (size_t)n + 1);
-    *out_len = (size_t)n;
+    memcpy(*out, buf, copy_len);
+    (*out)[copy_len] = '\0';
+    *out_len = copy_len;
     return HU_OK;
 }
 
@@ -1228,10 +1230,11 @@ hu_error_t hu_eval_detect_regression(sqlite3 *db, const char *suite_name, double
     out->current_pass_rate = current_pass_rate;
 
     sqlite3_stmt *stmt = NULL;
-    const char *sql = suite_name ? "SELECT AVG(pass_rate), COUNT(*) FROM eval_runs WHERE "
-                                   "suite_name = ? ORDER BY created_at DESC LIMIT 10"
-                                 : "SELECT AVG(pass_rate), COUNT(*) FROM (SELECT pass_rate FROM "
-                                   "eval_runs ORDER BY created_at DESC LIMIT 10)";
+    const char *sql = suite_name
+                          ? "SELECT AVG(pass_rate), COUNT(*) FROM (SELECT pass_rate FROM eval_runs "
+                            "WHERE suite_name = ? ORDER BY created_at DESC LIMIT 10)"
+                          : "SELECT AVG(pass_rate), COUNT(*) FROM (SELECT pass_rate FROM "
+                            "eval_runs ORDER BY created_at DESC LIMIT 10)";
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
         return HU_ERR_MEMORY_BACKEND;

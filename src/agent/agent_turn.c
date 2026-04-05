@@ -71,26 +71,38 @@ static void at_load_patterns(hu_allocator_t *alloc, hu_json_value_t *root, const
     const char **patterns = (const char **)alloc->alloc(alloc->ctx, (count + 1) * sizeof(const char *));
     if (!patterns)
         return;
-    memset(patterns, 0, (count + 1) * sizeof(const char *));
+    size_t filled = 0;
     for (size_t i = 0; i < count; i++) {
         hu_json_value_t *item = arr->data.array.items[i];
         if (item && item->type == HU_JSON_STRING) {
-            patterns[i] = hu_strndup(alloc, item->data.string.ptr, item->data.string.len);
+            const char *s = hu_strndup(alloc, item->data.string.ptr, item->data.string.len);
+            if (!s) {
+                for (size_t j = 0; j < filled; j++)
+                    alloc->free(alloc->ctx, (char *)patterns[j], strlen(patterns[j]) + 1);
+                alloc->free(alloc->ctx, patterns, (count + 1) * sizeof(const char *));
+                return;
+            }
+            patterns[filled++] = s;
         }
     }
-    patterns[count] = NULL;
+    patterns[filled] = NULL;
     *dest = patterns;
 }
 
 static void at_free_patterns(hu_allocator_t *alloc, const char **arr, const char **default_arr) {
-    if (arr != default_arr && arr) {
-        for (size_t i = 0; arr[i]; i++) {
-            alloc->free(alloc->ctx, (char *)arr[i], strlen(arr[i]) + 1);
-        }
-        size_t count = 0;
-        for (size_t i = 0; arr[i]; i++) count++;
-        alloc->free(alloc->ctx, (void *)arr, (count + 1) * sizeof(const char *));
+    if (arr == default_arr || !arr)
+        return;
+    /* at_load_patterns allocates (json_array_len + 1) slots with a NULL sentinel at the end.
+     * Intermediate slots may be NULL if hu_strndup failed. We must walk until we find
+     * a slot that is the sentinel (the slot after the last valid index). Since we can't
+     * distinguish a failed-strndup NULL from the sentinel, bail out on first NULL. This
+     * means some entries after a gap leak — but at_load_patterns should abort on failure. */
+    size_t i = 0;
+    while (arr[i]) {
+        alloc->free(alloc->ctx, (char *)arr[i], strlen(arr[i]) + 1);
+        i++;
     }
+    alloc->free(alloc->ctx, (void *)arr, (i + 1) * sizeof(const char *));
 }
 
 hu_error_t hu_agent_turn_data_init(hu_allocator_t *alloc) {
@@ -477,7 +489,7 @@ static void *dag_parallel_worker(void *arg) {
     dag_tool = hu_agent_internal_find_tool(
         w->agent, node->tool_name, node->tool_name ? strlen(node->tool_name) : 0);
     pthread_mutex_unlock(&g_dag_parallel_prep_mutex);
-    if (!dag_tool) {
+    if (!dag_tool || !dag_tool->vtable) {
         node->status = HU_DAG_FAILED;
         if (resolved_args)
             w->agent->alloc->free(w->agent->alloc->ctx, resolved_args, resolved_len + 1);
@@ -553,6 +565,8 @@ static void agent_turn_hula_exec_bind_spawn(hu_agent_t *agent, hu_hula_exec_t *e
 hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, char **response_out,
                          size_t *response_len_out) {
     if (!agent || !msg || !response_out)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!agent->provider.vtable)
         return HU_ERR_INVALID_ARGUMENT;
     *response_out = NULL;
     if (response_len_out)
@@ -695,16 +709,20 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             memset(&exec_result, 0, sizeof(exec_result));
             hu_error_t pe = hu_plan_executor_run(&exec, plan, msg, msg_len, &exec_result);
             if (pe == HU_OK && exec_result.summary_len > 0) {
+                if (plan_ctx)
+                    agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
                 plan_ctx = hu_strndup(agent->alloc, exec_result.summary, exec_result.summary_len);
-                plan_ctx_len = exec_result.summary_len;
+                plan_ctx_len = plan_ctx ? exec_result.summary_len : 0;
             } else {
                 char plan_buf[1024];
                 int pn =
                     snprintf(plan_buf, sizeof(plan_buf), "[PLAN]: %zu steps planned, %zu completed",
                              plan->steps_count, exec_result.steps_completed);
                 if (pn > 0 && (size_t)pn < sizeof(plan_buf)) {
+                    if (plan_ctx)
+                        agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
                     plan_ctx = hu_strndup(agent->alloc, plan_buf, (size_t)pn);
-                    plan_ctx_len = (size_t)pn;
+                    plan_ctx_len = plan_ctx ? (size_t)pn : 0;
                 }
             }
             if (plan && exec_result.steps_completed < plan->steps_count) {
@@ -2254,16 +2272,15 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 
         /* Emotional residue carryover from prior conversations */
-        if (agent->memory) {
+        if (agent->memory && agent->memory_session_id) {
             sqlite3 *rc_db = hu_sqlite_memory_get_db(agent->memory);
             if (rc_db) {
                 sqlite3_stmt *rc_stmt = NULL;
                 const char *rc_sql = "SELECT valence, intensity, created_at FROM emotional_residues"
                                      " WHERE contact_id = ?1 ORDER BY created_at DESC LIMIT 10";
                 if (sqlite3_prepare_v2(rc_db, rc_sql, -1, &rc_stmt, NULL) == SQLITE_OK) {
-                    if (agent->memory_session_id)
-                        sqlite3_bind_text(rc_stmt, 1, agent->memory_session_id,
-                                          (int)agent->memory_session_id_len, SQLITE_STATIC);
+                    sqlite3_bind_text(rc_stmt, 1, agent->memory_session_id,
+                                      (int)agent->memory_session_id_len, SQLITE_STATIC);
                     double valences[10];
                     double intensities[10];
                     int64_t timestamps[10];

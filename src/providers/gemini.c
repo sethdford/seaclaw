@@ -859,7 +859,7 @@ static hu_error_t gemini_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
                     if (text && !out->content) {
                         size_t tlen = strlen(text);
                         out->content = hu_strndup(alloc, text, tlen);
-                        out->content_len = tlen;
+                        out->content_len = out->content ? tlen : 0;
                     }
                     hu_json_value_t *fc = hu_json_object_get(part, "functionCall");
                     if (fc && fc->type == HU_JSON_OBJECT) {
@@ -867,11 +867,14 @@ static hu_error_t gemini_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
                         if (!fname)
                             continue;
                         if (!tcs) {
+                            size_t tc_alloc = parts->data.array.len;
+                            if (tc_alloc > SIZE_MAX / sizeof(hu_tool_call_t))
+                                break;
                             tcs = (hu_tool_call_t *)alloc->alloc(
-                                alloc->ctx, parts->data.array.len * sizeof(hu_tool_call_t));
+                                alloc->ctx, tc_alloc * sizeof(hu_tool_call_t));
                             if (!tcs)
                                 break;
-                            memset(tcs, 0, parts->data.array.len * sizeof(hu_tool_call_t));
+                            memset(tcs, 0, tc_alloc * sizeof(hu_tool_call_t));
                         }
                         hu_json_value_t *args = hu_json_object_get(fc, "args");
                         char *args_str = NULL;
@@ -879,10 +882,15 @@ static hu_error_t gemini_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
                         if (args && args->type == HU_JSON_OBJECT) {
                             hu_json_stringify(alloc, args, &args_str, &args_len);
                         }
+                        tcs[tc_valid].name = hu_strndup(alloc, fname, strlen(fname));
+                        if (!tcs[tc_valid].name) {
+                            if (args_str)
+                                alloc->free(alloc->ctx, args_str, args_len + 1);
+                            continue;
+                        }
                         tcs[tc_valid].id = NULL;
                         tcs[tc_valid].id_len = 0;
-                        tcs[tc_valid].name = hu_strndup(alloc, fname, strlen(fname));
-                        tcs[tc_valid].name_len = (size_t)strlen(fname);
+                        tcs[tc_valid].name_len = strlen(fname);
                         tcs[tc_valid].arguments = args_str;
                         tcs[tc_valid].arguments_len = args_len;
                         tc_valid++;

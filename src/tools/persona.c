@@ -35,6 +35,20 @@ typedef struct {
 } persona_tool_ctx_t;
 
 #if !HU_IS_TEST
+
+static bool persona_name_is_safe(const char *name) {
+    if (!name || !name[0])
+        return false;
+    if (name[0] == '.' || name[0] == '/')
+        return false;
+    for (const char *p = name; *p; p++) {
+        if (*p == '/' || *p == '\\' || *p == '\0')
+            return false;
+        if (p[0] == '.' && p[1] == '.')
+            return false;
+    }
+    return true;
+}
 static const char *persona_dir_path(char *buf, size_t cap) {
     return hu_persona_base_dir(buf, cap);
 }
@@ -49,6 +63,10 @@ static hu_error_t do_show(hu_allocator_t *alloc, const char *name, hu_tool_resul
 #else
     if (!name || !name[0]) {
         *out = hu_tool_result_fail("name required for show", 22);
+        return HU_OK;
+    }
+    if (!persona_name_is_safe(name)) {
+        *out = hu_tool_result_fail("invalid persona name", 20);
         return HU_OK;
     }
     hu_persona_t p = {0};
@@ -147,6 +165,10 @@ static hu_error_t do_delete(hu_allocator_t *alloc, const char *name, hu_tool_res
         *out = hu_tool_result_fail("name required for delete", 24);
         return HU_OK;
     }
+    if (!persona_name_is_safe(name)) {
+        *out = hu_tool_result_fail("invalid persona name", 20);
+        return HU_OK;
+    }
     char path[HU_PERSONA_PATH_MAX];
     const char *dir = persona_dir_path(path, sizeof(path));
     if (!dir) {
@@ -167,8 +189,17 @@ static hu_error_t do_delete(hu_allocator_t *alloc, const char *name, hu_tool_res
         }
         return HU_OK;
     }
-    char *result = hu_sprintf(alloc, "{\"deleted\":\"%s\"}", name);
-    *out = hu_tool_result_ok_owned(result, result ? strlen(result) : 0);
+    hu_json_buf_t jbuf;
+    hu_json_buf_init(&jbuf, alloc);
+    hu_json_buf_append_raw(&jbuf, "{", 1);
+    hu_json_append_key_value(&jbuf, "deleted", 7, name, strlen(name));
+    hu_json_buf_append_raw(&jbuf, "}", 1);
+    if (jbuf.ptr) {
+        *out = hu_tool_result_ok_owned(jbuf.ptr, jbuf.len);
+    } else {
+        hu_json_buf_free(&jbuf);
+        *out = hu_tool_result_ok("deleted", 7);
+    }
     return HU_OK;
 #endif
 }

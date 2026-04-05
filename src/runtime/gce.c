@@ -74,16 +74,24 @@ static hu_error_t gce_wrap_command(void *ctx, const char **argv_in, size_t argc_
         argv_out[idx++] = project_arg;
     }
 
-    /* Build combined command string for --command= */
+    /* Build combined command string for --command=, quoting each argument */
     size_t cmd_off = 0;
-    for (size_t i = 0; i < argc_in && cmd_off < sizeof(cmd_buf) - 2; i++) {
+    for (size_t i = 0; i < argc_in && cmd_off < sizeof(cmd_buf) - 4; i++) {
         if (i > 0 && cmd_off < sizeof(cmd_buf) - 1)
             cmd_buf[cmd_off++] = ' ';
-        size_t len = strlen(argv_in[i]);
-        if (cmd_off + len >= sizeof(cmd_buf) - 1)
-            len = sizeof(cmd_buf) - 1 - cmd_off;
-        memcpy(cmd_buf + cmd_off, argv_in[i], len);
-        cmd_off += len;
+        cmd_buf[cmd_off++] = '\'';
+        const char *arg = argv_in[i];
+        for (size_t k = 0; arg[k] && cmd_off < sizeof(cmd_buf) - 3; k++) {
+            if (arg[k] == '\'') {
+                if (cmd_off + 4 >= sizeof(cmd_buf) - 1)
+                    break;
+                memcpy(cmd_buf + cmd_off, "'\\''", 4);
+                cmd_off += 4;
+            } else {
+                cmd_buf[cmd_off++] = arg[k];
+            }
+        }
+        cmd_buf[cmd_off++] = '\'';
     }
     cmd_buf[cmd_off] = '\0';
 

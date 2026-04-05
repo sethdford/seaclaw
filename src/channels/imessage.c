@@ -1899,21 +1899,24 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
     hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
     c->alloc->free(c->alloc->ctx, script, script_cap);
     if (err != HU_OK) {
-        if (getenv("HU_DEBUG"))
-            hu_log_error("imessage", NULL, "tapback osascript failed: hu_process_run err=%s",
-                    hu_error_string(err));
+        hu_log_error("imessage", NULL, "tapback osascript failed: hu_process_run err=%s",
+                hu_error_string(err));
         hu_run_result_free(c->alloc, &result);
         return HU_ERR_NOT_SUPPORTED;
     }
     int exit_code = result.exit_code;
     bool ok = result.success && exit_code == 0;
-    hu_run_result_free(c->alloc, &result);
     if (!ok) {
-        if (getenv("HU_DEBUG"))
-            hu_log_error("imessage", NULL, "tapback JXA failed (exit=%d, accessibility may be denied)",
-                    exit_code);
-        return HU_ERR_NOT_SUPPORTED;
+        hu_log_error("imessage", NULL, "tapback JXA failed: exit=%d stdout=%.*s stderr=%.*s",
+                exit_code,
+                (int)(result.stdout_buf && result.stdout_len > 0 ? (result.stdout_len < 200 ? result.stdout_len : 200) : 0),
+                result.stdout_buf ? result.stdout_buf : "",
+                (int)(result.stderr_buf && result.stderr_len > 0 ? (result.stderr_len < 200 ? result.stderr_len : 200) : 0),
+                result.stderr_buf ? result.stderr_buf : "");
     }
+    hu_run_result_free(c->alloc, &result);
+    if (!ok)
+        return HU_ERR_NOT_SUPPORTED;
     return HU_OK;
 #endif
 #endif
