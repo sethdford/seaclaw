@@ -5,8 +5,12 @@
 #include "human/multimodal.h"
 #include "human/voice/provider.h"
 #include "human/websocket/websocket.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+static void gl_free_pending_calls(hu_allocator_t *alloc, hu_gl_pending_tool_call_t *pending,
+                                  size_t count);
 
 /* ── Endpoint construction ────────────────────────────────────────── */
 
@@ -46,6 +50,9 @@ static size_t gl_url_encode(const char *src, char *dst, size_t dst_cap) {
  * Build WebSocket URL.
  * Google AI: ...?key=API_KEY
  * Vertex AI: wss://{region}-aiplatform.googleapis.com/ws/...?access_token=TOKEN
+ *
+ * SECURITY: access_token/api_key in URL is required by the Gemini Live API.
+ * Never log or expose the full WebSocket URL — it contains credentials.
  */
 static int build_ws_url(const hu_gemini_live_config_t *cfg, char *buf, size_t cap) {
     if (cfg->region && cfg->region[0] && cfg->project_id && cfg->project_id[0]) {
@@ -804,6 +811,12 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
                     }
                     out->transcript_len = tlen;
                 } else {
+                    if (out->transcript_len > SIZE_MAX - 2 ||
+                        tlen > SIZE_MAX - 2 - out->transcript_len) {
+                        hu_json_free(alloc, json);
+                        alloc->free(alloc->ctx, msg, msg_len + 1);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
                     size_t combined_len = out->transcript_len + 1 + tlen;
                     char *combined = (char *)alloc->alloc(alloc->ctx, combined_len + 1);
                     if (combined) {
@@ -926,6 +939,12 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
                         stored++;
                     }
                     if (stored > 0) {
+                        if (session->pending_calls) {
+                            gl_free_pending_calls(alloc, session->pending_calls,
+                                                  session->pending_calls_count);
+                            session->pending_calls = NULL;
+                            session->pending_calls_count = 0;
+                        }
                         session->pending_calls = pcs;
                         session->pending_calls_count = stored;
                     } else {
@@ -970,6 +989,12 @@ hu_error_t hu_gemini_live_recv_event(hu_gemini_live_session_t *session, hu_alloc
                     stored++;
                 }
                 if (stored > 0) {
+                    if (session->pending_calls) {
+                        gl_free_pending_calls(alloc, session->pending_calls,
+                                              session->pending_calls_count);
+                        session->pending_calls = NULL;
+                        session->pending_calls_count = 0;
+                    }
                     session->pending_calls = pcs;
                     session->pending_calls_count = stored;
                 } else {
@@ -1186,6 +1211,22 @@ hu_error_t hu_gemini_live_send_tool_response(hu_gemini_live_session_t *session, 
 
 /* ── Cleanup ─────────────────────────────────────────────────────── */
 
+static void gl_free_pending_calls(hu_allocator_t *alloc, hu_gl_pending_tool_call_t *pending,
+                                  size_t count) {
+    if (!alloc || !pending || count == 0)
+        return;
+    for (size_t i = 0; i < count; i++) {
+        hu_gl_pending_tool_call_t *pc = &pending[i];
+        if (pc->name)
+            alloc->free(alloc->ctx, pc->name, pc->name_len + 1);
+        if (pc->call_id)
+            alloc->free(alloc->ctx, pc->call_id, pc->call_id_len + 1);
+        if (pc->args_json)
+            alloc->free(alloc->ctx, pc->args_json, pc->args_json_len + 1);
+    }
+    alloc->free(alloc->ctx, pending, count * sizeof(hu_gl_pending_tool_call_t));
+}
+
 void hu_gemini_live_session_destroy(hu_gemini_live_session_t *session) {
     if (!session)
         return;
@@ -1199,17 +1240,9 @@ void hu_gemini_live_session_destroy(hu_gemini_live_session_t *session) {
     if (session->resumption_handle)
         alloc->free(alloc->ctx, session->resumption_handle, session->resumption_handle_len + 1);
     if (session->pending_calls) {
-        for (size_t i = 0; i < session->pending_calls_count; i++) {
-            hu_gl_pending_tool_call_t *pc = &session->pending_calls[i];
-            if (pc->name)
-                alloc->free(alloc->ctx, pc->name, pc->name_len + 1);
-            if (pc->call_id)
-                alloc->free(alloc->ctx, pc->call_id, pc->call_id_len + 1);
-            if (pc->args_json)
-                alloc->free(alloc->ctx, pc->args_json, pc->args_json_len + 1);
-        }
-        alloc->free(alloc->ctx, session->pending_calls,
-                    session->pending_calls_count * sizeof(hu_gl_pending_tool_call_t));
+        gl_free_pending_calls(alloc, session->pending_calls, session->pending_calls_count);
+        session->pending_calls = NULL;
+        session->pending_calls_count = 0;
     }
     alloc->free(alloc->ctx, session, sizeof(hu_gemini_live_session_t));
 }

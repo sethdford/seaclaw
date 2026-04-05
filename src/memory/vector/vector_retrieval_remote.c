@@ -103,37 +103,28 @@ static hu_error_t qdr_insert(void *ctx, hu_allocator_t *alloc, const char *id, s
     if (!body)
         return HU_ERR_OUT_OF_MEMORY;
 
-    size_t pos = 0;
-    int w = snprintf(body + pos, body_cap - pos, "{\"points\":[{\"id\":\"%.*s\",\"vector\":[",
-                     (int)id_len, id);
-    if (w < 0 || (size_t)w >= body_cap - pos) {
+    size_t pos = hu_buf_appendf(body, body_cap, 0, "{\"points\":[{\"id\":\"%.*s\",\"vector\":[",
+                                (int)id_len, id);
+    if (pos >= body_cap - 1) {
         alloc->free(alloc->ctx, body, body_cap);
         return HU_ERR_INVALID_ARGUMENT;
     }
-    pos += (size_t)w;
     for (size_t i = 0; i < embedding->dim && pos + 32 < body_cap; i++) {
-        if (i > 0)
-            body[pos++] = ',';
-        pos += (size_t)snprintf(body + pos, body_cap - pos, "%f", (double)embedding->values[i]);
+        pos = hu_buf_appendf(body, body_cap, pos, i ? ",%f" : "%f",
+                             (double)embedding->values[i]);
     }
-    w = snprintf(body + pos, body_cap - pos, "],\"payload\":{\"key\":\"%.*s\"", (int)id_len, id);
-    if (w < 0 || (size_t)w >= body_cap - pos) {
+    pos = hu_buf_appendf(body, body_cap, pos, "],\"payload\":{\"key\":\"%.*s\"", (int)id_len, id);
+    if (pos >= body_cap - 1) {
         alloc->free(alloc->ctx, body, body_cap);
         return HU_ERR_INVALID_ARGUMENT;
     }
-    pos += (size_t)w;
     if (content && content_len > 0 && pos + 16 < body_cap) {
         body[pos++] = ',';
         memcpy(body + pos, "\"content\":", 10);
         pos += 10;
         pos += json_escape_string(content, content_len, body + pos, body_cap - pos);
     }
-    w = snprintf(body + pos, body_cap - pos, "}}]}");
-    if (w < 0 || (size_t)w >= body_cap - pos) {
-        alloc->free(alloc->ctx, body, body_cap);
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-    pos += (size_t)w;
+    pos = hu_buf_appendf(body, body_cap, pos, "}}]}");
 
     hu_http_response_t resp = {0};
     const char *auth = q->api_key && q->api_key[0] ? q->api_key : NULL;
@@ -163,25 +154,16 @@ static hu_error_t qdr_search(void *ctx, hu_allocator_t *alloc, const hu_embeddin
     char *body = (char *)alloc->alloc(alloc->ctx, body_cap);
     if (!body)
         return HU_ERR_OUT_OF_MEMORY;
-    size_t pos = 0;
-    int w = snprintf(body + pos, body_cap - pos, "{\"vector\":[");
-    if (w < 0) {
+    size_t pos = hu_buf_appendf(body, body_cap, 0, "{\"vector\":[");
+    if (pos >= body_cap - 1) {
         alloc->free(alloc->ctx, body, body_cap);
         return HU_ERR_INVALID_ARGUMENT;
     }
-    pos += (size_t)w;
     for (size_t i = 0; i < query->dim && pos + 32 < body_cap; i++) {
-        if (i > 0)
-            body[pos++] = ',';
-        pos += (size_t)snprintf(body + pos, body_cap - pos, "%f", (double)query->values[i]);
+        pos = hu_buf_appendf(body, body_cap, pos, i ? ",%f" : "%f", (double)query->values[i]);
     }
-    w = snprintf(body + pos, body_cap - pos, "],\"limit\":%zu,\"with_payload\":true}",
-                 limit > 0 ? limit : 10);
-    if (w < 0 || (size_t)w >= body_cap - pos) {
-        alloc->free(alloc->ctx, body, body_cap);
-        return HU_ERR_INVALID_ARGUMENT;
-    }
-    pos += (size_t)w;
+    pos = hu_buf_appendf(body, body_cap, pos, "],\"limit\":%zu,\"with_payload\":true}",
+                        limit > 0 ? limit : 10);
 
     hu_http_response_t resp = {0};
     const char *auth = q->api_key && q->api_key[0] ? q->api_key : NULL;
@@ -449,16 +431,12 @@ static hu_error_t pgv_insert(void *ctx, hu_allocator_t *alloc, const char *id, s
     if (!key_z)
         return HU_ERR_OUT_OF_MEMORY;
     char vec_buf[4096];
-    size_t pos = 0;
-    vec_buf[pos++] = '[';
+    size_t pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), 0, "[");
     for (size_t i = 0; i < embedding->dim && pos < sizeof(vec_buf) - 32; i++) {
-        if (i > 0)
-            vec_buf[pos++] = ',';
-        pos += (size_t)snprintf(vec_buf + pos, sizeof(vec_buf) - pos, "%f",
-                                (double)embedding->values[i]);
+        pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), pos, i ? ",%f" : "%f",
+                             (double)embedding->values[i]);
     }
-    vec_buf[pos++] = ']';
-    vec_buf[pos] = '\0';
+    pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), pos, "]");
     char *meta_z = NULL;
     if (content && content_len > 0) {
         meta_z = hu_strndup(alloc, content, content_len);
@@ -502,16 +480,12 @@ static hu_error_t pgv_search(void *ctx, hu_allocator_t *alloc, const hu_embeddin
     if (!p || !p->conn || !alloc || !query || !query->values)
         return HU_ERR_INVALID_ARGUMENT;
     char vec_buf[4096];
-    size_t pos = 0;
-    vec_buf[pos++] = '[';
+    size_t pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), 0, "[");
     for (size_t i = 0; i < query->dim && pos < sizeof(vec_buf) - 32; i++) {
-        if (i > 0)
-            vec_buf[pos++] = ',';
-        pos += (size_t)snprintf(vec_buf + pos, sizeof(vec_buf) - pos, "%f",
-                                (double)query->values[i]);
+        pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), pos, i ? ",%f" : "%f",
+                             (double)query->values[i]);
     }
-    vec_buf[pos++] = ']';
-    vec_buf[pos] = '\0';
+    pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), pos, "]");
     size_t lim = limit > 0 ? limit : 10;
     if (lim > 10000)
         lim = 10000;

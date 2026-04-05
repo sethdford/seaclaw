@@ -114,52 +114,50 @@ char *hu_humor_build_persona_directive(hu_allocator_t *alloc, const hu_humor_pro
     char buf[1024];
     size_t pos = 0;
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "[HUMOR: Use ");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "[HUMOR: Use ");
     if (humor->style_count > 0) {
-        for (size_t i = 0; i < humor->style_count && pos < sizeof(buf) - 32; i++) {
+        for (size_t i = 0; i < humor->style_count; i++) {
             if (i > 0)
-                pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", ");
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%s", humor->style[i]);
+                pos = hu_buf_appendf(buf, sizeof(buf), pos, ", ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "%s", humor->style[i]);
         }
     } else {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "subtle");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "subtle");
     }
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ". ");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, ". ");
 
     if (humor->signature_phrases_count > 0) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Signature phrases: ");
-        for (size_t i = 0; i < humor->signature_phrases_count && pos < sizeof(buf) - 64; i++) {
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "Signature phrases: ");
+        for (size_t i = 0; i < humor->signature_phrases_count; i++) {
             if (i > 0)
-                pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", ");
-            pos +=
-                (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%s", humor->signature_phrases[i]);
+                pos = hu_buf_appendf(buf, sizeof(buf), pos, ", ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "%s", humor->signature_phrases[i]);
         }
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ". ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, ". ");
     }
 
     if (humor->self_deprecation_count > 0) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Self-deprecate about: ");
-        for (size_t i = 0; i < humor->self_deprecation_count && pos < sizeof(buf) - 64; i++) {
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "Self-deprecate about: ");
+        for (size_t i = 0; i < humor->self_deprecation_count; i++) {
             if (i > 0)
-                pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", ");
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%s",
-                                    humor->self_deprecation_topics[i]);
+                pos = hu_buf_appendf(buf, sizeof(buf), pos, ", ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "%s", humor->self_deprecation_topics[i]);
         }
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ". ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, ". ");
     }
 
     if (humor->never_during_count > 0) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Never during: ");
-        for (size_t i = 0; i < humor->never_during_count && pos < sizeof(buf) - 32; i++) {
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "Never during: ");
+        for (size_t i = 0; i < humor->never_during_count; i++) {
             if (i > 0)
-                pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", ");
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%s", humor->never_during[i]);
+                pos = hu_buf_appendf(buf, sizeof(buf), pos, ", ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "%s", humor->never_during[i]);
         }
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ". ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, ". ");
     }
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "Rule of three, misdirection when appropriate.]");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "Rule of three, misdirection when appropriate.]");
     if (pos >= sizeof(buf))
         pos = sizeof(buf) - 1;
 
@@ -391,21 +389,20 @@ char *hu_humor_generate_strategy(hu_allocator_t *alloc, const hu_humor_audience_
     char buf[512];
     size_t pos = 0;
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Use %s humor",
-                            hu_humor_type_name(selected));
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "Use %s humor", hu_humor_type_name(selected));
     if (topic)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " about %s", topic);
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ".");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, " about %s", topic);
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, ".");
 
     /* Add persona style if available */
     if (humor && humor->style_count > 0)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " Style: %s.", humor->style[0]);
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, " Style: %s.", humor->style[0]);
 
     /* Add audience preference note */
     if (audience) {
         hu_humor_type_t pref = hu_humor_audience_preferred_type(audience);
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " Audience prefers %s.",
-                                hu_humor_type_name(pref));
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, " Audience prefers %s.",
+                             hu_humor_type_name(pref));
     }
 
     if (pos >= sizeof(buf))

@@ -1,29 +1,8 @@
 #include "test_framework.h"
 #include "human/agent/commands.h"
-#include "human/core/allocator.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* Allocator wrapper functions */
-static void *test_alloc_wrapper(void *ctx, size_t size) {
-    (void)ctx;
-    return malloc(size);
-}
-
-static void test_free_wrapper(void *ctx, void *ptr, size_t size) {
-    (void)ctx;
-    (void)size;
-    free(ptr);
-}
-
-/* Test allocator */
-static hu_allocator_t test_alloc = {
-    .ctx = NULL,
-    .alloc = test_alloc_wrapper,
-    .free = test_free_wrapper,
-    .realloc = NULL
-};
 
 /* Helper to parse a slash command */
 static const hu_slash_cmd_t *parse_cmd(const char *msg) {

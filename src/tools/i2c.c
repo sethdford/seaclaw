@@ -189,9 +189,9 @@ static hu_error_t i2c_execute(void *ctx, hu_allocator_t *alloc, const hu_json_va
         for (ssize_t i = 0; i < n; i++) {
             if (i > 0)
                 result[pos++] = ' ';
-            pos += (size_t)snprintf(result + pos, sizeof(result) - pos, "0x%02X", buf_data[i]);
+            pos = hu_buf_appendf(result, sizeof(result), pos, "0x%02X", buf_data[i]);
         }
-        pos += (size_t)snprintf(result + pos, sizeof(result) - pos, "\"}");
+        pos = hu_buf_appendf(result, sizeof(result), pos, "\"}");
         char *msg = hu_strndup(alloc, result, pos);
         *out = hu_tool_result_ok_owned(msg, pos);
         return HU_OK;

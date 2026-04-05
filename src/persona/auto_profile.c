@@ -27,22 +27,22 @@ char *hu_persona_profile_describe_style(hu_allocator_t *alloc,
 
     char buf[512];
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "Based on their texting: they send %s messages (avg %zu chars)",
-                            stats->avg_their_len < 30   ? "short"
-                            : stats->avg_their_len < 80 ? "medium-length"
-                                                        : "long",
-                            stats->avg_their_len);
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "Based on their texting: they send %s messages (avg %zu chars)",
+                         stats->avg_their_len < 30   ? "short"
+                         : stats->avg_their_len < 80 ? "medium-length"
+                                                     : "long",
+                         stats->avg_their_len);
     if (stats->uses_emoji)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", use emoji frequently");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, ", use emoji frequently");
     else
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", rarely use emoji");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, ", rarely use emoji");
     if (stats->texts_in_bursts)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", text in bursts of 2-3 messages");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, ", text in bursts of 2-3 messages");
     if (stats->prefers_short)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ". Mirror their energy and brevity.");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, ". Mirror their energy and brevity.");
     else
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ".");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, ".");
     if (pos >= sizeof(buf))
         pos = sizeof(buf) - 1;
 

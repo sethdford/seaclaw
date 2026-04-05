@@ -47,6 +47,15 @@
 #include "human/memory/adaptive_rag.h"
 #include "human/memory/self_rag.h"
 #include "human/memory/stm.h"
+#include "human/persona/somatic.h"
+#include "human/cognition/novelty.h"
+#include "human/cognition/attachment.h"
+#include "human/cognition/rupture_repair.h"
+#include "human/persona/narrative_self.h"
+#include "human/persona/creative_voice.h"
+#include "human/agent/growth_narrative.h"
+#include "human/persona/genuine_boundaries.h"
+#include "human/cognition/trust.h"
 #include "human/memory/tiers.h"
 #include "human/ml/dpo.h"
 #include "human/observability/bth_metrics.h"
@@ -117,6 +126,19 @@ typedef struct hu_agent_extensions {
     hu_scratchpad_t scratchpad;
     hu_escalate_protocol_t escalate_protocol;
 } hu_agent_extensions_t;
+
+typedef struct hu_frontier_state {
+    hu_somatic_state_t somatic;
+    hu_novelty_tracker_t novelty;
+    hu_attachment_state_t attachment;
+    hu_rupture_state_t rupture;
+    hu_narrative_self_t narrative;
+    hu_creative_voice_t creative_voice;
+    hu_growth_narrative_t growth;
+    hu_genuine_boundary_set_t boundaries;
+    hu_tcal_state_t trust;
+    bool initialized;
+} hu_frontier_state_t;
 
 /* Cognition, caching, and workflow infrastructure extracted from hu_agent_t.
  * Embedded as hu_agent_t::infra — always present, never NULL. */
@@ -311,6 +333,7 @@ struct hu_agent {
 
     bool constitutional_enabled;
     bool multi_agent_enabled;
+    bool lean_prompt; /* strip heavy contexts for fast local-model texting */
 
 #ifdef HU_ENABLE_SQLITE
     hu_meta_params_t meta_params;
@@ -332,6 +355,7 @@ struct hu_agent {
 
     /* SOTA neural subsystems (extracted to reduce main struct field count) */
     hu_agent_extensions_t sota;
+    hu_frontier_state_t frontiers;
 
     /* Permission tiers */
     hu_permission_level_t permission_level;      /* effective (may be escalated) */

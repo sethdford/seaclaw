@@ -26,7 +26,6 @@ typedef struct hu_model_selection {
     double temperature;     /* 0.0 = use default, >0 = override */
     hu_cognitive_tier_t tier;
     hu_route_source_t source;
-    int sensitivity;        /* 0 = not checked, 1 = S1 (safe), 2 = S2, 3 = S3 (local-only) */
 } hu_model_selection_t;
 
 typedef struct hu_model_router_config {

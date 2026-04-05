@@ -2,6 +2,7 @@
 #include "human/core/allocator.h"
 #include "human/core/json.h"
 #include "human/core/log.h"
+#include "human/core/string.h"
 #include "human/security.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -123,6 +124,13 @@ static bool is_public_method(const char *method) {
     return strcmp(method, "health") == 0 || strcmp(method, "connect") == 0 ||
            strcmp(method, "capabilities") == 0 || strcmp(method, "auth.oauth.start") == 0 ||
            strcmp(method, "auth.oauth.callback") == 0 || strcmp(method, "auth.oauth.refresh") == 0;
+}
+
+/* Admin-style RPC namespaces: dangerous when pairing is off and the socket is exposed. */
+static bool is_sensitive_rpc_namespace(const char *method) {
+    return strncmp(method, "memory.", 7) == 0 || strncmp(method, "config.", 7) == 0 ||
+           strncmp(method, "cron.", 5) == 0 || strncmp(method, "skills.", 7) == 0 ||
+           strncmp(method, "exec.", 5) == 0;
 }
 
 /* ── Method dispatcher ───────────────────────────────────────────────── */
@@ -259,6 +267,14 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
         return;
     }
 
+    if (!proto->require_pairing && conn && !conn->authenticated &&
+        is_sensitive_rpc_namespace(method)) {
+        size_t method_len = strlen(method);
+        hu_log_warn("control", NULL,
+                      "sensitive RPC without pairing: %.*s (recommend enabling require_pairing)",
+                      (int)method_len, method);
+    }
+
     size_t id_slen = strlen(id_raw);
     char *id = (char *)proto->alloc->alloc(proto->alloc->ctx, id_slen + 1);
     if (!id) {
@@ -312,7 +328,7 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
         char *res_buf = (char *)proto->alloc->alloc(proto->alloc->ctx, res_cap);
         if (res_buf) {
             size_t pos = 0;
-            pos += (size_t)snprintf(res_buf, res_cap, "{\"type\":\"res\",\"id\":\"");
+            pos = hu_buf_appendf(res_buf, res_cap, pos, "{\"type\":\"res\",\"id\":\"");
             size_t id_len = strlen(id);
             size_t esc_len = id_len * 2 + 16;
             char *id_esc = (char *)proto->alloc->alloc(proto->alloc->ctx, esc_len);
@@ -328,7 +344,7 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
                     }
                 }
                 id_esc[j] = '\0';
-                pos += (size_t)snprintf(res_buf + pos, res_cap - pos, "%s\"", id_esc);
+                pos = hu_buf_appendf(res_buf, res_cap, pos, "%s\"", id_esc);
                 proto->alloc->free(proto->alloc->ctx, id_esc, esc_len);
             } else {
                 for (size_t i = 0; i < id_len && pos + 4 < res_cap; i++) {
@@ -340,12 +356,16 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
                 if (pos < res_cap)
                     res_buf[pos++] = '"';
             }
-            pos += (size_t)snprintf(res_buf + pos, res_cap - pos,
-                                    ",\"ok\":%s,\"payload\":", ok ? "true" : "false");
-            memcpy(res_buf + pos, payload, payload_len);
-            pos += payload_len;
-            res_buf[pos++] = '}';
-            res_buf[pos] = '\0';
+            pos = hu_buf_appendf(res_buf, res_cap, pos, ",\"ok\":%s,\"payload\":",
+                                 ok ? "true" : "false");
+            if (pos + payload_len + 2 <= res_cap) {
+                memcpy(res_buf + pos, payload, payload_len);
+                pos += payload_len;
+                res_buf[pos++] = '}';
+                res_buf[pos] = '\0';
+            } else {
+                pos = hu_buf_appendf(res_buf, res_cap, pos, "}");
+            }
             hu_error_t send_err = hu_ws_server_send(proto->ws, conn, res_buf, pos);
             if (send_err != HU_OK) {
                 hu_log_error("control", NULL, "send response failed: %s",
@@ -441,9 +461,7 @@ hu_error_t hu_control_send_response(hu_control_protocol_t *proto, hu_ws_conn_t *
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, cap - pos, "{\"type\":\"res\",\"id\":\"");
-    if (pos >= cap)
-        pos = cap - 1;
+    pos = hu_buf_appendf(buf, cap, pos, "{\"type\":\"res\",\"id\":\"");
     for (size_t i = 0; i < id_len && pos + 4 < cap; i++) {
         char c = id[i];
         if (c == '"' || c == '\\') {
@@ -452,10 +470,8 @@ hu_error_t hu_control_send_response(hu_control_protocol_t *proto, hu_ws_conn_t *
         } else
             buf[pos++] = c;
     }
-    pos += (size_t)snprintf(buf + pos, cap - pos, "\",\"ok\":%s,\"payload\":%s}",
-                            ok ? "true" : "false", payload);
-    if (pos >= cap)
-        pos = cap - 1;
+    pos = hu_buf_appendf(buf, cap, pos, "\",\"ok\":%s,\"payload\":%s}",
+                         ok ? "true" : "false", payload);
 
     hu_error_t err = hu_ws_server_send(proto->ws, conn, buf, pos);
     if (err != HU_OK) {

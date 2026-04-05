@@ -393,7 +393,8 @@ static void test_compaction_compact_history(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_compaction_config_t cfg;
     hu_compaction_config_default(&cfg);
-    cfg.keep_recent = 2;
+    /* One system + five turns; keep one recent non-system so compact result stays <= 3 slots */
+    cfg.keep_recent = 1;
     cfg.max_history_messages = 3;
     cfg.max_summary_chars = 500;
     size_t cap = 10;
@@ -401,15 +402,25 @@ static void test_compaction_compact_history(void) {
         (hu_owned_message_t *)alloc.alloc(alloc.ctx, cap * sizeof(hu_owned_message_t));
     HU_ASSERT_NOT_NULL(msgs);
     memset(msgs, 0, cap * sizeof(hu_owned_message_t));
-    for (size_t i = 0; i < 5; i++) {
-        msgs[i].role = (i % 2 == 0) ? HU_ROLE_USER : HU_ROLE_ASSISTANT;
+    msgs[0].role = HU_ROLE_SYSTEM;
+    msgs[0].content = hu_strdup(&alloc, "You are a test assistant.");
+    msgs[0].content_len = strlen(msgs[0].content);
+    for (size_t i = 1; i < 6; i++) {
+        msgs[i].role = ((i - 1) % 2 == 0) ? HU_ROLE_USER : HU_ROLE_ASSISTANT;
         msgs[i].content = hu_strdup(&alloc, "message");
         msgs[i].content_len = 7;
     }
-    size_t count = 5;
-    hu_error_t err = hu_compact_history(&alloc, msgs, &count, &cap, &cfg);
+    size_t count = 6;
+    hu_error_t err = hu_compact_history(&alloc, &msgs, &count, &cap, &cfg);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(count <= 3);
+    /* Verify compacted messages have non-empty content */
+    for (size_t i = 0; i < count; i++) {
+        HU_ASSERT_NOT_NULL(msgs[i].content);
+        HU_ASSERT_TRUE(msgs[i].content_len > 0);
+    }
+    /* First message should be system role */
+    HU_ASSERT_EQ((int)msgs[0].role, (int)HU_ROLE_SYSTEM);
     for (size_t i = 0; i < count; i++) {
         if (msgs[i].content)
             alloc.free(alloc.ctx, (void *)msgs[i].content, msgs[i].content_len + 1);

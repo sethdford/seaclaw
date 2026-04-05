@@ -1,6 +1,7 @@
 #include "human/agent/compaction_structured.h"
 #include "human/core/string.h"
-#include <stdarg.h>
+#include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,33 +11,22 @@
 
 #define HU_COMPACT_PATH_MAX 4096
 
-__attribute__((unused))
-static char *alloc_sprintf(hu_allocator_t *alloc, size_t *out_len, const char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    int needed = vsnprintf(NULL, 0, fmt, ap);
-    va_end(ap);
-    if (needed < 0)
-        return NULL;
-    size_t sz = (size_t)needed + 1;
-    char *buf = (char *)alloc->alloc(alloc->ctx, sz);
-    if (!buf)
-        return NULL;
-    va_start(ap, fmt);
-    vsnprintf(buf, sz, fmt, ap);
-    va_end(ap);
-    if (out_len)
-        *out_len = (size_t)needed;
-    return buf;
-}
-
 /* Append src to *buf at *pos, growing if needed. Returns false on OOM. */
 static bool buf_append(hu_allocator_t *alloc, char **buf, size_t *cap, size_t *pos,
                        const char *src, size_t src_len) {
     while (*pos + src_len + 1 > *cap) {
-        size_t new_cap = *cap * 2;
-        if (new_cap < *pos + src_len + 1)
+        size_t new_cap;
+        if (*cap > SIZE_MAX / 2) {
             new_cap = *pos + src_len + 1;
+            if (new_cap < *pos || new_cap < src_len)
+                return false;
+        } else {
+            new_cap = *cap * 2;
+            if (new_cap < *pos + src_len + 1)
+                new_cap = *pos + src_len + 1;
+            if (new_cap < *pos || new_cap < src_len)
+                return false;
+        }
         char *nb = (char *)alloc->realloc(alloc->ctx, *buf, *cap, new_cap);
         if (!nb)
             return false;
@@ -83,10 +73,10 @@ size_t hu_compact_strip_analysis(char *content, size_t len) {
     if (!content || len == 0)
         return 0;
 
-    const char *open_tag = "<analysis>";
-    const char *close_tag = "</analysis>";
-    size_t open_len = 10;
-    size_t close_len = 11;
+    static const char open_tag[] = "<analysis>";
+    static const char close_tag[] = "</analysis>";
+    const size_t open_len = sizeof(open_tag) - 1;
+    const size_t close_len = sizeof(close_tag) - 1;
 
     size_t write_pos = 0;
     size_t read_pos = 0;
@@ -271,8 +261,20 @@ hu_error_t hu_compact_extract_metadata(
         if (messages[i - 1].role == HU_ROLE_ASSISTANT && messages[i - 1].content) {
             const char *c = messages[i - 1].content;
             size_t clen = messages[i - 1].content_len;
-            /* Simple heuristic: if content mentions "TODO", "next", "will", "need to" */
-            if (memmem(c, clen, "TODO", 4) || memmem(c, clen, "next step", 9) ||
+            /* Simple heuristic: pending-work cues (TODO only at word boundary) */
+            bool todo_wb = false;
+            {
+                const char *todo_hit = (const char *)memmem(c, clen, "TODO", 4);
+                if (todo_hit) {
+                    size_t off = (size_t)(todo_hit - c);
+                    bool left_ok =
+                        (off == 0 || !isalpha((unsigned char)todo_hit[-1]));
+                    bool right_ok =
+                        (off + 4 >= clen || !isalpha((unsigned char)todo_hit[4]));
+                    todo_wb = left_ok && right_ok;
+                }
+            }
+            if (todo_wb || memmem(c, clen, "next step", 9) ||
                 memmem(c, clen, "need to", 7) || memmem(c, clen, "will ", 5)) {
                 size_t plen = clen > 300 ? 300 : clen;
                 out->pending_work_inference = hu_strndup(alloc, c, plen);
@@ -381,6 +383,7 @@ hu_error_t hu_compact_build_structured_summary(
             size_t new_len = hu_compact_strip_analysis(copy, clen);
 
             const char *role_name = "unknown";
+            /* NB: duplicated role→string mapping also exists in compaction.c:role_str */
             switch (messages[i].role) {
             case HU_ROLE_SYSTEM: role_name = "system"; break;
             case HU_ROLE_USER: role_name = "user"; break;
@@ -575,11 +578,12 @@ bool hu_compact_is_pinned(
 hu_error_t hu_compact_inject_continuation_preamble(
     hu_allocator_t *alloc,
     const hu_compaction_summary_t *summary,
-    hu_owned_message_t *history, size_t *history_count, size_t *history_cap) {
+    hu_owned_message_t **history, size_t *history_count, size_t *history_cap) {
 
-    if (!alloc || !summary || !history || !history_count || !history_cap)
+    if (!alloc || !summary || !history || !*history || !history_count || !history_cap)
         return HU_ERR_INVALID_ARGUMENT;
 
+    hu_owned_message_t *h = *history;
     size_t count = *history_count;
     size_t cap = *history_cap;
 
@@ -603,37 +607,35 @@ hu_error_t hu_compact_inject_continuation_preamble(
     content[total_len] = '\0';
 
     /* Insert after system prompt (index 1) or at index 0 */
-    size_t insert_idx = (count > 0 && history[0].role == HU_ROLE_SYSTEM) ? 1 : 0;
+    size_t insert_idx = (count > 0 && h[0].role == HU_ROLE_SYSTEM) ? 1 : 0;
 
     /* Ensure capacity */
     if (count + 1 > cap) {
         size_t new_cap = cap == 0 ? 4 : cap * 2;
         hu_owned_message_t *nh = (hu_owned_message_t *)alloc->realloc(
-            alloc->ctx, history, cap * sizeof(hu_owned_message_t),
+            alloc->ctx, h, cap * sizeof(hu_owned_message_t),
             new_cap * sizeof(hu_owned_message_t));
         if (!nh) {
             alloc->free(alloc->ctx, content, total_len + 1);
             return HU_ERR_OUT_OF_MEMORY;
         }
-        /* Note: caller must update their pointer if realloc moved it.
-         * For safety, we only proceed if realloc returned the same address
-         * or if the caller passes a resizable buffer. Since hu_agent uses
-         * a dynamic array, this should be fine in practice. For the
-         * non-resizable case, we require cap > count. */
+        h = nh;
+        *history = nh;
         *history_cap = new_cap;
+        cap = new_cap;
     }
 
     /* Shift messages to make room */
     if (insert_idx < count) {
-        memmove(&history[insert_idx + 1], &history[insert_idx],
+        memmove(&h[insert_idx + 1], &h[insert_idx],
                 (count - insert_idx) * sizeof(hu_owned_message_t));
     }
 
     /* Insert preamble as user message */
-    memset(&history[insert_idx], 0, sizeof(hu_owned_message_t));
-    history[insert_idx].role = HU_ROLE_USER;
-    history[insert_idx].content = content;
-    history[insert_idx].content_len = total_len;
+    memset(&h[insert_idx], 0, sizeof(hu_owned_message_t));
+    h[insert_idx].role = HU_ROLE_USER;
+    h[insert_idx].content = content;
+    h[insert_idx].content_len = total_len;
 
     *history_count = count + 1;
     return HU_OK;

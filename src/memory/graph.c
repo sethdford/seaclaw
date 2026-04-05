@@ -188,13 +188,24 @@ hu_error_t hu_graph_open(hu_allocator_t *alloc, const char *db_path, size_t db_p
         }
     }
 
-    /* Run migrations for existing databases (errors are expected and ignored
-     * when columns/indexes already exist). */
+    /* Migrations: duplicate column / existing object errors are benign on reopen. */
     for (size_t i = 0; MIGRATION[i] != NULL; i++) {
-        char *errmsg = NULL;
-        sqlite3_exec(g->db, MIGRATION[i], NULL, NULL, &errmsg);
-        if (errmsg)
-            sqlite3_free(errmsg);
+        char *mig_err = NULL;
+        int mig_rc = sqlite3_exec(g->db, MIGRATION[i], NULL, NULL, &mig_err);
+        if (mig_rc != SQLITE_OK) {
+            bool benign = false;
+            if (mig_err && strstr(mig_err, "duplicate column name") != NULL)
+                benign = true;
+            if (mig_err)
+                sqlite3_free(mig_err);
+            if (!benign) {
+                sqlite3_close(g->db);
+                alloc->free(alloc->ctx, g, sizeof(hu_graph_t));
+                return HU_ERR_IO;
+            }
+        } else if (mig_err) {
+            sqlite3_free(mig_err);
+        }
     }
 
     *out = g;
@@ -257,8 +268,12 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t 
     rc = sqlite3_step(ins);
     sqlite3_finalize(ins);
     if (rc == SQLITE_DONE) {
-        *out_id = sqlite3_last_insert_rowid(g->db);
-        sqlite3_exec(g->db, "COMMIT", NULL, NULL, NULL);
+        int64_t new_id = sqlite3_last_insert_rowid(g->db);
+        if (sqlite3_exec(g->db, "COMMIT", NULL, NULL, NULL) != SQLITE_OK) {
+            sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+            return HU_ERR_MEMORY_BACKEND;
+        }
+        *out_id = new_id;
         return HU_OK;
     }
     if (rc != SQLITE_CONSTRAINT) {
@@ -294,15 +309,24 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t 
     }
     sqlite3_bind_text(sel, 1, cid, cid_len, SQLITE_STATIC);
     sqlite3_bind_text(sel, 2, name, (int)name_len, SQLITE_STATIC);
-    rc = sqlite3_step(sel);
-    int got_row = (rc == SQLITE_ROW);
-    if (got_row)
+    int sel_rc = sqlite3_step(sel);
+    if (sel_rc == SQLITE_ROW) {
         *out_id = sqlite3_column_int64(sel, 0);
+        sqlite3_finalize(sel);
+        rc = sqlite3_exec(g->db, "COMMIT", NULL, NULL, NULL);
+        if (rc != SQLITE_OK) {
+            sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+            return HU_ERR_IO;
+        }
+        return HU_OK;
+    }
     sqlite3_finalize(sel);
-    rc = sqlite3_exec(g->db, "COMMIT", NULL, NULL, NULL);
-    if (rc != SQLITE_OK)
-        return HU_ERR_IO;
-    return got_row ? HU_OK : HU_ERR_NOT_FOUND;
+    if (sel_rc == SQLITE_DONE) {
+        sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+        return HU_ERR_NOT_FOUND;
+    }
+    sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+    return HU_ERR_IO;
 }
 
 #else
@@ -967,13 +991,16 @@ hu_error_t hu_graph_list_entities(hu_graph_t *g, hu_allocator_t *alloc, const ch
         return HU_ERR_OUT_OF_MEMORY;
     }
     size_t count = 0;
+    bool oom = false;
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         if (count >= cap) {
             size_t new_cap = cap * 2;
             hu_graph_entity_t *tmp = alloc->alloc(alloc->ctx, new_cap * sizeof(hu_graph_entity_t));
-            if (!tmp)
+            if (!tmp) {
+                oom = true;
                 break;
+            }
             memcpy(tmp, arr, count * sizeof(hu_graph_entity_t));
             alloc->free(alloc->ctx, arr, cap * sizeof(hu_graph_entity_t));
             arr = tmp;
@@ -993,6 +1020,12 @@ hu_error_t hu_graph_list_entities(hu_graph_t *g, hu_allocator_t *alloc, const ch
         count++;
     }
     sqlite3_finalize(stmt);
+    if (oom) {
+        hu_graph_entities_free(alloc, arr, count);
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_OUT_OF_MEMORY;
+    }
     *out = arr;
     *out_count = count;
     return HU_OK;
@@ -1028,14 +1061,17 @@ hu_error_t hu_graph_list_relations(hu_graph_t *g, hu_allocator_t *alloc, const c
         return HU_ERR_OUT_OF_MEMORY;
     }
     size_t count = 0;
+    bool oom = false;
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         if (count >= cap) {
             size_t new_cap = cap * 2;
             hu_graph_relation_t *tmp =
                 alloc->alloc(alloc->ctx, new_cap * sizeof(hu_graph_relation_t));
-            if (!tmp)
+            if (!tmp) {
+                oom = true;
                 break;
+            }
             memcpy(tmp, arr, count * sizeof(hu_graph_relation_t));
             alloc->free(alloc->ctx, arr, cap * sizeof(hu_graph_relation_t));
             arr = tmp;
@@ -1056,6 +1092,12 @@ hu_error_t hu_graph_list_relations(hu_graph_t *g, hu_allocator_t *alloc, const c
         count++;
     }
     sqlite3_finalize(stmt);
+    if (oom) {
+        hu_graph_relations_free(alloc, arr, count);
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_OUT_OF_MEMORY;
+    }
     *out = arr;
     *out_count = count;
     return HU_OK;
@@ -1544,7 +1586,12 @@ hu_error_t hu_graph_leiden_communities(hu_graph_t *g, hu_allocator_t *alloc, con
         for (size_t i = 0; i < entity_count; i++) {
             sqlite3_bind_int(up_stmt, 1, labels[i]);
             sqlite3_bind_int64(up_stmt, 2, ids[i]);
-            sqlite3_step(up_stmt);
+            int up_rc = sqlite3_step(up_stmt);
+            if (up_rc != SQLITE_DONE) {
+                hu_log_error("graph", NULL, "leiden persist community_id for entity %lld: %s",
+                             (long long)ids[i], sqlite3_errmsg(g->db));
+                break;
+            }
             sqlite3_reset(up_stmt);
         }
         sqlite3_finalize(up_stmt);

@@ -68,6 +68,14 @@ hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider, c
 void hu_turing_apply_channel_weights(hu_turing_score_t *score, const char *channel,
                                      size_t channel_len);
 
+/* Adjust personality_consistency based on persona trait/vocab alignment.
+ * Call after hu_turing_score_heuristic when persona data is available. */
+void hu_turing_apply_persona_alignment(hu_turing_score_t *score,
+                                       const char *response, size_t response_len,
+                                       const char *const *traits, size_t traits_count,
+                                       const char *const *preferred_vocab, size_t preferred_count,
+                                       const char *const *avoided_vocab, size_t avoided_count);
+
 /* Dimension name for display/logging. */
 const char *hu_turing_dimension_name(hu_turing_dimension_t dim);
 

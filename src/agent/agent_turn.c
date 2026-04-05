@@ -4,6 +4,30 @@
 #include "human/data/loader.h"
 #include "human/core/json.h"
 
+#include "human/persona/somatic.h"
+#include "human/agent/choreography.h"
+#include "human/persona/narrative_self.h"
+#include "human/cognition/novelty.h"
+#include "human/cognition/attachment.h"
+#include "human/cognition/rupture_repair.h"
+#include "human/memory/relational_episode.h"
+#include "human/agent/frontier_persist.h"
+#include "human/cognition/presence.h"
+#include "human/persona/micro_expression.h"
+#include "human/persona/creative_voice.h"
+#include "human/agent/growth_narrative.h"
+#include "human/persona/genuine_boundaries.h"
+
+#include "human/cognition/trust.h"
+#include "human/persona/humor.h"
+#include "human/context/humor.h"
+#include "human/security/sycophancy_guard.h"
+#include "human/memory/hallucination_guard.h"
+#include "human/memory/fact_extract.h"
+#include "human/eval/consistency.h"
+#include "human/agent/model_router.h"
+#include "human/agent/conv_goals.h"
+
 /* Default fallback arrays (NULL-terminated) */
 static const char *DEFAULT_MULTISTEP_NEEDLES[] = {
     " first ", " then ", " finally", " step ", " steps ", "step 1",
@@ -23,6 +47,17 @@ static const char *DEFAULT_SENTIMENT_POS[] = {
     "thankful", "love",      "celebrating",
     NULL
 };
+
+/* Frontier tuning knobs — named constants for clarity.
+ * Changing these requires recompilation; they are intentionally not
+ * config-driven to keep the parameter surface small (YAGNI). */
+#define HU_HUMOR_RISK_TOLERANCE 0.4f
+#define HU_SYCOPHANCY_THRESHOLD 0.5f
+#define HU_FACT_CONFIDENCE_MIN 0.6f
+#define HU_SOMATIC_TIRED_THRESHOLD 0.3f
+#define HU_SOMATIC_LOW_THRESHOLD 0.5f
+#define HU_CONSISTENCY_DRIFT_THRESHOLD 0.3f
+#define HU_OPINION_FRICTION_COUNT 2
 
 /* Runtime loaded patterns */
 static const char **s_multistep_needles = DEFAULT_MULTISTEP_NEEDLES;
@@ -305,8 +340,11 @@ static void agent_turn_hula_append_histories(hu_agent_t *agent, const hu_hula_pr
             nm = "hula_emit";
             nm_len = 9;
         }
-        (void)hu_agent_internal_append_history(agent, HU_ROLE_TOOL, out_text, out_len, nm, nm_len,
-                                               tcid, tcid_len);
+        hu_error_t hist_err = hu_agent_internal_append_history(agent, HU_ROLE_TOOL, out_text, out_len,
+                                                               nm, nm_len, tcid, tcid_len);
+        if (hist_err != HU_OK)
+            hu_log_warn("agent", NULL, "failed to append tool result to history: %s",
+                        hu_error_string(hist_err));
     }
 }
 
@@ -329,41 +367,83 @@ static char *agent_turn_hula_ir_tool_calls_audit_json(hu_allocator_t *alloc,
     hu_json_value_t *root = hu_json_object_new(alloc);
     if (!root)
         return NULL;
+    bool oom = false;
+    bool calls_attached = false;
     static const char src_lit[] = "native_tool_calls_ir";
-    hu_json_object_set(alloc, root, "source",
-                       hu_json_string_new(alloc, src_lit, sizeof(src_lit) - 1));
+    {
+        hu_json_value_t *src_val = hu_json_string_new(alloc, src_lit, sizeof(src_lit) - 1);
+        if (!src_val || hu_json_object_set(alloc, root, "source", src_val) != HU_OK) {
+            if (src_val)
+                hu_json_free(alloc, src_val);
+            oom = true;
+        }
+    }
 
     hu_json_value_t *arr = hu_json_array_new(alloc);
-    if (!arr) {
+    if (!arr)
+        oom = true;
+
+    if (!oom) {
+        for (size_t i = 0; i < tc_count; i++) {
+            hu_json_value_t *o = hu_json_object_new(alloc);
+            if (!o) {
+                oom = true;
+                break;
+            }
+            if (calls[i].name && calls[i].name_len > 0) {
+                hu_json_value_t *tn =
+                    hu_json_string_new(alloc, calls[i].name, calls[i].name_len);
+                if (!tn || hu_json_object_set(alloc, o, "tool", tn) != HU_OK) {
+                    if (tn)
+                        hu_json_free(alloc, tn);
+                    hu_json_free(alloc, o);
+                    oom = true;
+                    break;
+                }
+            }
+            if (calls[i].arguments && calls[i].arguments_len > 0) {
+                hu_json_value_t *args_parsed = NULL;
+                if (hu_json_parse(alloc, calls[i].arguments, calls[i].arguments_len, &args_parsed) ==
+                        HU_OK &&
+                    args_parsed) {
+                    if (hu_json_object_set(alloc, o, "arguments", args_parsed) != HU_OK) {
+                        hu_json_free(alloc, args_parsed);
+                        hu_json_free(alloc, o);
+                        oom = true;
+                        break;
+                    }
+                } else {
+                    hu_json_value_t *raw = hu_json_string_new(alloc, calls[i].arguments,
+                                                              calls[i].arguments_len);
+                    if (!raw || hu_json_object_set(alloc, o, "arguments_raw", raw) != HU_OK) {
+                        if (raw)
+                            hu_json_free(alloc, raw);
+                        hu_json_free(alloc, o);
+                        oom = true;
+                        break;
+                    }
+                }
+            }
+            if (hu_json_array_push(alloc, arr, o) != HU_OK) {
+                hu_json_free(alloc, o);
+                oom = true;
+                break;
+            }
+        }
+    }
+    if (!oom) {
+        if (hu_json_object_set(alloc, root, "calls", arr) != HU_OK)
+            oom = true;
+        else
+            calls_attached = true;
+    }
+
+    if (oom) {
+        if (arr && !calls_attached)
+            hu_json_free(alloc, arr);
         hu_json_free(alloc, root);
         return NULL;
     }
-
-    for (size_t i = 0; i < tc_count; i++) {
-        hu_json_value_t *o = hu_json_object_new(alloc);
-        if (!o) {
-            hu_json_free(alloc, arr);
-            hu_json_free(alloc, root);
-            return NULL;
-        }
-        if (calls[i].name && calls[i].name_len > 0)
-            hu_json_object_set(alloc, o, "tool",
-                               hu_json_string_new(alloc, calls[i].name, calls[i].name_len));
-        if (calls[i].arguments && calls[i].arguments_len > 0) {
-            hu_json_value_t *args_parsed = NULL;
-            if (hu_json_parse(alloc, calls[i].arguments, calls[i].arguments_len, &args_parsed) ==
-                    HU_OK &&
-                args_parsed) {
-                hu_json_object_set(alloc, o, "arguments", args_parsed);
-            } else {
-                hu_json_object_set(
-                    alloc, o, "arguments_raw",
-                    hu_json_string_new(alloc, calls[i].arguments, calls[i].arguments_len));
-            }
-        }
-        hu_json_array_push(alloc, arr, o);
-    }
-    hu_json_object_set(alloc, root, "calls", arr);
 
     char *body = NULL;
     size_t blen = 0;
@@ -473,6 +553,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     *response_out = NULL;
     if (response_len_out)
         *response_len_out = 0;
+
+    if (getenv("HU_DEBUG"))
+        hu_log_info("agent_turn", NULL, "ENTER agent_turn msg_len=%zu", msg_len);
 
     hu_agent_set_current_for_tools(agent);
 
@@ -638,8 +721,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         pm += add;
                 }
                 if (pm > 0 && (size_t)pm < sizeof(plan_mem)) {
-                    (void)hu_agent_internal_append_history(agent, HU_ROLE_SYSTEM, plan_mem,
-                                                           (size_t)pm, NULL, 0, NULL, 0);
+                    hu_error_t plan_hist_err = hu_agent_internal_append_history(
+                        agent, HU_ROLE_SYSTEM, plan_mem, (size_t)pm, NULL, 0, NULL, 0);
+                    if (plan_hist_err != HU_OK)
+                        hu_log_warn("agent", NULL, "failed to append plan context to history: %s",
+                                    hu_error_string(plan_hist_err));
                 }
             }
             hu_plan_free(agent->alloc, plan);
@@ -650,6 +736,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     hu_error_t err =
         hu_agent_internal_append_history(agent, HU_ROLE_USER, msg, msg_len, NULL, 0, NULL, 0);
     if (err != HU_OK) {
+        if (getenv("HU_DEBUG"))
+            hu_log_error("agent_turn", NULL, "FAIL at history_append: %s", hu_error_string(err));
         if (plan_ctx)
             agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
         hu_agent_clear_current_for_tools();
@@ -711,6 +799,37 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     size_t episodic_replay_len = 0;
     bool cognition_skills_shown = false;
 
+    char *somatic_ctx = NULL;
+    size_t somatic_ctx_len = 0;
+    char *narrative_self_ctx = NULL;
+    size_t narrative_self_ctx_len = 0;
+    char *presence_ctx = NULL;
+    size_t presence_ctx_len = 0;
+    char *micro_expr_ctx = NULL;
+    size_t micro_expr_ctx_len = 0;
+    char *creative_voice_ctx = NULL;
+    size_t creative_voice_ctx_len = 0;
+    char *novelty_ctx = NULL;
+    size_t novelty_ctx_len = 0;
+    char *attachment_ctx = NULL;
+    size_t attachment_ctx_len = 0;
+    char *rupture_ctx = NULL;
+    size_t rupture_ctx_len = 0;
+    char *growth_ctx = NULL;
+    size_t growth_ctx_len = 0;
+    char *boundary_ctx = NULL;
+    size_t boundary_ctx_len = 0;
+    char *rel_episode_ctx = NULL;
+    size_t rel_episode_ctx_len = 0;
+    char *trust_ctx = NULL;
+    size_t trust_ctx_len = 0;
+    char *humor_dir = NULL;
+    size_t humor_dir_len = 0;
+    char *syc_friction_ctx = NULL;
+    size_t syc_friction_ctx_len = 0;
+    char *conv_goals_ctx = NULL;
+    size_t conv_goals_ctx_len = 0;
+
     /* Superhuman: observe user message (emotional, silence services) */
     (void)hu_superhuman_observe_all(&agent->superhuman, agent->alloc, msg, msg_len, "user", 4);
 
@@ -761,7 +880,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                   "frustration", "excitement", "anxiety"};
             for (size_t i = 0; i < fc_result.emotion_count; i++) {
                 hu_emotion_tag_t tag = fc_result.emotions[i].tag;
-                if (tag >= 0 && (size_t)tag < sizeof(emotion_names) / sizeof(emotion_names[0])) {
+                if ((size_t)tag < sizeof(emotion_names) / sizeof(emotion_names[0])) {
                     const char *name = emotion_names[tag];
                     (void)hu_pattern_radar_observe(&agent->radar, name, strlen(name),
                                                    HU_PATTERN_EMOTIONAL_TREND, NULL, 0, ts, ts_len);
@@ -867,7 +986,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         size_t pref_len = 0;
         char *pref = hu_preferences_extract(agent->alloc, msg, msg_len, &pref_len);
         if (pref) {
-            hu_preferences_store(agent->memory, agent->alloc, pref, pref_len);
+            hu_error_t pref_err =
+                hu_preferences_store(agent->memory, agent->alloc, pref, pref_len);
+            if (pref_err != HU_OK)
+                hu_log_warn("agent", NULL, "preference store failed: %s",
+                            hu_error_string(pref_err));
             agent->alloc->free(agent->alloc->ctx, pref, pref_len + 1);
         }
     }
@@ -910,9 +1033,14 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     c4 == 'e' && (msg[k + 5] | 0x20) == 'c')
                     positive = true;
             }
-            if (positive)
+            if (positive) {
                 hu_outcome_record_positive(agent->outcomes, msg);
+                if (agent->frontiers.initialized)
+                    hu_tcal_update(&agent->frontiers.trust, 0.6f, 0.5f, 0.5f);
+            }
         }
+        if (is_correction && agent->frontiers.initialized)
+            hu_tcal_update(&agent->frontiers.trust, -0.3f, 0.0f, -0.2f);
     }
 
     /* Detect tone from recent user messages */
@@ -933,6 +1061,22 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             hu_tone_t tone = hu_detect_tone(recent_msgs, recent_lens, rm_count);
             tone_hint = hu_tone_hint_string(tone, &tone_hint_len);
         }
+    }
+
+    /* Rhythm matching: when user sends a short casual message, nudge the
+     * agent to match their brevity. Long reflective messages get more space. */
+    static const char rhythm_short[] =
+        " The user sent a very short message — match their energy with a brief, "
+        "conversational reply. Don't over-explain.";
+    static const char rhythm_long[] =
+        " The user wrote a long, thoughtful message — give it the space it deserves "
+        "with a proportional, considered response.";
+    if (msg_len <= 15 && msg_len > 0 && !tone_hint) {
+        tone_hint = rhythm_short;
+        tone_hint_len = sizeof(rhythm_short) - 1;
+    } else if (msg_len >= 400 && !tone_hint) {
+        tone_hint = rhythm_long;
+        tone_hint_len = sizeof(rhythm_long) - 1;
     }
 
     /* Load user preferences for prompt injection */
@@ -2149,6 +2293,606 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
     }
 
+    /* ── 12 Frontiers of Humanness ── */
+    {
+        if (!agent->frontiers.initialized) {
+            hu_somatic_init(&agent->frontiers.somatic);
+            hu_novelty_tracker_init(&agent->frontiers.novelty);
+            hu_attachment_init(&agent->frontiers.attachment);
+            hu_rupture_init(&agent->frontiers.rupture);
+            hu_narrative_self_init(&agent->frontiers.narrative);
+            hu_creative_voice_init(&agent->frontiers.creative_voice);
+            hu_growth_narrative_init(&agent->frontiers.growth);
+            hu_genuine_boundary_set_init(&agent->frontiers.boundaries);
+
+#ifdef HU_HAS_PERSONA
+            /* Warm-start attachment from contact profile if available */
+            if (agent->persona && agent->memory_session_id) {
+                const hu_contact_profile_t *acp = hu_persona_find_contact(
+                    agent->persona, agent->memory_session_id, agent->memory_session_id_len);
+                if (acp && acp->attachment_style) {
+                    if (strstr(acp->attachment_style, "secure")) {
+                        agent->frontiers.attachment.user_style = HU_ATTACH_SECURE;
+                        agent->frontiers.attachment.user_confidence = 0.4f;
+                        agent->frontiers.attachment.proximity_seeking = 0.5f;
+                        agent->frontiers.attachment.safe_haven_usage = 0.5f;
+                        agent->frontiers.attachment.secure_base_behavior = 0.6f;
+                        agent->frontiers.attachment.separation_distress = 0.3f;
+                    } else if (strstr(acp->attachment_style, "anxious")) {
+                        agent->frontiers.attachment.user_style = HU_ATTACH_ANXIOUS;
+                        agent->frontiers.attachment.user_confidence = 0.3f;
+                        agent->frontiers.attachment.proximity_seeking = 0.8f;
+                        agent->frontiers.attachment.separation_distress = 0.7f;
+                    } else if (strstr(acp->attachment_style, "avoidant")) {
+                        agent->frontiers.attachment.user_style = HU_ATTACH_AVOIDANT;
+                        agent->frontiers.attachment.user_confidence = 0.3f;
+                        agent->frontiers.attachment.proximity_seeking = 0.2f;
+                        agent->frontiers.attachment.safe_haven_usage = 0.2f;
+                    }
+                }
+            }
+#endif
+
+#ifdef HU_HAS_PERSONA
+            if (agent->persona) {
+                /* F3: Seed narrative self from persona identity + biography */
+                if (agent->persona->identity)
+                    hu_narrative_self_set_identity(agent->alloc,
+                        &agent->frontiers.narrative, agent->persona->identity,
+                        strlen(agent->persona->identity));
+                if (agent->persona->biography)
+                    hu_narrative_self_add_theme(agent->alloc,
+                        &agent->frontiers.narrative, agent->persona->biography,
+                        strlen(agent->persona->biography));
+                for (size_t vi = 0; vi < agent->persona->values_count && vi < 4; vi++)
+                    hu_narrative_self_add_theme(agent->alloc,
+                        &agent->frontiers.narrative, agent->persona->values[vi],
+                        strlen(agent->persona->values[vi]));
+
+                /* F10: Seed creative voice from persona traits as metaphor domains */
+                for (size_t ti = 0; ti < agent->persona->traits_count && ti < 4; ti++)
+                    hu_creative_voice_add_domain(agent->alloc,
+                        &agent->frontiers.creative_voice, agent->persona->traits[ti],
+                        strlen(agent->persona->traits[ti]));
+                if (agent->persona->decision_style)
+                    hu_creative_voice_add_anchor(agent->alloc,
+                        &agent->frontiers.creative_voice, agent->persona->decision_style,
+                        strlen(agent->persona->decision_style));
+
+                /* F12: Seed genuine boundaries from persona principles + values */
+                for (size_t pi = 0; pi < agent->persona->principles_count && pi < 4; pi++)
+                    hu_genuine_boundary_add(agent->alloc,
+                        &agent->frontiers.boundaries, "principle",
+                        agent->persona->principles[pi], NULL, 0.8f, 0);
+                for (size_t vi = 0; vi < agent->persona->values_count && vi < 2; vi++)
+                    hu_genuine_boundary_add(agent->alloc,
+                        &agent->frontiers.boundaries, "value",
+                        agent->persona->values[vi], NULL, 0.7f, 0);
+            }
+#endif
+
+            hu_tcal_init(&agent->frontiers.trust);
+
+            agent->frontiers.initialized = true;
+
+#ifdef HU_ENABLE_SQLITE
+            if (agent->memory && agent->memory_session_id) {
+                sqlite3 *fp_db = hu_sqlite_memory_get_db(agent->memory);
+                if (fp_db) {
+                    hu_frontier_persist_ensure_table(fp_db);
+                    hu_error_t fp_err = hu_frontier_persist_load(agent->alloc, fp_db,
+                        agent->memory_session_id, agent->memory_session_id_len,
+                        &agent->frontiers);
+                    if (fp_err == HU_OK) {
+                        hu_frontier_persist_load_growth(agent->alloc, fp_db,
+                            agent->memory_session_id, agent->memory_session_id_len,
+                            &agent->frontiers);
+#ifdef HU_HAS_PERSONA
+                        {
+                            int rs = 0, rsc = 0, rt = 0;
+                            if (hu_frontier_persist_load_relationship(fp_db,
+                                    agent->memory_session_id, agent->memory_session_id_len,
+                                    &rs, &rsc, &rt) == HU_OK && (rs || rsc || rt)) {
+                                if (rs >= HU_REL_NEW && rs <= HU_REL_DEEP)
+                                    agent->relationship.stage = (hu_relationship_stage_t)rs;
+                                if (rsc >= 0)
+                                    agent->relationship.session_count = (uint32_t)rsc;
+                                if (rt >= 0)
+                                    agent->relationship.total_turns = (uint32_t)rt;
+                            }
+                        }
+#endif
+                        hu_log_info("agent", agent->observer,
+                                    "frontier state restored for %.*s",
+                                    (int)(agent->memory_session_id_len > 20 ? 20 :
+                                          agent->memory_session_id_len),
+                                    agent->memory_session_id);
+                    }
+                }
+            }
+#endif
+        }
+
+        /* F1: Somatic State Engine — derive topic_switches from STM,
+         * physical state from circadian phase */
+        uint32_t topic_switches = 0;
+        {
+            size_t stm_n = hu_stm_count(&agent->stm);
+            if (stm_n >= 2) {
+                const hu_stm_turn_t *prev = hu_stm_get(&agent->stm, stm_n - 2);
+                const hu_stm_turn_t *cur = hu_stm_get(&agent->stm, stm_n - 1);
+                if (prev && cur && prev->primary_topic && cur->primary_topic &&
+                    strcmp(prev->primary_topic, cur->primary_topic) != 0)
+                    topic_switches = 1;
+            }
+        }
+        hu_physical_state_t f1_physical = HU_PHYSICAL_NORMAL;
+#ifndef HU_IS_TEST
+        {
+            time_t f1_now = time(NULL);
+            struct tm f1_lt;
+            struct tm *f1_lp = localtime_r(&f1_now, &f1_lt);
+            if (f1_lp) {
+                hu_time_phase_t phase = hu_circadian_phase((uint8_t)(f1_lp->tm_hour & 0xFF));
+                if (phase == HU_PHASE_LATE_NIGHT)
+                    f1_physical = HU_PHYSICAL_TIRED;
+                else if (phase == HU_PHASE_EARLY_MORNING)
+                    f1_physical = HU_PHYSICAL_ENERGIZED;
+                else if (phase == HU_PHASE_NIGHT)
+                    f1_physical = HU_PHYSICAL_TIRED;
+            }
+        }
+#endif
+        hu_somatic_update(&agent->frontiers.somatic, (uint64_t)time(NULL),
+                          agent->infra.emotional_cognition.state.intensity,
+                          topic_switches, f1_physical);
+        hu_somatic_build_context(agent->alloc, &agent->frontiers.somatic, &somatic_ctx,
+                                 &somatic_ctx_len);
+
+        /* F8: Presence Gradient — derive from real relationship + vulnerability */
+        float f8_vulnerability = 0.0f;
+        uint32_t f8_rel_depth = 0;
+#ifdef HU_HAS_PERSONA
+        if (agent->persona && agent->memory_session_id) {
+            const hu_contact_profile_t *f8_cp = hu_persona_find_contact(
+                agent->persona, agent->memory_session_id, agent->memory_session_id_len);
+            if (f8_cp) {
+                if (f8_cp->vulnerability_level) {
+                    if (strstr(f8_cp->vulnerability_level, "high"))
+                        f8_vulnerability = 0.8f;
+                    else if (strstr(f8_cp->vulnerability_level, "medium"))
+                        f8_vulnerability = 0.5f;
+                    else
+                        f8_vulnerability = 0.2f;
+                }
+                if (f8_cp->relationship_stage) {
+                    if (strstr(f8_cp->relationship_stage, "deep"))
+                        f8_rel_depth = 8;
+                    else if (strstr(f8_cp->relationship_stage, "trusted"))
+                        f8_rel_depth = 6;
+                    else if (strstr(f8_cp->relationship_stage, "familiar"))
+                        f8_rel_depth = 4;
+                    else
+                        f8_rel_depth = 1;
+                }
+            }
+        }
+#endif
+        hu_presence_state_t pres;
+        hu_presence_init(&pres);
+        hu_presence_compute(&pres,
+                            agent->infra.emotional_cognition.state.intensity,
+                            f8_vulnerability, 0.0f,
+                            agent->infra.emotional_cognition.state.intensity,
+                            f8_rel_depth);
+        hu_presence_build_context(agent->alloc, &pres, &presence_ctx, &presence_ctx_len);
+        if (agent->observer && pres.level >= HU_PRESENCE_ATTENTIVE) {
+            hu_observer_event_t fev = {.tag = HU_OBSERVER_EVENT_FRONTIER};
+            fev.data.frontier.frontier = "presence";
+            fev.data.frontier.transition = hu_presence_level_name(pres.level);
+            fev.data.frontier.value = pres.attention_score;
+            hu_observer_record_event(*agent->observer, &fev);
+        }
+        hu_presence_deinit(agent->alloc, &pres);
+
+        /* F9: Micro-Expression — use relationship closeness from presence */
+        float f9_closeness = (float)f8_rel_depth / 10.0f;
+        if (f9_closeness > 1.0f) f9_closeness = 1.0f;
+        hu_micro_expression_t mexp;
+        hu_micro_expression_init(&mexp);
+        hu_micro_expression_compute(&mexp, agent->frontiers.somatic.energy,
+                                    agent->frontiers.somatic.social_battery,
+                                    agent->infra.emotional_cognition.state.valence,
+                                    agent->infra.emotional_cognition.state.intensity,
+                                    f9_closeness);
+        hu_micro_expression_build_context(agent->alloc, &mexp, &micro_expr_ctx, &micro_expr_ctx_len);
+        hu_micro_expression_deinit(agent->alloc, &mexp);
+
+        /* F4: Novelty Detection — feed STM topics as known context */
+        {
+            const char *stm_topic_ptrs[HU_STM_MAX_TOPICS];
+            size_t stm_topic_n = 0;
+            for (size_t ti = 0; ti < agent->stm.topic_count && ti < HU_STM_MAX_TOPICS; ti++) {
+                if (agent->stm.topics[ti]) {
+                    stm_topic_ptrs[stm_topic_n++] = agent->stm.topics[ti];
+                }
+            }
+            hu_novelty_signal_t nsig = {0};
+            hu_novelty_evaluate(agent->alloc, &agent->frontiers.novelty, msg, msg_len,
+                                stm_topic_ptrs, stm_topic_n,
+                                stm_topic_ptrs, stm_topic_n, &nsig);
+            if (nsig.surprise_prompt) {
+                novelty_ctx = hu_strndup(agent->alloc, nsig.surprise_prompt,
+                                         strlen(nsig.surprise_prompt));
+                if (novelty_ctx)
+                    novelty_ctx_len = strlen(novelty_ctx);
+            }
+            hu_novelty_signal_free(agent->alloc, &nsig);
+        }
+
+        /* F5: Attachment Dynamics — derive from emotional state + message patterns + timestamp gaps */
+        {
+            float msg_freq = 0.5f;
+            float emo_share = agent->infra.emotional_cognition.state.intensity;
+            float gap_distress = 0.2f;
+            float independence = 0.5f;
+            float growth_signal = 0.4f;
+            size_t stm_n = hu_stm_count(&agent->stm);
+            if (stm_n >= 2) {
+                size_t user_turns = 0;
+                uint64_t max_gap_ms = 0;
+                uint64_t total_gap_ms = 0;
+                size_t gap_count = 0;
+                for (size_t si = 0; si < stm_n; si++) {
+                    const hu_stm_turn_t *t = hu_stm_get(&agent->stm, si);
+                    if (!t) continue;
+                    if (t->role && strcmp(t->role, "user") == 0)
+                        user_turns++;
+                    if (si > 0) {
+                        const hu_stm_turn_t *prev_t = hu_stm_get(&agent->stm, si - 1);
+                        if (prev_t && t->timestamp_ms > prev_t->timestamp_ms) {
+                            uint64_t gap = t->timestamp_ms - prev_t->timestamp_ms;
+                            total_gap_ms += gap;
+                            gap_count++;
+                            if (gap > max_gap_ms) max_gap_ms = gap;
+                        }
+                    }
+                }
+                msg_freq = (float)user_turns / (float)stm_n;
+                if (max_gap_ms > 3600000) /* >1 hour gap */
+                    gap_distress = 0.7f + 0.3f * emo_share;
+                else if (max_gap_ms > 1800000) /* >30 min */
+                    gap_distress = 0.4f + 0.2f * emo_share;
+                else if (gap_count > 0) {
+                    float avg_gap = (float)(total_gap_ms / gap_count);
+                    gap_distress = avg_gap > 600000.0f ? 0.3f : 0.15f;
+                }
+                if (msg_freq > 0.7f)
+                    independence = 0.3f;
+                else if (msg_freq < 0.3f)
+                    independence = 0.7f;
+            }
+            hu_attachment_style_t prev_attach = agent->frontiers.attachment.user_style;
+            hu_attachment_update(&agent->frontiers.attachment,
+                                 msg_freq, emo_share, gap_distress,
+                                 independence, growth_signal);
+            if (agent->observer && agent->frontiers.attachment.user_style != prev_attach) {
+                hu_observer_event_t fev = {.tag = HU_OBSERVER_EVENT_FRONTIER};
+                fev.data.frontier.frontier = "attachment";
+                fev.data.frontier.transition = hu_attachment_style_name(
+                    agent->frontiers.attachment.user_style);
+                fev.data.frontier.value = agent->frontiers.attachment.user_confidence;
+                hu_observer_record_event(*agent->observer, &fev);
+            }
+        }
+        hu_attachment_build_context(agent->alloc, &agent->frontiers.attachment, &attachment_ctx,
+                                      &attachment_ctx_len);
+
+        /* F6: Rupture-Repair — detect from tone shift + message length delta + phrase detection */
+        {
+            hu_rupture_signals_t rsig = {0};
+            size_t stm_n = hu_stm_count(&agent->stm);
+            if (stm_n >= 2) {
+                const hu_stm_turn_t *prev_t = hu_stm_get(&agent->stm, stm_n - 2);
+                const hu_stm_turn_t *cur_t = hu_stm_get(&agent->stm, stm_n - 1);
+                if (prev_t && cur_t && prev_t->content_len > 0 && cur_t->content_len > 0) {
+                    float prev_len = (float)prev_t->content_len;
+                    float cur_len = (float)cur_t->content_len;
+                    rsig.length_delta = (cur_len - prev_len) / (prev_len > 0 ? prev_len : 1.0f);
+                    if (rsig.length_delta < -0.5f)
+                        rsig.energy_drop = -rsig.length_delta;
+
+                    /* Detect tone shift between consecutive user messages */
+                    if (prev_t->role && strcmp(prev_t->role, "user") == 0 &&
+                        cur_t->role && strcmp(cur_t->role, "user") == 0) {
+                        const char *tone_msgs[1];
+                        size_t tone_lens[1];
+                        tone_msgs[0] = prev_t->content;
+                        tone_lens[0] = prev_t->content_len;
+                        hu_tone_t prev_tone = hu_detect_tone(tone_msgs, tone_lens, 1);
+                        tone_msgs[0] = cur_t->content;
+                        tone_lens[0] = cur_t->content_len;
+                        hu_tone_t cur_tone = hu_detect_tone(tone_msgs, tone_lens, 1);
+                        if (prev_tone == HU_TONE_CASUAL && cur_tone == HU_TONE_FORMAL)
+                            rsig.tone_delta = 0.7f;
+                        else if (prev_tone != cur_tone)
+                            rsig.tone_delta = 0.3f;
+                    }
+                }
+                if (cur_t && cur_t->content && cur_t->content_len > 0) {
+                    if (hu_strcasestr(cur_t->content, "that's not what I meant") ||
+                        hu_strcasestr(cur_t->content, "no, I meant") ||
+                        hu_strcasestr(cur_t->content, "you misunderstood") ||
+                        hu_strcasestr(cur_t->content, "that's not what I said") ||
+                        hu_strcasestr(cur_t->content, "you're not listening") ||
+                        hu_strcasestr(cur_t->content, "never mind") ||
+                        hu_strcasestr(cur_t->content, "forget it"))
+                        rsig.explicit_correction = true;
+                }
+            }
+            const char *last_asst = NULL;
+            size_t last_asst_len = 0;
+            if (agent->history_count > 0) {
+                for (size_t hi = agent->history_count; hi > 0; hi--) {
+                    if (agent->history[hi - 1].role == HU_ROLE_ASSISTANT &&
+                        agent->history[hi - 1].content_len > 0) {
+                        last_asst = agent->history[hi - 1].content;
+                        last_asst_len = agent->history[hi - 1].content_len;
+                        break;
+                    }
+                }
+            }
+            hu_rupture_stage_t prev_rup = agent->frontiers.rupture.stage;
+            hu_rupture_evaluate(agent->alloc, &agent->frontiers.rupture, &rsig,
+                                last_asst, last_asst_len);
+            if (agent->observer && agent->frontiers.rupture.stage != prev_rup) {
+                hu_observer_event_t fev = {.tag = HU_OBSERVER_EVENT_FRONTIER};
+                fev.data.frontier.frontier = "rupture";
+                fev.data.frontier.transition = hu_rupture_stage_name(
+                    agent->frontiers.rupture.stage);
+                fev.data.frontier.value = agent->frontiers.rupture.severity;
+                hu_observer_record_event(*agent->observer, &fev);
+            }
+            hu_rupture_build_context(agent->alloc, &agent->frontiers.rupture, &rupture_ctx,
+                                     &rupture_ctx_len);
+        }
+
+        /* F3: Narrative Self */
+        hu_narrative_self_build_context(agent->alloc, &agent->frontiers.narrative,
+                                        &narrative_self_ctx, &narrative_self_ctx_len);
+
+        /* F10: Creative Voice */
+        hu_creative_voice_build_context(agent->alloc, &agent->frontiers.creative_voice,
+                                        &creative_voice_ctx, &creative_voice_ctx_len);
+
+        /* F11: Growth Narrative */
+        hu_growth_narrative_build_context(agent->alloc, &agent->frontiers.growth,
+                                          agent->memory_session_id,
+                                          &growth_ctx, &growth_ctx_len);
+
+        /* F12: Genuine Boundaries */
+        {
+            uint32_t boundary_rel_stage = 0;
+#ifdef HU_HAS_PERSONA
+            if (agent->persona && agent->memory_session_id) {
+                const hu_contact_profile_t *bcp = hu_persona_find_contact(
+                    agent->persona, agent->memory_session_id, agent->memory_session_id_len);
+                if (bcp && bcp->relationship_stage) {
+                    if (strstr(bcp->relationship_stage, "deep"))
+                        boundary_rel_stage = 3;
+                    else if (strstr(bcp->relationship_stage, "trusted") ||
+                             strstr(bcp->relationship_stage, "familiar"))
+                        boundary_rel_stage = 2;
+                    else
+                        boundary_rel_stage = 1;
+                }
+            }
+#endif
+            const hu_genuine_boundary_t *matched = NULL;
+            hu_genuine_boundary_check_relevance(&agent->frontiers.boundaries, msg, msg_len,
+                                                &matched);
+            if (matched) {
+                hu_genuine_boundary_build_context(agent->alloc, matched, boundary_rel_stage,
+                                                  &boundary_ctx, &boundary_ctx_len);
+            }
+        }
+
+        /* Trust calibration: update and build context */
+        {
+            float comp_sig = 0.0f, benev_sig = 0.0f, integ_sig = 0.0f;
+            if (agent->infra.emotional_cognition.state.valence > 0.3f)
+                benev_sig = 0.5f;
+            if (agent->infra.emotional_cognition.state.valence < -0.3f)
+                benev_sig = -0.3f;
+            if (agent->outcomes && agent->outcomes->total > 0) {
+                comp_sig = (float)agent->outcomes->tool_successes /
+                           (float)agent->outcomes->total;
+                integ_sig = comp_sig;
+            }
+            hu_tcal_update(&agent->frontiers.trust, comp_sig, benev_sig, integ_sig);
+            if (hu_tcal_check_erosion(&agent->frontiers.trust) && agent->observer) {
+                hu_observer_event_t tev = {.tag = HU_OBSERVER_EVENT_FRONTIER,
+                    .trace_id = agent->trace_id,
+                    .data.frontier = {.frontier = "trust",
+                        .transition = "erosion",
+                        .value = agent->frontiers.trust.erosion_rate}};
+                hu_observer_record_event(*agent->observer, &tev);
+            }
+            hu_tcal_build_context(agent->alloc, &agent->frontiers.trust,
+                                  &trust_ctx, &trust_ctx_len);
+        }
+
+        /* Humor framework: evaluate context and build directive */
+        {
+            hu_humor_context_t hctx;
+            memset(&hctx, 0, sizeof(hctx));
+            hctx.risk_tolerance = HU_HUMOR_RISK_TOLERANCE;
+            hctx.in_serious_context =
+                (agent->infra.emotional_cognition.state.intensity > 0.7f &&
+                 agent->infra.emotional_cognition.state.valence < -0.2f);
+            if (agent->active_channel) {
+                hctx.channel = agent->active_channel;
+                hctx.channel_len = agent->active_channel_len;
+            }
+            if (agent->memory_session_id) {
+                hctx.contact_id = agent->memory_session_id;
+                hctx.contact_id_len = agent->memory_session_id_len;
+            }
+#ifdef HU_HAS_PERSONA
+            /* Bridge persona humor style preferences into the structured evaluation */
+            if (agent->persona && agent->persona->humor.style_count > 0) {
+                for (size_t hs = 0; hs < agent->persona->humor.style_count &&
+                     hctx.preferred_count < 8; hs++) {
+                    const char *s = agent->persona->humor.style[hs];
+                    hu_humor_fw_style_t mapped = HU_HUMOR_FW_OBSERVATIONAL;
+                    if (strstr(s, "dry") || strstr(s, "deadpan"))
+                        mapped = HU_HUMOR_FW_DRY;
+                    else if (strstr(s, "self") || strstr(s, "deprecat"))
+                        mapped = HU_HUMOR_FW_SELF_DEPRECATING;
+                    else if (strstr(s, "word") || strstr(s, "pun"))
+                        mapped = HU_HUMOR_FW_WORDPLAY;
+                    else if (strstr(s, "absurd") || strstr(s, "surreal"))
+                        mapped = HU_HUMOR_FW_ABSURDIST;
+                    else if (strstr(s, "observ"))
+                        mapped = HU_HUMOR_FW_OBSERVATIONAL;
+                    hctx.preferred_styles[hctx.preferred_count++] = mapped;
+                }
+            }
+#endif
+            hu_humor_evaluation_t heval;
+            memset(&heval, 0, sizeof(heval));
+            hu_humor_fw_evaluate_context(msg, msg_len, &hctx, &heval);
+            if (heval.should_attempt) {
+                hu_humor_fw_build_directive(agent->alloc, &heval, &hctx,
+                                            &humor_dir, &humor_dir_len);
+                if (humor_dir && agent->observer) {
+                    hu_observer_event_t hev = {.tag = HU_OBSERVER_EVENT_FRONTIER,
+                        .trace_id = agent->trace_id,
+                        .data.frontier = {.frontier = "humor",
+                            .transition = "directive_injected",
+                            .value = heval.composite}};
+                    hu_observer_record_event(*agent->observer, &hev);
+                }
+            }
+        }
+
+        /* Sycophancy pre-check: when the user expresses strong opinions,
+         * proactively inject friction directive to prevent reflexive agreement */
+        {
+            static const char *opinion_pats[] = {
+                "i think", "i believe", "i feel", "in my opinion",
+                "don't you think", "right?", "wouldn't you say",
+                "obviously", "clearly", "everyone knows",
+            };
+            size_t opinion_hits = 0;
+            for (size_t pi = 0; pi < sizeof(opinion_pats) / sizeof(opinion_pats[0]); pi++) {
+                size_t plen = strlen(opinion_pats[pi]);
+                for (size_t mi = 0; mi + plen <= msg_len; mi++) {
+                    bool m = true;
+                    for (size_t k = 0; k < plen; k++) {
+                        char a = (char)(msg[mi + k] >= 'A' && msg[mi + k] <= 'Z'
+                                        ? msg[mi + k] + 32 : msg[mi + k]);
+                        if (a != opinion_pats[pi][k]) { m = false; break; }
+                    }
+                    if (m) { opinion_hits++; break; }
+                }
+            }
+            if (opinion_hits >= HU_OPINION_FRICTION_COUNT) {
+                hu_sycophancy_result_t syc_synth;
+                memset(&syc_synth, 0, sizeof(syc_synth));
+                syc_synth.flagged = true;
+                syc_synth.total_risk = 0.5f;
+                syc_synth.factor_scores[HU_SYCOPHANCY_UNCRITICAL_AGREEMENT] =
+                    (float)opinion_hits * 0.25f;
+                hu_sycophancy_build_friction(agent->alloc, &syc_synth, msg, msg_len,
+                                             &syc_friction_ctx, &syc_friction_ctx_len);
+            }
+        }
+
+        /* F7: Relational Episode Memory — load recent episodes for this contact */
+#ifdef HU_ENABLE_SQLITE
+        if (agent->memory && agent->memory_session_id && agent->memory_session_id_len > 0) {
+            sqlite3 *ep_db = hu_sqlite_memory_get_db(agent->memory);
+            if (ep_db) {
+                static const char ep_sql[] =
+                    "SELECT summary, felt_sense, relational_meaning, significance, warmth, "
+                    "timestamp FROM relational_episodes WHERE contact_id = ?1 "
+                    "ORDER BY significance DESC LIMIT 5";
+                sqlite3_stmt *ep_stmt = NULL;
+                int ep_rc = sqlite3_prepare_v2(ep_db, ep_sql, -1, &ep_stmt, NULL);
+                if (ep_rc == SQLITE_OK) {
+                    sqlite3_bind_text(ep_stmt, 1, agent->memory_session_id,
+                                      (int)agent->memory_session_id_len, SQLITE_STATIC);
+                    hu_relational_episode_t loaded_eps[5];
+                    size_t ep_n = 0;
+                    while (sqlite3_step(ep_stmt) == SQLITE_ROW && ep_n < 5) {
+                        hu_relational_episode_init(&loaded_eps[ep_n]);
+                        const char *s = (const char *)sqlite3_column_text(ep_stmt, 0);
+                        const char *f = (const char *)sqlite3_column_text(ep_stmt, 1);
+                        const char *r = (const char *)sqlite3_column_text(ep_stmt, 2);
+                        float sig = (float)sqlite3_column_double(ep_stmt, 3);
+                        float wrm = (float)sqlite3_column_double(ep_stmt, 4);
+                        uint64_t ts = (uint64_t)sqlite3_column_int64(ep_stmt, 5);
+                        hu_relational_episode_set(agent->alloc, &loaded_eps[ep_n],
+                            agent->memory_session_id, s ? s : "", f ? f : "",
+                            r ? r : "", sig, wrm, ts);
+                        ep_n++;
+                    }
+                    sqlite3_finalize(ep_stmt);
+                    if (ep_n > 0)
+                        hu_relational_episode_build_context(agent->alloc, loaded_eps, ep_n,
+                                                            &rel_episode_ctx, &rel_episode_ctx_len);
+                    for (size_t epi = 0; epi < ep_n; epi++)
+                        hu_relational_episode_free(agent->alloc, &loaded_eps[epi]);
+                }
+            }
+            /* Conversation goals: load active goals for this contact */
+            if (ep_db && agent->memory_session_id && agent->memory_session_id_len > 0) {
+                char qsql[512];
+                size_t qsql_len = 0;
+                if (hu_conv_goals_query_active_sql(agent->memory_session_id,
+                        agent->memory_session_id_len, qsql, sizeof(qsql), &qsql_len) == HU_OK) {
+                    sqlite3_stmt *gs = NULL;
+                    if (sqlite3_prepare_v2(ep_db, qsql, (int)qsql_len, &gs, NULL) == SQLITE_OK) {
+                        hu_conv_goal_t goals[4];
+                        size_t gc = 0;
+                        while (sqlite3_step(gs) == SQLITE_ROW && gc < 4) {
+                            memset(&goals[gc], 0, sizeof(goals[gc]));
+                            const char *d = (const char *)sqlite3_column_text(gs, 2);
+                            if (d) {
+                                goals[gc].description = hu_strndup(agent->alloc, d, strlen(d));
+                                goals[gc].description_len =
+                                    goals[gc].description ? strlen(goals[gc].description) : 0;
+                            }
+                            const char *sig = (const char *)sqlite3_column_text(gs, 3);
+                            if (sig) {
+                                goals[gc].success_signal = hu_strndup(agent->alloc, sig, strlen(sig));
+                                goals[gc].success_signal_len =
+                                    goals[gc].success_signal ? strlen(goals[gc].success_signal) : 0;
+                            }
+                            goals[gc].priority = (hu_goal_priority_t)sqlite3_column_int(gs, 5);
+                            goals[gc].attempts = (uint8_t)sqlite3_column_int(gs, 9);
+                            goals[gc].max_attempts = (uint8_t)sqlite3_column_int(gs, 10);
+                            gc++;
+                        }
+                        sqlite3_finalize(gs);
+                        if (gc > 0)
+                            hu_conv_goals_build_prompt(agent->alloc, goals, gc,
+                                                       &conv_goals_ctx, &conv_goals_ctx_len);
+                        for (size_t gi = 0; gi < gc; gi++)
+                            hu_conv_goal_deinit(agent->alloc, &goals[gi]);
+                    }
+                }
+            }
+        }
+        if (!rel_episode_ctx)
+#endif
+        {
+            hu_relational_episode_build_context(agent->alloc, NULL, 0,
+                                                &rel_episode_ctx, &rel_episode_ctx_len);
+        }
+    }
+
     /* Cognition: episodic replay + emotional context strings for prompt */
 #ifdef HU_ENABLE_SQLITE
     if (agent->infra.cognition_db && (agent->infra.current_cognition_mode == HU_COGNITION_SLOW ||
@@ -2232,7 +2976,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     if (agent->cached_static_prompt && !pref_ctx && !tone_hint && !persona_prompt &&
         !awareness_ctx && !stm_ctx && !commitment_ctx && !pattern_ctx && !adaptive_ctx &&
         !proactive_ctx && !superhuman_ctx && !skills_ctx && !emotional_ctx && !episodic_replay &&
-        !humanness_ctx && !imperfect_dir && !residue_dir && !contact_turing_hint) {
+        !humanness_ctx && !imperfect_dir && !residue_dir && !contact_turing_hint &&
+        !somatic_ctx && !presence_ctx && !micro_expr_ctx && !novelty_ctx && !attachment_ctx &&
+        !rupture_ctx && !narrative_self_ctx && !creative_voice_ctx && !growth_ctx &&
+        !boundary_ctx && !rel_episode_ctx && !trust_ctx && !humor_dir &&
+        !syc_friction_ctx && !conv_goals_ctx) {
         err = hu_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
@@ -2243,6 +2991,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             stm_ctx = NULL;
         }
         if (err != HU_OK) {
+            if (getenv("HU_DEBUG"))
+                hu_log_error("agent_turn", NULL, "FAIL at prompt_build_with_cache: %s",
+                             hu_error_string(err));
             if (pref_ctx)
                 agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
             if (commitment_ctx)
@@ -2333,7 +3084,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             .persona_prompt_len = persona_prompt_len,
             .preferences = pref_ctx,
             .preferences_len = pref_ctx_len,
-            .chain_of_thought = agent->chain_of_thought,
+            .chain_of_thought = agent->chain_of_thought || cognition_budget.enable_planning,
             .tone_hint = tone_hint,
             .tone_hint_len = tone_hint_len,
             .awareness_context = awareness_ctx,
@@ -2373,6 +3124,36 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             .residue_carryover_len = residue_dir_len,
             .contact_turing_hint = contact_turing_hint,
             .contact_turing_hint_len = contact_turing_hint_len,
+            .somatic_context = somatic_ctx,
+            .somatic_context_len = somatic_ctx_len,
+            .narrative_self_context = narrative_self_ctx,
+            .narrative_self_context_len = narrative_self_ctx_len,
+            .presence_context = presence_ctx,
+            .presence_context_len = presence_ctx_len,
+            .micro_expression_context = micro_expr_ctx,
+            .micro_expression_context_len = micro_expr_ctx_len,
+            .creative_voice_context = creative_voice_ctx,
+            .creative_voice_context_len = creative_voice_ctx_len,
+            .novelty_context = novelty_ctx,
+            .novelty_context_len = novelty_ctx_len,
+            .attachment_context = attachment_ctx,
+            .attachment_context_len = attachment_ctx_len,
+            .rupture_context = rupture_ctx,
+            .rupture_context_len = rupture_ctx_len,
+            .growth_context = growth_ctx,
+            .growth_context_len = growth_ctx_len,
+            .boundary_context = boundary_ctx,
+            .boundary_context_len = boundary_ctx_len,
+            .relational_episode_context = rel_episode_ctx,
+            .relational_episode_context_len = rel_episode_ctx_len,
+            .trust_context = trust_ctx,
+            .trust_context_len = trust_ctx_len,
+            .humor_directive = humor_dir,
+            .humor_directive_len = humor_dir_len,
+            .sycophancy_friction = syc_friction_ctx,
+            .sycophancy_friction_len = syc_friction_ctx_len,
+            .conv_goals_context = conv_goals_ctx,
+            .conv_goals_context_len = conv_goals_ctx_len,
         };
         err = hu_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
         if (persona_prompt)
@@ -2408,11 +3189,59 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (contact_turing_hint)
             agent->alloc->free(agent->alloc->ctx, contact_turing_hint, contact_turing_hint_len + 1);
         contact_turing_hint = NULL;
+        if (somatic_ctx)
+            agent->alloc->free(agent->alloc->ctx, somatic_ctx, somatic_ctx_len + 1);
+        somatic_ctx = NULL;
+        if (narrative_self_ctx)
+            agent->alloc->free(agent->alloc->ctx, narrative_self_ctx, narrative_self_ctx_len + 1);
+        narrative_self_ctx = NULL;
+        if (presence_ctx)
+            agent->alloc->free(agent->alloc->ctx, presence_ctx, presence_ctx_len + 1);
+        presence_ctx = NULL;
+        if (micro_expr_ctx)
+            agent->alloc->free(agent->alloc->ctx, micro_expr_ctx, micro_expr_ctx_len + 1);
+        micro_expr_ctx = NULL;
+        if (creative_voice_ctx)
+            agent->alloc->free(agent->alloc->ctx, creative_voice_ctx, creative_voice_ctx_len + 1);
+        creative_voice_ctx = NULL;
+        if (novelty_ctx)
+            agent->alloc->free(agent->alloc->ctx, novelty_ctx, novelty_ctx_len + 1);
+        novelty_ctx = NULL;
+        if (attachment_ctx)
+            agent->alloc->free(agent->alloc->ctx, attachment_ctx, attachment_ctx_len + 1);
+        attachment_ctx = NULL;
+        if (rupture_ctx)
+            agent->alloc->free(agent->alloc->ctx, rupture_ctx, rupture_ctx_len + 1);
+        rupture_ctx = NULL;
+        if (growth_ctx)
+            agent->alloc->free(agent->alloc->ctx, growth_ctx, growth_ctx_len + 1);
+        growth_ctx = NULL;
+        if (boundary_ctx)
+            agent->alloc->free(agent->alloc->ctx, boundary_ctx, boundary_ctx_len + 1);
+        boundary_ctx = NULL;
+        if (rel_episode_ctx)
+            agent->alloc->free(agent->alloc->ctx, rel_episode_ctx, rel_episode_ctx_len + 1);
+        rel_episode_ctx = NULL;
+        if (trust_ctx)
+            agent->alloc->free(agent->alloc->ctx, trust_ctx, trust_ctx_len + 1);
+        trust_ctx = NULL;
+        if (humor_dir)
+            agent->alloc->free(agent->alloc->ctx, humor_dir, humor_dir_len + 1);
+        humor_dir = NULL;
+        if (syc_friction_ctx)
+            agent->alloc->free(agent->alloc->ctx, syc_friction_ctx, syc_friction_ctx_len + 1);
+        syc_friction_ctx = NULL;
+        if (conv_goals_ctx)
+            agent->alloc->free(agent->alloc->ctx, conv_goals_ctx, conv_goals_ctx_len + 1);
+        conv_goals_ctx = NULL;
         cognition_skills_shown = (skills_ctx != NULL && skills_ctx_len > 0);
         if (skills_ctx)
             agent->alloc->free(agent->alloc->ctx, skills_ctx, skills_ctx_len + 1);
         skills_ctx = NULL;
         if (err != HU_OK) {
+            if (getenv("HU_DEBUG"))
+                hu_log_error("agent_turn", NULL, "FAIL at prompt_build_system: %s",
+                             hu_error_string(err));
             if (pref_ctx)
                 agent->alloc->free(agent->alloc->ctx, pref_ctx, pref_ctx_len + 1);
             if (commitment_ctx)
@@ -2820,8 +3649,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
          * Uses LLM summarization when the provider is available, with
          * rule-based fallback. */
         if (hu_should_compact(agent->history, agent->history_count, &compact_cfg)) {
-            hu_compact_history_llm(agent->alloc, agent->history, &agent->history_count,
-                                   &agent->history_cap, &compact_cfg, &agent->provider);
+            hu_error_t compact_err =
+                hu_compact_history_llm(agent->alloc, &agent->history, &agent->history_count,
+                                       &agent->history_cap, &compact_cfg, &agent->provider);
+            if (compact_err != HU_OK)
+                hu_log_warn("agent", NULL, "history compaction failed: %s",
+                            hu_error_string(compact_err));
 
             /* Hierarchical summarization for deeper memory */
             if (agent->provider.vtable && agent->provider.vtable->chat) {
@@ -2843,18 +3676,30 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             const char *hsid = agent->memory_session_id;
                             size_t hsid_len = agent->memory_session_id_len;
                             static const char src[] = "compaction";
-                            if (session_sum && session_len > 0)
-                                (void)hu_memory_store_with_source(
+                            if (session_sum && session_len > 0) {
+                                hu_error_t store_err = hu_memory_store_with_source(
                                     agent->memory, "hierarchical_session", 20, session_sum,
                                     session_len, &hcat, hsid, hsid_len, src, sizeof(src) - 1);
-                            if (chapter_sum && chapter_len > 0)
-                                (void)hu_memory_store_with_source(
+                                if (store_err != HU_OK)
+                                    hu_log_warn("agent", NULL, "memory store failed: %s",
+                                                hu_error_string(store_err));
+                            }
+                            if (chapter_sum && chapter_len > 0) {
+                                hu_error_t store_err = hu_memory_store_with_source(
                                     agent->memory, "hierarchical_chapter", 21, chapter_sum,
                                     chapter_len, &hcat, hsid, hsid_len, src, sizeof(src) - 1);
-                            if (overall_sum && overall_len > 0)
-                                (void)hu_memory_store_with_source(
+                                if (store_err != HU_OK)
+                                    hu_log_warn("agent", NULL, "memory store failed: %s",
+                                                hu_error_string(store_err));
+                            }
+                            if (overall_sum && overall_len > 0) {
+                                hu_error_t store_err = hu_memory_store_with_source(
                                     agent->memory, "hierarchical_overall", 21, overall_sum,
                                     overall_len, &hcat, hsid, hsid_len, src, sizeof(src) - 1);
+                                if (store_err != HU_OK)
+                                    hu_log_warn("agent", NULL, "memory store failed: %s",
+                                                hu_error_string(store_err));
+                            }
                         }
 #endif
                     }
@@ -2967,6 +3812,9 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 agent->alloc->free(agent->alloc->ctx, kv_hist_mask,
                                    agent->history_count * sizeof(bool));
             if (err != HU_OK) {
+                if (getenv("HU_DEBUG"))
+                    hu_log_error("agent_turn", NULL, "FAIL at history_build: %s",
+                                 hu_error_string(err));
                 hu_agent_clear_current_for_tools();
                 if (dpo_rejected_resp)
                     agent->alloc->free(agent->alloc->ctx, dpo_rejected_resp,
@@ -3065,18 +3913,61 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         double prm_turn_score = 0.0;
 
         /* Adaptive model selection: use per-turn override when set by the daemon's
-         * model router, falling back to the agent's default model. */
+         * model router, or run heuristic routing inline if no daemon set it. */
         const char *turn_model = agent->model_name;
         size_t turn_model_len = agent->model_name_len;
         double turn_temp = agent->temperature;
         if (agent->turn_model && agent->turn_model_len > 0) {
             turn_model = agent->turn_model;
             turn_model_len = agent->turn_model_len;
+        } else {
+            /* Inline routing: emotional/vulnerable messages get better models */
+            hu_model_router_config_t mr_cfg = hu_model_router_default_config();
+            const char *rel = NULL;
+            size_t rel_len = 0;
+#ifdef HU_HAS_PERSONA
+            if (agent->relationship.stage >= HU_REL_TRUSTED) {
+                rel = "trusted";
+                rel_len = 7;
+            } else if (agent->relationship.stage >= HU_REL_FAMILIAR) {
+                rel = "friend";
+                rel_len = 6;
+            }
+#endif
+            hu_model_selection_t sel = hu_model_route(&mr_cfg, msg, msg_len,
+                                                      rel, rel_len, -1,
+                                                      agent->history_count);
+            if (sel.tier >= HU_TIER_ANALYTICAL && sel.model && sel.model_len > 0) {
+                turn_model = sel.model;
+                turn_model_len = sel.model_len;
+                if (sel.temperature > 0.0)
+                    turn_temp = sel.temperature;
+            }
         }
         if (agent->turn_temperature > 0.0)
             turn_temp = agent->turn_temperature;
         if (agent->turn_thinking_budget > 0)
             req.thinking_budget = agent->turn_thinking_budget;
+
+        /* Somatic energy influence: low energy → shorter responses, lower creativity. */
+        if (agent->frontiers.initialized && agent->frontiers.somatic.energy < HU_SOMATIC_TIRED_THRESHOLD) {
+            if (agent->max_response_chars == 0 || agent->max_response_chars > 300)
+                req.max_tokens = 300;
+            if (turn_temp > 0.7)
+                turn_temp = 0.7;
+        } else if (agent->frontiers.initialized && agent->frontiers.somatic.energy < HU_SOMATIC_LOW_THRESHOLD) {
+            if (agent->max_response_chars == 0 || agent->max_response_chars > 600)
+                req.max_tokens = 600;
+        }
+
+        /* Empathy mode: slightly warmer temperature for emotional responses,
+         * and remove token caps that might truncate heartfelt replies. */
+        if (cognition_budget.prioritize_empathy) {
+            if (turn_temp < 0.8)
+                turn_temp = 0.8;
+            if (req.max_tokens > 0 && req.max_tokens < 600)
+                req.max_tokens = 600;
+        }
 
         /* Adaptive token budget: classify tier and apply budget constraints */
         if (agent->sota.token_budget.enabled) {
@@ -3148,6 +4039,12 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         }
 
         /* Provider graceful degradation: try primary -> fallback -> honest failure */
+        if (getenv("HU_DEBUG"))
+            hu_log_info("agent_turn", NULL,
+                        "calling provider chat: model=%.*s msgs=%zu tools=%zu degrade=%d",
+                        (int)(turn_model_len > 40 ? 40 : turn_model_len),
+                        turn_model ? turn_model : "(null)", req.messages_count, req.tools_count,
+                        agent->sota.degradation_config.enabled);
         hu_degrade_strategy_t degrade_strategy = HU_DEGRADE_PRIMARY;
         if (agent->sota.degradation_config.enabled) {
             hu_degradation_result_t degrade_result;
@@ -3186,8 +4083,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 *response_out = dup;
                 if (response_len_out)
                     *response_len_out = dup_len;
-                (void)hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT, dup, dup_len, NULL,
-                                                       0, NULL, 0);
+                hu_error_t hist_err = hu_agent_internal_append_history(
+                    agent, HU_ROLE_ASSISTANT, dup, dup_len, NULL, 0, NULL, 0);
+                if (hist_err != HU_OK)
+                    hu_log_warn("agent", NULL, "failed to append assistant history: %s",
+                                hu_error_string(hist_err));
                 {
                     hu_observer_event_t ev = {.tag = HU_OBSERVER_EVENT_ERR, .data = {{0}}};
                     ev.data.err.component = "agent";
@@ -3394,9 +4294,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         asst = stripped;
                         asst_len = slen;
                     }
-                    if (asst_len > 0)
-                        (void)hu_agent_internal_append_history(agent, HU_ROLE_ASSISTANT, asst,
-                                                               asst_len, NULL, 0, NULL, 0);
+                    if (asst_len > 0) {
+                        hu_error_t hist_err = hu_agent_internal_append_history(
+                            agent, HU_ROLE_ASSISTANT, asst, asst_len, NULL, 0, NULL, 0);
+                        if (hist_err != HU_OK)
+                            hu_log_warn("agent", NULL, "failed to append assistant history: %s",
+                                        hu_error_string(hist_err));
+                    }
                     if (stripped)
                         agent->alloc->free(agent->alloc->ctx, stripped, slen + 1);
                     agent_turn_hula_append_histories(agent, &hprog, &hx);
@@ -4572,6 +5476,150 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 }
             }
 
+            /* Post-response sycophancy check: flag and log if response is sycophantic */
+            if (*response_out && response_len_out && *response_len_out > 0) {
+                hu_sycophancy_result_t syc_post;
+                memset(&syc_post, 0, sizeof(syc_post));
+                if (hu_sycophancy_check(*response_out, *response_len_out, msg, msg_len,
+                                        HU_SYCOPHANCY_THRESHOLD, &syc_post) == HU_OK && syc_post.flagged) {
+                    hu_log_info("agent_turn", NULL,
+                                "sycophancy flagged: risk=%.2f patterns=%zu",
+                                syc_post.total_risk, syc_post.pattern_count);
+                    if (agent->observer) {
+                        hu_observer_event_t sev = {.tag = HU_OBSERVER_EVENT_FRONTIER,
+                            .trace_id = agent->trace_id,
+                            .data.frontier = {.frontier = "sycophancy",
+                                .transition = "flagged",
+                                .value = syc_post.total_risk}};
+                        hu_observer_record_event(*agent->observer, &sev);
+                    }
+                    if (agent->frontiers.initialized) {
+                        hu_tcal_update(&agent->frontiers.trust, 0.0f, -0.2f, -0.1f);
+                    }
+                }
+            }
+
+            /* Humor landing feedback: score the response if we injected a humor
+             * directive, then log + update trust based on whether it landed. */
+            if (humor_dir && humor_dir_len > 0 &&
+                *response_out && response_len_out && *response_len_out > 0) {
+                float humor_score = 0.0f;
+                if (hu_humor_fw_score_response(*response_out, *response_len_out,
+                                               NULL, &humor_score) == HU_OK) {
+                    bool landed = (humor_score >= 0.3f);
+                    if (agent->observer) {
+                        hu_observer_event_t hev = {.tag = HU_OBSERVER_EVENT_FRONTIER,
+                            .trace_id = agent->trace_id,
+                            .data.frontier = {.frontier = "humor",
+                                .transition = landed ? "landed" : "flat",
+                                .value = humor_score}};
+                        hu_observer_record_event(*agent->observer, &hev);
+                    }
+                    if (landed && agent->frontiers.initialized)
+                        hu_tcal_update(&agent->frontiers.trust, 0.3f, 0.4f, 0.2f);
+#ifdef HU_ENABLE_SQLITE
+                    if (agent->memory && agent->memory_session_id) {
+                        sqlite3 *ha_db = hu_sqlite_memory_get_db(agent->memory);
+                        if (ha_db)
+                            (void)hu_humor_audience_record(ha_db,
+                                agent->memory_session_id,
+                                HU_HUMOR_OBSERVATIONAL, landed);
+                    }
+#endif
+                }
+            }
+
+            /* Cross-turn consistency check: detect personality drift */
+            if (*response_out && response_len_out && *response_len_out > 0 &&
+                agent->conversation_context && agent->conversation_context_len > 20) {
+                float line_score = 0.0f;
+                if (hu_consistency_score_line(agent->conversation_context,
+                                              agent->conversation_context_len,
+                                              *response_out, *response_len_out,
+                                              &line_score) == HU_OK && line_score < HU_CONSISTENCY_DRIFT_THRESHOLD) {
+                    hu_log_info("agent_turn", NULL,
+                                "consistency drift detected: score=%.2f", line_score);
+                    if (agent->observer) {
+                        hu_observer_event_t cev = {.tag = HU_OBSERVER_EVENT_FRONTIER,
+                            .trace_id = agent->trace_id,
+                            .data.frontier = {.frontier = "consistency",
+                                .transition = "drift", .value = line_score}};
+                        hu_observer_record_event(*agent->observer, &cev);
+                    }
+                }
+            }
+
+            /* Hallucination guard: verify memory claims in response */
+            if (*response_out && response_len_out && *response_len_out > 0 && agent->memory) {
+                char *grounded = NULL;
+                size_t grounded_len = 0;
+                if (hu_hallucination_guard(agent->alloc, *response_out, *response_len_out,
+                                           agent->memory, &grounded, &grounded_len) == HU_OK &&
+                    grounded) {
+                    hu_log_info("agent_turn", NULL,
+                                "hallucination guard rewrote response (claims hedged)");
+                    if (agent->observer) {
+                        hu_observer_event_t hev = {.tag = HU_OBSERVER_EVENT_FRONTIER,
+                            .trace_id = agent->trace_id,
+                            .data.frontier = {.frontier = "hallucination_guard",
+                                .transition = "rewrite", .value = 1.0f}};
+                        hu_observer_record_event(*agent->observer, &hev);
+                    }
+                    agent->alloc->free(agent->alloc->ctx, *response_out, *response_len_out + 1);
+                    *response_out = grounded;
+                    *response_len_out = grounded_len;
+                }
+            }
+
+            /* Fact extraction: extract structured facts from user + AI messages
+             * with intra-batch dedup to avoid duplicate stores. */
+            if (*response_out && response_len_out && *response_len_out > 0 &&
+                agent->memory && agent->memory->vtable && agent->memory->vtable->store) {
+                hu_heuristic_fact_t stored_facts[16];
+                size_t stored_count = 0;
+                const char *fact_sources[] = { msg, *response_out };
+                size_t fact_source_lens[] = { msg_len, *response_len_out };
+                for (size_t fs = 0; fs < 2; fs++) {
+                    if (!fact_sources[fs] || fact_source_lens[fs] == 0)
+                        continue;
+                    hu_fact_extract_result_t fact_res;
+                    memset(&fact_res, 0, sizeof(fact_res));
+                    if (hu_fact_extract(fact_sources[fs], fact_source_lens[fs], &fact_res) == HU_OK &&
+                        fact_res.fact_count > 0) {
+                        if (stored_count > 0)
+                            hu_fact_dedup(&fact_res, stored_facts, stored_count);
+                        for (size_t fi = 0; fi < fact_res.fact_count; fi++) {
+                            if (fact_res.facts[fi].confidence < HU_FACT_CONFIDENCE_MIN)
+                                continue;
+                            /* Intra-batch dedup: skip if same subject+predicate already stored */
+                            bool dup = false;
+                            for (size_t si = 0; si < stored_count && !dup; si++) {
+                                if (strcmp(fact_res.facts[fi].subject, stored_facts[si].subject) == 0 &&
+                                    strcmp(fact_res.facts[fi].predicate, stored_facts[si].predicate) == 0)
+                                    dup = true;
+                            }
+                            if (dup) continue;
+                            char *fk = NULL, *fv = NULL;
+                            size_t fk_len = 0, fv_len = 0;
+                            if (hu_fact_format_for_store(agent->alloc, &fact_res.facts[fi],
+                                                         &fk, &fk_len, &fv, &fv_len) == HU_OK &&
+                                fk && fv) {
+                                (void)agent->memory->vtable->store(
+                                    agent->memory->ctx, fk, fk_len, fv, fv_len,
+                                    NULL, agent->memory_session_id,
+                                    agent->memory_session_id_len);
+                                if (stored_count < 16)
+                                    stored_facts[stored_count++] = fact_res.facts[fi];
+                            }
+                            if (fk)
+                                agent->alloc->free(agent->alloc->ctx, fk, fk_len + 1);
+                            if (fv)
+                                agent->alloc->free(agent->alloc->ctx, fv, fv_len + 1);
+                        }
+                    }
+                }
+            }
+
             /* Auto-save session after successful turn completion */
             if (agent->auto_save && agent->session_id[0] != '\0') {
                 const char *home = getenv("HOME");
@@ -4582,6 +5630,118 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     snprintf(sdir, sizeof(sdir), ".human/sessions");
                 hu_session_persist_save(agent->alloc, agent, sdir, NULL);
             }
+
+            /* F11: Detect growth signals (with dedup against last observation) */
+            if (agent->frontiers.initialized && agent->memory_session_id) {
+                hu_growth_narrative_t *gn = &agent->frontiers.growth;
+                const char *last_obs = (gn->observation_count > 0)
+                    ? gn->observations[gn->observation_count - 1].observation : NULL;
+                const char *last_mile = (gn->milestone_count > 0)
+                    ? gn->milestones[gn->milestone_count - 1].description : NULL;
+
+                if (agent->frontiers.attachment.user_confidence > 0.6f &&
+                    agent->frontiers.attachment.user_style == HU_ATTACH_SECURE &&
+                    (!last_mile || !strstr(last_mile, "secure communication"))) {
+                    hu_growth_narrative_add_milestone(agent->alloc, gn,
+                        agent->memory_session_id,
+                        "developed a secure communication pattern",
+                        (uint64_t)time(NULL),
+                        agent->frontiers.attachment.user_confidence);
+                }
+                if (agent->frontiers.rupture.stage == HU_RUPTURE_REPAIRED &&
+                    (!last_obs || !strstr(last_obs, "repaired a conversational"))) {
+                    hu_growth_narrative_add_observation(agent->alloc, gn,
+                        agent->memory_session_id,
+                        "successfully repaired a conversational rupture",
+                        "rupture was detected and resolved through the repair cycle",
+                        0.7f, (uint64_t)time(NULL));
+                }
+                if (agent->infra.emotional_cognition.state.intensity > 0.7f &&
+                    agent->frontiers.somatic.social_battery > 0.3f &&
+                    (!last_obs || !strstr(last_obs, "emotionally rich"))) {
+                    hu_growth_narrative_add_observation(agent->alloc, gn,
+                        agent->memory_session_id,
+                        "engaged deeply in an emotionally rich conversation",
+                        "high emotional intensity with sustained social energy",
+                        0.5f, (uint64_t)time(NULL));
+                }
+            }
+
+            /* F7: Create relational episode from this turn's emotional context */
+#ifdef HU_ENABLE_SQLITE
+            if (agent->frontiers.initialized && agent->memory &&
+                agent->memory_session_id && agent->memory_session_id_len > 0 &&
+                agent->infra.emotional_cognition.state.intensity > 0.5f &&
+                *response_out && *response_len_out > 0) {
+                sqlite3 *ep_db = hu_sqlite_memory_get_db(agent->memory);
+                if (ep_db) {
+                    char create_sql[512];
+                    size_t create_len = 0;
+                    if (hu_relational_episode_create_table_sql(create_sql,
+                            sizeof(create_sql), &create_len) == HU_OK) {
+                        char *errmsg = NULL;
+                        sqlite3_exec(ep_db, create_sql, NULL, NULL, &errmsg);
+                        if (errmsg) sqlite3_free(errmsg);
+                    }
+                    hu_relational_episode_t ep;
+                    hu_relational_episode_init(&ep);
+                    const char *felt = agent->infra.emotional_cognition.state.intensity > 0.7f
+                        ? "emotionally charged" : "warm";
+                    const char *meaning = agent->frontiers.rupture.stage == HU_RUPTURE_REPAIRED
+                        ? "we worked through something together"
+                        : (agent->frontiers.attachment.user_style == HU_ATTACH_SECURE
+                            ? "a deepening of trust" : "a meaningful exchange");
+                    char summary_buf[128];
+                    int sn = snprintf(summary_buf, sizeof(summary_buf),
+                        "%.80s%s", msg, msg_len > 80 ? "..." : "");
+                    if (sn > 0) {
+                        hu_relational_episode_set(agent->alloc, &ep,
+                            agent->memory_session_id, summary_buf,
+                            felt, meaning,
+                            agent->infra.emotional_cognition.state.intensity,
+                            agent->frontiers.somatic.social_battery > 0.5f ? 0.7f : 0.4f,
+                            (uint64_t)time(NULL));
+                        char insert_sql[2048];
+                        size_t insert_len = 0;
+                        if (hu_relational_episode_insert_sql(&ep, insert_sql,
+                                sizeof(insert_sql), &insert_len) == HU_OK) {
+                            char *ie = NULL;
+                            sqlite3_exec(ep_db, insert_sql, NULL, NULL, &ie);
+                            if (ie) sqlite3_free(ie);
+                            char prune_sql[256];
+                            snprintf(prune_sql, sizeof(prune_sql),
+                                "DELETE FROM relational_episodes WHERE contact_id = '%.*s' "
+                                "AND id NOT IN (SELECT id FROM relational_episodes "
+                                "WHERE contact_id = '%.*s' ORDER BY significance DESC LIMIT 20)",
+                                (int)agent->memory_session_id_len, agent->memory_session_id,
+                                (int)agent->memory_session_id_len, agent->memory_session_id);
+                            sqlite3_exec(ep_db, prune_sql, NULL, NULL, NULL);
+                        }
+                    }
+                    hu_relational_episode_free(agent->alloc, &ep);
+                }
+            }
+
+            if (agent->frontiers.initialized && agent->memory &&
+                agent->memory_session_id && agent->memory_session_id_len > 0) {
+                sqlite3 *fp_db = hu_sqlite_memory_get_db(agent->memory);
+                if (fp_db) {
+                    hu_frontier_persist_save(agent->alloc, fp_db,
+                        agent->memory_session_id, agent->memory_session_id_len,
+                        &agent->frontiers);
+                    hu_frontier_persist_save_growth(agent->alloc, fp_db,
+                        agent->memory_session_id, agent->memory_session_id_len,
+                        &agent->frontiers);
+#ifdef HU_HAS_PERSONA
+                    hu_frontier_persist_save_relationship(fp_db,
+                        agent->memory_session_id, agent->memory_session_id_len,
+                        (int)agent->relationship.stage,
+                        (int)agent->relationship.session_count,
+                        (int)agent->relationship.total_turns);
+#endif
+                }
+            }
+#endif
 
             /* Log workflow step completed */
             if (agent->infra.workflow_log) {
@@ -4724,7 +5884,20 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         batch.count == 0)
                                         break;
 #if (defined(__unix__) || defined(__APPLE__)) && !defined(HU_IS_TEST)
-                                    if (batch.count > 1) {
+                                    bool batch_thread_safe = (batch.count > 1);
+                                    if (batch_thread_safe) {
+                                        for (size_t bi = 0; bi < batch.count && batch_thread_safe;
+                                             bi++) {
+                                            hu_dag_node_t *bn = batch.nodes[bi];
+                                            hu_tool_t *bt = hu_agent_internal_find_tool(
+                                                agent, bn->tool_name,
+                                                bn->tool_name ? strlen(bn->tool_name) : 0);
+                                            if (!bt || !bt->vtable ||
+                                                !(bt->vtable->flags & HU_TOOL_FLAG_THREAD_SAFE))
+                                                batch_thread_safe = false;
+                                        }
+                                    }
+                                    if (batch_thread_safe) {
                                         dag_parallel_work_t works[HU_DAG_MAX_BATCH_SIZE];
                                         pthread_t tids[HU_DAG_MAX_BATCH_SIZE];
                                         bool thread_started[HU_DAG_MAX_BATCH_SIZE];

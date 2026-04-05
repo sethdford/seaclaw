@@ -9,6 +9,7 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/tool.h"
+#include "human/tools/web_search_providers.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,6 +51,18 @@ static const char *bff_base(void) {
     if (!b || !b[0])
         return NULL;
     return b;
+}
+
+static hu_error_t bff_json_set_str(hu_allocator_t *alloc, hu_json_value_t *obj, const char *key,
+                                   const char *s, size_t slen) {
+    hu_json_value_t *v = hu_json_string_new(alloc, s, slen);
+    if (!v)
+        return HU_ERR_OUT_OF_MEMORY;
+    if (hu_json_object_set(alloc, obj, key, v) != HU_OK) {
+        hu_json_free(alloc, v);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    return HU_OK;
 }
 #endif
 
@@ -98,132 +111,237 @@ static hu_error_t bff_memory_execute(void *ctx, hu_allocator_t *alloc, const hu_
         snprintf(xtenant, sizeof(xtenant), "X-Tenant-ID: %s\n", tenant);
         post_extra = xtenant;
     }
-    char all_hdr[3072];
-    int ah = snprintf(all_hdr, sizeof(all_hdr), "Authorization: %s\n", auth);
-    if (tenant && tenant[0])
-        ah += snprintf(all_hdr + ah, sizeof(all_hdr) - (size_t)ah, "X-Tenant-ID: %s\n", tenant);
+    size_t all_hdr_cap =
+        strlen(auth) + (tenant && tenant[0] ? strlen(tenant) + 128U : 0U) + 128U;
+    if (all_hdr_cap < 512U)
+        all_hdr_cap = 512U;
+    char *all_hdr = (char *)alloc->alloc(alloc->ctx, all_hdr_cap);
+    if (!all_hdr) {
+        *out = hu_tool_result_fail("out of memory", 12);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    {
+        size_t ah = hu_buf_appendf(all_hdr, all_hdr_cap, 0, "Authorization: %s\n", auth);
+        if (tenant && tenant[0])
+            ah = hu_buf_appendf(all_hdr, all_hdr_cap, ah, "X-Tenant-ID: %s\n", tenant);
+        (void)ah;
+    }
+
+    hu_error_t bff_ret = HU_OK;
 
     if (strcmp(action, "store") == 0) {
         const char *key = hu_json_get_string(args, "key");
         const char *content = hu_json_get_string(args, "content");
         if (!key || !content) {
             *out = hu_tool_result_fail("key and content required", 24);
-            return HU_OK;
+            goto bff_cleanup;
         }
         const char *sid = hu_json_get_string(args, "session_id");
         const char *cat = hu_json_get_string(args, "category");
-        size_t cap = strlen(key) + strlen(content) + 512;
-        char *jb = (char *)alloc->alloc(alloc->ctx, cap);
-        if (!jb) {
+        hu_json_value_t *root = hu_json_object_new(alloc);
+        if (!root) {
             *out = hu_tool_result_fail("out of memory", 12);
-            return HU_ERR_OUT_OF_MEMORY;
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
         }
-        int n = snprintf(jb, cap, "{\"key\":\"%s\",\"content\":\"%s\"", key, content);
-        if (sid && sid[0])
-            n += snprintf(jb + n, cap - (size_t)n, ",\"session_id\":\"%s\"", sid);
-        if (cat && cat[0])
-            n += snprintf(jb + n, cap - (size_t)n, ",\"category\":\"%s\"", cat);
-        n += snprintf(jb + n, cap - (size_t)n, "}");
+        if (bff_json_set_str(alloc, root, "key", key, strlen(key)) != HU_OK ||
+            bff_json_set_str(alloc, root, "content", content, strlen(content)) != HU_OK) {
+            hu_json_free(alloc, root);
+            *out = hu_tool_result_fail("out of memory", 12);
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
+        }
+        if (sid && sid[0] &&
+            bff_json_set_str(alloc, root, "session_id", sid, strlen(sid)) != HU_OK) {
+            hu_json_free(alloc, root);
+            *out = hu_tool_result_fail("out of memory", 12);
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
+        }
+        if (cat && cat[0] &&
+            bff_json_set_str(alloc, root, "category", cat, strlen(cat)) != HU_OK) {
+            hu_json_free(alloc, root);
+            *out = hu_tool_result_fail("out of memory", 12);
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
+        }
+        char *jb = NULL;
+        size_t jb_len = 0;
+        hu_error_t jerr = hu_json_stringify(alloc, root, &jb, &jb_len);
+        hu_json_free(alloc, root);
+        if (jerr != HU_OK || !jb) {
+            *out = hu_tool_result_fail("out of memory", 12);
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
+        }
         char url[768];
         snprintf(url, sizeof(url), "%s/v1/memory/store", base_buf);
         hu_http_response_t resp = {0};
         hu_error_t err =
-            hu_http_post_json_ex(alloc, url, auth, post_extra, jb, (size_t)n, &resp);
-        alloc->free(alloc->ctx, jb, cap);
+            hu_http_post_json_ex(alloc, url, auth, post_extra, jb, jb_len, &resp);
+        alloc->free(alloc->ctx, jb, jb_len + 1);
         if (err != HU_OK) {
             if (resp.owned && resp.body)
                 hu_http_response_free(alloc, &resp);
             *out = hu_tool_result_fail("http request failed", 19);
-            return HU_OK;
+            goto bff_cleanup;
         }
         char *rb = hu_strndup(alloc, resp.body, resp.body_len);
         hu_http_response_free(alloc, &resp);
         *out = hu_tool_result_ok_owned(rb, rb ? strlen(rb) : 0);
-        return HU_OK;
+        goto bff_cleanup;
     }
 
     if (strcmp(action, "recall") == 0) {
         const char *query = hu_json_get_string(args, "query");
         if (!query) {
             *out = hu_tool_result_fail("query required for recall", 25);
-            return HU_OK;
+            goto bff_cleanup;
         }
         long lim = (long)hu_json_get_number(args, "limit", 20);
         const char *sid = hu_json_get_string(args, "session_id");
-        size_t qcap = strlen(query) + 256;
-        char *jb = (char *)alloc->alloc(alloc->ctx, qcap);
-        if (!jb) {
+        hu_json_value_t *root = hu_json_object_new(alloc);
+        if (!root) {
             *out = hu_tool_result_fail("out of memory", 12);
-            return HU_ERR_OUT_OF_MEMORY;
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
         }
-        int n = snprintf(jb, qcap, "{\"query\":\"%s\",\"limit\":%ld", query, lim);
-        if (sid && sid[0])
-            n += snprintf(jb + n, qcap - (size_t)n, ",\"session_id\":\"%s\"", sid);
-        n += snprintf(jb + n, qcap - (size_t)n, "}");
+        if (bff_json_set_str(alloc, root, "query", query, strlen(query)) != HU_OK) {
+            hu_json_free(alloc, root);
+            *out = hu_tool_result_fail("out of memory", 12);
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
+        }
+        hu_json_value_t *lim_v = hu_json_number_new(alloc, (double)lim);
+        if (!lim_v || hu_json_object_set(alloc, root, "limit", lim_v) != HU_OK) {
+            if (lim_v)
+                hu_json_free(alloc, lim_v);
+            hu_json_free(alloc, root);
+            *out = hu_tool_result_fail("out of memory", 12);
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
+        }
+        if (sid && sid[0] &&
+            bff_json_set_str(alloc, root, "session_id", sid, strlen(sid)) != HU_OK) {
+            hu_json_free(alloc, root);
+            *out = hu_tool_result_fail("out of memory", 12);
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
+        }
+        char *jb = NULL;
+        size_t jb_len = 0;
+        hu_error_t jerr = hu_json_stringify(alloc, root, &jb, &jb_len);
+        hu_json_free(alloc, root);
+        if (jerr != HU_OK || !jb) {
+            *out = hu_tool_result_fail("out of memory", 12);
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
+        }
         char url[768];
         snprintf(url, sizeof(url), "%s/v1/memory/recall", base_buf);
         hu_http_response_t resp = {0};
         hu_error_t err =
-            hu_http_post_json_ex(alloc, url, auth, post_extra, jb, (size_t)n, &resp);
-        alloc->free(alloc->ctx, jb, qcap);
+            hu_http_post_json_ex(alloc, url, auth, post_extra, jb, jb_len, &resp);
+        alloc->free(alloc->ctx, jb, jb_len + 1);
         if (err != HU_OK || resp.status_code < 200 || resp.status_code >= 300) {
             if (resp.owned && resp.body)
                 hu_http_response_free(alloc, &resp);
             *out = hu_tool_result_fail("recall failed", 13);
-            return HU_OK;
+            goto bff_cleanup;
         }
         char *rb = hu_strndup(alloc, resp.body, resp.body_len);
         hu_http_response_free(alloc, &resp);
         *out = hu_tool_result_ok_owned(rb, rb ? strlen(rb) : 0);
-        return HU_OK;
+        goto bff_cleanup;
     }
 
     if (strcmp(action, "list") == 0) {
         const char *sid = hu_json_get_string(args, "session_id");
-        char url[768];
-        if (sid && sid[0])
-            snprintf(url, sizeof(url), "%s/v1/memory/list?session_id=%s", base_buf, sid);
-        else
-            snprintf(url, sizeof(url), "%s/v1/memory/list", base_buf);
+        char *url_heap = NULL;
+        size_t url_cap = 0;
+        char url_stack[768];
+        const char *url = url_stack;
+        if (sid && sid[0]) {
+            char *enc = NULL;
+            size_t enc_len = 0;
+            if (hu_web_search_url_encode(alloc, sid, strlen(sid), &enc, &enc_len) != HU_OK ||
+                !enc) {
+                *out = hu_tool_result_fail("out of memory", 12);
+                bff_ret = HU_ERR_OUT_OF_MEMORY;
+                goto bff_cleanup;
+            }
+            url_cap = strlen(base_buf) + enc_len + 48;
+            url_heap = (char *)alloc->alloc(alloc->ctx, url_cap);
+            if (!url_heap) {
+                alloc->free(alloc->ctx, enc, enc_len + 1);
+                *out = hu_tool_result_fail("out of memory", 12);
+                bff_ret = HU_ERR_OUT_OF_MEMORY;
+                goto bff_cleanup;
+            }
+            snprintf(url_heap, url_cap, "%s/v1/memory/list?session_id=%s", base_buf, enc);
+            alloc->free(alloc->ctx, enc, enc_len + 1);
+            url = url_heap;
+        } else {
+            snprintf(url_stack, sizeof(url_stack), "%s/v1/memory/list", base_buf);
+        }
         hu_http_response_t resp = {0};
         hu_error_t err = hu_http_get_ex(alloc, url, all_hdr, &resp);
-        (void)ah;
+        if (url_heap)
+            alloc->free(alloc->ctx, url_heap, url_cap);
         if (err != HU_OK || resp.status_code < 200 || resp.status_code >= 300) {
             if (resp.owned && resp.body)
                 hu_http_response_free(alloc, &resp);
             *out = hu_tool_result_fail("list failed", 11);
-            return HU_OK;
+            goto bff_cleanup;
         }
         char *rb = hu_strndup(alloc, resp.body, resp.body_len);
         hu_http_response_free(alloc, &resp);
         *out = hu_tool_result_ok_owned(rb, rb ? strlen(rb) : 0);
-        return HU_OK;
+        goto bff_cleanup;
     }
 
     if (strcmp(action, "forget") == 0) {
         const char *key = hu_json_get_string(args, "key");
         if (!key) {
             *out = hu_tool_result_fail("key required for forget", 23);
-            return HU_OK;
+            goto bff_cleanup;
         }
-        char url[1024];
-        snprintf(url, sizeof(url), "%s/v1/memory/forget?key=%s", base_buf, key);
+        char *enc = NULL;
+        size_t enc_len = 0;
+        if (hu_web_search_url_encode(alloc, key, strlen(key), &enc, &enc_len) != HU_OK || !enc) {
+            *out = hu_tool_result_fail("out of memory", 12);
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
+        }
+        size_t url_cap = strlen(base_buf) + enc_len + 48;
+        char *url = (char *)alloc->alloc(alloc->ctx, url_cap);
+        if (!url) {
+            alloc->free(alloc->ctx, enc, enc_len + 1);
+            *out = hu_tool_result_fail("out of memory", 12);
+            bff_ret = HU_ERR_OUT_OF_MEMORY;
+            goto bff_cleanup;
+        }
+        snprintf(url, url_cap, "%s/v1/memory/forget?key=%s", base_buf, enc);
+        alloc->free(alloc->ctx, enc, enc_len + 1);
         hu_http_response_t resp = {0};
         hu_error_t err = hu_http_request(alloc, url, "DELETE", all_hdr, NULL, 0, &resp);
+        alloc->free(alloc->ctx, url, url_cap);
         if (err != HU_OK || resp.status_code < 200 || resp.status_code >= 300) {
             if (resp.owned && resp.body)
                 hu_http_response_free(alloc, &resp);
             *out = hu_tool_result_fail("forget failed", 13);
-            return HU_OK;
+            goto bff_cleanup;
         }
         char *rb = hu_strndup(alloc, resp.body, resp.body_len);
         hu_http_response_free(alloc, &resp);
         *out = hu_tool_result_ok_owned(rb, rb ? strlen(rb) : 0);
-        return HU_OK;
+        goto bff_cleanup;
     }
 
     *out = hu_tool_result_fail("unknown action", 14);
-    return HU_OK;
+bff_cleanup:
+    alloc->free(alloc->ctx, all_hdr, all_hdr_cap);
+    return bff_ret;
 #endif
 }
 

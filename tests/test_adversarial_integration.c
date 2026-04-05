@@ -792,7 +792,7 @@ static void test_continuation_preamble_injection(void) {
     summary.preserved_count = 3;
 
     hu_error_t err = hu_compact_inject_continuation_preamble(
-        &alloc, &summary, history, &count, &cap);
+        &alloc, &summary, &history, &count, &cap);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(count, 3); /* system + preamble + user */
     HU_ASSERT_EQ(history[0].role, HU_ROLE_SYSTEM);

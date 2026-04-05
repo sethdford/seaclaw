@@ -213,6 +213,52 @@ Tooling adds **deep argument inspection** (`arg_inspector.c`, AEGIS-style) befor
 
 The loop can **deduplicate system prompts** via a **prompt cache** (`prompt_cache.c`), reuse **cross-turn tool results** with **TTL** (`tools/cache_ttl.c`), exchange messages through **ACP** (`agent_comm.c`) and an **ACP–mailbox bridge** (`acp_bridge.c`), prune **KV cache** entries with attention-aware policy (`kv_cache.c`), and apply **PersonaFuse** per-channel overlays (`persona_fuse.c`) without reloading full personas.
 
+## Humanness Frontiers
+
+Twelve subsystems that close the gap from "AI with personality" to "genuinely feels like a person." All follow the same pattern: C struct for state, per-turn compute, prompt builder, injection into `agent_turn.c` via `hu_prompt_config_t`.
+
+```mermaid
+flowchart LR
+    subgraph compute [Per-Turn Compute]
+        A[Somatic] --> B[Presence]
+        B --> C[Attachment]
+        C --> D[Rupture-Repair]
+        D --> E[Micro-Expression]
+    end
+    subgraph memory [Memory-Backed]
+        F[Narrative Self]
+        G[Relational Episodes]
+        H[Growth Narrative]
+        I[Genuine Boundaries]
+        J[Novelty Detection]
+    end
+    subgraph delivery [Post-Generation]
+        K[Message Choreography]
+        L[Creative Voice]
+    end
+    compute --> Prompt["System Prompt"]
+    memory --> Prompt
+    L --> Prompt
+    Prompt --> LLM
+    LLM --> K
+    K --> Channel["channel→send"]
+```
+
+| Feature | Module | Purpose |
+| ------- | ------ | ------- |
+| Somatic State | `persona/somatic.c` | Energy, social battery, focus — day-to-day variation |
+| Message Choreography | `agent/choreography.c` | Multi-message delivery with human rhythm |
+| Narrative Self | `persona/narrative_self.c` | Persistent "who I am" identity narrative |
+| Novelty Detection | `cognition/novelty.c` | Authentic surprise on genuinely new info |
+| Attachment Dynamics | `cognition/attachment.c` | Bowlby/Ainsworth relationship modeling |
+| Rupture-Repair | `cognition/rupture_repair.c` | Detect and repair conversational missteps |
+| Relational Episodes | `memory/relational_episode.c` | Memories tagged with relational texture |
+| Presence Gradient | `cognition/presence.c` | Variable attention depth from casual to deep |
+| Micro-Expression | `persona/micro_expression.c` | Dynamic style modulation (length, punctuation, emoji) |
+| Creative Voice | `persona/creative_voice.c` | Persona-shaped metaphors and worldview |
+| Growth Narrative | `agent/growth_narrative.c` | Track and surface relationship evolution |
+| Genuine Boundaries | `persona/genuine_boundaries.c` | Value-driven personal stances |
+
 ## Evaluation
 
 **Turing-style scoring** (`turing_score.c`) implements an **18-dimension** heuristic (S2S taxonomy) for naturalness and conversational quality, complementing the broader eval harness in `src/eval.c` and adversarial suites.

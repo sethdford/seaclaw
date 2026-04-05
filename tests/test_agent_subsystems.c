@@ -307,7 +307,7 @@ static void test_compaction_reduces_history(void) {
     size_t count = 31;
     HU_ASSERT_TRUE(hu_should_compact(history, count, &cfg));
 
-    hu_error_t err = hu_compact_history(&alloc, history, &count, &cap, &cfg);
+    hu_error_t err = hu_compact_history(&alloc, &history, &count, &cap, &cfg);
     HU_ASSERT_EQ(err, HU_OK);
     /* After compaction: system + 1 summary + 5 keep_recent = 7 */
     HU_ASSERT_TRUE(count < 31);
@@ -348,7 +348,7 @@ static void test_compaction_keep_recent_preserved(void) {
     }
 
     size_t count = 10;
-    hu_error_t err = hu_compact_history(&alloc, history, &count, &cap, &cfg);
+    hu_error_t err = hu_compact_history(&alloc, &history, &count, &cap, &cfg);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(count <= 6); /* 1 summary + 3 keep_recent = 4 */
     /* Most recent messages (msg-7, msg-8, msg-9) should be preserved */
@@ -410,7 +410,7 @@ static void test_compaction_frees_tool_calls(void) {
     size_t count = 31;
     HU_ASSERT_TRUE(hu_should_compact(history, count, &cfg));
 
-    hu_error_t err = hu_compact_history(&alloc, history, &count, &cap, &cfg);
+    hu_error_t err = hu_compact_history(&alloc, &history, &count, &cap, &cfg);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(count < 31);
 

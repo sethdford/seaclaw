@@ -57,7 +57,7 @@ static hu_json_value_t *alloc_value(hu_allocator_t *a, hu_json_type_t type) {
 static hu_error_t parse_value(parser_t *p, hu_json_value_t **out);
 
 static hu_error_t parse_string_raw(parser_t *p, char **out, size_t *out_len) {
-    if (p->src[p->pos] != '"')
+    if (p->pos >= p->len || p->src[p->pos] != '"')
         return HU_ERR_JSON_PARSE;
     p->pos++;
 
@@ -115,10 +115,17 @@ static hu_error_t parse_string_raw(parser_t *p, char **out, size_t *out_len) {
                 } else if (cp < 0x800) {
                     if (len + 2 > cap) {
                         size_t old_cap = cap;
-                        cap *= 2;
-                        buf = (char *)p->alloc->realloc(p->alloc->ctx, buf, old_cap, cap);
-                        if (!buf)
+                        if (cap > SIZE_MAX / 2) {
+                            p->alloc->free(p->alloc->ctx, buf, cap);
                             return HU_ERR_OUT_OF_MEMORY;
+                        }
+                        cap *= 2;
+                        char *nb = (char *)p->alloc->realloc(p->alloc->ctx, buf, old_cap, cap);
+                        if (!nb) {
+                            p->alloc->free(p->alloc->ctx, buf, old_cap);
+                            return HU_ERR_OUT_OF_MEMORY;
+                        }
+                        buf = nb;
                     }
                     buf[len++] = (char)(0xC0 | (cp >> 6));
                     c = (char)(0x80 | (cp & 0x3F));
@@ -130,9 +137,12 @@ static hu_error_t parse_string_raw(parser_t *p, char **out, size_t *out_len) {
                             return HU_ERR_OUT_OF_MEMORY;
                         }
                         cap *= 2;
-                        buf = (char *)p->alloc->realloc(p->alloc->ctx, buf, old_cap, cap);
-                        if (!buf)
+                        char *nb = (char *)p->alloc->realloc(p->alloc->ctx, buf, old_cap, cap);
+                        if (!nb) {
+                            p->alloc->free(p->alloc->ctx, buf, old_cap);
                             return HU_ERR_OUT_OF_MEMORY;
+                        }
+                        buf = nb;
                     }
                     buf[len++] = (char)(0xE0 | (cp >> 12));
                     buf[len++] = (char)(0x80 | ((cp >> 6) & 0x3F));
@@ -158,9 +168,12 @@ static hu_error_t parse_string_raw(parser_t *p, char **out, size_t *out_len) {
                 return HU_ERR_OUT_OF_MEMORY;
             }
             cap *= 2;
-            buf = (char *)p->alloc->realloc(p->alloc->ctx, buf, old, cap);
-            if (!buf)
+            char *nb = (char *)p->alloc->realloc(p->alloc->ctx, buf, old, cap);
+            if (!nb) {
+                p->alloc->free(p->alloc->ctx, buf, old);
                 return HU_ERR_OUT_OF_MEMORY;
+            }
+            buf = nb;
         }
         buf[len++] = c;
     }
@@ -208,6 +221,15 @@ static hu_error_t parse_number(parser_t *p, hu_json_value_t **out) {
     if (end == buf)
         return HU_ERR_JSON_PARSE;
     p->pos += (size_t)(end - buf);
+    /* Skip remainder of overlong number literals that exceeded the copy buffer */
+    while (p->pos < p->len) {
+        char nc = p->src[p->pos];
+        if ((nc >= '0' && nc <= '9') || nc == '.' || nc == 'e' || nc == 'E' || nc == '+' ||
+            nc == '-')
+            p->pos++;
+        else
+            break;
+    }
 
     if (fpclassify(num) == FP_NAN || fpclassify(num) == FP_INFINITE)
         return HU_ERR_JSON_PARSE;
@@ -222,12 +244,16 @@ static hu_error_t parse_number(parser_t *p, hu_json_value_t **out) {
 
 static hu_error_t parse_array(parser_t *p, hu_json_value_t **out) {
     p->pos++;
-    if (++p->depth > JSON_MAX_DEPTH)
+    if (++p->depth > JSON_MAX_DEPTH) {
+        p->depth--;
         return HU_ERR_JSON_DEPTH;
+    }
 
     hu_json_value_t *arr = alloc_value(p->alloc, HU_JSON_ARRAY);
-    if (!arr)
+    if (!arr) {
+        p->depth--;
         return HU_ERR_OUT_OF_MEMORY;
+    }
     arr->data.array.items = NULL;
     arr->data.array.len = 0;
     arr->data.array.cap = 0;
@@ -244,6 +270,7 @@ static hu_error_t parse_array(parser_t *p, hu_json_value_t **out) {
         hu_error_t err = parse_value(p, &val);
         if (err != HU_OK) {
             hu_json_free(p->alloc, arr);
+            p->depth--;
             return err;
         }
 
@@ -251,6 +278,7 @@ static hu_error_t parse_array(parser_t *p, hu_json_value_t **out) {
             size_t new_cap = arr->data.array.cap ? arr->data.array.cap * 2 : 4;
             if (new_cap > SIZE_MAX / sizeof(hu_json_value_t *)) {
                 hu_json_free(p->alloc, arr);
+                p->depth--;
                 return HU_ERR_OUT_OF_MEMORY;
             }
             size_t old_sz = arr->data.array.cap * sizeof(hu_json_value_t *);
@@ -260,6 +288,7 @@ static hu_error_t parse_array(parser_t *p, hu_json_value_t **out) {
             if (!items) {
                 hu_json_free(p->alloc, val);
                 hu_json_free(p->alloc, arr);
+                p->depth--;
                 return HU_ERR_OUT_OF_MEMORY;
             }
             arr->data.array.items = items;
@@ -280,6 +309,7 @@ static hu_error_t parse_array(parser_t *p, hu_json_value_t **out) {
             break;
         }
         hu_json_free(p->alloc, arr);
+        p->depth--;
         return HU_ERR_JSON_PARSE;
     }
 
@@ -290,12 +320,16 @@ static hu_error_t parse_array(parser_t *p, hu_json_value_t **out) {
 
 static hu_error_t parse_object(parser_t *p, hu_json_value_t **out) {
     p->pos++;
-    if (++p->depth > JSON_MAX_DEPTH)
+    if (++p->depth > JSON_MAX_DEPTH) {
+        p->depth--;
         return HU_ERR_JSON_DEPTH;
+    }
 
     hu_json_value_t *obj = alloc_value(p->alloc, HU_JSON_OBJECT);
-    if (!obj)
+    if (!obj) {
+        p->depth--;
         return HU_ERR_OUT_OF_MEMORY;
+    }
     obj->data.object.pairs = NULL;
     obj->data.object.len = 0;
     obj->data.object.cap = 0;
@@ -318,12 +352,14 @@ static hu_error_t parse_object(parser_t *p, hu_json_value_t **out) {
         hu_error_t err = parse_string_raw(p, &key, &key_len);
         if (err != HU_OK) {
             hu_json_free(p->alloc, obj);
+            p->depth--;
             return err;
         }
 
         if (advance(p) != ':') {
             p->alloc->free(p->alloc->ctx, key, key_len + 1);
             hu_json_free(p->alloc, obj);
+            p->depth--;
             return HU_ERR_JSON_PARSE;
         }
 
@@ -332,6 +368,7 @@ static hu_error_t parse_object(parser_t *p, hu_json_value_t **out) {
         if (err != HU_OK) {
             p->alloc->free(p->alloc->ctx, key, key_len + 1);
             hu_json_free(p->alloc, obj);
+            p->depth--;
             return err;
         }
 
@@ -354,6 +391,7 @@ static hu_error_t parse_object(parser_t *p, hu_json_value_t **out) {
                     p->alloc->free(p->alloc->ctx, key, key_len + 1);
                     hu_json_free(p->alloc, val);
                     hu_json_free(p->alloc, obj);
+                    p->depth--;
                     return HU_ERR_OUT_OF_MEMORY;
                 }
                 size_t old_sz = obj->data.object.cap * sizeof(hu_json_pair_t);
@@ -364,6 +402,7 @@ static hu_error_t parse_object(parser_t *p, hu_json_value_t **out) {
                     p->alloc->free(p->alloc->ctx, key, key_len + 1);
                     hu_json_free(p->alloc, val);
                     hu_json_free(p->alloc, obj);
+                    p->depth--;
                     return HU_ERR_OUT_OF_MEMORY;
                 }
                 obj->data.object.pairs = pairs;
@@ -384,6 +423,7 @@ static hu_error_t parse_object(parser_t *p, hu_json_value_t **out) {
             break;
         }
         hu_json_free(p->alloc, obj);
+        p->depth--;
         return HU_ERR_JSON_PARSE;
     }
 
@@ -728,6 +768,8 @@ static hu_error_t stringify_value(hu_allocator_t *alloc, const hu_json_value_t *
             n = snprintf(nbuf, sizeof(nbuf), "%lld", (long long)d);
         else
             n = snprintf(nbuf, sizeof(nbuf), "%.17g", d);
+        if (n < 0 || (size_t)n >= sizeof(nbuf))
+            return HU_ERR_INTERNAL;
         return buf_append(alloc, buf, len, cap, nbuf, (size_t)n);
     }
     case HU_JSON_STRING:

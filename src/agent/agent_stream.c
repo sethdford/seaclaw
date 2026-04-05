@@ -8,6 +8,16 @@
 #include "human/context.h"
 #include "human/core/json.h"
 #include "human/core/log.h"
+#include "human/memory/hallucination_guard.h"
+#include "human/security/sycophancy_guard.h"
+#include "human/memory/fact_extract.h"
+#include "human/cognition/trust.h"
+#include "human/persona/humor.h"
+#include "human/persona/somatic.h"
+#include "human/agent/frontier_persist.h"
+#include "human/eval/consistency.h"
+#include "human/agent/model_router.h"
+#include "human/security/moderation.h"
 #include "human/core/string.h"
 #include "human/tool.h"
 #ifdef HU_HAS_PERSONA
@@ -36,35 +46,6 @@
 #else
 #include <unistd.h>
 #endif
-
-typedef struct stream_token_wrap {
-    hu_agent_stream_token_cb on_token;
-    void *token_ctx;
-    uint32_t initial_delay_ms; /* emotional pacing: delay before first chunk */
-    bool first_chunk_sent;
-} stream_token_wrap_t;
-
-static bool stream_chunk_to_token_cb(void *ctx, const hu_stream_chunk_t *chunk) {
-    stream_token_wrap_t *w = (stream_token_wrap_t *)ctx;
-    if (chunk->is_final || !w->on_token)
-        return true;
-    if (chunk->type == HU_STREAM_CONTENT && chunk->delta && chunk->delta_len > 0) {
-        /* Emotional pacing: pause before first content chunk for heavy messages */
-        if (!w->first_chunk_sent && w->initial_delay_ms > 0) {
-            uint32_t delay = w->initial_delay_ms;
-            if (delay > 100)
-                delay = 100; /* cap at 100ms */
-#ifdef _WIN32
-            Sleep(delay);
-#else
-            usleep((useconds_t)delay * 1000);
-#endif
-        }
-        w->first_chunk_sent = true;
-        w->on_token(chunk->delta, chunk->delta_len, w->token_ctx);
-    }
-    return true;
-}
 
 /* v1 shim: translates hu_agent_stream_event_t back to the simple token callback */
 typedef struct v1_shim_ctx {
@@ -222,211 +203,24 @@ hu_error_t hu_agent_turn_stream(hu_agent_t *agent, const char *msg, size_t msg_l
                                        response_len_out);
     }
 
-    hu_error_t err =
-        hu_agent_internal_append_history(agent, HU_ROLE_USER, msg, msg_len, NULL, 0, NULL, 0);
-    if (err != HU_OK) {
-        hu_agent_clear_current_for_tools();
-        return err;
-    }
-
-    char *memory_ctx = NULL;
-    size_t memory_ctx_len = 0;
-    if (agent->memory && agent->memory->vtable) {
-        hu_memory_loader_t loader;
-        hu_memory_loader_init(&loader, agent->alloc, agent->memory, agent->retrieval_engine, 10,
-                              4000);
-        hu_error_t mem_err =
-            hu_memory_loader_load(&loader, msg, msg_len, "", 0, &memory_ctx, &memory_ctx_len);
-        if (mem_err != HU_OK && mem_err != HU_ERR_NOT_SUPPORTED)
-            hu_log_error("agent_stream", NULL, "memory_loader_load failed: %s",
-                         hu_error_string(mem_err));
-    }
-
-    /* Build situational awareness context */
-    char *awareness_ctx = NULL;
-    size_t awareness_ctx_len = 0;
-    if (agent->awareness)
-        awareness_ctx = hu_awareness_context(agent->awareness, agent->alloc, &awareness_ctx_len);
-
-    /* Build outcome tracking summary */
-    char *outcome_ctx = NULL;
-    size_t outcome_ctx_len = 0;
-    if (agent->outcomes)
-        outcome_ctx = hu_outcome_build_summary(agent->outcomes, agent->alloc, &outcome_ctx_len);
-
-    /* Build persona prompt fresh each turn (channel-dependent; no caching) */
-    char *persona_prompt = NULL;
-    size_t persona_prompt_len = 0;
-#ifdef HU_HAS_PERSONA
-    if (agent->persona) {
-        const char *ch = agent->active_channel;
-        size_t ch_len = agent->active_channel_len;
-        hu_error_t perr = hu_persona_build_prompt(agent->alloc, agent->persona, ch, ch_len, NULL, 0,
-                                                  &persona_prompt, &persona_prompt_len);
-        if (perr != HU_OK) {
-            if (memory_ctx)
-                agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
-            if (awareness_ctx)
-                agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
-            if (outcome_ctx)
-                agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
-            hu_agent_clear_current_for_tools();
-            return perr;
-        }
-    }
-#endif
-
-    char *system_prompt = NULL;
-    size_t system_prompt_len = 0;
-    if (agent->cached_static_prompt && !persona_prompt && !awareness_ctx) {
-        err = hu_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
-                                         agent->cached_static_prompt_len, memory_ctx,
-                                         memory_ctx_len, &system_prompt, &system_prompt_len);
-        if (memory_ctx)
-            agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
-        if (err != HU_OK) {
-            hu_agent_clear_current_for_tools();
-            return err;
-        }
-    } else {
-        hu_prompt_config_t cfg = {
-            .provider_name = agent->provider.vtable->get_name(agent->provider.ctx),
-            .provider_name_len = 0,
-            .model_name = agent->model_name,
-            .model_name_len = agent->model_name_len,
-            .workspace_dir = agent->workspace_dir,
-            .workspace_dir_len = agent->workspace_dir_len,
-            .tools = agent->tools,
-            .tools_count = agent->tools_count,
-            .memory_context = memory_ctx,
-            .memory_context_len = memory_ctx_len,
-            .autonomy_level = agent->autonomy_level,
-            .custom_instructions = agent->custom_instructions,
-            .custom_instructions_len = agent->custom_instructions_len,
-            .persona_prompt = persona_prompt,
-            .persona_prompt_len = persona_prompt_len,
-            .awareness_context = awareness_ctx,
-            .awareness_context_len = awareness_ctx_len,
-            .outcome_context = outcome_ctx,
-            .outcome_context_len = outcome_ctx_len,
-            .persona_immersive = (persona_prompt && persona_prompt_len > 0),
-            .persona =
-#ifdef HU_HAS_PERSONA
-                agent->persona
-#else
-                NULL
-#endif
-            ,
-            .contact_context = agent->contact_context,
-            .contact_context_len = agent->contact_context_len,
-            .conversation_context = agent->conversation_context,
-            .conversation_context_len = agent->conversation_context_len,
-            .max_response_chars = agent->max_response_chars,
-        };
-        err = hu_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
-        if (persona_prompt)
-            agent->alloc->free(agent->alloc->ctx, persona_prompt, persona_prompt_len + 1);
-        persona_prompt = NULL;
-        if (memory_ctx)
-            agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
-        if (awareness_ctx)
-            agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
-        if (outcome_ctx)
-            agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
-        if (err != HU_OK) {
-            hu_agent_clear_current_for_tools();
-            return err;
-        }
-    }
-
-    hu_chat_message_t *msgs = NULL;
-    size_t msgs_count = 0;
-    err = hu_context_format_messages(agent->alloc, agent->history, agent->history_count,
-                                     agent->max_history_messages, NULL, &msgs, &msgs_count);
-    if (err != HU_OK) {
-        if (system_prompt)
-            agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
-        return err;
-    }
-
-    size_t total_msgs = (msgs ? msgs_count : 0) + 1;
-    hu_chat_message_t *all_msgs = (hu_chat_message_t *)agent->alloc->alloc(
-        agent->alloc->ctx, total_msgs * sizeof(hu_chat_message_t));
-    if (!all_msgs) {
-        if (system_prompt)
-            agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
-        if (msgs)
-            agent->alloc->free(agent->alloc->ctx, msgs, msgs_count * sizeof(hu_chat_message_t));
-        return HU_ERR_OUT_OF_MEMORY;
-    }
-    all_msgs[0].role = HU_ROLE_SYSTEM;
-    all_msgs[0].content = system_prompt;
-    all_msgs[0].content_len = system_prompt_len;
-    all_msgs[0].name = NULL;
-    all_msgs[0].name_len = 0;
-    all_msgs[0].tool_call_id = NULL;
-    all_msgs[0].tool_call_id_len = 0;
-    all_msgs[0].content_parts = NULL;
-    all_msgs[0].content_parts_count = 0;
-    for (size_t i = 0; i < (msgs ? msgs_count : 0); i++)
-        all_msgs[i + 1] = msgs[i];
-    if (msgs)
-        agent->alloc->free(agent->alloc->ctx, msgs, msgs_count * sizeof(hu_chat_message_t));
-    msgs = all_msgs;
-    msgs_count = total_msgs;
-
-    hu_chat_request_t req;
-    memset(&req, 0, sizeof(req));
-    req.messages = msgs;
-    req.messages_count = msgs_count;
-    req.model = agent->model_name;
-    req.model_len = agent->model_name_len;
-    req.temperature = agent->temperature;
-    req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
-    req.tools_count = agent->tool_specs_count;
-
+    /* V1 no-tools path: route through batch (hu_agent_turn) for full frontier
+     * parity, then emit synthetic token callbacks from the final response. */
     {
-        /* Emotional pacing: compute delay from message weight */
-        hu_emotional_weight_t ew = hu_emotional_weight_classify(msg, msg_len);
-        uint32_t pacing_delay = (uint32_t)hu_emotional_pacing_adjust(0, ew);
-        stream_token_wrap_t wrap = {.on_token = on_token,
-                                    .token_ctx = token_ctx,
-                                    .initial_delay_ms = pacing_delay,
-                                    .first_chunk_sent = false};
-        hu_stream_chat_result_t sresp;
-        memset(&sresp, 0, sizeof(sresp));
-        err = agent->provider.vtable->stream_chat(
-            agent->provider.ctx, agent->alloc, &req, agent->model_name, agent->model_name_len,
-            agent->temperature, stream_chunk_to_token_cb, &wrap, &sresp);
-        if (msgs)
-            agent->alloc->free(agent->alloc->ctx, msgs, msgs_count * sizeof(hu_chat_message_t));
-        if (system_prompt)
-            agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
-        if (err != HU_OK) {
-            hu_agent_clear_current_for_tools();
-            return err;
-        }
-        agent->total_tokens += sresp.usage.total_tokens;
-        hu_agent_internal_record_cost(agent, &sresp.usage);
-        if (sresp.content && sresp.content_len > 0) {
-            {
-                hu_error_t hist_err = hu_agent_internal_append_history(
-                    agent, HU_ROLE_ASSISTANT, sresp.content, sresp.content_len, NULL, 0, NULL, 0);
-                if (hist_err != HU_OK)
-                    hu_log_error("agent_stream", NULL, "append_history failed: %s",
-                                 hu_error_string(hist_err));
-            }
-            *response_out = hu_strndup(agent->alloc, sresp.content, sresp.content_len);
-            hu_agent_internal_maybe_tts(agent, sresp.content, sresp.content_len);
-            agent->alloc->free(agent->alloc->ctx, (void *)sresp.content, sresp.content_len + 1);
-            if (!*response_out)
-                return HU_ERR_OUT_OF_MEMORY;
-            if (response_len_out)
-                *response_len_out = sresp.content_len;
-        }
         hu_agent_clear_current_for_tools();
-        return HU_OK;
+        hu_error_t batch_err = hu_agent_turn(agent, msg, msg_len, response_out, response_len_out);
+        if (batch_err == HU_OK && on_token && *response_out && response_len_out &&
+            *response_len_out > 0) {
+            size_t chunk_size = 12;
+            for (size_t i = 0; i < *response_len_out; i += chunk_size) {
+                size_t n = *response_len_out - i;
+                if (n > chunk_size)
+                    n = chunk_size;
+                on_token(*response_out + i, n, token_ctx);
+            }
+        }
+        return batch_err;
     }
+
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -467,6 +261,10 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
     bool can_stream = (on_event != NULL) && agent->provider.vtable->supports_streaming &&
                       agent->provider.vtable->supports_streaming(agent->provider.ctx) &&
                       agent->provider.vtable->stream_chat;
+
+    if (getenv("HU_DEBUG"))
+        hu_log_info("agent_stream", NULL, "stream_v2: can_stream=%d msg_len=%zu",
+                    can_stream, msg_len);
 
     /* Fallback: if provider can't stream, use batch turn and emit synthetic events */
     if (!can_stream) {
@@ -514,40 +312,110 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
 
     char *awareness_ctx = NULL;
     size_t awareness_ctx_len = 0;
-    if (agent->awareness)
+    if (agent->awareness && !agent->lean_prompt)
         awareness_ctx = hu_awareness_context(agent->awareness, agent->alloc, &awareness_ctx_len);
 
     char *outcome_ctx = NULL;
     size_t outcome_ctx_len = 0;
-    if (agent->outcomes)
+    if (agent->outcomes && !agent->lean_prompt)
         outcome_ctx = hu_outcome_build_summary(agent->outcomes, agent->alloc, &outcome_ctx_len);
 
     char *persona_prompt = NULL;
     size_t persona_prompt_len = 0;
 #ifdef HU_HAS_PERSONA
     if (agent->persona) {
-        const char *ch = agent->active_channel;
-        size_t ch_len = agent->active_channel_len;
-        hu_error_t perr = hu_persona_build_prompt(agent->alloc, agent->persona, ch, ch_len, NULL, 0,
-                                                  &persona_prompt, &persona_prompt_len);
-        if (perr != HU_OK) {
-            if (memory_ctx)
-                agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
-            if (awareness_ctx)
-                agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
-            if (outcome_ctx)
-                agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
-            hu_agent_clear_current_for_tools();
-            return perr;
+        if (agent->lean_prompt) {
+            /* Lean persona: core_anchor + reinforcement + anti_patterns + style_rules
+             * + channel overlay only. ~3-4KB instead of ~22KB. */
+            char lp[8192];
+            size_t lpo = 0;
+            const hu_persona_t *p = agent->persona;
+            if (p->core_anchor) {
+                int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s\n\n", p->core_anchor);
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            }
+            for (size_t i = 0; i < p->immersive_reinforcement_count && i < 10; i++) {
+                if (p->immersive_reinforcement[i]) {
+                    int n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n",
+                                     p->immersive_reinforcement[i]);
+                    if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                }
+            }
+            if (p->anti_patterns_count > 0) {
+                int n = snprintf(lp + lpo, sizeof(lp) - lpo, "\nNEVER do:\n");
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                for (size_t i = 0; i < p->anti_patterns_count; i++) {
+                    if (p->anti_patterns[i]) {
+                        n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n", p->anti_patterns[i]);
+                        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                    }
+                }
+            }
+            if (p->style_rules_count > 0) {
+                int n = snprintf(lp + lpo, sizeof(lp) - lpo, "\nStyle:\n");
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                for (size_t i = 0; i < p->style_rules_count; i++) {
+                    if (p->style_rules[i]) {
+                        n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n", p->style_rules[i]);
+                        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                    }
+                }
+            }
+            const hu_persona_overlay_t *ov = hu_persona_find_overlay(
+                p, agent->active_channel, agent->active_channel_len);
+            if (ov) {
+                int n = snprintf(lp + lpo, sizeof(lp) - lpo, "\nChannel style:");
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                if (ov->formality) {
+                    n = snprintf(lp + lpo, sizeof(lp) - lpo, " %s.", ov->formality);
+                    if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                }
+                if (ov->avg_length) {
+                    n = snprintf(lp + lpo, sizeof(lp) - lpo, " Length: %s.", ov->avg_length);
+                    if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                }
+                if (ov->emoji_usage) {
+                    n = snprintf(lp + lpo, sizeof(lp) - lpo, " Emoji: %s.", ov->emoji_usage);
+                    if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                }
+                for (size_t i = 0; i < ov->style_notes_count; i++) {
+                    if (ov->style_notes[i]) {
+                        n = snprintf(lp + lpo, sizeof(lp) - lpo, " %s.", ov->style_notes[i]);
+                        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                    }
+                }
+                n = snprintf(lp + lpo, sizeof(lp) - lpo, "\n");
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            }
+            if (lpo > 0) {
+                persona_prompt = hu_strndup(agent->alloc, lp, lpo);
+                persona_prompt_len = lpo;
+            }
+        } else {
+            const char *ch = agent->active_channel;
+            size_t ch_len = agent->active_channel_len;
+            hu_error_t perr = hu_persona_build_prompt(agent->alloc, agent->persona, ch, ch_len,
+                                                      NULL, 0, &persona_prompt, &persona_prompt_len);
+            if (perr != HU_OK) {
+                if (memory_ctx)
+                    agent->alloc->free(agent->alloc->ctx, memory_ctx, memory_ctx_len + 1);
+                if (awareness_ctx)
+                    agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
+                if (outcome_ctx)
+                    agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
+                hu_agent_clear_current_for_tools();
+                return perr;
+            }
         }
     }
 #endif
 
-    /* Intelligence context: learned behaviors, online learning, value learning. */
+    /* Intelligence context: learned behaviors, online learning, value learning.
+     * Skip in lean_prompt mode: not needed for fast texting. */
     char *intelligence_ctx = NULL;
     size_t intelligence_ctx_len = 0;
 #ifdef HU_ENABLE_SQLITE
-    if (agent->memory) {
+    if (agent->memory && !agent->lean_prompt) {
         sqlite3 *idb = hu_sqlite_memory_get_db(agent->memory);
         if (idb) {
             char ip[4096];
@@ -602,9 +470,107 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         }
     }
 #endif
+    /* Build frontier context for the streaming prompt (matching batch path) */
+    bool had_humor_dir = false;
+    char *somatic_ctx = NULL, *trust_ctx = NULL, *humor_dir = NULL;
+    size_t somatic_ctx_len = 0, trust_ctx_len = 0, humor_dir_len = 0;
+    char *syc_friction_ctx = NULL;
+    size_t syc_friction_ctx_len = 0;
+    const char *tone_hint = NULL;
+    size_t tone_hint_len = 0;
+
+    if (agent->frontiers.initialized && !agent->lean_prompt) {
+        hu_somatic_build_context(agent->alloc, &agent->frontiers.somatic,
+                                 &somatic_ctx, &somatic_ctx_len);
+        hu_tcal_build_context(agent->alloc, &agent->frontiers.trust,
+                              &trust_ctx, &trust_ctx_len);
+        /* Humor with persona style bridging */
+        hu_humor_context_t hctx;
+        memset(&hctx, 0, sizeof(hctx));
+        hctx.risk_tolerance = 0.4f; /* HU_HUMOR_RISK_TOLERANCE */
+        hctx.in_serious_context =
+            (agent->infra.emotional_cognition.state.intensity > 0.7f &&
+             agent->infra.emotional_cognition.state.valence < -0.2f);
+        if (agent->active_channel) {
+            hctx.channel = agent->active_channel;
+            hctx.channel_len = agent->active_channel_len;
+        }
+#ifdef HU_HAS_PERSONA
+        if (agent->persona && agent->persona->humor.style_count > 0) {
+            for (size_t hs = 0; hs < agent->persona->humor.style_count &&
+                 hctx.preferred_count < 8; hs++) {
+                const char *s = agent->persona->humor.style[hs];
+                hu_humor_fw_style_t mapped = HU_HUMOR_FW_OBSERVATIONAL;
+                if (strstr(s, "dry") || strstr(s, "deadpan"))
+                    mapped = HU_HUMOR_FW_DRY;
+                else if (strstr(s, "self") || strstr(s, "deprecat"))
+                    mapped = HU_HUMOR_FW_SELF_DEPRECATING;
+                else if (strstr(s, "word") || strstr(s, "pun"))
+                    mapped = HU_HUMOR_FW_WORDPLAY;
+                else if (strstr(s, "absurd") || strstr(s, "surreal"))
+                    mapped = HU_HUMOR_FW_ABSURDIST;
+                hctx.preferred_styles[hctx.preferred_count++] = mapped;
+            }
+        }
+#endif
+        hu_humor_evaluation_t heval;
+        memset(&heval, 0, sizeof(heval));
+        hu_humor_fw_evaluate_context(msg, msg_len, &hctx, &heval);
+        if (heval.should_attempt)
+            hu_humor_fw_build_directive(agent->alloc, &heval, &hctx,
+                                        &humor_dir, &humor_dir_len);
+
+        /* Sycophancy pre-check: scan for opinion patterns */
+        {
+            static const char *opinion_pats[] = {
+                "i think", "i believe", "i feel", "in my opinion",
+                "don't you think", "right?", "wouldn't you say",
+                "obviously", "clearly", "everyone knows",
+            };
+            size_t opinion_hits = 0;
+            for (size_t pi = 0; pi < sizeof(opinion_pats) / sizeof(opinion_pats[0]); pi++) {
+                size_t plen = strlen(opinion_pats[pi]);
+                for (size_t mi = 0; mi + plen <= msg_len; mi++) {
+                    bool m = true;
+                    for (size_t k = 0; k < plen; k++) {
+                        char a = (char)(msg[mi + k] >= 'A' && msg[mi + k] <= 'Z'
+                                        ? msg[mi + k] + 32 : msg[mi + k]);
+                        if (a != opinion_pats[pi][k]) { m = false; break; }
+                    }
+                    if (m) { opinion_hits++; break; }
+                }
+            }
+            if (opinion_hits >= 2) {
+                hu_sycophancy_result_t syc_synth;
+                memset(&syc_synth, 0, sizeof(syc_synth));
+                syc_synth.flagged = true;
+                syc_synth.total_risk = 0.5f;
+                syc_synth.factor_scores[HU_SYCOPHANCY_UNCRITICAL_AGREEMENT] =
+                    (float)opinion_hits * 0.25f;
+                hu_sycophancy_build_friction(agent->alloc, &syc_synth, msg, msg_len,
+                                             &syc_friction_ctx, &syc_friction_ctx_len);
+            }
+        }
+    }
+
+    /* Rhythm matching */
+    {
+        static const char rhythm_short[] =
+            " The user sent a very short message — match their energy with a brief, "
+            "conversational reply. Don't over-explain.";
+        static const char rhythm_long[] =
+            " The user wrote a long, thoughtful message — give it the space it deserves "
+            "with a proportional, considered response.";
+        if (msg_len <= 15 && msg_len > 0)
+            { tone_hint = rhythm_short; tone_hint_len = sizeof(rhythm_short) - 1; }
+        else if (msg_len >= 400)
+            { tone_hint = rhythm_long; tone_hint_len = sizeof(rhythm_long) - 1; }
+    }
+
     char *system_prompt = NULL;
     size_t system_prompt_len = 0;
-    if (agent->cached_static_prompt && !persona_prompt && !awareness_ctx) {
+    if (agent->cached_static_prompt && !persona_prompt && !awareness_ctx &&
+        !somatic_ctx && !trust_ctx && !humor_dir && !tone_hint && !syc_friction_ctx) {
         err = hu_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
@@ -620,15 +586,15 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             .provider_name_len = 0,
             .model_name = agent->model_name,
             .model_name_len = agent->model_name_len,
-            .workspace_dir = agent->workspace_dir,
-            .workspace_dir_len = agent->workspace_dir_len,
+            .workspace_dir = agent->lean_prompt ? NULL : agent->workspace_dir,
+            .workspace_dir_len = agent->lean_prompt ? 0 : agent->workspace_dir_len,
             .tools = agent->tools,
             .tools_count = agent->tools_count,
             .memory_context = memory_ctx,
             .memory_context_len = memory_ctx_len,
             .autonomy_level = agent->autonomy_level,
-            .custom_instructions = agent->custom_instructions,
-            .custom_instructions_len = agent->custom_instructions_len,
+            .custom_instructions = agent->lean_prompt ? NULL : agent->custom_instructions,
+            .custom_instructions_len = agent->lean_prompt ? 0 : agent->custom_instructions_len,
             .persona_prompt = persona_prompt,
             .persona_prompt_len = persona_prompt_len,
             .awareness_context = awareness_ctx,
@@ -636,7 +602,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             .outcome_context = outcome_ctx,
             .outcome_context_len = outcome_ctx_len,
             .persona_immersive = (persona_prompt && persona_prompt_len > 0),
-            .persona =
+            .persona = agent->lean_prompt ? NULL :
 #ifdef HU_HAS_PERSONA
                 agent->persona
 #else
@@ -650,6 +616,16 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             .max_response_chars = agent->max_response_chars,
             .intelligence_context = intelligence_ctx,
             .intelligence_context_len = intelligence_ctx_len,
+            .somatic_context = somatic_ctx,
+            .somatic_context_len = somatic_ctx_len,
+            .trust_context = trust_ctx,
+            .trust_context_len = trust_ctx_len,
+            .humor_directive = humor_dir,
+            .humor_directive_len = humor_dir_len,
+            .sycophancy_friction = syc_friction_ctx,
+            .sycophancy_friction_len = syc_friction_ctx_len,
+            .tone_hint = tone_hint,
+            .tone_hint_len = tone_hint_len,
         };
         err = hu_prompt_build_system(agent->alloc, &cfg, &system_prompt, &system_prompt_len);
         if (persona_prompt)
@@ -662,6 +638,17 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
         if (intelligence_ctx)
             agent->alloc->free(agent->alloc->ctx, intelligence_ctx, intelligence_ctx_len + 1);
+        if (somatic_ctx)
+            agent->alloc->free(agent->alloc->ctx, somatic_ctx, somatic_ctx_len + 1);
+        if (trust_ctx)
+            agent->alloc->free(agent->alloc->ctx, trust_ctx, trust_ctx_len + 1);
+        had_humor_dir = (humor_dir && humor_dir_len > 0);
+        if (humor_dir)
+            agent->alloc->free(agent->alloc->ctx, humor_dir, humor_dir_len + 1);
+        humor_dir = NULL;
+        humor_dir_len = 0;
+        if (syc_friction_ctx)
+            agent->alloc->free(agent->alloc->ctx, syc_friction_ctx, syc_friction_ctx_len + 1);
         if (err != HU_OK) {
             hu_agent_clear_current_for_tools();
             return err;
@@ -713,9 +700,51 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         memset(&req, 0, sizeof(req));
         req.messages = all_msgs;
         req.messages_count = total_msgs;
-        req.model = agent->model_name;
-        req.model_len = agent->model_name_len;
-        req.temperature = agent->temperature;
+
+        /* Emotional model routing (matching batch path) */
+        const char *turn_model = agent->model_name;
+        size_t turn_model_len = agent->model_name_len;
+        double turn_temp = agent->temperature;
+        if (agent->turn_model && agent->turn_model_len > 0) {
+            turn_model = agent->turn_model;
+            turn_model_len = agent->turn_model_len;
+        } else {
+            hu_model_router_config_t mr_cfg = hu_model_router_default_config();
+            const char *rel = NULL;
+            size_t rel_len = 0;
+#ifdef HU_HAS_PERSONA
+            if (agent->relationship.stage >= HU_REL_TRUSTED) {
+                rel = "trusted";
+                rel_len = 7;
+            } else if (agent->relationship.stage >= HU_REL_FAMILIAR) {
+                rel = "friend";
+                rel_len = 6;
+            }
+#endif
+            hu_model_selection_t sel = hu_model_route(&mr_cfg, msg, msg_len,
+                                                      rel, rel_len, -1,
+                                                      agent->history_count);
+            if (sel.tier >= HU_TIER_ANALYTICAL && sel.model && sel.model_len > 0) {
+                turn_model = sel.model;
+                turn_model_len = sel.model_len;
+                if (sel.temperature > 0.0)
+                    turn_temp = sel.temperature;
+            }
+        }
+        if (agent->turn_temperature > 0.0)
+            turn_temp = agent->turn_temperature;
+
+        /* Somatic energy caps */
+        if (agent->frontiers.initialized && agent->frontiers.somatic.energy < 0.3f) {
+            req.max_tokens = 300;
+            if (turn_temp > 0.7) turn_temp = 0.7;
+        } else if (agent->frontiers.initialized && agent->frontiers.somatic.energy < 0.5f) {
+            req.max_tokens = 600;
+        }
+
+        req.model = turn_model;
+        req.model_len = turn_model_len;
+        req.temperature = turn_temp;
         req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
         req.tools_count = agent->tool_specs_count;
 
@@ -734,13 +763,19 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                                  .first_content_sent = false};
         hu_stream_chat_result_t sresp;
         memset(&sresp, 0, sizeof(sresp));
+        if (getenv("HU_DEBUG"))
+            hu_log_info("agent_stream", NULL, "stream_v2: calling stream_chat msgs=%zu tools=%zu sp_len=%zu",
+                        total_msgs, req.tools_count, system_prompt_len);
         err = agent->provider.vtable->stream_chat(
-            agent->provider.ctx, agent->alloc, &req, agent->model_name, agent->model_name_len,
-            agent->temperature, stream_chunk_to_event_cb, &wrap, &sresp);
+            agent->provider.ctx, agent->alloc, &req, turn_model, turn_model_len, turn_temp,
+            stream_chunk_to_event_cb, &wrap, &sresp);
 
         agent->alloc->free(agent->alloc->ctx, all_msgs, total_msgs * sizeof(hu_chat_message_t));
 
         if (err != HU_OK) {
+            if (getenv("HU_DEBUG"))
+                hu_log_error("agent_stream", NULL, "stream_v2: stream_chat FAILED: %s",
+                             hu_error_string(err));
             hu_stream_chat_result_free(agent->alloc, &sresp);
             if (system_prompt)
                 agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
@@ -771,6 +806,15 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         err = hu_agent_internal_append_history_with_tool_calls(
             agent, sresp.content ? sresp.content : "", sresp.content_len, sresp.tool_calls,
             sresp.tool_calls_count);
+        if (err != HU_OK) {
+            hu_log_error("agent_stream_v2", NULL, "append_history_with_tool_calls failed: %s",
+                         hu_error_string(err));
+            hu_stream_chat_result_free(agent->alloc, &sresp);
+            if (system_prompt)
+                agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
+            hu_agent_clear_current_for_tools();
+            return err;
+        }
 
         /* Execute each tool call and emit TOOL_RESULT events */
         for (size_t tc = 0; tc < sresp.tool_calls_count; tc++) {
@@ -822,8 +866,12 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 result_text_len = 0;
             }
 
-            hu_agent_internal_append_history(agent, HU_ROLE_TOOL, result_text, result_text_len,
-                                             call->name, call->name_len, call->id, call->id_len);
+            hu_error_t hist_err = hu_agent_internal_append_history(
+                agent, HU_ROLE_TOOL, result_text, result_text_len, call->name, call->name_len,
+                call->id, call->id_len);
+            if (hist_err != HU_OK)
+                hu_log_error("agent_stream_v2", NULL, "append tool result failed: %s",
+                             hu_error_string(hist_err));
 
             /* Emit TOOL_RESULT event to the callback */
             if (on_event) {
@@ -976,22 +1024,20 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             hu_critique_result_free(agent->alloc, &critique);
         }
 
-        /* 3. Metacognition: signal-based re-entry (one regen max) */
+        /* 3. Metacognition: observe-only in streaming path (no re-generation).
+         *    agent_turn.c handles the interventional metacog loop for non-streaming. */
         if (agent->infra.metacognition.cfg.enabled) {
             hu_metacognition_signal_t mc_sig =
                 hu_metacognition_monitor(msg, msg_len, final_content, final_content_len, NULL, 0,
                                          0.0f, 0, 0, &agent->infra.metacognition);
             hu_metacog_action_t mc_act =
                 hu_metacognition_plan_action(&agent->infra.metacognition, &mc_sig);
-            if (mc_act != HU_METACOG_ACTION_NONE && agent->infra.metacognition.regen_count < 1) {
-                /* Inject metacognition directive and re-call provider once */
+            if (mc_act != HU_METACOG_ACTION_NONE) {
                 char directive[256];
                 size_t dir_len = 0;
                 hu_metacognition_apply(mc_act, directive, sizeof(directive), &dir_len);
-                if (dir_len > 0) {
-                    hu_log_info("human", NULL, "[metacog] %s → re-generating", directive);
-                    agent->infra.metacognition.regen_count++;
-                }
+                if (dir_len > 0)
+                    hu_log_info("human", NULL, "[metacog] signal: %s", directive);
             }
         }
 
@@ -1016,12 +1062,165 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         }
     }
 
+    /* Post-response guards (matching batch path) */
+    if (final_content && final_content_len > 0) {
+        /* Hallucination guard */
+        if (agent->memory) {
+            char *grounded = NULL;
+            size_t grounded_len = 0;
+            if (hu_hallucination_guard(agent->alloc, final_content, final_content_len,
+                                       agent->memory, &grounded, &grounded_len) == HU_OK &&
+                grounded) {
+                hu_log_info("agent_stream_v2", NULL,
+                            "hallucination guard rewrote streaming response");
+                agent->alloc->free(agent->alloc->ctx, final_content, final_content_len + 1);
+                final_content = grounded;
+                final_content_len = grounded_len;
+            }
+        }
+
+        /* Humor landing feedback */
+        if (had_humor_dir) {
+            float humor_score = 0.0f;
+            if (hu_humor_fw_score_response(final_content, final_content_len,
+                                           NULL, &humor_score) == HU_OK) {
+                if (agent->observer) {
+                    hu_observer_event_t hev = {.tag = HU_OBSERVER_EVENT_FRONTIER,
+                        .trace_id = agent->trace_id,
+                        .data.frontier = {.frontier = "humor",
+                            .transition = humor_score >= 0.3f ? "landed" : "flat",
+                            .value = humor_score}};
+                    hu_observer_record_event(*agent->observer, &hev);
+                }
+                if (humor_score >= 0.3f && agent->frontiers.initialized)
+                    hu_tcal_update(&agent->frontiers.trust, 0.3f, 0.4f, 0.2f);
+            }
+        }
+
+        /* Post-response sycophancy check */
+        {
+            hu_sycophancy_result_t syc_post;
+            memset(&syc_post, 0, sizeof(syc_post));
+            if (hu_sycophancy_check(final_content, final_content_len, msg, msg_len,
+                                    0.5f, &syc_post) == HU_OK && syc_post.flagged) {
+                hu_log_info("agent_stream_v2", NULL,
+                            "sycophancy flagged: risk=%.2f patterns=%zu",
+                            syc_post.total_risk, syc_post.pattern_count);
+                if (agent->observer) {
+                    hu_observer_event_t sev = {.tag = HU_OBSERVER_EVENT_FRONTIER,
+                        .trace_id = agent->trace_id,
+                        .data.frontier = {.frontier = "sycophancy",
+                            .transition = "flagged",
+                            .value = syc_post.total_risk}};
+                    hu_observer_record_event(*agent->observer, &sev);
+                }
+                if (agent->frontiers.initialized)
+                    hu_tcal_update(&agent->frontiers.trust, 0.0f, -0.2f, -0.1f);
+            }
+        }
+
+        /* Outbound moderation: check the response for safety */
+        {
+            hu_moderation_result_t mod_result;
+            if (hu_moderation_check_local(agent->alloc, final_content, final_content_len,
+                                          &mod_result) == HU_OK && mod_result.flagged) {
+                hu_log_info("agent_stream_v2", NULL,
+                            "outbound moderation flagged response (violence=%d self_harm=%d)",
+                            mod_result.violence, mod_result.self_harm);
+            }
+        }
+
+        /* Consistency drift check */
+        if (agent->conversation_context && agent->conversation_context_len > 20) {
+            float line_score = 0.0f;
+            if (hu_consistency_score_line(agent->conversation_context,
+                                          agent->conversation_context_len,
+                                          final_content, final_content_len,
+                                          &line_score) == HU_OK && line_score < 0.3f) {
+                hu_log_info("agent_stream_v2", NULL,
+                            "consistency drift detected: score=%.2f", line_score);
+                if (agent->observer) {
+                    hu_observer_event_t cev = {.tag = HU_OBSERVER_EVENT_FRONTIER,
+                        .trace_id = agent->trace_id,
+                        .data.frontier = {.frontier = "consistency",
+                            .transition = "drift", .value = line_score}};
+                    hu_observer_record_event(*agent->observer, &cev);
+                }
+            }
+        }
+
+        /* Fact extraction with intra-batch dedup */
+        if (agent->memory && agent->memory->vtable && agent->memory->vtable->store) {
+            hu_heuristic_fact_t stored_facts[16];
+            size_t stored_count = 0;
+            const char *fsrcs[] = { msg, final_content };
+            size_t fsrc_lens[] = { msg_len, final_content_len };
+            for (size_t fsi = 0; fsi < 2; fsi++) {
+                if (!fsrcs[fsi] || fsrc_lens[fsi] == 0) continue;
+                hu_fact_extract_result_t fact_res;
+                memset(&fact_res, 0, sizeof(fact_res));
+                if (hu_fact_extract(fsrcs[fsi], fsrc_lens[fsi], &fact_res) == HU_OK &&
+                    fact_res.fact_count > 0) {
+                    if (stored_count > 0)
+                        hu_fact_dedup(&fact_res, stored_facts, stored_count);
+                    for (size_t fi = 0; fi < fact_res.fact_count; fi++) {
+                        if (fact_res.facts[fi].confidence < 0.6f) continue;
+                        bool dup = false;
+                        for (size_t si = 0; si < stored_count && !dup; si++) {
+                            if (strcmp(fact_res.facts[fi].subject, stored_facts[si].subject) == 0 &&
+                                strcmp(fact_res.facts[fi].predicate, stored_facts[si].predicate) == 0)
+                                dup = true;
+                        }
+                        if (dup) continue;
+                        char *fk = NULL, *fv = NULL;
+                        size_t fk_len = 0, fv_len = 0;
+                        if (hu_fact_format_for_store(agent->alloc, &fact_res.facts[fi],
+                                                     &fk, &fk_len, &fv, &fv_len) == HU_OK &&
+                            fk && fv) {
+                            (void)agent->memory->vtable->store(
+                                agent->memory->ctx, fk, fk_len, fv, fv_len,
+                                NULL, agent->memory_session_id,
+                                agent->memory_session_id_len);
+                            if (stored_count < 16)
+                                stored_facts[stored_count++] = fact_res.facts[fi];
+                        }
+                        if (fk) agent->alloc->free(agent->alloc->ctx, fk, fk_len + 1);
+                        if (fv) agent->alloc->free(agent->alloc->ctx, fv, fv_len + 1);
+                    }
+                }
+            }
+        }
+    }
+
     if (final_content) {
         *response_out = final_content;
         if (response_len_out)
             *response_len_out = final_content_len;
         hu_agent_internal_maybe_tts(agent, final_content, final_content_len);
     }
+
+    /* Persist frontier state after streaming turn (matches batch path) */
+#ifdef HU_ENABLE_SQLITE
+    if (agent->frontiers.initialized && agent->memory &&
+        agent->memory_session_id && agent->memory_session_id_len > 0) {
+        sqlite3 *fp_db = hu_sqlite_memory_get_db(agent->memory);
+        if (fp_db) {
+            hu_frontier_persist_save(agent->alloc, fp_db,
+                agent->memory_session_id, agent->memory_session_id_len,
+                &agent->frontiers);
+            hu_frontier_persist_save_growth(agent->alloc, fp_db,
+                agent->memory_session_id, agent->memory_session_id_len,
+                &agent->frontiers);
+#ifdef HU_HAS_PERSONA
+            hu_frontier_persist_save_relationship(fp_db,
+                agent->memory_session_id, agent->memory_session_id_len,
+                (int)agent->relationship.stage,
+                (int)agent->relationship.session_count,
+                (int)agent->relationship.total_turns);
+#endif
+        }
+    }
+#endif
 
     /* Auto-save session after successful streaming turn */
     if (agent->auto_save && agent->session_id[0] != '\0') {

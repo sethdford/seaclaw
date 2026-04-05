@@ -2290,8 +2290,11 @@ static hu_error_t hula_demo_execute(void *ctx, hu_allocator_t *alloc, const hu_j
     char buf[256];
     int n = snprintf(buf, sizeof(buf), "[%s] %s", t->name, text);
     out->success = true;
-    out->output = hu_strndup(alloc, buf, n > 0 ? (size_t)n : 0);
-    out->output_len = n > 0 ? (size_t)n : 0;
+    size_t len = (n > 0 && (size_t)n < sizeof(buf)) ? (size_t)n
+                 : (n > 0) ? (sizeof(buf) - 1U)
+                           : 0U;
+    out->output = hu_strndup(alloc, buf, len);
+    out->output_len = len;
     out->output_owned = true;
     return HU_OK;
 }

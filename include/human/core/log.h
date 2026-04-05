@@ -12,6 +12,7 @@
  *
  * Usage:
  *   hu_log_error("daemon", obs, "failed: %s", detail);
+ *   hu_log_warn("agent", obs, "degraded path: %s", detail);
  *   hu_log_info("human", obs, "check-in sent to %s", name);
  *
  * The observer pointer may be NULL (triggers fallback).
@@ -37,6 +38,7 @@ static inline void hu_log_impl_(const char *component, hu_observer_t *obs, const
 }
 
 #define hu_log_error(component, obs_ptr, ...) hu_log_impl_((component), (obs_ptr), __VA_ARGS__)
+#define hu_log_warn(component, obs_ptr, ...) hu_log_impl_((component), (obs_ptr), __VA_ARGS__)
 #define hu_log_info(component, obs_ptr, ...)  hu_log_impl_((component), (obs_ptr), __VA_ARGS__)
 
 #endif /* HU_CORE_LOG_H */

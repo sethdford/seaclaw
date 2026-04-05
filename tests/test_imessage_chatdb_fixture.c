@@ -28,7 +28,8 @@ static const char *schema_sql = "CREATE TABLE handle ("
                                 "  date_edited INTEGER DEFAULT 0,"
                                 "  date_retracted INTEGER DEFAULT 0,"
                                 "  thread_originator_guid TEXT,"
-                                "  balloon_bundle_id TEXT"
+                                "  balloon_bundle_id TEXT,"
+                                "  expressive_send_style_id TEXT"
                                 ");"
                                 "CREATE TABLE attachment ("
                                 "  ROWID INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -104,7 +105,20 @@ static const char *seed_sql =
     "INSERT INTO message (guid, text, handle_id, date, is_from_me,"
     "  associated_message_type, attributedBody)"
     "  VALUES ('MSG-009', NULL, 1, 700000008000000000, 0, 0, X'62706C697374');"
-    "INSERT INTO chat_message_join (chat_id, message_id) VALUES (1, 9);";
+    "INSERT INTO chat_message_join (chat_id, message_id) VALUES (1, 9);"
+    /* Message with Slam effect */
+    "INSERT INTO message (guid, text, handle_id, date, is_from_me,"
+    "  associated_message_type, expressive_send_style_id)"
+    "  VALUES ('MSG-010', 'Wow!', 1, 700000009000000000, 0, 0,"
+    "  'com.apple.MobileSMS.expressivesend.impact');"
+    "INSERT INTO chat_message_join (chat_id, message_id) VALUES (1, 10);"
+    /* Memoji message (balloon_bundle_id with Animoji) */
+    "INSERT INTO message (guid, text, handle_id, date, is_from_me,"
+    "  associated_message_type, balloon_bundle_id)"
+    "  VALUES ('MSG-011', NULL, 1, 700000010000000000, 0, 0,"
+    "  'com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:"
+    "com.apple.Animoji.StickersApp.MessagesExtension');"
+    "INSERT INTO chat_message_join (chat_id, message_id) VALUES (1, 11);";
 
 static sqlite3 *open_fixture(void) {
     sqlite3 *db = NULL;
@@ -137,8 +151,8 @@ static void test_chatdb_poll_query_returns_inbound(void) {
     sqlite3 *db = open_fixture();
     HU_ASSERT_NOT_NULL(db);
 
-    /* Exact production poll SQL from imessage.c — kept in sync to catch drift.
-     * COALESCE: voice→[Voice Message], video→[Video], else→[Photo]. */
+    /* Production poll SQL from imessage.c — kept in sync to catch drift.
+     * COALESCE: voice→[Voice Message], video→[Video], fallback→[Photo]. */
     const char *sql =
         "SELECT m.ROWID, m.guid, "
         "  COALESCE(m.text, "
@@ -155,10 +169,7 @@ static void test_chatdb_poll_query_returns_inbound(void) {
         "             WHERE majv.message_id = m.ROWID AND av.filename IS NOT NULL "
         "             AND (LOWER(av.filename) LIKE '%.mov' OR LOWER(av.filename) LIKE '%.mp4' "
         "               OR LOWER(av.filename) LIKE '%.m4v')) > 0 "
-        "       THEN '[Video]' "
-        "       WHEN (SELECT COUNT(*) FROM message_attachment_join "
-        "             WHERE message_id = m.ROWID) > 0 "
-        "       THEN '[Photo]' ELSE NULL END)) AS text, h.id, "
+        "       THEN '[Video]' ELSE '[Photo]' END)) AS text, h.id, "
         "  COALESCE("
         "    (SELECT COUNT(DISTINCT chj2.handle_id) FROM chat_message_join cmj "
         "     JOIN chat_handle_join chj2 ON chj2.chat_id = cmj.chat_id "
@@ -184,14 +195,14 @@ static void test_chatdb_poll_query_returns_inbound(void) {
         "  CASE WHEN m.date_edited > 0 THEN 1 ELSE 0 END AS was_edited, "
         "  m.thread_originator_guid, "
         "  m.attributedBody, "
-        "  m.balloon_bundle_id "
+        "  m.balloon_bundle_id, "
+        "  m.expressive_send_style_id "
         "FROM message m "
         "JOIN handle h ON m.handle_id = h.ROWID "
         "WHERE m.is_from_me = 0 AND m.associated_message_type = 0 "
         "AND m.ROWID > ? "
         "AND ((m.text IS NOT NULL AND LENGTH(m.text) > 0) "
         "     OR (m.attributedBody IS NOT NULL AND LENGTH(m.attributedBody) > 0) "
-        "     OR (m.balloon_bundle_id IS NOT NULL AND LENGTH(m.balloon_bundle_id) > 0) "
         "     OR (EXISTS (SELECT 1 FROM message_attachment_join maj "
         "         JOIN attachment a ON maj.attachment_id = a.ROWID "
         "         WHERE maj.message_id = m.ROWID AND a.filename IS NOT NULL "
@@ -202,7 +213,8 @@ static void test_chatdb_poll_query_returns_inbound(void) {
         "             OR LOWER(a.filename) LIKE '%.m4v') "
         "           OR (LOWER(a.filename) LIKE '%.caf' OR LOWER(a.filename) LIKE '%.m4a' "
         "             OR LOWER(a.filename) LIKE '%.mp3' OR LOWER(a.filename) LIKE '%.aac' "
-        "             OR LOWER(a.filename) LIKE '%.opus'))))) "
+        "             OR LOWER(a.filename) LIKE '%.opus')))) "
+        "     OR (m.balloon_bundle_id IS NOT NULL)) "
         "ORDER BY m.ROWID ASC LIMIT ?";
 
     sqlite3_stmt *stmt = NULL;
@@ -213,13 +225,15 @@ static void test_chatdb_poll_query_returns_inbound(void) {
 
     int count = 0;
     bool saw_voice = false, saw_video = false, saw_photo = false;
-    bool saw_text = false, saw_attr = false;
+    bool saw_text = false, saw_attr = false, saw_effect = false, saw_memoji = false;
     bool saw_has_image = false, saw_has_video = false, saw_has_audio = false;
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         const char *text = (const char *)sqlite3_column_text(stmt, 2);
         int has_image = sqlite3_column_int(stmt, 5);
         int has_video_col = sqlite3_column_int(stmt, 6);
         int has_audio = sqlite3_column_int(stmt, 7);
+        const char *balloon = (const char *)sqlite3_column_text(stmt, 11);
+        const char *effect = (const char *)sqlite3_column_text(stmt, 12);
         if (text) {
             if (strcmp(text, "[Voice Message]") == 0)
                 saw_voice = true;
@@ -229,7 +243,11 @@ static void test_chatdb_poll_query_returns_inbound(void) {
                 saw_photo = true;
             if (strcmp(text, "Hello there") == 0)
                 saw_text = true;
+            if (strcmp(text, "Wow!") == 0 && effect)
+                saw_effect = true;
         }
+        if (balloon && strstr(balloon, "Animoji"))
+            saw_memoji = true;
         {
             const void *ab = sqlite3_column_blob(stmt, 10);
             if (ab && sqlite3_column_bytes(stmt, 10) > 0)
@@ -244,15 +262,18 @@ static void test_chatdb_poll_query_returns_inbound(void) {
         count++;
     }
     /* MSG-001(text), MSG-004(photo→[Photo]), MSG-005(sticker/balloon),
-     * MSG-006(voice), MSG-007(video), MSG-009(attributedBody).
+     * MSG-006(voice), MSG-007(video), MSG-009(attributedBody),
+     * MSG-010(text with Slam effect), MSG-011(Memoji/balloon).
      * MSG-008(doc.pdf) excluded — production EXISTS filter requires
      * known image/video/audio extensions. */
-    HU_ASSERT_EQ(count, 6);
+    HU_ASSERT_EQ(count, 8);
     HU_ASSERT_TRUE(saw_text);
     HU_ASSERT_TRUE(saw_voice);
     HU_ASSERT_TRUE(saw_video);
     HU_ASSERT_TRUE(saw_photo);
     HU_ASSERT_TRUE(saw_attr);
+    HU_ASSERT_TRUE(saw_effect);
+    HU_ASSERT_TRUE(saw_memoji);
     HU_ASSERT_TRUE(saw_has_image);
     HU_ASSERT_TRUE(saw_has_video);
     HU_ASSERT_TRUE(saw_has_audio);
@@ -614,7 +635,7 @@ static void test_chatdb_gif_tapback_count_query(void) {
     sqlite3_close(db);
 }
 
-/* TODO: enable when hu_imessage_load_history_from_db is implemented */
+/* History loading is implemented via imessage_load_conversation_history vtable. */
 
 void run_imessage_chatdb_fixture_tests(void) {
     HU_TEST_SUITE("iMessage ChatDB Fixture");

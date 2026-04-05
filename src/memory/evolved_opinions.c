@@ -484,6 +484,12 @@ hu_error_t hu_evolved_opinion_history(hu_allocator_t *alloc, sqlite3 *db, const 
     }
 
     sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        hu_opinion_history_free(alloc, entries, count);
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
     *out = entries;
     *out_count = count;
     return HU_OK;

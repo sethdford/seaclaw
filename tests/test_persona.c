@@ -3730,6 +3730,387 @@ static void test_affect_ceiling_stranger(void) {
     HU_ASSERT_TRUE(c >= 0.69f && c <= 0.71f); /* 0.7 */
 }
 
+/* ── Lean Prompt E2E Fleet ────────────────────────────────────────────── */
+
+static const char lean_test_persona_json[] =
+    "{\"version\":1,\"name\":\"seth\","
+    "\"core\":{\"identity\":\"Head of Agentic AI at Vanguard. Introverted engineer.\","
+    "\"traits\":[\"direct\",\"warm\",\"playfully teasing\"],"
+    "\"vocabulary\":{\"preferred\":[\"sounds good\",\"let's do it\"],\"avoided\":[\"synergy\"],"
+    "\"slang\":[\"haha\",\"lol\"]},"
+    "\"communication_rules\":[\"Keep messages short\",\"Tease family members\"],"
+    "\"values\":[\"authenticity\",\"family\"],"
+    "\"decision_style\":\"Decides fast\","
+    "\"biography\":\"Grew up in Star Valley Wyoming, third of seven children. "
+    "Worked at Google, now Vanguard. This is a long biography section that should NOT "
+    "appear in a lean prompt but SHOULD appear in a full prompt.\","
+    "\"directors_notes\":[\"Seth teases Mindy relentlessly but lovingly.\","
+    "\"Never sound like an AI assistant.\"]},"
+    "\"motivation\":{\"primary_drive\":\"Building AI systems that feel human\","
+    "\"protecting\":\"His kids and family relationships\","
+    "\"avoiding\":\"Corporate BS\",\"wanting\":\"Something meaningful in AI\"},"
+    "\"humor\":{\"type\":\"playful teasing with nerdy undertones\","
+    "\"frequency\":\"high with family\","
+    "\"targets\":[\"his sister Mindy\",\"himself\"],"
+    "\"boundaries\":[\"never mean-spirited\"],"
+    "\"timing\":\"Teasing IS his love language\"},"
+    "\"conflict_style\":{\"pushback_response\":\"Gets quiet first\","
+    "\"confrontation_comfort\":\"Moderate\","
+    "\"apology_style\":\"Straightforward\","
+    "\"boundary_assertion\":\"Calm and clear\","
+    "\"repair_behavior\":\"Reaches out first\"},"
+    "\"emotional_range\":{\"ceiling\":\"Multiple exclamation marks\","
+    "\"floor\":\"Goes quiet\","
+    "\"escalation_triggers\":[\"someone being fake\"],"
+    "\"de_escalation\":[\"codes something\"],"
+    "\"withdrawal_conditions\":\"Extended social drain\","
+    "\"recovery_style\":\"Comes back naturally\"},"
+    "\"voice_rhythm\":{\"sentence_pattern\":\"Short fragments\","
+    "\"paragraph_cadence\":\"Never writes paragraphs in texts\","
+    "\"response_tempo\":\"Fast when excited\","
+    "\"emphasis_style\":\"Caps for excitement\","
+    "\"pause_behavior\":\"Goes silent when thinking\"},"
+    "\"inner_world\":{\"contradictions\":[\"Introverted but texts family constantly\"],"
+    "\"embodied_memories\":[\"Riding the three-wheeler\"],"
+    "\"emotional_flashpoints\":[\"His kids\"],"
+    "\"unfinished_business\":[\"More time with his four kids\"],"
+    "\"secret_self\":[\"The nerdy kid from Star Valley never left\"]},"
+    "\"intellectual\":{\"expertise\":[\"Agentic AI\",\"vibe coding\"],"
+    "\"curiosity_areas\":[\"hardware hacking\"],"
+    "\"thinking_style\":\"First-principles\","
+    "\"metaphor_sources\":\"Building and engineering\"},"
+    "\"sensory\":{\"dominant_sense\":\"kinesthetic\","
+    "\"metaphor_vocabulary\":[\"dig into that\"],"
+    "\"grounding_patterns\":\"Goes outside\"},"
+    "\"core_anchor\":\"The nerdy mountain kid from Star Valley who builds AI and "
+    "loves his four kids more than anything.\","
+    "\"immersive_reinforcement\":[\"You ARE Seth. Not playing Seth.\","
+    "\"Text like a real person: short, messy, lowercase.\","
+    "\"Never explain yourself. Never apologize for being busy.\","
+    "\"If you don't know, say idk.\"],"
+    "\"anti_patterns\":[\"Never use exclamation marks excessively\","
+    "\"Never say 'I apologize'\",\"Never write paragraphs in texts\","
+    "\"Never use formal greetings\"],"
+    "\"style_rules\":[\"lowercase except proper nouns\","
+    "\"no periods at end of messages\",\"1-15 words per message\","
+    "\"abbreviations ok: gonna, wanna, idk, nah\"],"
+    "\"character_invariants\":[\"Always responds to family within minutes\","
+    "\"Teasing is love\"],"
+    "\"channel_overlays\":{\"imessage\":{\"formality\":\"very casual\","
+    "\"avg_length\":\"short\",\"emoji_usage\":\"moderate\","
+    "\"message_splitting\":true,\"max_segment_chars\":60,"
+    "\"typing_quirks\":[\"lowercase\",\"no_periods\"],"
+    "\"style_notes\":[\"1-10 word messages\",\"rapid-fire short messages\"]}}}";
+
+/* Helper: build lean persona prompt the same way agent_stream.c does */
+static char *build_lean_persona(hu_allocator_t *alloc, const hu_persona_t *p,
+                                const char *channel, size_t channel_len,
+                                size_t *out_len) {
+    char lp[8192];
+    size_t lpo = 0;
+    if (p->core_anchor) {
+        int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s\n\n", p->core_anchor);
+        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+    }
+    for (size_t i = 0; i < p->immersive_reinforcement_count && i < 10; i++) {
+        if (p->immersive_reinforcement[i]) {
+            int n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n",
+                             p->immersive_reinforcement[i]);
+            if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        }
+    }
+    if (p->anti_patterns_count > 0) {
+        int n = snprintf(lp + lpo, sizeof(lp) - lpo, "\nNEVER do:\n");
+        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        for (size_t i = 0; i < p->anti_patterns_count; i++) {
+            if (p->anti_patterns[i]) {
+                n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n", p->anti_patterns[i]);
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            }
+        }
+    }
+    if (p->style_rules_count > 0) {
+        int n = snprintf(lp + lpo, sizeof(lp) - lpo, "\nStyle:\n");
+        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        for (size_t i = 0; i < p->style_rules_count; i++) {
+            if (p->style_rules[i]) {
+                n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n", p->style_rules[i]);
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            }
+        }
+    }
+    const hu_persona_overlay_t *ov = hu_persona_find_overlay(p, channel, channel_len);
+    if (ov) {
+        int n = snprintf(lp + lpo, sizeof(lp) - lpo, "\nChannel style:");
+        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        if (ov->formality) {
+            n = snprintf(lp + lpo, sizeof(lp) - lpo, " %s.", ov->formality);
+            if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        }
+        if (ov->avg_length) {
+            n = snprintf(lp + lpo, sizeof(lp) - lpo, " Length: %s.", ov->avg_length);
+            if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        }
+        if (ov->emoji_usage) {
+            n = snprintf(lp + lpo, sizeof(lp) - lpo, " Emoji: %s.", ov->emoji_usage);
+            if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        }
+        for (size_t i = 0; i < ov->style_notes_count; i++) {
+            if (ov->style_notes[i]) {
+                n = snprintf(lp + lpo, sizeof(lp) - lpo, " %s.", ov->style_notes[i]);
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            }
+        }
+        n = snprintf(lp + lpo, sizeof(lp) - lpo, "\n");
+        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+    }
+    if (lpo > 0) {
+        *out_len = lpo;
+        return hu_strndup(alloc, lp, lpo);
+    }
+    *out_len = 0;
+    return NULL;
+}
+
+static void test_lean_prompt_size_under_5kb(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p;
+    memset(&p, 0, sizeof(p));
+    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
+                                          strlen(lean_test_persona_json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    size_t lean_len = 0;
+    char *lean = build_lean_persona(&alloc, &p, "imessage", 8, &lean_len);
+    HU_ASSERT_NOT_NULL(lean);
+    HU_ASSERT_TRUE(lean_len > 100); /* not trivially empty */
+    HU_ASSERT_TRUE(lean_len < 5120); /* under 5KB */
+
+    /* Build full system prompt through prompt.c immersive path */
+    hu_prompt_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.persona_prompt = lean;
+    cfg.persona_prompt_len = lean_len;
+    cfg.persona_immersive = true;
+    cfg.persona = NULL; /* lean mode sets this to NULL */
+
+    char *sp = NULL;
+    size_t sp_len = 0;
+    err = hu_prompt_build_system(&alloc, &cfg, &sp, &sp_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(sp);
+    HU_ASSERT_TRUE(sp_len < 5120); /* total system prompt under 5KB */
+
+    alloc.free(alloc.ctx, sp, sp_len + 1);
+    alloc.free(alloc.ctx, lean, lean_len + 1);
+    hu_persona_deinit(&alloc, &p);
+}
+
+static void test_lean_prompt_includes_core_anchor(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
+                                          strlen(lean_test_persona_json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    size_t lean_len = 0;
+    char *lean = build_lean_persona(&alloc, &p, "imessage", 8, &lean_len);
+    HU_ASSERT_NOT_NULL(lean);
+    HU_ASSERT_TRUE(strstr(lean, "nerdy mountain kid") != NULL);
+    HU_ASSERT_TRUE(strstr(lean, "Star Valley") != NULL);
+    HU_ASSERT_TRUE(strstr(lean, "four kids") != NULL);
+
+    alloc.free(alloc.ctx, lean, lean_len + 1);
+    hu_persona_deinit(&alloc, &p);
+}
+
+static void test_lean_prompt_includes_reinforcement(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
+                                          strlen(lean_test_persona_json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    size_t lean_len = 0;
+    char *lean = build_lean_persona(&alloc, &p, "imessage", 8, &lean_len);
+    HU_ASSERT_NOT_NULL(lean);
+    HU_ASSERT_TRUE(strstr(lean, "You ARE Seth") != NULL);
+    HU_ASSERT_TRUE(strstr(lean, "short, messy, lowercase") != NULL);
+    HU_ASSERT_TRUE(strstr(lean, "Never explain yourself") != NULL);
+
+    alloc.free(alloc.ctx, lean, lean_len + 1);
+    hu_persona_deinit(&alloc, &p);
+}
+
+static void test_lean_prompt_includes_anti_patterns(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
+                                          strlen(lean_test_persona_json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    size_t lean_len = 0;
+    char *lean = build_lean_persona(&alloc, &p, "imessage", 8, &lean_len);
+    HU_ASSERT_NOT_NULL(lean);
+    HU_ASSERT_TRUE(strstr(lean, "NEVER do:") != NULL);
+    HU_ASSERT_TRUE(strstr(lean, "I apologize") != NULL);
+    HU_ASSERT_TRUE(strstr(lean, "paragraphs in texts") != NULL);
+
+    alloc.free(alloc.ctx, lean, lean_len + 1);
+    hu_persona_deinit(&alloc, &p);
+}
+
+static void test_lean_prompt_excludes_biography(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
+                                          strlen(lean_test_persona_json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    size_t lean_len = 0;
+    char *lean = build_lean_persona(&alloc, &p, "imessage", 8, &lean_len);
+    HU_ASSERT_NOT_NULL(lean);
+    /* Biography, motivation, humor, conflict, emotional_range, voice_rhythm,
+       inner_world, intellectual, sensory — none of these should appear in lean */
+    HU_ASSERT_TRUE(strstr(lean, "Grew up in Star Valley Wyoming") == NULL);
+    HU_ASSERT_TRUE(strstr(lean, "This is a long biography") == NULL);
+    HU_ASSERT_TRUE(strstr(lean, "Building AI systems that feel human") == NULL);
+    HU_ASSERT_TRUE(strstr(lean, "Gets quiet first") == NULL);
+    HU_ASSERT_TRUE(strstr(lean, "Multiple exclamation marks") == NULL);
+    HU_ASSERT_TRUE(strstr(lean, "Short fragments") == NULL);
+    HU_ASSERT_TRUE(strstr(lean, "Introverted but texts family") == NULL);
+    HU_ASSERT_TRUE(strstr(lean, "First-principles") == NULL);
+    HU_ASSERT_TRUE(strstr(lean, "kinesthetic") == NULL);
+    HU_ASSERT_TRUE(strstr(lean, "teasing with nerdy") == NULL);
+
+    alloc.free(alloc.ctx, lean, lean_len + 1);
+    hu_persona_deinit(&alloc, &p);
+}
+
+static void test_lean_prompt_excludes_heavy_contexts(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
+                                          strlen(lean_test_persona_json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    size_t lean_len = 0;
+    char *lean = build_lean_persona(&alloc, &p, "imessage", 8, &lean_len);
+    HU_ASSERT_NOT_NULL(lean);
+
+    /* Build full system prompt with lean persona and verify heavy contexts are absent */
+    hu_prompt_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.persona_prompt = lean;
+    cfg.persona_prompt_len = lean_len;
+    cfg.persona_immersive = true;
+    cfg.persona = NULL;
+    /* These would normally have content — verify they're NULL-safe and excluded */
+    cfg.workspace_dir = NULL;
+    cfg.workspace_dir_len = 0;
+    cfg.custom_instructions = NULL;
+    cfg.custom_instructions_len = 0;
+    cfg.awareness_context = NULL;
+    cfg.awareness_context_len = 0;
+    cfg.outcome_context = NULL;
+    cfg.outcome_context_len = 0;
+    cfg.intelligence_context = NULL;
+    cfg.intelligence_context_len = 0;
+    cfg.somatic_context = NULL;
+    cfg.somatic_context_len = 0;
+    cfg.trust_context = NULL;
+    cfg.trust_context_len = 0;
+    cfg.humor_directive = NULL;
+    cfg.humor_directive_len = 0;
+    cfg.sycophancy_friction = NULL;
+    cfg.sycophancy_friction_len = 0;
+
+    char *sp = NULL;
+    size_t sp_len = 0;
+    err = hu_prompt_build_system(&alloc, &cfg, &sp, &sp_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(sp);
+
+    /* System prompt must NOT contain workspace, awareness, intelligence sections */
+    HU_ASSERT_TRUE(strstr(sp, "Workspace:") == NULL);
+    HU_ASSERT_TRUE(strstr(sp, "CRITICAL REMINDER") == NULL);
+
+    /* Must still contain the core lean persona content */
+    HU_ASSERT_TRUE(strstr(sp, "nerdy mountain kid") != NULL);
+    HU_ASSERT_TRUE(strstr(sp, "You ARE Seth") != NULL);
+    HU_ASSERT_TRUE(strstr(sp, "NEVER do:") != NULL);
+
+    alloc.free(alloc.ctx, sp, sp_len + 1);
+    alloc.free(alloc.ctx, lean, lean_len + 1);
+    hu_persona_deinit(&alloc, &p);
+}
+
+static void test_lean_prompt_full_pipeline_sp_len(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p = {0};
+    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
+                                          strlen(lean_test_persona_json), &p);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Build lean persona prompt */
+    size_t lean_len = 0;
+    char *lean = build_lean_persona(&alloc, &p, "imessage", 8, &lean_len);
+    HU_ASSERT_NOT_NULL(lean);
+
+    /* Now build full prompt the FULL way for comparison */
+    char *full_prompt = NULL;
+    size_t full_prompt_len = 0;
+    err = hu_persona_build_prompt(&alloc, &p, "imessage", 8, NULL, 0,
+                                  &full_prompt, &full_prompt_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(full_prompt);
+
+    /* Full persona prompt should be significantly larger than lean */
+    HU_ASSERT_TRUE(full_prompt_len > lean_len * 2);
+
+    /* Full should contain biography, motivation, etc. */
+    HU_ASSERT_TRUE(strstr(full_prompt, "Grew up in Star Valley Wyoming") != NULL);
+    HU_ASSERT_TRUE(strstr(full_prompt, "Building AI systems that feel human") != NULL);
+
+    /* Build system prompt both ways and compare */
+    hu_prompt_config_t lean_cfg;
+    memset(&lean_cfg, 0, sizeof(lean_cfg));
+    lean_cfg.persona_prompt = lean;
+    lean_cfg.persona_prompt_len = lean_len;
+    lean_cfg.persona_immersive = true;
+    lean_cfg.persona = NULL;
+
+    hu_prompt_config_t full_cfg;
+    memset(&full_cfg, 0, sizeof(full_cfg));
+    full_cfg.persona_prompt = full_prompt;
+    full_cfg.persona_prompt_len = full_prompt_len;
+    full_cfg.persona_immersive = true;
+    full_cfg.persona = &p;
+
+    char *lean_sp = NULL;
+    size_t lean_sp_len = 0;
+    err = hu_prompt_build_system(&alloc, &lean_cfg, &lean_sp, &lean_sp_len);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    char *full_sp = NULL;
+    size_t full_sp_len = 0;
+    err = hu_prompt_build_system(&alloc, &full_cfg, &full_sp, &full_sp_len);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Lean system prompt must be dramatically smaller */
+    HU_ASSERT_TRUE(lean_sp_len < full_sp_len);
+    HU_ASSERT_TRUE(lean_sp_len < 5120); /* under 5KB */
+
+    /* Full system prompt should be significantly larger (includes reinforcement etc.) */
+    HU_ASSERT_TRUE(full_sp_len > lean_sp_len + 500);
+
+    alloc.free(alloc.ctx, lean_sp, lean_sp_len + 1);
+    alloc.free(alloc.ctx, full_sp, full_sp_len + 1);
+    alloc.free(alloc.ctx, lean, lean_len + 1);
+    alloc.free(alloc.ctx, full_prompt, full_prompt_len + 1);
+    hu_persona_deinit(&alloc, &p);
+}
+
 void run_persona_tests(void) {
     HU_TEST_SUITE("Persona");
 
@@ -3935,6 +4316,15 @@ void run_persona_tests(void) {
 
     /* E2E dry run */
     HU_RUN_TEST(test_e2e_mindy_message_full_pipeline);
+
+    /* Lean prompt E2E fleet */
+    HU_RUN_TEST(test_lean_prompt_size_under_5kb);
+    HU_RUN_TEST(test_lean_prompt_includes_core_anchor);
+    HU_RUN_TEST(test_lean_prompt_includes_reinforcement);
+    HU_RUN_TEST(test_lean_prompt_includes_anti_patterns);
+    HU_RUN_TEST(test_lean_prompt_excludes_biography);
+    HU_RUN_TEST(test_lean_prompt_excludes_heavy_contexts);
+    HU_RUN_TEST(test_lean_prompt_full_pipeline_sp_len);
 
     HU_TEST_SUITE("Affect Mirror Ceiling (PERSONA-001)");
     HU_RUN_TEST(test_affect_ceiling_default_acquaintance);

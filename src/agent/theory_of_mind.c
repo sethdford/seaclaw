@@ -105,7 +105,7 @@ hu_error_t hu_tom_build_context(const hu_belief_state_t *state, hu_allocator_t *
     char buf[4096];
     size_t pos = 0;
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "### Contact Mental Model\n");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "### Contact Mental Model\n");
 
     for (int t = HU_BELIEF_KNOWS; t <= HU_BELIEF_MISTAKEN; t++) {
         hu_belief_type_t type = (hu_belief_type_t)t;
@@ -114,27 +114,25 @@ hu_error_t hu_tom_build_context(const hu_belief_state_t *state, hu_allocator_t *
             if (state->beliefs[i].type != type)
                 continue;
             if (first) {
-                pos +=
-                    (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%s: ", belief_type_label(type));
+                pos = hu_buf_appendf(buf, sizeof(buf), pos, "%s: ", belief_type_label(type));
                 first = false;
             } else {
-                pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", ");
+                pos = hu_buf_appendf(buf, sizeof(buf), pos, ", ");
             }
             if (pos >= sizeof(buf))
                 break;
             if (belief_shows_confidence(type)) {
                 int pct = (int)(state->beliefs[i].confidence * 100.0f + 0.5f);
-                pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%s (%d%%)",
-                                        state->beliefs[i].topic, pct);
+                pos = hu_buf_appendf(buf, sizeof(buf), pos, "%s (%d%%)",
+                                     state->beliefs[i].topic, pct);
             } else {
-                pos +=
-                    (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%s", state->beliefs[i].topic);
+                pos = hu_buf_appendf(buf, sizeof(buf), pos, "%s", state->beliefs[i].topic);
             }
             if (pos >= sizeof(buf))
                 break;
         }
         if (!first)
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "\n");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "\n");
         if (pos >= sizeof(buf)) {
             pos = sizeof(buf) - 1;
             break;
@@ -248,10 +246,10 @@ char *hu_tom_build_gap_directive(hu_allocator_t *alloc, const hu_tom_gap_t *gaps
 
     char buf[2048];
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "### Knowledge Gap Alert\n"
-                            "The user expects you to know about the following topics, "
-                            "but you don't have reliable information:\n");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                          "### Knowledge Gap Alert\n"
+                          "The user expects you to know about the following topics, "
+                          "but you don't have reliable information:\n");
 
     for (size_t i = 0; i < gap_count && pos < sizeof(buf) - 128; i++) {
         const char *label = "remembers";
@@ -259,11 +257,11 @@ char *hu_tom_build_gap_directive(hu_allocator_t *alloc, const hu_tom_gap_t *gaps
             label = "understands";
         else if (gaps[i].knowledge_type == HU_TOM_EXPECT_TRACKS)
             label = "tracks";
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "- \"%.*s\" (expects AI %s)\n",
-                                (int)gaps[i].topic_len, gaps[i].topic, label);
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "- \"%.*s\" (expects AI %s)\n",
+                             (int)gaps[i].topic_len, gaps[i].topic, label);
     }
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "Be honest rather than fabricate. Acknowledge gaps transparently.\n");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "Be honest rather than fabricate. Acknowledge gaps transparently.\n");
     if (pos >= sizeof(buf))
         pos = sizeof(buf) - 1;
 

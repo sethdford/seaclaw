@@ -2,6 +2,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/tool.h"
 #include <stdio.h>
@@ -482,7 +483,11 @@ hu_error_t hu_gui_workflow_run(hu_allocator_t *alloc, hu_gui_workflow_t *wf) {
             /* Verify: check state if expected is provided */
             if (step->has_expected) {
                 bool matches = false;
-                (void)hu_gui_verify_state(&step->expected_state, &after, &matches);
+                hu_error_t verify_err =
+                    hu_gui_verify_state(&step->expected_state, &after, &matches);
+                if (verify_err != HU_OK)
+                    hu_log_warn("gui_agent", NULL, "UI state verification failed: %s",
+                                hu_error_string(verify_err));
                 if (!matches) {
                     if (attempt >= wf->max_retries) {
                         snprintf(wf->failure_reason, sizeof(wf->failure_reason),
@@ -598,7 +603,10 @@ static hu_error_t gui_agent_execute(void *ctx, hu_allocator_t *alloc, const hu_j
         expected.element_count = (size_t)hu_json_get_number(args, "element_count",
                                                             (double)current.element_count);
         bool matches = false;
-        (void)hu_gui_verify_state(&expected, &current, &matches);
+        hu_error_t verify_err = hu_gui_verify_state(&expected, &current, &matches);
+        if (verify_err != HU_OK)
+            hu_log_warn("gui_agent", NULL, "UI state verification failed: %s",
+                        hu_error_string(verify_err));
         const char *resp = matches ? "{\"verified\":true}" : "{\"verified\":false}";
         size_t resp_len = matches ? 17 : 18;
         char *json = hu_strndup(alloc, resp, resp_len);

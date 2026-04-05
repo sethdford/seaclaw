@@ -152,7 +152,7 @@ hu_error_t hu_episode_get_by_contact(hu_allocator_t *alloc, void *db, const char
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         if (count >= cap) {
             cap *= 2;
             hu_episode_sqlite_t *n =
@@ -170,6 +170,13 @@ hu_error_t hu_episode_get_by_contact(hu_allocator_t *alloc, void *db, const char
         count++;
     }
     sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        if (arr)
+            alloc->free(alloc->ctx, arr, cap * sizeof(hu_episode_sqlite_t));
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
 
     if (count == 0 && arr) {
         alloc->free(alloc->ctx, arr, cap * sizeof(hu_episode_sqlite_t));
@@ -232,7 +239,7 @@ hu_error_t hu_episode_associative_recall(hu_allocator_t *alloc, void *db, const 
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         if (count >= cap) {
             cap *= 2;
             hu_episode_sqlite_t *n =
@@ -250,6 +257,13 @@ hu_error_t hu_episode_associative_recall(hu_allocator_t *alloc, void *db, const 
         count++;
     }
     sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        if (arr)
+            alloc->free(alloc->ctx, arr, cap * sizeof(hu_episode_sqlite_t));
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
 
     if (count == 0 && arr) {
         alloc->free(alloc->ctx, arr, cap * sizeof(hu_episode_sqlite_t));

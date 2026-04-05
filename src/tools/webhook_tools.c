@@ -55,13 +55,27 @@ static hu_error_t webhook_register_execute(void *ctx, hu_allocator_t *alloc,
         return HU_OK;
     }
 
-    char *result = hu_sprintf(alloc, "{\"id\":\"%s\"}", webhook_id);
-    if (!result) {
+    hu_json_buf_t jb;
+    hu_error_t je = hu_json_buf_init(&jb, alloc);
+    if (je != HU_OK) {
         hu_webhook_unregister(alloc, c->mgr, webhook_id);
-        alloc->free(alloc->ctx, webhook_id, strlen(webhook_id) + 1);
-        return HU_ERR_OUT_OF_MEMORY;
+        return je;
     }
-    *out = hu_tool_result_ok_owned(result, strlen(result));
+    je = hu_json_buf_append_raw(&jb, "{", 1);
+    if (je == HU_OK)
+        je = hu_json_append_key_value(&jb, "id", 2, webhook_id, strlen(webhook_id));
+    if (je == HU_OK)
+        je = hu_json_buf_append_raw(&jb, "}", 1);
+    if (je != HU_OK) {
+        hu_json_buf_free(&jb);
+        hu_webhook_unregister(alloc, c->mgr, webhook_id);
+        return je;
+    }
+    *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+    jb.ptr = NULL;
+    jb.len = 0;
+    jb.cap = 0;
+    hu_json_buf_free(&jb);
     return HU_OK;
 #endif
 }
@@ -157,30 +171,55 @@ static hu_error_t webhook_poll_execute(void *ctx, hu_allocator_t *alloc,
         return HU_OK;
     }
 
-    size_t buf_cap = 4096;
-    char *buf = (char *)alloc->alloc(alloc->ctx, buf_cap);
-    if (!buf) {
+    hu_json_buf_t jb;
+    hu_error_t je = hu_json_buf_init(&jb, alloc);
+    if (je != HU_OK) {
         hu_webhook_free_events(alloc, events, event_count);
-        return HU_ERR_OUT_OF_MEMORY;
+        return je;
     }
-
-    size_t off = 0;
-    off += (size_t)snprintf(buf + off, buf_cap - off, "{\"events\":[");
+    je = hu_json_buf_append_raw(&jb, "{\"events\":[", 11);
+    if (je != HU_OK)
+        goto poll_fail;
     int first = 1;
-
     for (size_t i = 0; i < event_count; i++) {
-        if (!first && off < buf_cap - 2)
-            buf[off++] = ',';
-        off += (size_t)snprintf(buf + off, buf_cap - off - 1,
-                                "{\"data\":\"%s\",\"received_at\":%ld}", events[i].event_data,
-                                (long)events[i].received_at);
+        if (!first) {
+            je = hu_json_buf_append_raw(&jb, ",", 1);
+            if (je != HU_OK)
+                goto poll_fail;
+        }
+        je = hu_json_buf_append_raw(&jb, "{", 1);
+        if (je != HU_OK)
+            goto poll_fail;
+        const char *edata = events[i].event_data ? events[i].event_data : "";
+        je = hu_json_append_key_value(&jb, "data", 4, edata, strlen(edata));
+        if (je != HU_OK)
+            goto poll_fail;
+        je = hu_json_buf_append_raw(&jb, ",", 1);
+        if (je != HU_OK)
+            goto poll_fail;
+        je = hu_json_append_key_int(&jb, "received_at", 11, (long long)events[i].received_at);
+        if (je != HU_OK)
+            goto poll_fail;
+        je = hu_json_buf_append_raw(&jb, "}", 1);
+        if (je != HU_OK)
+            goto poll_fail;
         first = 0;
     }
-
-    off += (size_t)snprintf(buf + off, buf_cap - off - 1, "]}");
-    *out = hu_tool_result_ok_owned(buf, off);
+    je = hu_json_buf_append_raw(&jb, "]}", 2);
+    if (je != HU_OK)
+        goto poll_fail;
+    *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+    jb.ptr = NULL;
+    jb.len = 0;
+    jb.cap = 0;
+    hu_json_buf_free(&jb);
     hu_webhook_free_events(alloc, events, event_count);
     return HU_OK;
+
+poll_fail:
+    hu_json_buf_free(&jb);
+    hu_webhook_free_events(alloc, events, event_count);
+    return je;
 #endif
 }
 
@@ -262,28 +301,50 @@ static hu_error_t webhook_list_execute(void *ctx, hu_allocator_t *alloc,
         return HU_OK;
     }
 
-    size_t buf_cap = 8192;
-    char *buf = (char *)alloc->alloc(alloc->ctx, buf_cap);
-    if (!buf) {
+    hu_json_buf_t jb;
+    hu_error_t je = hu_json_buf_init(&jb, alloc);
+    if (je != HU_OK) {
         hu_webhook_free_webhooks(alloc, webhooks, webhook_count);
-        return HU_ERR_OUT_OF_MEMORY;
+        return je;
     }
-
-    size_t off = 0;
-    off += (size_t)snprintf(buf + off, buf_cap - off, "{\"webhooks\":[");
+    je = hu_json_buf_append_raw(&jb, "{\"webhooks\":[", 14);
     int first = 1;
-
-    for (size_t i = 0; i < webhook_count; i++) {
-        if (!first && off < buf_cap - 2)
-            buf[off++] = ',';
-        off += (size_t)snprintf(buf + off, buf_cap - off - 1,
-                                "{\"id\":\"%s\",\"path\":\"%s\",\"registered_at\":%ld}",
-                                webhooks[i].id, webhooks[i].path, (long)webhooks[i].registered_at);
+    for (size_t i = 0; i < webhook_count && je == HU_OK; i++) {
+        if (!first)
+            je = hu_json_buf_append_raw(&jb, ",", 1);
+        if (je != HU_OK)
+            break;
+        je = hu_json_buf_append_raw(&jb, "{", 1);
+        if (je == HU_OK) {
+            const char *wid = webhooks[i].id ? webhooks[i].id : "";
+            je = hu_json_append_key_value(&jb, "id", 2, wid, strlen(wid));
+        }
+        if (je == HU_OK)
+            je = hu_json_buf_append_raw(&jb, ",", 1);
+        if (je == HU_OK) {
+            const char *pth = webhooks[i].path ? webhooks[i].path : "";
+            je = hu_json_append_key_value(&jb, "path", 4, pth, strlen(pth));
+        }
+        if (je == HU_OK)
+            je = hu_json_buf_append_raw(&jb, ",", 1);
+        if (je == HU_OK)
+            je = hu_json_append_key_int(&jb, "registered_at", 14, (long long)webhooks[i].registered_at);
+        if (je == HU_OK)
+            je = hu_json_buf_append_raw(&jb, "}", 1);
         first = 0;
     }
-
-    off += (size_t)snprintf(buf + off, buf_cap - off - 1, "]}");
-    *out = hu_tool_result_ok_owned(buf, off);
+    if (je == HU_OK)
+        je = hu_json_buf_append_raw(&jb, "]}", 2);
+    if (je != HU_OK) {
+        hu_json_buf_free(&jb);
+        hu_webhook_free_webhooks(alloc, webhooks, webhook_count);
+        return je;
+    }
+    *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+    jb.ptr = NULL;
+    jb.len = 0;
+    jb.cap = 0;
+    hu_json_buf_free(&jb);
     hu_webhook_free_webhooks(alloc, webhooks, webhook_count);
     return HU_OK;
 #endif

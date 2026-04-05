@@ -150,7 +150,7 @@ hu_error_t hu_info_asymmetry_build_guidance(const hu_info_asymmetry_t *asym, hu_
     char buf[4096];
     size_t pos = 0;
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "### Information Awareness\n");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "### Information Awareness\n");
 
     /* You know but they don't */
     bool first = true;
@@ -158,10 +158,10 @@ hu_error_t hu_info_asymmetry_build_guidance(const hu_info_asymmetry_t *asym, hu_
         if (asym->gaps[i].type != HU_GAP_AGENT_KNOWS)
             continue;
         if (first) {
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "You know but they don't: ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "You know but they don't: ");
             first = false;
         } else {
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, ", ");
         }
         size_t n = asym->gaps[i].topic_len;
         if (pos + n + 2 < sizeof(buf)) {
@@ -170,7 +170,7 @@ hu_error_t hu_info_asymmetry_build_guidance(const hu_info_asymmetry_t *asym, hu_
         }
     }
     if (!first)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "\n");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "\n");
 
     /* They know but you don't */
     first = true;
@@ -178,10 +178,10 @@ hu_error_t hu_info_asymmetry_build_guidance(const hu_info_asymmetry_t *asym, hu_
         if (asym->gaps[i].type != HU_GAP_CONTACT_KNOWS)
             continue;
         if (first) {
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "They know but you don't: ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "They know but you don't: ");
             first = false;
         } else {
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, ", ");
         }
         size_t n = asym->gaps[i].topic_len;
         if (pos + n + 2 < sizeof(buf)) {
@@ -190,7 +190,7 @@ hu_error_t hu_info_asymmetry_build_guidance(const hu_info_asymmetry_t *asym, hu_
         }
     }
     if (!first)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "\n");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "\n");
     if (pos >= sizeof(buf))
         pos = sizeof(buf) - 1;
 
@@ -200,10 +200,10 @@ hu_error_t hu_info_asymmetry_build_guidance(const hu_info_asymmetry_t *asym, hu_
         if (asym->gaps[i].type != HU_GAP_SHARED)
             continue;
         if (first) {
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Shared knowledge: ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "Shared knowledge: ");
             first = false;
         } else {
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, ", ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, ", ");
         }
         size_t n = asym->gaps[i].topic_len;
         if (pos + n + 2 < sizeof(buf)) {
@@ -212,7 +212,7 @@ hu_error_t hu_info_asymmetry_build_guidance(const hu_info_asymmetry_t *asym, hu_
         }
     }
     if (!first)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "\n");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "\n");
     if (pos >= sizeof(buf))
         pos = sizeof(buf) - 1;
 

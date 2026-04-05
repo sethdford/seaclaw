@@ -1,5 +1,6 @@
 #include "human/tools/declarative.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include <ctype.h>
 #include <stdio.h>
@@ -50,6 +51,42 @@ static hu_decl_exec_type_t parse_exec_type(const char *t) {
     return HU_DECL_EXEC_HTTP;
 }
 
+/* POSIX sh: wrap a value as a single shell word using single quotes; internal ' -> '\'' */
+static hu_error_t shell_escape_single_quoted(hu_allocator_t *alloc, const char *val, char **out,
+                                             size_t *out_len) {
+    if (!alloc || !out || !out_len)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!val)
+        val = "";
+    size_t vlen = strlen(val);
+    size_t extra = 0;
+    for (size_t i = 0; i < vlen; i++) {
+        if (val[i] == '\'')
+            extra += 3;
+    }
+    size_t need = 2 + vlen + extra + 1;
+    char *buf = (char *)alloc->alloc(alloc->ctx, need);
+    if (!buf)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t pos = 0;
+    buf[pos++] = '\'';
+    for (size_t i = 0; i < vlen; i++) {
+        if (val[i] == '\'') {
+            buf[pos++] = '\'';
+            buf[pos++] = '\\';
+            buf[pos++] = '\'';
+            buf[pos++] = '\'';
+        } else {
+            buf[pos++] = val[i];
+        }
+    }
+    buf[pos++] = '\'';
+    buf[pos] = '\0';
+    *out = buf;
+    *out_len = pos;
+    return HU_OK;
+}
+
 static hu_error_t buf_append(hu_allocator_t *alloc, char **buf, size_t *len, size_t *cap, const char *s,
                              size_t slen) {
     size_t need = *len + slen + 1;
@@ -70,7 +107,8 @@ static hu_error_t buf_append(hu_allocator_t *alloc, char **buf, size_t *len, siz
 }
 
 static hu_error_t substitute_placeholders(hu_allocator_t *alloc, const char *tmpl,
-                                          const hu_json_value_t *args, char **out, size_t *out_len) {
+                                          const hu_json_value_t *args, int shell_escape_vals, char **out,
+                                          size_t *out_len) {
     if (!tmpl) {
         char *e = hu_strdup(alloc, "");
         if (!e)
@@ -125,7 +163,20 @@ static hu_error_t substitute_placeholders(hu_allocator_t *alloc, const char *tmp
             if (!val)
                 val = "";
 
-            hu_error_t er = buf_append(alloc, &buf, &len, &cap, val, strlen(val));
+            hu_error_t er;
+            if (shell_escape_vals) {
+                char *esc = NULL;
+                size_t esc_len = 0;
+                hu_error_t ee = shell_escape_single_quoted(alloc, val, &esc, &esc_len);
+                if (ee != HU_OK) {
+                    alloc->free(alloc->ctx, buf, cap);
+                    return ee;
+                }
+                er = buf_append(alloc, &buf, &len, &cap, esc, esc_len);
+                alloc->free(alloc->ctx, esc, esc_len + 1);
+            } else {
+                er = buf_append(alloc, &buf, &len, &cap, val, strlen(val));
+            }
             if (er != HU_OK) {
                 alloc->free(alloc->ctx, buf, cap);
                 return er;
@@ -172,6 +223,33 @@ static hu_error_t read_pipe_all(hu_allocator_t *alloc, FILE *fp, char **out, siz
     *out = buf;
     *out_len = len;
     return HU_OK;
+}
+
+/* Declarative tools run user-defined templates through /bin/sh via popen; placeholders are
+ * shell-quoted but the fixed template text is not. Reject obvious injection transports. */
+static int decl_assembled_cmd_suspicious(const char *cmd) {
+    if (!cmd)
+        return 0;
+    for (const char *p = cmd; *p; p++) {
+        if (*p == '\n' || *p == '\r')
+            return 1;
+    }
+    return 0;
+}
+
+static void decl_warn_popen_surface(void) {
+    hu_log_warn("declarative", NULL,
+                "declarative tool executes curl/shell via popen; load definitions only from trusted "
+                "sources (template text is not shell-escaped)");
+}
+
+static int decl_template_text_suspicious(const char *tmpl) {
+    if (!tmpl)
+        return 0;
+    /* Unquoted subshell/backtick sequences in the template itself are high risk. */
+    if (strstr(tmpl, "$(") != NULL || strchr(tmpl, '`') != NULL)
+        return 1;
+    return 0;
 }
 #endif /* !(HU_IS_TEST) */
 
@@ -253,15 +331,42 @@ static hu_error_t decl_execute(void *ctx, hu_allocator_t *alloc, const hu_json_v
             }
             char *url = NULL;
             size_t url_len = 0;
-            hu_error_t se = substitute_placeholders(alloc, c->def.exec_url, args, &url, &url_len);
+            hu_error_t se =
+                substitute_placeholders(alloc, c->def.exec_url, args, 1, &url, &url_len);
             if (se != HU_OK)
                 return se;
             const char *method = c->def.exec_method ? c->def.exec_method : "GET";
+            char *method_esc = NULL;
+            size_t method_esc_len = 0;
+            se = shell_escape_single_quoted(alloc, method, &method_esc, &method_esc_len);
+            if (se != HU_OK) {
+                alloc->free(alloc->ctx, url, url_len + 1);
+                return se;
+            }
+            if (decl_template_text_suspicious(c->def.exec_url)) {
+                alloc->free(alloc->ctx, method_esc, method_esc_len + 1);
+                alloc->free(alloc->ctx, url, url_len + 1);
+                *out = hu_tool_result_fail("exec url template rejected", 26);
+                return HU_OK;
+            }
             char cmd[8192];
-            int nc = snprintf(cmd, sizeof cmd, "curl -sS -X %s --max-time 30 %s", method, url);
+            int cmd_n =
+                snprintf(cmd, sizeof cmd, "curl -sS -X %s --max-time 30 %s", method_esc, url);
+            alloc->free(alloc->ctx, method_esc, method_esc_len + 1);
             alloc->free(alloc->ctx, url, url_len + 1);
-            if (nc < 0 || (size_t)nc >= sizeof(cmd))
-                return HU_ERR_NOT_SUPPORTED;
+            if (cmd_n < 0 || (size_t)cmd_n >= sizeof(cmd)) {
+                *out = hu_tool_result_fail("command buffer overflow", 22);
+                return HU_OK;
+            }
+            if (strlen(cmd) > 8192) {
+                *out = hu_tool_result_fail("command too long", 16);
+                return HU_OK;
+            }
+            if (decl_assembled_cmd_suspicious(cmd)) {
+                *out = hu_tool_result_fail("command rejected", 16);
+                return HU_OK;
+            }
+            decl_warn_popen_surface();
             FILE *fp = popen(cmd, "r");
             if (!fp)
                 return HU_ERR_IO;
@@ -282,9 +387,25 @@ static hu_error_t decl_execute(void *ctx, hu_allocator_t *alloc, const hu_json_v
         }
         char *cmdline = NULL;
         size_t cmd_len = 0;
-        hu_error_t se = substitute_placeholders(alloc, c->def.exec_command, args, &cmdline, &cmd_len);
+        if (decl_template_text_suspicious(c->def.exec_command)) {
+            *out = hu_tool_result_fail("exec command template rejected", 30);
+            return HU_OK;
+        }
+        hu_error_t se =
+            substitute_placeholders(alloc, c->def.exec_command, args, 1, &cmdline, &cmd_len);
         if (se != HU_OK)
             return se;
+        if (strlen(cmdline) > 8192) {
+            alloc->free(alloc->ctx, cmdline, cmd_len + 1);
+            *out = hu_tool_result_fail("command too long", 16);
+            return HU_OK;
+        }
+        if (decl_assembled_cmd_suspicious(cmdline)) {
+            alloc->free(alloc->ctx, cmdline, cmd_len + 1);
+            *out = hu_tool_result_fail("command rejected", 16);
+            return HU_OK;
+        }
+        decl_warn_popen_surface();
         FILE *fp = popen(cmdline, "r");
         alloc->free(alloc->ctx, cmdline, cmd_len + 1);
         if (!fp)

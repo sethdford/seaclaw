@@ -153,6 +153,9 @@ static void test_cors_rejects_unknown_origins(void) {
     const char *allowed[] = {"https://app.example.com"};
     HU_ASSERT_FALSE(hu_gateway_is_allowed_origin("https://evil.com", allowed, 1));
     HU_ASSERT_FALSE(hu_gateway_is_allowed_origin("https://app.example.com.evil.com", allowed, 1));
+    /* Substring "://localhost" must not match unless host is actually localhost */
+    HU_ASSERT_FALSE(hu_gateway_is_allowed_origin("http://localhost.evil.com", NULL, 0));
+    HU_ASSERT_FALSE(hu_gateway_is_allowed_origin("http://127.0.0.1.evil.com", NULL, 0));
 }
 
 static void test_cors_allows_empty_origin(void) {

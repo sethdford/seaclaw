@@ -14,6 +14,8 @@ typedef struct hu_mcp_registry_entry {
     char args[512];
     bool running;
     int pid;
+    int stdin_fd;  /* write end: parent's handle to child's stdin, or -1 */
+    int stdout_fd; /* read end: parent's handle to child's stdout, or -1 */
 } hu_mcp_registry_entry_t;
 
 typedef struct hu_mcp_registry hu_mcp_registry_t;

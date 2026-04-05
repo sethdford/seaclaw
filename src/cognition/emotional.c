@@ -1,8 +1,21 @@
 #include "human/cognition/emotional.h"
+#include "human/core/string.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+
+/* Copy of external dominant_emotion strings; perception inputs may not outlive ec. */
+#define EMOTIONAL_DOM_LABEL_CAP 96
+static _Thread_local char s_emotional_dom_label[EMOTIONAL_DOM_LABEL_CAP];
+
+/* Heuristic thresholds for fusion, escalation, and prompt gating */
+#define EMOTIONAL_CONFIDENCE_INTENSITY_BOOST_THRESHOLD 0.5f
+#define EMOTIONAL_HIGH_INTENSITY_THRESHOLD             0.6f
+#define EMOTIONAL_ESCALATION_VALENCE_THRESHOLD         (-0.5f)
+#define EMOTIONAL_ESCALATION_INTENSITY_THRESHOLD       0.7f
+#define EMOTIONAL_TRAJECTORY_SLOPE_EPSILON             0.05f
+#define EMOTIONAL_MIN_PROMPT_INTENSITY                 0.1f
 
 void hu_emotional_cognition_init(hu_emotional_cognition_t *ec) {
     if (!ec) return;
@@ -145,7 +158,7 @@ void hu_emotional_cognition_perceive(hu_emotional_cognition_t *ec,
         if (mask & (1 << i)) source_count++;
     }
     float conf = (float)source_count / 5.0f;
-    if (fused_intensity > 0.5f) conf += 0.1f;
+    if (fused_intensity > EMOTIONAL_CONFIDENCE_INTENSITY_BOOST_THRESHOLD) conf += 0.1f;
     if (conf > 1.0f) conf = 1.0f;
 
     /* Determine dominant label from tag or fast_capture */
@@ -153,9 +166,13 @@ void hu_emotional_cognition_perceive(hu_emotional_cognition_t *ec,
     if (dominant != HU_EMOTION_NEUTRAL) {
         dom_label = emotion_tag_to_label(dominant);
     } else if (p->fast_capture && p->fast_capture->dominant_emotion) {
-        dom_label = p->fast_capture->dominant_emotion;
+        (void)snprintf(s_emotional_dom_label, sizeof(s_emotional_dom_label), "%s",
+                       p->fast_capture->dominant_emotion);
+        dom_label = s_emotional_dom_label;
     } else if (p->conversation && p->conversation->dominant_emotion) {
-        dom_label = p->conversation->dominant_emotion;
+        (void)snprintf(s_emotional_dom_label, sizeof(s_emotional_dom_label), "%s",
+                       p->conversation->dominant_emotion);
+        dom_label = s_emotional_dom_label;
     }
 
     ec->state.valence = fused_valence;
@@ -165,8 +182,10 @@ void hu_emotional_cognition_perceive(hu_emotional_cognition_t *ec,
     ec->source_mask = mask;
     ec->confidence = conf;
     ec->secondary_emotion = secondary;
-    ec->needs_empathy_boost = (fused_intensity > 0.6f && concerning);
-    ec->escalation_detected = (fused_valence < -0.5f && fused_intensity > 0.7f);
+    ec->needs_empathy_boost = (fused_intensity > EMOTIONAL_HIGH_INTENSITY_THRESHOLD && concerning);
+    ec->escalation_detected =
+        (fused_valence < EMOTIONAL_ESCALATION_VALENCE_THRESHOLD &&
+         fused_intensity > EMOTIONAL_ESCALATION_INTENSITY_THRESHOLD);
 
     hu_emotional_cognition_update_trajectory(ec, fused_valence);
 }
@@ -215,51 +234,51 @@ hu_error_t hu_emotional_cognition_build_prompt(hu_allocator_t *alloc,
     *out_len = 0;
 
     /* Skip if no meaningful emotional signal */
-    if (ec->source_mask == 0 || ec->state.intensity < 0.1f)
+    if (ec->source_mask == 0 || ec->state.intensity < EMOTIONAL_MIN_PROMPT_INTENSITY)
         return HU_OK;
 
     const char *dominant = ec->state.dominant_emotion ? ec->state.dominant_emotion : "neutral";
 
     char buf[2048];
-    int pos = 0;
-    pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                    "## Emotional Context\n\n");
-    pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                    "- Dominant emotion: **%s** (valence: %.2f, intensity: %.2f)\n",
-                    dominant, (double)ec->state.valence,
-                    (double)ec->state.intensity);
+    size_t pos = 0;
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "## Emotional Context\n\n");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "- Dominant emotion: **%s** (valence: %.2f, intensity: %.2f)\n",
+                         dominant, (double)ec->state.valence,
+                         (double)ec->state.intensity);
 
     if (ec->secondary_emotion != HU_EMOTION_NEUTRAL) {
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                        "- Secondary: %s\n",
-                        emotion_tag_to_label(ec->secondary_emotion));
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "- Secondary: %s\n",
+                             emotion_tag_to_label(ec->secondary_emotion));
     }
 
     if (ec->confidence > 0.0f) {
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                        "- Confidence: %.0f%%\n", (double)(ec->confidence * 100.0f));
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "- Confidence: %.0f%%\n", (double)(ec->confidence * 100.0f));
     }
 
     if (ec->valence_count >= 3) {
         const char *trend = "stable";
-        if (ec->trajectory_slope > 0.05f) trend = "improving";
-        else if (ec->trajectory_slope < -0.05f) trend = "declining";
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                        "- Trajectory: %s\n", trend);
+        if (ec->trajectory_slope > EMOTIONAL_TRAJECTORY_SLOPE_EPSILON) trend = "improving";
+        else if (ec->trajectory_slope < -EMOTIONAL_TRAJECTORY_SLOPE_EPSILON) trend = "declining";
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "- Trajectory: %s\n", trend);
     }
 
     if (ec->needs_empathy_boost) {
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                        "\n**Priority: Respond with empathy and active listening. "
-                        "Acknowledge their emotional state before addressing content.**\n");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "\n**Priority: Respond with empathy and active listening. "
+                             "Acknowledge their emotional state before addressing content.**\n");
     }
     if (ec->escalation_detected) {
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                        "\n**Warning: Emotional escalation detected. "
-                        "Use de-escalation techniques: validate, lower intensity, offer support.**\n");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "\n**Warning: Emotional escalation detected. "
+                             "Use de-escalation techniques: validate, lower intensity, offer support.**\n");
     }
 
-    pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos, "\n");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "\n");
 
     size_t len = (size_t)pos;
     char *result = alloc->alloc(alloc->ctx, len + 1);

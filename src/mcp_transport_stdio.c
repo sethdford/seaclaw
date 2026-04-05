@@ -219,8 +219,13 @@ hu_error_t hu_mcp_transport_stdio_start(hu_allocator_t *alloc, hu_mcp_transport_
     return HU_ERR_NOT_SUPPORTED;
 #else
     int stdin_pipe[2], stdout_pipe[2];
-    if (pipe(stdin_pipe) != 0 || pipe(stdout_pipe) != 0)
+    if (pipe(stdin_pipe) != 0)
         return HU_ERR_IO;
+    if (pipe(stdout_pipe) != 0) {
+        close(stdin_pipe[0]);
+        close(stdin_pipe[1]);
+        return HU_ERR_IO;
+    }
 
     pid_t pid = fork();
     if (pid < 0) {

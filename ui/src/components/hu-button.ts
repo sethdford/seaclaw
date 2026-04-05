@@ -212,16 +212,16 @@ export class ScButton extends LitElement {
   `;
 
   private _onPointerDown = (): void => {
-    if (!this.disabled && !this.loading) hapticFeedback('light');
+    if (!this.disabled && !this.loading) hapticFeedback("light");
   };
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.addEventListener('pointerdown', this._onPointerDown);
+    this.addEventListener("pointerdown", this._onPointerDown);
   }
 
   override disconnectedCallback(): void {
-    this.removeEventListener('pointerdown', this._onPointerDown);
+    this.removeEventListener("pointerdown", this._onPointerDown);
     super.disconnectedCallback();
   }
 

@@ -160,6 +160,7 @@ static void test_imessage_reaction_to_tapback_mapping(void) {
     HU_ASSERT_NULL(hu_imessage_reaction_to_tapback_name((hu_reaction_type_t)99));
 }
 
+#if HU_IS_TEST
 static void test_imessage_custom_emoji_react_records(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
@@ -178,6 +179,7 @@ static void test_imessage_custom_emoji_react_records(void) {
 
     hu_imessage_destroy(&ch);
 }
+#endif
 
 static void test_imessage_extract_attributed_body_basic(void) {
     unsigned char blob[] = {0x00, 0x00, 0x01, 0x2B, 0x05, 'H', 'e', 'l', 'l', 'o'};

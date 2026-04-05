@@ -266,28 +266,28 @@ char *hu_anticipatory_build_directive(hu_allocator_t *alloc, const hu_emotional_
     char buf[512];
     size_t pos = 0;
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "[ANTICIPATORY: ");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "[ANTICIPATORY: ");
     if (name_len > 0) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%.*s's ", (int)name_len, name);
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "%.*s's ", (int)name_len, name);
     }
 
     bool first = true;
-    for (size_t i = 0; i < count && pos < sizeof(buf) - 64; i++) {
+    for (size_t i = 0; i < count; i++) {
         if (preds[i].confidence <= HU_ANTICIPATORY_CONFIDENCE_THRESH)
             continue;
 
         if (!first)
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " ");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, " ");
         first = false;
 
         if (preds[i].basis[0]) {
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%.*s",
-                                    (int)(sizeof(preds[i].basis) - 1), preds[i].basis);
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "%.*s",
+                                 (int)(sizeof(preds[i].basis) - 1), preds[i].basis);
         } else {
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "upcoming event");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "upcoming event");
         }
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " — they may be %s.",
-                                preds[i].predicted_emotion);
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, " — they may be %s.",
+                             preds[i].predicted_emotion);
     }
 
     if (first) {
@@ -295,7 +295,7 @@ char *hu_anticipatory_build_directive(hu_allocator_t *alloc, const hu_emotional_
         return NULL;
     }
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " Consider checking in.]");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, " Consider checking in.]");
     if (pos >= sizeof(buf))
         pos = sizeof(buf) - 1;
 

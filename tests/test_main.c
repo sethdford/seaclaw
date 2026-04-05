@@ -408,6 +408,7 @@ void run_cdp_tests(void);
 void run_emotional_cognition_tests(void);
 void run_evolving_cognition_tests(void);
 void run_metacognition_tests(void);
+void run_humanness_frontiers_tests(void);
 void run_skill_routing_tests(void);
 void run_dual_process_tests(void);
 void run_sota_research_tests(void);
@@ -874,6 +875,7 @@ int main(int argc, char **argv) {
     run_emotional_cognition_tests();
     run_evolving_cognition_tests();
     run_metacognition_tests();
+    run_humanness_frontiers_tests();
     run_skill_routing_tests();
     run_dual_process_tests();
     run_sota_research_tests();

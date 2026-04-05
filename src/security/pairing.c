@@ -106,10 +106,8 @@ static bool is_token_hash(const char *s) {
 bool hu_pairing_guard_constant_time_eq(const char *a, const char *b) {
     size_t la = a ? strlen(a) : 0;
     size_t lb = b ? strlen(b) : 0;
-    if (la != lb)
-        return false;
     size_t max_len = la > lb ? la : lb;
-    unsigned char diff = 0;
+    volatile unsigned char diff = (la != lb) ? 1 : 0;
     for (size_t i = 0; i < max_len; i++) {
         unsigned char x = (i < la && a) ? (unsigned char)a[i] : 0;
         unsigned char y = (i < lb && b) ? (unsigned char)b[i] : 0;

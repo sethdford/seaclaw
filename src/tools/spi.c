@@ -139,13 +139,13 @@ static hu_error_t spi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_va
         }
         char hex_buf[512];
         size_t hp = 0;
-        hp += (size_t)snprintf(hex_buf + hp, sizeof(hex_buf) - hp, "{\"rx_data\":\"");
+        hp = hu_buf_appendf(hex_buf, sizeof(hex_buf), hp, "{\"rx_data\":\"");
         for (size_t i = 0; i < tx_len && hp + 4 < sizeof(hex_buf); i++) {
             if (i > 0)
                 hex_buf[hp++] = ' ';
-            hp += (size_t)snprintf(hex_buf + hp, sizeof(hex_buf) - hp, "%02X", rx[i]);
+            hp = hu_buf_appendf(hex_buf, sizeof(hex_buf), hp, "%02X", rx[i]);
         }
-        hp += (size_t)snprintf(hex_buf + hp, sizeof(hex_buf) - hp, "\"}");
+        hp = hu_buf_appendf(hex_buf, sizeof(hex_buf), hp, "\"}");
         char *msg = hu_strndup(alloc, hex_buf, hp);
         if (!msg) {
             *out = hu_tool_result_fail("out of memory", 12);
@@ -179,13 +179,13 @@ static hu_error_t spi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_va
         }
         char hex_buf[512];
         size_t hp = 0;
-        hp += (size_t)snprintf(hex_buf + hp, sizeof(hex_buf) - hp, "{\"rx_data\":\"");
+        hp = hu_buf_appendf(hex_buf, sizeof(hex_buf), hp, "{\"rx_data\":\"");
         for (size_t i = 0; i < read_len && hp + 4 < sizeof(hex_buf); i++) {
             if (i > 0)
                 hex_buf[hp++] = ' ';
-            hp += (size_t)snprintf(hex_buf + hp, sizeof(hex_buf) - hp, "%02X", rx[i]);
+            hp = hu_buf_appendf(hex_buf, sizeof(hex_buf), hp, "%02X", rx[i]);
         }
-        hp += (size_t)snprintf(hex_buf + hp, sizeof(hex_buf) - hp, "\"}");
+        hp = hu_buf_appendf(hex_buf, sizeof(hex_buf), hp, "\"}");
         char *msg = hu_strndup(alloc, hex_buf, hp);
         if (!msg) {
             *out = hu_tool_result_fail("out of memory", 12);

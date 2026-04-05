@@ -2,6 +2,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/string.h"
+#include <stdint.h>
 #include "human/tool.h"
 #include "human/tools/computer_use.h"
 #include "human/tools/image_gen.h"
@@ -642,6 +643,12 @@ hu_error_t hu_visual_scan_recent(hu_allocator_t *alloc, sqlite3 *db, uint64_t si
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         if (count >= cap) {
+            if (cap > SIZE_MAX / 2U) {
+                if (entries)
+                    alloc->free(alloc->ctx, entries, cap * sizeof(hu_visual_entry_t));
+                sqlite3_finalize(stmt);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
             size_t new_cap = cap == 0 ? 8 : cap * 2;
             hu_visual_entry_t *tmp =
                 (hu_visual_entry_t *)alloc->alloc(alloc->ctx, new_cap * sizeof(hu_visual_entry_t));

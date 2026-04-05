@@ -1054,6 +1054,7 @@ export class DemoGatewayClient extends EventTarget {
   #status: GatewayStatus = "disconnected";
   #features: ServerFeatures = {};
   #interval: ReturnType<typeof setInterval> | null = null;
+  private _connectTimer?: ReturnType<typeof setTimeout>;
   #nextId = 100;
   #onBinary: ((data: ArrayBuffer) => void) | null = null;
   #glMode = false;
@@ -1080,8 +1081,13 @@ export class DemoGatewayClient extends EventTarget {
   }
 
   connect(_url: string): void {
+    if (this._connectTimer !== undefined) {
+      clearTimeout(this._connectTimer);
+      this._connectTimer = undefined;
+    }
     this.#setStatus("connecting");
-    setTimeout(() => {
+    this._connectTimer = setTimeout(() => {
+      this._connectTimer = undefined;
       this.#setStatus("connected");
       this.#features = {
         methods: [],
@@ -1102,9 +1108,7 @@ export class DemoGatewayClient extends EventTarget {
   }
 
   #seedInitialEvents(): void {
-    const seed = [
-      { event: "health", payload: { status: "operational", uptime_secs: 172800 } },
-    ];
+    const seed = [{ event: "health", payload: { status: "operational", uptime_secs: 172800 } }];
     for (const s of seed) {
       this.dispatchEvent(new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, { detail: s }));
     }
@@ -2476,6 +2480,10 @@ export class DemoGatewayClient extends EventTarget {
   }
 
   disconnect(): void {
+    if (this._connectTimer !== undefined) {
+      clearTimeout(this._connectTimer);
+      this._connectTimer = undefined;
+    }
     if (this.#interval) clearInterval(this.#interval);
     this.#onBinary = null;
     this.#setStatus("disconnected");

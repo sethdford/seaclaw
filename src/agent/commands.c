@@ -382,15 +382,10 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
         char *buf = (char *)agent->alloc->alloc(agent->alloc->ctx, 4096);
         if (!buf)
             return NULL;
-        int off = snprintf(buf, 4096, "Tools (%zu):\n", agent->tools_count);
-        if (off < 0 || (size_t)off >= 4096)
-            off = 0;
+        size_t off = hu_buf_appendf(buf, 4096, 0, "Tools (%zu):\n", agent->tools_count);
         for (size_t i = 0; i < agent->tools_count && off < 4000; i++) {
             const char *n = agent->tools[i].vtable->name(agent->tools[i].ctx);
-            int nw = snprintf(buf + off, 4096 - (size_t)off, "  %s\n", n ? n : "?");
-            if (nw < 0)
-                break;
-            off += nw;
+            off = hu_buf_appendf(buf, 4096, off, "  %s\n", n ? n : "?");
         }
         return buf;
     }
@@ -555,16 +550,16 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             agent->alloc->free(agent->alloc->ctx, info, info_count * sizeof(hu_agent_pool_info_t));
             return NULL;
         }
-        int off = snprintf(buf, 4096, "Agents (%zu):\n", info_count);
+        size_t off = hu_buf_appendf(buf, 4096, 0, "Agents (%zu):\n", info_count);
         for (size_t i = 0; i < info_count && off < 4000; i++) {
-            off += snprintf(buf + off, 4096 - (size_t)off, "  #%llu [%s] %s\n",
-                            (unsigned long long)info[i].agent_id,
-                            info[i].status == HU_AGENT_RUNNING     ? "running"
-                            : info[i].status == HU_AGENT_IDLE      ? "idle"
-                            : info[i].status == HU_AGENT_COMPLETED ? "done"
-                            : info[i].status == HU_AGENT_FAILED    ? "failed"
-                                                                   : "cancelled",
-                            info[i].label ? info[i].label : "");
+            off = hu_buf_appendf(buf, 4096, off, "  #%llu [%s] %s\n",
+                                 (unsigned long long)info[i].agent_id,
+                                 info[i].status == HU_AGENT_RUNNING     ? "running"
+                                 : info[i].status == HU_AGENT_IDLE      ? "idle"
+                                 : info[i].status == HU_AGENT_COMPLETED ? "done"
+                                 : info[i].status == HU_AGENT_FAILED    ? "failed"
+                                                                        : "cancelled",
+                                 info[i].label ? info[i].label : "");
         }
         agent->alloc->free(agent->alloc->ctx, info, info_count * sizeof(hu_agent_pool_info_t));
         return buf;
@@ -706,11 +701,11 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             hu_session_metadata_free(agent->alloc, sessions, count);
             return NULL;
         }
-        int off = snprintf(buf, 4096, "Sessions (%zu):\n", count);
+        size_t off = hu_buf_appendf(buf, 4096, 0, "Sessions (%zu):\n", count);
         for (size_t i = 0; i < count && off < 4000; i++) {
-            off += snprintf(buf + off, 4096 - (size_t)off, "  %s  (%zu msgs, model: %s)\n",
-                            sessions[i].id, sessions[i].message_count,
-                            sessions[i].model_name ? sessions[i].model_name : "?");
+            off = hu_buf_appendf(buf, 4096, off, "  %s  (%zu msgs, model: %s)\n",
+                                 sessions[i].id, sessions[i].message_count,
+                                 sessions[i].model_name ? sessions[i].model_name : "?");
         }
         hu_session_metadata_free(agent->alloc, sessions, count);
         return buf;
@@ -772,10 +767,11 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
                 hu_gate_free_array(agent->alloc, gates, gate_count);
                 return NULL;
             }
-            int pos = snprintf(buf, 4096, "Pending gates (%zu):\n", gate_count);
+            size_t pos = hu_buf_appendf(buf, 4096, 0, "Pending gates (%zu):\n", gate_count);
             for (size_t i = 0; i < gate_count && pos < 4000; i++) {
-                pos += snprintf(buf + pos, 4096 - (size_t)pos, "  [%s] %s\n",
-                               gates[i].gate_id, gates[i].description ? gates[i].description : "");
+                pos = hu_buf_appendf(buf, 4096, pos, "  [%s] %s\n",
+                                     gates[i].gate_id,
+                                     gates[i].description ? gates[i].description : "");
             }
             hu_gate_free_array(agent->alloc, gates, gate_count);
             return buf;
@@ -829,9 +825,7 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
         char *buf = (char *)agent->alloc->alloc(agent->alloc->ctx, 4096);
         if (!buf)
             return NULL;
-        int off = snprintf(buf, 4096, "Hooks:\n");
-        if (off < 0 || (size_t)off >= 4096)
-            off = 0;
+        size_t off = hu_buf_appendf(buf, 4096, 0, "Hooks:\n");
         for (size_t i = 0; i < count && off < 3900; i++) {
             const hu_hook_entry_t *hook = hu_hook_registry_get(agent->hook_registry, i);
             if (!hook)
@@ -839,17 +833,14 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             const char *event_name = hook->event == HU_HOOK_PRE_TOOL_EXECUTE  ? "pre_tool_execute"
                                    : hook->event == HU_HOOK_POST_TOOL_EXECUTE ? "post_tool_execute"
                                                                               : "unknown";
-            int nw = snprintf(buf + off, 4096 - (size_t)off,
-                            "  [%s] %.*s: %.*s (timeout: %us, required: %s)\n",
-                            event_name, (int)hook->name_len, hook->name,
-                            (int)hook->command_len, hook->command,
-                            hook->timeout_sec > 0 ? hook->timeout_sec : 30,
-                            hook->required ? "yes" : "no");
-            if (nw < 0)
-                break;
-            off += nw;
+            off = hu_buf_appendf(buf, 4096, off,
+                                 "  [%s] %.*s: %.*s (timeout: %us, required: %s)\n",
+                                 event_name, (int)hook->name_len, hook->name,
+                                 (int)hook->command_len, hook->command,
+                                 hook->timeout_sec > 0 ? hook->timeout_sec : 30,
+                                 hook->required ? "yes" : "no");
         }
-        off += snprintf(buf + off, 4096 - (size_t)off, "Total: %zu hooks registered\n", count);
+        off = hu_buf_appendf(buf, 4096, off, "Total: %zu hooks registered\n", count);
         return buf;
     }
 
@@ -872,9 +863,9 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
         char *buf = (char *)agent->alloc->alloc(agent->alloc->ctx, 4096);
         if (!buf)
             return NULL;
-        int off = snprintf(buf, 4096, "Current permission level: %s\n\nTool classification:\n", level_name);
-        if (off < 0 || (size_t)off >= 4096)
-            off = 0;
+        size_t off = hu_buf_appendf(buf, 4096, 0,
+                                    "Current permission level: %s\n\nTool classification:\n",
+                                    level_name);
 
         /* Count tools by permission tier */
         size_t readonly_count = 0, workspace_count = 0, danger_count = 0;
@@ -894,11 +885,11 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
             }
         }
 
-        off += snprintf(buf + off, 4096 - (size_t)off,
-                       "  read_only (%zu): (use /tools for full list)\n"
-                       "  workspace_write (%zu): (use /tools for full list)\n"
-                       "  danger_full_access (%zu): (use /tools for full list)\n",
-                       readonly_count, workspace_count, danger_count);
+        off = hu_buf_appendf(buf, 4096, off,
+                             "  read_only (%zu): (use /tools for full list)\n"
+                             "  workspace_write (%zu): (use /tools for full list)\n"
+                             "  danger_full_access (%zu): (use /tools for full list)\n",
+                             readonly_count, workspace_count, danger_count);
         return buf;
     }
 
@@ -915,9 +906,7 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
         if (!buf)
             return NULL;
 
-        int off = snprintf(buf, 4096, "Instruction files:\n");
-        if (off < 0 || (size_t)off >= 4096)
-            off = 0;
+        size_t off = hu_buf_appendf(buf, 4096, 0, "Instruction files:\n");
 
         size_t total_chars = 0;
         for (size_t i = 0; i < disc->file_count && off < 3900; i++) {
@@ -926,22 +915,19 @@ char *hu_agent_handle_slash_command(hu_agent_t *agent, const char *message, size
                                     : f->source == HU_INSTRUCTION_SOURCE_PROJECT_ROOT ? "[project]"
                                                                                       : "[user]";
             total_chars += f->content_len;
-            int nw = snprintf(buf + off, 4096 - (size_t)off, "  %s %s (%zu chars)%s\n",
-                            source_name, f->path ? f->path : "?", f->content_len,
-                            f->truncated ? " [truncated]" : "");
-            if (nw < 0)
-                break;
-            off += nw;
+            off = hu_buf_appendf(buf, 4096, off, "  %s %s (%zu chars)%s\n",
+                                 source_name, f->path ? f->path : "?", f->content_len,
+                                 f->truncated ? " [truncated]" : "");
         }
 
         time_t now = time(NULL);
         int64_t age_sec = now - disc->last_check_time;
-        off += snprintf(buf + off, 4096 - (size_t)off,
-                       "Total: %zu chars (limit: %d)\n"
-                       "Cache: %s (last checked %lld seconds ago)\n",
-                       total_chars, HU_INSTRUCTION_MAX_CHARS_TOTAL,
-                       hu_instruction_discovery_is_fresh(disc) ? "fresh" : "stale",
-                       (long long)age_sec);
+        off = hu_buf_appendf(buf, 4096, off,
+                             "Total: %zu chars (limit: %d)\n"
+                             "Cache: %s (last checked %lld seconds ago)\n",
+                             total_chars, HU_INSTRUCTION_MAX_CHARS_TOTAL,
+                             hu_instruction_discovery_is_fresh(disc) ? "fresh" : "stale",
+                             (long long)age_sec);
         return buf;
     }
 

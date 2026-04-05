@@ -284,15 +284,16 @@ static void test_compaction_message_compaction(void) {
 
     size_t count = 6;
     size_t cap = 6;
-    hu_error_t err = hu_compact_history(&alloc, msgs, &count, &cap, &cfg);
+    hu_owned_message_t *hist = msgs;
+    hu_error_t err = hu_compact_history(&alloc, &hist, &count, &cap, &cfg);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(count < 6u);
-    HU_ASSERT_TRUE(strstr(msgs[1].content, "Compaction") != NULL ||
-                   strstr(msgs[1].content, "summary") != NULL);
+    HU_ASSERT_TRUE(strstr(hist[1].content, "Compaction") != NULL ||
+                   strstr(hist[1].content, "summary") != NULL);
 
     for (size_t i = 0; i < count; i++) {
-        if (msgs[i].content)
-            alloc.free(alloc.ctx, msgs[i].content, msgs[i].content_len + 1);
+        if (hist[i].content)
+            alloc.free(alloc.ctx, hist[i].content, hist[i].content_len + 1);
     }
 }
 

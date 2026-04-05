@@ -28,6 +28,8 @@ static const unsigned char hu_canvas_png_sig[8] = {
 static bool hu_canvas_path_shell_safe(const char *p) {
     if (!p)
         return false;
+    if (strstr(p, ".."))
+        return false;
     for (; *p; p++) {
         unsigned char c = (unsigned char)*p;
         if (c == '\'' || c == ';' || c == '|' || c == '&' || c == '$' || c == '`' || c == '"' ||
@@ -99,6 +101,8 @@ static hu_error_t hu_canvas_run_cmd(const char *cmd, int *exit_status) {
 static hu_error_t hu_canvas_write_temp_and_shot(const char *content, size_t content_len,
                                                 const char *suffix, const char *out_path,
                                                 const char *browser) {
+    if (out_path && strchr(out_path, '\''))
+        return HU_ERR_INVALID_ARGUMENT;
     char tmpl[64];
     static const char prefix[] = "/tmp/hu_canvas_XXXXXX";
     size_t plen = strlen(prefix);
@@ -158,6 +162,8 @@ static hu_error_t hu_canvas_chrome_screenshot(const char *content, size_t conten
 }
 
 static hu_error_t hu_canvas_mermaid_render(const char *content, size_t content_len, const char *out_path) {
+    if (out_path && strchr(out_path, '\''))
+        return HU_ERR_INVALID_ARGUMENT;
     char tmpl[] = "/tmp/hu_canvas_mmd_XXXXXX.mmd";
     int fd = mkstemps(tmpl, 4);
     if (fd < 0)

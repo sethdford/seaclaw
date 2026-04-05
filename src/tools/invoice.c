@@ -29,6 +29,30 @@ typedef struct {
     char _unused;
 } invoice_ctx_t;
 
+static hu_error_t inv_json_set_str(hu_allocator_t *alloc, hu_json_value_t *obj, const char *key,
+                                   const char *s, size_t slen) {
+    hu_json_value_t *v = hu_json_string_new(alloc, s, slen);
+    if (!v)
+        return HU_ERR_OUT_OF_MEMORY;
+    if (hu_json_object_set(alloc, obj, key, v) != HU_OK) {
+        hu_json_free(alloc, v);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    return HU_OK;
+}
+
+static hu_error_t inv_json_set_num(hu_allocator_t *alloc, hu_json_value_t *obj, const char *key,
+                                   double n) {
+    hu_json_value_t *v = hu_json_number_new(alloc, n);
+    if (!v)
+        return HU_ERR_OUT_OF_MEMORY;
+    if (hu_json_object_set(alloc, obj, key, v) != HU_OK) {
+        hu_json_free(alloc, v);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    return HU_OK;
+}
+
 static hu_error_t invoice_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
                                   hu_tool_result_t *out) {
     (void)ctx;
@@ -62,27 +86,36 @@ static hu_error_t invoice_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
         strftime(date, sizeof(date), "%Y-%m-%d", tm);
 
         size_t buf_sz = 8192;
-        char *msg = (char *)alloc->alloc(alloc->ctx, buf_sz);
-        if (!msg) {
-            *out = hu_tool_result_fail("out of memory", 13);
-            return HU_ERR_OUT_OF_MEMORY;
-        }
-
-        int n = 0;
+        char *msg = NULL;
+        size_t n = 0;
         double subtotal = 0;
 
         if (strcmp(format, "json") == 0) {
-            n += snprintf(msg + n, buf_sz - (size_t)n,
-                          "{\"invoice_number\":\"%s\",\"date\":\"%s\",\"from\":\"%s\","
-                          "\"to\":\"%s\",\"currency\":\"%s\",\"items\":[",
-                          inv_num ? inv_num : "INV-001", date, from ? from : "", to ? to : "",
-                          currency);
-
+            hu_json_value_t *root = hu_json_object_new(alloc);
+            if (!root) {
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            const char *inv_s = inv_num ? inv_num : "INV-001";
+            if (inv_json_set_str(alloc, root, "invoice_number", inv_s, strlen(inv_s)) != HU_OK ||
+                inv_json_set_str(alloc, root, "date", date, strlen(date)) != HU_OK ||
+                inv_json_set_str(alloc, root, "from", from ? from : "", from ? strlen(from) : 0) !=
+                    HU_OK ||
+                inv_json_set_str(alloc, root, "to", to ? to : "", to ? strlen(to) : 0) != HU_OK ||
+                inv_json_set_str(alloc, root, "currency", currency, strlen(currency)) != HU_OK) {
+                hu_json_free(alloc, root);
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            hu_json_value_t *items_arr = hu_json_array_new(alloc);
+            if (!items_arr) {
+                hu_json_free(alloc, root);
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
             hu_json_value_t *items = hu_json_object_get((hu_json_value_t *)args, "items");
             if (items && items->type == HU_JSON_ARRAY) {
                 for (size_t i = 0; i < items->data.array.len; i++) {
-                    if (n < 0 || (size_t)n >= buf_sz)
-                        break;
                     hu_json_value_t *item = items->data.array.items[i];
                     if (!item)
                         continue;
@@ -91,30 +124,73 @@ static hu_error_t invoice_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
                     double price = hu_json_get_number(item, "unit_price", 0);
                     double line_total = qty * price;
                     subtotal += line_total;
-                    int w = snprintf(msg + n, buf_sz - (size_t)n,
-                                     "%s{\"description\":\"%s\",\"quantity\":%.0f,"
-                                     "\"unit_price\":%.2f,\"total\":%.2f}",
-                                     i > 0 ? "," : "", desc ? desc : "", qty, price, line_total);
-                    if (w > 0)
-                        n += w;
+                    hu_json_value_t *item_obj = hu_json_object_new(alloc);
+                    if (!item_obj) {
+                        hu_json_free(alloc, items_arr);
+                        hu_json_free(alloc, root);
+                        *out = hu_tool_result_fail("out of memory", 13);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
+                    const char *ds = desc ? desc : "";
+                    size_t dsl = desc ? strlen(desc) : 0;
+                    if (inv_json_set_str(alloc, item_obj, "description", ds, dsl) != HU_OK ||
+                        inv_json_set_num(alloc, item_obj, "quantity", qty) != HU_OK ||
+                        inv_json_set_num(alloc, item_obj, "unit_price", price) != HU_OK ||
+                        inv_json_set_num(alloc, item_obj, "total", line_total) != HU_OK) {
+                        hu_json_free(alloc, item_obj);
+                        hu_json_free(alloc, items_arr);
+                        hu_json_free(alloc, root);
+                        *out = hu_tool_result_fail("out of memory", 13);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
+                    if (hu_json_array_push(alloc, items_arr, item_obj) != HU_OK) {
+                        hu_json_free(alloc, item_obj);
+                        hu_json_free(alloc, items_arr);
+                        hu_json_free(alloc, root);
+                        *out = hu_tool_result_fail("out of memory", 13);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
                 }
             }
+            if (hu_json_object_set(alloc, root, "items", items_arr) != HU_OK) {
+                hu_json_free(alloc, items_arr);
+                hu_json_free(alloc, root);
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
             double tax = subtotal * tax_rate;
-            n += snprintf(msg + n, buf_sz - (size_t)n,
-                          "],\"subtotal\":%.2f,\"tax\":%.2f,\"total\":%.2f}", subtotal, tax,
-                          subtotal + tax);
+            if (inv_json_set_num(alloc, root, "subtotal", subtotal) != HU_OK ||
+                inv_json_set_num(alloc, root, "tax", tax) != HU_OK ||
+                inv_json_set_num(alloc, root, "total", subtotal + tax) != HU_OK) {
+                hu_json_free(alloc, root);
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            hu_error_t jerr = hu_json_stringify(alloc, root, &msg, &n);
+            hu_json_free(alloc, root);
+            if (jerr != HU_OK || !msg) {
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
         } else {
-            n += snprintf(msg + n, buf_sz - (size_t)n,
-                          "# Invoice %s\n\n**Date:** %s\n**From:** %s\n**To:** %s\n"
-                          "**Currency:** %s\n\n| Item | Qty | Unit Price | Total |\n"
-                          "|------|-----|-----------|-------|\n",
-                          inv_num ? inv_num : "INV-001", date, from ? from : "", to ? to : "",
-                          currency);
+            msg = (char *)alloc->alloc(alloc->ctx, buf_sz);
+            if (!msg) {
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+
+            n = 0;
+            n = hu_buf_appendf(msg, buf_sz, n,
+                               "# Invoice %s\n\n**Date:** %s\n**From:** %s\n**To:** %s\n"
+                               "**Currency:** %s\n\n| Item | Qty | Unit Price | Total |\n"
+                               "|------|-----|-----------|-------|\n",
+                               inv_num ? inv_num : "INV-001", date, from ? from : "", to ? to : "",
+                               currency);
 
             hu_json_value_t *items = hu_json_object_get((hu_json_value_t *)args, "items");
             if (items && items->type == HU_JSON_ARRAY) {
                 for (size_t i = 0; i < items->data.array.len; i++) {
-                    if (n < 0 || (size_t)n >= buf_sz)
+                    if (n >= buf_sz)
                         break;
                     hu_json_value_t *item = items->data.array.items[i];
                     if (!item)
@@ -124,20 +200,18 @@ static hu_error_t invoice_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
                     double price = hu_json_get_number(item, "unit_price", 0);
                     double line_total = qty * price;
                     subtotal += line_total;
-                    int w = snprintf(msg + n, buf_sz - (size_t)n, "| %s | %.0f | %.2f | %.2f |\n",
-                                     desc ? desc : "", qty, price, line_total);
-                    if (w > 0)
-                        n += w;
+                    n = hu_buf_appendf(msg, buf_sz, n, "| %s | %.0f | %.2f | %.2f |\n",
+                                       desc ? desc : "", qty, price, line_total);
                 }
             }
             double tax = subtotal * tax_rate;
-            n += snprintf(msg + n, buf_sz - (size_t)n,
-                          "\n**Subtotal:** %.2f %s\n**Tax (%.0f%%):** %.2f %s\n"
-                          "**Total:** %.2f %s\n",
-                          subtotal, currency, tax_rate * 100, tax, currency, subtotal + tax,
-                          currency);
+            n = hu_buf_appendf(msg, buf_sz, n,
+                               "\n**Subtotal:** %.2f %s\n**Tax (%.0f%%):** %.2f %s\n"
+                               "**Total:** %.2f %s\n",
+                               subtotal, currency, tax_rate * 100, tax, currency, subtotal + tax,
+                               currency);
         }
-        *out = hu_tool_result_ok_owned(msg, (size_t)n);
+        *out = hu_tool_result_ok_owned(msg, n);
         return HU_OK;
     }
 

@@ -125,6 +125,8 @@ char *hu_sprintf(hu_allocator_t *alloc, const char *fmt, ...) {
 }
 
 void hu_str_free(hu_allocator_t *alloc, char *s) {
+    /* NB: passes strlen-derived size; safe with system/tracking allocators but
+       would break a strict size-matching allocator (arena, slab). */
     if (s)
         alloc->free(alloc->ctx, s, strlen(s) + 1);
 }
@@ -163,4 +165,18 @@ char *hu_strcasestr(const char *haystack, const char *needle) {
             return (char *)haystack;
     }
     return NULL;
+}
+
+size_t hu_buf_appendf(char *buf, size_t cap, size_t off, const char *fmt, ...) {
+    if (off >= cap)
+        return off;
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(buf + off, cap - off, fmt, ap);
+    va_end(ap);
+    if (n < 0)
+        return off;
+    if ((size_t)n >= cap - off)
+        return cap - 1;
+    return off + (size_t)n;
 }

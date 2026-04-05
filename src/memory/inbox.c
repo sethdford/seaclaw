@@ -1,4 +1,5 @@
 #include "human/memory/inbox.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/memory/ingest.h"
 #include "human/memory.h"
@@ -31,8 +32,10 @@ static void inbox_record_feed_item(sqlite3 *db, const char *path, size_t path_le
                       (int)(filename && filename_len > 0 ? filename_len : path_len),
                       SQLITE_STATIC);
     sqlite3_bind_int64(stmt, 3, (sqlite3_int64)time(NULL));
-    sqlite3_step(stmt);
+    int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE)
+        hu_log_error("inbox", NULL, "feed_items insert failed: %s", sqlite3_errmsg(db));
 }
 #endif
 

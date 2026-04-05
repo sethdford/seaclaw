@@ -45,6 +45,11 @@ void hu_tcal_update(hu_tcal_state_t *state,
     float consistency = 1.0f - fabsf(competence_signal - state->dimensions.competence);
     state->dimensions.predictability = ema(state->dimensions.predictability, consistency);
 
+    /* Transparency: grows when integrity and benevolence signals are both positive
+     * (open, honest behavior). Erodes when integrity drops (evasive/contradictory). */
+    float transparency_sig = (integrity_signal + benevolence_signal) * 0.5f;
+    state->dimensions.transparency = ema(state->dimensions.transparency, transparency_sig);
+
     state->interaction_count++;
     state->level = hu_tcal_compute_level(&state->dimensions);
     state->composite = state->dimensions.competence * 0.3f +
@@ -85,17 +90,26 @@ hu_tcal_level_t hu_tcal_compute_level(const hu_tcal_dimensions_t *dims) {
 
 const char *hu_tcal_confidence_language(float confidence,
                                         hu_tcal_level_t contact_trust) {
-    (void)contact_trust;
-    if (confidence >= 0.9f)
-        return "I'm confident that";
-    if (confidence >= 0.75f)
-        return "I'm fairly sure that";
-    if (confidence >= 0.6f)
-        return "I think";
-    if (confidence >= 0.4f)
-        return "I believe, though I'm not certain, that";
-    if (confidence >= 0.2f)
+    if (contact_trust >= HU_TCAL_ESTABLISHED) {
+        if (confidence >= 0.9f) return "I'm sure";
+        if (confidence >= 0.7f) return "I'm pretty sure";
+        if (confidence >= 0.5f) return "I think";
+        if (confidence >= 0.3f) return "hmm, I'm not totally sure but";
+        return "honestly I'm not sure, but";
+    }
+    if (contact_trust >= HU_TCAL_DEVELOPING) {
+        if (confidence >= 0.9f) return "I'm confident that";
+        if (confidence >= 0.7f) return "I'm fairly sure that";
+        if (confidence >= 0.5f) return "I think";
+        if (confidence >= 0.3f) return "I believe, though I'm not certain, that";
         return "I'm not sure, but";
+    }
+    /* UNKNOWN or CAUTIOUS — formal hedging */
+    if (confidence >= 0.9f) return "I'm confident that";
+    if (confidence >= 0.75f) return "I'm fairly sure that";
+    if (confidence >= 0.6f) return "I think";
+    if (confidence >= 0.4f) return "I believe, though I'm not certain, that";
+    if (confidence >= 0.2f) return "I'm not sure, but";
     return "I really don't know, but my best guess is";
 }
 
@@ -115,14 +129,25 @@ hu_error_t hu_tcal_build_context(hu_allocator_t *alloc,
         [HU_TCAL_DEEP] = "deep",
     };
 
-    char buf[512];
+    int sl = (int)state->level;
+    int n_level_names = (int)(sizeof(level_names) / sizeof(level_names[0]));
+    int lvl = (sl >= 0 && sl < n_level_names) ? sl : 0;
+    const char *level_name = level_names[lvl];
+
+    const char *high_conf = hu_tcal_confidence_language(0.9f, state->level);
+    const char *mid_conf = hu_tcal_confidence_language(0.5f, state->level);
+    const char *low_conf = hu_tcal_confidence_language(0.2f, state->level);
+
+    char buf[768];
     int n = snprintf(buf, sizeof(buf),
         "[TRUST CALIBRATION] Trust level: %s (%.2f). "
         "Interactions: %zu. %s"
-        "Use calibrated uncertainty language matching your actual confidence.",
-        level_names[state->level], state->composite,
+        "Calibrate uncertainty language to your actual confidence: "
+        "high=\"%s\", medium=\"%s\", low=\"%s\".",
+        level_name, state->composite,
         state->interaction_count,
-        state->erosion_detected ? "WARNING: Trust erosion detected. Be extra careful with claims. " : "");
+        state->erosion_detected ? "WARNING: Trust erosion detected. Be extra careful with claims. " : "",
+        high_conf, mid_conf, low_conf);
 
     if (n <= 0 || (size_t)n >= sizeof(buf))
         return HU_ERR_INVALID_ARGUMENT;

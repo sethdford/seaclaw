@@ -56,6 +56,9 @@
 #include "human/core/string.h"
 #include "human/memory/stm.h"
 #include "human/observer.h"
+#include "human/persona/narrative_self.h"
+#include "human/persona/creative_voice.h"
+#include "human/persona/genuine_boundaries.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
 #endif
@@ -394,22 +397,28 @@ hu_error_t hu_agent_from_config(
 
     if (persona && persona_len > 0) {
         out->persona_name = hu_strndup(alloc, persona, persona_len);
-        out->persona_name_len = persona_len;
-#ifdef HU_HAS_PERSONA
-        out->persona = (hu_persona_t *)alloc->alloc(alloc->ctx, sizeof(hu_persona_t));
-        if (out->persona) {
-            memset(out->persona, 0, sizeof(hu_persona_t));
-            hu_error_t perr = hu_persona_load(alloc, persona, persona_len, out->persona);
-            if (perr != HU_OK) {
+        if (!out->persona_name) {
 #ifndef HU_IS_TEST
-                hu_log_error("human", NULL, "warning: persona '%.*s' not found, running without persona",
-                        (int)persona_len, persona);
+            hu_log_warn("agent", NULL, "Failed to allocate persona name");
 #endif
-                alloc->free(alloc->ctx, out->persona, sizeof(hu_persona_t));
-                out->persona = NULL;
+        } else {
+            out->persona_name_len = persona_len;
+#ifdef HU_HAS_PERSONA
+            out->persona = (hu_persona_t *)alloc->alloc(alloc->ctx, sizeof(hu_persona_t));
+            if (out->persona) {
+                memset(out->persona, 0, sizeof(hu_persona_t));
+                hu_error_t perr = hu_persona_load(alloc, persona, persona_len, out->persona);
+                if (perr != HU_OK) {
+#ifndef HU_IS_TEST
+                    hu_log_error("human", NULL, "warning: persona '%.*s' not found, running without persona",
+                            (int)persona_len, persona);
+#endif
+                    alloc->free(alloc->ctx, out->persona, sizeof(hu_persona_t));
+                    out->persona = NULL;
+                }
             }
-        }
 #endif
+        }
     }
 
     out->turn_arena = hu_arena_create(*alloc);
@@ -493,7 +502,12 @@ hu_error_t hu_agent_from_config(
     }
 
     /* Superhuman services */
-    (void)hu_superhuman_registry_init(&out->superhuman);
+    {
+        hu_error_t sub_err = hu_superhuman_registry_init(&out->superhuman);
+        if (sub_err != HU_OK)
+            hu_log_warn("agent", NULL, "superhuman registry init failed: %s",
+                        hu_error_string(sub_err));
+    }
     memset(&out->superhuman_commitment_ctx, 0, sizeof(out->superhuman_commitment_ctx));
     memset(&out->superhuman_emotional_ctx, 0, sizeof(out->superhuman_emotional_ctx));
     memset(&out->superhuman_silence_ctx, 0, sizeof(out->superhuman_silence_ctx));
@@ -503,23 +517,55 @@ hu_error_t hu_agent_from_config(
         out->superhuman_commitment_ctx.session_id = NULL;
         out->superhuman_commitment_ctx.session_id_len = 0;
         hu_superhuman_service_t svc;
-        (void)hu_superhuman_commitment_service(&out->superhuman_commitment_ctx, &svc);
-        (void)hu_superhuman_register(&out->superhuman, svc);
+        hu_error_t sub_err = hu_superhuman_commitment_service(&out->superhuman_commitment_ctx, &svc);
+        if (sub_err != HU_OK)
+            hu_log_warn("agent", NULL, "superhuman commitment service init failed: %s",
+                        hu_error_string(sub_err));
+        else {
+            sub_err = hu_superhuman_register(&out->superhuman, svc);
+            if (sub_err != HU_OK)
+                hu_log_warn("agent", NULL, "superhuman register (commitment) failed: %s",
+                            hu_error_string(sub_err));
+        }
     }
     {
         hu_superhuman_service_t svc;
-        (void)hu_superhuman_predictive_service(&out->radar, &svc);
-        (void)hu_superhuman_register(&out->superhuman, svc);
+        hu_error_t sub_err = hu_superhuman_predictive_service(&out->radar, &svc);
+        if (sub_err != HU_OK)
+            hu_log_warn("agent", NULL, "superhuman predictive service init failed: %s",
+                        hu_error_string(sub_err));
+        else {
+            sub_err = hu_superhuman_register(&out->superhuman, svc);
+            if (sub_err != HU_OK)
+                hu_log_warn("agent", NULL, "superhuman register (predictive) failed: %s",
+                            hu_error_string(sub_err));
+        }
     }
     {
         hu_superhuman_service_t svc;
-        (void)hu_superhuman_emotional_service(&out->superhuman_emotional_ctx, &svc);
-        (void)hu_superhuman_register(&out->superhuman, svc);
+        hu_error_t sub_err = hu_superhuman_emotional_service(&out->superhuman_emotional_ctx, &svc);
+        if (sub_err != HU_OK)
+            hu_log_warn("agent", NULL, "superhuman emotional service init failed: %s",
+                        hu_error_string(sub_err));
+        else {
+            sub_err = hu_superhuman_register(&out->superhuman, svc);
+            if (sub_err != HU_OK)
+                hu_log_warn("agent", NULL, "superhuman register (emotional) failed: %s",
+                            hu_error_string(sub_err));
+        }
     }
     {
         hu_superhuman_service_t svc;
-        (void)hu_superhuman_silence_service(&out->superhuman_silence_ctx, &svc);
-        (void)hu_superhuman_register(&out->superhuman, svc);
+        hu_error_t sub_err = hu_superhuman_silence_service(&out->superhuman_silence_ctx, &svc);
+        if (sub_err != HU_OK)
+            hu_log_warn("agent", NULL, "superhuman silence service init failed: %s",
+                        hu_error_string(sub_err));
+        else {
+            sub_err = hu_superhuman_register(&out->superhuman, svc);
+            if (sub_err != HU_OK)
+                hu_log_warn("agent", NULL, "superhuman register (silence) failed: %s",
+                            hu_error_string(sub_err));
+        }
     }
 
     /* SOTA operational modules — safe defaults for production */
@@ -557,12 +603,43 @@ hu_error_t hu_agent_from_config(
 #else
         void *sota_db = NULL;
 #endif
-        hu_adaptive_rag_create(alloc, sota_db, &out->sota.adaptive_rag);
-        hu_tier_manager_create(alloc, sota_db, &out->sota.tier_manager);
-        hu_tier_manager_init_tables(&out->sota.tier_manager);
-        hu_tier_manager_load_core(&out->sota.tier_manager);
-        hu_dpo_collector_create(alloc, sota_db, 10000, &out->sota.dpo_collector);
-        hu_dpo_init_tables(&out->sota.dpo_collector);
+        {
+            hu_error_t sota_sub = hu_adaptive_rag_create(alloc, sota_db, &out->sota.adaptive_rag);
+            if (sota_sub != HU_OK)
+                hu_log_warn("agent", NULL, "adaptive RAG create failed: %s",
+                            hu_error_string(sota_sub));
+        }
+        {
+            hu_error_t sota_sub = hu_tier_manager_create(alloc, sota_db, &out->sota.tier_manager);
+            if (sota_sub != HU_OK)
+                hu_log_warn("agent", NULL, "tier manager create failed: %s",
+                            hu_error_string(sota_sub));
+        }
+        {
+            hu_error_t sota_sub = hu_tier_manager_init_tables(&out->sota.tier_manager);
+            if (sota_sub != HU_OK)
+                hu_log_warn("agent", NULL, "tier manager init tables failed: %s",
+                            hu_error_string(sota_sub));
+        }
+        {
+            hu_error_t sota_sub = hu_tier_manager_load_core(&out->sota.tier_manager);
+            if (sota_sub != HU_OK)
+                hu_log_warn("agent", NULL, "tier manager load core failed: %s",
+                            hu_error_string(sota_sub));
+        }
+        {
+            hu_error_t sota_sub =
+                hu_dpo_collector_create(alloc, sota_db, 10000, &out->sota.dpo_collector);
+            if (sota_sub != HU_OK)
+                hu_log_warn("agent", NULL, "DPO collector create failed: %s",
+                            hu_error_string(sota_sub));
+        }
+        {
+            hu_error_t sota_sub = hu_dpo_init_tables(&out->sota.dpo_collector);
+            if (sota_sub != HU_OK)
+                hu_log_warn("agent", NULL, "DPO init tables failed: %s",
+                            hu_error_string(sota_sub));
+        }
     }
     out->sota.sota_initialized = true;
 
@@ -634,6 +711,41 @@ hu_error_t hu_agent_set_persona(hu_agent_t *agent, const char *name, size_t name
         return HU_ERR_OUT_OF_MEMORY;
     }
     agent->persona_name_len = name_len;
+
+    /* Re-seed frontier state from new persona (narrative, creative voice, boundaries, trust) */
+    if (agent->frontiers.initialized) {
+        hu_narrative_self_deinit(agent->alloc, &agent->frontiers.narrative);
+        hu_creative_voice_deinit(agent->alloc, &agent->frontiers.creative_voice);
+        hu_genuine_boundary_set_deinit(agent->alloc, &agent->frontiers.boundaries);
+        hu_narrative_self_init(&agent->frontiers.narrative);
+        hu_creative_voice_init(&agent->frontiers.creative_voice);
+        hu_genuine_boundary_set_init(&agent->frontiers.boundaries);
+        hu_tcal_init(&agent->frontiers.trust);
+
+        if (new_persona->identity)
+            hu_narrative_self_set_identity(agent->alloc, &agent->frontiers.narrative,
+                new_persona->identity, strlen(new_persona->identity));
+        if (new_persona->biography)
+            hu_narrative_self_add_theme(agent->alloc, &agent->frontiers.narrative,
+                new_persona->biography, strlen(new_persona->biography));
+        for (size_t vi = 0; vi < new_persona->values_count && vi < 4; vi++)
+            hu_narrative_self_add_theme(agent->alloc, &agent->frontiers.narrative,
+                new_persona->values[vi], strlen(new_persona->values[vi]));
+
+        for (size_t ti = 0; ti < new_persona->traits_count && ti < 4; ti++)
+            hu_creative_voice_add_domain(agent->alloc, &agent->frontiers.creative_voice,
+                new_persona->traits[ti], strlen(new_persona->traits[ti]));
+        if (new_persona->decision_style)
+            hu_creative_voice_add_anchor(agent->alloc, &agent->frontiers.creative_voice,
+                new_persona->decision_style, strlen(new_persona->decision_style));
+
+        for (size_t pi = 0; pi < new_persona->principles_count && pi < 4; pi++)
+            hu_genuine_boundary_add(agent->alloc, &agent->frontiers.boundaries,
+                "principle", new_persona->principles[pi], NULL, 0.8f, 0);
+        for (size_t vi = 0; vi < new_persona->values_count && vi < 2; vi++)
+            hu_genuine_boundary_add(agent->alloc, &agent->frontiers.boundaries,
+                "value", new_persona->values[vi], NULL, 0.7f, 0);
+    }
 
     return HU_OK;
 }
@@ -824,6 +936,15 @@ void hu_agent_deinit(hu_agent_t *agent) {
             hu_log_error("agent", NULL, "STM promotion failed: %s", hu_error_string(promo_err));
     }
     hu_stm_deinit(&agent->stm);
+    if (agent->frontiers.initialized) {
+        hu_narrative_self_deinit(agent->alloc, &agent->frontiers.narrative);
+        hu_creative_voice_deinit(agent->alloc, &agent->frontiers.creative_voice);
+        hu_attachment_deinit(agent->alloc, &agent->frontiers.attachment);
+        hu_rupture_deinit(agent->alloc, &agent->frontiers.rupture);
+        hu_growth_narrative_deinit(agent->alloc, &agent->frontiers.growth);
+        hu_genuine_boundary_set_deinit(agent->alloc, &agent->frontiers.boundaries);
+        agent->frontiers.initialized = false;
+    }
     if (agent->sota.sota_initialized) {
         hu_adaptive_rag_deinit(&agent->sota.adaptive_rag);
         hu_tier_manager_deinit(&agent->sota.tier_manager);
@@ -917,8 +1038,11 @@ hu_error_t hu_agent_internal_ensure_history_cap(hu_agent_t *agent, size_t need) 
     if (agent->history_cap >= need)
         return HU_OK;
     size_t new_cap = agent->history_cap ? agent->history_cap : HU_AGENT_HISTORY_INIT_CAP;
-    while (new_cap < need)
+    while (new_cap < need) {
+        if (new_cap > SIZE_MAX / 2)
+            return HU_ERR_OUT_OF_MEMORY;
         new_cap *= 2;
+    }
     hu_owned_message_t *new_arr = (hu_owned_message_t *)agent->alloc->realloc(
         agent->alloc->ctx, agent->history, agent->history_cap * sizeof(hu_owned_message_t),
         new_cap * sizeof(hu_owned_message_t));
@@ -1167,6 +1291,8 @@ hu_policy_action_t hu_agent_internal_evaluate_tool_policy(hu_agent_t *agent, con
 }
 
 hu_tool_t *hu_agent_internal_find_tool(hu_agent_t *agent, const char *name, size_t name_len) {
+    if (!name || name_len == 0)
+        return NULL;
     for (size_t i = 0; i < agent->tools_count; i++) {
         const char *n = agent->tools[i].vtable->name(agent->tools[i].ctx);
         if (n && name_len == strlen(n) && memcmp(n, name, name_len) == 0) {
@@ -1336,7 +1462,7 @@ hu_error_t hu_agent_reload_config(hu_agent_t *agent, char **summary_out, size_t 
         hu_config_deinit(&fresh_cfg);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    int offset = 0;
+    size_t offset = 0;
 
     /* Track what changed */
     bool hooks_changed = false;
@@ -1369,15 +1495,15 @@ hu_error_t hu_agent_reload_config(hu_agent_t *agent, char **summary_out, size_t 
                 hu_hook_registry_add(agent->hook_registry, agent->alloc, &he);
             }
             hooks_changed = true;
-            offset += snprintf(summary_buf + offset, 512 - offset,
-                             "Hooks: rebuilt (%zu entries)\n", fresh_cfg.hooks.entries_count);
+            offset = hu_buf_appendf(summary_buf, 512, offset,
+                                    "Hooks: rebuilt (%zu entries)\n", fresh_cfg.hooks.entries_count);
         }
     } else if (agent->hook_registry) {
         /* Hooks were cleared in new config */
         hu_hook_registry_destroy(agent->hook_registry, agent->alloc);
         agent->hook_registry = NULL;
         hooks_changed = true;
-        offset += snprintf(summary_buf + offset, 512 - offset, "Hooks: cleared\n");
+        offset = hu_buf_appendf(summary_buf, 512, offset, "Hooks: cleared\n");
     }
 
     /* 2. Update permission level if changed */
@@ -1389,8 +1515,8 @@ hu_error_t hu_agent_reload_config(hu_agent_t *agent, char **summary_out, size_t 
             agent->permission_level = new_perm;
         }
         permission_changed = true;
-        offset += snprintf(summary_buf + offset, 512 - offset,
-                         "Permission level: updated to %u\n", (unsigned int)new_perm);
+        offset = hu_buf_appendf(summary_buf, 512, offset,
+                                "Permission level: updated to %u\n", (unsigned int)new_perm);
     }
 
     /* 3. Re-discover instruction files */
@@ -1405,9 +1531,9 @@ hu_error_t hu_agent_reload_config(hu_agent_t *agent, char **summary_out, size_t 
                                                            &agent->instruction_discovery);
         if (instr_err == HU_OK && agent->instruction_discovery) {
             instructions_changed = true;
-            offset += snprintf(summary_buf + offset, 512 - offset,
-                             "Instructions: re-discovered (%zu files)\n",
-                             agent->instruction_discovery->file_count);
+            offset = hu_buf_appendf(summary_buf, 512, offset,
+                                    "Instructions: re-discovered (%zu files)\n",
+                                    agent->instruction_discovery->file_count);
         }
     }
 
@@ -1416,10 +1542,12 @@ hu_error_t hu_agent_reload_config(hu_agent_t *agent, char **summary_out, size_t 
 
     /* Generate final summary */
     if (!hooks_changed && !permission_changed && !instructions_changed) {
-        offset += snprintf(summary_buf + offset, 512 - offset, "No changes detected.");
+        offset = hu_buf_appendf(summary_buf, 512, offset, "No changes detected.");
     } else {
-        offset += snprintf(summary_buf + offset, 512 - offset, "Config reloaded successfully.");
+        offset = hu_buf_appendf(summary_buf, 512, offset, "Config reloaded successfully.");
     }
+
+    summary_buf[offset] = '\0';
 
     *summary_out = summary_buf;
     if (summary_len_out)

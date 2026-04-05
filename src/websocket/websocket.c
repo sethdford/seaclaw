@@ -173,7 +173,7 @@ size_t hu_ws_build_upgrade_request(char *buf, size_t buf_cap, const char *host, 
 #if defined(HU_GATEWAY_POSIX) && !HU_IS_TEST
 /* Base64 encode 16 bytes into 24 chars. RFC 6455 accepts padding. */
 static void ws_b64_encode_16(const unsigned char *in, char *out) {
-    static const char tbl[] = "ABCDEFGHIJKLMOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    static const char tbl[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     int i;
     for (i = 0; i < 15; i += 3) {
         unsigned a = in[i], b = in[i + 1], c = in[i + 2];
@@ -440,7 +440,7 @@ hu_error_t hu_ws_connect_with_headers(hu_allocator_t *alloc, const char *url,
         close(sockfd);
         return HU_ERR_IO;
     }
-    if (!strstr(resp, "101")) {
+    if (strncmp(resp, "HTTP/1.1 101", 12) != 0 && strncmp(resp, "HTTP/1.0 101", 12) != 0) {
 #ifdef HU_HAS_TLS
         if (ssl) {
             SSL_free(ssl);
@@ -622,6 +622,23 @@ hu_error_t hu_ws_recv(hu_ws_client_t *ws, hu_allocator_t *alloc, char **data_out
         if (hdr.payload_len > HU_WS_MAX_MSG)
             return HU_ERR_IO;
 
+        if ((hdr.opcode == HU_WS_OP_TEXT || hdr.opcode == HU_WS_OP_BINARY) && hdr.fin
+            && hdr.payload_len == 0) {
+            if (ws->frag_buf) {
+                alloc->free(alloc->ctx, ws->frag_buf, ws->frag_cap);
+                ws->frag_buf = NULL;
+                ws->frag_len = 0;
+                ws->frag_cap = 0;
+            }
+            char *empty = (char *)alloc->alloc(alloc->ctx, 1);
+            if (!empty)
+                return HU_ERR_OUT_OF_MEMORY;
+            empty[0] = '\0';
+            *data_out = empty;
+            *data_len_out = 0;
+            return HU_OK;
+        }
+
         char *payload = NULL;
         if (hdr.payload_len > 0) {
             payload = (char *)alloc->alloc(alloc->ctx, hdr.payload_len + 1);
@@ -701,12 +718,10 @@ hu_error_t hu_ws_recv(hu_ws_client_t *ws, hu_allocator_t *alloc, char **data_out
                     ws->frag_len = 0;
                     ws->frag_cap = 0;
                 }
-                *data_out = payload ? payload : (char *)alloc->alloc(alloc->ctx, 1);
+                *data_out = payload;
                 *data_len_out = hdr.payload_len;
-                if (!*data_out && hdr.payload_len > 0)
+                if (!*data_out)
                     return HU_ERR_OUT_OF_MEMORY;
-                if (hdr.payload_len == 0 && *data_out)
-                    (*data_out)[0] = '\0';
                 return HU_OK;
             }
             /* First fragment of a multi-frame message */
@@ -737,6 +752,14 @@ hu_error_t hu_ws_recv(hu_ws_client_t *ws, hu_allocator_t *alloc, char **data_out
                 continue;
             }
             if (hdr.payload_len > 0 && payload) {
+                if (hdr.payload_len > SIZE_MAX - ws->frag_len) {
+                    alloc->free(alloc->ctx, ws->frag_buf, ws->frag_cap);
+                    ws->frag_buf = NULL;
+                    ws->frag_len = 0;
+                    ws->frag_cap = 0;
+                    alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
+                    return HU_ERR_IO;
+                }
                 size_t need_total = ws->frag_len + hdr.payload_len;
                 if (need_total > HU_WS_MAX_MSG) {
                     alloc->free(alloc->ctx, ws->frag_buf, ws->frag_cap);

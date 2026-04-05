@@ -63,15 +63,11 @@ static hu_error_t pgvector_upsert_impl(void *ctx, hu_allocator_t *alloc, const c
         return HU_ERR_OUT_OF_MEMORY;
 
     char vec_buf[4096];
-    size_t pos = 0;
-    vec_buf[pos++] = '[';
+    size_t pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), 0, "[");
     for (size_t i = 0; i < dims && pos < sizeof(vec_buf) - 32; i++) {
-        if (i > 0)
-            vec_buf[pos++] = ',';
-        pos += (size_t)snprintf(vec_buf + pos, sizeof(vec_buf) - pos, "%f", embedding[i]);
+        pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), pos, i ? ",%f" : "%f", (double)embedding[i]);
     }
-    vec_buf[pos++] = ']';
-    vec_buf[pos] = '\0';
+    pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), pos, "]");
 
     char *meta_z = NULL;
     if (metadata && metadata_len > 0) {
@@ -118,15 +114,12 @@ static hu_error_t pgvector_search_impl(void *ctx, hu_allocator_t *alloc,
         return HU_ERR_INVALID_ARGUMENT;
 
     char vec_buf[4096];
-    size_t pos = 0;
-    vec_buf[pos++] = '[';
+    size_t pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), 0, "[");
     for (size_t i = 0; i < dims && pos < sizeof(vec_buf) - 32; i++) {
-        if (i > 0)
-            vec_buf[pos++] = ',';
-        pos += (size_t)snprintf(vec_buf + pos, sizeof(vec_buf) - pos, "%f", query_embedding[i]);
+        pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), pos, i ? ",%f" : "%f",
+                             (double)query_embedding[i]);
     }
-    vec_buf[pos++] = ']';
-    vec_buf[pos] = '\0';
+    pos = hu_buf_appendf(vec_buf, sizeof(vec_buf), pos, "]");
 
     size_t lim = limit > 0 ? limit : 10;
     if (lim > 10000)

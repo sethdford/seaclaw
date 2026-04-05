@@ -1,6 +1,7 @@
 #include "human/memory/vector_math.h"
 #include "human/accel.h"
 #include <math.h>
+#include <stdint.h>
 #include <string.h>
 
 float hu_vector_cosine_similarity(const float *a, const float *b, size_t len) {
@@ -52,7 +53,9 @@ float hu_vector_cosine_similarity(const float *a, const float *b, size_t len) {
 unsigned char *hu_vector_to_bytes(hu_allocator_t *alloc, const float *v, size_t len) {
     if (!alloc || !v)
         return NULL;
-    size_t byte_len = len * 4;
+    if (len > SIZE_MAX / sizeof(float))
+        return NULL;
+    size_t byte_len = len * sizeof(float);
     unsigned char *bytes = (unsigned char *)alloc->alloc(alloc->ctx, byte_len);
     if (!bytes)
         return NULL;

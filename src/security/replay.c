@@ -88,16 +88,16 @@ hu_error_t hu_replay_export_json(hu_replay_recorder_t *rec, hu_allocator_t *allo
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t off = 0;
-    off += (size_t)snprintf(buf + off, cap - off, "{\"events\":[");
+    off = hu_buf_appendf(buf, cap, off, "{\"events\":[");
     for (size_t i = 0; i < rec->count && off < cap - 64; i++) {
         if (i > 0)
             buf[off++] = ',';
         hu_replay_event_t *e = &rec->events[i];
-        off += (size_t)snprintf(buf + off, cap - off,
-                                "{\"type\":\"%s\",\"timestamp\":%lld,\"data_len\":%zu}",
-                                event_type_str(e->type), (long long)e->timestamp, e->data_len);
+        off = hu_buf_appendf(buf, cap, off,
+                             "{\"type\":\"%s\",\"timestamp\":%lld,\"data_len\":%zu}",
+                             event_type_str(e->type), (long long)e->timestamp, e->data_len);
     }
-    off += (size_t)snprintf(buf + off, cap - off, "]}");
+    off = hu_buf_appendf(buf, cap, off, "]}");
 
     *out_json = buf;
     *out_len = off;

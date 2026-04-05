@@ -76,6 +76,40 @@ static void sycophancy_build_friction_null_result_returns_error(void) {
                  HU_ERR_INVALID_ARGUMENT);
 }
 
+static void sycophancy_opinion_boost_raises_risk(void) {
+    const char *response =
+        "You're absolutely right. I completely agree.";
+    const char *user_opinion = "I think this is clearly the best approach, obviously";
+    const char *user_neutral = "What is the best approach?";
+    hu_sycophancy_result_t r_opinion, r_neutral;
+    memset(&r_opinion, 0, sizeof(r_opinion));
+    memset(&r_neutral, 0, sizeof(r_neutral));
+
+    HU_ASSERT_EQ(hu_sycophancy_check(response, strlen(response),
+                 user_opinion, strlen(user_opinion), 0.5f, &r_opinion), HU_OK);
+    HU_ASSERT_EQ(hu_sycophancy_check(response, strlen(response),
+                 user_neutral, strlen(user_neutral), 0.5f, &r_neutral), HU_OK);
+
+    HU_ASSERT_TRUE(r_opinion.total_risk >= r_neutral.total_risk);
+}
+
+static void sycophancy_friction_includes_opinion_addendum(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_sycophancy_result_t synth;
+    memset(&synth, 0, sizeof(synth));
+    synth.flagged = true;
+    synth.total_risk = 0.6f;
+
+    const char *msg = "I think this is the best, don't you think?";
+    char *out = NULL;
+    size_t out_len = 0;
+    HU_ASSERT_EQ(hu_sycophancy_build_friction(&alloc, &synth, msg, strlen(msg),
+                                               &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_STR_CONTAINS(out, "opinion");
+    alloc.free(alloc.ctx, out, out_len + 1U);
+}
+
 void run_sycophancy_guard_tests(void) {
     HU_TEST_SUITE("sycophancy_guard");
     HU_RUN_TEST(sycophancy_neutral_response_not_flagged);
@@ -84,4 +118,6 @@ void run_sycophancy_guard_tests(void) {
     HU_RUN_TEST(sycophancy_threshold_affects_flagging);
     HU_RUN_TEST(sycophancy_build_friction_produces_string);
     HU_RUN_TEST(sycophancy_build_friction_null_result_returns_error);
+    HU_RUN_TEST(sycophancy_opinion_boost_raises_risk);
+    HU_RUN_TEST(sycophancy_friction_includes_opinion_addendum);
 }

@@ -35,11 +35,28 @@ static hu_error_t parse_nodes(hu_allocator_t *a, hu_config_t *cfg, const hu_json
             continue;
         const char *status = hu_json_get_string(item, "status");
         cfg->nodes[n].name = hu_strdup(a, name);
+        if (!cfg->nodes[n].name)
+            goto parse_nodes_oom;
         cfg->nodes[n].status = status && status[0] ? hu_strdup(a, status) : hu_strdup(a, "online");
+        if (!cfg->nodes[n].status) {
+            hu_str_free(a, cfg->nodes[n].name);
+            cfg->nodes[n].name = NULL;
+            goto parse_nodes_oom;
+        }
         n++;
     }
     cfg->nodes_len = n;
     return HU_OK;
+
+parse_nodes_oom:
+    for (size_t k = 0; k < n; k++) {
+        hu_str_free(a, cfg->nodes[k].name);
+        hu_str_free(a, cfg->nodes[k].status);
+        cfg->nodes[k].name = NULL;
+        cfg->nodes[k].status = NULL;
+    }
+    cfg->nodes_len = 0;
+    return HU_ERR_OUT_OF_MEMORY;
 }
 
 hu_error_t parse_string_array(hu_allocator_t *a, char ***out, size_t *out_len,
@@ -64,8 +81,18 @@ hu_error_t parse_string_array(hu_allocator_t *a, char ***out, size_t *out_len,
         if (!v || v->type != HU_JSON_STRING)
             continue;
         const char *s = v->data.string.ptr;
-        if (s)
-            list[j++] = hu_strdup(a, s);
+        if (s) {
+            char *dup = hu_strdup(a, s);
+            if (!dup) {
+                for (size_t k = 0; k < j; k++)
+                    hu_str_free(a, list[k]);
+                a->free(a->ctx, list, n * sizeof(char *));
+                *out = NULL;
+                *out_len = 0;
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            list[j++] = dup;
+        }
     }
     *out = list;
     *out_len = j;
@@ -102,8 +129,10 @@ static hu_error_t parse_autonomy(hu_allocator_t *a, hu_config_t *cfg, const hu_j
             a->free(a->ctx, cfg->autonomy.allowed_commands,
                     cfg->autonomy.allowed_commands_len * sizeof(char *));
         }
-        parse_string_array(a, &cfg->autonomy.allowed_commands, &cfg->autonomy.allowed_commands_len,
-                           ac);
+        hu_error_t sa_err = parse_string_array(a, &cfg->autonomy.allowed_commands,
+                                               &cfg->autonomy.allowed_commands_len, ac);
+        if (sa_err != HU_OK)
+            return sa_err;
     }
     return HU_OK;
 }
@@ -191,7 +220,10 @@ static hu_error_t parse_gateway(hu_allocator_t *a, hu_config_t *cfg, const hu_js
             a->free(a->ctx, cfg->gateway.cors_origins,
                     cfg->gateway.cors_origins_len * sizeof(char *));
         }
-        parse_string_array(a, &cfg->gateway.cors_origins, &cfg->gateway.cors_origins_len, cors);
+        hu_error_t cors_err =
+            parse_string_array(a, &cfg->gateway.cors_origins, &cfg->gateway.cors_origins_len, cors);
+        if (cors_err != HU_OK)
+            return cors_err;
     }
     return HU_OK;
 }
@@ -309,7 +341,10 @@ static hu_error_t parse_tools(hu_allocator_t *a, hu_config_t *cfg, const hu_json
             a->free(a->ctx, cfg->tools.enabled_tools,
                     cfg->tools.enabled_tools_len * sizeof(char *));
         }
-        parse_string_array(a, &cfg->tools.enabled_tools, &cfg->tools.enabled_tools_len, en);
+        hu_error_t en_err =
+            parse_string_array(a, &cfg->tools.enabled_tools, &cfg->tools.enabled_tools_len, en);
+        if (en_err != HU_OK)
+            return en_err;
     }
     hu_json_value_t *dis = hu_json_object_get(obj, "disabled_tools");
     if (dis && dis->type == HU_JSON_ARRAY) {
@@ -320,7 +355,10 @@ static hu_error_t parse_tools(hu_allocator_t *a, hu_config_t *cfg, const hu_json
             a->free(a->ctx, cfg->tools.disabled_tools,
                     cfg->tools.disabled_tools_len * sizeof(char *));
         }
-        parse_string_array(a, &cfg->tools.disabled_tools, &cfg->tools.disabled_tools_len, dis);
+        hu_error_t dis_err =
+            parse_string_array(a, &cfg->tools.disabled_tools, &cfg->tools.disabled_tools_len, dis);
+        if (dis_err != HU_OK)
+            return dis_err;
     }
     hu_json_value_t *tmo = hu_json_object_get(obj, "tool_model_overrides");
     if (tmo && tmo->type == HU_JSON_OBJECT && tmo->data.object.pairs) {
@@ -619,8 +657,10 @@ static hu_error_t parse_reliability(hu_allocator_t *a, hu_config_t *cfg,
             a->free(a->ctx, cfg->reliability.fallback_providers,
                     cfg->reliability.fallback_providers_len * sizeof(char *));
         }
-        parse_string_array(a, &cfg->reliability.fallback_providers,
-                           &cfg->reliability.fallback_providers_len, fp);
+        hu_error_t fp_err = parse_string_array(a, &cfg->reliability.fallback_providers,
+                                               &cfg->reliability.fallback_providers_len, fp);
+        if (fp_err != HU_OK)
+            return fp_err;
     }
     return HU_OK;
 }
@@ -926,10 +966,25 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
         a->free(a->ctx, cfg->workspace_dir_override, strlen(cfg->workspace_dir_override) + 1);
     }
     if (workspace) {
-        cfg->workspace_dir_override = hu_strdup(a, workspace);
+        char *ws_override = hu_strdup(a, workspace);
+        if (!ws_override) {
+            hu_json_free(a, root);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        char *ws_dir = hu_strdup(a, workspace);
+        if (!ws_dir) {
+            a->free(a->ctx, ws_override, strlen(ws_override) + 1);
+            hu_json_free(a, root);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        if (cfg->workspace_dir_override) {
+            a->free(a->ctx, cfg->workspace_dir_override,
+                    strlen(cfg->workspace_dir_override) + 1);
+        }
+        cfg->workspace_dir_override = ws_override;
         if (cfg->workspace_dir)
             a->free(a->ctx, cfg->workspace_dir, strlen(cfg->workspace_dir) + 1);
-        cfg->workspace_dir = hu_strdup(a, workspace);
+        cfg->workspace_dir = ws_dir;
     }
 
     const char *dpo_dir = hu_json_get_string(root, "dpo_export_dir");
@@ -999,20 +1054,35 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
         parse_ensemble(a, cfg, ensemble_obj);
 
     hu_json_value_t *aut = hu_json_object_get(root, "autonomy");
-    if (aut)
-        parse_autonomy(a, cfg, aut);
+    if (aut) {
+        hu_error_t aut_err = parse_autonomy(a, cfg, aut);
+        if (aut_err != HU_OK) {
+            hu_json_free(a, root);
+            return aut_err;
+        }
+    }
 
     hu_json_value_t *gw = hu_json_object_get(root, "gateway");
-    if (gw)
-        parse_gateway(a, cfg, gw);
+    if (gw) {
+        hu_error_t gw_err = parse_gateway(a, cfg, gw);
+        if (gw_err != HU_OK) {
+            hu_json_free(a, root);
+            return gw_err;
+        }
+    }
 
     hu_json_value_t *mem = hu_json_object_get(root, "memory");
     if (mem)
         parse_memory(a, cfg, mem);
 
     hu_json_value_t *tools_obj = hu_json_object_get(root, "tools");
-    if (tools_obj)
-        parse_tools(a, cfg, tools_obj);
+    if (tools_obj) {
+        hu_error_t tools_err = parse_tools(a, cfg, tools_obj);
+        if (tools_err != HU_OK) {
+            hu_json_free(a, root);
+            return tools_err;
+        }
+    }
 
     hu_json_value_t *voice_obj = hu_json_object_get(root, "voice");
     if (voice_obj)
@@ -1035,8 +1105,13 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
         parse_tunnel(a, cfg, tunnel_obj);
 
     hu_json_value_t *ch_obj = hu_json_object_get(root, "channels");
-    if (ch_obj)
-        parse_channels(a, cfg, ch_obj);
+    if (ch_obj) {
+        hu_error_t ch_err = parse_channels(a, cfg, ch_obj);
+        if (ch_err != HU_OK) {
+            hu_json_free(a, root);
+            return ch_err;
+        }
+    }
 
     hu_json_value_t *agent_obj = hu_json_object_get(root, "agent");
     if (agent_obj)
@@ -1051,8 +1126,13 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
         parse_heartbeat(a, cfg, heartbeat_obj);
 
     hu_json_value_t *reliability_obj = hu_json_object_get(root, "reliability");
-    if (reliability_obj)
-        parse_reliability(a, cfg, reliability_obj);
+    if (reliability_obj) {
+        hu_error_t rel_err = parse_reliability(a, cfg, reliability_obj);
+        if (rel_err != HU_OK) {
+            hu_json_free(a, root);
+            return rel_err;
+        }
+    }
 
     hu_json_value_t *diagnostics_obj = hu_json_object_get(root, "diagnostics");
     if (diagnostics_obj)
@@ -1134,8 +1214,13 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
                     a->free(a->ctx, cfg->security.sandbox_config.firejail_args,
                             cfg->security.sandbox_config.firejail_args_len * sizeof(char *));
                 }
-                parse_string_array(a, &cfg->security.sandbox_config.firejail_args,
-                                   &cfg->security.sandbox_config.firejail_args_len, fa);
+                hu_error_t fa_err = parse_string_array(a, &cfg->security.sandbox_config.firejail_args,
+                                                       &cfg->security.sandbox_config.firejail_args_len,
+                                                       fa);
+                if (fa_err != HU_OK) {
+                    hu_json_free(a, root);
+                    return fa_err;
+                }
             }
             hu_json_value_t *np = hu_json_object_get(sbox, "net_proxy");
             if (np && np->type == HU_JSON_OBJECT) {
@@ -1163,9 +1248,14 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
                                 cfg->security.sandbox_config.net_proxy.allowed_domains_len *
                                     sizeof(char *));
                     }
-                    parse_string_array(a, &cfg->security.sandbox_config.net_proxy.allowed_domains,
-                                       &cfg->security.sandbox_config.net_proxy.allowed_domains_len,
-                                       ad);
+                    hu_error_t ad_err =
+                        parse_string_array(a, &cfg->security.sandbox_config.net_proxy.allowed_domains,
+                                           &cfg->security.sandbox_config.net_proxy.allowed_domains_len,
+                                           ad);
+                    if (ad_err != HU_OK) {
+                        hu_json_free(a, root);
+                        return ad_err;
+                    }
                 }
             }
         }

@@ -4,9 +4,11 @@ typedef int hu_consolidation_engine_unused_;
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include "human/memory/consolidation_engine.h"
 #include "human/memory/episodic.h"
 #include "human/memory/forgetting_curve.h"
+#include "human/memory/sql_transaction.h"
 #include <sqlite3.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -76,7 +78,8 @@ hu_error_t hu_consolidation_engine_nightly(hu_consolidation_engine_t *engine, in
     } kept[32];
     size_t kept_count = 0;
 
-    while (sqlite3_step(sel) == SQLITE_ROW) {
+    int scan_rc;
+    while ((scan_rc = sqlite3_step(sel)) == SQLITE_ROW) {
         int64_t id = sqlite3_column_int64(sel, 0);
         const char *cid = (const char *)sqlite3_column_text(sel, 1);
         size_t cid_len = cid ? (size_t)sqlite3_column_bytes(sel, 1) : 0;
@@ -138,17 +141,44 @@ hu_error_t hu_consolidation_engine_nightly(hu_consolidation_engine_t *engine, in
         }
     }
     sqlite3_finalize(sel);
+    if (scan_rc != SQLITE_DONE) {
+        hu_log_warn("consolidation", NULL, "Nightly scan query error: %d", scan_rc);
+        engine->alloc->free(engine->alloc->ctx, to_delete, del_cap * sizeof(int64_t));
+        return HU_ERR_MEMORY_BACKEND;
+    }
 
-    for (size_t i = 0; i < del_count; i++) {
-        sqlite3_stmt *del = NULL;
-        rc = sqlite3_prepare_v2(engine->db, "DELETE FROM episodes WHERE id=?", -1, &del, NULL);
-        if (rc != SQLITE_OK) {
+    if (del_count > 0) {
+        hu_sql_txn_t txn = {0};
+        hu_error_t txn_err = hu_sql_txn_begin(&txn, engine->db);
+        if (txn_err != HU_OK) {
             engine->alloc->free(engine->alloc->ctx, to_delete, del_cap * sizeof(int64_t));
-            return HU_ERR_MEMORY_BACKEND;
+            return txn_err;
         }
-        sqlite3_bind_int64(del, 1, to_delete[i]);
-        sqlite3_step(del);
-        sqlite3_finalize(del);
+        for (size_t i = 0; i < del_count; i++) {
+            sqlite3_stmt *del = NULL;
+            rc = sqlite3_prepare_v2(engine->db, "DELETE FROM episodes WHERE id=?", -1, &del, NULL);
+            if (rc != SQLITE_OK) {
+                hu_sql_txn_rollback(&txn);
+                engine->alloc->free(engine->alloc->ctx, to_delete, del_cap * sizeof(int64_t));
+                return HU_ERR_MEMORY_BACKEND;
+            }
+            sqlite3_bind_int64(del, 1, to_delete[i]);
+            rc = sqlite3_step(del);
+            sqlite3_finalize(del);
+            if (rc != SQLITE_DONE) {
+                hu_log_error("consolidation_engine", NULL,
+                             "dedupe delete episode id %lld failed: %s", (long long)to_delete[i],
+                             sqlite3_errmsg(engine->db));
+                hu_sql_txn_rollback(&txn);
+                engine->alloc->free(engine->alloc->ctx, to_delete, del_cap * sizeof(int64_t));
+                return HU_ERR_MEMORY_BACKEND;
+            }
+        }
+        txn_err = hu_sql_txn_commit(&txn);
+        if (txn_err != HU_OK) {
+            engine->alloc->free(engine->alloc->ctx, to_delete, del_cap * sizeof(int64_t));
+            return txn_err;
+        }
     }
     engine->alloc->free(engine->alloc->ctx, to_delete, del_cap * sizeof(int64_t));
     return HU_OK;

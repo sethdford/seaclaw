@@ -233,28 +233,28 @@ hu_error_t hu_style_fingerprint_to_prompt(hu_allocator_t *alloc,
 
     char buf[1024];
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "[STYLE for this contact]:\n");
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "- Capitalization: mostly %s (%.0f%%)\n",
-                            fp->lowercase_ratio > 0.5 ? "lowercase" : "sentence case",
-                            fp->lowercase_ratio > 0.5 ? fp->lowercase_ratio * 100.0
-                                                      : fp->sentence_case_ratio * 100.0);
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "- Punctuation: %s periods (%.0f%%), %s ellipsis (%.0f%%)\n",
-                            fp->period_ending_ratio < 0.3 ? "rarely uses" : "uses",
-                            fp->period_ending_ratio * 100.0,
-                            fp->ellipsis_ratio > 0.1 ? "occasional" : "rare",
-                            fp->ellipsis_ratio * 100.0);
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "- Laughter: \"haha\" (%.0f%%), \"lol\" (%.0f%%), \"lmao\" (%.0f%%)\n",
-                            fp->haha_ratio * 100.0, fp->lol_ratio * 100.0, fp->lmao_ratio * 100.0);
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "- Average message length: %.0f chars\n", fp->avg_message_length);
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "- Emoji: %.1f per message\n", fp->emoji_per_message);
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            "- Sends follow-up messages %.0f%% of the time\n",
-                            fp->double_text_ratio * 100.0);
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "[STYLE for this contact]:\n");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "- Capitalization: mostly %s (%.0f%%)\n",
+                         fp->lowercase_ratio > 0.5 ? "lowercase" : "sentence case",
+                         fp->lowercase_ratio > 0.5 ? fp->lowercase_ratio * 100.0
+                                                     : fp->sentence_case_ratio * 100.0);
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "- Punctuation: %s periods (%.0f%%), %s ellipsis (%.0f%%)\n",
+                         fp->period_ending_ratio < 0.3 ? "rarely uses" : "uses",
+                         fp->period_ending_ratio * 100.0,
+                         fp->ellipsis_ratio > 0.1 ? "occasional" : "rare",
+                         fp->ellipsis_ratio * 100.0);
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "- Laughter: \"haha\" (%.0f%%), \"lol\" (%.0f%%), \"lmao\" (%.0f%%)\n",
+                         fp->haha_ratio * 100.0, fp->lol_ratio * 100.0, fp->lmao_ratio * 100.0);
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "- Average message length: %.0f chars\n", fp->avg_message_length);
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "- Emoji: %.1f per message\n", fp->emoji_per_message);
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "- Sends follow-up messages %.0f%% of the time\n",
+                         fp->double_text_ratio * 100.0);
     if (pos >= sizeof(buf))
         pos = sizeof(buf) - 1;
 

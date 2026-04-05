@@ -211,6 +211,9 @@ static void log_record_event(void *ctx, const hu_observer_event_t *event) {
                 (unsigned long long)event->data.hula_program_end.total_ms,
                 event->data.hula_program_end.node_count);
         break;
+    case HU_OBSERVER_EVENT_FRONTIER:
+        fprintf(f, "frontier\"}\n");
+        break;
     }
 }
 

@@ -338,7 +338,9 @@ bool hu_gateway_path_has_traversal(const char *path) {
         return false;
     return strstr(path, "..") != NULL || strstr(path, "%2e%2e") != NULL ||
            strstr(path, "%2E%2E") != NULL || strstr(path, "%2e%2E") != NULL ||
-           strstr(path, "%2E%2e") != NULL || strstr(path, "%00") != NULL ||
+           strstr(path, "%2E%2e") != NULL || strstr(path, "%2e.") != NULL ||
+           strstr(path, ".%2e") != NULL || strstr(path, "%2E.") != NULL ||
+           strstr(path, ".%2E") != NULL || strstr(path, "%00") != NULL ||
            strstr(path, "%252e%252e") != NULL || strstr(path, "%252E%252E") != NULL;
 }
 
@@ -362,9 +364,24 @@ bool hu_gateway_is_allowed_origin(const char *origin, const char *const *allowed
         return true;
     if (strchr(origin, '\r') || strchr(origin, '\n') || strlen(origin) > 256)
         return false;
-    if (strstr(origin, "://localhost") != NULL || strstr(origin, "://127.0.0.1") != NULL ||
-        strstr(origin, "://[::1]") != NULL)
-        return true;
+    const char *lo = strstr(origin, "://localhost");
+    if (lo) {
+        const char *after = lo + 12;
+        if (*after == '\0' || *after == ':' || *after == '/')
+            return true;
+    }
+    const char *ip4 = strstr(origin, "://127.0.0.1");
+    if (ip4) {
+        const char *after = ip4 + 12;
+        if (*after == '\0' || *after == ':' || *after == '/')
+            return true;
+    }
+    const char *ip6 = strstr(origin, "://[::1]");
+    if (ip6) {
+        const char *after = ip6 + 8;
+        if (*after == '\0' || *after == ':' || *after == '/')
+            return true;
+    }
     for (size_t i = 0; i < n; i++) {
         if (allowed[i] && strcmp(origin, allowed[i]) == 0)
             return true;
@@ -853,26 +870,25 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             return;
         }
         size_t off = 0;
-        off += (size_t)snprintf(buf + off, cap - off,
-                                "# HELP human_uptime_seconds Time since process start\n"
-                                "# TYPE human_uptime_seconds gauge\n"
-                                "human_uptime_seconds %llu\n",
-                                (unsigned long long)snap.uptime_seconds);
-        off += (size_t)snprintf(buf + off, cap - off,
-                                "# HELP human_websocket_connections Active WebSocket connections\n"
-                                "# TYPE human_websocket_connections gauge\n"
-                                "human_websocket_connections %zu\n",
-                                gw->ws.conn_count);
+        off = hu_buf_appendf(buf, cap, off,
+                             "# HELP human_uptime_seconds Time since process start\n"
+                             "# TYPE human_uptime_seconds gauge\n"
+                             "human_uptime_seconds %llu\n",
+                             (unsigned long long)snap.uptime_seconds);
+        off = hu_buf_appendf(buf, cap, off,
+                             "# HELP human_websocket_connections Active WebSocket connections\n"
+                             "# TYPE human_websocket_connections gauge\n"
+                             "human_websocket_connections %zu\n",
+                             gw->ws.conn_count);
         if (snap.component_count > 0 && snap.components) {
-            off +=
-                (size_t)snprintf(buf + off, cap - off,
+            off = hu_buf_appendf(buf, cap, off,
                                  "# HELP human_component_healthy Component health (1=ok, 0=error)\n"
                                  "# TYPE human_component_healthy gauge\n");
             hu_readiness_result_t r = hu_health_check_readiness(&a);
             for (size_t i = 0; i < r.check_count; i++) {
-                off += (size_t)snprintf(buf + off, cap - off,
-                                        "human_component_healthy{component=\"%s\"} %d\n",
-                                        r.checks[i].name, r.checks[i].healthy ? 1 : 0);
+                off = hu_buf_appendf(buf, cap, off,
+                                     "human_component_healthy{component=\"%s\"} %d\n",
+                                     r.checks[i].name, r.checks[i].healthy ? 1 : 0);
             }
             if (r.checks)
                 a.free(a.ctx, (void *)r.checks, r.check_count * sizeof(hu_component_check_t));
@@ -895,16 +911,15 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             components_json = (char *)a.alloc(a.ctx, components_cap);
             if (components_json) {
                 size_t off = 0;
-                off += (size_t)snprintf(components_json + off, components_cap - off, "[");
+                off = hu_buf_appendf(components_json, components_cap, off, "[");
                 for (size_t i = 0; i < snap.component_count; i++) {
                     if (i > 0)
-                        off += (size_t)snprintf(components_json + off, components_cap - off, ",");
-                    off +=
-                        (size_t)snprintf(components_json + off, components_cap - off,
+                        off = hu_buf_appendf(components_json, components_cap, off, ",");
+                    off = hu_buf_appendf(components_json, components_cap, off,
                                          "{\"status\":\"%s\",\"updated_at\":\"%s\"}",
                                          snap.components[i].status, snap.components[i].updated_at);
                 }
-                off += (size_t)snprintf(components_json + off, components_cap - off, "]");
+                off = hu_buf_appendf(components_json, components_cap, off, "]");
             }
         }
         char *json =
@@ -1000,25 +1015,25 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             (void)send_json(fd, 503, "{\"error\":\"out of memory\"}");
             return;
         }
-        size_t off = (size_t)snprintf(buf, cap, "{\"scores\":[");
+        size_t off = hu_buf_appendf(buf, cap, 0, "{\"scores\":[");
         for (size_t i = 0; i < count && off < cap - 256; i++) {
             if (i > 0)
-                off += (size_t)snprintf(buf + off, cap - off, ",");
-            off += (size_t)snprintf(buf + off, cap - off,
-                                    "{\"contact_id\":\"%s\",\"timestamp\":%lld,\"overall\":%d,"
-                                    "\"verdict\":\"%s\",\"dimensions\":{",
-                                    contact_ids[i], (long long)timestamps[i], scores[i].overall,
-                                    hu_turing_verdict_name(scores[i].verdict));
+                off = hu_buf_appendf(buf, cap, off, ",");
+            off = hu_buf_appendf(buf, cap, off,
+                                 "{\"contact_id\":\"%s\",\"timestamp\":%lld,\"overall\":%d,"
+                                 "\"verdict\":\"%s\",\"dimensions\":{",
+                                 contact_ids[i], (long long)timestamps[i], scores[i].overall,
+                                 hu_turing_verdict_name(scores[i].verdict));
             for (int d = 0; d < HU_TURING_DIM_COUNT && off < cap - 64; d++) {
                 if (d > 0)
-                    off += (size_t)snprintf(buf + off, cap - off, ",");
-                off += (size_t)snprintf(buf + off, cap - off, "\"%s\":%d",
-                                        hu_turing_dimension_name((hu_turing_dimension_t)d),
-                                        scores[i].dimensions[d]);
+                    off = hu_buf_appendf(buf, cap, off, ",");
+                off = hu_buf_appendf(buf, cap, off, "\"%s\":%d",
+                                     hu_turing_dimension_name((hu_turing_dimension_t)d),
+                                     scores[i].dimensions[d]);
             }
-            off += (size_t)snprintf(buf + off, cap - off, "}}");
+            off = hu_buf_appendf(buf, cap, off, "}}");
         }
-        off += (size_t)snprintf(buf + off, cap - off, "]}");
+        off = hu_buf_appendf(buf, cap, off, "]}");
         (void)send_json(fd, 200, buf);
         gw->alloc->free(gw->alloc->ctx, buf, cap);
         return;
@@ -1055,15 +1070,15 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             (void)send_json(fd, 503, "{\"error\":\"out of memory\"}");
             return;
         }
-        size_t off = (size_t)snprintf(buf, cap, "{\"trend\":[");
+        size_t off = hu_buf_appendf(buf, cap, 0, "{\"trend\":[");
         for (size_t i = 0; i < count && off < cap - 128; i++) {
             if (i > 0)
-                off += (size_t)snprintf(buf + off, cap - off, ",");
-            off += (size_t)snprintf(buf + off, cap - off,
-                                    "{\"contact_id\":\"%s\",\"timestamp\":%lld,\"overall\":%d}",
-                                    contact_ids[i], (long long)timestamps[i], scores[i].overall);
+                off = hu_buf_appendf(buf, cap, off, ",");
+            off = hu_buf_appendf(buf, cap, off,
+                                 "{\"contact_id\":\"%s\",\"timestamp\":%lld,\"overall\":%d}",
+                                 contact_ids[i], (long long)timestamps[i], scores[i].overall);
         }
-        off += (size_t)snprintf(buf + off, cap - off, "]}");
+        off = hu_buf_appendf(buf, cap, off, "]}");
         (void)send_json(fd, 200, buf);
         gw->alloc->free(gw->alloc->ctx, buf, cap);
         return;
@@ -1088,15 +1103,14 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         int dim_avgs[HU_TURING_DIM_COUNT];
         hu_turing_get_weakest_dimensions(db, dim_avgs);
         char buf[1024];
-        size_t off = (size_t)snprintf(buf, sizeof(buf), "{\"dimensions\":{");
+        size_t off = hu_buf_appendf(buf, sizeof(buf), 0, "{\"dimensions\":{");
         for (int d = 0; d < HU_TURING_DIM_COUNT; d++) {
             if (d > 0)
-                off += (size_t)snprintf(buf + off, sizeof(buf) - off, ",");
-            off +=
-                (size_t)snprintf(buf + off, sizeof(buf) - off, "\"%s\":%d",
+                off = hu_buf_appendf(buf, sizeof(buf), off, ",");
+            off = hu_buf_appendf(buf, sizeof(buf), off, "\"%s\":%d",
                                  hu_turing_dimension_name((hu_turing_dimension_t)d), dim_avgs[d]);
         }
-        off += (size_t)snprintf(buf + off, sizeof(buf) - off, "}}");
+        off = hu_buf_appendf(buf, sizeof(buf), off, "}}");
         (void)send_json(fd, 200, buf);
         return;
     }
@@ -1132,14 +1146,14 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             char *resp_buf = (char *)gw->alloc->alloc(gw->alloc->ctx, cap);
             if (resp_buf) {
                 size_t pos = 0;
-                pos += (size_t)snprintf(resp_buf, cap, "{\"token\":\"");
+                pos = hu_buf_appendf(resp_buf, cap, pos, "{\"token\":\"");
                 for (size_t i = 0; i < tok_len && pos + 4 < cap; i++) {
                     char c = token[i];
                     if (c == '"' || c == '\\')
                         resp_buf[pos++] = '\\';
                     resp_buf[pos++] = c;
                 }
-                pos += (size_t)snprintf(resp_buf + pos, cap - pos, "\"}");
+                pos = hu_buf_appendf(resp_buf, cap, pos, "\"}");
                 (void)send_json(fd, 200, resp_buf);
                 gw->alloc->free(gw->alloc->ctx, resp_buf, cap);
             } else {
@@ -1295,12 +1309,14 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
     }
 
     if (is_webhook_path(path)) {
-        if (gw && gw->config.hmac_secret && gw->config.hmac_secret_len > 0) {
-            if (!verify_hmac(body, body_len, sig_header, gw->config.hmac_secret,
-                             gw->config.hmac_secret_len)) {
-                (void)send_json(fd, 401, "{\"error\":\"invalid signature\"}");
-                return;
-            }
+        if (!gw || !gw->config.hmac_secret || gw->config.hmac_secret_len == 0) {
+            (void)send_json(fd, 403, "{\"error\":\"webhook HMAC not configured\"}");
+            return;
+        }
+        if (!verify_hmac(body, body_len, sig_header, gw->config.hmac_secret,
+                         gw->config.hmac_secret_len)) {
+            (void)send_json(fd, 401, "{\"error\":\"invalid signature\"}");
+            return;
         }
         char ch_buf[32];
         const char *channel = webhook_path_to_channel(path, ch_buf, sizeof(ch_buf));
@@ -1376,14 +1392,14 @@ int hu_gateway_test_pair_request(hu_allocator_t *alloc, void *guard, size_t max_
         char *resp_buf = (char *)alloc->alloc(alloc->ctx, cap);
         if (resp_buf) {
             size_t pos = 0;
-            pos += (size_t)snprintf(resp_buf, cap, "{\"token\":\"");
+            pos = hu_buf_appendf(resp_buf, cap, pos, "{\"token\":\"");
             for (size_t i = 0; i < tok_len && pos + 4 < cap; i++) {
                 char c = token[i];
                 if (c == '"' || c == '\\')
                     resp_buf[pos++] = '\\';
                 resp_buf[pos++] = c;
             }
-            pos += (size_t)snprintf(resp_buf + pos, cap - pos, "\"}");
+            pos = hu_buf_appendf(resp_buf, cap, pos, "\"}");
             /* Copy to exact-size buffer so caller can free(out_body, out_len+1) */
             char *copy = hu_strndup(alloc, resp_buf, pos);
             alloc->free(alloc->ctx, resp_buf, cap);

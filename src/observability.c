@@ -44,18 +44,6 @@ typedef struct {
     FILE *output;
 } hu_log_observer_ctx_t;
 
-static const char *detail_truncate(const char *detail) {
-    if (!detail || !detail[0])
-        return NULL;
-    static char buf[HU_OBSERVER_DETAIL_MAX + 1];
-    size_t len = strlen(detail);
-    if (len > HU_OBSERVER_DETAIL_MAX)
-        len = HU_OBSERVER_DETAIL_MAX;
-    memcpy(buf, detail, len);
-    buf[len] = '\0';
-    return buf;
-}
-
 static void log_record_event(void *ctx, const hu_observer_event_t *event) {
     FILE *f =
         ((hu_log_observer_ctx_t *)ctx)->output ? ((hu_log_observer_ctx_t *)ctx)->output : stderr;
@@ -84,17 +72,24 @@ static void log_record_event(void *ctx, const hu_observer_event_t *event) {
         fprintf(f, "tool.start tool=%s\n", HU_STR(event->data.tool_call_start.tool));
         break;
     case HU_OBSERVER_EVENT_TOOL_CALL: {
-        const char *d = detail_truncate(event->data.tool_call.detail);
-        if (d)
+        const char *raw = event->data.tool_call.detail;
+        if (raw && raw[0]) {
+            char detail_buf[HU_OBSERVER_DETAIL_MAX + 1];
+            size_t len = strlen(raw);
+            if (len > HU_OBSERVER_DETAIL_MAX)
+                len = HU_OBSERVER_DETAIL_MAX;
+            memcpy(detail_buf, raw, len);
+            detail_buf[len] = '\0';
             fprintf(f, "tool.call tool=%s duration_ms=%llu success=%s detail=%s\n",
                     HU_STR(event->data.tool_call.tool),
                     (unsigned long long)event->data.tool_call.duration_ms,
-                    event->data.tool_call.success ? "true" : "false", d);
-        else
+                    event->data.tool_call.success ? "true" : "false", detail_buf);
+        } else {
             fprintf(f, "tool.call tool=%s duration_ms=%llu success=%s\n",
                     HU_STR(event->data.tool_call.tool),
                     (unsigned long long)event->data.tool_call.duration_ms,
                     event->data.tool_call.success ? "true" : "false");
+        }
         break;
     }
     case HU_OBSERVER_EVENT_TOOL_ITERATIONS_EXHAUSTED:
@@ -149,6 +144,9 @@ static void log_record_event(void *ctx, const hu_observer_event_t *event) {
                 (unsigned long long)event->data.hula_program_end.total_ms,
                 event->data.hula_program_end.node_count);
         break;
+    case HU_OBSERVER_EVENT_FRONTIER:
+        fprintf(f, "frontier\n");
+        break;
     }
 }
 
@@ -193,6 +191,8 @@ static const hu_observer_vtable_t log_vtable = {
 };
 
 hu_observer_t hu_observer_log_create(FILE *output) {
+    /* Single process-wide ctx: each hu_observer_log_create overwrites .output.
+     * Safe when only one FILE-targeted log observer is used at a time (typical). */
     static hu_log_observer_ctx_t static_ctx = {.output = NULL};
     static_ctx.output = output;
     return (hu_observer_t){.ctx = &static_ctx, .vtable = &log_vtable};

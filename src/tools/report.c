@@ -68,19 +68,19 @@ static hu_error_t report_execute(void *ctx, hu_allocator_t *alloc, const hu_json
             *out = hu_tool_result_fail("out of memory", 13);
             return HU_ERR_OUT_OF_MEMORY;
         }
-        int n = 0;
+        size_t n = 0;
         if (html) {
-            n += snprintf(msg + n, buf_sz - (size_t)n,
-                          "<!DOCTYPE html><html><head><title>%s</title>"
-                          "<style>body{font-family:system-ui;max-width:800px;margin:40px auto;"
-                          "padding:0 20px}h1{border-bottom:2px solid #333}h2{color:#555}"
-                          "table{border-collapse:collapse;width:100%%}td,th{border:1px solid "
-                          "#ddd;padding:8px;text-align:left}</style></head><body>"
-                          "<h1>%s</h1><p><em>Generated: %s</em></p>",
-                          title ? title : "Report", title ? title : "Report", date);
+            n = hu_buf_appendf(msg, buf_sz, n,
+                               "<!DOCTYPE html><html><head><title>%s</title>"
+                               "<style>body{font-family:system-ui;max-width:800px;margin:40px auto;"
+                               "padding:0 20px}h1{border-bottom:2px solid #333}h2{color:#555}"
+                               "table{border-collapse:collapse;width:100%%}td,th{border:1px solid "
+                               "#ddd;padding:8px;text-align:left}</style></head><body>"
+                               "<h1>%s</h1><p><em>Generated: %s</em></p>",
+                               title ? title : "Report", title ? title : "Report", date);
         } else {
-            n += snprintf(msg + n, buf_sz - (size_t)n, "# %s\n\n*Generated: %s*\n\n",
-                          title ? title : "Report", date);
+            n = hu_buf_appendf(msg, buf_sz, n, "# %s\n\n*Generated: %s*\n\n",
+                               title ? title : "Report", date);
         }
 
         hu_json_value_t *sections = hu_json_object_get((hu_json_value_t *)args, "sections");
@@ -92,19 +92,19 @@ static hu_error_t report_execute(void *ctx, hu_allocator_t *alloc, const hu_json
                 const char *heading = hu_json_get_string(sec, "heading");
                 const char *content = hu_json_get_string(sec, "content");
                 if (html) {
-                    n += snprintf(msg + n, buf_sz - (size_t)n, "<h2>%s</h2><p>%s</p>",
-                                  heading ? heading : "", content ? content : "");
+                    n = hu_buf_appendf(msg, buf_sz, n, "<h2>%s</h2><p>%s</p>",
+                                       heading ? heading : "", content ? content : "");
                 } else {
-                    n += snprintf(msg + n, buf_sz - (size_t)n, "## %s\n\n%s\n\n",
-                                  heading ? heading : "", content ? content : "");
+                    n = hu_buf_appendf(msg, buf_sz, n, "## %s\n\n%s\n\n",
+                                       heading ? heading : "", content ? content : "");
                 }
             }
         }
 
         if (html)
-            n += snprintf(msg + n, buf_sz - (size_t)n, "</body></html>");
+            n = hu_buf_appendf(msg, buf_sz, n, "</body></html>");
 
-        *out = hu_tool_result_ok_owned(msg, (size_t)n);
+        *out = hu_tool_result_ok_owned(msg, n);
         return HU_OK;
     }
 

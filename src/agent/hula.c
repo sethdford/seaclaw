@@ -19,7 +19,6 @@
 
 #define HU_HULA_REF_EXPAND_CAP (256u * 1024u)
 
-__attribute__((unused))
 static uint64_t hula_wall_ms(void) {
 #ifdef _WIN32
     return (uint64_t)GetTickCount64();

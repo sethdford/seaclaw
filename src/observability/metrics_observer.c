@@ -61,6 +61,8 @@ static void metrics_record_event(void *ctx, const hu_observer_event_t *event) {
     case HU_OBSERVER_EVENT_HULA_NODE_OUTPUT:
     case HU_OBSERVER_EVENT_HULA_PROGRAM_END:
         break;
+    case HU_OBSERVER_EVENT_FRONTIER:
+        break;
     }
 }
 

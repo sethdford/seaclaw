@@ -1,4 +1,5 @@
 #include "human/agent/awareness.h"
+#include "human/core/string.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -96,44 +97,44 @@ char *hu_awareness_context(const hu_awareness_t *aw, hu_allocator_t *alloc, size
     char buf[2048];
     size_t pos = 0;
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "## Situational Awareness\n");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "## Situational Awareness\n");
     if (pos >= sizeof(buf))
         pos = sizeof(buf) - 1;
 
     if (s->health_degraded) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                                "- WARNING: System health is degraded\n");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                              "- WARNING: System health is degraded\n");
         if (pos >= sizeof(buf))
             pos = sizeof(buf) - 1;
     }
 
     if (has_stats) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                                "- Session stats: %llu msgs received, %llu sent, %llu tool calls\n",
-                                (unsigned long long)s->messages_received,
-                                (unsigned long long)s->messages_sent,
-                                (unsigned long long)s->tool_calls);
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "- Session stats: %llu msgs received, %llu sent, %llu tool calls\n",
+                             (unsigned long long)s->messages_received,
+                             (unsigned long long)s->messages_sent,
+                             (unsigned long long)s->tool_calls);
         if (pos >= sizeof(buf))
             pos = sizeof(buf) - 1;
     }
 
     if (s->active_channel_count > 0) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "- Active channels:");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "- Active channels:");
         if (pos >= sizeof(buf))
             pos = sizeof(buf) - 1;
         for (size_t i = 0; i < s->active_channel_count && pos < sizeof(buf) - 40; i++) {
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " %s", s->active_channels[i]);
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, " %s", s->active_channels[i]);
             if (pos >= sizeof(buf))
                 pos = sizeof(buf) - 1;
         }
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "\n");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "\n");
         if (pos >= sizeof(buf))
             pos = sizeof(buf) - 1;
     }
 
     if (has_errors) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "- Recent errors (%llu total):\n",
-                                (unsigned long long)s->total_errors);
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "- Recent errors (%llu total):\n",
+                             (unsigned long long)s->total_errors);
         if (pos >= sizeof(buf))
             pos = sizeof(buf) - 1;
         size_t nerr = s->total_errors < HU_AWARENESS_MAX_RECENT_ERRORS
@@ -142,8 +143,8 @@ char *hu_awareness_context(const hu_awareness_t *aw, hu_allocator_t *alloc, size
         for (size_t i = 0; i < nerr && pos < sizeof(buf) - 300; i++) {
             size_t idx = (s->error_write_idx + HU_AWARENESS_MAX_RECENT_ERRORS - nerr + i) %
                         HU_AWARENESS_MAX_RECENT_ERRORS;
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "  - %s\n",
-                                    s->recent_errors[idx].text);
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "  - %s\n",
+                                 s->recent_errors[idx].text);
             if (pos >= sizeof(buf))
                 pos = sizeof(buf) - 1;
         }

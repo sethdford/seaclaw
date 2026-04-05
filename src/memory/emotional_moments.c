@@ -113,7 +113,7 @@ hu_error_t hu_emotional_moment_get_due(hu_allocator_t *alloc, hu_memory_t *memor
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         if (count >= cap) {
             cap *= 2;
             hu_emotional_moment_t *n =
@@ -162,6 +162,13 @@ hu_error_t hu_emotional_moment_get_due(hu_allocator_t *alloc, hu_memory_t *memor
         count++;
     }
     sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        if (arr)
+            alloc->free(alloc->ctx, arr, cap * sizeof(hu_emotional_moment_t));
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
 
     if (count == 0 && arr) {
         alloc->free(alloc->ctx, arr, cap * sizeof(hu_emotional_moment_t));

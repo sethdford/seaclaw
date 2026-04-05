@@ -465,47 +465,46 @@ char *hu_theory_of_mind_build_inference(hu_allocator_t *alloc,
     char buf[512];
     size_t pos = 0;
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "[THEORY OF MIND: ");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "[THEORY OF MIND: ");
     if (nlen > 0 && name) {
         size_t copy = nlen < 32 ? nlen : 32;
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%.*s's messages ", (int)copy, name);
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "%.*s's messages ", (int)copy, name);
     } else {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Messages ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "Messages ");
     }
 
     bool first = true;
     if (dev->length_drop) {
         if (!first)
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " and ");
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "are shorter than usual");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, " and ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "are shorter than usual");
         first = false;
     }
     if (dev->emoji_drop) {
         if (!first)
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " and ");
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "%.*s hasn't used emoji lately",
-                                (int)plen, pro);
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, " and ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "%.*s hasn't used emoji lately", (int)plen, pro);
         first = false;
     }
     if (dev->topic_narrowing) {
         if (!first)
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " and ");
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "conversation has narrowed");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, " and ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "conversation has narrowed");
         first = false;
     }
     if (dev->sentiment_shift) {
         if (!first)
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " and ");
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "tone seems different");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, " and ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "tone seems different");
         first = false;
     }
 
     if (first)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "show subtle changes");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "show subtle changes");
 
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                            ". May be upset or distracted. Use natural probing like 'hey you "
-                            "okay?' — never cite data.]");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         ". May be upset or distracted. Use natural probing like 'hey you "
+                         "okay?' — never cite data.]");
     if (pos >= sizeof(buf))
         pos = sizeof(buf) - 1;
 

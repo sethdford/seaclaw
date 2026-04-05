@@ -17,6 +17,7 @@
 #include "human/core/string.h"
 
 /* Subsystem facades — each aggregates related implementation headers */
+#include "human/agent/choreography.h"
 #include "human/daemon/agent_facade.h"
 #include "human/daemon/context_facade.h"
 #include "human/daemon/feeds_facade.h"
@@ -29,6 +30,8 @@
 
 /* Channel helpers */
 #include "human/channels/channel_embed.h"
+/* Provider factory for classify provider creation */
+#include "human/providers/factory.h"
 
 /* Plan 2: Background observer registry */
 #include "human/background_observer.h"
@@ -80,6 +83,14 @@ hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc, const char **own_m
 #define HU_DAEMON_PID_FILE "human.pid"
 #define HU_MAX_PATH        1024
 
+/* Lightweight classification provider (e.g. Gemini Flash Lite) for hybrid routing.
+ * When llm_decides is active, the primary agent turn uses the local model while
+ * classification/scoring calls use this fast cloud provider. */
+static hu_provider_t g_classify_provider;
+static bool g_classify_provider_ok = false;
+static const char *g_classify_model = "gemini-3.1-flash-lite-preview";
+static size_t g_classify_model_len = 29;
+
 /* Emotion call sites are under #ifndef HU_IS_TEST in several branches; test lib still compiles
  * daemon.c with HU_IS_TEST=1, so the helper may be unreferenced. */
 #if defined(__GNUC__) || defined(__clang__)
@@ -93,10 +104,185 @@ static hu_emotional_state_t hu_daemon_detect_emotion(hu_allocator_t *alloc, hu_a
     (void)agent;
     return hu_conversation_detect_emotion(entries, count);
 #else
+    /* Hybrid routing: prefer fast cloud classify provider when available */
+    if (g_classify_provider_ok && g_classify_provider.vtable &&
+        g_classify_provider.vtable->chat_with_system)
+        return hu_conversation_detect_emotion_llm(alloc, &g_classify_provider, g_classify_model,
+                                                  g_classify_model_len, entries, count);
     if (agent && agent->provider.vtable && agent->provider.vtable->chat_with_system)
         return hu_conversation_detect_emotion_llm(alloc, &agent->provider, agent->model_name,
                                                   agent->model_name_len, entries, count);
     return hu_conversation_detect_emotion(entries, count);
+#endif
+}
+
+/* ── Director meta-behavior result ─────────────────────────────────────── */
+typedef enum {
+    DIR_TEXT = 0,
+    DIR_TAPBACK,
+    DIR_SILENCE
+} hu_director_action_t;
+
+typedef struct {
+    hu_director_action_t action;
+    uint32_t delay_s;
+    hu_reaction_type_t reaction;
+    bool burst;
+    char direction[512];
+} hu_director_result_t;
+
+static void hu_daemon_parse_director_result(const char *raw, size_t len,
+                                            hu_director_result_t *out) {
+    memset(out, 0, sizeof(*out));
+    out->action = DIR_TEXT;
+
+    if (!raw || len == 0) return;
+
+    /* Look for "action:" prefix — if absent, treat whole string as direction */
+    const char *ap = strstr(raw, "action:");
+    if (!ap) {
+        size_t cp = len < sizeof(out->direction) - 1 ? len : sizeof(out->direction) - 1;
+        memcpy(out->direction, raw, cp);
+        out->direction[cp] = '\0';
+        return;
+    }
+
+    const char *val = ap + 7; /* skip "action:" */
+    if (strncmp(val, "tapback", 7) == 0)
+        out->action = DIR_TAPBACK;
+    else if (strncmp(val, "silence", 7) == 0)
+        out->action = DIR_SILENCE;
+
+    /* Parse "|delay_s:N" */
+    const char *dp = strstr(raw, "delay_s:");
+    if (dp) out->delay_s = (uint32_t)strtoul(dp + 8, NULL, 10);
+
+    /* Parse "|burst:true" */
+    out->burst = (strstr(raw, "burst:true") != NULL);
+
+    /* Parse "|reaction:<type>" */
+    const char *rp = strstr(raw, "reaction:");
+    if (rp) {
+        const char *rv = rp + 9;
+        if (strncmp(rv, "heart", 5) == 0)
+            out->reaction = HU_REACTION_HEART;
+        else if (strncmp(rv, "haha", 4) == 0)
+            out->reaction = HU_REACTION_HAHA;
+        else if (strncmp(rv, "thumbs_up", 9) == 0)
+            out->reaction = HU_REACTION_THUMBS_UP;
+        else if (strncmp(rv, "emphasis", 8) == 0)
+            out->reaction = HU_REACTION_EMPHASIS;
+        else if (strncmp(rv, "thumbs_down", 11) == 0)
+            out->reaction = HU_REACTION_THUMBS_DOWN;
+        else if (strncmp(rv, "question", 8) == 0)
+            out->reaction = HU_REACTION_QUESTION;
+    }
+
+    /* Parse "|direction:..." (everything after "direction:") */
+    const char *drp = strstr(raw, "direction:");
+    if (drp) {
+        const char *dv = drp + 10;
+        size_t rem = len - (size_t)(dv - raw);
+        size_t cp = rem < sizeof(out->direction) - 1 ? rem : sizeof(out->direction) - 1;
+        memcpy(out->direction, dv, cp);
+        out->direction[cp] = '\0';
+        /* Trim trailing whitespace/pipe from direction */
+        while (cp > 0 && (out->direction[cp - 1] == '|' || out->direction[cp - 1] == '\n' ||
+                          out->direction[cp - 1] == '\r' || out->direction[cp - 1] == ' '))
+            out->direction[--cp] = '\0';
+    }
+}
+
+/* Real-time scene director: Flash Lite call that returns structured meta-behavior.
+ * Decides action (text/tapback/silence), delay, reaction type, burst mode, and
+ * performance direction. Only runs when llm_decides && g_classify_provider_ok.
+ * Returns true if result is valid. Caller uses result to route behavior. */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((unused))
+#endif
+static bool hu_daemon_director_call(hu_allocator_t *alloc, const char *combined,
+                                    size_t combined_len,
+                                    const hu_channel_history_entry_t *entries,
+                                    size_t entry_count,
+                                    hu_director_result_t *result) {
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    (void)alloc; (void)combined; (void)combined_len;
+    (void)entries; (void)entry_count; (void)result;
+    return false;
+#else
+    memset(result, 0, sizeof(*result));
+    if (!g_classify_provider_ok || !g_classify_provider.vtable ||
+        !g_classify_provider.vtable->chat_with_system)
+        return false;
+
+    static const char director_system[] =
+        "You are a dialogue director for a texting scene. The actor plays Seth, a 45yo "
+        "tech guy and single dad. Decide his BEHAVIOR — not just words.\n\n"
+        "Reply in this exact format (one line, pipe-separated):\n"
+        "action:<text|tapback|silence>[|delay_s:N][|reaction:<heart|haha|thumbs_up|emphasis>]"
+        "[|burst:true][|direction:...]\n\n"
+        "Rules:\n"
+        "- DEFAULT is action:text. When in doubt, respond.\n"
+        "- action:text — Seth sends a text. Include delay_s (seconds to wait before replying, "
+        "2-8 for normal, 15-60 for busy/low-priority) and direction for tone/length.\n"
+        "- action:tapback — Seth reacts instead of texting. ONLY for messages that are clearly "
+        "just reactions ('haha nice', 'lol', 'omg'), standalone photos, or simple acknowledgments "
+        "where a tapback is the most natural human move. Include reaction type.\n"
+        "- action:silence — RARE. Only use when they're being toxic/abusive, or after 3+ "
+        "unanswered low-effort messages in a row ('k', 'ok', '...'). NEVER use silence for "
+        "greetings, questions, or any message that expects a reply.\n"
+        "- burst:true — Seth sends 3-4 rapid messages. Only for urgent/exciting news.\n"
+        "- CRITICAL: If they're testing whether you're real/AI, NEVER fabricate specific "
+        "memories. Deflect: 'dude idk, that was forever ago'.\n\n"
+        "Examples:\n"
+        "action:text|delay_s:3|direction:Short empathetic reaction, 5 words max\n"
+        "action:text|delay_s:2|direction:Casual greeting back, match their energy\n"
+        "action:tapback|reaction:haha\n"
+        "action:text|delay_s:2|burst:true|direction:Match urgency, 3 rapid messages\n"
+        "action:text|delay_s:45|direction:He's busy, one-word reply when he gets back";
+
+    char user_buf[2048];
+    size_t pos = 0;
+    static const char hdr[] = "Recent thread:\n";
+    memcpy(user_buf, hdr, sizeof(hdr) - 1);
+    pos = sizeof(hdr) - 1;
+
+    size_t start = entry_count > 5 ? entry_count - 5 : 0;
+    for (size_t i = start; i < entry_count; i++) {
+        const char *who = entries[i].from_me ? "Seth" : "Them";
+        int w = snprintf(user_buf + pos, sizeof(user_buf) - pos, "%s: %s\n", who,
+                         entries[i].text);
+        if (w > 0 && pos + (size_t)w < sizeof(user_buf))
+            pos += (size_t)w;
+    }
+    {
+        int w = snprintf(user_buf + pos, sizeof(user_buf) - pos, "\nNew message from them:\n%.*s",
+                         (int)(combined_len > 500 ? 500 : combined_len), combined);
+        if (w > 0 && pos + (size_t)w < sizeof(user_buf))
+            pos += (size_t)w;
+    }
+
+    char *raw = NULL;
+    size_t raw_len = 0;
+    hu_error_t err = g_classify_provider.vtable->chat_with_system(
+        g_classify_provider.ctx, alloc, director_system, sizeof(director_system) - 1, user_buf,
+        pos, g_classify_model, g_classify_model_len, 0.4, &raw, &raw_len);
+
+    if (err != HU_OK || !raw || raw_len == 0 || raw_len > 500) {
+        if (raw) alloc->free(alloc->ctx, raw, raw_len + 1);
+        return false;
+    }
+
+    hu_daemon_parse_director_result(raw, raw_len, result);
+
+    hu_log_info("director", NULL, "meta: action=%s delay=%us reaction=%d burst=%d dir=%s",
+                result->action == DIR_TAPBACK ? "tapback" :
+                result->action == DIR_SILENCE ? "silence" : "text",
+                result->delay_s, (int)result->reaction, result->burst,
+                result->direction[0] ? result->direction : "(none)");
+
+    alloc->free(alloc->ctx, raw, raw_len + 1);
+    return true;
 #endif
 }
 
@@ -432,6 +618,10 @@ static void store_conversation_summary(hu_allocator_t *alloc, hu_memory_t *memor
 #endif
 
     /* Build "them: ... | me: ..." for richer extraction context */
+    if (response_len > SIZE_MAX - user_msg_len)
+        return;
+    if (user_msg_len + response_len > SIZE_MAX - 17)
+        return;
     size_t total = user_msg_len + response_len + 16;
     char *combined = (char *)alloc->alloc(alloc->ctx, total + 1);
     if (!combined)
@@ -1069,18 +1259,21 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     tm_now.tm_mday, important_date_msg, sizeof(important_date_msg),
                     important_date_type, sizeof(important_date_type))) {
                 char ctx_buf[384];
-                int n = snprintf(ctx_buf, sizeof(ctx_buf), "IMPORTANT DATE (%s): %s",
-                                 important_date_type, important_date_msg);
-                if (n > 0 && (size_t)n < sizeof(ctx_buf)) {
+                int n0 = snprintf(ctx_buf, sizeof(ctx_buf), "IMPORTANT DATE (%s): %s",
+                                  important_date_type, important_date_msg);
+                if (n0 > 0 && (size_t)n0 < sizeof(ctx_buf)) {
+                    size_t n = (size_t)n0;
                     if (strcmp(important_date_type, "birthday") == 0)
-                        n += snprintf(ctx_buf + n, sizeof(ctx_buf) - (size_t)n,
-                                      " Use confetti effect when sending.");
-                    if (n > 0 && (size_t)n < sizeof(ctx_buf)) {
-                        important_date_ctx = (char *)alloc->alloc(alloc->ctx, (size_t)n + 1);
+                        n = hu_buf_appendf(ctx_buf, sizeof(ctx_buf), n,
+                                           " Use confetti effect when sending.");
+                    if (n >= sizeof(ctx_buf))
+                        n = sizeof(ctx_buf) - 1;
+                    if (n > 0 && n < sizeof(ctx_buf)) {
+                        important_date_ctx = (char *)alloc->alloc(alloc->ctx, n + 1);
                         if (important_date_ctx) {
-                            memcpy(important_date_ctx, ctx_buf, (size_t)n);
-                            important_date_ctx[(size_t)n] = '\0';
-                            important_date_ctx_len = (size_t)n;
+                            memcpy(important_date_ctx, ctx_buf, n);
+                            important_date_ctx[n] = '\0';
+                            important_date_ctx_len = n;
                             had_important_date = true;
                         }
                     }
@@ -1849,6 +2042,43 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
     hu_outcome_tracker_init(&daemon_outcomes, true);
     if (agent && !agent->outcomes)
         hu_agent_set_outcomes(agent, &daemon_outcomes);
+
+    /* Hybrid routing: create a lightweight cloud provider for classification/scoring
+     * when the primary provider is a slow local model (llm_decides mode). */
+    {
+        bool any_llm_decides = false;
+        if (config) {
+            const char *base = (const char *)&config->channels;
+            for (size_t ci = 0; ci < sizeof(k_daemon_configs) / sizeof(k_daemon_configs[0]); ci++) {
+                const hu_channel_daemon_config_t *dc =
+                    (const hu_channel_daemon_config_t *)(const void *)(base +
+                                                                       k_daemon_configs[ci].daemon_offset);
+                if (dc->llm_decides) {
+                    any_llm_decides = true;
+                    break;
+                }
+            }
+        }
+        if (any_llm_decides && !g_classify_provider_ok) {
+            const char *gemini_url = config
+                ? hu_config_get_provider_base_url(config, "gemini")
+                : NULL;
+            size_t gemini_url_len = gemini_url ? strlen(gemini_url) : 0;
+            hu_error_t cp_err = hu_provider_create(alloc, "gemini", 6, NULL, 0,
+                                                   gemini_url, gemini_url_len,
+                                                   &g_classify_provider);
+            if (cp_err == HU_OK) {
+                g_classify_provider_ok = true;
+                hu_log_info("human", NULL,
+                            "hybrid routing: classify provider ready (gemini flash-lite)");
+            } else {
+                hu_log_error("human", NULL,
+                             "hybrid routing: classify provider failed (%s), "
+                             "classifications will be skipped",
+                             hu_error_string(cp_err));
+            }
+        }
+    }
 
 #ifdef HU_HAS_CRON
     time_t last_cron_minute = 0;
@@ -3091,7 +3321,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         alloc, path, plen, &agent->provider, model, model_len,
                                         &media_desc, &media_desc_len) == HU_OK &&
                                     media_desc && media_desc_len > 0) {
-                                    static char attachment_augmented[4096];
+                                    char attachment_augmented[4096];
                                     size_t desc_copy =
                                         media_desc_len > 3800 ? 3800 : media_desc_len;
                                     int n;
@@ -3137,7 +3367,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     hu_vision_describe_image(alloc, &agent->provider, path, plen,
                                                              model, model_len, &desc, &desc_len);
                                 if (verr == HU_OK && desc && desc_len > 0) {
-                                    static char attachment_augmented[4096];
+                                    char attachment_augmented[4096];
                                     size_t desc_copy = desc_len > 3800 ? 3800 : desc_len;
                                     int n;
                                     if (mlen > 0 && strcmp(content_to_add, "[Photo]") != 0) {
@@ -3165,7 +3395,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     } else if (msgs[m].has_video) {
                         /* F7: Video context — no vision in Phase 1; inject "[They sent a video]" */
-                        static char video_augmented[4096];
+                        char video_augmented[4096];
                         int n;
                         if (mlen > 0 && strcmp(content_to_add, "[Video]") != 0) {
                             n = snprintf(video_augmented, sizeof(video_augmented),
@@ -3274,6 +3504,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 bool use_backchannel = false;
                 char backchannel_buf[32];
                 size_t backchannel_len = 0;
+
+                /* Director meta-behavior result — persists through batch scope */
+                hu_director_result_t director_result;
+                memset(&director_result, 0, sizeof(director_result));
+                bool director_result_valid = false;
                 if (ch->channel->vtable->load_conversation_history) {
                     ch->channel->vtable->load_conversation_history(
                         ch->channel->ctx, alloc, batch_key, key_len, 10, &early_history,
@@ -3307,17 +3542,39 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         group_brief = true;
                 }
 
+                /* Check llm_decides: bypass all heuristic gating */
+                bool llm_decides = false;
+                {
+                    const char *chn_ld = ch->channel->vtable->name
+                                             ? ch->channel->vtable->name(ch->channel->ctx)
+                                             : NULL;
+                    const hu_channel_daemon_config_t *dcfg_ld =
+                        get_active_daemon_config(config, chn_ld);
+                    if (dcfg_ld && dcfg_ld->llm_decides)
+                        llm_decides = true;
+                }
+
                 /* Response decision using conversation-aware classifier */
                 uint32_t extra_delay_ms = 0;
 
                 hu_response_action_t action = hu_conversation_classify_response(
                     combined, combined_len, early_history, early_history_count, &extra_delay_ms);
 
+                if (llm_decides) {
+                    action = HU_RESPONSE_FULL;
+                    extra_delay_ms = 0;
+                    if (agent)
+                        agent->lean_prompt = true;
+                    hu_log_info("human", agent ? agent->observer : NULL,
+                                "llm_decides: forwarding to LLM (lean prompt) for %.*s",
+                                (int)(key_len > 20 ? 20 : key_len), batch_key);
+                }
+
                 /* Apply response_mode override from active channel's daemon config.
                  * "selective" (default): FULL→BRIEF for non-questions.
                  * "eager": BRIEF/SKIP→FULL (respond to almost everything).
                  * "normal": no override. */
-                {
+                if (!llm_decides) {
                     const char *ch_name_rm = ch->channel->vtable->name
                                                  ? ch->channel->vtable->name(ch->channel->ctx)
                                                  : NULL;
@@ -3340,8 +3597,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Natural drop-off: when FULL/BRIEF, probabilistic skip for mutual farewell,
                  * low-energy acks, emoji-only, or our farewell + their minimal reply. */
 #ifndef HU_IS_TEST
-                if ((action == HU_RESPONSE_FULL || action == HU_RESPONSE_BRIEF) && early_history &&
-                    early_history_count > 0) {
+                if (!llm_decides && (action == HU_RESPONSE_FULL || action == HU_RESPONSE_BRIEF) &&
+                    early_history && early_history_count > 0) {
                     uint32_t dropoff_seed =
                         (uint32_t)time(NULL) * 1103515245u + 12345u + (uint32_t)(uintptr_t)combined;
                     int dropoff_prob = hu_conversation_classify_dropoff(
@@ -3373,8 +3630,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         break;
                     }
                 }
-                if (consec_idx != SIZE_MAX && consec_response_count[consec_idx] >= 3 &&
-                    action != HU_RESPONSE_SKIP) {
+                if (!llm_decides && consec_idx != SIZE_MAX &&
+                    consec_response_count[consec_idx] >= 3 && action != HU_RESPONSE_SKIP) {
                     hu_log_info("human", agent ? agent->observer : NULL,
                                 "consecutive limit (%u) reached for %.*s — staying silent",
                                 (unsigned)consec_response_count[consec_idx],
@@ -3385,7 +3642,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Tapback-skip: for tapback-worthy messages, 70% chance to not respond */
                 bool tapback_skip = false;
 #ifndef HU_IS_TEST
-                if (action != HU_RESPONSE_SKIP &&
+                if (!llm_decides && action != HU_RESPONSE_SKIP &&
                     hu_daemon_is_tapback_worthy(combined, combined_len)) {
                     uint32_t r = (uint32_t)time(NULL);
                     r = r * 1103515245u + 12345u + (uint32_t)(uintptr_t)combined;
@@ -3400,7 +3657,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                  * if classifier says leave-on-read and we store 2–24h timer. */
                 bool leave_on_read_skip = false;
 #ifndef HU_IS_TEST
-                if (!msgs[batch_start].is_group) {
+                if (!llm_decides && !msgs[batch_start].is_group) {
                     time_t now_ts = time(NULL);
                     size_t lor_slot = SIZE_MAX;
                     for (size_t lor_i = 0; lor_i < HU_LEAVE_ON_READ_MAX; lor_i++) {
@@ -3476,6 +3733,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (early_history)
                         alloc->free(alloc->ctx, early_history,
                                     early_history_count * sizeof(hu_channel_history_entry_t));
+                    if (agent)
+                        agent->lean_prompt = false;
                     continue;
                 }
 
@@ -3497,9 +3756,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             use_backchannel = true;
                     }
                 }
-                if (early_history)
+                if (early_history && !llm_decides) {
                     alloc->free(alloc->ctx, early_history,
                                 early_history_count * sizeof(hu_channel_history_entry_t));
+                    early_history = NULL;
+                    early_history_count = 0;
+                }
 
                 /* ── BTH: Late-night mode (b1c) ────────────────────────────── */
                 int bth_hour = -1;
@@ -3519,6 +3781,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             hu_log_info("human", agent ? agent->observer : NULL,
                                         "late-night skip (2AM-6AM, hour=%d)", bth_hour);
                             action = HU_RESPONSE_SKIP;
+                            if (early_history) {
+                                alloc->free(alloc->ctx, early_history,
+                                            early_history_count *
+                                                sizeof(hu_channel_history_entry_t));
+                                early_history = NULL;
+                                early_history_count = 0;
+                            }
+                            if (agent)
+                                agent->lean_prompt = false;
                             continue;
                         }
                         /* If not skipped, force very delayed + brief */
@@ -3565,6 +3836,39 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                                 /* Seen behavior: model realistic "read then wait" patterns */
 #ifndef HU_IS_TEST
+                if (llm_decides) {
+                    /* Call director early for meta-behavior (delay, tapback, silence) */
+                    if (g_classify_provider_ok) {
+                        director_result_valid = hu_daemon_director_call(
+                            alloc, combined, combined_len, early_history,
+                            early_history_count, &director_result);
+                    }
+                    if (early_history) {
+                        alloc->free(alloc->ctx, early_history,
+                                    early_history_count * sizeof(hu_channel_history_entry_t));
+                        early_history = NULL;
+                        early_history_count = 0;
+                    }
+                    if (director_result_valid && director_result.delay_s > 0) {
+                        uint32_t delay_ms = director_result.delay_s * 1000;
+                        uint32_t delay_seed =
+                            (uint32_t)time(NULL) * 1103515245u + 12345u +
+                            (uint32_t)(uintptr_t)batch_key;
+                        uint32_t jitter = delay_seed % (delay_ms / 5 + 1);
+                        delay_ms += (delay_seed & 1) ? jitter : 0;
+                        if (delay_ms > 120000) delay_ms = 120000;
+                        hu_log_info("human", agent ? agent->observer : NULL,
+                                    "director delay: %u ms", delay_ms);
+                        if (ch->channel->vtable->mark_read) {
+                            uint32_t read_wait = 500 + (delay_seed >> 16u) % 2001u;
+                            usleep(read_wait * 1000u);
+                            ch->channel->vtable->mark_read(ch->channel->ctx, batch_key,
+                                                           key_len);
+                        }
+                        usleep((delay_ms > 2500 ? delay_ms - 2500 : 0) * 1000u);
+                    }
+                    goto llm_decides_skip_delays;
+                }
                 /* Trigger read receipt with human-like delay */
                 if (ch->channel->vtable->mark_read) {
                     uint32_t read_seed =
@@ -3790,6 +4094,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     usleep(read_ms * 1000);
                 }
 #endif
+                llm_decides_skip_delays:;
 
                 /* Burst accumulation: re-poll for messages that arrived during
                  * the read delay. Humans finish their thought in 2-3 messages,
@@ -3900,6 +4205,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 break;
                             }
                         }
+                        if (agent)
+                            agent->lean_prompt = false;
                         continue;
                     }
                 }
@@ -3967,7 +4274,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     role = HU_ROLE_SYSTEM;
                             }
                             if (agent->history_count >= agent->history_cap) {
-                                size_t new_cap = agent->history_cap ? agent->history_cap * 2 : 8;
+                                size_t new_cap;
+                                if (!agent->history_cap)
+                                    new_cap = 8;
+                                else if (agent->history_cap > SIZE_MAX / 2)
+                                    break;
+                                else
+                                    new_cap = agent->history_cap * 2;
                                 hu_owned_message_t *arr = (hu_owned_message_t *)alloc->realloc(
                                     alloc->ctx, agent->history,
                                     agent->history_cap * sizeof(hu_owned_message_t),
@@ -4054,7 +4367,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         hu_contact_profile_build_context(alloc, cp, &contact_ctx, &contact_ctx_len);
 
                         size_t iw_len = 0;
-                        char *iw_ctx = hu_persona_build_inner_world_context(
+                        char *iw_ctx = llm_decides ? NULL :
+                            hu_persona_build_inner_world_context(
                             alloc, agent->persona, cp->relationship_stage, &iw_len);
                         if (iw_ctx && iw_len > 0 && contact_ctx) {
                             size_t total = contact_ctx_len + iw_len + 1;
@@ -4077,8 +4391,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
 #if defined(HU_HAS_PERSONA) && !defined(HU_IS_TEST)
                 /* BTH: Ongoing per-contact style learning (b2c) — re-run every 10 convos,
-                 * use all overlay fields, LRU eviction at cap */
-                {
+                 * use all overlay fields, LRU eviction at cap.
+                 * Skip in llm_decides: auto_profile may use LLM. */
+                if (!llm_decides) {
 #define HU_STYLE_CACHE_CAP        16
 #define HU_STYLE_RELEARN_INTERVAL 10
                     static struct {
@@ -4171,7 +4486,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 char *note = hu_strndup(alloc, profile_buf, (size_t)pb_n);
                                 if (note) {
                                     if (contact_ctx) {
-                                        size_t total = contact_ctx_len + (size_t)pb_n + 2;
+                                        size_t total = contact_ctx_len + (size_t)pb_n + 1;
                                         char *merged = (char *)alloc->alloc(alloc->ctx, total + 1);
                                         if (merged) {
                                             memcpy(merged, contact_ctx, contact_ctx_len);
@@ -4263,7 +4578,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                  * graph). Formatted lines are prepended to convo_ctx for the LLM, not merged into
                  * history. */
                 if (agent->memory && ch->channel->vtable->name && batch_key && key_len > 0 &&
-                    key_len < 512) {
+                    key_len < 512 && !llm_decides) {
                     sqlite3 *cg_db = hu_sqlite_memory_get_db(agent->memory);
                     if (cg_db) {
                         const char *cur_plat = ch->channel->vtable->name(ch->channel->ctx);
@@ -4344,7 +4659,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #ifdef HU_HAS_PERSONA
                 char *phase6_prefix = NULL;
                 size_t phase6_len = 0;
-                if (agent && agent->persona) {
+                if (agent && agent->persona && !llm_decides) {
                     const hu_contact_profile_t *cp_p6 =
                         hu_persona_find_contact(agent->persona, batch_key, key_len);
                     (void)cp_p6;
@@ -5611,8 +5926,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif /* HU_HAS_PERSONA */
 
-                /* 3. Build awareness context from history via shared analyzer. */
-                if (ctx_entries && ctx_count > 0) {
+                /* 3. Build awareness context from history via shared analyzer.
+                 * Skip in llm_decides: director + persona are sufficient. */
+                if (ctx_entries && ctx_count > 0 && !llm_decides) {
                     char *awareness_ctx = hu_conversation_build_awareness(
                         alloc, ctx_entries, ctx_count,
 #ifdef HU_HAS_PERSONA
@@ -5758,7 +6074,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* 2d. Style analysis: analyze their texting patterns for mirroring */
                 char *style_ctx = NULL;
                 size_t style_ctx_len = 0;
-                if (history_entries && history_count > 0) {
+                if (history_entries && history_count > 0 && !llm_decides) {
                     style_ctx = hu_conversation_analyze_style(
                         alloc, history_entries, history_count,
 #ifdef HU_HAS_PERSONA
@@ -5770,8 +6086,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* F32: Style fingerprint — our texting style with this contact (haha vs lol, etc.)
-                 */
-                if (agent->memory && batch_key && key_len > 0) {
+                 * Skip in llm_decides: persona already covers voice. */
+                if (agent->memory && batch_key && key_len > 0 && !llm_decides) {
                     hu_style_fingerprint_t fp;
                     memset(&fp, 0, sizeof(fp));
                     if (hu_style_fingerprint_get(agent->memory, alloc, batch_key, key_len, &fp) ==
@@ -5808,7 +6124,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* F32b: Rich style clone — detailed texting patterns from chat history */
 #ifdef HU_HAS_PERSONA
-                if (history_entries && history_count > 10) {
+                if (history_entries && history_count > 10 && !llm_decides) {
                     const char *own_msgs[512];
                     size_t own_count = 0;
                     for (size_t hi = 0; hi < history_count && own_count < 512; hi++) {
@@ -5940,8 +6256,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
-                /* Narrative, engagement, emotion: inject when meaningful */
-                if (history_entries && history_count > 0) {
+                /* Narrative, engagement, emotion: inject when meaningful.
+                 * Skip in llm_decides: avoids expensive emotion LLM calls. */
+                if (history_entries && history_count > 0 && !llm_decides) {
                     hu_narrative_phase_t narr =
                         hu_conversation_detect_narrative(history_entries, history_count);
                     hu_engagement_level_t eng =
@@ -6034,9 +6351,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* F14: Escalation detection — if 3+ consecutive negative messages,
-                 * use de-escalation directive (overrides energy). */
+                 * use de-escalation directive (overrides energy).
+                 * Skip in llm_decides mode — reduces prompt building latency. */
                 bool use_escalation = false;
-                if (history_entries && history_count > 0) {
+                if (history_entries && history_count > 0 && !llm_decides) {
                     hu_escalation_state_t escalation =
                         hu_conversation_detect_escalation(history_entries, history_count);
                     if (escalation.escalating) {
@@ -6082,7 +6400,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     hu_thread_energy_init(&g_energy_tracker);
                     g_energy_tracker_inited = true;
                 }
-                if (!use_escalation && combined_len > 0) {
+                if (!use_escalation && combined_len > 0 && !llm_decides) {
                     hu_energy_level_t energy = hu_conversation_detect_energy(
                         combined, combined_len, history_entries, history_count);
                     hu_thread_energy_update(&g_energy_tracker, batch_key, key_len, energy,
@@ -6140,9 +6458,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* TRUST-001: Trap question detection — inject anti-fabrication directive */
+                /* TRUST-001: Trap question detection — inject anti-fabrication directive.
+                 * Skip in llm_decides mode. */
 #ifdef HU_ENABLE_SQLITE
-                {
+                if (!llm_decides) {
                     hu_challenge_result_t adv_r;
                     if (hu_adversarial_detect(combined, combined_len, &adv_r) == HU_OK &&
                         adv_r.type == HU_CHALLENGE_TRAP_QUESTION && adv_r.confidence >= 0.5) {
@@ -6228,8 +6547,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* F27: Comfort pattern — when emotion is negative, inject learned preference. */
-                if (history_entries && history_count > 0 && agent->memory) {
+                /* F27: Comfort pattern — when emotion is negative, inject learned preference.
+                 * Skip in llm_decides: avoids expensive emotion LLM calls. */
+                if (history_entries && history_count > 0 && agent->memory && !llm_decides) {
                     hu_emotional_state_t emo_f27 =
                         hu_daemon_detect_emotion(alloc, agent, history_entries, history_count);
                     bool emo_negative =
@@ -6284,9 +6604,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
 #ifdef HU_HAS_PERSONA
-                /* F16: Context modifiers — heavy topics, personal sharing, high emotion, early turn
-                 */
-                if (history_entries && history_count > 0) {
+                /* F16: Context modifiers — heavy topics, personal sharing, high emotion, early turn.
+                 * Skip in llm_decides: avoids expensive emotion LLM calls. */
+                if (history_entries && history_count > 0 && !llm_decides) {
                     hu_emotional_state_t emo_ctx =
                         hu_daemon_detect_emotion(alloc, agent, history_entries, history_count);
                     const hu_context_modifiers_t *mods =
@@ -6322,8 +6642,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                 /* F17: First-time vulnerability detection — extra care when they share
-                 * something personal for the first time. */
-                {
+                 * something personal for the first time. Skip in llm_decides mode. */
+                if (!llm_decides) {
                     hu_vulnerability_state_t vuln = hu_conversation_detect_first_time_vulnerability(
                         combined, combined_len, agent ? agent->memory : NULL, batch_key, key_len);
                     if (vuln.first_time && vuln.topic_category) {
@@ -6366,8 +6686,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* F49: Call escalation — when text isn't enough, suggest a call. */
-                if (combined_len > 0) {
+                /* F49: Call escalation — when text isn't enough, suggest a call.
+                 * Skip in llm_decides mode. */
+                if (combined_len > 0 && !llm_decides) {
                     hu_call_escalation_t call_esc = hu_conversation_should_escalate_to_call(
                         combined, combined_len, history_entries, history_count);
                     if (call_esc.should_suggest) {
@@ -6401,10 +6722,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* GraphRAG: inject knowledge graph context (cross-contact synthesis via batch_key)
-                 */
+                /* GraphRAG: inject knowledge graph context (cross-contact synthesis via batch_key).
+                 * Skip in llm_decides mode — prompt inflation. */
 #ifdef HU_ENABLE_SQLITE
-                if (graph) {
+                if (graph && !llm_decides) {
                     char *graph_ctx = NULL;
                     size_t graph_ctx_len = 0;
                     hu_error_t gerr = hu_graph_build_contact_context(
@@ -6436,8 +6757,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* 6. Attachment context: guidance when attachments detected in history.
                  * When provider supports vision and channel exposes attachments, try to
-                 * get image path and describe it for richer context. */
-                if (history_entries && history_count > 0) {
+                 * get image path and describe it for richer context.
+                 * Skip in llm_decides: vision description uses expensive LLM call. */
+                if (history_entries && history_count > 0 && !llm_decides) {
                     size_t attach_ctx_len = 0;
                     char *attach_ctx = hu_conversation_attachment_context(
                         alloc, history_entries, history_count, &attach_ctx_len);
@@ -6510,8 +6832,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* 3b. Conversation callbacks: thread callback (history) + memory-based */
-                {
+                /* 3b. Conversation callbacks: thread callback (history) + memory-based.
+                 * Skip in llm_decides mode — reduces prompt bloat. */
+                if (!llm_decides) {
                     char *thread_cb = NULL;
                     size_t thread_cb_len = 0;
                     char *mem_cb = NULL;
@@ -6569,46 +6892,47 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
 #ifndef HU_IS_TEST
-                /* Episodic: load recent sessions for context */
+                /* Episodic: load recent sessions for context.
+                 * Skip in llm_decides: reduces prompt bloat. */
                 char *episodic_ctx = NULL;
                 size_t episodic_ctx_len = 0;
                 char *avoidance_json = NULL;
                 size_t avoidance_len = 0;
-                if (agent->memory) {
+                if (agent->memory && !llm_decides) {
                     hu_episodic_load(agent->memory, alloc, &episodic_ctx, &episodic_ctx_len);
                 }
-                /* F19: Inside jokes — inject for natural callback opportunities */
+                /* F19: Inside jokes — inject for natural callback opportunities.
+                 * Skip in llm_decides mode — prompt inflation. */
                 hu_inside_joke_t *jokes_ctx = NULL;
                 size_t jokes_count = 0;
-                if (agent->memory &&
+                if (agent->memory && !llm_decides &&
                     hu_superhuman_inside_joke_list(agent->memory, alloc, batch_key, key_len, 5,
                                                    &jokes_ctx, &jokes_count) == HU_OK &&
                     jokes_ctx && jokes_count > 0) {
                     char jokes_buf[768];
                     const size_t jokes_cap = sizeof(jokes_buf);
                     size_t jokes_pos =
-                        (size_t)snprintf(jokes_buf, jokes_cap, "Inside jokes with this contact: ");
+                        hu_buf_appendf(jokes_buf, jokes_cap, 0, "Inside jokes with this contact: ");
                     if (jokes_pos >= jokes_cap)
                         jokes_pos = jokes_cap - 1;
                     for (size_t j = 0; j < jokes_count && jokes_pos < 700; j++) {
                         if (j > 0) {
-                            jokes_pos += (size_t)snprintf(jokes_buf + jokes_pos,
-                                                          jokes_cap - jokes_pos, "; ");
+                            jokes_pos =
+                                hu_buf_appendf(jokes_buf, jokes_cap, jokes_pos, "; ");
                             if (jokes_pos >= jokes_cap)
                                 jokes_pos = jokes_cap - 1;
                         }
                         size_t ctx_len = strnlen(jokes_ctx[j].context, 80);
                         size_t pl_len = strnlen(jokes_ctx[j].punchline, 60);
-                        jokes_pos +=
-                            (size_t)snprintf(jokes_buf + jokes_pos, jokes_cap - jokes_pos,
-                                             "[%.*s] %.*s", (int)ctx_len, jokes_ctx[j].context,
-                                             (int)pl_len, jokes_ctx[j].punchline);
+                        jokes_pos = hu_buf_appendf(jokes_buf, jokes_cap, jokes_pos,
+                                                   "[%.*s] %.*s", (int)ctx_len, jokes_ctx[j].context,
+                                                   (int)pl_len, jokes_ctx[j].punchline);
                         if (jokes_pos >= jokes_cap)
                             jokes_pos = jokes_cap - 1;
                     }
                     if (jokes_pos < jokes_cap - 32) {
-                        jokes_pos += (size_t)snprintf(jokes_buf + jokes_pos, jokes_cap - jokes_pos,
-                                                      ". Use naturally when relevant.");
+                        jokes_pos = hu_buf_appendf(jokes_buf, jokes_cap, jokes_pos,
+                                                   ". Use naturally when relevant.");
                         if (jokes_pos >= jokes_cap)
                             jokes_pos = jokes_cap - 1;
                     }
@@ -6639,10 +6963,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                     hu_superhuman_inside_joke_free(alloc, jokes_ctx, jokes_count);
                 }
-                /* F18: Micro-moments — inject notable details for natural reference */
+                /* F18: Micro-moments — inject notable details for natural reference.
+                 * Skip in llm_decides mode. */
                 char *mm_json = NULL;
                 size_t mm_len = 0;
-                if (agent->memory &&
+                if (agent->memory && !llm_decides &&
                     hu_superhuman_micro_moment_list(agent->memory, alloc, batch_key, key_len, 10,
                                                     &mm_json, &mm_len) == HU_OK &&
                     mm_json && mm_len > 0) {
@@ -6678,8 +7003,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                     alloc->free(alloc->ctx, mm_json, mm_len);
                 }
-                /* F21: Avoidance patterns — inject for context, don't push */
-                if (agent->memory &&
+                /* F21: Avoidance patterns — inject for context, don't push.
+                 * Skip in llm_decides mode. */
+                if (agent->memory && !llm_decides &&
                     hu_superhuman_avoidance_list(agent->memory, alloc, batch_key, key_len,
                                                  &avoidance_json, &avoidance_len) == HU_OK &&
                     avoidance_json && avoidance_len > 0 && strstr(avoidance_json, "- ") != NULL) {
@@ -6717,8 +7043,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     avoidance_json = NULL;
                     avoidance_len = 0;
                 }
-                /* F22: Pattern mirror — inject behavioral patterns for friend+ surfacing */
-                {
+                /* F22: Pattern mirror — inject behavioral patterns for friend+ surfacing.
+                 * Skip in llm_decides mode. */
+                if (!llm_decides) {
                     char *pattern_json = NULL;
                     size_t pattern_len = 0;
                     if (agent->memory &&
@@ -6759,8 +7086,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         alloc->free(alloc->ctx, pattern_json, pattern_len);
                     }
                 }
-                /* F24: Growth celebration — inject recent milestones for natural celebration */
-                {
+                /* F24: Growth celebration — inject recent milestones for natural celebration.
+                 * Skip in llm_decides mode. */
+                if (!llm_decides) {
                     char *growth_json = NULL;
                     size_t growth_len = 0;
                     if (agent->memory &&
@@ -7039,8 +7367,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
                 }
 
-                /* Pre-populate STM from current message for egraph */
-                {
+                /* Pre-populate STM from current message for egraph.
+                 * Skip in llm_decides mode — STM + egraph add latency. */
+                if (!llm_decides) {
                     hu_fc_result_t fc_pre;
                     memset(&fc_pre, 0, sizeof(fc_pre));
                     (void)hu_fast_capture(alloc, combined, combined_len, &fc_pre);
@@ -7061,8 +7390,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 #ifndef HU_IS_TEST
-                    /* F25: Record emotional moments for 1–3 day check-ins */
-                    if (agent->memory && history_entries && history_count > 0) {
+                    /* F25: Record emotional moments for 1–3 day check-ins.
+                     * Skip in llm_decides: avoids post-response emotion LLM call. */
+                    if (agent->memory && history_entries && history_count > 0 && !llm_decides) {
                         hu_emotional_state_t emo_rec =
                             hu_daemon_detect_emotion(alloc, agent, history_entries, history_count);
                         hu_escalation_state_t esc_rec =
@@ -7103,8 +7433,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     hu_fc_result_deinit(&fc_pre, alloc);
                 }
 
-                /* 7. Emotional topic map: topics → dominant emotions from STM */
-                {
+                /* 7. Emotional topic map: topics → dominant emotions from STM.
+                 * Skip in llm_decides mode. */
+                if (!llm_decides) {
                     hu_emotional_graph_t egraph;
                     size_t egraph_len = 0;
                     hu_egraph_init(&egraph, *alloc);
@@ -7138,11 +7469,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* 7b. Mood context: recent emotional state from memory */
+                /* 7b. Mood context: recent emotional state from memory.
+                 * Skip in llm_decides mode — prompt inflation. */
                 {
                     char *mood_ctx = NULL;
                     size_t mood_ctx_len = 0;
-                    if (agent->memory &&
+                    if (agent->memory && !llm_decides &&
                         hu_mood_build_context(alloc, agent->memory, batch_key, key_len, &mood_ctx,
                                               &mood_ctx_len) == HU_OK &&
                         mood_ctx && mood_ctx_len > 0) {
@@ -7174,7 +7506,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* ── BTH Tier 1: Wire conversation planning (t1a) ──────────── */
 #ifndef HU_IS_TEST
-                {
+                if (!llm_decides) {
                     hu_conversation_plan_t plan;
                     memset(&plan, 0, sizeof(plan));
                     const char *emotional_ctx = convo_ctx ? convo_ctx : "";
@@ -7227,7 +7559,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* ── BTH Tier 1: Theory of Mind context (t1b-pre) ──────────── */
-                {
+                if (!llm_decides) {
                     size_t tom_idx = (size_t)-1;
                     for (size_t ti = 0; ti < tom_contact_count; ti++) {
                         if (strncmp(tom_contact_keys[ti], batch_key, key_len) == 0 &&
@@ -7308,7 +7640,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* ── BTH Tier 1: Information asymmetry guidance (t1c) ──────── */
-                {
+                if (!llm_decides) {
                     hu_info_asymmetry_t asym;
                     memset(&asym, 0, sizeof(asym));
                     const char *agent_ctx = convo_ctx ? convo_ctx : "";
@@ -7348,7 +7680,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* ── BTH Tier 1: Anticipatory actions from GraphRAG (t1d) ──── */
-                if (graph) {
+                if (graph && !llm_decides) {
                     hu_anticipatory_result_t antic;
                     memset(&antic, 0, sizeof(antic));
                     int64_t now_ts = (int64_t)time(NULL);
@@ -7386,7 +7718,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* ── BTH Tier 1: Voice maturity guidance (t1e) ─────────────── */
 #ifdef HU_HAS_PERSONA
-                {
+                if (!llm_decides) {
                     size_t vm_idx = (size_t)-1;
                     for (size_t vi = 0; vi < voice_contact_count; vi++) {
                         if (strncmp(voice_contact_keys[vi], batch_key, key_len) == 0 &&
@@ -7491,7 +7823,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif /* HU_HAS_PERSONA */
 
                 /* ── BTH Tier 2: Sentiment momentum (t2b) ─────────────────── */
-                if (history_entries && history_count >= 3) {
+                if (history_entries && history_count >= 3 && !llm_decides) {
                     char *sent_ctx = NULL;
                     size_t sent_ctx_len = 0;
                     sent_ctx = hu_conversation_build_sentiment_momentum(
@@ -7520,7 +7852,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* ── BTH Tier 2: Topic tangent callback (t2e) ─────────────── */
-                if (history_entries && history_count >= 6) {
+                if (history_entries && history_count >= 6 && !llm_decides) {
                     char *tang_ctx = NULL;
                     size_t tang_ctx_len = 0;
                     tang_ctx = hu_conversation_build_tangent_callback(
@@ -7549,7 +7881,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* ── BTH Tier 3: Conversation depth signal (t3b) ──────────── */
-                if (history_entries && history_count >= 5) {
+                if (history_entries && history_count >= 5 && !llm_decides) {
                     char *depth_ctx = NULL;
                     size_t depth_ctx_len = 0;
                     depth_ctx = hu_conversation_build_depth_signal(alloc, history_entries,
@@ -7855,7 +8187,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 #endif
                     hu_model_selection_t sel;
-                    if (config && config->agent.mr_judge_enabled) {
+                    if (config && config->agent.mr_judge_enabled && !llm_decides) {
                         static hu_route_cache_t judge_cache;
                         static bool judge_cache_inited = false;
                         if (!judge_cache_inited) {
@@ -7932,6 +8264,30 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* Tapback-vs-text decision: gate reaction and/or LLM flow */
+                if (llm_decides) {
+                    if (director_result_valid && director_result.action == DIR_SILENCE) {
+                        hu_log_info("human", agent ? agent->observer : NULL,
+                                    "director: silence (leave on read)");
+                        goto skip_llm_this_batch;
+                    }
+                    if (director_result_valid && director_result.action == DIR_TAPBACK &&
+                        ch->channel->vtable->react) {
+                        int64_t msg_id = msgs[batch_end].message_id;
+                        if (msg_id > 0 && director_result.reaction != HU_REACTION_NONE) {
+                            hu_log_info("human", agent ? agent->observer : NULL,
+                                        "director: tapback reaction=%d",
+                                        (int)director_result.reaction);
+                            ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len,
+                                                       msg_id, director_result.reaction);
+                            if (agent->bth_metrics)
+                                agent->bth_metrics->reactions_sent++;
+                        }
+                        goto skip_llm_this_batch;
+                    }
+                    hu_log_info("human", agent ? agent->observer : NULL,
+                                "director: text response, sending to LLM");
+                    goto llm_decides_skip_tapback;
+                }
                 {
                     hu_tapback_decision_t tapback_decision =
                         hu_conversation_classify_tapback_decision(combined, combined_len,
@@ -8019,11 +8375,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 #endif
+                llm_decides_skip_tapback:;
 
-                /* F45: Burst messaging — 3–4 rapid-fire thoughts for urgent/exciting context */
+                /* F45: Burst messaging — 3–4 rapid-fire thoughts for urgent/exciting context.
+                 * Skip in llm_decides mode — burst is an extra LLM call. */
 #ifndef HU_IS_TEST
 #ifdef HU_HAS_PERSONA
-                {
+                if (!llm_decides) {
                     float burst_prob = 0.03f;
                     if (agent && agent->persona)
                         burst_prob = agent->persona->humanization.burst_message_probability;
@@ -8178,6 +8536,43 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             memcpy(stream_ctx.id, batch_key, ik);
                             stream_ctx.id[ik] = '\0';
                         }
+                        /* Inject director's scene direction into conversation context.
+                         * The director call was made earlier (before delays) and the
+                         * result is stored in director_result. */
+                        if (llm_decides && director_result_valid &&
+                            director_result.direction[0] != '\0') {
+                            size_t dn_len = strlen(director_result.direction);
+                            static const char dn_hdr[] =
+                                "\n--- Scene Direction (this message only) ---\n";
+                            static const char dn_tail[] = "\n";
+                            size_t new_len = convo_ctx_len + sizeof(dn_hdr) - 1 + dn_len +
+                                             sizeof(dn_tail) - 1 + 1;
+                            char *new_convo =
+                                (char *)alloc->alloc(alloc->ctx, new_len);
+                            if (new_convo) {
+                                memcpy(new_convo, convo_ctx, convo_ctx_len);
+                                memcpy(new_convo + convo_ctx_len, dn_hdr, sizeof(dn_hdr) - 1);
+                                memcpy(new_convo + convo_ctx_len + sizeof(dn_hdr) - 1,
+                                       director_result.direction, dn_len);
+                                memcpy(new_convo + convo_ctx_len + sizeof(dn_hdr) - 1 + dn_len,
+                                       dn_tail, sizeof(dn_tail) - 1);
+                                new_convo[new_len - 1] = '\0';
+                                alloc->free(alloc->ctx, convo_ctx, convo_ctx_len + 1);
+                                convo_ctx = new_convo;
+                                convo_ctx_len = new_len - 1;
+                                agent->conversation_context = convo_ctx;
+                                agent->conversation_context_len = convo_ctx_len;
+                            }
+                        }
+
+                        size_t saved_tools = 0;
+                        size_t saved_specs = 0;
+                        if (llm_decides) {
+                            saved_tools = agent->tools_count;
+                            saved_specs = agent->tool_specs_count;
+                            agent->tools_count = 0;
+                            agent->tool_specs_count = 0;
+                        }
                         if (!retried) {
                             err = hu_agent_turn_stream_v2(agent, combined, combined_len,
                                                           daemon_stream_event_cb, &stream_ctx,
@@ -8185,6 +8580,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         } else {
                             err = hu_agent_turn(agent, combined, combined_len, &response,
                                                 &response_len);
+                        }
+                        if (llm_decides) {
+                            agent->tools_count = saved_tools;
+                            agent->tool_specs_count = saved_specs;
                         }
                     }
                     daemon_out_bus_bridge.active_turn = NULL;
@@ -8199,7 +8598,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                     /* Best-of-N: generate additional candidates, score with Turing heuristic */
                     if (err == HU_OK && response && response_len > 0 && !retried &&
-                        config && config->agent.best_of_n >= 2) {
+                        config && config->agent.best_of_n >= 2 && !llm_decides) {
                         uint32_t n_extra = config->agent.best_of_n - 1;
                         if (n_extra > 4) n_extra = 4;
                         hu_turing_score_t best_ts;
@@ -8253,9 +8652,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 
 
-                    /* Persona constitutional critique */
+                    /* Persona constitutional critique — skip in llm_decides mode
+                     * (director already provides quality guidance) */
                     if (err == HU_OK && response && response_len > 0 && !retried &&
-                        agent->constitutional_enabled) {
+                        agent->constitutional_enabled && !llm_decides) {
                         hu_constitutional_config_t persona_cfg = hu_constitutional_config_persona();
                         hu_critique_result_t cr = {0};
                         hu_error_t ce = hu_constitutional_critique(alloc, &agent->provider,
@@ -8277,8 +8677,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         hu_critique_result_free(alloc, &cr);
                     }
 
-                    /* AI-tell filter: catch known robotic phrases and force retry */
-                    if (err == HU_OK && response && response_len > 0 && !retried) {
+                    /* AI-tell filter: catch known robotic phrases and force retry.
+                     * Skip retry in llm_decides mode (too expensive with local model). */
+                    if (err == HU_OK && response && response_len > 0 && !retried && !llm_decides) {
                         static const char *ai_tells[] = {
                             "I understand how you",
                             "I am here to support",
@@ -8346,8 +8747,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 
                     /* Quality gate: check response for unnatural patterns.
-                     * If needs_revision, retry once with hint. */
-                    if (err == HU_OK && response && response_len > 0 && history_entries) {
+                     * If needs_revision, retry once with hint.
+                     * Skip retry in llm_decides mode (director handles quality). */
+                    if (err == HU_OK && response && response_len > 0 && history_entries
+                        && !llm_decides) {
                         hu_quality_score_t qscore = hu_conversation_evaluate_quality(
                             response, response_len, history_entries, history_count, max_chars);
                         if (qscore.needs_revision && !retried) {
@@ -8408,7 +8811,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                     /* Turing score gate: retry if heuristic score is too low.
                      * Only fires once (shares retried flag with quality gate). */
-                    if (err == HU_OK && response && response_len > 0 && !retried) {
+                    if (err == HU_OK && response && response_len > 0 && !retried && !llm_decides) {
                         hu_turing_score_t pre_tscore;
                         hu_error_t pre_ts_err = hu_turing_score_heuristic(
                             response, response_len, combined, combined_len, &pre_tscore);
@@ -8468,9 +8871,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             continue;
                         }
                     }
-                    /* LLM judge gate for contacts with consistently low scores */
+                    /* LLM judge gate for contacts with consistently low scores.
+                     * Skip entirely in llm_decides mode (director handles quality,
+                     * retries are too expensive with local model). */
 #ifdef HU_ENABLE_SQLITE
-                    if (err == HU_OK && response && response_len > 0 && !retried && agent->memory) {
+                    if (err == HU_OK && response && response_len > 0 && !retried &&
+                        !llm_decides && agent->memory) {
                         sqlite3 *ljdb = hu_sqlite_memory_get_db(agent->memory);
                         if (ljdb) {
                             int contact_dims[HU_TURING_DIM_COUNT];
@@ -8484,11 +8890,23 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     }
                                 }
                                 bool high_stakes = (ccnt > 0 && csum / ccnt < 7);
-                                if (high_stakes && agent->provider.vtable->chat) {
+                                hu_provider_t *judge_prov =
+                                    (llm_decides && g_classify_provider_ok)
+                                        ? &g_classify_provider
+                                        : &agent->provider;
+                                const char *judge_model =
+                                    (llm_decides && g_classify_provider_ok)
+                                        ? g_classify_model
+                                        : agent->model_name;
+                                size_t judge_model_len =
+                                    (llm_decides && g_classify_provider_ok)
+                                        ? g_classify_model_len
+                                        : agent->model_name_len;
+                                if (high_stakes && judge_prov->vtable->chat) {
                                     hu_turing_score_t llm_tscore;
                                     hu_error_t llm_terr = hu_turing_score_llm(
-                                        alloc, &agent->provider, agent->model_name,
-                                        agent->model_name_len, response, response_len, combined,
+                                        alloc, judge_prov, judge_model,
+                                        judge_model_len, response, response_len, combined,
                                         combined_len, &llm_tscore);
                                     if (llm_terr == HU_OK && llm_tscore.overall < 6) {
                                         retried = true;
@@ -8565,8 +8983,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
 #ifdef HU_HAS_PERSONA
-                /* Replay learning: analyze conversation and store insights for future prompts */
-                if (history_entries && history_count > 0) {
+                /* Replay learning: analyze conversation and store insights for future prompts.
+                 * Skip in llm_decides mode — post-turn analysis is too slow. */
+                if (history_entries && history_count > 0 && !llm_decides) {
                     hu_replay_result_t replay = {0};
                     hu_error_t rerr =
                         hu_replay_analyze(alloc, history_entries, history_count, 2000, &replay);
@@ -8649,7 +9068,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* ── Phase 4 post-turn: style drift self-tracking ─────── */
 #ifdef HU_ENABLE_SQLITE
-                if (err == HU_OK && response && response_len > 0 && agent->memory)
+                if (err == HU_OK && response && response_len > 0 && agent->memory && !llm_decides)
                     (void)hu_style_fingerprint_update_self(agent->memory, alloc, response,
                                                            response_len);
 #endif
@@ -8678,7 +9097,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* ── BTH post-turn: Theory of Mind record (t1b-post) ──────── */
 #ifndef HU_IS_TEST
-                if (err == HU_OK && response && response_len > 0) {
+                if (err == HU_OK && response && response_len > 0 && !llm_decides) {
                     size_t tom_idx = (size_t)-1;
                     for (size_t ti = 0; ti < tom_contact_count; ti++) {
                         if (strncmp(tom_contact_keys[ti], batch_key, key_len) == 0 &&
@@ -8709,7 +9128,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* ── BTH post-turn: Voice maturity update (t1e-post) ──────── */
 #ifdef HU_HAS_PERSONA
-                if (err == HU_OK && response && response_len > 0) {
+                if (err == HU_OK && response && response_len > 0 && !llm_decides) {
                     size_t vm_idx = (size_t)-1;
                     for (size_t vi = 0; vi < voice_contact_count; vi++) {
                         if (strncmp(voice_contact_keys[vi], batch_key, key_len) == 0 &&
@@ -8939,7 +9358,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
                 /* ── BTH post-turn: LLM deep extraction (t1g) ─────────────── */
-                if (err == HU_OK && response && response_len > 0 && agent->memory && graph) {
+                /* Skip in llm_decides mode — too expensive with local model for
+                 * casual conversation, and the agent_turn call here uses full
+                 * tools which overwhelms the single-threaded MLX server. */
+                if (err == HU_OK && response && response_len > 0 && agent->memory && graph
+                    && !llm_decides) {
                     char convo_buf[4096];
                     int cb_w = snprintf(convo_buf, sizeof(convo_buf), "User: %.*s\nAssistant: %.*s",
                                         (int)combined_len, combined, (int)response_len, response);
@@ -9008,6 +9431,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 agent->ab_history_count = 0;
                 agent->turn_model = NULL;
                 agent->turn_model_len = 0;
+                agent->lean_prompt = false;
                 agent->turn_temperature = 0.0;
                 agent->turn_thinking_budget = 0;
                 agent->max_response_chars = 0;
@@ -9072,9 +9496,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
 #ifndef HU_IS_TEST
                 /* F27: If we responded to negative emotion, set pending to record engagement
-                 * when we get their next reply. */
+                 * when we get their next reply.
+                 * Skip in llm_decides: avoids post-response emotion LLM call. */
                 if (err == HU_OK && response && response_len > 0 && agent->memory &&
-                    history_entries && history_count > 0) {
+                    history_entries && history_count > 0 && !llm_decides) {
                     hu_emotional_state_t emo_pend =
                         hu_daemon_detect_emotion(alloc, agent, history_entries, history_count);
                     bool should_pend = emo_pend.concerning ||
@@ -9118,8 +9543,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 history_count = 0;
 
                 /* Episodic: summarize this interaction (LLM when provider available, else
-                 * rule-based) */
-                if (err == HU_OK && response && response_len > 0 && agent->memory) {
+                 * rule-based). Skip in llm_decides mode — extra LLM call is too slow. */
+                if (err == HU_OK && response && response_len > 0 && agent->memory &&
+                    !llm_decides) {
                     const char *ep_msgs[2] = {combined, response};
                     size_t ep_lens[2] = {combined_len, response_len};
                     size_t summary_len = 0;
@@ -9640,8 +10066,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 delay_secs, recv_hr, curr_hr, (uint32_t)now_ts);
                             if (ack) {
                                 size_t ack_len = strlen(ack);
-                                send_buf_ack = (char *)alloc->alloc(alloc->ctx,
-                                                                    ack_len + 2 + response_len + 1);
+                                if (response_len <= SIZE_MAX - ack_len &&
+                                    ack_len + response_len <= SIZE_MAX - 3) {
+                                    send_buf_ack = (char *)alloc->alloc(
+                                        alloc->ctx, ack_len + 2 + response_len + 1);
+                                }
                                 if (send_buf_ack) {
                                     memcpy(send_buf_ack, ack, ack_len);
                                     send_buf_ack[ack_len] = '\n';
@@ -9761,9 +10190,55 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 split_max = constraints.max_chars;
                             }
                         }
+
+                        /* F2: Choreography-driven message delivery */
+                        hu_message_plan_t choreo_plan = {0};
+                        bool use_choreography = false;
+                        if (agent && agent->frontiers.initialized) {
+                            hu_choreography_config_t choreo_cfg = hu_choreography_config_default();
+                            choreo_cfg.energy_level = agent->frontiers.somatic.energy;
+                            hu_error_t ce = hu_choreography_plan(alloc, send_ptr, send_len,
+                                &choreo_cfg, (uint32_t)(time(NULL) ^ (uintptr_t)send_ptr),
+                                &choreo_plan);
+                            if (ce == HU_OK && choreo_plan.segment_count > 1)
+                                use_choreography = true;
+                        }
+
+                        if (use_choreography) {
+                            for (size_t seg = 0; seg < choreo_plan.segment_count; seg++) {
+                                if (seg > 0 && choreo_plan.segments[seg].delay_ms > 0) {
+                                    uint32_t dms = choreo_plan.segments[seg].delay_ms;
+                                    if (bth_hour >= 1 && bth_hour < 7)
+                                        dms *= 4;
+                                    else if (bth_hour >= 0 && bth_hour < 1)
+                                        dms *= 3;
+                                    else if (bth_hour >= 22)
+                                        dms *= 2;
+#ifndef HU_IS_TEST
+                                    if (choreo_plan.segments[seg].show_typing_indicator &&
+                                        ch->channel->vtable->start_typing)
+                                        ch->channel->vtable->start_typing(ch->channel->ctx,
+                                                                          batch_key, key_len);
+                                    usleep((useconds_t)(dms * 1000));
+#endif
+                                }
+                                const char *const *pv_ptr =
+                                    (seg == 0 && all_send_media_cnt > 0) ? all_send_media_ptr : NULL;
+                                size_t pv_cnt =
+                                    (seg == 0 && all_send_media_cnt > 0) ? all_send_media_cnt : 0;
+                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                    choreo_plan.segments[seg].text,
+                                    choreo_plan.segments[seg].text_len, pv_ptr, pv_cnt);
+                            }
+                            hu_choreography_plan_free(alloc, &choreo_plan);
+                        }
+
                         hu_message_fragment_t fragments[4];
-                        size_t frag_count = hu_conversation_split_response(
+                        size_t frag_count = 0;
+                        if (!use_choreography) {
+                        frag_count = hu_conversation_split_response(
                             alloc, send_ptr, send_len, fragments, 4, split_max);
+                        }
                         if (frag_count > 0) {
                             /* Stephanie2 active waiting: thinking + typing time per fragment */
                             for (size_t f = 0; f < frag_count; f++) {
@@ -9963,13 +10438,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 
                 /* F32: Update style fingerprint with our sent response */
-                if (agent->memory && batch_key && key_len > 0 && response && response_len > 0)
+                if (agent->memory && batch_key && key_len > 0 && response && response_len > 0 &&
+                    !llm_decides)
                     (void)hu_style_fingerprint_update(agent->memory, alloc, batch_key, key_len,
                                                       response, response_len);
 
 #if !defined(HU_IS_TEST) && defined(HU_ENABLE_SQLITE)
-                /* Turing score: evaluate response human-likeness post-send */
-                if (response && response_len > 0 && agent->memory) {
+                /* Turing score: evaluate response human-likeness post-send.
+                 * Skip in llm_decides mode — heuristic scoring adds latency. */
+                if (response && response_len > 0 && agent->memory && !llm_decides) {
                     hu_turing_score_t tscore;
                     hu_error_t ts_err = hu_turing_score_heuristic(response, response_len, combined,
                                                                   combined_len, &tscore);
@@ -9977,6 +10454,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         hu_turing_apply_channel_weights(&tscore, agent->active_channel,
                                                         agent->active_channel_len);
                     }
+#ifdef HU_HAS_PERSONA
+                    if (ts_err == HU_OK && agent->persona &&
+                        agent->persona->traits_count > 0) {
+                        hu_turing_apply_persona_alignment(&tscore, response, response_len,
+                            (const char *const *)agent->persona->traits,
+                            agent->persona->traits_count,
+                            (const char *const *)agent->persona->preferred_vocab,
+                            agent->persona->preferred_vocab_count,
+                            (const char *const *)agent->persona->avoided_vocab,
+                            agent->persona->avoided_vocab_count);
+                    }
+#endif
                     if (ts_err == HU_OK) {
                         if (agent->bth_metrics)
                             agent->bth_metrics->total_turns++;
@@ -10035,9 +10524,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
 #if !defined(HU_IS_TEST) && defined(HU_HAS_PERSONA)
-                /* F9: Double-text — natural afterthought follow-up */
-                if (response && response_len > 0 && agent->persona && ch->channel->vtable->send &&
-                    agent->provider.vtable && agent->provider.vtable->chat_with_system) {
+                /* F9: Double-text — natural afterthought follow-up.
+                 * When llm_decides is active, use the fast classify provider. */
+                {
+                    const hu_provider_vtable_t *dt_vtable =
+                        (llm_decides && g_classify_provider_ok)
+                            ? g_classify_provider.vtable
+                            : agent->provider.vtable;
+                    void *dt_ctx =
+                        (llm_decides && g_classify_provider_ok)
+                            ? g_classify_provider.ctx
+                            : agent->provider.ctx;
+                if (response && response_len > 0 && agent->persona &&
+                    ch->channel->vtable->send && dt_vtable && dt_vtable->chat_with_system) {
                     float dt_prob = agent->persona->humanization.double_text_probability;
                     uint32_t dt_seed =
                         (uint32_t)time(NULL) * 1103515245u + 12345u + (uint32_t)(uintptr_t)response;
@@ -10054,12 +10553,17 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (dt_n > 0 && (size_t)dt_n < sizeof(dt_user)) {
                             char *dt_resp = NULL;
                             size_t dt_resp_len = 0;
-                            const char *dt_model = agent->model_name
-                                                       ? agent->model_name
-                                                       : "gemini-3.1-flash-lite-preview";
-                            size_t dt_model_len = agent->model_name ? agent->model_name_len : 31;
-                            hu_error_t dt_err = agent->provider.vtable->chat_with_system(
-                                agent->provider.ctx, alloc,
+                            const char *dt_model =
+                                (llm_decides && g_classify_provider_ok)
+                                    ? g_classify_model
+                                    : (agent->model_name ? agent->model_name
+                                                         : "gemini-3.1-flash-lite-preview");
+                            size_t dt_model_len =
+                                (llm_decides && g_classify_provider_ok)
+                                    ? g_classify_model_len
+                                    : (agent->model_name ? agent->model_name_len : 31);
+                            hu_error_t dt_err = dt_vtable->chat_with_system(
+                                dt_ctx, alloc,
                                 "You are texting as this person. Keep it casual, short, lowercase. "
                                 "No quotes, no explanation, just the follow-up text.",
                                 93, dt_user, (size_t)dt_n, dt_model, dt_model_len, 0.9, &dt_resp,
@@ -10091,6 +10595,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+                } /* end dt_vtable scope */
 
                 /* Self-reaction: occasionally haha/emphasize own message (~2%) */
                 if (response && response_len > 0 && ch->channel->vtable->react) {

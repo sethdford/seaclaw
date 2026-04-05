@@ -51,7 +51,6 @@ static bool cu_autonomy_allows(hu_computer_use_ctx_t *c) {
 }
 #endif
 
-__attribute__((unused))
 static char *cu_dup_json(hu_allocator_t *alloc, const char *s, size_t len) {
     char *p = (char *)alloc->alloc(alloc->ctx, len + 1);
     if (!p)
@@ -60,6 +59,21 @@ static char *cu_dup_json(hu_allocator_t *alloc, const char *s, size_t len) {
     p[len] = '\0';
     return p;
 }
+
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
+#if (defined(__APPLE__) && !defined(HU_IS_TEST)) || \
+    (defined(__linux__) && !defined(HU_IS_TEST) && defined(HU_HAS_X11) && HU_HAS_X11)
+static bool cu_path_json_safe(const char *path) {
+    if (!path)
+        return true;
+    for (const unsigned char *p = (const unsigned char *)path; *p; p++) {
+        if (*p == '"' || *p == '\\' || *p < 0x20)
+            return false;
+    }
+    return true;
+}
+#endif
+#endif
 
 #if defined(__APPLE__) && !defined(HU_IS_TEST)
 
@@ -243,16 +257,6 @@ static void cu_post_key_combo(CGKeyCode kc, CGEventFlags flags) {
         CGEventPost(kCGHIDEventTap, up);
         CFRelease(up);
     }
-}
-
-static bool cu_path_json_safe(const char *path) {
-    if (!path)
-        return true;
-    for (const unsigned char *p = (const unsigned char *)path; *p; p++) {
-        if (*p == '"' || *p == '\\' || *p < 0x20)
-            return false;
-    }
-    return true;
 }
 
 static hu_error_t cu_mac_screenshot(hu_allocator_t *alloc, hu_computer_use_ctx_t *c, const char *path,
@@ -528,6 +532,18 @@ static hu_error_t cu_linux_read_png_file(hu_allocator_t *alloc, const char *path
 
 static hu_error_t cu_linux_screenshot(hu_allocator_t *alloc, hu_computer_use_ctx_t *c, const char *path,
                                       hu_tool_result_t *out) {
+    if (path && path[0]) {
+        if (!cu_path_json_safe(path)) {
+            *out = hu_tool_result_fail("path contains invalid characters", 31);
+            return HU_OK;
+        }
+        const char *ws = c && c->policy ? c->policy->workspace_dir : NULL;
+        size_t ws_len = ws ? strlen(ws) : 0;
+        if (hu_tool_validate_path(path, ws, ws_len) != HU_OK) {
+            *out = hu_tool_result_fail("path not allowed", 16);
+            return HU_OK;
+        }
+    }
     char tmpl[] = "/tmp/hu_cuXXXXXX.png";
     const char *work = path;
     int tmp_fd = -1;

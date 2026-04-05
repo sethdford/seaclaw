@@ -1,6 +1,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
+#include "human/core/log.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/provider.h"
@@ -202,22 +203,30 @@ static hu_error_t anthropic_chat(void *ctx, hu_allocator_t *alloc, const hu_chat
                 return HU_ERR_OUT_OF_MEMORY;
             }
             size_t j = i;
+            bool tool_result_oom = false;
             while (j < request->messages_count && request->messages[j].role == HU_ROLE_TOOL) {
                 const hu_chat_message_t *tm = &request->messages[j];
                 if (tm->tool_call_id && tm->content) {
                     hu_json_value_t *tr = hu_json_object_new(alloc);
-                    if (tr) {
-                        hu_json_object_set(alloc, tr, "type",
-                                           hu_json_string_new(alloc, "tool_result", 11));
-                        hu_json_object_set(
-                            alloc, tr, "tool_use_id",
-                            hu_json_string_new(alloc, tm->tool_call_id, tm->tool_call_id_len));
-                        hu_json_object_set(alloc, tr, "content",
-                                           hu_json_string_new(alloc, tm->content, tm->content_len));
-                        hu_json_array_push(alloc, content_arr, tr);
+                    if (!tr) {
+                        tool_result_oom = true;
+                        break;
                     }
+                    hu_json_object_set(alloc, tr, "type",
+                                       hu_json_string_new(alloc, "tool_result", 11));
+                    hu_json_object_set(
+                        alloc, tr, "tool_use_id",
+                        hu_json_string_new(alloc, tm->tool_call_id, tm->tool_call_id_len));
+                    hu_json_object_set(alloc, tr, "content",
+                                       hu_json_string_new(alloc, tm->content, tm->content_len));
+                    hu_json_array_push(alloc, content_arr, tr);
                 }
                 j++;
+            }
+            if (tool_result_oom) {
+                hu_json_free(alloc, content_arr);
+                hu_json_free(alloc, root);
+                return HU_ERR_OUT_OF_MEMORY;
             }
             hu_json_value_t *obj = hu_json_object_new(alloc);
             if (!obj) {
@@ -243,84 +252,99 @@ static hu_error_t anthropic_chat(void *ctx, hu_allocator_t *alloc, const hu_chat
                            hu_json_string_new(alloc, role_str, strlen(role_str)));
         if (m->role == HU_ROLE_ASSISTANT && m->tool_calls && m->tool_calls_count > 0) {
             hu_json_value_t *content_arr = hu_json_array_new(alloc);
-            if (content_arr) {
-                for (size_t k = 0; k < m->tool_calls_count; k++) {
-                    const hu_tool_call_t *tc = &m->tool_calls[k];
-                    hu_json_value_t *tu = hu_json_object_new(alloc);
-                    if (!tu) {
-                        hu_json_free(alloc, content_arr);
-                        hu_json_free(alloc, root);
-                        return HU_ERR_OUT_OF_MEMORY;
-                    }
-                    hu_json_object_set(alloc, tu, "type", hu_json_string_new(alloc, "tool_use", 8));
-                    if (tc->id && tc->id_len > 0)
-                        hu_json_object_set(alloc, tu, "id",
-                                           hu_json_string_new(alloc, tc->id, tc->id_len));
-                    if (tc->name && tc->name_len > 0)
-                        hu_json_object_set(alloc, tu, "name",
-                                           hu_json_string_new(alloc, tc->name, tc->name_len));
-                    if (tc->arguments && tc->arguments_len > 0) {
-                        hu_json_value_t *input_val = NULL;
-                        if (hu_json_parse(alloc, tc->arguments, tc->arguments_len, &input_val) ==
-                            HU_OK)
-                            hu_json_object_set(alloc, tu, "input", input_val);
-                    }
-                    hu_json_array_push(alloc, content_arr, tu);
-                }
-                hu_json_object_set(alloc, obj, "content", content_arr);
+            if (!content_arr) {
+                hu_json_free(alloc, obj);
+                hu_json_free(alloc, root);
+                return HU_ERR_OUT_OF_MEMORY;
             }
+            for (size_t k = 0; k < m->tool_calls_count; k++) {
+                const hu_tool_call_t *tc = &m->tool_calls[k];
+                hu_json_value_t *tu = hu_json_object_new(alloc);
+                if (!tu) {
+                    hu_json_free(alloc, content_arr);
+                    hu_json_free(alloc, obj);
+                    hu_json_free(alloc, root);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                hu_json_object_set(alloc, tu, "type", hu_json_string_new(alloc, "tool_use", 8));
+                if (tc->id && tc->id_len > 0)
+                    hu_json_object_set(alloc, tu, "id",
+                                       hu_json_string_new(alloc, tc->id, tc->id_len));
+                if (tc->name && tc->name_len > 0)
+                    hu_json_object_set(alloc, tu, "name",
+                                       hu_json_string_new(alloc, tc->name, tc->name_len));
+                if (tc->arguments && tc->arguments_len > 0) {
+                    hu_json_value_t *input_val = NULL;
+                    if (hu_json_parse(alloc, tc->arguments, tc->arguments_len, &input_val) == HU_OK)
+                        hu_json_object_set(alloc, tu, "input", input_val);
+                }
+                hu_json_array_push(alloc, content_arr, tu);
+            }
+            hu_json_object_set(alloc, obj, "content", content_arr);
         } else if (m->content_parts && m->content_parts_count > 0) {
             hu_json_value_t *parts_arr = hu_json_array_new(alloc);
-            if (parts_arr) {
-                for (size_t p = 0; p < m->content_parts_count; p++) {
-                    const hu_content_part_t *cp = &m->content_parts[p];
-                    hu_json_value_t *part = hu_json_object_new(alloc);
-                    if (!part)
-                        break;
-                    if (cp->tag == HU_CONTENT_PART_TEXT) {
-                        hu_json_object_set(alloc, part, "type",
-                                           hu_json_string_new(alloc, "text", 4));
-                        hu_json_object_set(
-                            alloc, part, "text",
-                            hu_json_string_new(alloc, cp->data.text.ptr, cp->data.text.len));
-                    } else if (cp->tag == HU_CONTENT_PART_IMAGE_BASE64) {
-                        hu_json_object_set(alloc, part, "type",
-                                           hu_json_string_new(alloc, "image", 5));
-                        hu_json_value_t *src_obj = hu_json_object_new(alloc);
-                        if (src_obj) {
-                            hu_json_object_set(alloc, src_obj, "type",
-                                               hu_json_string_new(alloc, "base64", 6));
-                            hu_json_object_set(
-                                alloc, src_obj, "media_type",
-                                hu_json_string_new(alloc, cp->data.image_base64.media_type,
-                                                   cp->data.image_base64.media_type_len));
-                            hu_json_object_set(alloc, src_obj, "data",
-                                               hu_json_string_new(alloc, cp->data.image_base64.data,
-                                                                  cp->data.image_base64.data_len));
-                            hu_json_object_set(alloc, part, "source", src_obj);
-                        }
-                    } else if (cp->tag == HU_CONTENT_PART_IMAGE_URL) {
-                        hu_json_object_set(alloc, part, "type",
-                                           hu_json_string_new(alloc, "image", 5));
-                        hu_json_value_t *src_obj = hu_json_object_new(alloc);
-                        if (src_obj) {
-                            hu_json_object_set(alloc, src_obj, "type",
-                                               hu_json_string_new(alloc, "url", 3));
-                            hu_json_object_set(alloc, src_obj, "url",
-                                               hu_json_string_new(alloc, cp->data.image_url.url,
-                                                                  cp->data.image_url.url_len));
-                            hu_json_object_set(alloc, part, "source", src_obj);
-                        }
-                    } else if (cp->tag == HU_CONTENT_PART_AUDIO_BASE64 ||
-                               cp->tag == HU_CONTENT_PART_VIDEO_URL) {
-                        /* Anthropic does not support audio/video in content; skip */
-                        hu_json_free(alloc, part);
-                        continue;
-                    }
-                    hu_json_array_push(alloc, parts_arr, part);
-                }
-                hu_json_object_set(alloc, obj, "content", parts_arr);
+            if (!parts_arr) {
+                hu_json_free(alloc, obj);
+                hu_json_free(alloc, root);
+                return HU_ERR_OUT_OF_MEMORY;
             }
+            bool parts_oom = false;
+            for (size_t p = 0; p < m->content_parts_count; p++) {
+                const hu_content_part_t *cp = &m->content_parts[p];
+                hu_json_value_t *part = hu_json_object_new(alloc);
+                if (!part) {
+                    parts_oom = true;
+                    break;
+                }
+                if (cp->tag == HU_CONTENT_PART_TEXT) {
+                    hu_json_object_set(alloc, part, "type",
+                                       hu_json_string_new(alloc, "text", 4));
+                    hu_json_object_set(
+                        alloc, part, "text",
+                        hu_json_string_new(alloc, cp->data.text.ptr, cp->data.text.len));
+                } else if (cp->tag == HU_CONTENT_PART_IMAGE_BASE64) {
+                    hu_json_object_set(alloc, part, "type",
+                                       hu_json_string_new(alloc, "image", 5));
+                    hu_json_value_t *src_obj = hu_json_object_new(alloc);
+                    if (src_obj) {
+                        hu_json_object_set(alloc, src_obj, "type",
+                                           hu_json_string_new(alloc, "base64", 6));
+                        hu_json_object_set(
+                            alloc, src_obj, "media_type",
+                            hu_json_string_new(alloc, cp->data.image_base64.media_type,
+                                               cp->data.image_base64.media_type_len));
+                        hu_json_object_set(alloc, src_obj, "data",
+                                           hu_json_string_new(alloc, cp->data.image_base64.data,
+                                                              cp->data.image_base64.data_len));
+                        hu_json_object_set(alloc, part, "source", src_obj);
+                    }
+                } else if (cp->tag == HU_CONTENT_PART_IMAGE_URL) {
+                    hu_json_object_set(alloc, part, "type",
+                                       hu_json_string_new(alloc, "image", 5));
+                    hu_json_value_t *src_obj = hu_json_object_new(alloc);
+                    if (src_obj) {
+                        hu_json_object_set(alloc, src_obj, "type",
+                                           hu_json_string_new(alloc, "url", 3));
+                        hu_json_object_set(alloc, src_obj, "url",
+                                           hu_json_string_new(alloc, cp->data.image_url.url,
+                                                              cp->data.image_url.url_len));
+                        hu_json_object_set(alloc, part, "source", src_obj);
+                    }
+                } else if (cp->tag == HU_CONTENT_PART_AUDIO_BASE64 ||
+                           cp->tag == HU_CONTENT_PART_VIDEO_URL) {
+                    /* Anthropic does not support audio/video in content; skip */
+                    hu_json_free(alloc, part);
+                    continue;
+                }
+                hu_json_array_push(alloc, parts_arr, part);
+            }
+            if (parts_oom) {
+                hu_json_free(alloc, parts_arr);
+                hu_json_free(alloc, obj);
+                hu_json_free(alloc, root);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            hu_json_object_set(alloc, obj, "content", parts_arr);
         } else if (m->content && m->content_len > 0) {
             hu_json_value_t *content_val = hu_json_string_new(alloc, m->content, m->content_len);
             hu_json_object_set(alloc, obj, "content", content_val);
@@ -434,7 +458,11 @@ static hu_error_t anthropic_chat(void *ctx, hu_allocator_t *alloc, const hu_chat
                 char *args_str = NULL;
                 size_t args_len = 0;
                 if (input && input->type == HU_JSON_OBJECT) {
-                    hu_json_stringify(alloc, input, &args_str, &args_len);
+                    hu_error_t json_err = hu_json_stringify(alloc, input, &args_str, &args_len);
+                    if (json_err != HU_OK) {
+                        hu_log_error("anthropic", NULL, "failed to stringify tool arguments");
+                        continue;
+                    }
                 }
                 tcs[tc_valid].id = tid ? hu_strndup(alloc, tid, strlen(tid)) : NULL;
                 tcs[tc_valid].id_len = tid ? (size_t)strlen(tid) : 0;
@@ -928,22 +956,30 @@ static hu_error_t anthropic_stream_chat(void *ctx, hu_allocator_t *alloc,
                 return HU_ERR_OUT_OF_MEMORY;
             }
             size_t j = i;
+            bool tool_result_oom = false;
             while (j < request->messages_count && request->messages[j].role == HU_ROLE_TOOL) {
                 const hu_chat_message_t *tm = &request->messages[j];
                 if (tm->tool_call_id && tm->content) {
                     hu_json_value_t *tr = hu_json_object_new(alloc);
-                    if (tr) {
-                        hu_json_object_set(alloc, tr, "type",
-                                           hu_json_string_new(alloc, "tool_result", 11));
-                        hu_json_object_set(
-                            alloc, tr, "tool_use_id",
-                            hu_json_string_new(alloc, tm->tool_call_id, tm->tool_call_id_len));
-                        hu_json_object_set(alloc, tr, "content",
-                                           hu_json_string_new(alloc, tm->content, tm->content_len));
-                        hu_json_array_push(alloc, content_arr, tr);
+                    if (!tr) {
+                        tool_result_oom = true;
+                        break;
                     }
+                    hu_json_object_set(alloc, tr, "type",
+                                       hu_json_string_new(alloc, "tool_result", 11));
+                    hu_json_object_set(
+                        alloc, tr, "tool_use_id",
+                        hu_json_string_new(alloc, tm->tool_call_id, tm->tool_call_id_len));
+                    hu_json_object_set(alloc, tr, "content",
+                                       hu_json_string_new(alloc, tm->content, tm->content_len));
+                    hu_json_array_push(alloc, content_arr, tr);
                 }
                 j++;
+            }
+            if (tool_result_oom) {
+                hu_json_free(alloc, content_arr);
+                hu_json_free(alloc, root);
+                return HU_ERR_OUT_OF_MEMORY;
             }
             hu_json_value_t *obj = hu_json_object_new(alloc);
             if (!obj) {
@@ -969,83 +1005,98 @@ static hu_error_t anthropic_stream_chat(void *ctx, hu_allocator_t *alloc,
                            hu_json_string_new(alloc, role_str, strlen(role_str)));
         if (m->role == HU_ROLE_ASSISTANT && m->tool_calls && m->tool_calls_count > 0) {
             hu_json_value_t *content_arr = hu_json_array_new(alloc);
-            if (content_arr) {
-                for (size_t k = 0; k < m->tool_calls_count; k++) {
-                    const hu_tool_call_t *tc = &m->tool_calls[k];
-                    hu_json_value_t *tu = hu_json_object_new(alloc);
-                    if (!tu) {
-                        hu_json_free(alloc, content_arr);
-                        hu_json_free(alloc, root);
-                        return HU_ERR_OUT_OF_MEMORY;
-                    }
-                    hu_json_object_set(alloc, tu, "type", hu_json_string_new(alloc, "tool_use", 8));
-                    if (tc->id && tc->id_len > 0)
-                        hu_json_object_set(alloc, tu, "id",
-                                           hu_json_string_new(alloc, tc->id, tc->id_len));
-                    if (tc->name && tc->name_len > 0)
-                        hu_json_object_set(alloc, tu, "name",
-                                           hu_json_string_new(alloc, tc->name, tc->name_len));
-                    if (tc->arguments && tc->arguments_len > 0) {
-                        hu_json_value_t *input_val = NULL;
-                        if (hu_json_parse(alloc, tc->arguments, tc->arguments_len, &input_val) ==
-                            HU_OK)
-                            hu_json_object_set(alloc, tu, "input", input_val);
-                    }
-                    hu_json_array_push(alloc, content_arr, tu);
-                }
-                hu_json_object_set(alloc, obj, "content", content_arr);
+            if (!content_arr) {
+                hu_json_free(alloc, obj);
+                hu_json_free(alloc, root);
+                return HU_ERR_OUT_OF_MEMORY;
             }
+            for (size_t k = 0; k < m->tool_calls_count; k++) {
+                const hu_tool_call_t *tc = &m->tool_calls[k];
+                hu_json_value_t *tu = hu_json_object_new(alloc);
+                if (!tu) {
+                    hu_json_free(alloc, content_arr);
+                    hu_json_free(alloc, obj);
+                    hu_json_free(alloc, root);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                hu_json_object_set(alloc, tu, "type", hu_json_string_new(alloc, "tool_use", 8));
+                if (tc->id && tc->id_len > 0)
+                    hu_json_object_set(alloc, tu, "id",
+                                       hu_json_string_new(alloc, tc->id, tc->id_len));
+                if (tc->name && tc->name_len > 0)
+                    hu_json_object_set(alloc, tu, "name",
+                                       hu_json_string_new(alloc, tc->name, tc->name_len));
+                if (tc->arguments && tc->arguments_len > 0) {
+                    hu_json_value_t *input_val = NULL;
+                    if (hu_json_parse(alloc, tc->arguments, tc->arguments_len, &input_val) == HU_OK)
+                        hu_json_object_set(alloc, tu, "input", input_val);
+                }
+                hu_json_array_push(alloc, content_arr, tu);
+            }
+            hu_json_object_set(alloc, obj, "content", content_arr);
         } else if (m->content_parts && m->content_parts_count > 0) {
             hu_json_value_t *parts_arr = hu_json_array_new(alloc);
-            if (parts_arr) {
-                for (size_t p = 0; p < m->content_parts_count; p++) {
-                    const hu_content_part_t *cp = &m->content_parts[p];
-                    hu_json_value_t *part = hu_json_object_new(alloc);
-                    if (!part)
-                        break;
-                    if (cp->tag == HU_CONTENT_PART_TEXT) {
-                        hu_json_object_set(alloc, part, "type",
-                                           hu_json_string_new(alloc, "text", 4));
-                        hu_json_object_set(
-                            alloc, part, "text",
-                            hu_json_string_new(alloc, cp->data.text.ptr, cp->data.text.len));
-                    } else if (cp->tag == HU_CONTENT_PART_IMAGE_BASE64) {
-                        hu_json_object_set(alloc, part, "type",
-                                           hu_json_string_new(alloc, "image", 5));
-                        hu_json_value_t *src_obj = hu_json_object_new(alloc);
-                        if (src_obj) {
-                            hu_json_object_set(alloc, src_obj, "type",
-                                               hu_json_string_new(alloc, "base64", 6));
-                            hu_json_object_set(
-                                alloc, src_obj, "media_type",
-                                hu_json_string_new(alloc, cp->data.image_base64.media_type,
-                                                   cp->data.image_base64.media_type_len));
-                            hu_json_object_set(alloc, src_obj, "data",
-                                               hu_json_string_new(alloc, cp->data.image_base64.data,
-                                                                  cp->data.image_base64.data_len));
-                            hu_json_object_set(alloc, part, "source", src_obj);
-                        }
-                    } else if (cp->tag == HU_CONTENT_PART_IMAGE_URL) {
-                        hu_json_object_set(alloc, part, "type",
-                                           hu_json_string_new(alloc, "image", 5));
-                        hu_json_value_t *src_obj = hu_json_object_new(alloc);
-                        if (src_obj) {
-                            hu_json_object_set(alloc, src_obj, "type",
-                                               hu_json_string_new(alloc, "url", 3));
-                            hu_json_object_set(alloc, src_obj, "url",
-                                               hu_json_string_new(alloc, cp->data.image_url.url,
-                                                                  cp->data.image_url.url_len));
-                            hu_json_object_set(alloc, part, "source", src_obj);
-                        }
-                    } else if (cp->tag == HU_CONTENT_PART_AUDIO_BASE64 ||
-                               cp->tag == HU_CONTENT_PART_VIDEO_URL) {
-                        hu_json_free(alloc, part);
-                        continue;
-                    }
-                    hu_json_array_push(alloc, parts_arr, part);
-                }
-                hu_json_object_set(alloc, obj, "content", parts_arr);
+            if (!parts_arr) {
+                hu_json_free(alloc, obj);
+                hu_json_free(alloc, root);
+                return HU_ERR_OUT_OF_MEMORY;
             }
+            bool parts_oom = false;
+            for (size_t p = 0; p < m->content_parts_count; p++) {
+                const hu_content_part_t *cp = &m->content_parts[p];
+                hu_json_value_t *part = hu_json_object_new(alloc);
+                if (!part) {
+                    parts_oom = true;
+                    break;
+                }
+                if (cp->tag == HU_CONTENT_PART_TEXT) {
+                    hu_json_object_set(alloc, part, "type",
+                                       hu_json_string_new(alloc, "text", 4));
+                    hu_json_object_set(
+                        alloc, part, "text",
+                        hu_json_string_new(alloc, cp->data.text.ptr, cp->data.text.len));
+                } else if (cp->tag == HU_CONTENT_PART_IMAGE_BASE64) {
+                    hu_json_object_set(alloc, part, "type",
+                                       hu_json_string_new(alloc, "image", 5));
+                    hu_json_value_t *src_obj = hu_json_object_new(alloc);
+                    if (src_obj) {
+                        hu_json_object_set(alloc, src_obj, "type",
+                                           hu_json_string_new(alloc, "base64", 6));
+                        hu_json_object_set(
+                            alloc, src_obj, "media_type",
+                            hu_json_string_new(alloc, cp->data.image_base64.media_type,
+                                               cp->data.image_base64.media_type_len));
+                        hu_json_object_set(alloc, src_obj, "data",
+                                           hu_json_string_new(alloc, cp->data.image_base64.data,
+                                                              cp->data.image_base64.data_len));
+                        hu_json_object_set(alloc, part, "source", src_obj);
+                    }
+                } else if (cp->tag == HU_CONTENT_PART_IMAGE_URL) {
+                    hu_json_object_set(alloc, part, "type",
+                                       hu_json_string_new(alloc, "image", 5));
+                    hu_json_value_t *src_obj = hu_json_object_new(alloc);
+                    if (src_obj) {
+                        hu_json_object_set(alloc, src_obj, "type",
+                                           hu_json_string_new(alloc, "url", 3));
+                        hu_json_object_set(alloc, src_obj, "url",
+                                           hu_json_string_new(alloc, cp->data.image_url.url,
+                                                              cp->data.image_url.url_len));
+                        hu_json_object_set(alloc, part, "source", src_obj);
+                    }
+                } else if (cp->tag == HU_CONTENT_PART_AUDIO_BASE64 ||
+                           cp->tag == HU_CONTENT_PART_VIDEO_URL) {
+                    hu_json_free(alloc, part);
+                    continue;
+                }
+                hu_json_array_push(alloc, parts_arr, part);
+            }
+            if (parts_oom) {
+                hu_json_free(alloc, parts_arr);
+                hu_json_free(alloc, obj);
+                hu_json_free(alloc, root);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            hu_json_object_set(alloc, obj, "content", parts_arr);
         } else if (m->content && m->content_len > 0) {
             hu_json_object_set(alloc, obj, "content",
                                hu_json_string_new(alloc, m->content, m->content_len));

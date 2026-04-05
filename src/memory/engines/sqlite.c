@@ -698,11 +698,9 @@ static hu_error_t impl_recall(void *ctx, hu_allocator_t *alloc, const char *quer
                 }
             }
             escaped_word[ew_len] = '\0';
-            if (!first) {
-                fts_len += (size_t)snprintf(fts_buf + fts_len, sizeof(fts_buf) - fts_len, " OR ");
-            }
-            fts_len += (size_t)snprintf(fts_buf + fts_len, sizeof(fts_buf) - fts_len, "\"%s\"",
-                                        escaped_word);
+            if (!first)
+                fts_len = hu_buf_appendf(fts_buf, sizeof(fts_buf), fts_len, " OR ");
+            fts_len = hu_buf_appendf(fts_buf, sizeof(fts_buf), fts_len, "\"%s\"", escaped_word);
             first = false;
         }
     }

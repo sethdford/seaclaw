@@ -561,30 +561,22 @@ hu_error_t hu_planner_replan(hu_allocator_t *alloc, hu_provider_t *provider, con
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    int off = snprintf(user, user_cap, "The original goal was: %.*s\n", (int)original_goal_len,
-                       original_goal);
-    if (off < 0)
-        off = 0;
+    size_t off = hu_buf_appendf(user, user_cap, 0, "The original goal was: %.*s\n",
+                                (int)original_goal_len, original_goal);
 
     if (progress_summary && progress_summary_len > 0) {
-        off += snprintf(user + off, user_cap - (size_t)off, "Progress so far: %.*s\n",
-                        (int)progress_summary_len, progress_summary);
-        if (off < 0)
-            off = (int)(user_cap - 1);
+        off = hu_buf_appendf(user, user_cap, off, "Progress so far: %.*s\n",
+                             (int)progress_summary_len, progress_summary);
     }
 
     if (failure_detail && failure_detail_len > 0) {
-        off += snprintf(user + off, user_cap - (size_t)off, "The last step failed: %.*s\n",
-                        (int)failure_detail_len, failure_detail);
-        if (off < 0)
-            off = (int)(user_cap - 1);
+        off = hu_buf_appendf(user, user_cap, off, "The last step failed: %.*s\n",
+                             (int)failure_detail_len, failure_detail);
     }
 
-    off += snprintf(user + off, user_cap - (size_t)off,
-                    "Create a revised plan to achieve the remaining goal.");
-    if (off < 0 || (size_t)off >= user_cap)
-        off = (int)user_cap - 1;
-    size_t user_len = (size_t)off;
+    off = hu_buf_appendf(user, user_cap, off,
+                         "Create a revised plan to achieve the remaining goal.");
+    size_t user_len = off;
 
     hu_chat_message_t msgs[2];
     memset(msgs, 0, sizeof(msgs));

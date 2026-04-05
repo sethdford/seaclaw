@@ -328,12 +328,12 @@ static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
         return HU_ERR_OUT_OF_MEMORY;
     }
     size_t j = 0;
-    j += (size_t)snprintf(jb + j, jb_cap - j, "{\"key\":\"%s\",\"content\":\"", keyb);
+    j = hu_buf_appendf(jb, jb_cap, j, "{\"key\":\"%s\",\"content\":\"", keyb);
     for (size_t k = 0; k < tlen; k++) {
         unsigned char ch = (unsigned char)transcript[k];
         if (ch == '"' || ch == '\\') {
             if (j + 2 < jb_cap)
-                j += (size_t)snprintf(jb + j, jb_cap - j, "\\%c", (char)ch);
+                j = hu_buf_appendf(jb, jb_cap, j, "\\%c", (char)ch);
         } else if (ch < 32) {
             if (j + 1 < jb_cap)
                 jb[j++] = ' ';
@@ -342,10 +342,10 @@ static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
                 jb[j++] = (char)ch;
         }
     }
-    j += (size_t)snprintf(jb + j, jb_cap - j, "\"");
+    j = hu_buf_appendf(jb, jb_cap, j, "\"");
     if (sid && sid[0])
-        j += (size_t)snprintf(jb + j, jb_cap - j, ",\"session_id\":\"%s\"", sid);
-    j += (size_t)snprintf(jb + j, jb_cap - j, "}");
+        j = hu_buf_appendf(jb, jb_cap, j, ",\"session_id\":\"%s\"", sid);
+    j = hu_buf_appendf(jb, jb_cap, j, "}");
     alloc->free(alloc->ctx, transcript, tlen + 1);
 
     const char *tenant = getenv("BFF_TENANT_ID");

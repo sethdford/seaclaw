@@ -6,6 +6,7 @@
 #include "human/core/error.h"
 #include "human/core/string.h"
 #include "human/memory.h"
+#include "human/memory/sql_transaction.h"
 #include <sqlite3.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -335,13 +336,20 @@ hu_error_t hu_superhuman_temporal_record(void *sqlite_ctx, const char *contact_i
     if (!db)
         return HU_ERR_NOT_SUPPORTED;
 
+    hu_sql_txn_t txn = {0};
+    hu_error_t txn_err = hu_sql_txn_begin(&txn, db);
+    if (txn_err != HU_OK)
+        return txn_err;
+
     sqlite3_stmt *sel = NULL;
     int rc = sqlite3_prepare_v2(db,
                                 "SELECT message_count, avg_response_time_ms FROM temporal_patterns "
                                 "WHERE contact_id=? AND day_of_week=? AND hour=?",
                                 -1, &sel, NULL);
-    if (rc != SQLITE_OK)
-        return HU_ERR_MEMORY_BACKEND;
+    if (rc != SQLITE_OK) {
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
 
     sqlite3_bind_text(sel, 1, contact_id, (int)contact_id_len, NULL);
     sqlite3_bind_int(sel, 2, day_of_week);
@@ -353,6 +361,10 @@ hu_error_t hu_superhuman_temporal_record(void *sqlite_ctx, const char *contact_i
     if (rc == SQLITE_ROW) {
         old_count = sqlite3_column_int(sel, 0);
         old_avg = sqlite3_column_int64(sel, 1);
+    } else if (rc != SQLITE_DONE) {
+        sqlite3_finalize(sel);
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
     }
     sqlite3_finalize(sel);
 
@@ -365,8 +377,10 @@ hu_error_t hu_superhuman_temporal_record(void *sqlite_ctx, const char *contact_i
         "INSERT OR REPLACE INTO temporal_patterns(contact_id,day_of_week,hour,message_count,"
         "avg_response_time_ms) VALUES(?,?,?,?,?)",
         -1, &stmt, NULL);
-    if (rc != SQLITE_OK)
-        return HU_ERR_MEMORY_BACKEND;
+    if (rc != SQLITE_OK) {
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
 
     sqlite3_bind_text(stmt, 1, contact_id, (int)contact_id_len, NULL);
     sqlite3_bind_int(stmt, 2, day_of_week);
@@ -376,7 +390,11 @@ hu_error_t hu_superhuman_temporal_record(void *sqlite_ctx, const char *contact_i
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
+    if (rc != SQLITE_DONE) {
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
+    return hu_sql_txn_commit(&txn);
 }
 
 hu_error_t hu_superhuman_temporal_get_quiet_hours(void *sqlite_ctx, hu_allocator_t *alloc,
@@ -481,7 +499,8 @@ hu_error_t hu_superhuman_delayed_followup_list_due(void *sqlite_ctx, hu_allocato
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    int step_rc;
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         if (count >= cap) {
             cap *= 2;
             hu_delayed_followup_t *n = (hu_delayed_followup_t *)alloc->alloc(
@@ -509,6 +528,14 @@ hu_error_t hu_superhuman_delayed_followup_list_due(void *sqlite_ctx, hu_allocato
         count++;
     }
     sqlite3_finalize(stmt);
+
+    if (step_rc != SQLITE_DONE) {
+        if (arr)
+            alloc->free(alloc->ctx, arr, cap * sizeof(hu_delayed_followup_t));
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
 
     if (count == 0 && arr) {
         alloc->free(alloc->ctx, arr, cap * sizeof(hu_delayed_followup_t));
@@ -668,7 +695,7 @@ hu_error_t hu_superhuman_micro_moment_list(void *sqlite_ctx, hu_allocator_t *all
         }
     }
     *out_json = buf;
-    *out_len = buf_cap; /* allocated size for caller to free */
+    *out_len = buf_len;
     return HU_OK;
 }
 
@@ -686,14 +713,21 @@ hu_error_t hu_superhuman_avoidance_record(void *sqlite_ctx, const char *contact_
     if (!db)
         return HU_ERR_NOT_SUPPORTED;
 
+    hu_sql_txn_t txn = {0};
+    hu_error_t txn_err = hu_sql_txn_begin(&txn, db);
+    if (txn_err != HU_OK)
+        return txn_err;
+
     int64_t now_ts = (int64_t)time(NULL);
     sqlite3_stmt *sel = NULL;
     int rc = sqlite3_prepare_v2(db,
                                 "SELECT mention_count, change_count FROM avoidance_patterns "
                                 "WHERE contact_id=? AND topic=?",
                                 -1, &sel, NULL);
-    if (rc != SQLITE_OK)
-        return HU_ERR_MEMORY_BACKEND;
+    if (rc != SQLITE_OK) {
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
 
     sqlite3_bind_text(sel, 1, contact_id, (int)contact_id_len, NULL);
     sqlite3_bind_text(sel, 2, topic, (int)topic_len, NULL);
@@ -704,6 +738,10 @@ hu_error_t hu_superhuman_avoidance_record(void *sqlite_ctx, const char *contact_
     if (rc == SQLITE_ROW) {
         mention = sqlite3_column_int(sel, 0) + 1;
         change = sqlite3_column_int(sel, 1) + (topic_changed_quickly ? 1 : 0);
+    } else if (rc != SQLITE_DONE) {
+        sqlite3_finalize(sel);
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
     }
     sqlite3_finalize(sel);
 
@@ -713,8 +751,10 @@ hu_error_t hu_superhuman_avoidance_record(void *sqlite_ctx, const char *contact_
         "INSERT OR REPLACE INTO avoidance_patterns(contact_id,topic,mention_count,change_count,"
         "last_mentioned) VALUES(?,?,?,?,?)",
         -1, &stmt, NULL);
-    if (rc != SQLITE_OK)
-        return HU_ERR_MEMORY_BACKEND;
+    if (rc != SQLITE_OK) {
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
 
     sqlite3_bind_text(stmt, 1, contact_id, (int)contact_id_len, NULL);
     sqlite3_bind_text(stmt, 2, topic, (int)topic_len, NULL);
@@ -724,7 +764,11 @@ hu_error_t hu_superhuman_avoidance_record(void *sqlite_ctx, const char *contact_
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
+    if (rc != SQLITE_DONE) {
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
+    return hu_sql_txn_commit(&txn);
 }
 
 hu_error_t hu_superhuman_avoidance_list(void *sqlite_ctx, hu_allocator_t *alloc,
@@ -783,7 +827,7 @@ hu_error_t hu_superhuman_avoidance_list(void *sqlite_ctx, hu_allocator_t *alloc,
         }
     }
     *out_json = buf;
-    *out_len = buf_cap; /* allocated size for caller to free */
+    *out_len = buf_len;
     return HU_OK;
 }
 
@@ -801,13 +845,20 @@ hu_error_t hu_superhuman_topic_baseline_record(void *sqlite_ctx, const char *con
     if (!db)
         return HU_ERR_NOT_SUPPORTED;
 
+    hu_sql_txn_t txn = {0};
+    hu_error_t txn_err = hu_sql_txn_begin(&txn, db);
+    if (txn_err != HU_OK)
+        return txn_err;
+
     int64_t now_ts = (int64_t)time(NULL);
     sqlite3_stmt *sel = NULL;
     int rc = sqlite3_prepare_v2(
         db, "SELECT mention_count FROM topic_baselines WHERE contact_id=? AND topic=?", -1, &sel,
         NULL);
-    if (rc != SQLITE_OK)
-        return HU_ERR_MEMORY_BACKEND;
+    if (rc != SQLITE_OK) {
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
 
     sqlite3_bind_text(sel, 1, contact_id, (int)contact_id_len, NULL);
     sqlite3_bind_text(sel, 2, topic, (int)topic_len, NULL);
@@ -816,6 +867,11 @@ hu_error_t hu_superhuman_topic_baseline_record(void *sqlite_ctx, const char *con
     rc = sqlite3_step(sel);
     if (rc == SQLITE_ROW)
         mention = sqlite3_column_int(sel, 0) + 1;
+    else if (rc != SQLITE_DONE) {
+        sqlite3_finalize(sel);
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
     sqlite3_finalize(sel);
 
     sqlite3_stmt *stmt = NULL;
@@ -824,8 +880,10 @@ hu_error_t hu_superhuman_topic_baseline_record(void *sqlite_ctx, const char *con
         "INSERT OR REPLACE INTO topic_baselines(contact_id,topic,mention_count,last_mentioned) "
         "VALUES(?,?,?,?)",
         -1, &stmt, NULL);
-    if (rc != SQLITE_OK)
-        return HU_ERR_MEMORY_BACKEND;
+    if (rc != SQLITE_OK) {
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
 
     sqlite3_bind_text(stmt, 1, contact_id, (int)contact_id_len, NULL);
     sqlite3_bind_text(stmt, 2, topic, (int)topic_len, NULL);
@@ -834,7 +892,11 @@ hu_error_t hu_superhuman_topic_baseline_record(void *sqlite_ctx, const char *con
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
+    if (rc != SQLITE_DONE) {
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
+    return hu_sql_txn_commit(&txn);
 }
 
 hu_error_t hu_superhuman_topic_absence_list(void *sqlite_ctx, hu_allocator_t *alloc,
@@ -898,7 +960,7 @@ hu_error_t hu_superhuman_topic_absence_list(void *sqlite_ctx, hu_allocator_t *al
         }
     }
     *out_json = buf;
-    *out_len = buf_cap; /* allocated size for caller to free */
+    *out_len = buf_len;
     return HU_OK;
 }
 
@@ -1002,7 +1064,7 @@ hu_error_t hu_superhuman_growth_list_recent(void *sqlite_ctx, hu_allocator_t *al
         }
     }
     *out_json = buf;
-    *out_len = buf_cap; /* allocated size for caller to free */
+    *out_len = buf_len;
     return HU_OK;
 }
 
@@ -1105,7 +1167,7 @@ hu_error_t hu_superhuman_pattern_list(void *sqlite_ctx, hu_allocator_t *alloc,
         }
     }
     *out_json = buf;
-    *out_len = buf_cap; /* allocated size for caller to free */
+    *out_len = buf_len;
     return HU_OK;
 }
 
@@ -1314,7 +1376,7 @@ hu_error_t hu_superhuman_memory_build_context(void *sqlite_ctx, hu_allocator_t *
     }
 
     *out = buf;
-    *out_len = buf_cap; /* allocated size for caller to free */
+    *out_len = buf_len;
     return HU_OK;
 }
 

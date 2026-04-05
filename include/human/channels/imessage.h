@@ -14,6 +14,13 @@ hu_error_t hu_imessage_create(hu_allocator_t *alloc, const char *default_target,
                               size_t allow_from_count, hu_channel_t *out);
 void hu_imessage_destroy(hu_channel_t *ch);
 
+/** Enable the imsg CLI (steipete/imsg) for send/react at runtime.
+ * Must be called after hu_imessage_create. */
+void hu_imessage_set_use_imsg_cli(hu_channel_t *ch, bool use);
+
+/** Treat is_from_me=1 messages from this handle as incoming (self-test via same Apple ID). */
+void hu_imessage_set_loopback_handle(hu_channel_t *ch, const char *handle);
+
 /** Returns true if default target (phone/email) is configured. */
 bool hu_imessage_is_configured(hu_channel_t *ch);
 
@@ -63,6 +70,26 @@ char *hu_imessage_get_latest_attachment_path(hu_allocator_t *alloc, const char *
 hu_error_t hu_imessage_lookup_message_by_guid(hu_allocator_t *alloc, const char *guid,
                                               size_t guid_len, char *out_text, size_t out_cap,
                                               size_t *out_len);
+
+/** Map an expressive_send_style_id to a human-readable effect name.
+ * Returns e.g. "Slam", "Confetti", "Gentle", or NULL if unrecognized.
+ * Available on Apple platforms and under HU_IS_TEST. */
+const char *hu_imessage_effect_name(const char *style_id);
+
+/** Classify a balloon_bundle_id into a display label.
+ * Returns "[Sticker]", "[Memoji]", or "[iMessage App]".
+ * Returns NULL if balloon_id is NULL/empty.
+ * Available on Apple platforms and under HU_IS_TEST. */
+const char *hu_imessage_balloon_label(const char *balloon_id);
+
+/** True if text is NULL, empty, or a COALESCE-generated generic label
+ * ("[Photo]", "[Video]", "[Voice Message]") that balloon classification
+ * should override. Used by poll, history, and lookup paths. */
+bool hu_imessage_text_is_placeholder(const char *text);
+
+/** Copy src into dst with bounded length. Returns bytes written (excluding NUL).
+ * Safe when src_len >= dst_cap — truncates and always NUL-terminates. */
+size_t hu_imessage_copy_bounded(char *dst, size_t dst_cap, const char *src, size_t src_len);
 
 /** Extract plain text from an NSAttributedString (NSKeyedArchiver) blob.
  * macOS 15+ stores iMessage text in attributedBody instead of the text column.

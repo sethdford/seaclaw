@@ -3,6 +3,7 @@
 #include "human/core/error.h"
 #include "human/core/string.h"
 #include <ctype.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,7 +19,13 @@ char *hu_llm_reranker_build_prompt(hu_allocator_t *alloc, const char *query, siz
     if (limit == 0)
         return hu_sprintf(alloc, "%s", "");
 
-    size_t cap = 512 + (size_t)query_len + limit * (SNIPPET_MAX + 32);
+    const size_t per_item = (size_t)SNIPPET_MAX + 32;
+    if (per_item != 0 && limit > SIZE_MAX / per_item)
+        return NULL;
+    size_t entries_part = limit * per_item;
+    if ((size_t)query_len > SIZE_MAX - 512 - entries_part)
+        return NULL;
+    size_t cap = 512 + (size_t)query_len + entries_part;
     char *buf = (char *)alloc->alloc(alloc->ctx, cap);
     if (!buf)
         return NULL;

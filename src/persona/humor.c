@@ -70,17 +70,41 @@ hu_error_t hu_humor_fw_evaluate_context(const char *conversation, size_t conv_le
     else
         eval->appropriateness = 0.5f;
 
-    /* Persona fit: check if preferred styles match */
-    eval->persona_fit = 0.5f;
-    if (ctx && ctx->preferred_count > 0)
-        eval->persona_fit = 0.8f;
+    /* Persona fit: check whether preferred styles match the suggested theory */
+    eval->persona_fit = 0.4f;
+    if (ctx && ctx->preferred_count > 0) {
+        for (size_t si = 0; si < ctx->preferred_count; si++) {
+            hu_humor_fw_style_t s = ctx->preferred_styles[si];
+            if ((s == HU_HUMOR_FW_DRY && light_hits == 0) ||
+                (s == HU_HUMOR_FW_SELF_DEPRECATING) ||
+                (s == HU_HUMOR_FW_OBSERVATIONAL && light_hits > 0) ||
+                (s == HU_HUMOR_FW_WORDPLAY) ||
+                (s == HU_HUMOR_FW_ABSURDIST && serious_hits == 0)) {
+                eval->persona_fit = 0.85f;
+                break;
+            }
+        }
+        if (eval->persona_fit < 0.85f)
+            eval->persona_fit = 0.6f;
+    }
 
-    /* Audience fit based on channel/contact availability */
-    eval->audience_fit = 0.6f;
-    if (ctx && ctx->contact_id && ctx->contact_id_len > 0)
-        eval->audience_fit = 0.8f;
+    /* Audience fit: real risk_tolerance and channel context */
+    eval->audience_fit = 0.5f;
+    if (ctx) {
+        float risk_factor = ctx->risk_tolerance;
+        if (ctx->contact_id && ctx->contact_id_len > 0)
+            eval->audience_fit = 0.65f + risk_factor * 0.2f;
+        if (ctx->channel && ctx->channel_len > 0) {
+            if (ctx->channel_len == 8 &&
+                (memcmp(ctx->channel, "imessage", 8) == 0 ||
+                 memcmp(ctx->channel, "whatsapp", 8) == 0))
+                eval->audience_fit += 0.1f;
+        }
+        if (eval->audience_fit > 1.0f) eval->audience_fit = 1.0f;
+    }
 
-    eval->novelty = 0.6f;
+    /* Novelty: penalize if conversation is short (less context = less setup) */
+    eval->novelty = conv_len > 200 ? 0.7f : (conv_len > 50 ? 0.5f : 0.3f);
 
     eval->composite = eval->appropriateness * 0.4f +
                       eval->persona_fit * 0.2f +
@@ -130,7 +154,9 @@ hu_error_t hu_humor_fw_build_directive(hu_allocator_t *alloc,
         return HU_OK;
     }
 
-    const char *guidance = theory_guidance[eval->suggested_theory];
+    int theory = (int)eval->suggested_theory;
+    if (theory < 0 || theory >= HU_HUMOR_THEORY_COUNT) theory = 0;
+    const char *guidance = theory_guidance[theory];
     size_t glen = strlen(guidance);
     size_t cap = glen + 64;
     char tmp[512];

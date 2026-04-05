@@ -19,51 +19,123 @@ static const char *default_allowed_commands[] = {"git",  "npm",  "cargo", "ls", 
 static const size_t default_allowed_commands_len =
     sizeof(default_allowed_commands) / sizeof(default_allowed_commands[0]);
 
+static void set_defaults_rollback(hu_config_t *cfg, hu_allocator_t *a) {
+    if (!cfg || !a)
+        return;
+    if (cfg->autonomy.allowed_commands) {
+        for (size_t i = 0; i < cfg->autonomy.allowed_commands_len; i++) {
+            if (cfg->autonomy.allowed_commands[i])
+                a->free(a->ctx, cfg->autonomy.allowed_commands[i],
+                        strlen(cfg->autonomy.allowed_commands[i]) + 1);
+        }
+        a->free(a->ctx, cfg->autonomy.allowed_commands,
+                cfg->autonomy.allowed_commands_len * sizeof(char *));
+        cfg->autonomy.allowed_commands = NULL;
+        cfg->autonomy.allowed_commands_len = 0;
+    }
+#define HU_SET_DEF_FREE_STR(field)                                                                 \
+    do {                                                                                           \
+        if ((field)) {                                                                             \
+            a->free(a->ctx, (field), strlen((field)) + 1);                                         \
+            (field) = NULL;                                                                        \
+        }                                                                                          \
+    } while (0)
+    HU_SET_DEF_FREE_STR(cfg->nodes[0].status);
+    HU_SET_DEF_FREE_STR(cfg->nodes[0].name);
+    HU_SET_DEF_FREE_STR(cfg->hardware.transport);
+    HU_SET_DEF_FREE_STR(cfg->identity.format);
+    HU_SET_DEF_FREE_STR(cfg->tools.web_search_provider);
+    HU_SET_DEF_FREE_STR(cfg->security.sandbox);
+    HU_SET_DEF_FREE_STR(cfg->gateway.host);
+    HU_SET_DEF_FREE_STR(cfg->tunnel.provider);
+    HU_SET_DEF_FREE_STR(cfg->auto_update);
+    HU_SET_DEF_FREE_STR(cfg->memory.backend);
+    HU_SET_DEF_FREE_STR(cfg->memory.profile);
+    HU_SET_DEF_FREE_STR(cfg->runtime.kind);
+    HU_SET_DEF_FREE_STR(cfg->agent.tool_dispatcher);
+    HU_SET_DEF_FREE_STR(cfg->diagnostics.backend);
+    HU_SET_DEF_FREE_STR(cfg->autonomy.level);
+    HU_SET_DEF_FREE_STR(cfg->gateway_host);
+    HU_SET_DEF_FREE_STR(cfg->memory_backend);
+    HU_SET_DEF_FREE_STR(cfg->default_model);
+    HU_SET_DEF_FREE_STR(cfg->default_provider);
+#undef HU_SET_DEF_FREE_STR
+    memset(cfg, 0, sizeof(*cfg));
+}
+
 static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     memset(cfg, 0, sizeof(*cfg));
     cfg->providers = NULL;
     cfg->providers_len = 0;
     cfg->api_key = NULL;
     cfg->default_provider = hu_strdup(a, "gemini");
-    if (!cfg->default_provider)
+    if (!cfg->default_provider) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->default_model = hu_strdup(a, "gemini-3.1-flash-lite-preview");
-    if (!cfg->default_model)
+    if (!cfg->default_model) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->default_temperature = 0.7;
     cfg->temperature = 0.7;
     cfg->max_tokens = 0;
     cfg->memory_backend = hu_strdup(a, "markdown");
-    if (!cfg->memory_backend)
+    if (!cfg->memory_backend) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->memory_auto_save = true;
     cfg->heartbeat_enabled = false;
     cfg->heartbeat_interval_minutes = 30;
     cfg->gateway_host = hu_strdup(a, "127.0.0.1");
-    if (!cfg->gateway_host)
+    if (!cfg->gateway_host) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->gateway_port = 3000;
     cfg->workspace_only = true;
     cfg->max_actions_per_hour = 20;
     cfg->autonomy.level = hu_strdup(a, "supervised");
-    if (!cfg->autonomy.level)
+    if (!cfg->autonomy.level) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->autonomy.workspace_only = true;
     cfg->autonomy.max_actions_per_hour = 20;
     cfg->autonomy.require_approval_for_medium_risk = true;
     cfg->autonomy.block_high_risk_commands = true;
     cfg->autonomy.allowed_commands =
         (char **)a->alloc(a->ctx, default_allowed_commands_len * sizeof(char *));
-    if (cfg->autonomy.allowed_commands) {
-        for (size_t i = 0; i < default_allowed_commands_len; i++)
-            cfg->autonomy.allowed_commands[i] = hu_strdup(a, default_allowed_commands[i]);
-        cfg->autonomy.allowed_commands_len = default_allowed_commands_len;
+    if (!cfg->autonomy.allowed_commands) {
+        set_defaults_rollback(cfg, a);
+        return;
     }
+    for (size_t i = 0; i < default_allowed_commands_len; i++) {
+        cfg->autonomy.allowed_commands[i] = hu_strdup(a, default_allowed_commands[i]);
+        if (!cfg->autonomy.allowed_commands[i]) {
+            for (size_t j = 0; j < i; j++) {
+                if (cfg->autonomy.allowed_commands[j])
+                    a->free(a->ctx, cfg->autonomy.allowed_commands[j],
+                            strlen(cfg->autonomy.allowed_commands[j]) + 1);
+            }
+            a->free(a->ctx, cfg->autonomy.allowed_commands,
+                    default_allowed_commands_len * sizeof(char *));
+            cfg->autonomy.allowed_commands = NULL;
+            cfg->autonomy.allowed_commands_len = 0;
+            set_defaults_rollback(cfg, a);
+            return;
+        }
+    }
+    cfg->autonomy.allowed_commands_len = default_allowed_commands_len;
     cfg->autonomy.allowed_paths = NULL;
     cfg->autonomy.allowed_paths_len = 0;
     cfg->diagnostics.backend = hu_strdup(a, "none");
-    if (!cfg->diagnostics.backend)
+    if (!cfg->diagnostics.backend) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->diagnostics.otel_endpoint = NULL;
     cfg->diagnostics.otel_service_name = NULL;
     cfg->diagnostics.log_tool_calls = false;
@@ -87,8 +159,10 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->agent.max_history_messages = 100;
     cfg->agent.parallel_tools = false;
     cfg->agent.tool_dispatcher = hu_strdup(a, "auto");
-    if (!cfg->agent.tool_dispatcher)
+    if (!cfg->agent.tool_dispatcher) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->agent.token_limit = HU_DEFAULT_AGENT_TOKEN_LIMIT;
     cfg->agent.session_idle_timeout_secs = 1800;
     cfg->agent.compaction_keep_recent = 20;
@@ -126,18 +200,24 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->router.complexity_low = 50;
     cfg->router.complexity_high = 500;
     cfg->runtime.kind = hu_strdup(a, "native");
-    if (!cfg->runtime.kind)
+    if (!cfg->runtime.kind) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->runtime.docker_image = NULL;
     cfg->runtime.gce_project = NULL;
     cfg->runtime.gce_zone = NULL;
     cfg->runtime.gce_instance = NULL;
     cfg->memory.profile = hu_strdup(a, "markdown_only");
-    if (!cfg->memory.profile)
+    if (!cfg->memory.profile) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->memory.backend = hu_strdup(a, "markdown");
-    if (!cfg->memory.backend)
+    if (!cfg->memory.backend) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->memory.auto_save = true;
     cfg->memory.consolidation_interval_hours = 24;
     cfg->memory.sqlite_path = NULL;
@@ -150,18 +230,24 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
      * hu_config_parse_json (global then workspace in config_load_impl) overlays
      * only keys present in each file — no separate merge pass. */
     cfg->auto_update = hu_strdup(a, "off");
-    if (!cfg->auto_update)
+    if (!cfg->auto_update) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->update_check_interval_hours = 24;
     cfg->tunnel.provider = hu_strdup(a, "none");
-    if (!cfg->tunnel.provider)
+    if (!cfg->tunnel.provider) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->tunnel.domain = NULL;
     cfg->gateway.enabled = true;
     cfg->gateway.port = 3000;
     cfg->gateway.host = hu_strdup(a, "127.0.0.1");
-    if (!cfg->gateway.host)
+    if (!cfg->gateway.host) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->gateway.require_pairing = true;
     cfg->gateway.auth_token = NULL;
     cfg->gateway.allow_public_bind = false;
@@ -171,8 +257,10 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->gateway.webhook_hmac_secret = NULL;
     cfg->secrets.encrypt = true;
     cfg->security.sandbox = hu_strdup(a, "auto");
-    if (!cfg->security.sandbox)
+    if (!cfg->security.sandbox) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->security.autonomy_level = 1;
     cfg->security.sandbox_config.enabled = false;
     cfg->security.sandbox_config.backend = HU_SANDBOX_AUTO;
@@ -193,8 +281,10 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->tools.max_file_size_bytes = 10485760;
     cfg->tools.web_fetch_max_chars = 100000;
     cfg->tools.web_search_provider = hu_strdup(a, "duckduckgo");
-    if (!cfg->tools.web_search_provider)
+    if (!cfg->tools.web_search_provider) {
+        set_defaults_rollback(cfg, a);
         return;
+    }
     cfg->tools.enabled_tools = NULL;
     cfg->tools.enabled_tools_len = 0;
     cfg->tools.disabled_tools = NULL;
@@ -204,6 +294,10 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->session.identity_links = NULL;
     cfg->session.identity_links_len = 0;
     cfg->identity.format = hu_strdup(a, "human");
+    if (!cfg->identity.format) {
+        set_defaults_rollback(cfg, a);
+        return;
+    }
     cfg->cost.enabled = false;
     cfg->cost.daily_limit_usd = 10.0;
     cfg->cost.monthly_limit_usd = 100.0;
@@ -214,6 +308,10 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->peripherals.datasheet_dir = NULL;
     cfg->hardware.enabled = false;
     cfg->hardware.transport = hu_strdup(a, "none");
+    if (!cfg->hardware.transport) {
+        set_defaults_rollback(cfg, a);
+        return;
+    }
     cfg->hardware.baud_rate = 115200;
     cfg->cron.enabled = false;
     cfg->cron.interval_minutes = 30;
@@ -231,7 +329,15 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->behavior.tapback_skip_pct = 20;
     cfg->nodes_len = 1;
     cfg->nodes[0].name = hu_strdup(a, "local");
+    if (!cfg->nodes[0].name) {
+        set_defaults_rollback(cfg, a);
+        return;
+    }
     cfg->nodes[0].status = hu_strdup(a, "online");
+    if (!cfg->nodes[0].status) {
+        set_defaults_rollback(cfg, a);
+        return;
+    }
 }
 
 static void sync_autonomy_level_from_string(hu_config_t *cfg) {
@@ -269,15 +375,27 @@ static hu_error_t load_json_file(hu_config_t *cfg, const char *path) {
         return (errno == ENOENT) ? HU_ERR_CONFIG_NOT_FOUND : HU_ERR_IO;
     hu_allocator_t *a = &cfg->allocator;
     hu_error_t err = HU_OK;
-    fseek(f, 0, SEEK_END);
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return HU_ERR_IO;
+    }
     long sz = ftell(f);
-    fseek(f, 0, SEEK_SET);
+    if (sz < 0) {
+        fclose(f);
+        return HU_ERR_IO;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return HU_ERR_IO;
+    }
     if (sz > 0 && sz < 65536) {
         char *buf = (char *)a->alloc(a->ctx, (size_t)sz + 1);
         if (buf) {
             size_t read_len = fread(buf, 1, (size_t)sz, f);
             buf[read_len] = '\0';
             err = hu_config_parse_json(cfg, buf, read_len);
+        } else {
+            err = HU_ERR_OUT_OF_MEMORY;
         }
     }
     fclose(f);
@@ -382,8 +500,12 @@ static hu_error_t config_load_impl(hu_allocator_t *backing, hu_config_t *out,
         char workspace_cfg[HU_MAX_PATH];
         int wn = snprintf(workspace_cfg, sizeof(workspace_cfg), "%s/%s/%s", cwd, HU_CONFIG_DIR,
                           HU_CONFIG_FILE);
-        if (wn > 0 && (size_t)wn < sizeof(workspace_cfg))
-            load_json_file(out, workspace_cfg);
+        if (wn > 0 && (size_t)wn < sizeof(workspace_cfg)) {
+            hu_error_t ws_err = load_json_file(out, workspace_cfg);
+            if (ws_err != HU_OK && ws_err != HU_ERR_CONFIG_NOT_FOUND)
+                hu_log_warn("config", NULL, "workspace config load failed: %s",
+                            hu_error_string(ws_err));
+        }
     }
 
     hu_config_apply_env_overrides(out);

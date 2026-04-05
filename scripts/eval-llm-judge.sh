@@ -12,7 +12,10 @@ cd "$ROOT"
 BUILD="${BUILD:-build}"
 BINARY="$BUILD/human"
 VERBOSE="${1:-}"
-PROJECT="johnb-2025"
+PROJECT="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null || echo "")}"
+if [ -z "$PROJECT" ]; then
+    echo "Error: set GCP_PROJECT or run 'gcloud config set project <id>'." >&2; exit 1
+fi
 MODEL="gemini-3.1-flash-lite-preview"
 ENDPOINT="https://aiplatform.googleapis.com/v1/projects/$PROJECT/locations/global/publishers/google/models/$MODEL:generateContent"
 
@@ -52,7 +55,8 @@ import sys, json
 try:
     d = json.load(sys.stdin)
     print(d['candidates'][0]['content']['parts'][0]['text'])
-except: print('ERROR: could not parse response')
+except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
+    print('ERROR: could not parse response (' + str(e) + ')')
 " 2>/dev/null
 }
 
@@ -125,7 +129,7 @@ echo ""
 echo "============================================"
 echo "  h-uman LLM-as-Judge Eval"
 echo "============================================"
-echo "  Chatbot: $BINARY ($(./build/human --version 2>&1))"
+echo "  Chatbot: $BINARY ($($BINARY --version 2>&1))"
 echo "  Judge: Gemini ($MODEL via Vertex AI)"
 echo "  Scoring: 5 axes x 10 points = 50 max"
 echo ""
@@ -180,4 +184,5 @@ else
 fi
 echo "============================================"
 echo ""
+[ "$fail" -gt 125 ] && fail=125
 exit "$fail"

@@ -206,6 +206,7 @@ static void imessage_vtable_has_all_expected_hooks(void) {
     HU_ASSERT_NOT_NULL(ch.vtable->get_latest_attachment_path);
     HU_ASSERT_NOT_NULL(ch.vtable->build_reaction_context);
     HU_ASSERT_NOT_NULL(ch.vtable->build_read_receipt_context);
+    HU_ASSERT_NOT_NULL(ch.vtable->mark_read);
     HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
     HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
     hu_imessage_destroy(&ch);
@@ -829,6 +830,167 @@ static void imessage_gif_style_hint_for_friend(void) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * PART 13 — Effect mapping, balloon classification, mark_read, use_imsg_cli
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void imessage_effect_name_slam(void) {
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.MobileSMS.expressivesend.impact"), "Slam");
+}
+
+static void imessage_effect_name_all_known(void) {
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.MobileSMS.expressivesend.loud"), "Loud");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.MobileSMS.expressivesend.gentle"),
+                      "Gentle");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.MobileSMS.expressivesend.invisibleink"),
+                      "Invisible Ink");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKConfettiEffect"),
+                      "Confetti");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKEchoEffect"), "Echo");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKFireworksEffect"),
+                      "Fireworks");
+    HU_ASSERT_STR_EQ(
+        hu_imessage_effect_name("com.apple.messages.effect.CKHappyBirthdayEffect"),
+        "Happy Birthday");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKHeartEffect"), "Heart");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKLasersEffect"),
+                      "Lasers");
+    HU_ASSERT_STR_EQ(
+        hu_imessage_effect_name("com.apple.messages.effect.CKShootingStarEffect"),
+        "Shooting Star");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKSparklesEffect"),
+                      "Sparkles");
+    HU_ASSERT_STR_EQ(
+        hu_imessage_effect_name("com.apple.messages.effect.CKSpotlightEffect"), "Spotlight");
+}
+
+static void imessage_effect_name_null_and_unknown(void) {
+    HU_ASSERT_NULL(hu_imessage_effect_name(NULL));
+    HU_ASSERT_NULL(hu_imessage_effect_name(""));
+    HU_ASSERT_NULL(hu_imessage_effect_name("com.apple.unknown.effect"));
+}
+
+static void imessage_balloon_label_sticker(void) {
+    HU_ASSERT_STR_EQ(
+        hu_imessage_balloon_label(
+            "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:"
+            "com.apple.Stickers.UserGenerated.StickerPack"),
+        "[Sticker]");
+}
+
+static void imessage_balloon_label_memoji(void) {
+    HU_ASSERT_STR_EQ(
+        hu_imessage_balloon_label(
+            "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:"
+            "com.apple.Animoji.StickersApp.MessagesExtension"),
+        "[Memoji]");
+    HU_ASSERT_STR_EQ(hu_imessage_balloon_label("some.Memoji.plugin"), "[Memoji]");
+}
+
+static void imessage_balloon_label_app(void) {
+    HU_ASSERT_STR_EQ(hu_imessage_balloon_label("com.example.app"), "[iMessage App]");
+}
+
+static void imessage_balloon_label_null_and_empty(void) {
+    HU_ASSERT_NULL(hu_imessage_balloon_label(NULL));
+    HU_ASSERT_NULL(hu_imessage_balloon_label(""));
+}
+
+static void imessage_text_is_placeholder_true_cases(void) {
+    HU_ASSERT_TRUE(hu_imessage_text_is_placeholder(NULL));
+    HU_ASSERT_TRUE(hu_imessage_text_is_placeholder(""));
+    HU_ASSERT_TRUE(hu_imessage_text_is_placeholder("[Photo]"));
+    HU_ASSERT_TRUE(hu_imessage_text_is_placeholder("[Video]"));
+    HU_ASSERT_TRUE(hu_imessage_text_is_placeholder("[Voice Message]"));
+}
+
+static void imessage_text_is_placeholder_false_cases(void) {
+    HU_ASSERT_FALSE(hu_imessage_text_is_placeholder("Hello!"));
+    HU_ASSERT_FALSE(hu_imessage_text_is_placeholder("Check this out"));
+    HU_ASSERT_FALSE(hu_imessage_text_is_placeholder("[Photo] extra text"));
+    HU_ASSERT_FALSE(hu_imessage_text_is_placeholder("photo"));
+}
+
+static void imessage_copy_bounded_normal(void) {
+    char dst[32];
+    size_t n = hu_imessage_copy_bounded(dst, sizeof(dst), "hello", 5);
+    HU_ASSERT_EQ(n, 5);
+    HU_ASSERT_STR_EQ(dst, "hello");
+}
+
+static void imessage_copy_bounded_truncates(void) {
+    char dst[4];
+    size_t n = hu_imessage_copy_bounded(dst, sizeof(dst), "hello world", 11);
+    HU_ASSERT_EQ(n, 3);
+    HU_ASSERT_STR_EQ(dst, "hel");
+}
+
+static void imessage_copy_bounded_exact_fit(void) {
+    char dst[6];
+    size_t n = hu_imessage_copy_bounded(dst, sizeof(dst), "hello", 5);
+    HU_ASSERT_EQ(n, 5);
+    HU_ASSERT_STR_EQ(dst, "hello");
+}
+
+static void imessage_copy_bounded_null_and_empty(void) {
+    char dst[16] = "dirty";
+    HU_ASSERT_EQ(hu_imessage_copy_bounded(dst, sizeof(dst), NULL, 0), 0);
+    HU_ASSERT_EQ(dst[0], '\0');
+
+    dst[0] = 'x';
+    HU_ASSERT_EQ(hu_imessage_copy_bounded(dst, sizeof(dst), "", 0), 0);
+    HU_ASSERT_EQ(dst[0], '\0');
+
+    HU_ASSERT_EQ(hu_imessage_copy_bounded(NULL, 0, "hello", 5), 0);
+}
+
+#if HU_IS_TEST
+static void imessage_typing_returns_ok_under_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->start_typing(ch.ctx, "+15551234567", 12), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->stop_typing(ch.ctx, "+15551234567", 12), HU_OK);
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_typing_null_ctx_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    (void)ch.vtable->start_typing(NULL, "+15551234567", 12);
+    (void)ch.vtable->stop_typing(NULL, "+15551234567", 12);
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_set_use_imsg_cli_wires_to_context(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    hu_imessage_set_use_imsg_cli(&ch, true);
+    hu_imessage_set_use_imsg_cli(&ch, false);
+    hu_imessage_set_use_imsg_cli(NULL, true);
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_mark_read_returns_ok_under_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    HU_ASSERT_NOT_NULL(ch.vtable->mark_read);
+    HU_ASSERT_EQ(ch.vtable->mark_read(ch.ctx, "+15551234567", 12), HU_OK);
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_mark_read_null_ctx_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    (void)ch.vtable->mark_read(NULL, "+15551234567", 12);
+    hu_imessage_destroy(&ch);
+}
+#endif
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * Suite registration
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -938,6 +1100,28 @@ void run_imessage_adversarial_tests(void) {
     HU_RUN_TEST(imessage_link_context_detects_url);
     HU_RUN_TEST(imessage_emoji_mirror_hint_exists);
     HU_RUN_TEST(imessage_gif_style_hint_for_friend);
+
+    /* Part 13: Effect mapping, balloon labels, mark_read, use_imsg_cli */
+    HU_RUN_TEST(imessage_effect_name_slam);
+    HU_RUN_TEST(imessage_effect_name_all_known);
+    HU_RUN_TEST(imessage_effect_name_null_and_unknown);
+    HU_RUN_TEST(imessage_balloon_label_sticker);
+    HU_RUN_TEST(imessage_balloon_label_memoji);
+    HU_RUN_TEST(imessage_balloon_label_app);
+    HU_RUN_TEST(imessage_balloon_label_null_and_empty);
+    HU_RUN_TEST(imessage_text_is_placeholder_true_cases);
+    HU_RUN_TEST(imessage_text_is_placeholder_false_cases);
+    HU_RUN_TEST(imessage_copy_bounded_normal);
+    HU_RUN_TEST(imessage_copy_bounded_truncates);
+    HU_RUN_TEST(imessage_copy_bounded_exact_fit);
+    HU_RUN_TEST(imessage_copy_bounded_null_and_empty);
+#if HU_IS_TEST
+    HU_RUN_TEST(imessage_mark_read_returns_ok_under_test);
+    HU_RUN_TEST(imessage_mark_read_null_ctx_no_crash);
+    HU_RUN_TEST(imessage_typing_returns_ok_under_test);
+    HU_RUN_TEST(imessage_typing_null_ctx_no_crash);
+    HU_RUN_TEST(imessage_set_use_imsg_cli_wires_to_context);
+#endif
 }
 #else  /* !HU_HAS_IMESSAGE */
 void run_imessage_adversarial_tests(void) {

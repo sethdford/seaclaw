@@ -58,6 +58,8 @@ static hu_error_t database_execute(void *ctx, hu_allocator_t *alloc, const hu_js
     sqlite3 *db = NULL;
     int flags = (strcmp(action, "execute") == 0) ? SQLITE_OPEN_READWRITE : SQLITE_OPEN_READONLY;
     if (sqlite3_open_v2(db_path, &db, flags, NULL) != SQLITE_OK) {
+        if (db)
+            sqlite3_close(db);
         *out = hu_tool_result_fail("cannot open database", 20);
         return HU_OK;
     }
@@ -66,21 +68,41 @@ static hu_error_t database_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         const char *tq = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name";
         sqlite3_stmt *stmt = NULL;
         if (sqlite3_prepare_v2(db, tq, -1, &stmt, NULL) == SQLITE_OK) {
-            size_t cap = 256;
+            size_t cap = 512;
             char *buf = (char *)alloc->alloc(alloc->ctx, cap);
             size_t off = 0;
             if (buf) {
-                off += (size_t)snprintf(buf + off, cap - off, "{\"tables\":[");
+                off = hu_buf_appendf(buf, cap, off, "{\"tables\":[");
                 int first = 1;
                 while (sqlite3_step(stmt) == SQLITE_ROW) {
                     const char *nm = (const char *)sqlite3_column_text(stmt, 0);
+                    size_t nm_len = nm ? strlen(nm) : 0;
+                    while (off + nm_len + 8 > cap) {
+                        size_t ncap = cap * 2;
+                        if (ncap < off + nm_len + 64)
+                            ncap = off + nm_len + 64;
+                        void *nb = alloc->realloc(alloc->ctx, buf, cap, ncap);
+                        if (!nb) {
+                            alloc->free(alloc->ctx, buf, cap);
+                            buf = NULL;
+                            break;
+                        }
+                        buf = (char *)nb;
+                        cap = ncap;
+                    }
+                    if (!buf)
+                        break;
                     if (!first && off < cap)
                         buf[off++] = ',';
-                    off += (size_t)snprintf(buf + off, cap - off, "\"%s\"", nm ? nm : "");
+                    off = hu_buf_appendf(buf, cap, off, "\"%s\"", nm ? nm : "");
                     first = 0;
                 }
-                off += (size_t)snprintf(buf + off, cap - off, "]}");
-                *out = hu_tool_result_ok_owned(buf, off);
+                if (buf) {
+                    off = hu_buf_appendf(buf, cap, off, "]}");
+                    *out = hu_tool_result_ok_owned(buf, off);
+                } else {
+                    *out = hu_tool_result_fail("out of memory", 12);
+                }
             } else {
                 *out = hu_tool_result_fail("out of memory", 12);
             }

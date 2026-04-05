@@ -144,7 +144,13 @@ static hu_error_t codex_cli_chat(void *ctx, hu_allocator_t *alloc, const hu_chat
     out->content = hu_strndup(alloc, content, len);
     out->content_len = len;
     out->model = hu_strndup(alloc, "codex-cli", 9);
-    out->model_len = 9;
+    out->model_len = out->model ? 9 : 0;
+    if (!out->model) {
+        if (out->content)
+            alloc->free(alloc->ctx, (void *)out->content, out->content_len + 1);
+        memset(out, 0, sizeof(*out));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
     return HU_OK;
 #else
 #ifdef HU_GATEWAY_POSIX
@@ -165,7 +171,12 @@ static hu_error_t codex_cli_chat(void *ctx, hu_allocator_t *alloc, const hu_chat
         out->content = text;
         out->content_len = text_len;
         out->model = hu_strndup(alloc, "codex-cli", 9);
-        out->model_len = 9;
+        out->model_len = out->model ? 9 : 0;
+        if (!out->model) {
+            alloc->free(alloc->ctx, (void *)out->content, out->content_len + 1);
+            memset(out, 0, sizeof(*out));
+            return HU_ERR_OUT_OF_MEMORY;
+        }
         return HU_OK;
     }
 #else
@@ -221,6 +232,10 @@ hu_error_t hu_codex_cli_create(hu_allocator_t *alloc, const char *api_key, size_
         return HU_ERR_OUT_OF_MEMORY;
     memset(c, 0, sizeof(*c));
     c->model = hu_strndup(alloc, HU_CODEX_DEFAULT_MODEL, sizeof(HU_CODEX_DEFAULT_MODEL) - 1);
+    if (!c->model) {
+        alloc->free(alloc->ctx, c, sizeof(*c));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
     c->model_len = sizeof(HU_CODEX_DEFAULT_MODEL) - 1;
     out->ctx = c;
     out->vtable = &codex_cli_vtable;

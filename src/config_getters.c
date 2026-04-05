@@ -27,6 +27,8 @@ bool hu_config_provider_requires_api_key(const char *provider) {
         return false;
     if (strcmp(provider, "sglang") == 0)
         return false;
+    if (strcmp(provider, "mlx_local") == 0 || strcmp(provider, "mlx-local") == 0)
+        return false;
     if (strcmp(provider, "vertex") == 0)
         return false;
     if (strcmp(provider, "ensemble") == 0)

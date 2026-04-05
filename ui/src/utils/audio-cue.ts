@@ -23,11 +23,14 @@ export function playAudioCue(type: "send" | "receive" | "success" | "error"): vo
     osc.connect(gain);
     gain.connect(ctx.destination);
 
-    const configs: Record<string, { freq: number; duration: number; wave: OscillatorType; vol: number }> = {
+    const configs: Record<
+      string,
+      { freq: number; duration: number; wave: OscillatorType; vol: number }
+    > = {
       send: { freq: 880, duration: 0.05, wave: "triangle", vol: 0.06 },
       receive: { freq: 660, duration: 0.08, wave: "sine", vol: 0.05 },
       success: { freq: 880, duration: 0.12, wave: "sine", vol: 0.06 },
-      error: { freq: 330, duration: 0.10, wave: "sawtooth", vol: 0.04 },
+      error: { freq: 330, duration: 0.1, wave: "sawtooth", vol: 0.04 },
     };
 
     const cfg = configs[type] ?? configs.send;

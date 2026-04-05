@@ -271,40 +271,42 @@ hu_error_t hu_usage_tracker_format_report(const hu_usage_tracker_t *tracker,
     size_t offset = 0;
 
     /* Header */
-    offset += snprintf(buffer + offset, sizeof(buffer) - offset,
-                       "Session cost: $%.4f\n", total_cost);
+    offset = hu_buf_appendf(buffer, sizeof(buffer), offset,
+                            "Session cost: $%.4f\n", total_cost);
 
     /* Per-model breakdown */
     for (size_t i = 0; i < breakdown_count; i++) {
         const hu_model_usage_t *mu = &breakdown[i];
-        offset += snprintf(
-            buffer + offset, sizeof(buffer) - offset,
+        offset = hu_buf_appendf(
+            buffer, sizeof(buffer), offset,
             "  %s: %llu in / %llu out", mu->model_name,
             (unsigned long long)mu->input_tokens, (unsigned long long)mu->output_tokens);
 
         if (mu->cache_read_tokens > 0 || mu->cache_write_tokens > 0) {
-            offset += snprintf(buffer + offset, sizeof(buffer) - offset, " / %llu cache_r / %llu cache_w",
-                             (unsigned long long)mu->cache_read_tokens,
-                             (unsigned long long)mu->cache_write_tokens);
+            offset = hu_buf_appendf(buffer, sizeof(buffer), offset,
+                                    " / %llu cache_r / %llu cache_w",
+                                    (unsigned long long)mu->cache_read_tokens,
+                                    (unsigned long long)mu->cache_write_tokens);
         }
 
-        offset += snprintf(buffer + offset, sizeof(buffer) - offset, " ($%.4f, %zu req)\n",
-                          mu->estimated_cost_usd, mu->request_count);
+        offset = hu_buf_appendf(buffer, sizeof(buffer), offset,
+                                " ($%.4f, %zu req)\n",
+                                mu->estimated_cost_usd, mu->request_count);
     }
 
     /* Totals */
-    offset += snprintf(buffer + offset, sizeof(buffer) - offset,
-                       "Total: %llu input / %llu output tokens",
-                       (unsigned long long)totals.input_tokens,
-                       (unsigned long long)totals.output_tokens);
+    offset = hu_buf_appendf(buffer, sizeof(buffer), offset,
+                            "Total: %llu input / %llu output tokens",
+                            (unsigned long long)totals.input_tokens,
+                            (unsigned long long)totals.output_tokens);
 
     if (totals.cache_read_tokens > 0 || totals.cache_write_tokens > 0) {
-        offset += snprintf(buffer + offset, sizeof(buffer) - offset,
-                          " / %llu cache_read / %llu cache_write",
-                          (unsigned long long)totals.cache_read_tokens,
-                          (unsigned long long)totals.cache_write_tokens);
+        offset = hu_buf_appendf(buffer, sizeof(buffer), offset,
+                                " / %llu cache_read / %llu cache_write",
+                                (unsigned long long)totals.cache_read_tokens,
+                                (unsigned long long)totals.cache_write_tokens);
     }
-    offset += snprintf(buffer + offset, sizeof(buffer) - offset, "\n");
+    offset = hu_buf_appendf(buffer, sizeof(buffer), offset, "\n");
 
     *out = hu_strndup(alloc, buffer, offset);
     *out_len = *out ? offset : 0;

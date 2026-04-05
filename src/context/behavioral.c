@@ -245,16 +245,16 @@ hu_error_t hu_mirror_build_directive(hu_allocator_t *alloc, const hu_mirror_anal
     int first = 1;
     if (analysis->uses_lowercase) {
         if (!first)
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " ");
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                                "They type in lowercase — match their style.");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, " ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "They type in lowercase — match their style.");
         first = 0;
     }
     if (analysis->uses_abbreviations) {
         if (!first)
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " ");
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                                "They use abbreviations — ok to use 'u' and 'rn'.");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, " ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "They use abbreviations — ok to use 'u' and 'rn'.");
         first = 0;
     }
     if (analysis->avg_msg_length > 0.0) {
@@ -262,8 +262,8 @@ hu_error_t hu_mirror_build_directive(hu_allocator_t *alloc, const hu_mirror_anal
         if (n < 1)
             n = 1;
         if (!first)
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, " ");
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Keep messages around %d chars.", n);
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, " ");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "Keep messages around %d chars.", n);
         first = 0;
     }
     if (pos >= sizeof(buf))

@@ -103,7 +103,7 @@ export class ScSwitch extends LitElement {
 
   private _onClick(): void {
     if (this.disabled) return;
-    hapticFeedback('light');
+    hapticFeedback("light");
     this._hasToggled = true;
     this.checked = !this.checked;
     this.dispatchEvent(

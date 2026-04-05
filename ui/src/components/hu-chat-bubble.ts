@@ -131,7 +131,8 @@ export class ScChatBubble extends LitElement {
       background: var(--hu-surface-container-high);
       color: var(--hu-text);
       border-radius: var(--hu-radius-xl) var(--hu-radius-xl) var(--hu-radius-sm) var(--hu-radius-xl);
-      animation: hu-bubble-send var(--hu-duration-normal)
+      animation:
+        hu-bubble-send var(--hu-duration-normal)
           var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both,
         hu-send-confirm var(--hu-duration-slow) var(--hu-ease-out) both;
     }

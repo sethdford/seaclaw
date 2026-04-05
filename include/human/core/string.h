@@ -20,4 +20,9 @@ int hu_str_index_of(hu_str_t haystack, hu_str_t needle);
 /* Portable case-insensitive substring search (like GNU strcasestr). */
 char *hu_strcasestr(const char *haystack, const char *needle);
 
+/* Bounded buffer append — returns new offset, clamped to cap on truncation.
+   Prevents the pos+=snprintf overflow pattern. */
+size_t hu_buf_appendf(char *buf, size_t cap, size_t off, const char *fmt, ...)
+    __attribute__((format(printf, 4, 5)));
+
 #endif

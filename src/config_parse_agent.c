@@ -246,8 +246,23 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
     }
 
     hu_json_value_t *ct_obj = hu_json_object_get(obj, "persona_contacts");
-    if (ct_obj && ct_obj->type == HU_JSON_OBJECT && ct_obj->data.object.pairs) {
-        size_t n = ct_obj->data.object.len;
+    if (ct_obj && ct_obj->type == HU_JSON_OBJECT) {
+        /* Free previous persona_contacts to prevent leak on config reload */
+        if (cfg->agent.persona_contacts && cfg->agent.persona_contacts_count > 0) {
+            for (size_t i = 0; i < cfg->agent.persona_contacts_count; i++) {
+                if (cfg->agent.persona_contacts[i].channel)
+                    a->free(a->ctx, cfg->agent.persona_contacts[i].channel,
+                            strlen(cfg->agent.persona_contacts[i].channel) + 1);
+                if (cfg->agent.persona_contacts[i].persona)
+                    a->free(a->ctx, cfg->agent.persona_contacts[i].persona,
+                            strlen(cfg->agent.persona_contacts[i].persona) + 1);
+            }
+            a->free(a->ctx, cfg->agent.persona_contacts,
+                    cfg->agent.persona_contacts_count * sizeof(hu_persona_channel_entry_t));
+            cfg->agent.persona_contacts = NULL;
+            cfg->agent.persona_contacts_count = 0;
+        }
+        size_t n = ct_obj->data.object.pairs ? ct_obj->data.object.len : 0;
         if (n > 0) {
             hu_persona_channel_entry_t *arr = (hu_persona_channel_entry_t *)a->alloc(
                 a->ctx, n * sizeof(hu_persona_channel_entry_t));
@@ -265,13 +280,19 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
                         count++;
                     else {
                         if (arr[count].channel)
-                            a->free(a->ctx, arr[count].channel, strlen(arr[count].channel) + 1);
+                            a->free(a->ctx, arr[count].channel,
+                                    strlen(arr[count].channel) + 1);
                         if (arr[count].persona)
-                            a->free(a->ctx, arr[count].persona, strlen(arr[count].persona) + 1);
+                            a->free(a->ctx, arr[count].persona,
+                                    strlen(arr[count].persona) + 1);
                     }
                 }
-                cfg->agent.persona_contacts = arr;
-                cfg->agent.persona_contacts_count = count;
+                if (count > 0) {
+                    cfg->agent.persona_contacts = arr;
+                    cfg->agent.persona_contacts_count = count;
+                } else {
+                    a->free(a->ctx, arr, n * sizeof(hu_persona_channel_entry_t));
+                }
             }
         }
     }

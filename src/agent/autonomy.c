@@ -1,4 +1,5 @@
 #include "human/agent/autonomy.h"
+#include "human/core/string.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -151,31 +152,26 @@ hu_error_t hu_autonomy_externalize_state(const hu_autonomy_state_t *state,
     if (!state || !buf || !out_len || buf_size < 32)
         return HU_ERR_INVALID_ARGUMENT;
 
-    int pos = snprintf(buf, buf_size, "{\"goals\":%zu,\"budget\":%zu,\"used\":%zu,\"items\":[",
-                       state->goal_count, state->context_budget, state->context_tokens_used);
-    if (pos < 0 || (size_t)pos >= buf_size)
+    int w = snprintf(buf, buf_size, "{\"goals\":%zu,\"budget\":%zu,\"used\":%zu,\"items\":[",
+                     state->goal_count, state->context_budget, state->context_tokens_used);
+    if (w < 0 || (size_t)w >= buf_size)
         return HU_ERR_INVALID_ARGUMENT;
+    size_t pos = (size_t)w;
 
-    for (size_t i = 0; i < state->goal_count && (size_t)pos < buf_size - 64; i++) {
+    for (size_t i = 0; i < state->goal_count && pos < buf_size - 64; i++) {
         const hu_autonomy_goal_t *g = &state->goals[i];
-        if (i > 0 && (size_t)pos < buf_size - 1)
+        if (i > 0 && pos < buf_size - 1)
             buf[pos++] = ',';
-        int n = snprintf(buf + pos, buf_size - (size_t)pos,
-                         "{\"d\":\"%.*s\",\"p\":%.2f,\"c\":%s}",
-                         (int)(g->description_len < 80 ? g->description_len : 80),
-                         g->description,
-                         g->priority,
-                         g->completed ? "true" : "false");
-        if (n > 0)
-            pos += n;
+        pos = hu_buf_appendf(buf, buf_size, pos,
+                             "{\"d\":\"%.*s\",\"p\":%.2f,\"c\":%s}",
+                             (int)(g->description_len < 80 ? g->description_len : 80),
+                             g->description,
+                             g->priority,
+                             g->completed ? "true" : "false");
     }
 
-    if ((size_t)pos < buf_size - 2) {
-        buf[pos++] = ']';
-        buf[pos++] = '}';
-        buf[pos] = '\0';
-    }
-    *out_len = (size_t)pos;
+    pos = hu_buf_appendf(buf, buf_size, pos, "]}");
+    *out_len = pos;
     return HU_OK;
 }
 

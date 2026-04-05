@@ -146,7 +146,8 @@ hu_error_t cp_admin_connect(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_
                                           "turing.trend",
                                           "turing.dimensions",
                                           "mcp.resources.list",
-                                          "mcp.prompts.list"};
+                                          "mcp.prompts.list",
+                                          "models.decisions"};
     for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
         hu_json_value_t *m = hu_json_string_new(alloc, methods[i], strlen(methods[i]));
         if (!m) {
@@ -550,6 +551,10 @@ hu_error_t cp_admin_models_list(hu_allocator_t *alloc, hu_app_context_t *app, hu
         return HU_ERR_OUT_OF_MEMORY;
 
     hu_json_value_t *arr = hu_json_array_new(alloc);
+    if (!arr) {
+        hu_json_free(alloc, obj);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
 
     if (app && app->config && app->config->providers) {
         for (size_t i = 0; i < app->config->providers_len; i++) {
@@ -589,9 +594,14 @@ hu_error_t cp_admin_models_decisions(hu_allocator_t *alloc, hu_app_context_t *ap
     if (!obj)
         return HU_ERR_OUT_OF_MEMORY;
 
-    hu_route_global_log_lock();
     hu_route_decision_log_t *log = hu_route_global_log();
+    hu_route_global_log_lock();
     hu_json_value_t *arr = hu_json_array_new(alloc);
+    if (!arr) {
+        hu_route_global_log_unlock();
+        hu_json_free(alloc, obj);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
 
     size_t count = hu_route_log_count(log);
     for (size_t i = 0; i < count; i++) {
@@ -599,6 +609,8 @@ hu_error_t cp_admin_models_decisions(hu_allocator_t *alloc, hu_app_context_t *ap
         if (!d)
             continue;
         hu_json_value_t *entry = hu_json_object_new(alloc);
+        if (!entry)
+            continue;
         cp_json_set_str(alloc, entry, "tier", hu_cognitive_tier_str(d->tier));
         cp_json_set_str(alloc, entry, "source", hu_route_source_str(d->source));
         cp_json_set_str(alloc, entry, "model", d->model);
@@ -616,6 +628,10 @@ hu_error_t cp_admin_models_decisions(hu_allocator_t *alloc, hu_app_context_t *ap
     hu_route_log_tier_counts(log, tier_counts);
     hu_route_global_log_unlock();
     hu_json_value_t *dist = hu_json_object_new(alloc);
+    if (!dist) {
+        hu_json_free(alloc, obj);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
     hu_json_object_set(alloc, dist, "reflexive",
                        hu_json_number_new(alloc, (double)tier_counts[HU_TIER_REFLEXIVE]));
     hu_json_object_set(alloc, dist, "conversational",

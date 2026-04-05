@@ -1,4 +1,5 @@
 /* Gateway edge cases + control protocol + event bridge tests. */
+#include "human/agent/model_router.h"
 #include "human/bus.h"
 #include "human/config.h"
 #include "human/core/allocator.h"
@@ -1197,6 +1198,35 @@ static void test_openai_compat_models_null_config_503(void) {
         alloc.free(alloc.ctx, resp, resp_len + 1);
 }
 
+static void test_rpc_models_decisions_returns_valid_json(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+
+    /* Seed the global route log with one entry so the response is non-empty.
+     * hu_route_global_log() acquires the mutex internally, so call it BEFORE lock. */
+    hu_model_selection_t sel;
+    memset(&sel, 0, sizeof(sel));
+    sel.tier = HU_TIER_CONVERSATIONAL;
+    sel.source = HU_ROUTE_HEURISTIC;
+    sel.model = "gemini-3-flash-preview";
+    sel.model_len = 22;
+    hu_route_decision_log_t *rlog = hu_route_global_log();
+    hu_route_global_log_lock();
+    hu_route_log_record(rlog, &sel, 3, 1000);
+    hu_route_global_log_unlock();
+
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = cp_admin_models_decisions(&alloc, NULL, NULL, NULL, NULL, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(out_len > 0);
+    HU_ASSERT_TRUE(strstr(out, "\"decisions\"") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "\"total\"") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "\"tier_distribution\"") != NULL);
+    HU_ASSERT_TRUE(strstr(out, "\"conversational\"") != NULL);
+    alloc.free(alloc.ctx, out, out_len + 1);
+}
+
 void run_gateway_extended_tests(void) {
     HU_TEST_SUITE("Gateway Extended");
     HU_RUN_TEST(test_gateway_webhook_paths);
@@ -1288,6 +1318,7 @@ void run_gateway_extended_tests(void) {
     HU_RUN_TEST(test_rpc_nodes_action_missing_fields_no_crash);
     HU_RUN_TEST(test_cp_admin_nodes_action_restart_returns_mock_json);
     HU_RUN_TEST(test_event_bridge_payload_propagation);
+    HU_RUN_TEST(test_rpc_models_decisions_returns_valid_json);
 
     HU_TEST_SUITE("WS Server Extended");
     HU_RUN_TEST(test_ws_server_process_null);

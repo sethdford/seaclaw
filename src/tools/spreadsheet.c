@@ -133,16 +133,16 @@ static hu_error_t ss_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
                 return HU_ERR_OUT_OF_MEMORY;
             }
             char cell[SS_MAX_CELL];
-            int n = snprintf(msg, buf_sz,
-                             "Rows: %zu (including header)\nColumns: %zu\nHeaders: ", row_count,
-                             num_cols);
+            size_t n = hu_buf_appendf(msg, buf_sz, 0,
+                                      "Rows: %zu (including header)\nColumns: %zu\nHeaders: ",
+                                      row_count, num_cols);
             p = data;
             for (size_t c = 0; c < num_cols; c++) {
                 p = csv_next_field(p, delim, cell, sizeof(cell));
-                n += snprintf(msg + n, buf_sz - (size_t)n, "%s%s", c > 0 ? ", " : "", cell);
+                n = hu_buf_appendf(msg, buf_sz, n, "%s%s", c > 0 ? ", " : "", cell);
             }
-            n += snprintf(msg + n, buf_sz - (size_t)n, "\nDelimiter: '%c'", delim);
-            *out = hu_tool_result_ok_owned(msg, (size_t)n);
+            n = hu_buf_appendf(msg, buf_sz, n, "\nDelimiter: '%c'", delim);
+            *out = hu_tool_result_ok_owned(msg, n);
             return HU_OK;
         }
 
@@ -175,7 +175,7 @@ static hu_error_t ss_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
                 *out = hu_tool_result_fail("out of memory", 13);
                 return HU_ERR_OUT_OF_MEMORY;
             }
-            int n = snprintf(msg, buf_sz, "Matching rows:\n");
+            size_t n = hu_buf_appendf(msg, buf_sz, 0, "Matching rows:\n");
             size_t matches = 0;
             while (*p) {
                 while (*p == '\n' || *p == '\r')
@@ -191,9 +191,9 @@ static hu_error_t ss_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
                 }
                 if (match) {
                     size_t row_end_off = (size_t)(p - row_start);
-                    if ((size_t)n + row_end_off + 2 < buf_sz) {
+                    if (n + row_end_off + 2 < buf_sz) {
                         memcpy(msg + n, row_start, row_end_off);
-                        n += (int)row_end_off;
+                        n += row_end_off;
                         msg[n++] = '\n';
                     }
                     matches++;
@@ -201,8 +201,8 @@ static hu_error_t ss_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
                 while (*p && *p != '\n')
                     p++;
             }
-            n += snprintf(msg + n, buf_sz - (size_t)n, "Total matches: %zu", matches);
-            *out = hu_tool_result_ok_owned(msg, (size_t)n);
+            n = hu_buf_appendf(msg, buf_sz, n, "Total matches: %zu", matches);
+            *out = hu_tool_result_ok_owned(msg, n);
             return HU_OK;
         }
 

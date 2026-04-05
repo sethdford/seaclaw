@@ -49,17 +49,18 @@ static hu_error_t broadcast_execute(void *ctx, hu_allocator_t *alloc, const hu_j
         *out = hu_tool_result_fail("out of memory", 13);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    int n = snprintf(msg, buf_sz, "Broadcast to %zu channels:\n", channels->data.array.len);
+    size_t n = hu_buf_appendf(msg, buf_sz, 0, "Broadcast to %zu channels:\n",
+                              channels->data.array.len);
     for (size_t i = 0; i < channels->data.array.len; i++) {
         hu_json_value_t *entry = channels->data.array.items[i];
         if (!entry || entry->type != HU_JSON_OBJECT)
             continue;
         const char *ch = hu_json_get_string(entry, "channel");
         const char *tgt = hu_json_get_string(entry, "target");
-        n += snprintf(msg + n, buf_sz - (size_t)n, "- %s -> %s: delivered (test)\n",
-                      ch ? ch : "unknown", tgt ? tgt : "default");
+        n = hu_buf_appendf(msg, buf_sz, n, "- %s -> %s: delivered (test)\n",
+                           ch ? ch : "unknown", tgt ? tgt : "default");
     }
-    *out = hu_tool_result_ok_owned(msg, (size_t)n);
+    *out = hu_tool_result_ok_owned(msg, n);
 #else
     size_t buf_sz = 256 + channels->data.array.len * 128;
     char *msg = (char *)alloc->alloc(alloc->ctx, buf_sz);

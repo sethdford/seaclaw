@@ -68,6 +68,8 @@ hu_error_t hu_mcp_registry_add(hu_mcp_registry_t *reg, const char *name, const c
         memcpy(e->args, args, alen + 1);
     e->running = false;
     e->pid = -1;
+    e->stdin_fd = -1;
+    e->stdout_fd = -1;
     reg->count++;
     return HU_OK;
 }
@@ -115,8 +117,13 @@ hu_error_t hu_mcp_registry_start(hu_mcp_registry_t *reg, const char *name) {
     return HU_OK;
 #else
     int stdin_pipe[2], stdout_pipe[2];
-    if (pipe(stdin_pipe) != 0 || pipe(stdout_pipe) != 0)
+    if (pipe(stdin_pipe) != 0)
         return HU_ERR_IO;
+    if (pipe(stdout_pipe) != 0) {
+        close(stdin_pipe[0]);
+        close(stdin_pipe[1]);
+        return HU_ERR_IO;
+    }
 
     pid_t pid = fork();
     if (pid < 0) {
@@ -161,8 +168,8 @@ hu_error_t hu_mcp_registry_start(hu_mcp_registry_t *reg, const char *name) {
 
     close(stdin_pipe[0]);
     close(stdout_pipe[1]);
-    close(stdin_pipe[1]);
-    close(stdout_pipe[0]);
+    e->stdin_fd = stdin_pipe[1];
+    e->stdout_fd = stdout_pipe[0];
 
     e->running = true;
     e->pid = (int)pid;
@@ -191,6 +198,14 @@ hu_error_t hu_mcp_registry_stop(hu_mcp_registry_t *reg, const char *name) {
     if (e->pid > 0) {
         kill((pid_t)e->pid, SIGTERM);
         waitpid((pid_t)e->pid, NULL, 0);
+    }
+    if (e->stdin_fd >= 0) {
+        close(e->stdin_fd);
+        e->stdin_fd = -1;
+    }
+    if (e->stdout_fd >= 0) {
+        close(e->stdout_fd);
+        e->stdout_fd = -1;
     }
     e->running = false;
     e->pid = -1;

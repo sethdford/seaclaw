@@ -1,6 +1,7 @@
 #include "human/tools/vision_ocr.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/tools/validation.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
@@ -122,6 +123,16 @@ static hu_error_t vision_ocr_execute(void *ctx, hu_allocator_t *alloc,
     const char *path = hu_json_get_string(args, "image_path");
     if (!path) {
         *out = hu_tool_result_fail("missing image_path", 18);
+        return HU_OK;
+    }
+    hu_error_t verr = hu_tool_validate_path(path, NULL, 0);
+    if (verr != HU_OK) {
+        *out = hu_tool_result_fail("path traversal or invalid path", 30);
+        return HU_OK;
+    }
+    /* No workspace binding on this tool: confine absolute paths to /tmp/ (see file_read workspace). */
+    if (path[0] == '/' && strncmp(path, "/tmp/", 5) != 0) {
+        *out = hu_tool_result_fail("absolute image_path must be under /tmp/", 40);
         return HU_OK;
     }
 

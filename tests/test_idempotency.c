@@ -163,7 +163,6 @@ static void test_idempotency_clear(void) {
     HU_ASSERT_EQ(err, HU_OK);
 
     const char *tool_name = "test_tool";
-    const char *args_json = "{\"param\": \"value\"}";
     const char *result_json = "{\"output\": \"success\"}";
 
     /* Record some entries */

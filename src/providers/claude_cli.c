@@ -91,6 +91,13 @@ static hu_error_t run_claude_cli(hu_allocator_t *alloc, const char *prompt, size
     }
     close(stdin_fds[1]);
 
+    if (written < prompt_len) {
+        close(stdout_fds[0]);
+        kill(pid, SIGTERM);
+        waitpid(pid, NULL, 0);
+        return HU_ERR_IO;
+    }
+
     size_t cap = 256 * 1024;
     char *buf = (char *)alloc->alloc(alloc->ctx, cap);
     if (!buf) {
@@ -161,14 +168,14 @@ static hu_error_t claude_cli_chat_with_system(void *ctx, hu_allocator_t *alloc,
                                               double temperature, char **out, size_t *out_len) {
     (void)ctx;
     (void)temperature;
-    (void)model;
-    (void)model_len;
+
+#if HU_IS_TEST
     (void)system_prompt;
     (void)system_prompt_len;
     (void)message;
     (void)message_len;
-
-#if HU_IS_TEST
+    (void)model;
+    (void)model_len;
     const char *mock = "Hello from mock Claude CLI";
     size_t n = strlen(mock);
     char *buf = (char *)alloc->alloc(alloc->ctx, n + 1);
@@ -214,31 +221,16 @@ static hu_error_t claude_cli_chat_with_system(void *ctx, hu_allocator_t *alloc,
 #endif
 }
 
-#if !HU_IS_TEST
-__attribute__((unused))
-static const char *extract_last_user_message(const hu_chat_message_t *msgs, size_t count,
-                                             size_t *out_len) {
-    for (size_t i = count; i > 0; i--) {
-        if (msgs[i - 1].role == HU_ROLE_USER && msgs[i - 1].content &&
-            msgs[i - 1].content_len > 0) {
-            *out_len = msgs[i - 1].content_len;
-            return msgs[i - 1].content;
-        }
-    }
-    return NULL;
-}
-#endif /* !HU_IS_TEST */
-
 static hu_error_t claude_cli_chat(void *ctx, hu_allocator_t *alloc,
                                   const hu_chat_request_t *request, const char *model,
                                   size_t model_len, double temperature, hu_chat_response_t *out) {
     (void)ctx;
     (void)temperature;
+
+#if HU_IS_TEST
     (void)model;
     (void)model_len;
     (void)request;
-
-#if HU_IS_TEST
     memset(out, 0, sizeof(*out));
     const char *content = "Hello from mock Claude CLI";
     size_t len = strlen(content);

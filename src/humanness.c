@@ -132,22 +132,22 @@ char *hu_shared_references_build_directive(hu_allocator_t *alloc, const hu_share
         return NULL;
 
     char buf[2048];
-    int pos = snprintf(buf, sizeof(buf),
-                       "You share history with this person. "
-                       "If naturally relevant, weave in brief callbacks to past moments — "
-                       "not as explicit reminders, but as the shorthand that develops between "
-                       "people who know each other. Possible references:\n");
+    size_t pos = hu_buf_appendf(buf, sizeof(buf), 0,
+                                "You share history with this person. "
+                                "If naturally relevant, weave in brief callbacks to past moments — "
+                                "not as explicit reminders, but as the shorthand that develops between "
+                                "people who know each other. Possible references:\n");
 
-    for (size_t i = 0; i < count && (size_t)pos < sizeof(buf) - 200; i++) {
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos, "- \"%.*s\"\n",
-                        (int)(refs[i].reference_len > 120 ? 120 : refs[i].reference_len),
-                        refs[i].reference);
+    for (size_t i = 0; i < count && pos < sizeof(buf) - 200; i++) {
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "- \"%.*s\"\n",
+                              (int)(refs[i].reference_len > 120 ? 120 : refs[i].reference_len),
+                              refs[i].reference);
     }
-    pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                    "Use these sparingly. A single natural callback is better than "
-                    "multiple forced references.");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "Use these sparingly. A single natural callback is better than "
+                         "multiple forced references.");
 
-    size_t len = (size_t)pos;
+    size_t len = pos;
     char *result = hu_strndup(alloc, buf, len);
     if (out_len)
         *out_len = len;
@@ -474,19 +474,19 @@ char *hu_curiosity_build_directive(hu_allocator_t *alloc, const hu_curiosity_pro
         return NULL;
 
     char buf[1024];
-    int pos = snprintf(buf, sizeof(buf),
-                       "You're genuinely curious about something from their past. "
-                       "If there's a natural opening, ask — not as a scripted check-in "
-                       "but because you actually want to know:\n");
+    size_t pos = hu_buf_appendf(buf, sizeof(buf), 0,
+                                "You're genuinely curious about something from their past. "
+                                "If there's a natural opening, ask — not as a scripted check-in "
+                                "but because you actually want to know:\n");
 
-    for (size_t i = 0; i < count && (size_t)pos < sizeof(buf) - 200; i++) {
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos, "- %.*s\n",
-                        (int)prompts[i].question_len, prompts[i].question);
+    for (size_t i = 0; i < count && pos < sizeof(buf) - 200; i++) {
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "- %.*s\n",
+                             (int)prompts[i].question_len, prompts[i].question);
     }
-    pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                    "Only ask if the conversation naturally leads there. Never force it.");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "Only ask if the conversation naturally leads there. Never force it.");
 
-    size_t len = (size_t)pos;
+    size_t len = pos;
     char *result = hu_strndup(alloc, buf, len);
     if (out_len)
         *out_len = len;
@@ -582,20 +582,20 @@ char *hu_absence_build_directive(hu_allocator_t *alloc, const hu_absence_signal_
         return NULL;
 
     char buf[1024];
-    int pos = snprintf(buf, sizeof(buf),
-                       "Notice what they didn't say. They described an outcome but "
-                       "didn't share how they feel about it. If appropriate, gently "
-                       "ask about the emotional side — not clinically, but the way "
-                       "a close friend would notice the gap:\n");
+    size_t pos = hu_buf_appendf(buf, sizeof(buf), 0,
+                                "Notice what they didn't say. They described an outcome but "
+                                "didn't share how they feel about it. If appropriate, gently "
+                                "ask about the emotional side — not clinically, but the way "
+                                "a close friend would notice the gap:\n");
 
-    for (size_t i = 0; i < count && (size_t)pos < sizeof(buf) - 200; i++) {
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                        "- They mentioned \"%.*s\" but didn't address %.*s\n",
-                        (int)signals[i].topic_len, signals[i].topic,
-                        (int)signals[i].missing_aspect_len, signals[i].missing_aspect);
+    for (size_t i = 0; i < count && pos < sizeof(buf) - 200; i++) {
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "- They mentioned \"%.*s\" but didn't address %.*s\n",
+                             (int)signals[i].topic_len, signals[i].topic,
+                             (int)signals[i].missing_aspect_len, signals[i].missing_aspect);
     }
 
-    size_t len = (size_t)pos;
+    size_t len = pos;
     char *result = hu_strndup(alloc, buf, len);
     if (out_len)
         *out_len = len;
@@ -631,29 +631,29 @@ char *hu_evolved_opinion_build_directive(hu_allocator_t *alloc,
         return NULL;
 
     char buf[2048];
-    int pos = snprintf(buf, sizeof(buf),
-                       "Over time, you've developed genuine perspectives on certain topics "
-                       "through repeated conversation. These aren't reflexive agreement — "
-                       "they're positions you've arrived at through experience. "
-                       "Share them when relevant, even if the user might disagree:\n");
+    size_t pos = hu_buf_appendf(buf, sizeof(buf), 0,
+                                  "Over time, you've developed genuine perspectives on certain topics "
+                                  "through repeated conversation. These aren't reflexive agreement — "
+                                  "they're positions you've arrived at through experience. "
+                                  "Share them when relevant, even if the user might disagree:\n");
 
-    for (size_t i = 0; i < count && (size_t)pos < sizeof(buf) - 300; i++) {
+    for (size_t i = 0; i < count && pos < sizeof(buf) - 300; i++) {
         if (opinions[i].conviction < min_conviction)
             continue;
         const char *firmness = opinions[i].conviction > 0.8   ? "firmly"
                                : opinions[i].conviction > 0.5 ? "moderately"
                                                               : "tentatively";
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                        "- On \"%.*s\": you %s believe \"%.*s\" (shaped by %u conversations)\n",
-                        (int)opinions[i].topic_len, opinions[i].topic, firmness,
-                        (int)(opinions[i].stance_len > 100 ? 100 : opinions[i].stance_len),
-                        opinions[i].stance, opinions[i].interactions);
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "- On \"%.*s\": you %s believe \"%.*s\" (shaped by %u conversations)\n",
+                             (int)opinions[i].topic_len, opinions[i].topic, firmness,
+                             (int)(opinions[i].stance_len > 100 ? 100 : opinions[i].stance_len),
+                             opinions[i].stance, opinions[i].interactions);
     }
-    pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                    "Express these naturally — not as pronouncements, but as a thoughtful "
-                    "person sharing their honest take. Be open to being persuaded otherwise.");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "Express these naturally — not as pronouncements, but as a thoughtful "
+                         "person sharing their honest take. Be open to being persuaded otherwise.");
 
-    size_t len = (size_t)pos;
+    size_t len = pos;
     char *result = hu_strndup(alloc, buf, len);
     if (out_len)
         *out_len = len;

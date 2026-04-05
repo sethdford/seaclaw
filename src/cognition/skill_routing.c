@@ -1,7 +1,9 @@
 #include "human/cognition/skill_routing.h"
+#include "human/core/string.h"
 #include "human/skillforge.h"
 
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,6 +54,7 @@ hu_error_t hu_skill_routing_embed_catalog(hu_skill_routing_ctx_t *ctx,
                         skills[0].name ? skills[0].name : "",
                         skills[0].description ? skills[0].description : "");
     if (tlen < 0) tlen = 0;
+    if ((size_t)tlen >= sizeof(text_buf)) tlen = (int)(sizeof(text_buf) - 1);
 
     float *first_vec = NULL;
     size_t dims = 0;
@@ -63,7 +66,16 @@ hu_error_t hu_skill_routing_embed_catalog(hu_skill_routing_ctx_t *ctx,
     }
 
     /* Allocate flat embedding matrix */
-    size_t total = skills_count * dims * sizeof(float);
+    if (dims > SIZE_MAX / sizeof(float)) {
+        alloc->free(alloc->ctx, first_vec, 0);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    const size_t bytes_per_row = dims * sizeof(float);
+    if (skills_count > SIZE_MAX / bytes_per_row) {
+        alloc->free(alloc->ctx, first_vec, dims * sizeof(float));
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    size_t total = skills_count * bytes_per_row;
     float *embeddings = alloc->alloc(alloc->ctx, total);
     if (!embeddings) {
         alloc->free(alloc->ctx, first_vec, dims * sizeof(float));
@@ -78,6 +90,7 @@ hu_error_t hu_skill_routing_embed_catalog(hu_skill_routing_ctx_t *ctx,
                         skills[i].name ? skills[i].name : "",
                         skills[i].description ? skills[i].description : "");
         if (tlen < 0) tlen = 0;
+        if ((size_t)tlen >= sizeof(text_buf)) tlen = (int)(sizeof(text_buf) - 1);
 
         float *vec = NULL;
         size_t vdims = 0;
@@ -225,9 +238,9 @@ hu_error_t hu_skill_routing_build_catalog(hu_allocator_t *alloc,
                                            size_t skills_count,
                                            size_t top_k,
                                            char **out, size_t *out_len) {
+    /* skills/skills_count reserved for future independent filtering */
     (void)skills;
     (void)skills_count;
-    (void)top_k;
 
     if (!alloc || !blend || !out || !out_len) return HU_ERR_INVALID_ARGUMENT;
     *out = NULL;
@@ -235,24 +248,26 @@ hu_error_t hu_skill_routing_build_catalog(hu_allocator_t *alloc,
 
     if (blend->count == 0) return HU_OK;
 
-    char buf[4096];
-    int pos = 0;
+    size_t limit = top_k > 0 && top_k < blend->count ? top_k : blend->count;
 
-    for (size_t i = 0; i < blend->count && i < HU_SKILL_BLEND_MAX; i++) {
+    char buf[4096];
+    size_t pos = 0;
+
+    for (size_t i = 0; i < limit && i < HU_SKILL_BLEND_MAX; i++) {
         const hu_skill_route_t *r = &blend->routes[i];
         if (!r->skill || !r->skill->name) continue;
 
         if (i == 0) {
-            pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                            "- **%s**: %s (relevance: %.0f%%)\n",
-                            r->skill->name,
-                            r->skill->description ? r->skill->description : "",
-                            (double)(r->combined_score * 100.0f));
+            pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                                 "- **%s**: %s (relevance: %.0f%%)\n",
+                                 r->skill->name,
+                                 r->skill->description ? r->skill->description : "",
+                                 (double)(r->combined_score * 100.0f));
         } else {
-            pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                            "- %s: %s\n",
-                            r->skill->name,
-                            r->skill->description ? r->skill->description : "");
+            pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                                 "- %s: %s\n",
+                                 r->skill->name,
+                                 r->skill->description ? r->skill->description : "");
         }
     }
 

@@ -115,7 +115,6 @@ static hu_error_t parse_headers(hu_allocator_t *alloc, const hu_json_value_t *he
 
 static hu_error_t http_request_execute(void *ctx, hu_allocator_t *alloc,
                                        const hu_json_value_t *args, hu_tool_result_t *out) {
-    (void)ctx;
     if (!args || !out) {
         *out = hu_tool_result_fail("invalid args", 12);
         return HU_ERR_INVALID_ARGUMENT;
@@ -125,7 +124,24 @@ static hu_error_t http_request_execute(void *ctx, hu_allocator_t *alloc,
         *out = hu_tool_result_fail("Missing 'url' parameter", 22);
         return HU_OK;
     }
-    if (hu_tool_validate_url(url) != HU_OK) {
+
+    hu_http_request_ctx_t *hc = (hu_http_request_ctx_t *)ctx;
+    bool allow_http = hc != NULL && hc->allow_http;
+
+    hu_error_t url_err = hu_tool_validate_url(url);
+    if (url_err != HU_OK && allow_http) {
+        size_t url_len = strlen(url);
+        if (url_len >= 7 && tolower((unsigned char)url[0]) == 'h' &&
+            tolower((unsigned char)url[1]) == 't' && tolower((unsigned char)url[2]) == 't' &&
+            tolower((unsigned char)url[3]) == 'p' && url[4] == ':' && url[5] == '/' &&
+            url[6] == '/') {
+            char synthetic[8194];
+            int sn = snprintf(synthetic, sizeof(synthetic), "https://%s", url + 7);
+            if (sn > 0 && (size_t)sn < sizeof(synthetic))
+                url_err = hu_tool_validate_url(synthetic);
+        }
+    }
+    if (url_err != HU_OK) {
         *out = hu_tool_result_fail("Only HTTPS allowed, no private IPs", 33);
         return HU_OK;
     }

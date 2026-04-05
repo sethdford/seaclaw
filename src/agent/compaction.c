@@ -7,6 +7,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* chat_with_system model label: provider ctx supplies real model on main path; compaction has no
+ * per-call model here, so use the same neutral default as the multi-provider router. */
+static const char hu_compaction_chat_model[] = "default";
+#define HU_COMPACTION_CHAT_MODEL_LEN (sizeof(hu_compaction_chat_model) - 1)
+
 static const char *role_str(hu_role_t role) {
     switch (role) {
     case HU_ROLE_SYSTEM:
@@ -238,17 +243,17 @@ static void free_messages(hu_allocator_t *alloc, hu_owned_message_t *history, si
     }
 }
 
-hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t *history,
+hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t **history,
                               size_t *history_count, size_t *history_cap,
                               const hu_compaction_config_t *config) {
-    if (!alloc || !history || !history_count || !history_cap || !config)
+    if (!alloc || !history || !*history || !history_count || !history_cap || !config)
         return HU_ERR_INVALID_ARGUMENT;
     size_t count = *history_count;
 
     (void)history_cap;
-    if (!history || count == 0)
+    if (!*history || count == 0)
         return HU_OK;
-    if (!hu_should_compact(history, count, config))
+    if (!hu_should_compact(*history, count, config))
         return HU_OK;
 
     /* Structured compaction path: generate XML summary with metadata */
@@ -257,11 +262,11 @@ hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t *history
             ? config->preserve_recent_count : config->keep_recent;
 
         hu_compaction_summary_t meta;
-        hu_error_t err = hu_compact_extract_metadata(alloc, history, count, keep, &meta);
+        hu_error_t err = hu_compact_extract_metadata(alloc, *history, count, keep, &meta);
         if (err != HU_OK) return err;
 
         /* Determine range to summarize */
-        bool sys = count > 0 && history[0].role == HU_ROLE_SYSTEM;
+        bool sys = count > 0 && (*history)[0].role == HU_ROLE_SYSTEM;
         size_t s = sys ? 1 : 0;
         size_t non_sys = count - s;
         if (keep > (uint32_t)non_sys) keep = (uint32_t)non_sys;
@@ -270,7 +275,7 @@ hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t *history
         /* Build structured summary from messages being compacted */
         char *xml = NULL;
         size_t xml_len = 0;
-        err = hu_compact_build_structured_summary(alloc, history + s, compact_end - s, &meta,
+        err = hu_compact_build_structured_summary(alloc, *history + s, compact_end - s, &meta,
                                                   &xml, &xml_len);
         if (err != HU_OK) {
             hu_compaction_summary_free(alloc, &meta);
@@ -278,27 +283,27 @@ hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t *history
         }
 
         /* Free compacted messages */
-        free_messages(alloc, history, s, compact_end);
+        free_messages(alloc, *history, s, compact_end);
 
         /* Replace first slot with structured summary */
-        history[s].role = HU_ROLE_ASSISTANT;
-        history[s].content = xml;
-        history[s].content_len = xml_len;
-        history[s].name = NULL;
-        history[s].name_len = 0;
-        history[s].tool_call_id = NULL;
-        history[s].tool_call_id_len = 0;
-        history[s].tool_calls = NULL;
-        history[s].tool_calls_count = 0;
-        history[s].content_parts = NULL;
-        history[s].content_parts_count = 0;
+        (*history)[s].role = HU_ROLE_ASSISTANT;
+        (*history)[s].content = xml;
+        (*history)[s].content_len = xml_len;
+        (*history)[s].name = NULL;
+        (*history)[s].name_len = 0;
+        (*history)[s].tool_call_id = NULL;
+        (*history)[s].tool_call_id_len = 0;
+        (*history)[s].tool_calls = NULL;
+        (*history)[s].tool_calls_count = 0;
+        (*history)[s].content_parts = NULL;
+        (*history)[s].content_parts_count = 0;
 
         /* Shift remaining messages down */
         if (compact_end > s + 1) {
             size_t shift = compact_end - s - 1;
             size_t remaining = count - compact_end;
             if (remaining > 0) {
-                memmove(&history[s + 1], &history[compact_end],
+                memmove(&(*history)[s + 1], &(*history)[compact_end],
                         remaining * sizeof(hu_owned_message_t));
             }
             count -= shift;
@@ -315,7 +320,7 @@ hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t *history
         return err;
     }
 
-    bool has_system = history[0].role == HU_ROLE_SYSTEM;
+    bool has_system = (*history)[0].role == HU_ROLE_SYSTEM;
     size_t start = has_system ? 1 : 0;
     size_t non_system = count - start;
 
@@ -336,7 +341,7 @@ hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t *history
 
     size_t summary_raw_alloc = 0;
     char *summary_raw =
-        build_summary(alloc, history, start, compact_end, max_src, &summary_raw_alloc);
+        build_summary(alloc, *history, start, compact_end, max_src, &summary_raw_alloc);
     if (!summary_raw)
         return HU_ERR_OUT_OF_MEMORY;
 
@@ -360,25 +365,25 @@ hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t *history
     alloc->free(alloc->ctx, summary_raw, summary_raw_alloc);
 
     /* Free compacted messages */
-    free_messages(alloc, history, start, compact_end);
+    free_messages(alloc, *history, start, compact_end);
 
     /* Replace first compacted slot with summary (assistant role for consistency) */
-    history[start].role = HU_ROLE_ASSISTANT;
-    history[start].content = summary_content;
-    history[start].content_len = prefix_len + sum_len;
-    history[start].name = NULL;
-    history[start].name_len = 0;
-    history[start].tool_call_id = NULL;
-    history[start].tool_call_id_len = 0;
-    history[start].tool_calls = NULL;
-    history[start].tool_calls_count = 0;
+    (*history)[start].role = HU_ROLE_ASSISTANT;
+    (*history)[start].content = summary_content;
+    (*history)[start].content_len = prefix_len + sum_len;
+    (*history)[start].name = NULL;
+    (*history)[start].name_len = 0;
+    (*history)[start].tool_call_id = NULL;
+    (*history)[start].tool_call_id_len = 0;
+    (*history)[start].tool_calls = NULL;
+    (*history)[start].tool_calls_count = 0;
 
     /* Shift remaining messages down */
     if (compact_end > start + 1) {
         size_t shift = compact_end - start - 1;
         size_t remaining = count - compact_end;
         if (remaining > 0) {
-            memmove(&history[start + 1], &history[compact_end],
+            memmove(&(*history)[start + 1], &(*history)[compact_end],
                     remaining * sizeof(hu_owned_message_t));
         }
         count -= shift;
@@ -479,20 +484,20 @@ hu_error_t hu_context_compact_for_pressure(hu_allocator_t *alloc, hu_owned_messa
     return HU_OK;
 }
 
-hu_error_t hu_compact_history_llm(hu_allocator_t *alloc, hu_owned_message_t *history,
+hu_error_t hu_compact_history_llm(hu_allocator_t *alloc, hu_owned_message_t **history,
                                   size_t *history_count, size_t *history_cap,
                                   const hu_compaction_config_t *config, hu_provider_t *provider) {
-    if (!alloc || !history || !history_count || !history_cap || !config)
+    if (!alloc || !history || !*history || !history_count || !history_cap || !config)
         return HU_ERR_INVALID_ARGUMENT;
 
     if (!provider || !provider->vtable || !provider->vtable->chat_with_system)
         return hu_compact_history(alloc, history, history_count, history_cap, config);
 
     size_t count = *history_count;
-    if (!hu_should_compact(history, count, config))
+    if (!hu_should_compact(*history, count, config))
         return HU_OK;
 
-    bool has_system = history[0].role == HU_ROLE_SYSTEM;
+    bool has_system = (*history)[0].role == HU_ROLE_SYSTEM;
     size_t start = has_system ? 1 : 0;
     size_t non_system = count - start;
 
@@ -511,7 +516,7 @@ hu_error_t hu_compact_history_llm(hu_allocator_t *alloc, hu_owned_message_t *his
         max_src = HU_COMPACTION_DEFAULT_MAX_SOURCE_CHARS;
 
     size_t raw_alloc = 0;
-    char *raw = build_summary(alloc, history, start, compact_end, max_src, &raw_alloc);
+    char *raw = build_summary(alloc, *history, start, compact_end, max_src, &raw_alloc);
     if (!raw)
         return HU_ERR_OUT_OF_MEMORY;
 
@@ -522,8 +527,8 @@ hu_error_t hu_compact_history_llm(hu_allocator_t *alloc, hu_owned_message_t *his
     char *llm_summary = NULL;
     size_t llm_summary_len = 0;
     hu_error_t err = provider->vtable->chat_with_system(
-        provider->ctx, alloc, sys_prompt, sizeof(sys_prompt) - 1, raw, strlen(raw), "gpt-4o-mini",
-        11, 0.2, &llm_summary, &llm_summary_len);
+        provider->ctx, alloc, sys_prompt, sizeof(sys_prompt) - 1, raw, strlen(raw),
+        hu_compaction_chat_model, HU_COMPACTION_CHAT_MODEL_LEN, 0.2, &llm_summary, &llm_summary_len);
 
     alloc->free(alloc->ctx, raw, raw_alloc);
 
@@ -552,23 +557,23 @@ hu_error_t hu_compact_history_llm(hu_allocator_t *alloc, hu_owned_message_t *his
     memcpy(summary_content + prefix_len, llm_summary, llm_summary_len + 1);
     alloc->free(alloc->ctx, llm_summary, llm_summary_len + 1);
 
-    free_messages(alloc, history, start, compact_end);
+    free_messages(alloc, *history, start, compact_end);
 
-    history[start].role = HU_ROLE_ASSISTANT;
-    history[start].content = summary_content;
-    history[start].content_len = prefix_len + llm_summary_len;
-    history[start].name = NULL;
-    history[start].name_len = 0;
-    history[start].tool_call_id = NULL;
-    history[start].tool_call_id_len = 0;
-    history[start].tool_calls = NULL;
-    history[start].tool_calls_count = 0;
+    (*history)[start].role = HU_ROLE_ASSISTANT;
+    (*history)[start].content = summary_content;
+    (*history)[start].content_len = prefix_len + llm_summary_len;
+    (*history)[start].name = NULL;
+    (*history)[start].name_len = 0;
+    (*history)[start].tool_call_id = NULL;
+    (*history)[start].tool_call_id_len = 0;
+    (*history)[start].tool_calls = NULL;
+    (*history)[start].tool_calls_count = 0;
 
     if (compact_end > start + 1) {
         size_t shift = compact_end - start - 1;
         size_t remaining = count - compact_end;
         if (remaining > 0) {
-            memmove(&history[start + 1], &history[compact_end],
+            memmove(&(*history)[start + 1], &(*history)[compact_end],
                     remaining * sizeof(hu_owned_message_t));
         }
         count -= shift;
@@ -732,8 +737,12 @@ hu_error_t hu_compact_hierarchical(hu_allocator_t *alloc, hu_provider_t *provide
     const char *conv = conversation ? conversation : "";
 
     static const char sys1[] =
-        "Summarize the conversation excerpt concisely in about 200 words. Preserve key decisions, "
-        "facts, timelines, and open questions. Output only the summary text, no preamble.";
+        "Summarize the conversation excerpt concisely in about 200 words. "
+        "PRIORITIZE preserving: (1) emotional context — how people felt, tone shifts, "
+        "moments of vulnerability or connection; (2) relational dynamics — trust, "
+        "rapport, inside jokes, shared references; (3) key decisions, commitments, "
+        "and open questions; (4) factual details. Output only the summary text, "
+        "no preamble.";
     static const char tail1[] =
         "\n\nSummarize the above conversation for long-term session memory.";
 
@@ -829,13 +838,14 @@ static char *summarize_chunk_text(hu_allocator_t *alloc, hu_provider_t *provider
     if (provider && provider->vtable && provider->vtable->chat_with_system) {
         static const char sys[] =
             "Summarize the following conversation excerpt into a brief paragraph. "
-            "Preserve key decisions, facts, commitments, and emotional context. "
-            "Output only the summary.";
+            "PRIORITIZE: emotional context (feelings, tone, vulnerability), "
+            "relational dynamics (trust, rapport, shared references), then "
+            "decisions, commitments, and facts. Output only the summary.";
         char *summary = NULL;
         size_t summary_len = 0;
         hu_error_t serr = provider->vtable->chat_with_system(
-            provider->ctx, alloc, sys, sizeof(sys) - 1, chunk, chunk_len,
-            "gpt-4o-mini", 11, 0.2, &summary, &summary_len);
+            provider->ctx, alloc, sys, sizeof(sys) - 1, chunk, chunk_len, hu_compaction_chat_model,
+            HU_COMPACTION_CHAT_MODEL_LEN, 0.2, &summary, &summary_len);
         if (serr == HU_OK && summary && summary_len > 0) {
             if (summary_len > max_chars) {
                 summary[max_chars] = '\0';
@@ -854,22 +864,22 @@ static char *summarize_chunk_text(hu_allocator_t *alloc, hu_provider_t *provider
     return trunc;
 }
 
-hu_error_t hu_compact_history_hierarchical(hu_allocator_t *alloc, hu_owned_message_t *history,
+hu_error_t hu_compact_history_hierarchical(hu_allocator_t *alloc, hu_owned_message_t **history,
                                            size_t *history_count, size_t *history_cap,
                                            const hu_compaction_config_t *config,
                                            hu_provider_t *provider,
                                            uint32_t chunk_size, uint32_t max_depth) {
-    if (!alloc || !history || !history_count || !history_cap || !config)
+    if (!alloc || !history || !*history || !history_count || !history_cap || !config)
         return HU_ERR_INVALID_ARGUMENT;
 
     size_t cnt = *history_count;
-    if (!hu_should_compact(history, cnt, config))
+    if (!hu_should_compact(*history, cnt, config))
         return HU_OK;
 
     if (chunk_size == 0) chunk_size = 10;
     if (max_depth == 0) max_depth = 3;
 
-    bool has_sys = cnt > 0 && history[0].role == HU_ROLE_SYSTEM;
+    bool has_sys = cnt > 0 && (*history)[0].role == HU_ROLE_SYSTEM;
     size_t hstart = has_sys ? 1 : 0;
     size_t non_sys = cnt - hstart;
 
@@ -906,7 +916,7 @@ hu_error_t hu_compact_history_hierarchical(hu_allocator_t *alloc, hu_owned_messa
         if (ce > cend) ce = cend;
 
         size_t raw_alloc_sz = 0;
-        char *raw = build_summary(alloc, history, cs, ce, msrc, &raw_alloc_sz);
+        char *raw = build_summary(alloc, *history, cs, ce, msrc, &raw_alloc_sz);
         if (!raw) continue;
 
         size_t slen = 0;
@@ -993,23 +1003,23 @@ hu_error_t hu_compact_history_hierarchical(hu_allocator_t *alloc, hu_owned_messa
     alloc->free(alloc->ctx, ctexts, orig_chunks * sizeof(char *));
     alloc->free(alloc->ctx, clens, orig_chunks * sizeof(size_t));
 
-    free_messages(alloc, history, hstart, cend);
+    free_messages(alloc, *history, hstart, cend);
 
-    history[hstart].role = HU_ROLE_ASSISTANT;
-    history[hstart].content = fc;
-    history[hstart].content_len = fp;
-    history[hstart].name = NULL;
-    history[hstart].name_len = 0;
-    history[hstart].tool_call_id = NULL;
-    history[hstart].tool_call_id_len = 0;
-    history[hstart].tool_calls = NULL;
-    history[hstart].tool_calls_count = 0;
+    (*history)[hstart].role = HU_ROLE_ASSISTANT;
+    (*history)[hstart].content = fc;
+    (*history)[hstart].content_len = fp;
+    (*history)[hstart].name = NULL;
+    (*history)[hstart].name_len = 0;
+    (*history)[hstart].tool_call_id = NULL;
+    (*history)[hstart].tool_call_id_len = 0;
+    (*history)[hstart].tool_calls = NULL;
+    (*history)[hstart].tool_calls_count = 0;
 
     if (cend > hstart + 1) {
         size_t hshift = cend - hstart - 1;
         size_t hrem = cnt - cend;
         if (hrem > 0)
-            memmove(&history[hstart + 1], &history[cend], hrem * sizeof(hu_owned_message_t));
+            memmove(&(*history)[hstart + 1], &(*history)[cend], hrem * sizeof(hu_owned_message_t));
         cnt -= hshift;
     }
 

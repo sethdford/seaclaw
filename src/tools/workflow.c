@@ -1,7 +1,6 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
-#include "human/core/string.h"
 #include "human/tool.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,6 +56,42 @@ typedef struct {
     size_t count;
     uint32_t next_id;
 } workflow_ctx_t;
+
+static hu_error_t wf_json_set_str(hu_allocator_t *alloc, hu_json_value_t *obj, const char *key,
+                                  const char *s, size_t slen) {
+    hu_json_value_t *v = hu_json_string_new(alloc, s, slen);
+    if (!v)
+        return HU_ERR_OUT_OF_MEMORY;
+    if (hu_json_object_set(alloc, obj, key, v) != HU_OK) {
+        hu_json_free(alloc, v);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    return HU_OK;
+}
+
+static hu_error_t wf_json_set_num(hu_allocator_t *alloc, hu_json_value_t *obj, const char *key,
+                                  double n) {
+    hu_json_value_t *v = hu_json_number_new(alloc, n);
+    if (!v)
+        return HU_ERR_OUT_OF_MEMORY;
+    if (hu_json_object_set(alloc, obj, key, v) != HU_OK) {
+        hu_json_free(alloc, v);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    return HU_OK;
+}
+
+static void wf_emit_tool_json(hu_allocator_t *alloc, hu_tool_result_t *out, hu_json_value_t *root) {
+    char *msg = NULL;
+    size_t msg_len = 0;
+    hu_error_t jerr = hu_json_stringify(alloc, root, &msg, &msg_len);
+    hu_json_free(alloc, root);
+    if (jerr != HU_OK || !msg) {
+        *out = hu_tool_result_fail("out of memory", 13);
+        return;
+    }
+    *out = hu_tool_result_ok_owned(msg, msg_len);
+}
 
 static const char *wf_status_str(wf_status_t s) {
     switch (s) {
@@ -144,9 +179,27 @@ static hu_error_t workflow_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         }
         wf->status = WF_STATUS_CREATED;
         c->count++;
-        char *msg = hu_sprintf(alloc, "{\"created\":true,\"workflow_id\":\"%s\",\"steps\":%zu}",
-                               wf->id, wf->step_count);
-        *out = hu_tool_result_ok_owned(msg, msg ? strlen(msg) : 0);
+        hu_json_value_t *cj = hu_json_object_new(alloc);
+        if (!cj) {
+            *out = hu_tool_result_fail("out of memory", 13);
+            return HU_OK;
+        }
+        hu_json_value_t *t = hu_json_bool_new(alloc, true);
+        if (!t || hu_json_object_set(alloc, cj, "created", t) != HU_OK) {
+            if (t)
+                hu_json_free(alloc, t);
+            hu_json_free(alloc, cj);
+            *out = hu_tool_result_fail("out of memory", 13);
+            return HU_OK;
+        }
+        if (wf_json_set_str(alloc, cj, "workflow_id", wf->id,
+                            strnlen(wf->id, sizeof(wf->id))) != HU_OK ||
+            wf_json_set_num(alloc, cj, "steps", (double)wf->step_count) != HU_OK) {
+            hu_json_free(alloc, cj);
+            *out = hu_tool_result_fail("out of memory", 13);
+            return HU_OK;
+        }
+        wf_emit_tool_json(alloc, out, cj);
         return HU_OK;
     }
 
@@ -171,10 +224,21 @@ static hu_error_t workflow_execute(void *ctx, hu_allocator_t *alloc, const hu_js
             wf_step_t *step = &wf->steps[wf->current_step];
             if (step->requires_approval && !step->approved) {
                 wf->status = WF_STATUS_WAITING_APPROVAL;
-                char *msg = hu_sprintf(
-                    alloc, "{\"status\":\"waiting_approval\",\"step\":\"%s\",\"step_index\":%zu}",
-                    step->name, wf->current_step);
-                *out = hu_tool_result_ok_owned(msg, msg ? strlen(msg) : 0);
+                hu_json_value_t *rj = hu_json_object_new(alloc);
+                if (!rj) {
+                    *out = hu_tool_result_fail("out of memory", 13);
+                    return HU_OK;
+                }
+                if (wf_json_set_str(alloc, rj, "status", "waiting_approval",
+                                    sizeof("waiting_approval") - 1) != HU_OK ||
+                    wf_json_set_str(alloc, rj, "step", step->name,
+                                    strnlen(step->name, sizeof(step->name))) != HU_OK ||
+                    wf_json_set_num(alloc, rj, "step_index", (double)wf->current_step) != HU_OK) {
+                    hu_json_free(alloc, rj);
+                    *out = hu_tool_result_fail("out of memory", 13);
+                    return HU_OK;
+                }
+                wf_emit_tool_json(alloc, out, rj);
                 return HU_OK;
             }
             step->completed = true;
@@ -207,11 +271,28 @@ static hu_error_t workflow_execute(void *ctx, hu_allocator_t *alloc, const hu_js
             wf_step_t *step = &wf->steps[wf->current_step];
             if (step->requires_approval && !step->approved) {
                 wf->status = WF_STATUS_WAITING_APPROVAL;
-                char *msg = hu_sprintf(
-                    alloc,
-                    "{\"approved\":true,\"next_step\":\"%s\",\"status\":\"waiting_approval\"}",
-                    step->name);
-                *out = hu_tool_result_ok_owned(msg, msg ? strlen(msg) : 0);
+                hu_json_value_t *aj = hu_json_object_new(alloc);
+                if (!aj) {
+                    *out = hu_tool_result_fail("out of memory", 13);
+                    return HU_OK;
+                }
+                hu_json_value_t *ap = hu_json_bool_new(alloc, true);
+                if (!ap || hu_json_object_set(alloc, aj, "approved", ap) != HU_OK) {
+                    if (ap)
+                        hu_json_free(alloc, ap);
+                    hu_json_free(alloc, aj);
+                    *out = hu_tool_result_fail("out of memory", 13);
+                    return HU_OK;
+                }
+                if (wf_json_set_str(alloc, aj, "next_step", step->name,
+                                    strnlen(step->name, sizeof(step->name))) != HU_OK ||
+                    wf_json_set_str(alloc, aj, "status", "waiting_approval",
+                                    sizeof("waiting_approval") - 1) != HU_OK) {
+                    hu_json_free(alloc, aj);
+                    *out = hu_tool_result_fail("out of memory", 13);
+                    return HU_OK;
+                }
+                wf_emit_tool_json(alloc, out, aj);
                 return HU_OK;
             }
             step->completed = true;
@@ -233,32 +314,76 @@ static hu_error_t workflow_execute(void *ctx, hu_allocator_t *alloc, const hu_js
             *out = hu_tool_result_fail("workflow not found", 18);
             return HU_OK;
         }
-        char *msg = hu_sprintf(alloc,
-                               "{\"workflow_id\":\"%s\",\"name\":\"%s\",\"status\":\"%s\","
-                               "\"current_step\":%zu,\"total_steps\":%zu}",
-                               wf->id, wf->name, wf_status_str(wf->status), wf->current_step,
-                               wf->step_count);
-        *out = hu_tool_result_ok_owned(msg, msg ? strlen(msg) : 0);
+        hu_json_value_t *sj = hu_json_object_new(alloc);
+        if (!sj) {
+            *out = hu_tool_result_fail("out of memory", 13);
+            return HU_OK;
+        }
+        const char *st = wf_status_str(wf->status);
+        if (wf_json_set_str(alloc, sj, "workflow_id", wf->id,
+                            strnlen(wf->id, sizeof(wf->id))) != HU_OK ||
+            wf_json_set_str(alloc, sj, "name", wf->name,
+                            strnlen(wf->name, sizeof(wf->name))) != HU_OK ||
+            wf_json_set_str(alloc, sj, "status", st, strlen(st)) != HU_OK ||
+            wf_json_set_num(alloc, sj, "current_step", (double)wf->current_step) != HU_OK ||
+            wf_json_set_num(alloc, sj, "total_steps", (double)wf->step_count) != HU_OK) {
+            hu_json_free(alloc, sj);
+            *out = hu_tool_result_fail("out of memory", 13);
+            return HU_OK;
+        }
+        wf_emit_tool_json(alloc, out, sj);
         return HU_OK;
     }
 
     if (strcmp(action, "list") == 0) {
-        size_t buf_sz = 256 + c->count * 256;
-        char *msg = (char *)alloc->alloc(alloc->ctx, buf_sz);
-        if (!msg) {
+        hu_json_value_t *lj = hu_json_object_new(alloc);
+        if (!lj) {
             *out = hu_tool_result_fail("out of memory", 13);
-            return HU_ERR_OUT_OF_MEMORY;
+            return HU_OK;
         }
-        int n = snprintf(msg, buf_sz, "{\"workflows\":[");
+        hu_json_value_t *warr = hu_json_array_new(alloc);
+        if (!warr) {
+            hu_json_free(alloc, lj);
+            *out = hu_tool_result_fail("out of memory", 13);
+            return HU_OK;
+        }
         for (size_t i = 0; i < c->count; i++) {
             wf_def_t *wf = &c->workflows[i];
-            n += snprintf(msg + n, buf_sz - (size_t)n,
-                          "%s{\"id\":\"%s\",\"name\":\"%s\",\"status\":\"%s\",\"steps\":%zu}",
-                          i > 0 ? "," : "", wf->id, wf->name, wf_status_str(wf->status),
-                          wf->step_count);
+            hu_json_value_t *el = hu_json_object_new(alloc);
+            if (!el) {
+                hu_json_free(alloc, warr);
+                hu_json_free(alloc, lj);
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_OK;
+            }
+            const char *st = wf_status_str(wf->status);
+            if (wf_json_set_str(alloc, el, "id", wf->id, strnlen(wf->id, sizeof(wf->id))) !=
+                    HU_OK ||
+                wf_json_set_str(alloc, el, "name", wf->name,
+                                strnlen(wf->name, sizeof(wf->name))) != HU_OK ||
+                wf_json_set_str(alloc, el, "status", st, strlen(st)) != HU_OK ||
+                wf_json_set_num(alloc, el, "steps", (double)wf->step_count) != HU_OK) {
+                hu_json_free(alloc, el);
+                hu_json_free(alloc, warr);
+                hu_json_free(alloc, lj);
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_OK;
+            }
+            if (hu_json_array_push(alloc, warr, el) != HU_OK) {
+                hu_json_free(alloc, el);
+                hu_json_free(alloc, warr);
+                hu_json_free(alloc, lj);
+                *out = hu_tool_result_fail("out of memory", 13);
+                return HU_OK;
+            }
         }
-        n += snprintf(msg + n, buf_sz - (size_t)n, "]}");
-        *out = hu_tool_result_ok_owned(msg, (size_t)n);
+        if (hu_json_object_set(alloc, lj, "workflows", warr) != HU_OK) {
+            hu_json_free(alloc, warr);
+            hu_json_free(alloc, lj);
+            *out = hu_tool_result_fail("out of memory", 13);
+            return HU_OK;
+        }
+        wf_emit_tool_json(alloc, out, lj);
         return HU_OK;
     }
 

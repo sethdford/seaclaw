@@ -1,4 +1,6 @@
 #include "human/observability/otlp.h"
+#include "human/core/string.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,34 +73,39 @@ hu_error_t hu_otlp_trace_to_json(hu_allocator_t *alloc, const hu_otlp_trace_t *t
     if (!alloc || !trace || !out_json || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
 
-    size_t buf_size = 256 + trace->span_count * 512;
+    size_t sc = trace->span_count;
+    if (sc > HU_OTLP_MAX_SPANS)
+        return HU_ERR_INVALID_ARGUMENT;
+    size_t buf_size = 256;
+    if (sc > (SIZE_MAX - buf_size) / 512)
+        return HU_ERR_OUT_OF_MEMORY;
+    buf_size += sc * 512;
     char *buf = (char *)alloc->alloc(alloc->ctx, buf_size);
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, buf_size - pos,
-                            "{\"resourceSpans\":[{\"resource\":{},\"scopeSpans\":[{\"spans\":[");
+    pos = hu_buf_appendf(buf, buf_size, pos,
+                         "{\"resourceSpans\":[{\"resource\":{},\"scopeSpans\":[{\"spans\":[");
 
     for (size_t i = 0; i < trace->span_count; i++) {
         const hu_otlp_span_t *s = &trace->spans[i];
         if (i > 0)
-            buf[pos++] = ',';
-        int n = snprintf(buf + pos, buf_size - pos,
-                         "{\"traceId\":\"%s\",\"spanId\":\"%s\","
-                         "\"parentSpanId\":\"%s\","
-                         "\"name\":\"%.*s\","
-                         "\"startTimeUnixNano\":\"%llu\","
-                         "\"endTimeUnixNano\":\"%llu\","
-                         "\"status\":{\"code\":%d}}",
-                         s->trace_id, s->span_id, s->parent_span_id,
-                         (int)(s->name_len < 200 ? s->name_len : 200), s->name ? s->name : "",
-                         (unsigned long long)s->start_ns, (unsigned long long)s->end_ns, s->status);
-        if (n > 0)
-            pos += (size_t)n;
+            pos = hu_buf_appendf(buf, buf_size, pos, ",");
+        pos = hu_buf_appendf(buf, buf_size, pos,
+                             "{\"traceId\":\"%s\",\"spanId\":\"%s\","
+                             "\"parentSpanId\":\"%s\","
+                             "\"name\":\"%.*s\","
+                             "\"startTimeUnixNano\":\"%llu\","
+                             "\"endTimeUnixNano\":\"%llu\","
+                             "\"status\":{\"code\":%d}}",
+                             s->trace_id, s->span_id, s->parent_span_id,
+                             (int)(s->name_len < 200 ? s->name_len : 200), s->name ? s->name : "",
+                             (unsigned long long)s->start_ns, (unsigned long long)s->end_ns,
+                             s->status);
     }
 
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "]}]}]}");
+    pos = hu_buf_appendf(buf, buf_size, pos, "]}]}]}");
 
     *out_json = buf;
     *out_len = pos;

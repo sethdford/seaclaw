@@ -445,6 +445,7 @@ hu_error_t hu_turing_adversarial_run_cycle(
         fid.composite = hu_fidelity_composite(&fid);
 
         /* Find the mutation for this dimension */
+        bool found_mutation = false;
         for (size_t m = 0; m < MUTATION_COUNT; m++) {
             if ((int)MUTATION_TABLE[m].dim == dim) {
                 const char *mut = MUTATION_TABLE[m].mutation;
@@ -452,7 +453,19 @@ hu_error_t hu_turing_adversarial_run_cycle(
                 bool kept = hu_self_improve_record(state, mut, mut_len, &fid);
                 if (kept)
                     (*mutations_applied)++;
+                found_mutation = true;
                 break;
+            }
+        }
+        if (!found_mutation) {
+            char *proposed = NULL;
+            size_t proposed_len = 0;
+            if (hu_self_improve_propose(alloc, state, &proposed, &proposed_len) == HU_OK &&
+                proposed) {
+                bool kept = hu_self_improve_record(state, proposed, proposed_len, &fid);
+                if (kept)
+                    (*mutations_applied)++;
+                alloc->free(alloc->ctx, proposed, proposed_len + 1);
             }
         }
     }

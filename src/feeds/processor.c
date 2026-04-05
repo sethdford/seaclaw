@@ -10,9 +10,12 @@
 #endif
 #include "human/core/string.h"
 #include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+
+#define HU_FEEDS_PROMPT_MAX_NEED (SIZE_MAX / 2U)
 
 #define HU_FEEDS_ESCAPE_BUF 2048
 
@@ -341,8 +344,11 @@ hu_error_t hu_feeds_build_prompt(hu_allocator_t *alloc, const hu_feed_item_t *it
         return HU_OK;
     }
 
-    int need = snprintf(NULL, 0, "[EXTERNAL AWARENESS]: ");
-    if (need < 0)
+    int hn = snprintf(NULL, 0, "[EXTERNAL AWARENESS]: ");
+    if (hn < 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    size_t need = (size_t)hn;
+    if (need > HU_FEEDS_PROMPT_MAX_NEED)
         return HU_ERR_INVALID_ARGUMENT;
 
     for (size_t i = 0; i < count; i++) {
@@ -353,18 +359,23 @@ hu_error_t hu_feeds_build_prompt(hu_allocator_t *alloc, const hu_feed_item_t *it
         int n = snprintf(NULL, 0, "%s%s: %.*s.", sep, cat, (int)cnt_len, cnt);
         if (n < 0)
             return HU_ERR_INVALID_ARGUMENT;
-        need += n;
+        size_t add = (size_t)n;
+        if (need > HU_FEEDS_PROMPT_MAX_NEED - add)
+            return HU_ERR_INVALID_ARGUMENT;
+        need += add;
     }
-    need += 2; /* \n and NUL */
+    if (need > HU_FEEDS_PROMPT_MAX_NEED - 2U)
+        return HU_ERR_INVALID_ARGUMENT;
+    need += 2U; /* \n and NUL */
 
-    char *buf = (char *)alloc->alloc(alloc->ctx, (size_t)need);
+    char *buf = (char *)alloc->alloc(alloc->ctx, need);
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-    int n = snprintf(buf + pos, (size_t)need - pos, "[EXTERNAL AWARENESS]: ");
-    if (n < 0 || (size_t)n >= (size_t)need - pos) {
-        alloc->free(alloc->ctx, buf, (size_t)need);
+    int n = snprintf(buf + pos, need - pos, "[EXTERNAL AWARENESS]: ");
+    if (n < 0 || (size_t)n >= need - pos) {
+        alloc->free(alloc->ctx, buf, need);
         return HU_ERR_INVALID_ARGUMENT;
     }
     pos += (size_t)n;
@@ -374,17 +385,17 @@ hu_error_t hu_feeds_build_prompt(hu_allocator_t *alloc, const hu_feed_item_t *it
         const char *cnt = items[i].content ? items[i].content : "(no content)";
         size_t cnt_len = items[i].content_len ? items[i].content_len : strlen(cnt);
         const char *sep = (i == 0) ? "" : " ";
-        n = snprintf(buf + pos, (size_t)need - pos, "%s%s: %.*s.", sep, cat, (int)cnt_len, cnt);
-        if (n < 0 || (size_t)n >= (size_t)need - pos) {
-            alloc->free(alloc->ctx, buf, (size_t)need);
+        n = snprintf(buf + pos, need - pos, "%s%s: %.*s.", sep, cat, (int)cnt_len, cnt);
+        if (n < 0 || (size_t)n >= need - pos) {
+            alloc->free(alloc->ctx, buf, need);
             return HU_ERR_INVALID_ARGUMENT;
         }
         pos += (size_t)n;
     }
 
-    n = snprintf(buf + pos, (size_t)need - pos, "\n");
-    if (n < 0 || (size_t)n >= (size_t)need - pos) {
-        alloc->free(alloc->ctx, buf, (size_t)need);
+    n = snprintf(buf + pos, need - pos, "\n");
+    if (n < 0 || (size_t)n >= need - pos) {
+        alloc->free(alloc->ctx, buf, need);
         return HU_ERR_INVALID_ARGUMENT;
     }
     pos += (size_t)n;
@@ -935,10 +946,13 @@ hu_error_t hu_feed_build_daily_digest(hu_allocator_t *alloc, sqlite3 *db, int64_
         goto no_items;
 
     size_t need = 128;
-    need += snprintf(NULL, 0, "## Feed Digest (%zu items from %zu sources)\n\n", total_items,
-                     source_count);
-    if (need < 128)
-        need = 128;
+    int hdr_n = snprintf(NULL, 0, "## Feed Digest (%zu items from %zu sources)\n\n", total_items,
+                         source_count);
+    if (hdr_n < 0)
+        return HU_ERR_INVALID_ARGUMENT;
+    if ((size_t)hdr_n > SIZE_MAX - need)
+        return HU_ERR_INVALID_ARGUMENT;
+    need += (size_t)hdr_n;
 
     char *buf = (char *)alloc->alloc(alloc->ctx, need);
     if (!buf)

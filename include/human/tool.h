@@ -113,6 +113,11 @@ typedef struct hu_tool {
     const struct hu_tool_vtable *vtable;
 } hu_tool_t;
 
+typedef enum hu_tool_flags {
+    HU_TOOL_FLAG_NONE        = 0,
+    HU_TOOL_FLAG_THREAD_SAFE = (1u << 0),
+} hu_tool_flags_t;
+
 /* args: JSON object (hu_json_value_t with type HU_JSON_OBJECT) */
 typedef struct hu_tool_vtable {
     /**
@@ -140,6 +145,9 @@ typedef struct hu_tool_vtable {
                                     void (*on_chunk)(void *cb_ctx, const char *data, size_t len),
                                     void *cb_ctx,
                                     hu_tool_result_t *out);
+    /* Thread-safety declaration: tools default to not-thread-safe (0).
+     * Set HU_TOOL_FLAG_THREAD_SAFE for tools safe to call from multiple threads. */
+    hu_tool_flags_t flags;
 } hu_tool_vtable_t;
 
 /* ──────────────────────────────────────────────────────────────────────────

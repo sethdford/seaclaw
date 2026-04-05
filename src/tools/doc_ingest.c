@@ -222,12 +222,12 @@ static hu_error_t doc_ingest_execute(void *ctx, hu_allocator_t *alloc, const hu_
         char keyb[384];
         snprintf(keyb, sizeof(keyb), "%s:%s:%d", client, stype, part);
         size_t j = 0;
-        j += (size_t)snprintf(jb + j, jb_cap - j, "{\"key\":\"%s\",\"content\":\"", keyb);
+        j = hu_buf_appendf(jb, jb_cap, j, "{\"key\":\"%s\",\"content\":\"", keyb);
         for (size_t k = 0; k < take; k++) {
             unsigned char ch = (unsigned char)buf[off + k];
             if (ch == '"' || ch == '\\') {
                 if (j + 2 < jb_cap)
-                    j += (size_t)snprintf(jb + j, jb_cap - j, "\\%c", (char)ch);
+                    j = hu_buf_appendf(jb, jb_cap, j, "\\%c", (char)ch);
             } else if (ch < 32) {
                 if (j + 1 < jb_cap)
                     jb[j++] = ' ';
@@ -236,10 +236,10 @@ static hu_error_t doc_ingest_execute(void *ctx, hu_allocator_t *alloc, const hu_
                     jb[j++] = (char)ch;
             }
         }
-        j += (size_t)snprintf(jb + j, jb_cap - j, "\"");
+        j = hu_buf_appendf(jb, jb_cap, j, "\"");
         if (sid && sid[0])
-            j += (size_t)snprintf(jb + j, jb_cap - j, ",\"session_id\":\"%s\"", sid);
-        j += (size_t)snprintf(jb + j, jb_cap - j, "}");
+            j = hu_buf_appendf(jb, jb_cap, j, ",\"session_id\":\"%s\"", sid);
+        j = hu_buf_appendf(jb, jb_cap, j, "}");
 
         if (bff_store_json(alloc, base, auth, tenant, jb, j) != 0) {
             alloc->free(alloc->ctx, jb, jb_cap);

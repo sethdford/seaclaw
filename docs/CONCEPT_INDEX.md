@@ -177,6 +177,23 @@ Use this to find the right files for a given task without searching the full cod
 | **Training / feedback**         | `src/persona/training.c`, `feedback.c` | `test_persona_training.c`, `test_feedback.c` |
 | **PersonaFuse (per-channel overlays)** | `src/persona/persona_fuse.c`, `include/human/persona/persona_fuse.h` | `—`                                 |
 
+## Humanness Frontiers
+
+| Concept                          | Primary Source Files                                         | Test Files                      |
+| -------------------------------- | ------------------------------------------------------------ | ------------------------------- |
+| **Somatic State Engine**         | `src/persona/somatic.c`, `include/human/persona/somatic.h`  | `test_humanness_frontiers.c`    |
+| **Message Choreography**         | `src/agent/choreography.c`, `include/human/agent/choreography.h` | `test_humanness_frontiers.c` |
+| **Narrative Self**               | `src/persona/narrative_self.c`, `include/human/persona/narrative_self.h` | `test_humanness_frontiers.c` |
+| **Novelty Detection**            | `src/cognition/novelty.c`, `include/human/cognition/novelty.h` | `test_humanness_frontiers.c`  |
+| **Attachment Dynamics**          | `src/cognition/attachment.c`, `include/human/cognition/attachment.h` | `test_humanness_frontiers.c` |
+| **Rupture-Repair Cycle**         | `src/cognition/rupture_repair.c`, `include/human/cognition/rupture_repair.h` | `test_humanness_frontiers.c` |
+| **Relational Episode Memory**    | `src/memory/relational_episode.c`, `include/human/memory/relational_episode.h` | `test_humanness_frontiers.c` |
+| **Presence Gradient**            | `src/cognition/presence.c`, `include/human/cognition/presence.h` | `test_humanness_frontiers.c` |
+| **Micro-Expression Text Layer**  | `src/persona/micro_expression.c`, `include/human/persona/micro_expression.h` | `test_humanness_frontiers.c` |
+| **Creative Voice Engine**        | `src/persona/creative_voice.c`, `include/human/persona/creative_voice.h` | `test_humanness_frontiers.c` |
+| **Growth Narrative**             | `src/agent/growth_narrative.c`, `include/human/agent/growth_narrative.h` | `test_humanness_frontiers.c` |
+| **Genuine Boundaries**           | `src/persona/genuine_boundaries.c`, `include/human/persona/genuine_boundaries.h` | `test_humanness_frontiers.c` |
+
 ## Context
 
 | Concept            | Primary Source Files           | Test Files              |

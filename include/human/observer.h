@@ -25,6 +25,7 @@ typedef enum hu_observer_event_tag {
     HU_OBSERVER_EVENT_HULA_NODE_END,
     HU_OBSERVER_EVENT_HULA_NODE_OUTPUT,
     HU_OBSERVER_EVENT_HULA_PROGRAM_END,
+    HU_OBSERVER_EVENT_FRONTIER,
 } hu_observer_event_tag_t;
 
 typedef struct hu_observer_event {
@@ -100,6 +101,11 @@ typedef struct hu_observer_event {
             uint64_t total_ms;
             size_t node_count;
         } hula_program_end;
+        struct {
+            const char *frontier;
+            const char *transition;
+            float value;
+        } frontier;
     } data;
 } hu_observer_event_t;
 

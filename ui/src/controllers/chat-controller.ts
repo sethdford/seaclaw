@@ -237,7 +237,13 @@ export class ChatController implements ReactiveController {
   async flushQueue(): Promise<void> {
     const queued = this._messageQueue.splice(0);
     for (const entry of queued) {
-      await this.send(entry.text, entry.sessionKey, entry.attachments, entry.mentionedFiles, entry.options);
+      await this.send(
+        entry.text,
+        entry.sessionKey,
+        entry.attachments,
+        entry.mentionedFiles,
+        entry.options,
+      );
     }
   }
 

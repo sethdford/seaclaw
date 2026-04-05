@@ -111,9 +111,8 @@ static hu_agent_t *g_active_agent = NULL;
 
 static void sigint_handler(int sig) {
     (void)sig;
+    /* Async-signal-safe: only sig_atomic_t; agent cancel is propagated in the main loop. */
     g_cancel = 1;
-    if (g_active_agent)
-        g_active_agent->cancel_requested = 1;
 }
 
 #ifndef _WIN32
@@ -1078,6 +1077,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         }
 
         run_spinner_loop(&tctx, use_ansi);
+
+        if (g_cancel && g_active_agent)
+            g_active_agent->cancel_requested = 1;
 
         if (g_cancel && !tctx.done) {
             if (use_ansi)

@@ -91,6 +91,36 @@ typedef struct hu_prompt_config {
     size_t contact_turing_hint_len;
     const char *instruction_context; /* discovered .human.md / HUMAN.md instructions */
     size_t instruction_context_len;
+    const char *somatic_context;
+    size_t somatic_context_len;
+    const char *narrative_self_context;
+    size_t narrative_self_context_len;
+    const char *presence_context;
+    size_t presence_context_len;
+    const char *micro_expression_context;
+    size_t micro_expression_context_len;
+    const char *creative_voice_context;
+    size_t creative_voice_context_len;
+    const char *novelty_context;
+    size_t novelty_context_len;
+    const char *attachment_context;
+    size_t attachment_context_len;
+    const char *rupture_context;
+    size_t rupture_context_len;
+    const char *growth_context;
+    size_t growth_context_len;
+    const char *boundary_context;
+    size_t boundary_context_len;
+    const char *relational_episode_context;
+    size_t relational_episode_context_len;
+    const char *trust_context;
+    size_t trust_context_len;
+    const char *humor_directive;
+    size_t humor_directive_len;
+    const char *sycophancy_friction;
+    size_t sycophancy_friction_len;
+    const char *conv_goals_context;
+    size_t conv_goals_context_len;
 } hu_prompt_config_t;
 
 /* Build the full system prompt. Caller owns returned string; free with alloc. */

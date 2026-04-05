@@ -2,6 +2,11 @@
 
 #ifdef HU_ENABLE_SQLITE
 
+/* Max rows we materialize in memory per retrieve (SQL LIMIT must match allocation). */
+#define HU_EPISODIC_MAX_RETRIEVE 16
+
+#include "human/core/string.h"
+#include "human/core/log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -90,37 +95,46 @@ hu_error_t hu_episodic_extract_and_store(sqlite3 *db, hu_allocator_t *alloc,
                                           const hu_episodic_session_summary_t *summary) {
     if (!db || !alloc || !summary) return HU_ERR_INVALID_ARGUMENT;
 
-    /* Only extract a pattern if there were skills or tools used */
-    if (summary->skill_count == 0 && summary->tool_count == 0)
+    /* Store a pattern even for pure conversation turns when there was
+     * meaningful emotional engagement (positive feedback or corrections).
+     * This ensures emotional encounters persist as episodic memory. */
+    if (summary->skill_count == 0 && summary->tool_count == 0 &&
+        !summary->had_positive_feedback && !summary->had_correction)
         return HU_OK;
 
     /* Build skills_used string */
     char skills_buf[512] = "";
-    int spos = 0;
+    size_t spos = 0;
     for (size_t i = 0; i < summary->skill_count && i < 10; i++) {
-        if (i > 0) spos += snprintf(skills_buf + spos, sizeof(skills_buf) - (size_t)spos, ",");
-        spos += snprintf(skills_buf + spos, sizeof(skills_buf) - (size_t)spos,
-                         "%s", summary->skill_names[i]);
+        if (i > 0) spos = hu_buf_appendf(skills_buf, sizeof(skills_buf), spos, ",");
+        spos = hu_buf_appendf(skills_buf, sizeof(skills_buf), spos,
+                              "%s", summary->skill_names[i]);
     }
 
     /* Build approach from tool names */
     char approach_buf[512] = "";
-    int apos = 0;
+    size_t apos = 0;
     if (summary->tool_count > 0) {
-        apos += snprintf(approach_buf + apos, sizeof(approach_buf) - (size_t)apos,
-                         "Used tools: ");
+        apos = hu_buf_appendf(approach_buf, sizeof(approach_buf), apos,
+                              "Used tools: ");
         for (size_t i = 0; i < summary->tool_count && i < 8; i++) {
-            if (i > 0) apos += snprintf(approach_buf + apos,
-                                         sizeof(approach_buf) - (size_t)apos, ", ");
-            apos += snprintf(approach_buf + apos, sizeof(approach_buf) - (size_t)apos,
-                             "%s", summary->tool_names[i]);
+            if (i > 0) apos = hu_buf_appendf(approach_buf, sizeof(approach_buf), apos, ", ");
+            apos = hu_buf_appendf(approach_buf, sizeof(approach_buf), apos,
+                                  "%s", summary->tool_names[i]);
         }
     }
     if (summary->skill_count > 0) {
-        if (apos > 0) apos += snprintf(approach_buf + apos,
-                                        sizeof(approach_buf) - (size_t)apos, "; ");
-        apos += snprintf(approach_buf + apos, sizeof(approach_buf) - (size_t)apos,
-                         "Applied skills: %s", skills_buf);
+        if (apos > 0) apos = hu_buf_appendf(approach_buf, sizeof(approach_buf), apos, "; ");
+        apos = hu_buf_appendf(approach_buf, sizeof(approach_buf), apos,
+                              "Applied skills: %s", skills_buf);
+    }
+    if (summary->tool_count == 0 && summary->skill_count == 0) {
+        if (summary->had_positive_feedback)
+            apos = hu_buf_appendf(approach_buf, sizeof(approach_buf), apos,
+                                  "Emotional encounter (positive connection)");
+        else if (summary->had_correction)
+            apos = hu_buf_appendf(approach_buf, sizeof(approach_buf), apos,
+                                  "Emotional encounter (correction/growth)");
     }
 
     float quality = 0.5f;
@@ -193,12 +207,15 @@ hu_error_t hu_episodic_retrieve(sqlite3 *db, hu_allocator_t *alloc,
     }
     keyword[klen] = '\0';
 
+    size_t cap = max_results < HU_EPISODIC_MAX_RETRIEVE ? max_results : HU_EPISODIC_MAX_RETRIEVE;
+    if (max_results > HU_EPISODIC_MAX_RETRIEVE)
+        hu_log_warn("episodic", NULL, "retrieve capped max_results=%zu to %d", max_results,
+                    HU_EPISODIC_MAX_RETRIEVE);
+
     sqlite3_bind_text(stmt, 1, keyword, (int)klen, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, keyword, (int)klen, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 3, keyword, (int)klen, SQLITE_STATIC);
-    sqlite3_bind_int(stmt, 4, (int)max_results);
-
-    size_t cap = max_results < 16 ? max_results : 16;
+    sqlite3_bind_int(stmt, 4, (int)cap);
     hu_episodic_pattern_t *arr = alloc->alloc(alloc->ctx, cap * sizeof(hu_episodic_pattern_t));
     if (!arr) { sqlite3_finalize(stmt); return HU_ERR_OUT_OF_MEMORY; }
     size_t count = 0;
@@ -247,29 +264,27 @@ hu_error_t hu_episodic_build_replay(hu_allocator_t *alloc,
     if (!patterns || count == 0) return HU_OK;
 
     char buf[4096];
-    int pos = 0;
-    pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                    "### Cognitive Replay\n\n"
-                    "*Prior approaches that worked for similar problems (use as hints, not facts):*\n\n");
+    size_t pos = 0;
+    pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                         "### Cognitive Replay\n\n"
+                         "*Prior approaches that worked for similar problems (use as hints, not facts):*\n\n");
 
-    for (size_t i = 0; i < count && (size_t)pos < sizeof(buf) - 200; i++) {
+    for (size_t i = 0; i < count && pos < sizeof(buf) - 1; i++) {
         const hu_episodic_pattern_t *p = &patterns[i];
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                        "- **%s** (quality: %.0f%%, seen %u time%s): %s",
-                        p->problem_type,
-                        (double)(p->outcome_quality * 100.0f),
-                        p->support_count,
-                        p->support_count == 1 ? "" : "s",
-                        p->approach);
-        if (p->insight && p->insight[0]) {
-            pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos,
-                            " — *%s*", p->insight);
-        }
-        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos, "\n");
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "- **%s** (quality: %.0f%%, seen %u time%s): %s",
+                             p->problem_type,
+                             (double)(p->outcome_quality * 100.0f),
+                             p->support_count,
+                             p->support_count == 1 ? "" : "s",
+                             p->approach);
+        if (p->insight && p->insight[0])
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, " — *%s*", p->insight);
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "\n");
     }
-    pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos, "\n");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "\n");
 
-    size_t len = (size_t)pos;
+    size_t len = pos;
     char *result = alloc->alloc(alloc->ctx, len + 1);
     if (!result) return HU_ERR_OUT_OF_MEMORY;
     memcpy(result, buf, len);
@@ -305,15 +320,20 @@ hu_error_t hu_episodic_compress(sqlite3 *db, hu_allocator_t *alloc) {
 
         if (!ptype) continue;
 
-        /* Delete individual patterns */
+        if (sqlite3_exec(db, "BEGIN IMMEDIATE", NULL, NULL, NULL) != SQLITE_OK)
+            continue;
+
+        /* Delete individual patterns (rolled back if store fails) */
         const char *del_sql =
             "DELETE FROM episodic_patterns WHERE problem_type = ?";
         sqlite3_stmt *del_stmt = NULL;
-        if (sqlite3_prepare_v2(db, del_sql, -1, &del_stmt, NULL) == SQLITE_OK) {
-            sqlite3_bind_text(del_stmt, 1, ptype, -1, SQLITE_STATIC);
-            sqlite3_step(del_stmt);
-            sqlite3_finalize(del_stmt);
+        if (sqlite3_prepare_v2(db, del_sql, -1, &del_stmt, NULL) != SQLITE_OK) {
+            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+            continue;
         }
+        sqlite3_bind_text(del_stmt, 1, ptype, -1, SQLITE_STATIC);
+        sqlite3_step(del_stmt);
+        sqlite3_finalize(del_stmt);
 
         /* Build compressed approach (truncated) */
         char approach[512];
@@ -332,7 +352,15 @@ hu_error_t hu_episodic_compress(sqlite3 *db, hu_allocator_t *alloc) {
             .timestamp = NULL,
         };
 
-        hu_episodic_store_pattern(db, alloc, &compressed);
+        hu_error_t store_err = hu_episodic_store_pattern(db, alloc, &compressed);
+        if (store_err != HU_OK) {
+            hu_log_warn("episodic", NULL, "Failed to store compressed pattern: %s",
+                        hu_error_string(store_err));
+            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+            continue;
+        }
+        if (sqlite3_exec(db, "COMMIT", NULL, NULL, NULL) != SQLITE_OK)
+            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
     }
     sqlite3_finalize(stmt);
 

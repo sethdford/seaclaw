@@ -133,16 +133,16 @@ hu_error_t hu_opinions_build_prompt(hu_allocator_t *alloc, const hu_opinion_t *o
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, total - pos, "[YOUR OPINIONS]:");
+    pos = hu_buf_appendf(buf, total, pos, "[YOUR OPINIONS]:");
     for (size_t i = 0; i < count && pos < total - 2; i++) {
         const char *t = opinions[i].topic ? opinions[i].topic : "";
         size_t tl = opinions[i].topic_len;
         const char *p = opinions[i].position ? opinions[i].position : "";
         size_t pl = opinions[i].position_len;
         double conf = opinions[i].confidence;
-        pos += (size_t)snprintf(buf + pos, total - pos,
-                                " - [%.*s]: %.*s (confidence: %.2f)",
-                                (int)tl, t, (int)pl, p, conf);
+        pos = hu_buf_appendf(buf, total, pos,
+                             " - [%.*s]: %.*s (confidence: %.2f)",
+                             (int)tl, t, (int)pl, p, conf);
     }
     *out = buf;
     *out_len = strlen(buf);

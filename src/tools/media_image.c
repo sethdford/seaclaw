@@ -1,7 +1,7 @@
 /* media_image — Generate images via Gemini native image generation
- * (gemini-2.5-flash-image or gemini-3.x-*-image-preview) or Imagen 4 on
- * Vertex AI. Writes the decoded PNG to a temp file and returns the local path
- * in media_path so the daemon can attach it to a channel send. */
+ * (gemini-3-flash-preview) or Imagen 4 on Vertex AI. Writes the decoded PNG
+ * to a temp file and returns the local path in media_path so the daemon can
+ * attach it to a channel send. */
 
 #include "human/tools/media_image.h"
 #include "human/agent.h"
@@ -10,6 +10,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
+#include "human/core/log.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/core/vertex_auth.h"
@@ -347,17 +348,18 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
         return HU_OK;
 
     } else {
-        /* Gemini native image generation via generateContent API.
-         * Model priority: gemini-2.5-flash-image (GA, broadly available),
-         * with future upgrade to gemini-3.x-*-image-preview when accessible. */
+        /* Gemini native image generation via generateContent API. */
         const char *api_key = getenv("GEMINI_API_KEY");
         if (!api_key) api_key = getenv("GOOGLE_API_KEY");
 
         char auth_buf[1024];
         char url[512];
-        const char *nb_model = "gemini-2.5-flash-image";
+        const char *nb_model = "gemini-3-flash-preview";
 
         if (api_key && api_key[0]) {
+            /* API keys in query strings leak via Referer, logs, and proxies; Vertex + ADC is preferred. */
+            hu_log_warn("media_image", NULL,
+                        "Gemini image generation using API key path; prefer Vertex AI + ADC");
             int ulen = snprintf(url, sizeof(url),
                                 "https://generativelanguage.googleapis.com/v1beta/models/%s"
                                 ":generateContent?key=%s",

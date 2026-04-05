@@ -26,7 +26,7 @@ static void record_expectation_updates_existing(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_belief_state_t state;
     memset(&state, 0, sizeof(state));
-    hu_tom_init(&state, &alloc, "bob", 3);
+    HU_ASSERT_EQ(hu_tom_init(&state, &alloc, "bob", 3), HU_OK);
 
     hu_tom_record_user_expectation(&state, &alloc, "job search", 10, HU_TOM_EXPECT_TRACKS);
     hu_tom_record_user_expectation(&state, &alloc, "job search", 10, HU_TOM_EXPECT_REMEMBERS);

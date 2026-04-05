@@ -110,6 +110,13 @@ hu_error_t hu_tier_manager_update_core(hu_tier_manager_t *mgr, const char *field
     if (!target)
         return HU_ERR_INVALID_ARGUMENT;
 
+    /* Largest core field is user_preferences[1024] — stack snapshot for rollback */
+    char saved[1024];
+    if (target_cap > sizeof(saved))
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(saved, target, target_cap);
+    int64_t old_updated_at = mgr->core.updated_at;
+
     size_t copy_len = value_len < target_cap - 1 ? value_len : target_cap - 1;
     if (value && copy_len > 0)
         memcpy(target, value, copy_len);
@@ -122,12 +129,20 @@ hu_error_t hu_tier_manager_update_core(hu_tier_manager_t *mgr, const char *field
         int rc = sqlite3_prepare_v2(mgr->db,
             "INSERT OR REPLACE INTO core_memory(field, value, updated_at) VALUES(?, ?, ?)",
             -1, &stmt, NULL);
-        if (rc == SQLITE_OK) {
-            sqlite3_bind_text(stmt, 1, field, (int)field_len, SQLITE_STATIC);
-            sqlite3_bind_text(stmt, 2, target, (int)copy_len, SQLITE_STATIC);
-            sqlite3_bind_int64(stmt, 3, mgr->core.updated_at);
-            sqlite3_step(stmt);
-            sqlite3_finalize(stmt);
+        if (rc != SQLITE_OK) {
+            memcpy(target, saved, target_cap);
+            mgr->core.updated_at = old_updated_at;
+            return HU_ERR_MEMORY_BACKEND;
+        }
+        sqlite3_bind_text(stmt, 1, field, (int)field_len, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, target, (int)copy_len, SQLITE_STATIC);
+        sqlite3_bind_int64(stmt, 3, mgr->core.updated_at);
+        rc = sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        if (rc != SQLITE_DONE) {
+            memcpy(target, saved, target_cap);
+            mgr->core.updated_at = old_updated_at;
+            return HU_ERR_MEMORY_BACKEND;
         }
     }
 #endif
@@ -150,7 +165,10 @@ hu_error_t hu_tier_manager_store(hu_tier_manager_t *mgr, hu_memory_tier_t tier,
         return HU_ERR_IO;
     sqlite3_bind_text(stmt, 1, key, (int)key_len, SQLITE_STATIC);
     sqlite3_bind_int(stmt, 2, (int)tier);
-    sqlite3_bind_text(stmt, 3, content, (int)content_len, SQLITE_STATIC);
+    if (content && content_len > 0)
+        sqlite3_bind_text(stmt, 3, content, (int)content_len, SQLITE_STATIC);
+    else
+        sqlite3_bind_null(stmt, 3);
     sqlite3_bind_int64(stmt, 4, (int64_t)time(NULL));
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
@@ -184,9 +202,9 @@ hu_error_t hu_tier_manager_promote(hu_tier_manager_t *mgr,
     sqlite3_bind_int(stmt, 1, (int)to);
     sqlite3_bind_text(stmt, 2, key, (int)key_len, SQLITE_STATIC);
     sqlite3_bind_int(stmt, 3, (int)from);
-    sqlite3_step(stmt);
+    rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    return HU_OK;
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
 #else
     (void)from;
     (void)to;
@@ -215,9 +233,9 @@ hu_error_t hu_tier_manager_demote(hu_tier_manager_t *mgr,
     sqlite3_bind_int(stmt, 1, (int)to);
     sqlite3_bind_text(stmt, 2, key, (int)key_len, SQLITE_STATIC);
     sqlite3_bind_int(stmt, 3, (int)from);
-    sqlite3_step(stmt);
+    rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    return HU_OK;
+    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
 #else
     (void)from;
     (void)to;

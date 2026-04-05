@@ -4,6 +4,7 @@
 #include "human/feeds/apple.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/json.h"
 #include "human/core/process_util.h"
 #include "human/core/string.h"
 #include <limits.h>
@@ -241,11 +242,21 @@ static hu_error_t hu_apple_contacts_fetch_impl(hu_allocator_t *alloc,
         return HU_OK;
     }
     /* Build JSON array from pipe-delimited lines: id|name|email|phone */
-    size_t off = 0;
-    out_json[off++] = '[';
+    hu_json_buf_t jb;
+    hu_error_t jerr = hu_json_buf_init(&jb, alloc);
+    if (jerr != HU_OK) {
+        hu_run_result_free(alloc, &result);
+        return jerr;
+    }
+    jerr = hu_json_buf_append_raw(&jb, "[", 1);
+    if (jerr != HU_OK) {
+        hu_json_buf_free(&jb);
+        hu_run_result_free(alloc, &result);
+        return jerr;
+    }
     const char *p = result.stdout_buf;
     int first = 1;
-    while (off < out_cap - 32 && *p) {
+    while (jb.len < out_cap - 32 && *p) {
         const char *eol = strchr(p, '\n');
         if (!eol)
             eol = p + strlen(p);
@@ -274,21 +285,63 @@ static hu_error_t hu_apple_contacts_fetch_impl(hu_allocator_t *alloc,
             }
         }
         if (field >= 2) {
-            if (!first)
-                off += (size_t)snprintf(out_json + off, out_cap - off, ",");
-            off += (size_t)snprintf(out_json + off, out_cap - off,
-                "{\"id\":\"%s\",\"name\":\"%s\",\"email\":\"%s\",\"phone\":\"%s\"}",
-                id_buf, name_buf, email_buf, phone_buf);
+            if (!first) {
+                jerr = hu_json_buf_append_raw(&jb, ",", 1);
+                if (jerr != HU_OK)
+                    goto contacts_json_fail;
+            }
+            jerr = hu_json_buf_append_raw(&jb, "{", 1);
+            if (jerr != HU_OK)
+                goto contacts_json_fail;
+            jerr = hu_json_append_key_value(&jb, "id", 2, id_buf, strnlen(id_buf, sizeof id_buf));
+            if (jerr != HU_OK)
+                goto contacts_json_fail;
+            jerr = hu_json_buf_append_raw(&jb, ",", 1);
+            if (jerr != HU_OK)
+                goto contacts_json_fail;
+            jerr = hu_json_append_key_value(&jb, "name", 4, name_buf,
+                                            strnlen(name_buf, sizeof name_buf));
+            if (jerr != HU_OK)
+                goto contacts_json_fail;
+            jerr = hu_json_buf_append_raw(&jb, ",", 1);
+            if (jerr != HU_OK)
+                goto contacts_json_fail;
+            jerr = hu_json_append_key_value(&jb, "email", 5, email_buf,
+                                            strnlen(email_buf, sizeof email_buf));
+            if (jerr != HU_OK)
+                goto contacts_json_fail;
+            jerr = hu_json_buf_append_raw(&jb, ",", 1);
+            if (jerr != HU_OK)
+                goto contacts_json_fail;
+            jerr = hu_json_append_key_value(&jb, "phone", 5, phone_buf,
+                                            strnlen(phone_buf, sizeof phone_buf));
+            if (jerr != HU_OK)
+                goto contacts_json_fail;
+            jerr = hu_json_buf_append_raw(&jb, "}", 1);
+            if (jerr != HU_OK)
+                goto contacts_json_fail;
             first = 0;
         }
         p = (*eol == '\n') ? eol + 1 : eol;
     }
-    if (off < out_cap)
-        out_json[off++] = ']';
-    out_json[off] = '\0';
-    *out_len = off;
+    jerr = hu_json_buf_append_raw(&jb, "]", 1);
+    if (jerr != HU_OK)
+        goto contacts_json_fail;
+    if (jb.len + 1U > out_cap) {
+        hu_json_buf_free(&jb);
+        hu_run_result_free(alloc, &result);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    memcpy(out_json, jb.ptr, jb.len + 1);
+    *out_len = jb.len;
+    hu_json_buf_free(&jb);
     hu_run_result_free(alloc, &result);
     return HU_OK;
+
+contacts_json_fail:
+    hu_json_buf_free(&jb);
+    hu_run_result_free(alloc, &result);
+    return jerr;
 #endif
 }
 

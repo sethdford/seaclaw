@@ -330,6 +330,9 @@ static void destroy_voice_wrap(hu_channel_t *ch, hu_allocator_t *a) {
     hu_channel_voice_destroy(ch);
 }
 #endif
+static void destroy_twilio_media_wrap(hu_channel_t *ch, hu_allocator_t *a) {
+    hu_twilio_media_destroy(ch, a);
+}
 
 /* Feature 2: Plugin hook registration context (must be before bootstrap_internal) */
 typedef struct {
@@ -1012,6 +1015,11 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                                      cfg->channels.imessage.allow_from_count,
                                      &bi->channel_slots[ch_count]);
             if (err == HU_OK) {
+                if (cfg->channels.imessage.use_imsg_cli)
+                    hu_imessage_set_use_imsg_cli(&bi->channel_slots[ch_count], true);
+                if (cfg->channels.imessage.loopback_handle)
+                    hu_imessage_set_loopback_handle(&bi->channel_slots[ch_count],
+                                                    cfg->channels.imessage.loopback_handle);
                 bi->channels[ch_count].channel_ctx = bi->channel_slots[ch_count].ctx;
                 bi->channels[ch_count].channel = &bi->channel_slots[ch_count];
                 bi->channels[ch_count].poll_fn = hu_imessage_poll;
@@ -1612,7 +1620,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                 bi->channels[ch_count].webhook_fn = NULL;
                 bi->channels[ch_count].interval_ms = 1000u;
                 bi->channels[ch_count].last_poll_ms = 0;
-                bi->channel_destroys[ch_count] = NULL;
+                bi->channel_destroys[ch_count] = destroy_twilio_media_wrap;
                 ch_count++;
             }
         }

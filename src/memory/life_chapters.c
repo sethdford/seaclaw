@@ -63,17 +63,19 @@ static hu_error_t parse_key_threads(hu_allocator_t *alloc, const char *json, siz
     size_t n = root->data.array.len;
     if (n > 8)
         n = 8;
-    for (size_t i = 0; i < n && root->data.array.items[i]; i++) {
+    size_t filled = 0;
+    for (size_t i = 0; i < n && root->data.array.items[i] && filled < 8; i++) {
         hu_json_value_t *item = root->data.array.items[i];
         if (item->type == HU_JSON_STRING && item->data.string.ptr) {
             size_t len = item->data.string.len;
             if (len > 127)
                 len = 127;
-            snprintf(out->key_threads[i], sizeof(out->key_threads[i]), "%.*s", (int)len,
+            snprintf(out->key_threads[filled], sizeof(out->key_threads[filled]), "%.*s", (int)len,
                      item->data.string.ptr);
+            filled++;
         }
     }
-    out->key_threads_count = n;
+    out->key_threads_count = filled;
     hu_json_free(alloc, root);
     return HU_OK;
 }
@@ -137,17 +139,27 @@ hu_error_t hu_life_chapter_store(hu_allocator_t *alloc, hu_memory_t *memory,
     if (!db)
         return HU_ERR_NOT_SUPPORTED;
 
-    /* Deactivate all previous chapters */
+    if (sqlite3_exec(db, "BEGIN", NULL, NULL, NULL) != SQLITE_OK)
+        return HU_ERR_MEMORY_BACKEND;
+
+    /* Deactivate all previous chapters (rolled back if insert/json fails) */
     sqlite3_stmt *upd = NULL;
     int rc = sqlite3_prepare_v2(db, "UPDATE life_chapters SET active=0", -1, &upd, NULL);
-    if (rc != SQLITE_OK)
+    if (rc != SQLITE_OK) {
+        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
         return HU_ERR_MEMORY_BACKEND;
-    sqlite3_step(upd);
+    }
+    rc = sqlite3_step(upd);
     sqlite3_finalize(upd);
+    if (rc != SQLITE_DONE) {
+        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        return HU_ERR_MEMORY_BACKEND;
+    }
 
     size_t kt_len = 0;
     char *key_threads_json = key_threads_to_json(alloc, chapter, &kt_len);
     if (!key_threads_json && chapter->key_threads_count > 0) {
+        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
         return HU_ERR_OUT_OF_MEMORY;
     }
     const char *kt = key_threads_json ? key_threads_json : "[]";
@@ -162,6 +174,7 @@ hu_error_t hu_life_chapter_store(hu_allocator_t *alloc, hu_memory_t *memory,
     if (rc != SQLITE_OK) {
         if (key_threads_json)
             alloc->free(alloc->ctx, key_threads_json, kt_len + 1);
+        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
         return HU_ERR_MEMORY_BACKEND;
     }
     sqlite3_bind_text(ins, 1, chapter->theme, -1, SQLITE_STATIC);
@@ -172,7 +185,15 @@ hu_error_t hu_life_chapter_store(hu_allocator_t *alloc, hu_memory_t *memory,
     sqlite3_finalize(ins);
     if (key_threads_json)
         alloc->free(alloc->ctx, key_threads_json, kt_len + 1);
-    return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
+    if (rc != SQLITE_DONE) {
+        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        return HU_ERR_MEMORY_BACKEND;
+    }
+    if (sqlite3_exec(db, "COMMIT", NULL, NULL, NULL) != SQLITE_OK) {
+        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        return HU_ERR_MEMORY_BACKEND;
+    }
+    return HU_OK;
 }
 
 char *hu_life_chapter_build_directive(hu_allocator_t *alloc,

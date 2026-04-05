@@ -67,6 +67,57 @@ static void humor_score_null_response_returns_error(void) {
     HU_ASSERT_EQ(hu_humor_fw_score_response(NULL, 0, NULL, &score), HU_ERR_INVALID_ARGUMENT);
 }
 
+static void humor_persona_fit_preferred_style_boosts(void) {
+    const char *conv = "haha that was great, tell me another one";
+    hu_humor_context_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.preferred_styles[0] = HU_HUMOR_FW_OBSERVATIONAL;
+    ctx.preferred_count = 1;
+    ctx.risk_tolerance = 0.6f;
+    hu_humor_evaluation_t with_pref;
+    HU_ASSERT_EQ(hu_humor_fw_evaluate_context(conv, strlen(conv), &ctx, &with_pref), HU_OK);
+
+    hu_humor_context_t ctx2;
+    memset(&ctx2, 0, sizeof(ctx2));
+    ctx2.risk_tolerance = 0.6f;
+    hu_humor_evaluation_t no_pref;
+    HU_ASSERT_EQ(hu_humor_fw_evaluate_context(conv, strlen(conv), &ctx2, &no_pref), HU_OK);
+
+    HU_ASSERT_TRUE(with_pref.persona_fit > no_pref.persona_fit);
+}
+
+static void humor_audience_fit_uses_risk_tolerance(void) {
+    const char *conv = "let me tell you something funny";
+    hu_humor_context_t low_risk;
+    memset(&low_risk, 0, sizeof(low_risk));
+    low_risk.risk_tolerance = 0.1f;
+    low_risk.contact_id = "alice";
+    low_risk.contact_id_len = 5;
+
+    hu_humor_context_t high_risk;
+    memset(&high_risk, 0, sizeof(high_risk));
+    high_risk.risk_tolerance = 0.9f;
+    high_risk.contact_id = "alice";
+    high_risk.contact_id_len = 5;
+
+    hu_humor_evaluation_t lo, hi;
+    HU_ASSERT_EQ(hu_humor_fw_evaluate_context(conv, strlen(conv), &low_risk, &lo), HU_OK);
+    HU_ASSERT_EQ(hu_humor_fw_evaluate_context(conv, strlen(conv), &high_risk, &hi), HU_OK);
+    HU_ASSERT_TRUE(hi.audience_fit >= lo.audience_fit);
+}
+
+static void humor_novelty_scales_with_conversation_length(void) {
+    const char *short_conv = "hi";
+    const char *long_conv =
+        "So I was thinking about the whole situation and realized it's actually "
+        "quite absurd when you consider all the different angles we could look at "
+        "this from, and then we talked about it more and more.";
+    hu_humor_evaluation_t short_eval, long_eval;
+    HU_ASSERT_EQ(hu_humor_fw_evaluate_context(short_conv, strlen(short_conv), NULL, &short_eval), HU_OK);
+    HU_ASSERT_EQ(hu_humor_fw_evaluate_context(long_conv, strlen(long_conv), NULL, &long_eval), HU_OK);
+    HU_ASSERT_TRUE(long_eval.novelty > short_eval.novelty);
+}
+
 void run_humor_fw_tests(void) {
     HU_TEST_SUITE("humor_fw");
     HU_RUN_TEST(humor_evaluate_happy_context_allows_humor);
@@ -75,4 +126,7 @@ void run_humor_fw_tests(void) {
     HU_RUN_TEST(humor_build_directive_produces_string);
     HU_RUN_TEST(humor_score_response_witty_gets_positive);
     HU_RUN_TEST(humor_score_null_response_returns_error);
+    HU_RUN_TEST(humor_persona_fit_preferred_style_boosts);
+    HU_RUN_TEST(humor_audience_fit_uses_risk_tolerance);
+    HU_RUN_TEST(humor_novelty_scales_with_conversation_length);
 }

@@ -38,12 +38,20 @@ static hu_error_t mem_vec_upsert(void *ctx, hu_allocator_t *alloc, const char *i
 
     for (size_t i = 0; i < m->count; i++) {
         if (strlen(m->entries[i].id) == id_len && memcmp(m->entries[i].id, id, id_len) == 0) {
-            alloc->free(alloc->ctx, m->entries[i].embedding, m->entries[i].dims * sizeof(float));
-            m->entries[i].id = hu_strndup(alloc, id, id_len);
-            m->entries[i].embedding = (float *)alloc->alloc(alloc->ctx, dims * sizeof(float));
-            if (!m->entries[i].embedding)
+            float *new_emb = (float *)alloc->alloc(alloc->ctx, dims * sizeof(float));
+            if (!new_emb)
                 return HU_ERR_OUT_OF_MEMORY;
-            memcpy(m->entries[i].embedding, embedding, dims * sizeof(float));
+            memcpy(new_emb, embedding, dims * sizeof(float));
+            char *new_id = hu_strndup(alloc, id, id_len);
+            if (!new_id) {
+                alloc->free(alloc->ctx, new_emb, dims * sizeof(float));
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            alloc->free(alloc->ctx, m->entries[i].embedding, m->entries[i].dims * sizeof(float));
+            if (m->entries[i].id)
+                alloc->free(alloc->ctx, m->entries[i].id, strlen(m->entries[i].id) + 1);
+            m->entries[i].embedding = new_emb;
+            m->entries[i].id = new_id;
             m->entries[i].dims = dims;
             return HU_OK;
         }
@@ -63,9 +71,14 @@ static hu_error_t mem_vec_upsert(void *ctx, hu_allocator_t *alloc, const char *i
 
     mem_vec_entry_t *e = &m->entries[m->count];
     e->id = hu_strndup(alloc, id, id_len);
-    e->embedding = (float *)alloc->alloc(alloc->ctx, dims * sizeof(float));
-    if (!e->id || !e->embedding)
+    if (!e->id)
         return HU_ERR_OUT_OF_MEMORY;
+    e->embedding = (float *)alloc->alloc(alloc->ctx, dims * sizeof(float));
+    if (!e->embedding) {
+        alloc->free(alloc->ctx, e->id, strlen(e->id) + 1);
+        e->id = NULL;
+        return HU_ERR_OUT_OF_MEMORY;
+    }
     memcpy(e->embedding, embedding, dims * sizeof(float));
     e->dims = dims;
     m->count++;
@@ -93,6 +106,14 @@ static hu_error_t mem_vec_search(void *ctx, hu_allocator_t *alloc, const float *
             continue;
         float sim = hu_vector_cosine_similarity(query_embedding, m->entries[i].embedding, dims);
         arr[n].id = hu_strdup(alloc, m->entries[i].id);
+        if (!arr[n].id) {
+            for (size_t k = 0; k < n; k++)
+                hu_str_free(alloc, arr[k].id);
+            alloc->free(alloc->ctx, arr, m->count * sizeof(hu_vector_search_result_t));
+            *results = NULL;
+            *result_count = 0;
+            return HU_ERR_OUT_OF_MEMORY;
+        }
         arr[n].score = sim;
         n++;
     }

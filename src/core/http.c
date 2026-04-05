@@ -1,6 +1,7 @@
 #include "human/core/http.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,8 +94,11 @@ static size_t write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
 }
 
 static void add_header(struct curl_slist **list, const char *header) {
-    if (header && header[0])
-        *list = curl_slist_append(*list, header);
+    if (header && header[0]) {
+        struct curl_slist *tmp = curl_slist_append(*list, header);
+        if (tmp)
+            *list = tmp;
+    }
 }
 
 /* ── Connection pool: reuse curl handles to avoid TCP/TLS handshake ── */
@@ -147,6 +151,12 @@ static hu_error_t hu_http_get_impl(hu_allocator_t *alloc, const char *url, const
                                    hu_http_response_t *out) {
     if (!alloc || !url || !out)
         return HU_ERR_INVALID_ARGUMENT;
+
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
+    if (strncmp(url, "https://", 8) != 0 && strncmp(url, "http://localhost", 16) != 0 &&
+        strncmp(url, "http://127.0.0.1", 16) != 0)
+        hu_log_warn("http", NULL, "non-HTTPS URL: scheme enforcement recommended");
+#endif
 
     CURL *curl = curl_pool_acquire();
     if (!curl)
@@ -279,6 +289,12 @@ static hu_error_t hu_http_post_json_impl(hu_allocator_t *alloc, const char *url,
     if (!alloc || !url || !out)
         return HU_ERR_INVALID_ARGUMENT;
 
+#if !defined(HU_IS_TEST) || !HU_IS_TEST
+    if (strncmp(url, "https://", 8) != 0 && strncmp(url, "http://localhost", 16) != 0 &&
+        strncmp(url, "http://127.0.0.1", 16) != 0)
+        hu_log_warn("http", NULL, "non-HTTPS URL: scheme enforcement recommended");
+#endif
+
     CURL *curl = curl_pool_acquire();
     if (!curl)
         return HU_ERR_NOT_SUPPORTED;
@@ -323,10 +339,13 @@ static hu_error_t hu_http_post_json_impl(hu_allocator_t *alloc, const char *url,
     w.buf[0] = '\0';
 
     if (json_body_len > (size_t)LONG_MAX) {
+        alloc->free(alloc->ctx, w.buf, w.cap);
         curl_slist_free_all(headers);
         curl_pool_release(curl);
         return HU_ERR_INVALID_ARGUMENT;
     }
+    if (getenv("HU_DEBUG"))
+        hu_log_info("http", NULL, "POST %s (body_len=%zu)", url, json_body_len);
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_body);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)json_body_len);
@@ -343,6 +362,8 @@ static hu_error_t hu_http_post_json_impl(hu_allocator_t *alloc, const char *url,
     curl_pool_release(curl);
 
     if (res != CURLE_OK) {
+        hu_log_error("http", NULL, "curl POST failed: %s (code=%d) url=%s body_len=%zu",
+                     curl_easy_strerror(res), (int)res, url, json_body_len);
         alloc->free(alloc->ctx, w.buf, w.cap);
         if (res == CURLE_OPERATION_TIMEDOUT)
             return HU_ERR_TIMEOUT;

@@ -125,7 +125,13 @@ static hu_error_t ollama_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
     if (!root)
         return HU_ERR_OUT_OF_MEMORY;
 
-    hu_json_object_set(alloc, root, "model", hu_json_string_new(alloc, model, model_len));
+    hu_json_value_t *model_val = hu_json_string_new(alloc, model, model_len);
+    if (!model_val || hu_json_object_set(alloc, root, "model", model_val) != HU_OK) {
+        if (model_val)
+            hu_json_free(alloc, model_val);
+        hu_json_free(alloc, root);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
     hu_json_object_set(alloc, root, "stream", hu_json_bool_new(alloc, false));
     hu_json_object_set(alloc, root, "temperature", hu_json_number_new(alloc, temperature));
 
@@ -134,7 +140,11 @@ static hu_error_t ollama_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
         hu_json_free(alloc, root);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    hu_json_object_set(alloc, root, "messages", msgs_arr);
+    if (hu_json_object_set(alloc, root, "messages", msgs_arr) != HU_OK) {
+        hu_json_free(alloc, msgs_arr);
+        hu_json_free(alloc, root);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
 
     for (size_t i = 0; i < request->messages_count; i++) {
         const hu_chat_message_t *m = &request->messages[i];
@@ -264,38 +274,58 @@ static hu_error_t ollama_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
         if (content) {
             size_t clen = strlen(content);
             out->content = hu_strndup(alloc, content, clen);
-            out->content_len = clen;
+            out->content_len = out->content ? clen : 0;
         }
         hu_json_value_t *tc_arr = hu_json_object_get(msg, "tool_calls");
         if (tc_arr && tc_arr->type == HU_JSON_ARRAY && tc_arr->data.array.len > 0) {
             size_t tc_count = tc_arr->data.array.len;
             hu_tool_call_t *tcs =
                 (hu_tool_call_t *)alloc->alloc(alloc->ctx, tc_count * sizeof(hu_tool_call_t));
-            if (tcs) {
-                memset(tcs, 0, tc_count * sizeof(hu_tool_call_t));
-                size_t valid = 0;
-                for (size_t j = 0; j < tc_count; j++) {
-                    hu_json_value_t *tc = tc_arr->data.array.items[j];
-                    const char *tc_id = hu_json_get_string(tc, "id");
-                    hu_json_value_t *fn = hu_json_object_get(tc, "function");
-                    if (!fn || fn->type != HU_JSON_OBJECT)
-                        continue;
-                    const char *fn_name = hu_json_get_string(fn, "name");
-                    const char *fn_args = hu_json_get_string(fn, "arguments");
-                    if (!fn_name)
-                        continue;
-                    tcs[valid].id = tc_id ? hu_strndup(alloc, tc_id, strlen(tc_id)) : NULL;
-                    tcs[valid].id_len = tc_id ? (size_t)strlen(tc_id) : 0;
-                    tcs[valid].name = hu_strndup(alloc, fn_name, strlen(fn_name));
-                    tcs[valid].name_len = (size_t)strlen(fn_name);
-                    tcs[valid].arguments =
-                        fn_args ? hu_strndup(alloc, fn_args, strlen(fn_args)) : NULL;
-                    tcs[valid].arguments_len = fn_args ? (size_t)strlen(fn_args) : 0;
-                    valid++;
-                }
-                out->tool_calls = tcs;
-                out->tool_calls_count = valid;
+            if (!tcs) {
+                hu_json_free(alloc, parsed);
+                return HU_ERR_OUT_OF_MEMORY;
             }
+            memset(tcs, 0, tc_count * sizeof(hu_tool_call_t));
+            size_t valid = 0;
+            for (size_t j = 0; j < tc_count; j++) {
+                hu_json_value_t *tc = tc_arr->data.array.items[j];
+                const char *tc_id = hu_json_get_string(tc, "id");
+                hu_json_value_t *fn = hu_json_object_get(tc, "function");
+                if (!fn || fn->type != HU_JSON_OBJECT)
+                    continue;
+                const char *fn_name = hu_json_get_string(fn, "name");
+                const char *fn_args = hu_json_get_string(fn, "arguments");
+                if (!fn_name)
+                    continue;
+                tcs[valid].name = hu_strndup(alloc, fn_name, strlen(fn_name));
+                tcs[valid].name_len = tcs[valid].name ? (size_t)strlen(fn_name) : 0;
+                if (!tcs[valid].name)
+                    continue;
+                tcs[valid].id = tc_id ? hu_strndup(alloc, tc_id, strlen(tc_id)) : NULL;
+                tcs[valid].id_len = (tc_id && tcs[valid].id) ? (size_t)strlen(tc_id) : 0;
+                if (tc_id && !tcs[valid].id) {
+                    alloc->free(alloc->ctx, (void *)tcs[valid].name, tcs[valid].name_len + 1);
+                    tcs[valid].name = NULL;
+                    tcs[valid].name_len = 0;
+                    continue;
+                }
+                tcs[valid].arguments = fn_args ? hu_strndup(alloc, fn_args, strlen(fn_args)) : NULL;
+                tcs[valid].arguments_len =
+                    (fn_args && tcs[valid].arguments) ? (size_t)strlen(fn_args) : 0;
+                if (fn_args && !tcs[valid].arguments) {
+                    alloc->free(alloc->ctx, (void *)tcs[valid].name, tcs[valid].name_len + 1);
+                    if (tcs[valid].id)
+                        alloc->free(alloc->ctx, (void *)tcs[valid].id, tcs[valid].id_len + 1);
+                    tcs[valid].name = NULL;
+                    tcs[valid].name_len = 0;
+                    tcs[valid].id = NULL;
+                    tcs[valid].id_len = 0;
+                    continue;
+                }
+                valid++;
+            }
+            out->tool_calls = tcs;
+            out->tool_calls_count = valid;
         }
     }
     hu_json_free(alloc, parsed);

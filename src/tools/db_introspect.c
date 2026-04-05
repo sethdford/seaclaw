@@ -1,6 +1,8 @@
 #include "human/tools/db_introspect.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/tools/validation.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +25,17 @@ typedef struct {
     hu_allocator_t *alloc;
     char *default_db_path;
 } db_introspect_ctx_t;
+
+static bool is_safe_sql_identifier(const char *s) {
+    if (!s || !s[0])
+        return false;
+    for (const char *p = s; *p; p++) {
+        if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+              (*p >= '0' && *p <= '9') || *p == '_'))
+            return false;
+    }
+    return true;
+}
 
 static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
                                         hu_tool_result_t *out) {
@@ -64,6 +77,11 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
     if (!db_path)
         db_path = c->default_db_path ? c->default_db_path : ":memory:";
 
+    if (hu_tool_validate_path(db_path, NULL, 0) != HU_OK) {
+        *out = hu_tool_result_fail("invalid database path", 21);
+        return HU_OK;
+    }
+
     sqlite3 *db = NULL;
     if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
         *out = hu_tool_result_fail("cannot open database", 20);
@@ -88,18 +106,18 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
         }
 
         size_t off = 0;
-        off += (size_t)snprintf(buf + off, cap - off, "{\"tables\":[");
+        off = hu_buf_appendf(buf, cap, off, "{\"tables\":[");
         int first = 1;
 
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             const char *nm = (const char *)sqlite3_column_text(stmt, 0);
             if (!first && off < cap - 2)
                 buf[off++] = ',';
-            off += (size_t)snprintf(buf + off, cap - off - 1, "\"%s\"", nm ? nm : "");
+            off = hu_buf_appendf(buf, cap, off, "\"%s\"", nm ? nm : "");
             first = 0;
         }
 
-        off += (size_t)snprintf(buf + off, cap - off - 1, "]}");
+        off = hu_buf_appendf(buf, cap, off, "]}");
         *out = hu_tool_result_ok_owned(buf, off);
         sqlite3_finalize(stmt);
 
@@ -107,6 +125,11 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
         if (!table) {
             sqlite3_close(db);
             *out = hu_tool_result_fail("columns action requires table parameter", 39);
+            return HU_OK;
+        }
+        if (!is_safe_sql_identifier(table)) {
+            sqlite3_close(db);
+            *out = hu_tool_result_fail("invalid table name", 18);
             return HU_OK;
         }
 
@@ -128,7 +151,7 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
         }
 
         size_t off = 0;
-        off += (size_t)snprintf(buf + off, cap - off, "{\"columns\":[");
+        off = hu_buf_appendf(buf, cap, off, "{\"columns\":[");
         int first = 1;
 
         while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -139,14 +162,14 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
 
             if (!first && off < cap - 2)
                 buf[off++] = ',';
-            off += (size_t)snprintf(buf + off, cap - off - 1,
-                                    "{\"name\":\"%s\",\"type\":\"%s\",\"notnull\":%d,\"pk\":%d}",
-                                    col_name ? col_name : "", col_type ? col_type : "", col_notnull,
-                                    col_pk);
+            off = hu_buf_appendf(buf, cap, off,
+                                 "{\"name\":\"%s\",\"type\":\"%s\",\"notnull\":%d,\"pk\":%d}",
+                                 col_name ? col_name : "", col_type ? col_type : "", col_notnull,
+                                 col_pk);
             first = 0;
         }
 
-        off += (size_t)snprintf(buf + off, cap - off - 1, "]}");
+        off = hu_buf_appendf(buf, cap, off, "]}");
         *out = hu_tool_result_ok_owned(buf, off);
         sqlite3_finalize(stmt);
 
@@ -154,6 +177,11 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
         if (!table) {
             sqlite3_close(db);
             *out = hu_tool_result_fail("indexes action requires table parameter", 39);
+            return HU_OK;
+        }
+        if (!is_safe_sql_identifier(table)) {
+            sqlite3_close(db);
+            *out = hu_tool_result_fail("invalid table name", 18);
             return HU_OK;
         }
 
@@ -175,7 +203,7 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
         }
 
         size_t off = 0;
-        off += (size_t)snprintf(buf + off, cap - off, "{\"indexes\":[");
+        off = hu_buf_appendf(buf, cap, off, "{\"indexes\":[");
         int first = 1;
 
         while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -184,12 +212,12 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
 
             if (!first && off < cap - 2)
                 buf[off++] = ',';
-            off += (size_t)snprintf(buf + off, cap - off - 1, "{\"name\":\"%s\",\"unique\":%d}",
-                                    idx_name ? idx_name : "", idx_unique);
+            off = hu_buf_appendf(buf, cap, off, "{\"name\":\"%s\",\"unique\":%d}",
+                                 idx_name ? idx_name : "", idx_unique);
             first = 0;
         }
 
-        off += (size_t)snprintf(buf + off, cap - off - 1, "]}");
+        off = hu_buf_appendf(buf, cap, off, "]}");
         *out = hu_tool_result_ok_owned(buf, off);
         sqlite3_finalize(stmt);
 
@@ -197,6 +225,11 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
         if (!table) {
             sqlite3_close(db);
             *out = hu_tool_result_fail("foreign_keys action requires table parameter", 44);
+            return HU_OK;
+        }
+        if (!is_safe_sql_identifier(table)) {
+            sqlite3_close(db);
+            *out = hu_tool_result_fail("invalid table name", 18);
             return HU_OK;
         }
 
@@ -218,7 +251,7 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
         }
 
         size_t off = 0;
-        off += (size_t)snprintf(buf + off, cap - off, "{\"foreign_keys\":[");
+        off = hu_buf_appendf(buf, cap, off, "{\"foreign_keys\":[");
         int first = 1;
 
         while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -229,14 +262,14 @@ static hu_error_t db_introspect_execute(void *ctx, hu_allocator_t *alloc, const 
 
             if (!first && off < cap - 2)
                 buf[off++] = ',';
-            off += (size_t)snprintf(buf + off, cap - off - 1,
-                                    "{\"id\":%d,\"table\":\"%s\",\"from\":\"%s\",\"to\":\"%s\"}", fk_id,
-                                    fk_table ? fk_table : "", fk_from ? fk_from : "",
-                                    fk_to ? fk_to : "");
+            off = hu_buf_appendf(buf, cap, off,
+                                 "{\"id\":%d,\"table\":\"%s\",\"from\":\"%s\",\"to\":\"%s\"}", fk_id,
+                                 fk_table ? fk_table : "", fk_from ? fk_from : "",
+                                 fk_to ? fk_to : "");
             first = 0;
         }
 
-        off += (size_t)snprintf(buf + off, cap - off - 1, "]}");
+        off = hu_buf_appendf(buf, cap, off, "]}");
         *out = hu_tool_result_ok_owned(buf, off);
         sqlite3_finalize(stmt);
 

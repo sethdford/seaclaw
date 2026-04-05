@@ -65,13 +65,18 @@ hu_error_t hu_opinions_upsert(hu_allocator_t *alloc, hu_memory_t *memory,
         }
 
         /* Different position: insert new, then supersede old */
+        if (sqlite3_exec(db, "BEGIN", NULL, NULL, NULL) != SQLITE_OK)
+            return HU_ERR_MEMORY_BACKEND;
+
         sqlite3_stmt *ins = NULL;
         rc = sqlite3_prepare_v2(db,
                                 "INSERT INTO opinions(topic,position,confidence,first_expressed,"
                                 "last_expressed,superseded_by) VALUES(?,?,?,?,?,NULL)",
                                 -1, &ins, NULL);
-        if (rc != SQLITE_OK)
+        if (rc != SQLITE_OK) {
+            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
             return HU_ERR_MEMORY_BACKEND;
+        }
         sqlite3_bind_text(ins, 1, topic, (int)topic_len, SQLITE_STATIC);
         sqlite3_bind_text(ins, 2, position, (int)position_len, SQLITE_STATIC);
         sqlite3_bind_double(ins, 3, (double)confidence);
@@ -80,6 +85,7 @@ hu_error_t hu_opinions_upsert(hu_allocator_t *alloc, hu_memory_t *memory,
         rc = sqlite3_step(ins);
         if (rc != SQLITE_DONE) {
             sqlite3_finalize(ins);
+            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
             return HU_ERR_MEMORY_BACKEND;
         }
         int64_t new_id = sqlite3_last_insert_rowid(db);
@@ -88,13 +94,23 @@ hu_error_t hu_opinions_upsert(hu_allocator_t *alloc, hu_memory_t *memory,
         sqlite3_stmt *sup = NULL;
         rc = sqlite3_prepare_v2(db, "UPDATE opinions SET superseded_by=? WHERE id=?",
                                 -1, &sup, NULL);
-        if (rc != SQLITE_OK)
+        if (rc != SQLITE_OK) {
+            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
             return HU_ERR_MEMORY_BACKEND;
+        }
         sqlite3_bind_int64(sup, 1, new_id);
         sqlite3_bind_int64(sup, 2, old_id);
         rc = sqlite3_step(sup);
         sqlite3_finalize(sup);
-        return (rc == SQLITE_DONE) ? HU_OK : HU_ERR_MEMORY_BACKEND;
+        if (rc != SQLITE_DONE) {
+            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+            return HU_ERR_MEMORY_BACKEND;
+        }
+        if (sqlite3_exec(db, "COMMIT", NULL, NULL, NULL) != SQLITE_OK) {
+            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+            return HU_ERR_MEMORY_BACKEND;
+        }
+        return HU_OK;
     }
 
     sqlite3_finalize(sel);

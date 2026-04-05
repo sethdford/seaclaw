@@ -6,6 +6,7 @@
 #include "human/core/string.h"
 #include "human/data/loader.h"
 #include "human/persona.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +29,14 @@ static hu_error_t hu_prompt_data_init(hu_allocator_t *alloc) {
     if (!alloc)
         return HU_ERR_INVALID_ARGUMENT;
 
+    for (size_t i = 0; i < 3; i++) {
+        if (g_tone_hints[i]) {
+            hu_str_free(alloc, (char *)g_tone_hints[i]);
+            g_tone_hints[i] = NULL;
+            g_tone_hints_len[i] = 0;
+        }
+    }
+
     /* Load tone hints */
     char *json_data = NULL;
     size_t json_len = 0;
@@ -42,15 +51,15 @@ static hu_error_t hu_prompt_data_init(hu_allocator_t *alloc) {
             const char *formal = hu_json_get_string(root, "formal");
             if (casual) {
                 g_tone_hints[0] = hu_strndup(alloc, casual, strlen(casual));
-                g_tone_hints_len[0] = strlen(g_tone_hints[0]);
+                g_tone_hints_len[0] = g_tone_hints[0] ? strlen(g_tone_hints[0]) : 0;
             }
             if (technical) {
                 g_tone_hints[1] = hu_strndup(alloc, technical, strlen(technical));
-                g_tone_hints_len[1] = strlen(g_tone_hints[1]);
+                g_tone_hints_len[1] = g_tone_hints[1] ? strlen(g_tone_hints[1]) : 0;
             }
             if (formal) {
                 g_tone_hints[2] = hu_strndup(alloc, formal, strlen(formal));
-                g_tone_hints_len[2] = strlen(g_tone_hints[2]);
+                g_tone_hints_len[2] = g_tone_hints[2] ? strlen(g_tone_hints[2]) : 0;
             }
             hu_json_free(alloc, root);
         }
@@ -61,8 +70,19 @@ static hu_error_t hu_prompt_data_init(hu_allocator_t *alloc) {
 
 static hu_error_t append(hu_allocator_t *alloc, char **buf, size_t *len, size_t *cap, const char *s,
                          size_t slen) {
+    if (slen > SIZE_MAX - *len - 1)
+        return HU_ERR_OUT_OF_MEMORY;
     while (*len + slen + 1 > *cap) {
-        size_t new_cap = *cap ? *cap * 2 : HU_PROMPT_INIT_CAP;
+        size_t new_cap;
+        if (*cap == 0) {
+            new_cap = HU_PROMPT_INIT_CAP;
+        } else if (*cap > SIZE_MAX / 2) {
+            new_cap = *len + slen + 1;
+        } else {
+            new_cap = *cap * 2;
+            if (new_cap < *len + slen + 1)
+                new_cap = *len + slen + 1;
+        }
         char *nb = (char *)alloc->realloc(alloc->ctx, *buf, *cap, new_cap);
         if (!nb)
             return HU_ERR_OUT_OF_MEMORY;
@@ -125,6 +145,15 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
         if (config->memory_context && config->memory_context_len > 0) {
             err =
                 append(alloc, &buf, &len, &cap, config->memory_context, config->memory_context_len);
+            if (err != HU_OK)
+                goto fail;
+            err = append(alloc, &buf, &len, &cap, "\n\n", 2);
+            if (err != HU_OK)
+                goto fail;
+        }
+        if (config->relational_episode_context && config->relational_episode_context_len > 0) {
+            err = append(alloc, &buf, &len, &cap, config->relational_episode_context,
+                         config->relational_episode_context_len);
             if (err != HU_OK)
                 goto fail;
             err = append(alloc, &buf, &len, &cap, "\n\n", 2);
@@ -526,6 +555,15 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
         if (err != HU_OK)
             goto fail;
     }
+    if (config->relational_episode_context && config->relational_episode_context_len > 0) {
+        err = append(alloc, &buf, &len, &cap, config->relational_episode_context,
+                     config->relational_episode_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n\n", 2);
+        if (err != HU_OK)
+            goto fail;
+    }
 
     /* Instruction file context (discovered .human.md / HUMAN.md) */
     if (config->instruction_context && config->instruction_context_len > 0) {
@@ -590,6 +628,14 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
             goto fail;
         err = append(alloc, &buf, &len, &cap, config->proactive_context,
                      config->proactive_context_len);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->growth_context && config->growth_context_len > 0) {
+        err = append(alloc, &buf, &len, &cap, "\n\n", 2);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->growth_context, config->growth_context_len);
         if (err != HU_OK)
             goto fail;
     }
@@ -765,6 +811,155 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
             goto fail;
         err = append(alloc, &buf, &len, &cap, config->humanness_context,
                      config->humanness_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    if (config->boundary_context && config->boundary_context_len > 0) {
+        err = append(alloc, &buf, &len, &cap, config->boundary_context, config->boundary_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->somatic_context && config->somatic_context_len > 0) {
+        static const char somatic_hdr[] = "\n## Somatic Awareness\n\n";
+        err = append(alloc, &buf, &len, &cap, somatic_hdr, sizeof(somatic_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->somatic_context, config->somatic_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->presence_context && config->presence_context_len > 0) {
+        static const char presence_hdr[] = "\n## Presence\n\n";
+        err = append(alloc, &buf, &len, &cap, presence_hdr, sizeof(presence_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->presence_context, config->presence_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->narrative_self_context && config->narrative_self_context_len > 0) {
+        static const char narrative_hdr[] = "\n## Narrative Self\n\n";
+        err = append(alloc, &buf, &len, &cap, narrative_hdr, sizeof(narrative_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->narrative_self_context,
+                     config->narrative_self_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->novelty_context && config->novelty_context_len > 0) {
+        err = append(alloc, &buf, &len, &cap, config->novelty_context, config->novelty_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->attachment_context && config->attachment_context_len > 0) {
+        err = append(alloc, &buf, &len, &cap, config->attachment_context,
+                     config->attachment_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->rupture_context && config->rupture_context_len > 0) {
+        err = append(alloc, &buf, &len, &cap, config->rupture_context, config->rupture_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->micro_expression_context && config->micro_expression_context_len > 0) {
+        static const char micro_hdr[] = "\n## Expression Style\n\n";
+        err = append(alloc, &buf, &len, &cap, micro_hdr, sizeof(micro_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->micro_expression_context,
+                     config->micro_expression_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->creative_voice_context && config->creative_voice_context_len > 0) {
+        static const char creative_hdr[] = "\n## Creative Voice\n\n";
+        err = append(alloc, &buf, &len, &cap, creative_hdr, sizeof(creative_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->creative_voice_context,
+                     config->creative_voice_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    if (config->trust_context && config->trust_context_len > 0) {
+        static const char trust_hdr[] = "\n## Trust Calibration\n\n";
+        err = append(alloc, &buf, &len, &cap, trust_hdr, sizeof(trust_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->trust_context, config->trust_context_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->humor_directive && config->humor_directive_len > 0) {
+        static const char humor_hdr[] = "\n## Humor Guidance\n\n";
+        err = append(alloc, &buf, &len, &cap, humor_hdr, sizeof(humor_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->humor_directive, config->humor_directive_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+    if (config->sycophancy_friction && config->sycophancy_friction_len > 0) {
+        static const char syc_hdr[] = "\n## Anti-Sycophancy\n\n";
+        err = append(alloc, &buf, &len, &cap, syc_hdr, sizeof(syc_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->sycophancy_friction,
+                     config->sycophancy_friction_len);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    if (config->conv_goals_context && config->conv_goals_context_len > 0) {
+        static const char cg_hdr[] = "\n## Conversation Goals\n\n";
+        err = append(alloc, &buf, &len, &cap, cg_hdr, sizeof(cg_hdr) - 1);
+        if (err != HU_OK)
+            goto fail;
+        err = append(alloc, &buf, &len, &cap, config->conv_goals_context,
+                     config->conv_goals_context_len);
         if (err != HU_OK)
             goto fail;
         err = append(alloc, &buf, &len, &cap, "\n", 1);

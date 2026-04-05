@@ -240,7 +240,8 @@ static void test_continuation_preamble(void) {
     meta.summarized_count = 8;
     meta.preserved_count = 2;
 
-    hu_error_t err = hu_compact_inject_continuation_preamble(&alloc, &meta, history, &count, &cap);
+    hu_owned_message_t *hist = history;
+    hu_error_t err = hu_compact_inject_continuation_preamble(&alloc, &meta, &hist, &count, &cap);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(count, 3);
 
@@ -347,7 +348,7 @@ static void test_compaction_with_structured_flag_enabled(void) {
     cfg.token_limit = 100000;
 
     /* Perform compaction */
-    hu_error_t err = hu_compact_history(&alloc, history, &history_count, &history_cap, &cfg);
+    hu_error_t err = hu_compact_history(&alloc, &history, &history_count, &history_cap, &cfg);
     HU_ASSERT_EQ(err, HU_OK);
 
     /* Verify that compaction happened */
@@ -401,7 +402,7 @@ static void test_compaction_with_structured_flag_disabled(void) {
     cfg.token_limit = 100000;
 
     /* Perform compaction */
-    hu_error_t err = hu_compact_history(&alloc, history, &history_count, &history_cap, &cfg);
+    hu_error_t err = hu_compact_history(&alloc, &history, &history_count, &history_cap, &cfg);
     HU_ASSERT_EQ(err, HU_OK);
 
     /* Verify that compaction happened */

@@ -324,15 +324,21 @@ static hu_error_t hu_hook_build_command(hu_allocator_t *alloc, const hu_hook_ent
                            (int)hook->command_len, hook->command);
     }
 
+    if (written < 0 || (size_t)written > total) {
+        alloc->free(alloc->ctx, cmd, total + 1);
+        alloc->free(alloc->ctx, esc_tool, esc_tool_len + 1);
+        alloc->free(alloc->ctx, esc_args, esc_args_len + 1);
+        if (esc_output)
+            alloc->free(alloc->ctx, esc_output, esc_output_len + 1);
+        *cmd_out = NULL;
+        *cmd_len_out = 0;
+        return HU_ERR_LIMIT_REACHED;
+    }
+
     alloc->free(alloc->ctx, esc_tool, esc_tool_len + 1);
     alloc->free(alloc->ctx, esc_args, esc_args_len + 1);
     if (esc_output)
         alloc->free(alloc->ctx, esc_output, esc_output_len + 1);
-
-    if (written < 0) {
-        alloc->free(alloc->ctx, cmd, total + 1);
-        return HU_ERR_INTERNAL;
-    }
 
     *cmd_out = cmd;
     *cmd_len_out = (size_t)written;
@@ -410,29 +416,38 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
         /* Sanitize dangerous environment variables */
         extern char **environ;
 
-        /* Phase 1: collect names of dangerous variables (avoid modifying environ during iteration) */
-        char *to_remove[32];
-        size_t remove_count = 0;
-        for (char **env = environ; env && *env && remove_count < 32; env++) {
-            if (hu_hook_is_dangerous_env(*env)) {
-                /* Extract variable name (up to '=') */
-                const char *eq = strchr(*env, '=');
-                if (eq) {
-                    size_t nlen = (size_t)(eq - *env);
-                    char *name_copy = malloc(nlen + 1);
-                    if (name_copy) {
-                        memcpy(name_copy, *env, nlen);
-                        name_copy[nlen] = '\0';
-                        to_remove[remove_count++] = name_copy;
-                    }
+        /* Collect names without malloc when short; heap only for long names. Never skip short names
+         * on OOM (previous code dropped sanitization entirely if malloc failed). */
+        char stack_names[32][256];
+        char *heap_names[32];
+        size_t stack_count = 0;
+        size_t heap_count = 0;
+        for (char **env = environ; env && *env && (stack_count + heap_count) < 32; env++) {
+            if (!hu_hook_is_dangerous_env(*env))
+                continue;
+            const char *eq = strchr(*env, '=');
+            if (!eq)
+                continue;
+            size_t nlen = (size_t)(eq - *env);
+            if (nlen < sizeof(stack_names[0])) {
+                memcpy(stack_names[stack_count], *env, nlen);
+                stack_names[stack_count][nlen] = '\0';
+                stack_count++;
+            } else {
+                char *name_copy = malloc(nlen + 1);
+                if (name_copy) {
+                    memcpy(name_copy, *env, nlen);
+                    name_copy[nlen] = '\0';
+                    heap_names[heap_count++] = name_copy;
                 }
             }
         }
 
-        /* Phase 2: remove collected variable names */
-        for (size_t i = 0; i < remove_count; i++) {
-            unsetenv(to_remove[i]);
-            free(to_remove[i]);
+        for (size_t i = 0; i < stack_count; i++)
+            unsetenv(stack_names[i]);
+        for (size_t i = 0; i < heap_count; i++) {
+            unsetenv(heap_names[i]);
+            free(heap_names[i]);
         }
 
         execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);

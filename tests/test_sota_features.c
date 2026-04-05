@@ -3,11 +3,15 @@
 #include "human/agent/dag.h"
 #include "human/agent/dag_executor.h"
 #include "human/agent/prompt.h"
+#include "human/cognition/trust.h"
 #include "human/context/conversation.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/string.h"
+#include "human/eval/consistency.h"
+#include "human/memory/fact_extract.h"
 #include "human/memory/lifecycle/semantic_cache.h"
+#include "human/persona/somatic.h"
 #include "test_framework.h"
 #include <string.h>
 
@@ -36,7 +40,8 @@ static void hierarchical_compact_below_threshold_noop(void) {
 
     size_t count = 3;
     size_t cap = 3;
-    hu_error_t err = hu_compact_history_hierarchical(&alloc, history, &count, &cap,
+    hu_owned_message_t *hist = history;
+    hu_error_t err = hu_compact_history_hierarchical(&alloc, &hist, &count, &cap,
                                                       &cfg, NULL, 5, 2);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(count, 3u);
@@ -66,7 +71,8 @@ static void hierarchical_compact_produces_summary(void) {
 
     size_t count = total;
     size_t cap = total;
-    hu_error_t err = hu_compact_history_hierarchical(&alloc, history, &count, &cap,
+    hu_owned_message_t *hist = history;
+    hu_error_t err = hu_compact_history_hierarchical(&alloc, &hist, &count, &cap,
                                                       &cfg, NULL, 5, 3);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(count < total);
@@ -383,6 +389,95 @@ static void emotion_skips_own_messages(void) {
     HU_ASSERT_STR_EQ(s.dominant_emotion, "neutral");
 }
 
+/* ===== Frontier integration tests ===== */
+
+static void trust_update_modifies_composite(void) {
+    hu_tcal_state_t state;
+    memset(&state, 0, sizeof(state));
+    hu_tcal_init(&state);
+    float before = state.composite;
+    hu_tcal_update(&state, 0.9f, 0.8f, 0.7f);
+    HU_ASSERT_TRUE(state.dimensions.competence > before);
+    HU_ASSERT_TRUE(state.dimensions.benevolence > before);
+    HU_ASSERT_TRUE(state.dimensions.integrity > before);
+}
+
+static void somatic_low_energy_below_threshold(void) {
+    hu_somatic_state_t ss;
+    memset(&ss, 0, sizeof(ss));
+    ss.energy = 0.2f;
+    ss.social_battery = 0.6f;
+    ss.focus = 0.4f;
+    HU_ASSERT_TRUE(ss.energy < 0.3f);
+    hu_allocator_t alloc = hu_system_allocator();
+    char *ctx = NULL;
+    size_t ctx_len = 0;
+    HU_ASSERT_EQ(hu_somatic_build_context(&alloc, &ss, &ctx, &ctx_len), HU_OK);
+    HU_ASSERT_NOT_NULL(ctx);
+    HU_ASSERT_TRUE(ctx_len > 0);
+    HU_ASSERT_NOT_NULL(strstr(ctx, "Energy"));
+    alloc.free(alloc.ctx, ctx, ctx_len + 1);
+}
+
+static void consistency_score_similar_text_high(void) {
+    const char *a = "I love hiking in the mountains and being outdoors";
+    const char *b = "I enjoy hiking and spending time in the mountains outdoors";
+    float score = 0.0f;
+    HU_ASSERT_EQ(hu_consistency_score_line(a, strlen(a), b, strlen(b), &score), HU_OK);
+    HU_ASSERT_TRUE(score > 0.3f);
+}
+
+static void fact_extract_basic_statement(void) {
+    const char *text = "My name is Alice and I live in Boston.";
+    hu_fact_extract_result_t res;
+    memset(&res, 0, sizeof(res));
+    HU_ASSERT_EQ(hu_fact_extract(text, strlen(text), &res), HU_OK);
+    HU_ASSERT_TRUE(res.fact_count > 0);
+}
+
+static void fact_dedup_removes_duplicates(void) {
+    hu_heuristic_fact_t existing[1] = {{
+        .subject = "alice",
+        .predicate = "lives in",
+        .object = "boston",
+        .confidence = 0.9f,
+    }};
+    hu_fact_extract_result_t res;
+    memset(&res, 0, sizeof(res));
+    res.fact_count = 1;
+    res.facts[0] = existing[0];
+    size_t novel = hu_fact_dedup(&res, existing, 1);
+    HU_ASSERT_EQ(novel, (size_t)0);
+
+    hu_heuristic_fact_t different = {
+        .subject = "bob", .predicate = "works at", .object = "acme",
+        .confidence = 0.8f,
+    };
+    res.facts[0] = different;
+    novel = hu_fact_dedup(&res, existing, 1);
+    HU_ASSERT_EQ(novel, (size_t)1);
+}
+
+static void prompt_includes_conv_goals_section(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_prompt_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.provider_name = "test";
+    cfg.provider_name_len = 4;
+    cfg.model_name = "test-model";
+    cfg.model_name_len = 10;
+    cfg.conv_goals_context = "- Goal: check in about mood";
+    cfg.conv_goals_context_len = 27;
+    char *prompt = NULL;
+    size_t prompt_len = 0;
+    hu_error_t err = hu_prompt_build_system(&alloc, &cfg, &prompt, &prompt_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(prompt);
+    HU_ASSERT_NOT_NULL(strstr(prompt, "Conversation Goals"));
+    HU_ASSERT_NOT_NULL(strstr(prompt, "check in about mood"));
+    alloc.free(alloc.ctx, prompt, prompt_len + 1);
+}
+
 void run_sota_features_tests(void) {
     HU_TEST_SUITE("sota_features");
 
@@ -420,4 +515,12 @@ void run_sota_features_tests(void) {
     HU_RUN_TEST(emotion_concerning_high_negative);
     HU_RUN_TEST(emotion_mixed_signals);
     HU_RUN_TEST(emotion_skips_own_messages);
+
+    HU_TEST_SUITE("frontier_integration");
+    HU_RUN_TEST(trust_update_modifies_composite);
+    HU_RUN_TEST(somatic_low_energy_below_threshold);
+    HU_RUN_TEST(consistency_score_similar_text_high);
+    HU_RUN_TEST(fact_extract_basic_statement);
+    HU_RUN_TEST(fact_dedup_removes_duplicates);
+    HU_RUN_TEST(prompt_includes_conv_goals_section);
 }

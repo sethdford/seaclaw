@@ -51,8 +51,13 @@ hu_error_t hu_process_run_sandboxed(hu_allocator_t *alloc, const char *const *ar
 
     int stdout_pipe[2];
     int stderr_pipe[2];
-    if (pipe(stdout_pipe) != 0 || pipe(stderr_pipe) != 0)
+    if (pipe(stdout_pipe) != 0)
         return HU_ERR_IO;
+    if (pipe(stderr_pipe) != 0) {
+        close(stdout_pipe[0]);
+        close(stdout_pipe[1]);
+        return HU_ERR_IO;
+    }
 
     pid_t pid = fork();
     if (pid < 0) {

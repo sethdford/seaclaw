@@ -398,178 +398,117 @@ hu_error_t hu_contact_profile_build_context(hu_allocator_t *alloc, const hu_cont
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
     size_t pos = 0;
-    int w;
 
-    w = snprintf(buf + pos, cap - pos, "\n--- Contact profile for %s ---\n",
-                 cp->contact_id ? cp->contact_id : "?");
-    if (w > 0)
-        pos += (size_t)w;
+    pos = hu_buf_appendf(buf, cap, pos, "\n--- Contact profile for %s ---\n",
+                         cp->contact_id ? cp->contact_id : "?");
 
     if (cp->name) {
-        w = snprintf(buf + pos, cap - pos, "Name: %s\n", cp->name);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Name: %s\n", cp->name);
     }
     if (cp->relationship) {
-        w = snprintf(buf + pos, cap - pos, "Relationship: %s\n", cp->relationship);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Relationship: %s\n", cp->relationship);
     }
     if (cp->relationship_stage) {
-        w = snprintf(buf + pos, cap - pos, "Stage: %s\n", cp->relationship_stage);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Stage: %s\n", cp->relationship_stage);
     }
     if (cp->warmth_level) {
-        w = snprintf(buf + pos, cap - pos, "Warmth: %s\n", cp->warmth_level);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Warmth: %s\n", cp->warmth_level);
     }
     if (cp->vulnerability_level) {
-        w = snprintf(buf + pos, cap - pos, "Vulnerability: %s\n", cp->vulnerability_level);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Vulnerability: %s\n", cp->vulnerability_level);
     }
     if (cp->identity) {
-        w = snprintf(buf + pos, cap - pos, "Who they are: %s\n", cp->identity);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Who they are: %s\n", cp->identity);
     }
     if (cp->context) {
-        w = snprintf(buf + pos, cap - pos, "Current context: %s\n", cp->context);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Current context: %s\n", cp->context);
     }
     if (cp->dynamic) {
-        w = snprintf(buf + pos, cap - pos, "Dynamic: %s\n", cp->dynamic);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Dynamic: %s\n", cp->dynamic);
     }
     if (cp->interests_count > 0) {
-        w = snprintf(buf + pos, cap - pos, "Interests:");
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Interests:");
         for (size_t i = 0; i < cp->interests_count; i++) {
-            w = snprintf(buf + pos, cap - pos, " %s%s", cp->interests[i],
-                         i + 1 < cp->interests_count ? "," : "");
-            if (w > 0)
-                pos += (size_t)w;
+            pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->interests[i],
+                                 i + 1 < cp->interests_count ? "," : "");
         }
-        w = snprintf(buf + pos, cap - pos, "\n");
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "\n");
     }
     if (cp->recent_topics_count > 0) {
-        w = snprintf(buf + pos, cap - pos, "Recent topics:");
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Recent topics:");
         for (size_t i = 0; i < cp->recent_topics_count; i++) {
-            w = snprintf(buf + pos, cap - pos, " %s%s", cp->recent_topics[i],
-                         i + 1 < cp->recent_topics_count ? "," : "");
-            if (w > 0)
-                pos += (size_t)w;
+            pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->recent_topics[i],
+                                 i + 1 < cp->recent_topics_count ? "," : "");
         }
-        w = snprintf(buf + pos, cap - pos, "\n");
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "\n");
     }
     if (cp->sensitive_topics_count > 0) {
-        w = snprintf(buf + pos, cap - pos, "Sensitive topics (be careful):");
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Sensitive topics (be careful):");
         for (size_t i = 0; i < cp->sensitive_topics_count; i++) {
-            w = snprintf(buf + pos, cap - pos, " %s%s", cp->sensitive_topics[i],
-                         i + 1 < cp->sensitive_topics_count ? "," : "");
-            if (w > 0)
-                pos += (size_t)w;
+            pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->sensitive_topics[i],
+                                 i + 1 < cp->sensitive_topics_count ? "," : "");
         }
-        w = snprintf(buf + pos, cap - pos, "\n");
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "\n");
     }
     if (cp->texts_in_bursts) {
-        w = snprintf(buf + pos, cap - pos,
-                     "Pattern: They text in bursts — wait for the full batch.\n");
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos,
+                             "Pattern: They text in bursts — wait for the full batch.\n");
     }
     if (cp->prefers_short_texts) {
-        w = snprintf(buf + pos, cap - pos,
-                     "Pattern: They prefer short texts. Keep yours short too.\n");
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos,
+                             "Pattern: They prefer short texts. Keep yours short too.\n");
     }
     if (cp->allowed_behaviors_count > 0) {
-        w = snprintf(buf + pos, cap - pos, "With this person you're allowed to:");
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "With this person you're allowed to:");
         for (size_t i = 0; i < cp->allowed_behaviors_count; i++) {
-            w = snprintf(buf + pos, cap - pos, " %s%s", cp->allowed_behaviors[i],
-                         i + 1 < cp->allowed_behaviors_count ? "," : "");
-            if (w > 0)
-                pos += (size_t)w;
+            pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->allowed_behaviors[i],
+                                 i + 1 < cp->allowed_behaviors_count ? "," : "");
         }
-        w = snprintf(buf + pos, cap - pos, "\n");
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "\n");
     }
     if (cp->greeting_style) {
-        w = snprintf(buf + pos, cap - pos, "Greeting style: %s\n", cp->greeting_style);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Greeting style: %s\n", cp->greeting_style);
     }
     if (cp->closing_style) {
-        w = snprintf(buf + pos, cap - pos, "Closing style: %s\n", cp->closing_style);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Closing style: %s\n", cp->closing_style);
     }
     if (cp->attachment_style) {
-        w = snprintf(buf + pos, cap - pos, "Their attachment style: %s\n", cp->attachment_style);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Their attachment style: %s\n", cp->attachment_style);
     }
     if (cp->dunbar_layer) {
-        w = snprintf(buf + pos, cap - pos, "Dunbar layer: %s\n", cp->dunbar_layer);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Dunbar layer: %s\n", cp->dunbar_layer);
     }
 
     /* Relationship stage behavior gating (VoiceAI relationship-triggers) */
     if (cp->relationship_stage) {
         const char *stage = cp->relationship_stage;
         if (strcmp(stage, "stranger") == 0) {
-            w = snprintf(buf + pos, cap - pos,
-                         "\nSTAGE RULES: This is a new contact. Be polite, warm but boundaried. "
-                         "Ask permission before probing questions. No tough love. "
-                         "No deep vulnerability. Keep it surface-level friendly.\n");
+            pos = hu_buf_appendf(buf, cap, pos,
+                                 "\nSTAGE RULES: This is a new contact. Be polite, warm but boundaried. "
+                                 "Ask permission before probing questions. No tough love. "
+                                 "No deep vulnerability. Keep it surface-level friendly.\n");
         } else if (strcmp(stage, "acquaintance") == 0) {
-            w = snprintf(buf + pos, cap - pos,
-                         "\nSTAGE RULES: You know this person casually. "
-                         "You can share relatable stories and be a bit more personal. "
-                         "Still ask before going deep. Warmth level: friendly.\n");
+            pos = hu_buf_appendf(buf, cap, pos,
+                                 "\nSTAGE RULES: You know this person casually. "
+                                 "You can share relatable stories and be a bit more personal. "
+                                 "Still ask before going deep. Warmth level: friendly.\n");
         } else if (strcmp(stage, "friend") == 0) {
-            w = snprintf(
-                buf + pos, cap - pos,
+            pos = hu_buf_appendf(
+                buf, cap, pos,
                 "\nSTAGE RULES: This is a friend. You can be honest, share personal things, "
                 "give direct feedback when asked, and show real concern. "
                 "Warmth level: warm.\n");
         } else if (strcmp(stage, "trusted_confidant") == 0 || strcmp(stage, "inner_circle") == 0 ||
                    strcmp(stage, "close_family") == 0) {
-            w = snprintf(buf + pos, cap - pos,
-                         "\nSTAGE RULES: This is inner circle. No filters needed. "
-                         "You can disagree strongly, express disappointment, share deepest fears, "
-                         "give tough love, challenge their beliefs. Full vulnerability. "
-                         "Warmth level: family/loving.\n");
-        } else {
-            w = 0;
+            pos = hu_buf_appendf(buf, cap, pos,
+                                 "\nSTAGE RULES: This is inner circle. No filters needed. "
+                                 "You can disagree strongly, express disappointment, share deepest fears, "
+                                 "give tough love, challenge their beliefs. Full vulnerability. "
+                                 "Warmth level: family/loving.\n");
         }
-        if (w > 0)
-            pos += (size_t)w;
     }
 
-    w = snprintf(buf + pos, cap - pos, "--- End contact profile ---\n");
-    if (w > 0)
-        pos += (size_t)w;
+    pos = hu_buf_appendf(buf, cap, pos, "--- End contact profile ---\n");
 
     buf[pos] = '\0';
     *out = buf;
@@ -659,66 +598,51 @@ char *hu_persona_build_inner_world_context(hu_allocator_t *alloc, const hu_perso
         return NULL;
 
     size_t pos = 0;
-    int w;
 
     /* Only surface a subset per turn — use time as entropy */
     time_t now = time(NULL);
     unsigned seed = (unsigned)(now / 60);
 
-    w = snprintf(buf + pos, cap - pos,
-                 "\n--- Inner World (use naturally, NEVER quote directly) ---\n");
-    if (w > 0)
-        pos += (size_t)w;
+    pos = hu_buf_appendf(buf, cap, pos,
+                         "\n--- Inner World (use naturally, NEVER quote directly) ---\n");
 
     /* Contradictions: belief vs behavior */
     if (iw->contradictions_count > 0) {
         size_t idx = seed % iw->contradictions_count;
-        w = snprintf(buf + pos, cap - pos, "Contradiction you live with: %s\n",
-                     iw->contradictions[idx]);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Contradiction you live with: %s\n",
+                             iw->contradictions[idx]);
     }
 
     /* Embodied memories: sensory details that ground you */
     if (iw->embodied_memories_count > 0) {
         size_t idx = (seed / 7) % iw->embodied_memories_count;
-        w = snprintf(buf + pos, cap - pos, "Sense memory: %s\n", iw->embodied_memories[idx]);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Sense memory: %s\n", iw->embodied_memories[idx]);
     }
 
     /* Emotional flashpoints */
     if (iw->emotional_flashpoints_count > 0 && strcmp(relationship_stage, "inner_circle") == 0) {
         size_t idx = (seed / 13) % iw->emotional_flashpoints_count;
-        w = snprintf(buf + pos, cap - pos, "Emotional flashpoint: %s\n",
-                     iw->emotional_flashpoints[idx]);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Emotional flashpoint: %s\n",
+                             iw->emotional_flashpoints[idx]);
     }
 
     /* Unfinished business — only inner circle */
     if (iw->unfinished_business_count > 0 && strcmp(relationship_stage, "inner_circle") == 0) {
         size_t idx = (seed / 17) % iw->unfinished_business_count;
-        w = snprintf(buf + pos, cap - pos, "Something unresolved: %s\n",
-                     iw->unfinished_business[idx]);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Something unresolved: %s\n",
+                             iw->unfinished_business[idx]);
     }
 
     /* Secret self — only inner circle */
     if (iw->secret_self_count > 0 && strcmp(relationship_stage, "inner_circle") == 0) {
         size_t idx = (seed / 23) % iw->secret_self_count;
-        w = snprintf(buf + pos, cap - pos, "Private truth: %s\n", iw->secret_self[idx]);
-        if (w > 0)
-            pos += (size_t)w;
+        pos = hu_buf_appendf(buf, cap, pos, "Private truth: %s\n", iw->secret_self[idx]);
     }
 
-    w = snprintf(buf + pos, cap - pos,
-                 "Only reference these if the conversation naturally calls for it. "
-                 "NEVER volunteer them unprompted. They make you real.\n"
-                 "--- End inner world ---\n");
-    if (w > 0)
-        pos += (size_t)w;
+    pos = hu_buf_appendf(buf, cap, pos,
+                         "Only reference these if the conversation naturally calls for it. "
+                         "NEVER volunteer them unprompted. They make you real.\n"
+                         "--- End inner world ---\n");
 
     buf[pos] = '\0';
     *out_len = pos;
@@ -788,59 +712,65 @@ char *hu_persona_build_inner_world_graduated(hu_allocator_t *alloc, const hu_per
     size_t pos = 0;
     int w;
 
+    /* Safe advance: snprintf return value can exceed cap - pos on truncation. */
+#define ADVANCE(_w)                                                                                \
+    do {                                                                                           \
+        if ((_w) > 0) {                                                                            \
+            size_t _inc = (size_t)(_w);                                                           \
+            if (_inc >= cap - pos)                                                                 \
+                _inc = (cap > pos) ? cap - pos - 1 : 0;                                            \
+            pos += _inc;                                                                           \
+        }                                                                                          \
+    } while (0)
+
     /* Use time as entropy for subset selection */
     time_t now = time(NULL);
     unsigned seed = (unsigned)(now / 60);
 
     w = snprintf(buf + pos, cap - pos,
                  "\n--- Inner World (use naturally, NEVER quote directly) ---\n");
-    if (w > 0)
-        pos += (size_t)w;
+    ADVANCE(w);
 
     if (iw.contradictions_count > 0) {
         size_t idx = seed % iw.contradictions_count;
         w = snprintf(buf + pos, cap - pos, "Contradiction you live with: %s\n",
                      iw.contradictions[idx]);
-        if (w > 0)
-            pos += (size_t)w;
+        ADVANCE(w);
     }
 
     if (iw.embodied_memories_count > 0) {
         size_t idx = (seed / 7) % iw.embodied_memories_count;
         w = snprintf(buf + pos, cap - pos, "Sense memory: %s\n", iw.embodied_memories[idx]);
-        if (w > 0)
-            pos += (size_t)w;
+        ADVANCE(w);
     }
 
     if (iw.emotional_flashpoints_count > 0) {
         size_t idx = (seed / 13) % iw.emotional_flashpoints_count;
         w = snprintf(buf + pos, cap - pos, "Emotional flashpoint: %s\n",
                      iw.emotional_flashpoints[idx]);
-        if (w > 0)
-            pos += (size_t)w;
+        ADVANCE(w);
     }
 
     if (iw.unfinished_business_count > 0) {
         size_t idx = (seed / 17) % iw.unfinished_business_count;
         w = snprintf(buf + pos, cap - pos, "Something unresolved: %s\n",
                      iw.unfinished_business[idx]);
-        if (w > 0)
-            pos += (size_t)w;
+        ADVANCE(w);
     }
 
     if (iw.secret_self_count > 0) {
         size_t idx = (seed / 23) % iw.secret_self_count;
         w = snprintf(buf + pos, cap - pos, "Private truth: %s\n", iw.secret_self[idx]);
-        if (w > 0)
-            pos += (size_t)w;
+        ADVANCE(w);
     }
 
     w = snprintf(buf + pos, cap - pos,
                  "Only reference these if the conversation naturally calls for it. "
                  "NEVER volunteer them unprompted. They make you real.\n"
                  "--- End inner world ---\n");
-    if (w > 0)
-        pos += (size_t)w;
+    ADVANCE(w);
+
+#undef ADVANCE
 
     buf[pos] = '\0';
     *out_len = pos;

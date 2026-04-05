@@ -201,18 +201,24 @@ hu_error_t hu_rrf_merge(hu_allocator_t *alloc, const hu_memory_entry_t **source_
                 node->score += rrf_term;
             } else {
                 if (merged_count >= merged_cap) {
-                    merged_cap *= 2;
-                    scores_cap *= 2;
+                    size_t new_merged_cap = merged_cap * 2;
+                    size_t new_scores_cap = scores_cap * 2;
                     hu_memory_entry_t *nm = (hu_memory_entry_t *)alloc->realloc(
                         alloc->ctx, merged, merged_count * sizeof(hu_memory_entry_t),
-                        merged_cap * sizeof(hu_memory_entry_t));
-                    double *ns =
-                        (double *)alloc->realloc(alloc->ctx, scores, merged_count * sizeof(double),
-                                                 scores_cap * sizeof(double));
-                    if (!nm || !ns)
+                        new_merged_cap * sizeof(hu_memory_entry_t));
+                    if (!nm)
                         break;
                     merged = nm;
+                    double *ns =
+                        (double *)alloc->realloc(alloc->ctx, scores, merged_count * sizeof(double),
+                                                 new_scores_cap * sizeof(double));
+                    if (!ns) {
+                        merged_cap = new_merged_cap;
+                        break;
+                    }
                     scores = ns;
+                    merged_cap = new_merged_cap;
+                    scores_cap = new_scores_cap;
                 }
                 if (entry_dup(alloc, c, &merged[merged_count], 0.0) != HU_OK)
                     break;

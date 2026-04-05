@@ -6,8 +6,6 @@
 #include <time.h>
 #include <unistd.h>
 
-static hu_allocator_t test_allocator = {0};
-
 static hu_allocator_t hu_test_allocator_create(void) {
     hu_allocator_t alloc = hu_system_allocator();
     return alloc;

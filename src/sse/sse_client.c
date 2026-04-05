@@ -1,6 +1,7 @@
 #include "human/sse/sse_client.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -179,8 +180,9 @@ static hu_error_t process_buffer(sse_ctx_t *ctx) {
                 parse_field(line_start, line_len, &field, &field_len, &value, &value_len);
 
                 if (field_eq(field, field_len, "data")) {
-                    size_t new_size = total_event_size + value_len + (has_data ? 1 : 0);
-                    if (new_size > HU_SSE_MAX_EVENT_SIZE) {
+                    size_t sep = has_data ? 1U : 0U;
+                    if (total_event_size > SIZE_MAX - sep ||
+                        value_len > SIZE_MAX - (total_event_size + sep)) {
                         if (event_type) {
                             ctx->alloc->free(ctx->alloc->ctx, event_type, event_type_len + 1);
                             event_type = NULL;
@@ -192,25 +194,39 @@ static hu_error_t process_buffer(sse_ctx_t *ctx) {
                         has_data = 0;
                         total_event_size = 0;
                     } else {
-                        size_t need = data_len + value_len + (has_data ? 1 : 0) + 1;
-                        if (need > data_cap) {
-                            size_t new_cap = data_cap ? data_cap * 2 : 256;
-                            while (new_cap < need)
-                                new_cap *= 2;
-                            char *nd = (char *)ctx->alloc->realloc(
-                                ctx->alloc->ctx, data, data_cap ? data_cap : 0, new_cap);
-                            if (!nd)
-                                return HU_ERR_OUT_OF_MEMORY;
-                            data = nd;
-                            data_cap = new_cap;
+                        size_t new_size = total_event_size + sep + value_len;
+                        if (new_size > HU_SSE_MAX_EVENT_SIZE) {
+                            if (event_type) {
+                                ctx->alloc->free(ctx->alloc->ctx, event_type, event_type_len + 1);
+                                event_type = NULL;
+                            }
+                            if (data) {
+                                ctx->alloc->free(ctx->alloc->ctx, data, data_cap);
+                                data = NULL;
+                            }
+                            has_data = 0;
+                            total_event_size = 0;
+                        } else {
+                            size_t need = data_len + value_len + (has_data ? 1 : 0) + 1;
+                            if (need > data_cap) {
+                                size_t new_cap = data_cap ? data_cap * 2 : 256;
+                                while (new_cap < need)
+                                    new_cap *= 2;
+                                char *nd = (char *)ctx->alloc->realloc(
+                                    ctx->alloc->ctx, data, data_cap ? data_cap : 0, new_cap);
+                                if (!nd)
+                                    return HU_ERR_OUT_OF_MEMORY;
+                                data = nd;
+                                data_cap = new_cap;
+                            }
+                            if (has_data)
+                                data[data_len++] = '\n';
+                            memcpy(data + data_len, value, value_len);
+                            data_len += value_len;
+                            data[data_len] = '\0';
+                            total_event_size = new_size;
+                            has_data = 1;
                         }
-                        if (has_data)
-                            data[data_len++] = '\n';
-                        memcpy(data + data_len, value, value_len);
-                        data_len += value_len;
-                        data[data_len] = '\0';
-                        total_event_size = new_size;
-                        has_data = 1;
                     }
                 } else if (field_eq(field, field_len, "event")) {
                     if (event_type)

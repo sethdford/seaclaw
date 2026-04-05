@@ -435,6 +435,8 @@ hu_error_t hu_workflow_event_log_find_by_key(hu_workflow_event_log_t *log,
         return err;
     }
 
+    hu_error_t find_err = HU_OK;
+
     /* Search for matching key */
     for (size_t i = 0; i < count; i++) {
         if (events[i].idempotency_key && strcmp(events[i].idempotency_key, idempotency_key) == 0) {
@@ -443,36 +445,45 @@ hu_error_t hu_workflow_event_log_find_by_key(hu_workflow_event_log_t *log,
             out->sequence_num = events[i].sequence_num;
             out->timestamp = events[i].timestamp;
 
+            bool copy_ok = true;
             if (events[i].workflow_id_len > 0) {
                 out->workflow_id = (char *)malloc(events[i].workflow_id_len + 1);
-                if (out->workflow_id) {
+                if (!out->workflow_id)
+                    copy_ok = false;
+                else {
                     memcpy(out->workflow_id, events[i].workflow_id, events[i].workflow_id_len);
                     out->workflow_id[events[i].workflow_id_len] = '\0';
                     out->workflow_id_len = events[i].workflow_id_len;
                 }
             }
 
-            if (events[i].step_id_len > 0) {
+            if (copy_ok && events[i].step_id_len > 0) {
                 out->step_id = (char *)malloc(events[i].step_id_len + 1);
-                if (out->step_id) {
+                if (!out->step_id)
+                    copy_ok = false;
+                else {
                     memcpy(out->step_id, events[i].step_id, events[i].step_id_len);
                     out->step_id[events[i].step_id_len] = '\0';
                     out->step_id_len = events[i].step_id_len;
                 }
             }
 
-            if (events[i].data_json_len > 0) {
+            if (copy_ok && events[i].data_json_len > 0) {
                 out->data_json = (char *)malloc(events[i].data_json_len + 1);
-                if (out->data_json) {
+                if (!out->data_json)
+                    copy_ok = false;
+                else {
                     memcpy(out->data_json, events[i].data_json, events[i].data_json_len);
                     out->data_json[events[i].data_json_len] = '\0';
                     out->data_json_len = events[i].data_json_len;
                 }
             }
 
-            if (events[i].idempotency_key_len > 0) {
+            if (copy_ok && events[i].idempotency_key_len > 0) {
                 out->idempotency_key = (char *)malloc(events[i].idempotency_key_len + 1);
-                if (out->idempotency_key) {
+                if (!out->idempotency_key)
+                    copy_ok = false;
+                else {
                     memcpy(out->idempotency_key, events[i].idempotency_key,
                            events[i].idempotency_key_len);
                     out->idempotency_key[events[i].idempotency_key_len] = '\0';
@@ -480,7 +491,17 @@ hu_error_t hu_workflow_event_log_find_by_key(hu_workflow_event_log_t *log,
                 }
             }
 
-            *found = true;
+            if (!copy_ok) {
+                free(out->workflow_id);
+                free(out->step_id);
+                free(out->data_json);
+                free(out->idempotency_key);
+                memset(out, 0, sizeof(*out));
+                *found = false;
+                find_err = HU_ERR_OUT_OF_MEMORY;
+            } else {
+                *found = true;
+            }
             break;
         }
     }
@@ -493,7 +514,7 @@ hu_error_t hu_workflow_event_log_find_by_key(hu_workflow_event_log_t *log,
         temp_alloc.free(temp_alloc.ctx, events, sizeof(*events) * count);
     }
 
-    return HU_OK;
+    return find_err;
 }
 
 size_t hu_workflow_event_log_count(const hu_workflow_event_log_t *log) {

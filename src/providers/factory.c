@@ -114,6 +114,8 @@ static const struct {
     {"sglang", "http://localhost:30000/v1"},
     {"osaurus", "http://localhost:1337/v1"},
     {"litellm", "http://localhost:4000"},
+    {"mlx_local", "http://127.0.0.1:8741/v1"},
+    {"mlx-local", "http://127.0.0.1:8741/v1"},
 };
 
 static const size_t hu_compat_providers_count =

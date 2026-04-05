@@ -1,6 +1,7 @@
 #include "human/tools/cron_session_tools.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -22,6 +23,51 @@ typedef struct {
     hu_cron_scheduler_t *scheduler;
 } cron_session_ctx_t;
 
+static hu_error_t cron_create_ok_json(hu_allocator_t *alloc, uint64_t job_id, const char *cron_expr,
+                                      const char *prompt, bool with_recurring, bool recurring_val,
+                                      hu_tool_result_t *out) {
+    hu_json_value_t *root = hu_json_object_new(alloc);
+    if (!root) {
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_OK;
+    }
+#define CRON_SET(field, val_expr)                                                                  \
+    do {                                                                                           \
+        hu_json_value_t *_v = (val_expr);                                                          \
+        if (!_v) {                                                                                 \
+            hu_json_free(alloc, root);                                                             \
+            *out = hu_tool_result_fail("out of memory", 13);                                       \
+            return HU_OK;                                                                          \
+        }                                                                                          \
+        if (hu_json_object_set(alloc, root, (field), _v) != HU_OK) {                               \
+            hu_json_free(alloc, _v);                                                               \
+            hu_json_free(alloc, root);                                                             \
+            *out = hu_tool_result_fail("out of memory", 13);                                       \
+            return HU_OK;                                                                          \
+        }                                                                                          \
+    } while (0)
+
+    CRON_SET("id", hu_json_number_new(alloc, (double)job_id));
+    CRON_SET("cron_expr", hu_json_string_new(alloc, cron_expr ? cron_expr : "",
+                                             cron_expr ? strlen(cron_expr) : 0));
+    CRON_SET("prompt", hu_json_string_new(alloc, prompt ? prompt : "", prompt ? strlen(prompt) : 0));
+    if (with_recurring)
+        CRON_SET("recurring", hu_json_bool_new(alloc, recurring_val));
+    CRON_SET("message", hu_json_string_new(alloc, "Job created", 11));
+#undef CRON_SET
+
+    char *msg = NULL;
+    size_t msg_len = 0;
+    hu_error_t jerr = hu_json_stringify(alloc, root, &msg, &msg_len);
+    hu_json_free(alloc, root);
+    if (jerr != HU_OK || !msg) {
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_OK;
+    }
+    *out = hu_tool_result_ok_owned(msg, msg_len);
+    return HU_OK;
+}
+
 static hu_error_t cron_create_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
                                       hu_tool_result_t *out) {
     cron_session_ctx_t *c = (cron_session_ctx_t *)ctx;
@@ -35,7 +81,6 @@ static hu_error_t cron_create_execute(void *ctx, hu_allocator_t *alloc, const hu
     const char *cron_expr = hu_json_get_string(args, "cron_expr");
     const char *prompt = hu_json_get_string(args, "prompt");
     double recurring_d = hu_json_get_number(args, "recurring", 1.0);
-    (void)recurring_d;  /* Used in HU_IS_TEST */
 
     if (!cron_expr || !cron_expr[0]) {
         *out = hu_tool_result_fail("missing cron_expr", 17);
@@ -48,14 +93,9 @@ static hu_error_t cron_create_execute(void *ctx, hu_allocator_t *alloc, const hu
 
 #if HU_IS_TEST
     (void)c;
-    /* Test: simulate job creation with ID */
-    char *response = hu_sprintf(alloc,
-                                "{\"id\":1,\"cron_expr\":\"%s\",\"prompt\":\"%s\",\"recurring\":%s,\"message\":\"Job created\"}",
-                                cron_expr, prompt, recurring_d > 0.5 ? "true" : "false");
-    if (!response)
-        return HU_ERR_OUT_OF_MEMORY;
-    *out = hu_tool_result_ok_owned(response, strlen(response));
+    return cron_create_ok_json(alloc, 1u, cron_expr, prompt, true, recurring_d > 0.5, out);
 #else
+    (void)recurring_d;
     /* Production: use scheduler */
     if (!c->scheduler) {
         *out = hu_tool_result_fail("scheduler not available", 23);
@@ -63,19 +103,16 @@ static hu_error_t cron_create_execute(void *ctx, hu_allocator_t *alloc, const hu
     }
 
     uint64_t job_id = 0;
-    hu_error_t err = hu_cron_add_job(c->scheduler, alloc, cron_expr, prompt, "", &job_id);
+    /* Agent job: prompt is stored as HU_CRON_JOB_AGENT data, not executed via /bin/sh. */
+    hu_error_t err =
+        hu_cron_add_agent_job(c->scheduler, alloc, cron_expr, prompt, "", NULL, &job_id);
     if (err != HU_OK) {
         *out = hu_tool_result_fail("failed to add job", 17);
         return HU_OK;
     }
 
-    char *response = hu_sprintf(alloc, "{\"id\":%llu,\"cron_expr\":\"%s\",\"message\":\"Job created\"}",
-                                (unsigned long long)job_id, cron_expr);
-    if (!response)
-        return HU_ERR_OUT_OF_MEMORY;
-    *out = hu_tool_result_ok_owned(response, strlen(response));
+    return cron_create_ok_json(alloc, job_id, cron_expr, prompt, false, false, out);
 #endif
-    return HU_OK;
 }
 
 static const char *cron_create_name(void *ctx) {
@@ -255,15 +292,29 @@ static hu_error_t cron_list_execute(void *ctx, hu_allocator_t *alloc, const hu_j
         for (size_t i = 0; i < job_count && i < 100; i++) {
             if (i > 0)
                 err = hu_json_buf_append_raw(&buf, ",", 1);
+            if (err != HU_OK)
+                break;
+            err = hu_json_buf_append_raw(&buf, "{", 1);
+            if (err == HU_OK)
+                err = hu_json_append_key_int(&buf, "id", 2, (long long)jobs[i].id);
+            if (err == HU_OK)
+                err = hu_json_buf_append_raw(&buf, ",", 1);
             if (err == HU_OK) {
-                char job_json[512];
-                int len = snprintf(job_json, sizeof(job_json),
-                                   "{\"id\":%llu,\"expression\":\"%s\",\"command\":\"%s\",\"next_run\":%lld}",
-                                   (unsigned long long)jobs[i].id, jobs[i].expression ? jobs[i].expression : "",
-                                   jobs[i].command ? jobs[i].command : "", (long long)jobs[i].next_run_secs);
-                if (len > 0)
-                    err = hu_json_buf_append_raw(&buf, job_json, (size_t)len);
+                const char *ex = jobs[i].expression ? jobs[i].expression : "";
+                err = hu_json_append_key_value(&buf, "expression", 10, ex, strlen(ex));
             }
+            if (err == HU_OK)
+                err = hu_json_buf_append_raw(&buf, ",", 1);
+            if (err == HU_OK) {
+                const char *cmd = jobs[i].command ? jobs[i].command : "";
+                err = hu_json_append_key_value(&buf, "command", 7, cmd, strlen(cmd));
+            }
+            if (err == HU_OK)
+                err = hu_json_buf_append_raw(&buf, ",", 1);
+            if (err == HU_OK)
+                err = hu_json_append_key_int(&buf, "next_run", 8, (long long)jobs[i].next_run_secs);
+            if (err == HU_OK)
+                err = hu_json_buf_append_raw(&buf, "}", 1);
         }
     }
     if (err == HU_OK)

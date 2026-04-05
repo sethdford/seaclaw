@@ -160,25 +160,19 @@ hu_error_t hu_protective_build_prompt(hu_allocator_t *alloc, const hu_boundary_t
             continue;
         if (b->type_len >= 6 && strncmp(b->type, "avoid", 5) == 0) {
             if (avoid_len > 0)
-                avoid_len += (size_t)snprintf(avoid_buf + avoid_len,
-                                              sizeof(avoid_buf) - avoid_len, ", ");
-            avoid_len += (size_t)snprintf(avoid_buf + avoid_len,
-                                          sizeof(avoid_buf) - avoid_len, "%.*s",
-                                          (int)b->topic_len, b->topic);
+                avoid_len = hu_buf_appendf(avoid_buf, sizeof(avoid_buf), avoid_len, ", ");
+            avoid_len = hu_buf_appendf(avoid_buf, sizeof(avoid_buf), avoid_len, "%.*s",
+                                       (int)b->topic_len, b->topic);
         } else if (b->type_len >= 8 && strncmp(b->type, "redirect", 8) == 0) {
             if (redirect_len > 0)
-                redirect_len += (size_t)snprintf(redirect_buf + redirect_len,
-                                                 sizeof(redirect_buf) - redirect_len, ", ");
-            redirect_len += (size_t)snprintf(redirect_buf + redirect_len,
-                                             sizeof(redirect_buf) - redirect_len, "%.*s",
-                                             (int)b->topic_len, b->topic);
+                redirect_len = hu_buf_appendf(redirect_buf, sizeof(redirect_buf), redirect_len, ", ");
+            redirect_len = hu_buf_appendf(redirect_buf, sizeof(redirect_buf), redirect_len, "%.*s",
+                                        (int)b->topic_len, b->topic);
         } else if (b->type_len >= 3 && strncmp(b->type, "lie", 3) == 0) {
             if (lie_len > 0)
-                lie_len += (size_t)snprintf(lie_buf + lie_len,
-                                            sizeof(lie_buf) - lie_len, ", ");
-            lie_len += (size_t)snprintf(lie_buf + lie_len,
-                                        sizeof(lie_buf) - lie_len, "%.*s",
-                                        (int)b->topic_len, b->topic);
+                lie_len = hu_buf_appendf(lie_buf, sizeof(lie_buf), lie_len, ", ");
+            lie_len = hu_buf_appendf(lie_buf, sizeof(lie_buf), lie_len, "%.*s",
+                                     (int)b->topic_len, b->topic);
         }
     }
 
@@ -198,13 +192,13 @@ hu_error_t hu_protective_build_prompt(hu_allocator_t *alloc, const hu_boundary_t
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-    pos += (size_t)snprintf(result + pos, total - pos, "[BOUNDARIES with this contact]: ");
+    pos = hu_buf_appendf(result, total, pos, "[BOUNDARIES with this contact]: ");
     if (avoid_len > 0)
-        pos += (size_t)snprintf(result + pos, total - pos, "AVOID: %s. ", avoid_buf);
+        pos = hu_buf_appendf(result, total, pos, "AVOID: %s. ", avoid_buf);
     if (redirect_len > 0)
-        pos += (size_t)snprintf(result + pos, total - pos, "REDIRECT: %s. ", redirect_buf);
+        pos = hu_buf_appendf(result, total, pos, "REDIRECT: %s. ", redirect_buf);
     if (lie_len > 0)
-        pos += (size_t)snprintf(result + pos, total - pos, "LIE: %s. ", lie_buf);
+        pos = hu_buf_appendf(result, total, pos, "LIE: %s. ", lie_buf);
 
     *out = result;
     *out_len = pos;

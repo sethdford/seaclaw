@@ -56,6 +56,31 @@ static void tcal_confidence_language_returns_non_null(void) {
     HU_ASSERT_TRUE(strlen(c) > 0);
 }
 
+static void tcal_confidence_language_varies_by_trust_level(void) {
+    const char *established_high = hu_tcal_confidence_language(0.95f, HU_TCAL_ESTABLISHED);
+    const char *cautious_high = hu_tcal_confidence_language(0.95f, HU_TCAL_CAUTIOUS);
+    HU_ASSERT_NOT_NULL(established_high);
+    HU_ASSERT_NOT_NULL(cautious_high);
+    HU_ASSERT_TRUE(strcmp(established_high, cautious_high) != 0);
+}
+
+static void tcal_build_context_includes_calibrated_phrases(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_tcal_state_t state;
+    hu_tcal_init(&state);
+    for (int i = 0; i < 10; i++)
+        hu_tcal_update(&state, 0.9f, 0.9f, 0.9f);
+    char *out = NULL;
+    size_t out_len = 0;
+    HU_ASSERT_EQ(hu_tcal_build_context(&alloc, &state, &out, &out_len), HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_STR_CONTAINS(out, "Calibrate uncertainty language");
+    HU_ASSERT_STR_CONTAINS(out, "high=");
+    HU_ASSERT_STR_CONTAINS(out, "medium=");
+    HU_ASSERT_STR_CONTAINS(out, "low=");
+    alloc.free(alloc.ctx, out, out_len + 1U);
+}
+
 static void tcal_build_context_produces_string(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_tcal_state_t state;
@@ -91,7 +116,9 @@ void run_trust_calibration_tests(void) {
     HU_RUN_TEST(tcal_compute_level_zero_dims_returns_unknown);
     HU_RUN_TEST(tcal_compute_level_high_dims_returns_established_or_deep);
     HU_RUN_TEST(tcal_confidence_language_returns_non_null);
+    HU_RUN_TEST(tcal_confidence_language_varies_by_trust_level);
     HU_RUN_TEST(tcal_build_context_produces_string);
+    HU_RUN_TEST(tcal_build_context_includes_calibrated_phrases);
     HU_RUN_TEST(tcal_check_erosion_false_on_fresh_state);
     HU_RUN_TEST(tcal_update_negative_then_check_erosion);
 }

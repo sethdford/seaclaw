@@ -1,4 +1,5 @@
 #include "human/mcp_resources.h"
+#include "human/core/string.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -61,19 +62,18 @@ hu_error_t hu_mcp_resource_list_json(hu_allocator_t *alloc, const hu_mcp_resourc
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "{\"resources\":[");
+    pos = hu_buf_appendf(buf, buf_size, pos, "{\"resources\":[");
 
-    for (size_t i = 0; i < reg->resource_count && pos < buf_size - 256; i++) {
+    for (size_t i = 0; i < reg->resource_count; i++) {
         if (i > 0)
-            buf[pos++] = ',';
-        pos += (size_t)snprintf(
-            buf + pos, buf_size - pos,
-            "{\"uri\":\"%s\",\"name\":\"%s\",\"description\":\"%s\",\"mimeType\":\"%s\"}",
-            reg->resources[i].uri, reg->resources[i].name, reg->resources[i].description,
-            reg->resources[i].mime_type);
+            pos = hu_buf_appendf(buf, buf_size, pos, ",");
+        pos = hu_buf_appendf(buf, buf_size, pos,
+                             "{\"uri\":\"%s\",\"name\":\"%s\",\"description\":\"%s\",\"mimeType\":\"%s\"}",
+                             reg->resources[i].uri, reg->resources[i].name,
+                             reg->resources[i].description, reg->resources[i].mime_type);
     }
 
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "]}");
+    pos = hu_buf_appendf(buf, buf_size, pos, "]}");
     buf[pos] = '\0';
     *out_json = buf;
     *out_len = pos;
@@ -170,28 +170,28 @@ hu_error_t hu_mcp_prompt_list_json(hu_allocator_t *alloc, const hu_mcp_prompt_re
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "{\"prompts\":[");
+    pos = hu_buf_appendf(buf, buf_size, pos, "{\"prompts\":[");
 
-    for (size_t i = 0; i < reg->prompt_count && pos < buf_size - 512; i++) {
+    for (size_t i = 0; i < reg->prompt_count; i++) {
         if (i > 0)
-            buf[pos++] = ',';
-        pos += (size_t)snprintf(buf + pos, buf_size - pos,
-                                "{\"name\":\"%s\",\"description\":\"%s\",\"arguments\":[",
-                                reg->prompts[i].name, reg->prompts[i].description);
+            pos = hu_buf_appendf(buf, buf_size, pos, ",");
+        pos = hu_buf_appendf(buf, buf_size, pos,
+                             "{\"name\":\"%s\",\"description\":\"%s\",\"arguments\":[",
+                             reg->prompts[i].name, reg->prompts[i].description);
 
-        for (size_t a = 0; a < reg->prompts[i].argument_count && pos < buf_size - 256; a++) {
+        for (size_t a = 0; a < reg->prompts[i].argument_count; a++) {
             if (a > 0)
-                buf[pos++] = ',';
-            pos += (size_t)snprintf(buf + pos, buf_size - pos,
-                                    "{\"name\":\"%s\",\"description\":\"%s\",\"required\":%s}",
-                                    reg->prompts[i].arguments[a].name,
-                                    reg->prompts[i].arguments[a].description,
-                                    reg->prompts[i].arguments[a].required ? "true" : "false");
+                pos = hu_buf_appendf(buf, buf_size, pos, ",");
+            pos = hu_buf_appendf(buf, buf_size, pos,
+                                 "{\"name\":\"%s\",\"description\":\"%s\",\"required\":%s}",
+                                 reg->prompts[i].arguments[a].name,
+                                 reg->prompts[i].arguments[a].description,
+                                 reg->prompts[i].arguments[a].required ? "true" : "false");
         }
-        pos += (size_t)snprintf(buf + pos, buf_size - pos, "]}");
+        pos = hu_buf_appendf(buf, buf_size, pos, "]}");
     }
 
-    pos += (size_t)snprintf(buf + pos, buf_size - pos, "]}");
+    pos = hu_buf_appendf(buf, buf_size, pos, "]}");
     buf[pos] = '\0';
     *out_json = buf;
     *out_len = pos;

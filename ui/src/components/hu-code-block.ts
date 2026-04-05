@@ -80,6 +80,7 @@ export class ScCodeBlock extends LitElement {
   @state() private _darkScheme = true;
   @state() private _expanded = false;
   private _copyTimeout = 0;
+  private _highlightGeneration = 0;
   private _mediaQuery: MediaQueryList | null = null;
   private _mediaHandler: (() => void) | null = null;
   private _themeObserver: MutationObserver | null = null;
@@ -302,22 +303,28 @@ export class ScCodeBlock extends LitElement {
   }
 
   private async _highlight(): Promise<void> {
+    const gen = ++this._highlightGeneration;
     let lang = this.language.toLowerCase().trim();
     lang = LANG_ALIASES[lang] ?? lang;
     const supported = lang && SHIKI_LANGS.has(lang);
     if (!supported) {
+      if (gen !== this._highlightGeneration) return;
       this._highlighted = "";
       this._shikiReady = true;
       return;
     }
     try {
       const highlighter = await getHighlighter();
+      if (gen !== this._highlightGeneration) return;
       const theme = this._darkScheme ? "github-dark-default" : "github-light-default";
       const result = highlighter.codeToHtml(this.code, { lang, theme });
+      if (gen !== this._highlightGeneration) return;
       this._highlighted = result;
     } catch {
+      if (gen !== this._highlightGeneration) return;
       this._highlighted = "";
     }
+    if (gen !== this._highlightGeneration) return;
     this._shikiReady = true;
   }
 
@@ -395,9 +402,7 @@ export class ScCodeBlock extends LitElement {
                 @click=${this._toggleExpand}
                 aria-expanded=${this._expanded}
               >
-                ${this._expanded
-                  ? "Show less"
-                  : `Show more (${hiddenCount} lines)`}
+                ${this._expanded ? "Show less" : `Show more (${hiddenCount} lines)`}
               </button>
             `
           : ""}

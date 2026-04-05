@@ -158,38 +158,29 @@ char *hu_social_graph_build_directive(hu_allocator_t *alloc,
     if (!buf)
         return NULL;
 
-    int n = snprintf(buf, cap, "[SOCIAL: ");
-    if (n < 0 || (size_t)n >= cap) {
-        alloc->free(alloc->ctx, buf, cap);
-        return NULL;
-    }
-    size_t pos = (size_t)n;
+    size_t pos = hu_buf_appendf(buf, cap, 0, "[SOCIAL: ");
 
-    for (size_t i = 0; i < count && pos < cap - 128; i++) {
+    for (size_t i = 0; i < count; i++) {
         const char *name = rels[i].name[0] ? rels[i].name : "unnamed";
         const char *role = rels[i].role[0] ? rels[i].role : "";
         const char *notes = rels[i].notes[0] ? rels[i].notes : "";
 
         if (i > 0)
-            pos += (size_t)snprintf(buf + pos, cap - pos, " ");
-        if (pos < cap - 64) {
-            if (i == 0 && name_len > 0 && contact_name) {
-                pos += (size_t)snprintf(buf + pos, cap - pos, "%.*s's ", (int)name_len,
-                                        contact_name);
-            } else if (i > 0) {
-                pos += (size_t)snprintf(buf + pos, cap - pos, "Her ");
-            }
-            if (role[0])
-                pos += (size_t)snprintf(buf + pos, cap - pos, "%s ", role);
-            pos += (size_t)snprintf(buf + pos, cap - pos, "%s", name);
-            if (notes[0])
-                pos += (size_t)snprintf(buf + pos, cap - pos, " — %s.", notes);
-            else
-                pos += (size_t)snprintf(buf + pos, cap - pos, ".");
+            pos = hu_buf_appendf(buf, cap, pos, " ");
+        if (i == 0 && name_len > 0 && contact_name) {
+            pos = hu_buf_appendf(buf, cap, pos, "%.*s's ", (int)name_len, contact_name);
+        } else if (i > 0) {
+            pos = hu_buf_appendf(buf, cap, pos, "Her ");
         }
+        if (role[0])
+            pos = hu_buf_appendf(buf, cap, pos, "%s ", role);
+        pos = hu_buf_appendf(buf, cap, pos, "%s", name);
+        if (notes[0])
+            pos = hu_buf_appendf(buf, cap, pos, " — %s.", notes);
+        else
+            pos = hu_buf_appendf(buf, cap, pos, ".");
     }
-    if (pos < cap - 2)
-        pos += (size_t)snprintf(buf + pos, cap - pos, "]");
+    pos = hu_buf_appendf(buf, cap, pos, "]");
 
     char *result = hu_strndup(alloc, buf, pos);
     alloc->free(alloc->ctx, buf, cap);

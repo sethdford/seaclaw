@@ -51,14 +51,14 @@ bool hu_should_compact(const hu_owned_message_t *history, size_t history_count,
 /* Compact history: keep N most recent, summarize older into single message.
  * Summary is concatenation of key points (role: content) — not LLM-generated.
  * Modifies history in place. Returns HU_OK on success. */
-hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t *history,
+hu_error_t hu_compact_history(hu_allocator_t *alloc, hu_owned_message_t **history,
                               size_t *history_count, size_t *history_cap,
                               const hu_compaction_config_t *config);
 
 /* LLM-enhanced compaction: sends old messages to the provider for summarization.
  * Falls back to rule-based compaction if provider is NULL or the LLM call fails.
  * provider/alloc/history semantics are the same as hu_compact_history. */
-hu_error_t hu_compact_history_llm(hu_allocator_t *alloc, hu_owned_message_t *history,
+hu_error_t hu_compact_history_llm(hu_allocator_t *alloc, hu_owned_message_t **history,
                                   size_t *history_count, size_t *history_cap,
                                   const hu_compaction_config_t *config, hu_provider_t *provider);
 
@@ -82,7 +82,7 @@ hu_error_t hu_compact_hierarchical(hu_allocator_t *alloc, hu_provider_t *provide
 /* Hierarchical compaction: groups messages into chunks, summarizes each chunk,
  * then recursively summarizes summaries until the result fits within limits.
  * chunk_size: messages per chunk (0 = default 10). max_depth: recursion limit (0 = default 3). */
-hu_error_t hu_compact_history_hierarchical(hu_allocator_t *alloc, hu_owned_message_t *history,
+hu_error_t hu_compact_history_hierarchical(hu_allocator_t *alloc, hu_owned_message_t **history,
                                            size_t *history_count, size_t *history_cap,
                                            const hu_compaction_config_t *config,
                                            hu_provider_t *provider,

@@ -96,7 +96,6 @@ export class ScMessageThread extends LitElement {
     startY: number;
     currentX: number;
   } | null = null;
-  private _swipeRaf = 0;
 
   private _scrollHandler = (): void => {
     const el = this.scrollContainer;
@@ -247,7 +246,8 @@ export class ScMessageThread extends LitElement {
       transform: translateX(-50%);
       background: var(--hu-bg-surface);
       border: 1px solid var(--hu-accent);
-      box-shadow: var(--hu-shadow-md),
+      box-shadow:
+        var(--hu-shadow-md),
         0 0 12px 2px color-mix(in srgb, var(--hu-accent) 20%, transparent);
       padding: var(--hu-space-xs) var(--hu-space-md);
       border-radius: var(--hu-radius-full);
@@ -497,7 +497,7 @@ export class ScMessageThread extends LitElement {
       }
     }
     .hero-greeting {
-      font-family: var(--hu-font-display, Georgia, 'Times New Roman', serif);
+      font-family: var(--hu-font-display, Georgia, "Times New Roman", serif);
       font-size: clamp(1.5rem, 4vw, 2.25rem);
       font-weight: var(--hu-weight-medium, 500);
       color: var(--hu-text);
@@ -702,6 +702,10 @@ export class ScMessageThread extends LitElement {
     this.scrollContainer?.addEventListener("scroll", this._scrollHandler, { passive: true });
   }
   override disconnectedCallback(): void {
+    if (this._smoothScrollRaf) {
+      cancelAnimationFrame(this._smoothScrollRaf);
+      this._smoothScrollRaf = 0;
+    }
     this.scrollContainer?.removeEventListener("scroll", this._scrollHandler);
     super.disconnectedCallback();
   }
@@ -1364,7 +1368,7 @@ export class ScMessageThread extends LitElement {
                 : "Scroll to latest message"}
             >
               ${this._unseenCount > 0
-                ? html`${this._unseenCount} new message${this._unseenCount > 1 ? "s" : ""} \u2193`
+                ? html`${this._unseenCount} new message${this._unseenCount > 1 ? "s" : ""} ↓`
                 : html`<span class="pill-icon">${icons["arrow-down"]}</span> New messages`}
             </button>
           `

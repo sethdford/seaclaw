@@ -68,15 +68,13 @@ static hu_error_t qdrant_upsert(void *ctx, hu_allocator_t *alloc, const char *id
     snprintf(url, sizeof(url), "%s/collections/%s/points?wait=true", q->url, q->collection_name);
 
     char body[4096];
-    size_t pos =
-        snprintf(body, sizeof(body), "{\"points\":[{\"id\":\"%.*s\",\"vector\":[", (int)id_len, id);
+    size_t pos = hu_buf_appendf(body, sizeof(body), 0,
+                                "{\"points\":[{\"id\":\"%.*s\",\"vector\":[", (int)id_len, id);
     for (size_t i = 0; i < dims && pos < sizeof(body) - 32; i++) {
-        if (i > 0)
-            body[pos++] = ',';
-        pos += snprintf(body + pos, sizeof(body) - pos, "%f", embedding[i]);
+        pos = hu_buf_appendf(body, sizeof(body), pos, i ? ",%f" : "%f", (double)embedding[i]);
     }
-    snprintf(body + pos, sizeof(body) - pos, "],\"payload\":{\"key\":\"%.*s\"}}]}", (int)id_len,
-             id);
+    pos = hu_buf_appendf(body, sizeof(body), pos, "],\"payload\":{\"key\":\"%.*s\"}}]}",
+                        (int)id_len, id);
 
     hu_http_response_t resp = {0};
     const char *auth = q->api_key && q->api_key[0] ? q->api_key : NULL;
@@ -99,13 +97,11 @@ static hu_error_t qdrant_search(void *ctx, hu_allocator_t *alloc, const float *q
     snprintf(url, sizeof(url), "%s/collections/%s/points/search", q->url, q->collection_name);
 
     char body[4096];
-    size_t pos = snprintf(body, sizeof(body), "{\"vector\":[");
+    size_t pos = hu_buf_appendf(body, sizeof(body), 0, "{\"vector\":[");
     for (size_t i = 0; i < dims && pos < sizeof(body) - 32; i++) {
-        if (i > 0)
-            body[pos++] = ',';
-        pos += snprintf(body + pos, sizeof(body) - pos, "%f", query_embedding[i]);
+        pos = hu_buf_appendf(body, sizeof(body), pos, i ? ",%f" : "%f", (double)query_embedding[i]);
     }
-    snprintf(body + pos, sizeof(body) - pos, "],\"limit\":%zu,\"with_payload\":true}", limit);
+    pos = hu_buf_appendf(body, sizeof(body), pos, "],\"limit\":%zu,\"with_payload\":true}", limit);
 
     hu_http_response_t resp = {0};
     const char *auth = q->api_key && q->api_key[0] ? q->api_key : NULL;

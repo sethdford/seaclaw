@@ -46,17 +46,32 @@ static void load_patterns(hu_allocator_t *alloc, hu_json_value_t *root, const ch
     size_t count = arr->data.array.len;
     if (count == 0)
         return;
-    const char **patterns = (const char **)alloc->alloc(alloc->ctx, (count + 1) * sizeof(const char *));
+    size_t valid = 0;
+    for (size_t i = 0; i < count; i++) {
+        hu_json_value_t *item = arr->data.array.items[i];
+        if (item && item->type == HU_JSON_STRING)
+            valid++;
+    }
+    if (valid == 0)
+        return;
+    const char **patterns = (const char **)alloc->alloc(alloc->ctx, (valid + 1) * sizeof(const char *));
     if (!patterns)
         return;
-    memset(patterns, 0, (count + 1) * sizeof(const char *));
+    size_t w = 0;
     for (size_t i = 0; i < count; i++) {
         hu_json_value_t *item = arr->data.array.items[i];
         if (item && item->type == HU_JSON_STRING) {
-            patterns[i] = hu_strndup(alloc, item->data.string.ptr, item->data.string.len);
+            patterns[w] = hu_strndup(alloc, item->data.string.ptr, item->data.string.len);
+            if (!patterns[w]) {
+                for (size_t j = 0; j < w; j++)
+                    alloc->free(alloc->ctx, (char *)patterns[j], strlen(patterns[j]) + 1);
+                alloc->free(alloc->ctx, patterns, (valid + 1) * sizeof(const char *));
+                return;
+            }
+            w++;
         }
     }
-    patterns[count] = NULL;
+    patterns[w] = NULL;
     *dest = patterns;
 }
 
@@ -246,6 +261,17 @@ hu_cognition_budget_t hu_cognition_get_budget(hu_cognition_mode_t mode,
         budget.enable_mid_turn_retrieval = true;
         budget.enable_reflection = true;
         budget.prioritize_empathy = true;
+        break;
+
+    default:
+        budget.max_memory_entries = 3;
+        budget.max_memory_chars = 1500;
+        budget.max_tool_iterations = 2;
+        budget.enable_planning = false;
+        budget.enable_tree_of_thought = false;
+        budget.enable_mid_turn_retrieval = false;
+        budget.enable_reflection = false;
+        budget.prioritize_empathy = false;
         break;
     }
 

@@ -79,10 +79,16 @@ hu_error_t hu_relationship_data_init(hu_allocator_t *alloc) {
         const char *name = hu_json_get_string(stage_obj, "name");
         const char *guide = hu_json_get_string(stage_obj, "guidance");
 
-        if (name)
+        if (name) {
             names[i] = hu_strndup(alloc, name, strlen(name));
-        if (guide)
+            if (!names[i])
+                goto relationship_stages_load_fail;
+        }
+        if (guide) {
             guidance[i] = hu_strndup(alloc, guide, strlen(guide));
+            if (!guidance[i])
+                goto relationship_stages_load_fail;
+        }
     }
 
     /* Atomically swap in new data */
@@ -90,6 +96,18 @@ hu_error_t hu_relationship_data_init(hu_allocator_t *alloc) {
     s_stage_guidance = guidance;
     s_stage_count = stage_count;
 
+    hu_json_free(alloc, root);
+    return HU_OK;
+
+relationship_stages_load_fail:
+    for (size_t j = 0; j < stage_count; j++) {
+        if (names[j])
+            alloc->free(alloc->ctx, (char *)names[j], strlen(names[j]) + 1);
+        if (guidance[j])
+            alloc->free(alloc->ctx, (char *)guidance[j], strlen(guidance[j]) + 1);
+    }
+    alloc->free(alloc->ctx, names, stage_count * sizeof(const char *));
+    alloc->free(alloc->ctx, guidance, stage_count * sizeof(const char *));
     hu_json_free(alloc, root);
     return HU_OK;
 }
@@ -206,6 +224,22 @@ void hu_relationship_update(hu_relationship_state_t *state, uint32_t turn_count)
     if (!state)
         return;
     state->total_turns += turn_count;
+
+    /* Gradually advance stage based on accumulated turns when no quality
+     * scoring is available (e.g. CLI mode without the daemon). This is a
+     * conservative fallback — quality-based progression in
+     * hu_relationship_new_session_quality is preferred. */
+    hu_relationship_stage_t floor;
+    if (state->total_turns >= 200)
+        floor = HU_REL_DEEP;
+    else if (state->total_turns >= 80)
+        floor = HU_REL_TRUSTED;
+    else if (state->total_turns >= 20)
+        floor = HU_REL_FAMILIAR;
+    else
+        floor = HU_REL_NEW;
+    if (floor > state->stage)
+        state->stage = floor;
 }
 
 hu_error_t hu_relationship_build_prompt(hu_allocator_t *alloc, const hu_relationship_state_t *state,

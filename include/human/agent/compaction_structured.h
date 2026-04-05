@@ -88,7 +88,7 @@ bool hu_compact_is_pinned(
 hu_error_t hu_compact_inject_continuation_preamble(
     hu_allocator_t *alloc,
     const hu_compaction_summary_t *summary,
-    hu_owned_message_t *history, size_t *history_count, size_t *history_cap);
+    hu_owned_message_t **history, size_t *history_count, size_t *history_cap);
 
 /* ── Strip analysis blocks ───────────────────────────────────────────────
  * Remove <analysis>...</analysis> blocks from content string in-place.

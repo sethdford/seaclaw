@@ -147,7 +147,10 @@ hu_error_t hu_migrate_read_brain_db(hu_allocator_t *alloc, const char *db_path,
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    int step_rc = SQLITE_OK;
+    int migrate_err = 0; /* 0 ok, 1 oom, 2 sqlite */
+
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         const char *rk = (const char *)sqlite3_column_text(stmt, 0);
         const char *rc = (const char *)sqlite3_column_text(stmt, 1);
         const char *rcat = (const char *)sqlite3_column_text(stmt, 2);
@@ -164,8 +167,10 @@ hu_error_t hu_migrate_read_brain_db(hu_allocator_t *alloc, const char *db_path,
             hu_sqlite_source_entry_t *n = (hu_sqlite_source_entry_t *)alloc->realloc(
                 alloc->ctx, entries, count * sizeof(hu_sqlite_source_entry_t),
                 cap * sizeof(hu_sqlite_source_entry_t));
-            if (!n)
+            if (!n) {
+                migrate_err = 1;
                 break;
+            }
             entries = n;
         }
 
@@ -179,6 +184,7 @@ hu_error_t hu_migrate_read_brain_db(hu_allocator_t *alloc, const char *db_path,
                 alloc->free(alloc->ctx, content, clen + 1);
             if (category)
                 alloc->free(alloc->ctx, category, catlen + 1);
+            migrate_err = 1;
             break;
         }
         if (rk)
@@ -198,6 +204,20 @@ hu_error_t hu_migrate_read_brain_db(hu_allocator_t *alloc, const char *db_path,
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);
+
+    if (migrate_err) {
+        hu_migrate_free_entries(alloc, entries, count);
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    if (step_rc != SQLITE_DONE) {
+        hu_migrate_free_entries(alloc, entries, count);
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_INTERNAL;
+    }
+
     *out = entries;
     *out_count = count;
     return HU_OK;

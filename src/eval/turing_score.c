@@ -1,4 +1,5 @@
 #include "human/eval/turing_score.h"
+#include "human/eval/consistency.h"
 #include "human/core/string.h"
 #include <ctype.h>
 #include <stdio.h>
@@ -203,16 +204,20 @@ static int has_opinion_markers(const char *s, size_t len) {
 }
 
 /* Find the last user turn in conversation context. Looks for role prefixes
- * (user:, U:, Human:) scanning backward, or falls back to last line. */
-static size_t last_user_msg_len(const char *ctx, size_t ctx_len) {
+ * (user:, U:, Human:) scanning backward, or falls back to last line.
+ * Writes byte offset from ctx and length so callers can slice without assuming
+ * the message is a suffix of the buffer. */
+static void last_user_msg_span(const char *ctx, size_t ctx_len, size_t *out_off, size_t *out_len) {
+    *out_off = 0;
+    *out_len = 0;
     if (!ctx || ctx_len == 0)
-        return 0;
+        return;
 
     size_t end = ctx_len;
     while (end > 0 && (ctx[end - 1] == '\n' || ctx[end - 1] == '\r' || ctx[end - 1] == ' '))
         end--;
     if (end == 0)
-        return 0;
+        return;
 
     /* Scan backward for the last user-role prefix to find full turn */
     static const char *user_prefixes[] = {"user: ", "User: ", "U: ", "Human: ", "human: "};
@@ -262,7 +267,9 @@ static size_t last_user_msg_len(const char *ctx, size_t ctx_len) {
                 if (msg_end > msg_start && msg_start > best_start) {
                     best_start = msg_start;
                     found_prefix = true;
-                    return msg_end - msg_start;
+                    *out_off = msg_start;
+                    *out_len = msg_end - msg_start;
+                    return;
                 }
             }
             if (check == 0)
@@ -275,9 +282,9 @@ static size_t last_user_msg_len(const char *ctx, size_t ctx_len) {
         size_t start = end;
         while (start > 0 && ctx[start - 1] != '\n')
             start--;
-        return end - start;
+        *out_off = start;
+        *out_len = end - start;
     }
-    return 0;
 }
 
 static int count_exclamations(const char *s, size_t len) {
@@ -580,9 +587,10 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
         /* Context-responsive: if user message has emotional tone, emotional response is appropriate
          */
         if (conversation_context && context_len > 0) {
-            size_t user_len = last_user_msg_len(conversation_context, context_len);
-            if (user_len > 0) {
-                const char *user_start = conversation_context + context_len - user_len;
+            size_t user_off = 0, user_len = 0;
+            last_user_msg_span(conversation_context, context_len, &user_off, &user_len);
+            if (user_len > 0 && user_off + user_len <= context_len) {
+                const char *user_start = conversation_context + user_off;
                 int user_emotional = has_emotional_words(user_start, user_len);
                 int user_vuln = has_vulnerability_markers(user_start, user_len);
                 if ((user_emotional > 0 || user_vuln > 0) && emotional > 0)
@@ -625,6 +633,13 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
         if (vulnerability > 0 && emotional > 0)
             pc += 1;
         pc += cross_turn_consistency(response, response_len, conversation_context, context_len);
+        if (conversation_context && context_len > 10) {
+            float line_score = 0.0f;
+            if (hu_consistency_score_line(conversation_context, context_len,
+                                          response, response_len, &line_score) == HU_OK &&
+                line_score > 0.6f)
+                pc += 1;
+        }
         out->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] = pc;
     }
 
@@ -675,9 +690,10 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
     {
         int score = 6;
         if (conversation_context && context_len > 0) {
-            size_t user_len = last_user_msg_len(conversation_context, context_len);
-            const char *user_start = (user_len > 0 && user_len <= context_len)
-                                         ? conversation_context + context_len - user_len
+            size_t user_off = 0, user_len = 0;
+            last_user_msg_span(conversation_context, context_len, &user_off, &user_len);
+            const char *user_start = (user_len > 0 && user_off + user_len <= context_len)
+                                         ? conversation_context + user_off
                                          : conversation_context;
             size_t user_scan_len = (user_len > 0) ? user_len : context_len;
 
@@ -774,8 +790,10 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
         else if (response_len < 50)
             score += 1;
         if (conversation_context && context_len > 0) {
-            size_t user_len = last_user_msg_len(conversation_context, context_len);
-            if (user_len > 0 && user_len < 30 && response_len < 80)
+            size_t user_off = 0, user_len = 0;
+            last_user_msg_span(conversation_context, context_len, &user_off, &user_len);
+            if (user_len > 0 && user_off + user_len <= context_len && user_len < 30 &&
+                response_len < 80)
                 score += 1;
         }
         if (response_len > 400)
@@ -914,23 +932,21 @@ hu_error_t hu_turing_score_heuristic(const char *response, size_t response_len,
 
     /* Build tell/signal strings */
     size_t pos = 0;
-    if (ai_tells > 0 && pos < sizeof(out->ai_tells) - 20)
-        pos += (size_t)snprintf(out->ai_tells + pos, sizeof(out->ai_tells) - pos, "ai_phrases=%d ",
-                                ai_tells);
-    if (structural > 0 && pos < sizeof(out->ai_tells) - 20)
-        pos += (size_t)snprintf(out->ai_tells + pos, sizeof(out->ai_tells) - pos, "structural=%d ",
-                                structural);
+    if (ai_tells > 0)
+        pos = hu_buf_appendf(out->ai_tells, sizeof(out->ai_tells), pos, "ai_phrases=%d ", ai_tells);
+    if (structural > 0)
+        pos = hu_buf_appendf(out->ai_tells, sizeof(out->ai_tells), pos, "structural=%d ",
+                             structural);
 
     pos = 0;
-    if (contractions && pos < sizeof(out->human_signals) - 20)
-        pos += (size_t)snprintf(out->human_signals + pos, sizeof(out->human_signals) - pos,
-                                "contractions ");
-    if (casual > 0 && pos < sizeof(out->human_signals) - 20)
-        pos += (size_t)snprintf(out->human_signals + pos, sizeof(out->human_signals) - pos,
-                                "casual=%d ", casual);
-    if (emotional > 0 && pos < sizeof(out->human_signals) - 20)
-        pos += (size_t)snprintf(out->human_signals + pos, sizeof(out->human_signals) - pos,
-                                "emotional=%d ", emotional);
+    if (contractions)
+        pos = hu_buf_appendf(out->human_signals, sizeof(out->human_signals), pos, "contractions ");
+    if (casual > 0)
+        pos = hu_buf_appendf(out->human_signals, sizeof(out->human_signals), pos, "casual=%d ",
+                             casual);
+    if (emotional > 0)
+        pos = hu_buf_appendf(out->human_signals, sizeof(out->human_signals), pos, "emotional=%d ",
+                             emotional);
 
     return HU_OK;
 }
@@ -1067,6 +1083,47 @@ hu_error_t hu_turing_score_llm(hu_allocator_t *alloc, hu_provider_t *provider, c
     return HU_OK;
 }
 
+void hu_turing_apply_persona_alignment(hu_turing_score_t *score,
+                                       const char *response, size_t response_len,
+                                       const char *const *traits, size_t traits_count,
+                                       const char *const *preferred_vocab, size_t preferred_count,
+                                       const char *const *avoided_vocab, size_t avoided_count) {
+    if (!score || !response || response_len == 0)
+        return;
+    float alignment = 0.0f;
+    if (hu_consistency_score_prompt_alignment(response, response_len,
+            traits, traits_count, preferred_vocab, preferred_count,
+            avoided_vocab, avoided_count, &alignment) == HU_OK) {
+        int bonus = 0;
+        if (alignment >= 0.7f) bonus = 2;
+        else if (alignment >= 0.5f) bonus = 1;
+        else if (alignment < 0.2f) bonus = -1;
+        score->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] += bonus;
+        if (score->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] > 10)
+            score->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] = 10;
+        if (score->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] < 0)
+            score->dimensions[HU_TURING_PERSONALITY_CONSISTENCY] = 0;
+        /* Recompute overall using same weighted formula as hu_turing_score_compute */
+        int weighted_sum = 0;
+        int total_weight = 0;
+        for (int i = 0; i < 12; i++) {
+            weighted_sum += score->dimensions[i] * 3;
+            total_weight += 3;
+        }
+        for (int i = 12; i < HU_TURING_DIM_COUNT; i++) {
+            weighted_sum += score->dimensions[i];
+            total_weight += 1;
+        }
+        score->overall = (weighted_sum + total_weight / 2) / total_weight;
+        if (score->overall >= 8)
+            score->verdict = HU_TURING_HUMAN;
+        else if (score->overall >= 6)
+            score->verdict = HU_TURING_BORDERLINE;
+        else
+            score->verdict = HU_TURING_AI_DETECTED;
+    }
+}
+
 void hu_turing_apply_channel_weights(hu_turing_score_t *score, const char *channel,
                                      size_t channel_len) {
     if (!score || !channel || channel_len == 0)
@@ -1153,17 +1210,16 @@ char *hu_turing_score_summary(hu_allocator_t *alloc, const hu_turing_score_t *sc
 
     char buf[1024];
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Turing Score: %d/10 [%s]\n",
-                            score->overall, hu_turing_verdict_name(score->verdict));
-    for (int i = 0; i < HU_TURING_DIM_COUNT && pos < sizeof(buf) - 40; i++) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "  %s: %d\n", DIMENSION_NAMES[i],
-                                score->dimensions[i]);
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "Turing Score: %d/10 [%s]\n", score->overall,
+                         hu_turing_verdict_name(score->verdict));
+    for (int i = 0; i < HU_TURING_DIM_COUNT; i++) {
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "  %s: %d\n", DIMENSION_NAMES[i],
+                             score->dimensions[i]);
     }
-    if (score->ai_tells[0] && pos < sizeof(buf) - 40)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "AI tells: %s\n", score->ai_tells);
-    if (score->human_signals[0] && pos < sizeof(buf) - 40)
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Human signals: %s\n",
-                                score->human_signals);
+    if (score->ai_tells[0])
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "AI tells: %s\n", score->ai_tells);
+    if (score->human_signals[0])
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "Human signals: %s\n", score->human_signals);
 
     char *out = hu_strndup(alloc, buf, pos);
     if (out)

@@ -332,7 +332,11 @@ export class ScChatView extends GatewayAwareLitElement {
 
   private _onToggleSessions = (): void => {
     this._sessionsPanelOpen = !this._sessionsPanelOpen;
-    try { localStorage.setItem("hu-sessions-panel-open", String(this._sessionsPanelOpen)); } catch { /* test env */ }
+    try {
+      localStorage.setItem("hu-sessions-panel-open", String(this._sessionsPanelOpen));
+    } catch {
+      /* test env */
+    }
   };
 
   private _onToggleArtifacts = (): void => {
@@ -344,7 +348,11 @@ export class ScChatView extends GatewayAwareLitElement {
       this._artifactsPanelOpen = false;
     } else if (this._sessionsPanelOpen) {
       this._sessionsPanelOpen = false;
-      try { localStorage.setItem("hu-sessions-panel-open", "false"); } catch { /* test env */ }
+      try {
+        localStorage.setItem("hu-sessions-panel-open", "false");
+      } catch {
+        /* test env */
+      }
     }
   };
 
@@ -388,7 +396,11 @@ export class ScChatView extends GatewayAwareLitElement {
     document.addEventListener("toggle-sessions", this._onToggleSessions);
     document.addEventListener("toggle-artifacts", this._onToggleArtifacts);
     document.addEventListener("close-panel", this._onClosePanel);
-    try { this._sessionsPanelOpen = localStorage.getItem("hu-sessions-panel-open") === "true"; } catch { /* test env */ }
+    try {
+      this._sessionsPanelOpen = localStorage.getItem("hu-sessions-panel-open") === "true";
+    } catch {
+      /* test env */
+    }
   }
 
   protected override onGatewaySwapped(
@@ -546,9 +558,7 @@ export class ScChatView extends GatewayAwareLitElement {
     const msgId = artifact?.messageId;
     let sourceIdx = -1;
     if (msgId) {
-      sourceIdx = this.chat.items.findIndex(
-        (item) => item.type === "message" && item.id === msgId,
-      );
+      sourceIdx = this.chat.items.findIndex((item) => item.type === "message" && item.id === msgId);
     }
     if (sourceIdx < 0) {
       for (let i = this.chat.items.length - 1; i >= 0; i--) {

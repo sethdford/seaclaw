@@ -4,6 +4,8 @@
 
 #include "human/core/allocator.h"
 #include "human/core/error.h"
+#include "human/core/json.h"
+#include "human/core/string.h"
 #include "human/ml/training_data.h"
 #include <stddef.h>
 #include <stdio.h>
@@ -170,9 +172,9 @@ hu_error_t hu_training_data_export_json(hu_allocator_t *alloc, sqlite3 *db,
             buf = nb;
             cap = new_cap;
         }
-        len += (size_t)snprintf(buf + len, cap - len,
-                               "{\"id\":%lld,\"total_reward\":%.4f,\"steps\":[",
-                               (long long)tid, total);
+        len = hu_buf_appendf(buf, cap, len,
+                             "{\"id\":%lld,\"total_reward\":%.4f,\"steps\":[",
+                             (long long)tid, total);
 
         int sfirst = 1;
         while (sqlite3_step(sstmt) == SQLITE_ROW) {
@@ -186,11 +188,41 @@ hu_error_t hu_training_data_export_json(hu_allocator_t *alloc, sqlite3 *db,
                 buf[len++] = ',';
             sfirst = 0;
 
-            need = 512;
+            hu_json_buf_t step = {0};
+            hu_error_t jerr = hu_json_buf_init(&step, alloc);
+            if (jerr == HU_OK)
+                jerr = hu_json_buf_append_raw(&step, "{", 1);
+            if (jerr == HU_OK)
+                jerr = hu_json_append_key_value(&step, "state", 5, st ? st : "",
+                                                st ? (size_t)sqlite3_column_bytes(sstmt, 0) : 0);
+            if (jerr == HU_OK)
+                jerr = hu_json_buf_append_raw(&step, ",", 1);
+            if (jerr == HU_OK)
+                jerr = hu_json_append_key_value(&step, "action", 6, ac ? ac : "",
+                                                ac ? (size_t)sqlite3_column_bytes(sstmt, 1) : 0);
+            if (jerr == HU_OK) {
+                char tail[160];
+                int tn = snprintf(tail, sizeof(tail),
+                                  ",\"reward\":%.4f,\"reward_type\":%d,\"timestamp\":%lld}", r, rt,
+                                  (long long)ts);
+                if (tn > 0 && (size_t)tn < sizeof(tail))
+                    jerr = hu_json_buf_append_raw(&step, tail, (size_t)tn);
+                else
+                    jerr = HU_ERR_INTERNAL;
+            }
+            if (jerr != HU_OK) {
+                hu_json_buf_free(&step);
+                sqlite3_finalize(sstmt);
+                sqlite3_finalize(stmt);
+                alloc->free(alloc->ctx, buf, cap);
+                return jerr;
+            }
+            need = step.len + 1;
             while (len + need > cap) {
                 size_t new_cap = cap * 2;
                 char *nb = (char *)alloc->realloc(alloc->ctx, buf, cap, new_cap);
                 if (!nb) {
+                    hu_json_buf_free(&step);
                     sqlite3_finalize(sstmt);
                     sqlite3_finalize(stmt);
                     alloc->free(alloc->ctx, buf, cap);
@@ -199,10 +231,9 @@ hu_error_t hu_training_data_export_json(hu_allocator_t *alloc, sqlite3 *db,
                 buf = nb;
                 cap = new_cap;
             }
-            len += (size_t)snprintf(buf + len, cap - len,
-                                   "{\"state\":\"%s\",\"action\":\"%s\",\"reward\":%.4f,"
-                                   "\"reward_type\":%d,\"timestamp\":%lld}",
-                                   st ? st : "", ac ? ac : "", r, rt, (long long)ts);
+            memcpy(buf + len, step.ptr, step.len);
+            len += step.len;
+            hu_json_buf_free(&step);
         }
         sqlite3_finalize(sstmt);
         buf[len++] = ']';

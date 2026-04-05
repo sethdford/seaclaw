@@ -37,9 +37,15 @@ static void *worker(void *arg) {
         hu_work_item_t item = pool->queue[pool->head];
         pool->head = (pool->head + 1) % POOL_QUEUE_SIZE;
         pool->count--;
+        pool->busy_count++;
         pthread_cond_signal(&pool->not_full);
         pthread_mutex_unlock(&pool->mutex);
+
         item.fn(item.arg);
+
+        pthread_mutex_lock(&pool->mutex);
+        pool->busy_count--;
+        pthread_mutex_unlock(&pool->mutex);
     }
 }
 

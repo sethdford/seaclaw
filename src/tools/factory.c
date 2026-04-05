@@ -102,6 +102,7 @@
 #include "human/tools/tool_search.h"
 #include "human/tools/skill_write.h"
 #include "human/tools/spawn.h"
+#include "human/tools/send_voice_message.h"
 #include "human/tools/voice_clone.h"
 #include "human/tools/web_fetch.h"
 #include "human/tools/web_search.h"
@@ -608,6 +609,11 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
     if (err != HU_OK)
         goto fail;
 #endif
+
+    err = hu_send_voice_message_create(alloc, &tools[idx]);
+    if (err != HU_OK)
+        goto fail;
+    idx++;
 
     tools[idx] = hu_lsp_tool_create(alloc);
     idx++;

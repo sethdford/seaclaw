@@ -128,6 +128,7 @@ All error codes are defined in `include/human/core/error.h` as `hu_error_t`. Use
 | `HU_ERR_FLEET_DEPTH_EXCEEDED`   | 48    | Nested spawn would exceed `agent.fleet_max_spawn_depth`        |
 | `HU_ERR_FLEET_SPAWN_CAP`        | 49    | Lifetime spawn count hit `agent.fleet_max_total_spawns`        |
 | `HU_ERR_FLEET_BUDGET_EXCEEDED`  | 50    | Shared session cost is at/above `agent.fleet_budget_usd`       |
+| `HU_ERR_LIMIT_REACHED`          | 51    | A fixed cap (tags, queue depth, etc.) was exceeded            |
 
 ## Usage Guidelines
 

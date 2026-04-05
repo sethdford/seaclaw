@@ -2,6 +2,7 @@
 #include "human/agent.h"
 #include "human/agent/tool_context.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +23,62 @@ typedef struct {
     hu_allocator_t *alloc;
     hu_agent_pool_t *pool;
 } agent_spawn_ctx_t;
+
+static hu_error_t agent_spawn_ok_json(hu_allocator_t *alloc, uint64_t agent_id, const char *label,
+                                      hu_tool_result_t *out) {
+    hu_json_value_t *root = hu_json_object_new(alloc);
+    if (!root) {
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_OK;
+    }
+    hu_json_value_t *idv = hu_json_number_new(alloc, (double)agent_id);
+    if (!idv) {
+        hu_json_free(alloc, root);
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_OK;
+    }
+    if (hu_json_object_set(alloc, root, "agent_id", idv) != HU_OK) {
+        hu_json_free(alloc, idv);
+        hu_json_free(alloc, root);
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_OK;
+    }
+    size_t label_len = label ? strlen(label) : 0;
+    hu_json_value_t *labv = hu_json_string_new(alloc, label ? label : "", label_len);
+    if (!labv) {
+        hu_json_free(alloc, root);
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_OK;
+    }
+    if (hu_json_object_set(alloc, root, "label", labv) != HU_OK) {
+        hu_json_free(alloc, labv);
+        hu_json_free(alloc, root);
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_OK;
+    }
+    hu_json_value_t *statv = hu_json_string_new(alloc, "running", 7);
+    if (!statv) {
+        hu_json_free(alloc, root);
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_OK;
+    }
+    if (hu_json_object_set(alloc, root, "status", statv) != HU_OK) {
+        hu_json_free(alloc, statv);
+        hu_json_free(alloc, root);
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_OK;
+    }
+    char *msg = NULL;
+    size_t msg_len = 0;
+    hu_error_t jerr = hu_json_stringify(alloc, root, &msg, &msg_len);
+    hu_json_free(alloc, root);
+    if (jerr != HU_OK || !msg) {
+        *out = hu_tool_result_fail("out of memory", 13);
+        return HU_OK;
+    }
+    *out = hu_tool_result_ok_owned(msg, msg_len);
+    return HU_OK;
+}
 
 static hu_error_t agent_spawn_execute(void *ctx, hu_allocator_t *alloc, const hu_json_value_t *args,
                                       hu_tool_result_t *out) {
@@ -45,9 +102,7 @@ static hu_error_t agent_spawn_execute(void *ctx, hu_allocator_t *alloc, const hu
 
 #if HU_IS_TEST
     (void)c;
-    char *msg =
-        hu_sprintf(alloc, "{\"agent_id\":1,\"label\":\"%s\",\"status\":\"running\"}", label);
-    *out = hu_tool_result_ok_owned(msg, msg ? strlen(msg) : 0);
+    return agent_spawn_ok_json(alloc, 1u, label, out);
 #else
     if (!c->pool) {
         *out = hu_tool_result_fail("agent pool not configured", 25);
@@ -98,14 +153,13 @@ static hu_error_t agent_spawn_execute(void *ctx, hu_allocator_t *alloc, const hu
     uint64_t agent_id = 0;
     hu_error_t err = hu_agent_pool_spawn(c->pool, &cfg, task, strlen(task), label, &agent_id);
     if (err != HU_OK) {
-        *out = hu_tool_result_fail(hu_error_string(err), strlen(hu_error_string(err)));
+        hu_log_error("agent_spawn", NULL, "spawn failed: %s", hu_error_string(err));
+        static const char fail_msg[] = "agent spawn failed";
+        *out = hu_tool_result_fail(fail_msg, sizeof(fail_msg) - 1);
         return HU_OK;
     }
-    char *msg = hu_sprintf(alloc, "{\"agent_id\":%llu,\"label\":\"%s\",\"status\":\"running\"}",
-                           (unsigned long long)agent_id, label);
-    *out = hu_tool_result_ok_owned(msg, msg ? strlen(msg) : 0);
+    return agent_spawn_ok_json(alloc, agent_id, label, out);
 #endif
-    return HU_OK;
 }
 
 static const char *agent_spawn_name(void *ctx) {

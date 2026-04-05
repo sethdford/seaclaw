@@ -94,21 +94,26 @@ static hu_error_t notebook_execute(void *ctx, hu_allocator_t *alloc, const hu_js
         c->count = 0;
         *out = hu_tool_result_ok("cleared", 7);
     } else if (strcmp(action, "list") == 0) {
-        size_t cap = 256;
-        char *buf = (char *)alloc->alloc(alloc->ctx, cap);
+        size_t need = 32;
+        for (size_t i = 0; i < c->count; i++) {
+            const char *k = c->entries[i].key ? c->entries[i].key : "";
+            need += strlen(k) + 4;
+        }
+        if (need < 256)
+            need = 256;
+        char *buf = (char *)alloc->alloc(alloc->ctx, need);
         if (!buf) {
             *out = hu_tool_result_fail("oom", 3);
             return HU_OK;
         }
-        size_t off = 0;
-        off += (size_t)snprintf(buf + off, cap - off, "{\"keys\":[");
+        size_t off = hu_buf_appendf(buf, need, 0, "{\"keys\":[");
         for (size_t i = 0; i < c->count; i++) {
-            if (i > 0 && off < cap)
+            if (i > 0 && off < need)
                 buf[off++] = ',';
-            off += (size_t)snprintf(buf + off, cap - off, "\"%s\"",
-                                    c->entries[i].key ? c->entries[i].key : "");
+            off = hu_buf_appendf(buf, need, off, "\"%s\"",
+                                 c->entries[i].key ? c->entries[i].key : "");
         }
-        off += (size_t)snprintf(buf + off, cap - off, "]}");
+        off = hu_buf_appendf(buf, need, off, "]}");
         *out = hu_tool_result_ok_owned(buf, off);
     } else {
         *out = hu_tool_result_fail("unknown action", 14);

@@ -111,6 +111,11 @@ export class ScImageViewer extends LitElement {
       transform: scale(1);
     }
 
+    .image-wrap img:focus-visible {
+      outline: var(--hu-focus-ring-width) solid var(--hu-accent);
+      outline-offset: var(--hu-focus-ring-offset);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .backdrop,
       .backdrop.closing {
@@ -174,9 +179,17 @@ export class ScImageViewer extends LitElement {
       return;
     }
     if (e.key === "Tab") {
-      e.preventDefault();
-      const btn = this.renderRoot.querySelector<HTMLButtonElement>(".close-btn");
-      btn?.focus();
+      const focusable = this.shadowRoot?.querySelectorAll<HTMLElement>('button, [tabindex="0"]');
+      if (!focusable?.length) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
   }
 
@@ -246,13 +259,14 @@ export class ScImageViewer extends LitElement {
           @click=${(e: MouseEvent) => e.stopPropagation()}
         >
           <img
-              src=${this.src}
-              alt=""
-              loading="lazy"
-              draggable="false"
-              class=${this._imageLoaded ? "loaded" : ""}
-              @load=${this._onImageLoad}
-            />
+            src=${this.src}
+            alt=""
+            tabindex="0"
+            loading="lazy"
+            draggable="false"
+            class=${this._imageLoaded ? "loaded" : ""}
+            @load=${this._onImageLoad}
+          />
         </div>
       </div>
     `;

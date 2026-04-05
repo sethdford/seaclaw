@@ -421,6 +421,8 @@ set(HU_CORE_SOURCES
     src/persona/persona_fuse.c
     src/persona/humor.c
     src/persona/markdown_loader.c
+    src/persona/somatic.c
+    src/persona/narrative_self.c
     src/gateway/event_bridge.c
     src/gateway/tenant.c
     src/runtime/native.c
@@ -472,10 +474,13 @@ set(HU_CORE_SOURCES
     src/agent/tui.c
     src/agent/commands.c
     src/agent/context_tokens.c
+    src/agent/choreography.c
     src/agent/max_tokens.c
     src/agent/preferences.c
     src/agent/awareness.c
     src/agent/outcomes.c
+    src/agent/growth_narrative.c
+    src/agent/frontier_persist.c
     src/context/conversation.c
     src/context/style_tracker.c
     src/context/theory_of_mind.c
@@ -626,6 +631,7 @@ set(HU_CORE_SOURCES
     src/visual/content.c
     src/memory/ingest.c
     src/memory/inbox.c
+    src/memory/relational_episode.c
     src/memory/vector/circuit_breaker.c
     src/cognition/db.c
     src/cognition/trust.c
@@ -635,6 +641,10 @@ set(HU_CORE_SOURCES
     src/cognition/skill_routing.c
     src/cognition/dual_process.c
     src/cognition/episodic.c
+    src/cognition/attachment.c
+    src/cognition/rupture_repair.c
+    src/cognition/presence.c
+    src/cognition/novelty.c
     src/tools/validation.c
     src/tools/path_security.c
     src/tools/shell.c
@@ -843,6 +853,7 @@ list(APPEND HU_CORE_SOURCES
     src/ml/dpo.c
     src/security/cot_audit.c
     src/security/escalate.c
+    src/security/normalize.c
     src/security/moderation.c
     src/security/companion_safety.c
     src/tools/code_sandbox.c
@@ -894,6 +905,9 @@ if(HU_ENABLE_PERSONA)
         src/persona/life_sim.c
         src/persona/mood.c
         src/persona/style_learner.c
+        src/persona/micro_expression.c
+        src/persona/creative_voice.c
+        src/persona/genuine_boundaries.c
         src/tools/persona.c
         src/context/theory_of_mind.c
         src/context/self_awareness.c
@@ -991,6 +1005,7 @@ endif()
 # Phase 7 feeds: OAuth token storage (oauth_tokens table)
 if(HU_ENABLE_SQLITE)
     list(APPEND HU_CORE_SOURCES
+        src/memory/sql_transaction.c
         src/memory/episodic.c
         src/memory/consolidation_engine.c
         src/memory/forgetting.c
@@ -1758,7 +1773,8 @@ if(NOT HU_ENABLE_PERSONA)
         src/persona/replay.c src/persona/circadian.c src/persona/relationship.c
         src/persona/auto_profile.c src/persona/auto_tune.c src/persona/voice_maturity.c
         src/persona/style_clone.c src/persona/life_sim.c src/persona/mood.c
-        src/persona/style_learner.c src/tools/persona.c
+        src/persona/style_learner.c src/persona/micro_expression.c src/persona/creative_voice.c
+        src/persona/genuine_boundaries.c src/tools/persona.c
         src/context/theory_of_mind.c src/context/self_awareness.c src/context/anticipatory.c
         src/context/protective.c src/context/humor.c src/context/social_graph.c
         src/context/authentic.c
@@ -2262,6 +2278,7 @@ set(HU_TEST_SOURCES
     tests/test_emotional_cognition.c
     tests/test_evolving_cognition.c
     tests/test_metacognition.c
+    tests/test_humanness_frontiers.c
     tests/test_skill_routing.c
     tests/test_dual_process.c
     tests/test_repair.c

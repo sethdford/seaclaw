@@ -276,6 +276,6 @@ hu_error_t hu_classifier_build_prompt(hu_allocator_t *alloc, hu_classify_result_
         return HU_ERR_INVALID_ARGUMENT;
     }
     *out = buf;
-    *out_len = (size_t)w;
+    *out_len = (size_t)w < 256 ? (size_t)w : 255;
     return HU_OK;
 }

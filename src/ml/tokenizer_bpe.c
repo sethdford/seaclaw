@@ -50,8 +50,12 @@ static hu_error_t ensure_vocab_capacity(struct hu_bpe_tokenizer *tok, size_t nee
         old_cap * sizeof(size_t),
         cap * sizeof(size_t));
     if (!new_lens) {
-        /* vocab_bytes already grew — update capacity to match so deinit frees correctly */
-        tok->vocab_capacity = cap;
+        uint8_t **rb = (uint8_t **)tok->alloc->realloc(
+            tok->alloc->ctx, tok->vocab_bytes,
+            cap * sizeof(uint8_t *),
+            old_cap * sizeof(uint8_t *));
+        if (rb)
+            tok->vocab_bytes = rb;
         return HU_ERR_OUT_OF_MEMORY;
     }
     tok->vocab_lens = new_lens;
@@ -81,7 +85,12 @@ static hu_error_t ensure_merge_capacity(struct hu_bpe_tokenizer *tok, size_t nee
         old_cap * sizeof(int32_t),
         cap * sizeof(int32_t));
     if (!new_b) {
-        tok->merge_capacity = cap;
+        int32_t *rb = (int32_t *)tok->alloc->realloc(
+            tok->alloc->ctx, tok->merge_a,
+            cap * sizeof(int32_t),
+            old_cap * sizeof(int32_t));
+        if (rb)
+            tok->merge_a = rb;
         return HU_ERR_OUT_OF_MEMORY;
     }
     tok->merge_b = new_b;

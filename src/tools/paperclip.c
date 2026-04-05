@@ -74,14 +74,14 @@ static hu_error_t paperclip_execute(void *raw_ctx, hu_allocator_t *alloc,
         }
         size_t pos = 0;
         const size_t cap = 4096;
-        pos += (size_t)snprintf(buf + pos, cap - pos, "Found %zu task(s):\n", list.count);
+        pos = hu_buf_appendf(buf, cap, pos, "Found %zu task(s):\n", list.count);
         if (pos >= cap)
             pos = cap - 1;
         for (size_t i = 0; i < list.count && pos < 3900; i++) {
-            pos += (size_t)snprintf(buf + pos, cap - pos, "- [%s] %s (status: %s)\n",
-                                    list.tasks[i].id ? list.tasks[i].id : "?",
-                                    list.tasks[i].title ? list.tasks[i].title : "(untitled)",
-                                    list.tasks[i].status ? list.tasks[i].status : "?");
+            pos = hu_buf_appendf(buf, cap, pos, "- [%s] %s (status: %s)\n",
+                                 list.tasks[i].id ? list.tasks[i].id : "?",
+                                 list.tasks[i].title ? list.tasks[i].title : "(untitled)",
+                                 list.tasks[i].status ? list.tasks[i].status : "?");
             if (pos >= cap)
                 pos = cap - 1;
         }
@@ -161,21 +161,21 @@ static hu_error_t paperclip_execute(void *raw_ctx, hu_allocator_t *alloc,
         }
         size_t pos = 0;
         const size_t cap = 2048;
-        pos += (size_t)snprintf(buf + pos, cap - pos, "Task: %s\n", t.title ? t.title : "?");
+        pos = hu_buf_appendf(buf, cap, pos, "Task: %s\n", t.title ? t.title : "?");
         if (pos >= cap)
             pos = cap - 1;
         if (t.status) {
-            pos += (size_t)snprintf(buf + pos, cap - pos, "Status: %s\n", t.status);
+            pos = hu_buf_appendf(buf, cap, pos, "Status: %s\n", t.status);
             if (pos >= cap)
                 pos = cap - 1;
         }
         if (t.priority) {
-            pos += (size_t)snprintf(buf + pos, cap - pos, "Priority: %s\n", t.priority);
+            pos = hu_buf_appendf(buf, cap, pos, "Priority: %s\n", t.priority);
             if (pos >= cap)
                 pos = cap - 1;
         }
         if (t.description) {
-            pos += (size_t)snprintf(buf + pos, cap - pos, "Description:\n%s\n", t.description);
+            pos = hu_buf_appendf(buf, cap, pos, "Description:\n%s\n", t.description);
             if (pos >= cap)
                 pos = cap - 1;
         }

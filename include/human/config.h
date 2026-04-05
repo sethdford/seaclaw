@@ -186,6 +186,7 @@ typedef struct hu_channel_daemon_config {
     int user_response_window_sec; /* 0 = use default (120s) */
     int poll_interval_sec;        /* 0 = use channel-specific default (see bootstrap) */
     bool voice_enabled;           /* enable TTS on this channel */
+    bool llm_decides;             /* bypass heuristic gating, let LLM decide responses */
 } hu_channel_daemon_config_t;
 
 typedef struct hu_email_channel_config {
@@ -219,6 +220,7 @@ typedef struct hu_imessage_channel_config {
     int user_response_window_sec; /* DEPRECATED: use daemon.user_response_window_sec */
     char *response_mode;          /* DEPRECATED: use daemon.response_mode */
     bool use_imsg_cli;            /* prefer steipete/imsg CLI for send/react when available */
+    char *loopback_handle; /* treat is_from_me=1 from this handle as incoming (self-test) */
     hu_channel_daemon_config_t daemon;
 } hu_imessage_channel_config_t;
 

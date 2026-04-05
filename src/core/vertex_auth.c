@@ -24,10 +24,14 @@ hu_error_t hu_vertex_auth_load_adc(hu_vertex_auth_t *auth, hu_allocator_t *alloc
     const char *cred_env = getenv("GOOGLE_APPLICATION_CREDENTIALS");
     char path[512];
     if (cred_env && strlen(cred_env) > 0) {
-        snprintf(path, sizeof(path), "%s", cred_env);
+        int pn = snprintf(path, sizeof(path), "%s", cred_env);
+        if (pn < 0 || (size_t)pn >= sizeof(path))
+            return HU_ERR_INVALID_ARGUMENT;
     } else {
-        snprintf(path, sizeof(path), "%s/.config/gcloud/application_default_credentials.json",
-                 home);
+        int pn = snprintf(path, sizeof(path), "%s/.config/gcloud/application_default_credentials.json",
+                          home);
+        if (pn < 0 || (size_t)pn >= sizeof(path))
+            return HU_ERR_INVALID_ARGUMENT;
     }
 
 #if defined(HU_IS_TEST) && HU_IS_TEST
@@ -127,7 +131,7 @@ static hu_error_t vertex_auth_refresh(hu_vertex_auth_t *auth, hu_allocator_t *al
         alloc->free(alloc->ctx, auth->access_token, auth->access_token_len + 1);
     size_t tlen = strlen(token);
     auth->access_token = hu_strndup(alloc, token, tlen);
-    auth->access_token_len = tlen;
+    auth->access_token_len = auth->access_token ? tlen : 0;
     auth->token_expires_at = time(NULL) + (time_t)expires_in;
     hu_json_free(alloc, root);
     return auth->access_token ? HU_OK : HU_ERR_OUT_OF_MEMORY;

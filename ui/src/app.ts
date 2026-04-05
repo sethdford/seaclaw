@@ -543,6 +543,52 @@ export class ScApp extends LitElement {
     if (!this._isDemo) this._switchToDemo();
   }) as EventListener;
 
+  private _onNavigate = ((e: Event) => {
+    const raw = (e as CustomEvent<string>).detail as string;
+    const [tabPart, sessionPart] = raw.includes(":")
+      ? (raw.split(":") as [string, string])
+      : [raw, undefined];
+    const target = tabPart as TabId;
+    if (VALID_TABS.includes(target)) {
+      this._switchTab(target);
+      if (target === "chat") {
+        this.chatSessionKey = sessionPart ?? "default";
+      }
+    }
+  }) as EventListener;
+
+  private _onVoiceTranscribe = ((e: Event) => {
+    const ce = e as CustomEvent<{ audio: string; mimeType: string }>;
+    if (!this.gateway) return;
+    this.gateway
+      .request<{ text?: string }>("voice.transcribe", {
+        audio: ce.detail.audio,
+        mimeType: ce.detail.mimeType,
+      })
+      .then((result) => {
+        window.dispatchEvent(
+          new CustomEvent("hu-voice-transcript-result", {
+            detail: { text: result.text ?? "" },
+          }),
+        );
+      })
+      .catch(() => {
+        window.dispatchEvent(
+          new CustomEvent("hu-voice-transcript-result", {
+            detail: { text: "" },
+          }),
+        );
+      });
+  }) as EventListener;
+
+  private _onGatewayFeatures = (() => {
+    if (this._fallbackTimer) {
+      clearTimeout(this._fallbackTimer);
+      this._fallbackTimer = null;
+      this._inFallbackWindow = false;
+    }
+  }) as EventListener;
+
   private get _isDemo(): boolean {
     return new URLSearchParams(window.location.search).has("demo");
   }
@@ -576,44 +622,8 @@ export class ScApp extends LitElement {
 
     void this._initGateway();
 
-    this.addEventListener("navigate", ((e: CustomEvent<string>) => {
-      const raw = e.detail as string;
-      const [tabPart, sessionPart] = raw.includes(":")
-        ? (raw.split(":") as [string, string])
-        : [raw, undefined];
-      const target = tabPart as TabId;
-      if (VALID_TABS.includes(target)) {
-        this._switchTab(target);
-        if (target === "chat") {
-          this.chatSessionKey = sessionPart ?? "default";
-        }
-      }
-    }) as EventListener);
-
-    this.addEventListener("hu-voice-transcribe", ((
-      e: CustomEvent<{ audio: string; mimeType: string }>,
-    ) => {
-      if (!this.gateway) return;
-      this.gateway
-        .request<{ text?: string }>("voice.transcribe", {
-          audio: e.detail.audio,
-          mimeType: e.detail.mimeType,
-        })
-        .then((result) => {
-          window.dispatchEvent(
-            new CustomEvent("hu-voice-transcript-result", {
-              detail: { text: result.text ?? "" },
-            }),
-          );
-        })
-        .catch(() => {
-          window.dispatchEvent(
-            new CustomEvent("hu-voice-transcript-result", {
-              detail: { text: "" },
-            }),
-          );
-        });
-    }) as EventListener);
+    this.addEventListener("navigate", this._onNavigate);
+    this.addEventListener("hu-voice-transcribe", this._onVoiceTranscribe);
   }
 
   override updated(changedProperties: PropertyValues): void {
@@ -646,7 +656,8 @@ export class ScApp extends LitElement {
   }
 
   override disconnectedCallback(): void {
-    super.disconnectedCallback();
+    this.removeEventListener("navigate", this._onNavigate);
+    this.removeEventListener("hu-voice-transcribe", this._onVoiceTranscribe);
     this._clearPendingG();
     if (this._navHoverTimer) {
       clearTimeout(this._navHoverTimer);
@@ -669,7 +680,9 @@ export class ScApp extends LitElement {
       this._bannerAutoTimer = null;
     }
     this.gateway?.removeEventListener("status", this._statusHandler);
+    this.gateway?.removeEventListener("features", this._onGatewayFeatures);
     this.gateway?.disconnect();
+    super.disconnectedCallback();
   }
 
   private _getMoreSheetFocusable(): HTMLElement[] {
@@ -926,13 +939,7 @@ export class ScApp extends LitElement {
     this._fallbackTimer = setTimeout(() => {
       this._switchToDemo();
     }, 5000);
-    gw.addEventListener("features", (() => {
-      if (this._fallbackTimer) {
-        clearTimeout(this._fallbackTimer);
-        this._fallbackTimer = null;
-        this._inFallbackWindow = false;
-      }
-    }) as EventListener);
+    gw.addEventListener("features", this._onGatewayFeatures);
 
     gw.connect(wsUrl);
   }
@@ -942,6 +949,7 @@ export class ScApp extends LitElement {
     this._inFallbackWindow = false;
     this._demoFallback = true;
     this.gateway?.removeEventListener("status", this._statusHandler);
+    this.gateway?.removeEventListener("features", this._onGatewayFeatures);
     // Don't disconnect the real gateway — let it keep reconnecting in background
     // so it can recover if the server comes up later
     this._createDemoGateway().then((demo) => {
@@ -1058,18 +1066,24 @@ export class ScApp extends LitElement {
       >
         Skip to content
       </button>
-      ${this.connectionStatus === "disconnected" && !this._inFallbackWindow && !this._bannerDismissed
+      ${this.connectionStatus === "disconnected" &&
+      !this._inFallbackWindow &&
+      !this._bannerDismissed
         ? html`<div class="disconnect-banner" role="alert">
             Disconnected from server
             <button @click=${this._reconnect}>Reconnect</button>
-            <button class="banner-dismiss" @click=${this._dismissBanner} aria-label="Dismiss">\u00d7</button>
+            <button class="banner-dismiss" @click=${this._dismissBanner} aria-label="Dismiss">
+              ×
+            </button>
           </div>`
         : nothing}
       ${this._demoFallback && !this._bannerDismissed
         ? html`<div class="demo-fallback-banner" role="status">
             Demo mode — gateway not reachable
             <button @click=${this._reconnect}>Retry</button>
-            <button class="banner-dismiss" @click=${this._dismissBanner} aria-label="Dismiss">\u00d7</button>
+            <button class="banner-dismiss" @click=${this._dismissBanner} aria-label="Dismiss">
+              ×
+            </button>
           </div>`
         : nothing}
       <div
@@ -1211,6 +1225,7 @@ export class ScApp extends LitElement {
   private _reconnect(): void {
     this._demoFallback = false;
     this.gateway?.removeEventListener("status", this._statusHandler);
+    this.gateway?.removeEventListener("features", this._onGatewayFeatures);
     this.gateway?.disconnect();
     this._initGateway();
   }

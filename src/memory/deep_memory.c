@@ -4,6 +4,7 @@
 #include "human/memory/deep_memory.h"
 #include <ctype.h>
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -269,17 +270,29 @@ hu_error_t hu_prospective_build_prompt(hu_allocator_t *alloc,
     }
     size_t total = 128;
     for (size_t i = 0; i < count; i++) {
-        if (items[i].description)
-            total += 16 + items[i].description_len + items[i].trigger_type_len
-                     + items[i].trigger_value_len + 32;
+        if (!items[i].description)
+            continue;
+        size_t add = 16;
+        if (add > SIZE_MAX - items[i].description_len)
+            return HU_ERR_OUT_OF_MEMORY;
+        add += items[i].description_len;
+        if (add > SIZE_MAX - items[i].trigger_type_len)
+            return HU_ERR_OUT_OF_MEMORY;
+        add += items[i].trigger_type_len;
+        if (add > SIZE_MAX - items[i].trigger_value_len)
+            return HU_ERR_OUT_OF_MEMORY;
+        add += items[i].trigger_value_len;
+        if (add > SIZE_MAX - 32)
+            return HU_ERR_OUT_OF_MEMORY;
+        add += 32;
+        if (total > SIZE_MAX - add)
+            return HU_ERR_OUT_OF_MEMORY;
+        total += add;
     }
     char *buf = (char *)alloc->alloc(alloc->ctx, total);
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
-    size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, total - pos, "[PENDING REMINDERS]:");
-    if (pos >= total)
-        pos = total - 1;
+    size_t pos = hu_buf_appendf(buf, total, 0, "[PENDING REMINDERS]:");
     for (size_t i = 0; i < count && pos < total - 2; i++) {
         const char *d = items[i].description ? items[i].description : "";
         size_t dl = items[i].description_len;
@@ -287,10 +300,8 @@ hu_error_t hu_prospective_build_prompt(hu_allocator_t *alloc,
         size_t tt_len = items[i].trigger_type_len;
         const char *tv = items[i].trigger_value ? items[i].trigger_value : "";
         size_t tv_len = items[i].trigger_value_len;
-        pos += (size_t)snprintf(buf + pos, total - pos, " - %.*s (%.*s: %.*s)", (int)dl, d,
-                               (int)tt_len, tt, (int)tv_len, tv);
-        if (pos >= total)
-            pos = total - 1;
+        pos = hu_buf_appendf(buf, total, pos, " - %.*s (%.*s: %.*s)", (int)dl, d, (int)tt_len, tt,
+                            (int)tv_len, tv);
     }
     *out = buf;
     *out_len = strlen(buf);
@@ -383,26 +394,30 @@ hu_error_t hu_residue_build_prompt(hu_allocator_t *alloc,
     }
     size_t total = 128;
     for (size_t i = 0; i < count; i++) {
-        if (residues[i].emotion)
-            total += 24 + residues[i].emotion_len + 48;
+        if (!residues[i].emotion)
+            continue;
+        size_t add = 24;
+        if (add > SIZE_MAX - residues[i].emotion_len)
+            return HU_ERR_OUT_OF_MEMORY;
+        add += residues[i].emotion_len;
+        if (add > SIZE_MAX - 48)
+            return HU_ERR_OUT_OF_MEMORY;
+        add += 48;
+        if (total > SIZE_MAX - add)
+            return HU_ERR_OUT_OF_MEMORY;
+        total += add;
     }
     char *buf = (char *)alloc->alloc(alloc->ctx, total);
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
-    size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, total - pos, "[EMOTIONAL RESIDUE]:");
-    if (pos >= total)
-        pos = total - 1;
+    size_t pos = hu_buf_appendf(buf, total, 0, "[EMOTIONAL RESIDUE]:");
     for (size_t i = 0; i < count && pos < total - 2; i++) {
         const char *e = residues[i].emotion ? residues[i].emotion : "";
         size_t el = residues[i].emotion_len;
         double cur =
             hu_residue_current_intensity(residues[i].intensity, residues[i].decay_rate,
                                          hours_elapsed);
-        pos += (size_t)snprintf(buf + pos, total - pos, " - %.*s (intensity: %.2f)", (int)el, e,
-                               cur);
-        if (pos >= total)
-            pos = total - 1;
+        pos = hu_buf_appendf(buf, total, pos, " - %.*s (intensity: %.2f)", (int)el, e, cur);
     }
     *out = buf;
     *out_len = strlen(buf);

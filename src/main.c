@@ -1033,7 +1033,11 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
 
             hu_feed_correlate_recent(alloc, feed_db, since, 0.3);
 
-            size_t combined_len = (digest ? digest_len : 0) + (trend_section ? trend_len : 0);
+            size_t digest_part = digest ? digest_len : 0;
+            size_t trend_part = trend_section ? trend_len : 0;
+            size_t combined_len = 0;
+            if (trend_part <= SIZE_MAX - digest_part)
+                combined_len = digest_part + trend_part;
             if (combined_len > 0) {
                 char *combined = (char *)alloc->alloc(alloc->ctx, combined_len + 1);
                 if (combined) {
