@@ -1877,12 +1877,14 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         color: var(--color-text-tertiary);
         text-decoration: none;
         transition:
-          color var(--hu-duration-fast) var(--hu-ease-out),
-          background var(--hu-duration-fast) var(--hu-ease-out);
+          color var(--hu-duration-fast) var(--hu-spring-gentle),
+          background var(--hu-duration-fast) var(--hu-spring-gentle),
+          transform var(--hu-duration-fast) var(--hu-spring-gentle);
       }
       .brand-section-nav a:hover {
         color: var(--color-text);
         background: var(--hu-hover-overlay);
+        transform: translateY(-1px);
       }
       .brand-section-nav a.active {
         color: var(--hu-accent);
@@ -2000,10 +2002,27 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         border-bottom: none;
       }
 
+      /* Glass card spring hover */
+      .glass {
+        transition:
+          transform var(--hu-duration-normal) var(--hu-spring-gentle),
+          box-shadow var(--hu-duration-normal) var(--hu-spring-gentle);
+      }
+      .glass:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px color-mix(in srgb, var(--hu-accent) 8%, transparent);
+      }
+
       @media (prefers-reduced-motion: reduce) {
         [data-reveal] {
           opacity: 1 !important;
           transform: none !important;
+        }
+        .glass {
+          transition: none !important;
+        }
+        .glass:hover {
+          transform: none;
         }
       }
     </style>

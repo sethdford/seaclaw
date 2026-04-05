@@ -371,6 +371,34 @@ const tools = [
             >
           </div>
           <div
+            class="hero-badges hero-fade-in flex flex-wrap justify-center gap-2 mb-8"
+          >
+            <img
+              src="https://img.shields.io/github/stars/sethdford/h-uman?style=flat-square&color=7AB648&label=stars"
+              alt="GitHub stars"
+              height="20"
+              style="aspect-ratio: auto;"
+              loading="lazy"
+              decoding="async"
+            />
+            <img
+              src="https://img.shields.io/badge/license-MIT-7AB648?style=flat-square"
+              alt="MIT License"
+              height="20"
+              style="aspect-ratio: auto;"
+              loading="lazy"
+              decoding="async"
+            />
+            <img
+              src="https://img.shields.io/badge/binary-1%2C750_KB-7AB648?style=flat-square"
+              alt="Binary size: 1,750 KB"
+              height="20"
+              style="aspect-ratio: auto;"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <div
             class="hero-buttons flex flex-col sm:flex-row gap-4 justify-center hero-fade-in"
           >
             <a href={`${base}getting-started/installation/`} class="btn-primary"
@@ -2657,7 +2685,7 @@ const tools = [
 
       // Show all elements immediately for reduced motion
       if (prefersReducedMotion) {
-        document.querySelectorAll("[data-reveal]").forEach((el) => {
+        document.querySelectorAll("[data-reveal], .hu-chapter-reveal").forEach((el) => {
           (el as HTMLElement).style.opacity = "1";
           (el as HTMLElement).style.transform = "none";
           (el as HTMLElement).style.transitionDuration = "0s";
@@ -2766,7 +2794,7 @@ const tools = [
           { threshold: 0.15, rootMargin: "0px 0px -50px 0px" },
         );
         document
-          .querySelectorAll("[data-reveal], .glass-enter")
+          .querySelectorAll("[data-reveal], .glass-enter, .hu-chapter-reveal")
           .forEach((el) => {
             revealObserver.observe(el);
           });

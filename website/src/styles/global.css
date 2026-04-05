@@ -491,10 +491,26 @@
     }
   }
 
+  /* ── Section-level reveal (smooth entrance for each chapter) ── */
+  .hu-chapter-reveal {
+    opacity: 0;
+    transform: translateY(24px) scale(0.985);
+    transition:
+      opacity var(--hu-duration-slower, 0.6s)
+        var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      transform var(--hu-duration-slower, 0.6s)
+        var(--hu-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+  }
+  .hu-chapter-reveal.revealed {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
   /* ── Scroll reveal system (replaces GSAP ScrollTrigger) ── */
   /* No-JS fallback: show content when scripting is unavailable */
   @media (scripting: none) {
-    [data-reveal] {
+    [data-reveal],
+    .hu-chapter-reveal {
       opacity: 1 !important;
       transform: none !important;
     }
@@ -603,7 +619,7 @@
     color: var(--hu-on-accent);
     transition:
       --hu-gradient-angle var(--hu-duration-normal) var(--hu-ease-out),
-      transform var(--hu-duration-normal) var(--hu-ease-out),
+      transform 200ms var(--hu-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
       box-shadow var(--hu-duration-normal) var(--hu-ease-out);
     box-shadow:
       0 1px 2px color-mix(in srgb, var(--hu-text) 10%, transparent),
@@ -628,8 +644,7 @@
   }
 
   .btn-primary:active {
-    animation: hu-squash-press var(--hu-duration-fast) var(--hu-ease-out)
-      forwards;
+    transform: scale(0.97);
     box-shadow: 0 1px 2px color-mix(in srgb, var(--hu-text) 10%, transparent);
   }
 
@@ -643,7 +658,10 @@
     font-weight: 500;
     color: var(--hu-text-secondary);
     border: 1px solid var(--hu-border);
-    transition: all var(--hu-duration-normal) var(--hu-ease-out);
+    transition:
+      color var(--hu-duration-normal) var(--hu-ease-out),
+      border-color var(--hu-duration-normal) var(--hu-ease-out),
+      transform 200ms var(--hu-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
   }
 
   .btn-outline:hover {
@@ -653,8 +671,7 @@
   }
 
   .btn-outline:active {
-    animation: hu-squash-press var(--hu-duration-fast) var(--hu-ease-out)
-      forwards;
+    transform: scale(0.97);
   }
 
   /* ── Terminal cursor blink ── */
@@ -923,10 +940,10 @@
         transform: translateY(-10px);
       }
       transition:
-        opacity var(--hu-duration-normal) var(--hu-ease-out),
-        transform var(--hu-duration-normal) var(--hu-ease-out),
-        overlay var(--hu-duration-normal) var(--hu-ease-out) allow-discrete,
-        display var(--hu-duration-normal) var(--hu-ease-out) allow-discrete;
+        opacity var(--hu-duration-normal) var(--hu-spring-gentle),
+        transform var(--hu-duration-normal) var(--hu-spring-gentle),
+        overlay var(--hu-duration-normal) var(--hu-spring-gentle) allow-discrete,
+        display var(--hu-duration-normal) var(--hu-spring-gentle) allow-discrete;
     }
   }
 

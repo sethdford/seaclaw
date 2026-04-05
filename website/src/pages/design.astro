@@ -87,12 +87,14 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         color: var(--color-text-tertiary);
         text-decoration: none;
         transition:
-          color var(--hu-duration-fast) var(--hu-ease-out),
-          background var(--hu-duration-fast) var(--hu-ease-out);
+          color var(--hu-duration-fast) var(--hu-spring-gentle),
+          background var(--hu-duration-fast) var(--hu-spring-gentle),
+          transform var(--hu-duration-fast) var(--hu-spring-gentle);
       }
       .design-section-nav a:hover {
         color: var(--color-text);
         background: var(--hu-hover-overlay);
+        transform: translateY(-1px);
       }
       .design-section-nav a.active {
         color: var(--hu-accent);
@@ -157,7 +159,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
           </h2>
           <div class="grid md:grid-cols-3 gap-8">
             <article
-              class="p-8 rounded-2xl border transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:translate-y-[-2px]"
+              class="p-8 rounded-2xl border transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-spring-gentle)] hover:translate-y-[-2px]"
               style="background: var(--hu-surface-container); border-color: var(--color-border);"
               data-reveal
             >
@@ -191,7 +193,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               </p>
             </article>
             <article
-              class="p-8 rounded-2xl border transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:translate-y-[-2px]"
+              class="p-8 rounded-2xl border transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-spring-gentle)] hover:translate-y-[-2px]"
               style="background: var(--hu-surface-container); border-color: var(--color-border);"
               data-reveal
             >
@@ -229,7 +231,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               </p>
             </article>
             <article
-              class="p-8 rounded-2xl border transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:translate-y-[-2px]"
+              class="p-8 rounded-2xl border transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-spring-gentle)] hover:translate-y-[-2px]"
               style="background: var(--hu-surface-container); border-color: var(--color-border);"
               data-reveal
             >
@@ -285,7 +287,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
               --hu-accent (Human green)
             </p>
             <div
-              class="w-full h-32 md:h-40 rounded-2xl flex items-center justify-center transition-transform duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:scale-[1.02]"
+              class="w-full h-32 md:h-40 rounded-2xl flex items-center justify-center transition-transform duration-[var(--hu-duration-normal)] ease-[var(--hu-spring-gentle)] hover:scale-[1.02]"
               style="background: var(--hu-accent); color: var(--hu-on-accent);"
               data-swatch
               title="var(--hu-accent)"
@@ -645,7 +647,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
             </div>
             <div class="relative grid md:grid-cols-3 gap-6">
               <div
-                class="hu-glass-subtle p-8 rounded-2xl transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:scale-[1.02]"
+                class="hu-glass-subtle p-8 rounded-2xl transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-spring-gentle)] hover:scale-[1.02]"
                 data-reveal
               >
                 <p
@@ -662,7 +664,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 </p>
               </div>
               <div
-                class="hu-glass-standard p-8 rounded-2xl transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:scale-[1.02]"
+                class="hu-glass-standard p-8 rounded-2xl transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-spring-gentle)] hover:scale-[1.02]"
                 data-reveal
               >
                 <p
@@ -679,7 +681,7 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
                 </p>
               </div>
               <div
-                class="hu-glass-prominent p-8 rounded-2xl transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-ease-out)] hover:scale-[1.02]"
+                class="hu-glass-prominent p-8 rounded-2xl transition-all duration-[var(--hu-duration-normal)] ease-[var(--hu-spring-gentle)] hover:scale-[1.02]"
                 data-reveal
               >
                 <p

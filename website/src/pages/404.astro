@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
 import Nav from "../components/Nav.astro";
+import AnimatedLogo from "../components/AnimatedLogo.astro";
 
 const rawBase = import.meta.env.BASE_URL;
 const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
@@ -37,47 +38,73 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     <main
       id="main-content"
       tabindex="-1"
-      class="min-h-[80vh] flex flex-col items-center justify-center px-6 text-center"
+      class="relative min-h-[80vh] flex flex-col items-center justify-center px-6 text-center overflow-hidden"
     >
-      <img
-        src={`${base}human.svg`}
-        alt="h-uman logo"
-        width="80"
-        height="80"
-        class="w-16 h-16 mb-8 opacity-40"
-        loading="lazy"
-        decoding="async"
-      />
-      <h1
-        class="font-sans font-black text-[clamp(4rem,12vw,8rem)] leading-none mb-4"
-        style="color: var(--hu-text); letter-spacing: -0.05em; opacity: 0.12;"
+      <div
+        class="absolute inset-0 opacity-20"
+        style="background: radial-gradient(ellipse 60% 40% at 50% 40%, color-mix(in srgb, var(--hu-accent) 20%, transparent), transparent 70%);"
+        aria-hidden="true"
       >
-        404
-      </h1>
-      <p class="text-xl font-medium mb-2" style="color: var(--hu-text)">
-        Page not found
-      </p>
-      <p
-        class="text-base mb-10 max-w-md"
-        style="color: var(--hu-text-secondary)"
-      >
-        The page you're looking for doesn't exist or has been moved.
-      </p>
-      <div class="flex flex-col sm:flex-row gap-4">
-        <a
-          href={`${base}`}
-          class="inline-flex items-center justify-center px-6 py-3 rounded-full text-[15px] font-semibold transition-all"
-          style="background: var(--hu-accent); color: var(--hu-on-accent);"
+      </div>
+
+      <div class="relative z-10 flex flex-col items-center">
+        <div class="mb-8 error-logo">
+          <AnimatedLogo size={80} />
+        </div>
+        <h1
+          class="font-sans font-black text-[clamp(4rem,12vw,8rem)] leading-none mb-4"
+          style="color: var(--hu-text); letter-spacing: -0.05em; opacity: 0.08;"
         >
-          Back to Home
-        </a>
-        <a
-          href={`${base}getting-started/installation/`}
-          class="inline-flex items-center justify-center px-6 py-3 rounded-full text-[15px] font-medium transition-all"
-          style="color: var(--hu-text-secondary); border: 1px solid var(--hu-border);"
+          404
+        </h1>
+        <p class="text-xl font-medium mb-2" style="color: var(--hu-text)">
+          not quite found.
+        </p>
+        <p
+          class="text-base mb-10 max-w-md"
+          style="color: var(--hu-text-secondary)"
         >
-          Read the Docs
-        </a>
+          This page doesn't exist — or it wandered off. Let's get you back on
+          track.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4">
+          <a
+            href={`${base}`}
+            class="error-cta-primary inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full text-[15px] font-semibold"
+            style="background: var(--hu-accent); color: var(--hu-on-accent); transition: transform var(--hu-duration-normal) var(--hu-spring-gentle), box-shadow var(--hu-duration-normal) var(--hu-spring-gentle);"
+          >
+            <svg
+              class="w-4 h-4"
+              viewBox="0 0 256 256"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"
+              ></path>
+            </svg>
+            Back to Home
+          </a>
+          <a
+            href="https://github.com/sethdford/h-uman"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="error-cta-secondary inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full text-[15px] font-medium"
+            style="color: var(--hu-text-secondary); border: 1px solid var(--hu-border); transition: transform var(--hu-duration-normal) var(--hu-spring-gentle), border-color var(--hu-duration-normal) var(--hu-spring-gentle), color var(--hu-duration-normal) var(--hu-spring-gentle);"
+          >
+            <svg
+              class="w-4 h-4"
+              viewBox="0 0 256 256"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.55a43.81,43.81,0,0,1,.79-23.86,43.84,43.84,0,0,1,32.32,20.06A8,8,0,0,0,119.82,72h32.35a8,8,0,0,0,6.74-2.25,43.84,43.84,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.55a8,8,0,0,0,1.11,7.95A41.74,41.74,0,0,1,200,104Z"
+              ></path>
+            </svg>
+            View on GitHub
+          </a>
+        </div>
       </div>
     </main>
 
@@ -122,5 +149,33 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         </div>
       </div>
     </footer>
+
+    <style>
+      .error-cta-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px color-mix(in srgb, var(--hu-accent) 30%, transparent);
+      }
+      .error-cta-secondary:hover {
+        transform: translateY(-2px);
+        border-color: var(--hu-text-muted);
+        color: var(--hu-text);
+      }
+      .error-logo {
+        animation: error-float 6s ease-in-out infinite;
+      }
+      @keyframes error-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .error-logo {
+          animation: none;
+        }
+        .error-cta-primary,
+        .error-cta-secondary {
+          transition: none !important;
+        }
+      }
+    </style>
   </body>
 </html>

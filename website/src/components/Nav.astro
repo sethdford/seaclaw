@@ -201,6 +201,12 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     .nav-link:focus-visible {
       color: var(--hu-text);
     }
+    .theme-toggle svg {
+      transition: transform var(--hu-duration-moderate, 200ms) var(--hu-spring-gentle, cubic-bezier(0.22, 1.2, 0.36, 1));
+    }
+    .theme-toggle:active svg {
+      transform: rotate(30deg) scale(0.85);
+    }
     [data-theme="dark"] .theme-icon-sun {
       display: block;
     }
