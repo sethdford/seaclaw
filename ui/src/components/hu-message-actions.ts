@@ -106,7 +106,7 @@ export class ScMessageActions extends LitElement {
       cursor: pointer;
       min-width: auto;
       min-height: auto;
-      animation: hu-undo-fade 5s var(--hu-ease-out) forwards;
+      animation: hu-undo-fade 5s var(--hu-ease-out) forwards; /* hu-lint-ok: functional timeout */
     }
 
     .undo-btn:hover {

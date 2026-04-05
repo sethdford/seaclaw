@@ -216,7 +216,7 @@ export class ScDeliveryStatus extends LitElement {
       stroke: currentColor;
       stroke-width: 2.5;
       stroke-linecap: round;
-      transition: stroke-dashoffset 1s linear;
+      transition: stroke-dashoffset 1s linear; /* hu-lint-ok: countdown tick */
     }
 
     .countdown-text {
@@ -286,9 +286,7 @@ export class ScDeliveryStatus extends LitElement {
       if (this._countdown <= 0) {
         this._clearCountdown();
         this._retryCount++;
-        this.dispatchEvent(
-          new CustomEvent("hu-retry", { bubbles: true, composed: true }),
-        );
+        this.dispatchEvent(new CustomEvent("hu-retry", { bubbles: true, composed: true }));
       }
     }, 1000);
   }
@@ -297,16 +295,12 @@ export class ScDeliveryStatus extends LitElement {
     e.preventDefault();
     this._retryCount = 0;
     this._clearCountdown();
-    this.dispatchEvent(
-      new CustomEvent("hu-retry", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("hu-retry", { bubbles: true, composed: true }));
   }
 
   private _onLogin(e: Event) {
     e.preventDefault();
-    this.dispatchEvent(
-      new CustomEvent("hu-login", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("hu-login", { bubbles: true, composed: true }));
   }
 
   private _renderFailed() {
@@ -334,9 +328,7 @@ export class ScDeliveryStatus extends LitElement {
             </svg>
             <span class="countdown-text" aria-hidden="true">${this._countdown}</span>
           </span>
-          <span class="error-message"
-            >${label} &middot; Retrying in ${this._countdown}s</span
-          >
+          <span class="error-message">${label} &middot; Retrying in ${this._countdown}s</span>
         </span>
       `;
     }

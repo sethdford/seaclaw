@@ -1,6 +1,5 @@
 package ai.human.app.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -20,6 +19,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,14 +33,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import ai.human.app.GatewayClient
 import ai.human.app.ui.HUTokens
 import ai.human.app.ui.StaggeredItem
@@ -56,6 +65,113 @@ private val listItemSpring = spring<IntOffset>(
     dampingRatio = 0.86f,
     stiffness = Spring.StiffnessMediumLow,
 )
+
+// MARK: - Markdown Parsing
+
+private fun parseMarkdownToAnnotatedString(
+    text: String,
+    linkColor: Color,
+    codeBackground: Color,
+): AnnotatedString {
+    return buildAnnotatedString {
+        val codeBlockRegex = Regex("```(?:\\w*\\n)?([\\s\\S]*?)```")
+        var lastEnd = 0
+
+        for (match in codeBlockRegex.findAll(text)) {
+            if (match.range.first > lastEnd) {
+                appendInlineMarkdown(
+                    text.substring(lastEnd, match.range.first),
+                    linkColor,
+                    codeBackground,
+                )
+            }
+            val code = match.groupValues[1].trim()
+            withStyle(
+                SpanStyle(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = HUTokens.textSm,
+                    background = codeBackground,
+                ),
+            ) {
+                append(code)
+            }
+            lastEnd = match.range.last + 1
+        }
+
+        if (lastEnd < text.length) {
+            appendInlineMarkdown(text.substring(lastEnd), linkColor, codeBackground)
+        }
+    }
+}
+
+private fun AnnotatedString.Builder.appendInlineMarkdown(
+    text: String,
+    linkColor: Color,
+    codeBackground: Color,
+) {
+    // Order matters: bold (**) before italic (*) so ** isn't consumed as two *
+    val pattern = Regex(
+        "\\*\\*(.+?)\\*\\*" +
+            "|\\*(.+?)\\*" +
+            "|`([^`]+)`" +
+            "|\\[(.+?)\\]\\((.+?)\\)",
+    )
+
+    var lastEnd = 0
+    for (match in pattern.findAll(text)) {
+        if (match.range.first > lastEnd) {
+            append(text.substring(lastEnd, match.range.first))
+        }
+
+        when {
+            match.groupValues[1].isNotEmpty() -> {
+                // Bold
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                    append(match.groupValues[1])
+                }
+            }
+            match.groupValues[2].isNotEmpty() -> {
+                // Italic
+                withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
+                    append(match.groupValues[2])
+                }
+            }
+            match.groupValues[3].isNotEmpty() -> {
+                // Inline code
+                withStyle(
+                    SpanStyle(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = HUTokens.textSm,
+                        background = codeBackground,
+                    ),
+                ) {
+                    append(match.groupValues[3])
+                }
+            }
+            match.groupValues[4].isNotEmpty() -> {
+                // Link
+                pushStringAnnotation(tag = "URL", annotation = match.groupValues[5])
+                withStyle(
+                    SpanStyle(
+                        color = linkColor,
+                        textDecoration = TextDecoration.Underline,
+                    ),
+                ) {
+                    append(match.groupValues[4])
+                }
+                pop()
+            }
+        }
+
+        lastEnd = match.range.last + 1
+    }
+
+    if (lastEnd < text.length) {
+        append(text.substring(lastEnd))
+    }
+}
+
+// MARK: - Chat Screen
 
 @Composable
 fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
@@ -180,10 +296,21 @@ private fun ChatBubble(
     isUser: Boolean,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val uriHandler = LocalUriHandler.current
     val (backgroundColor, textColor) = if (isUser) {
         colorScheme.primary to colorScheme.onPrimary
     } else {
         colorScheme.surface to colorScheme.onSurface
+    }
+    val linkColor = if (isUser) colorScheme.onPrimary else colorScheme.primary
+    val codeBackground = if (isUser) {
+        colorScheme.onPrimary.copy(alpha = 0.15f)
+    } else {
+        colorScheme.surfaceContainerHigh
+    }
+
+    val annotatedString = remember(text, linkColor, codeBackground) {
+        parseMarkdownToAnnotatedString(text, linkColor, codeBackground)
     }
 
     val role = if (isUser) "You" else "Assistant"
@@ -206,10 +333,14 @@ private fun ChatBubble(
                 .background(backgroundColor)
                 .padding(horizontal = HUTokens.spaceMd, vertical = HUTokens.spaceSm),
         ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = textColor,
+            @Suppress("DEPRECATION")
+            ClickableText(
+                text = annotatedString,
+                style = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+                onClick = { offset ->
+                    annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                        .firstOrNull()?.let { uriHandler.openUri(it.item) }
+                },
             )
         }
     }
