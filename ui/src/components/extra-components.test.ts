@@ -3228,7 +3228,7 @@ describe("hu-chat-composer", () => {
     expect(el.shadowRoot?.querySelectorAll(".pill")?.length).toBeGreaterThan(0);
     el.remove();
   });
-  it("renders model chip", async () => {
+  it("renders model selector when model is set", async () => {
     const el = document.createElement("hu-chat-composer") as HTMLElement & {
       model: string;
       updateComplete: Promise<boolean>;
@@ -3236,7 +3236,7 @@ describe("hu-chat-composer", () => {
     el.model = "GPT-4";
     document.body.appendChild(el);
     await el.updateComplete;
-    expect(el.shadowRoot?.querySelector(".model-chip")?.textContent?.trim()).toBe("GPT-4");
+    expect(el.shadowRoot?.querySelector("hu-model-selector")).toBeTruthy();
     el.remove();
   });
   it("has attach file button", async () => {
