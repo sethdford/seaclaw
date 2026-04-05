@@ -12,7 +12,13 @@ export class ScMessageActions extends LitElement {
 
   @property({ type: Number }) index = -1;
 
+  @property({ type: Boolean, attribute: "newly-sent" }) newlySent = false;
+
   @state() private _copied = false;
+
+  @state() private _undoAvailable = false;
+
+  private _undoTimer = 0;
 
   static override styles = css`
     :host {
@@ -37,7 +43,8 @@ export class ScMessageActions extends LitElement {
       z-index: 2;
     }
 
-    :host(:focus-within) {
+    :host(:focus-within),
+    :host([data-undo]) {
       opacity: 1;
       transform: translateY(0);
     }
@@ -78,6 +85,35 @@ export class ScMessageActions extends LitElement {
       height: var(--hu-icon-sm);
     }
 
+    @keyframes hu-undo-fade {
+      0%,
+      80% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+
+    .undo-btn {
+      font-family: var(--hu-font);
+      font-size: var(--hu-text-2xs);
+      color: var(--hu-text-muted);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      background: color-mix(in srgb, var(--hu-warning) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--hu-warning) 25%, transparent);
+      border-radius: var(--hu-radius-full);
+      cursor: pointer;
+      min-width: auto;
+      min-height: auto;
+      animation: hu-undo-fade 5s var(--hu-ease-out) forwards;
+    }
+
+    .undo-btn:hover {
+      color: var(--hu-text);
+      background: color-mix(in srgb, var(--hu-warning) 20%, transparent);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       :host {
         transition: none;
@@ -85,8 +121,31 @@ export class ScMessageActions extends LitElement {
       .action-btn {
         transition: none;
       }
+      .undo-btn {
+        animation: none;
+      }
     }
   `;
+
+  override updated(changed: Map<string, unknown>): void {
+    if (changed.has("newlySent")) {
+      if (this.newlySent && this.role === "user") {
+        clearTimeout(this._undoTimer);
+        this._undoAvailable = true;
+        this._undoTimer = window.setTimeout(() => {
+          this._undoAvailable = false;
+        }, 5000);
+      } else {
+        clearTimeout(this._undoTimer);
+        this._undoAvailable = false;
+      }
+    }
+  }
+
+  override disconnectedCallback(): void {
+    clearTimeout(this._undoTimer);
+    super.disconnectedCallback();
+  }
 
   private _onCopy(): void {
     if (!this.content) return;
@@ -141,7 +200,39 @@ export class ScMessageActions extends LitElement {
     );
   }
 
+  private _onUndo(): void {
+    clearTimeout(this._undoTimer);
+    this._undoAvailable = false;
+    this.dispatchEvent(
+      new CustomEvent("hu-undo-send", {
+        bubbles: true,
+        composed: true,
+        detail: { index: this.index },
+      }),
+    );
+  }
+
   override render() {
+    if (this._undoAvailable) {
+      this.setAttribute("data-undo", "");
+    } else {
+      this.removeAttribute("data-undo");
+    }
+
+    if (this._undoAvailable) {
+      return html`
+        <button
+          type="button"
+          class="action-btn undo-btn"
+          aria-label="Undo send"
+          title="Undo send"
+          @click=${this._onUndo}
+        >
+          Undo
+        </button>
+      `;
+    }
+
     return html`
       <button
         type="button"

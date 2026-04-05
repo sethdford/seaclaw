@@ -84,6 +84,7 @@ export class ScMessageThread extends LitElement {
   @property({ type: Array }) artifacts: ArtifactData[] = [];
 
   @state() private showScrollPill = false;
+  @state() private _unseenCount = 0;
   @state() private _imageViewerOpen = false;
   @state() private _imageViewerSrc = "";
   @state() private _focusedMessageIndex = -1;
@@ -102,6 +103,7 @@ export class ScMessageThread extends LitElement {
     if (!el) return;
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_AT_BOTTOM_PX;
     if (this.showScrollPill === atBottom) this.showScrollPill = !atBottom;
+    if (atBottom) this._unseenCount = 0;
   };
 
   static override styles = css`
@@ -239,13 +241,15 @@ export class ScMessageThread extends LitElement {
       left: 50%;
       transform: translateX(-50%);
       background: var(--hu-bg-surface);
-      border: 1px solid var(--hu-border);
-      box-shadow: var(--hu-shadow-md);
+      border: 1px solid var(--hu-accent);
+      box-shadow: var(--hu-shadow-md),
+        0 0 12px 2px color-mix(in srgb, var(--hu-accent) 20%, transparent);
       padding: var(--hu-space-xs) var(--hu-space-md);
       border-radius: var(--hu-radius-full);
       font-size: var(--hu-text-xs);
+      font-weight: var(--hu-weight-medium);
       font-family: var(--hu-font);
-      color: var(--hu-text);
+      color: var(--hu-accent);
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -254,8 +258,13 @@ export class ScMessageThread extends LitElement {
       animation: hu-pill-bounce var(--hu-duration-slow)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
     }
+    @media (prefers-reduced-motion: reduce) {
+      .scroll-bottom-pill {
+        animation: none;
+      }
+    }
     .scroll-bottom-pill:hover {
-      background: var(--hu-hover-overlay);
+      background: color-mix(in srgb, var(--hu-accent) 8%, var(--hu-bg-surface));
     }
     .pill-icon svg {
       width: var(--hu-icon-xs);
@@ -695,8 +704,14 @@ export class ScMessageThread extends LitElement {
     if (changed.has("items") || changed.has("isWaiting")) {
       const el = this.scrollContainer;
       if (!el) return;
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_AUTO_FOLLOW_PX)
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_AUTO_FOLLOW_PX;
+      if (atBottom) {
         this.scrollToBottom();
+      } else if (changed.has("items")) {
+        const prev = changed.get("items") as ChatItem[] | undefined;
+        const newCount = (this.items?.length ?? 0) - (prev?.length ?? 0);
+        if (newCount > 0) this._unseenCount += newCount;
+      }
     }
   }
 
@@ -787,11 +802,12 @@ export class ScMessageThread extends LitElement {
         break;
       case "Home":
         e.preventDefault();
-        nextIdx = indices[0];
-        break;
+        if (this.scrollContainer) this.scrollContainer.scrollTop = 0;
+        return;
       case "End":
         e.preventDefault();
         this.scrollToBottom();
+        this._unseenCount = 0;
         return;
       case "E":
         if (this._focusedMessageIndex >= 0 && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -1334,10 +1350,17 @@ export class ScMessageThread extends LitElement {
         ? html`
             <button
               class="scroll-bottom-pill"
-              @click=${() => this.scrollToBottom()}
-              aria-label="Scroll to latest message"
+              @click=${() => {
+                this.scrollToBottom();
+                this._unseenCount = 0;
+              }}
+              aria-label=${this._unseenCount > 0
+                ? `${this._unseenCount} new message${this._unseenCount > 1 ? "s" : ""}`
+                : "Scroll to latest message"}
             >
-              <span class="pill-icon">${icons["arrow-down"]}</span> New messages
+              ${this._unseenCount > 0
+                ? html`${this._unseenCount} new message${this._unseenCount > 1 ? "s" : ""} \u2193`
+                : html`<span class="pill-icon">${icons["arrow-down"]}</span> New messages`}
             </button>
           `
         : nothing}

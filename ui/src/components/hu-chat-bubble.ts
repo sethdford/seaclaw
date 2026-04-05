@@ -76,6 +76,15 @@ export class ScChatBubble extends LitElement {
       }
     }
 
+    @keyframes hu-send-confirm {
+      0% {
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--hu-accent) 25%, transparent);
+      }
+      100% {
+        box-shadow: 0 0 0 0 transparent;
+      }
+    }
+
     :host {
       display: block;
       contain: layout style;
@@ -94,12 +103,15 @@ export class ScChatBubble extends LitElement {
     @keyframes hu-bubble-settle {
       0% {
         transform: scale(1);
+        box-shadow: 0 0 0 0 transparent;
       }
       40% {
-        transform: scale(1.008);
+        transform: scale(1.015);
+        box-shadow: 0 0 8px 2px color-mix(in srgb, var(--hu-accent) 15%, transparent);
       }
       100% {
         transform: scale(1);
+        box-shadow: 0 0 0 0 transparent;
       }
     }
 
@@ -118,7 +130,8 @@ export class ScChatBubble extends LitElement {
       color: var(--hu-text);
       border-radius: var(--hu-radius-xl) var(--hu-radius-xl) var(--hu-radius-sm) var(--hu-radius-xl);
       animation: hu-bubble-send var(--hu-duration-normal)
-        var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+          var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both,
+        hu-send-confirm var(--hu-duration-slow) var(--hu-ease-out) both;
     }
 
     .bubble.role-assistant {
@@ -346,7 +359,7 @@ export class ScChatBubble extends LitElement {
     }
 
     .bubble.settling {
-      animation: hu-bubble-settle var(--hu-duration-normal)
+      animation: hu-bubble-settle var(--hu-duration-slow)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
     }
 

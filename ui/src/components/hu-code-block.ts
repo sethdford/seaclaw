@@ -78,6 +78,7 @@ export class ScCodeBlock extends LitElement {
   @state() private _copied = false;
   @state() private _shikiReady = false;
   @state() private _darkScheme = true;
+  @state() private _expanded = false;
   private _copyTimeout = 0;
   private _mediaQuery: MediaQueryList | null = null;
   private _mediaHandler: (() => void) | null = null;
@@ -133,6 +134,7 @@ export class ScCodeBlock extends LitElement {
         color var(--hu-duration-fast) var(--hu-ease-out),
         border-color var(--hu-duration-fast) var(--hu-ease-out),
         background var(--hu-duration-fast) var(--hu-ease-out);
+      z-index: 1;
     }
 
     :host:hover .copy-btn,
@@ -155,7 +157,48 @@ export class ScCodeBlock extends LitElement {
       border-color: var(--hu-success);
     }
 
+    .code-wrapper {
+      display: flex;
+      overflow: hidden;
+    }
+
+    .code-wrapper.truncated {
+      max-height: calc(var(--hu-text-sm) * 1.5 * 30 + var(--hu-space-md) * 2);
+      position: relative;
+    }
+
+    .truncated-fade {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: var(--hu-space-3xl, 3rem);
+      background: linear-gradient(transparent, var(--hu-bg-inset));
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .gutter {
+      flex-shrink: 0;
+      padding: var(--hu-space-md) 0;
+      border-right: 1px solid var(--hu-border-subtle);
+      user-select: none;
+      -webkit-user-select: none;
+      text-align: right;
+      color: var(--hu-text-muted);
+      font-family: var(--hu-font-mono);
+      font-size: var(--hu-text-2xs);
+    }
+
+    .line-number {
+      padding: 0 var(--hu-space-sm);
+      height: calc(var(--hu-text-sm) * 1.5);
+      line-height: calc(var(--hu-text-sm) * 1.5);
+    }
+
     .content {
+      flex: 1;
+      min-width: 0;
       padding: var(--hu-space-md);
       overflow-x: auto;
     }
@@ -163,11 +206,37 @@ export class ScCodeBlock extends LitElement {
     .content pre {
       margin: 0;
       white-space: pre;
+      line-height: 1.5;
+      background: transparent !important;
     }
 
     .content :global(code) {
       font-family: var(--hu-font-mono);
       font-size: inherit;
+    }
+
+    .show-more-btn {
+      display: block;
+      width: 100%;
+      padding: var(--hu-space-xs);
+      background: color-mix(in srgb, var(--hu-border) 10%, var(--hu-bg-inset));
+      border: none;
+      border-top: 1px solid var(--hu-border-subtle);
+      color: var(--hu-text-muted);
+      font-family: var(--hu-font);
+      font-size: var(--hu-text-sm);
+      cursor: pointer;
+      text-align: center;
+      transition: color var(--hu-duration-fast) var(--hu-ease-out);
+    }
+
+    .show-more-btn:hover {
+      color: var(--hu-text);
+    }
+
+    .show-more-btn:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: -2px;
     }
 
     @media (prefers-reduced-transparency: reduce) {
@@ -177,8 +246,10 @@ export class ScCodeBlock extends LitElement {
         background: var(--hu-bg-elevated);
       }
     }
+
     @media (prefers-reduced-motion: reduce) {
-      .copy-btn {
+      .copy-btn,
+      .show-more-btn {
         transition: none;
       }
     }
@@ -226,6 +297,7 @@ export class ScCodeBlock extends LitElement {
   override updated(changed: Map<string, unknown>): void {
     if (changed.has("code") || changed.has("language")) {
       this._highlight();
+      this._expanded = false;
     }
   }
 
@@ -272,9 +344,18 @@ export class ScCodeBlock extends LitElement {
     }
   }
 
+  private _toggleExpand(): void {
+    this._expanded = !this._expanded;
+  }
+
   override render() {
     const langLabel = this.language ? this.language.toLowerCase() : "plain";
     const showHighlighted = this._shikiReady && this._highlighted;
+    const lineCount = this.code ? this.code.split("\n").length : 0;
+    const canTruncate = lineCount > 30;
+    const shouldTruncate = canTruncate && !this._expanded;
+    const hiddenCount = lineCount - 30;
+
     return html`
       <div
         class="code-block"
@@ -292,11 +373,34 @@ export class ScCodeBlock extends LitElement {
         >
           ${this._copied ? "Copied!" : "Copy"}
         </button>
-        <div class="content">
-          ${showHighlighted
-            ? html`${unsafeHTML(DOMPurify.sanitize(this._highlighted))}`
-            : html`<pre><code>${this.code}</code></pre>`}
+        <div class="code-wrapper ${shouldTruncate ? "truncated" : ""}">
+          <div class="gutter" aria-hidden="true">
+            ${Array.from(
+              { length: lineCount },
+              (_, i) => html`<div class="line-number">${i + 1}</div>`,
+            )}
+          </div>
+          <div class="content">
+            ${showHighlighted
+              ? html`${unsafeHTML(DOMPurify.sanitize(this._highlighted))}`
+              : html`<pre><code>${this.code}</code></pre>`}
+          </div>
+          ${shouldTruncate ? html`<div class="truncated-fade"></div>` : ""}
         </div>
+        ${canTruncate
+          ? html`
+              <button
+                type="button"
+                class="show-more-btn"
+                @click=${this._toggleExpand}
+                aria-expanded=${this._expanded}
+              >
+                ${this._expanded
+                  ? "Show less"
+                  : `Show more (${hiddenCount} lines)`}
+              </button>
+            `
+          : ""}
       </div>
     `;
   }

@@ -9,6 +9,7 @@ export class ScImageViewer extends LitElement {
   @property({ type: Boolean }) open = false;
 
   @state() private _closing = false;
+  @state() private _imageLoaded = false;
   @state() private _scale = 1;
   @state() private _translateX = 0;
   @state() private _translateY = 0;
@@ -97,12 +98,28 @@ export class ScImageViewer extends LitElement {
       box-shadow: var(--hu-shadow-lg);
       user-select: none;
       -webkit-user-drag: none;
+      background: var(--hu-surface-container);
+      filter: blur(20px);
+      transform: scale(1.1);
+      transition:
+        filter var(--hu-duration-normal) var(--hu-ease-out),
+        transform var(--hu-duration-normal) var(--hu-ease-out);
+    }
+
+    .image-wrap img.loaded {
+      filter: none;
+      transform: scale(1);
     }
 
     @media (prefers-reduced-motion: reduce) {
       .backdrop,
       .backdrop.closing {
         animation: none;
+      }
+      .image-wrap img {
+        filter: none;
+        transform: none;
+        transition: none;
       }
     }
   `;
@@ -111,6 +128,7 @@ export class ScImageViewer extends LitElement {
     if (changedProperties.has("open") || changedProperties.has("src")) {
       if (this.open && this.src) {
         this._closing = false;
+        this._imageLoaded = false;
         this._scale = 1;
         this._translateX = 0;
         this._translateY = 0;
@@ -193,6 +211,10 @@ export class ScImageViewer extends LitElement {
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   }
 
+  private _onImageLoad(): void {
+    this._imageLoaded = true;
+  }
+
   private _close(): void {
     this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
   }
@@ -223,7 +245,14 @@ export class ScImageViewer extends LitElement {
           @pointercancel=${this._onPointerUp}
           @click=${(e: MouseEvent) => e.stopPropagation()}
         >
-          <img src=${this.src} alt="" loading="eager" draggable="false" />
+          <img
+              src=${this.src}
+              alt=""
+              loading="lazy"
+              draggable="false"
+              class=${this._imageLoaded ? "loaded" : ""}
+              @load=${this._onImageLoad}
+            />
         </div>
       </div>
     `;

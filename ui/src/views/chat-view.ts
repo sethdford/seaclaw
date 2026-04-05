@@ -306,6 +306,7 @@ export class ScChatView extends GatewayAwareLitElement {
   ];
   @state() private _tapback = { open: false, x: 0, y: 0, index: -1, content: "" };
   @state() private _sessionsLoading = false;
+  private _artifactHighlightTimer: ReturnType<typeof setTimeout> | null = null;
   @query("hu-chat-composer") private _composer!: HTMLElement & { focus?: () => void };
   @query("hu-message-thread") private _messageThread!: HTMLElement & {
     scrollToBottom: () => void;
@@ -444,6 +445,7 @@ export class ScChatView extends GatewayAwareLitElement {
   }
 
   override disconnectedCallback(): void {
+    if (this._artifactHighlightTimer) clearTimeout(this._artifactHighlightTimer);
     document.removeEventListener("keydown", this._handleKeyDown);
     document.removeEventListener("toggle-sessions", this._onToggleSessions);
     document.removeEventListener("toggle-artifacts", this._onToggleArtifacts);
@@ -532,6 +534,56 @@ export class ScChatView extends GatewayAwareLitElement {
         },
       ],
     };
+  }
+
+  private _highlightArtifactSource(artifactId: string): void {
+    const artifact = this.chat.artifacts.get(artifactId);
+    const msgId = artifact?.messageId;
+    let sourceIdx = -1;
+    if (msgId) {
+      sourceIdx = this.chat.items.findIndex(
+        (item) => item.type === "message" && item.id === msgId,
+      );
+    }
+    if (sourceIdx < 0) {
+      for (let i = this.chat.items.length - 1; i >= 0; i--) {
+        const item = this.chat.items[i];
+        if (item.type === "message" && item.role === "assistant") {
+          sourceIdx = i;
+          break;
+        }
+      }
+    }
+    if (sourceIdx < 0) return;
+
+    if (this._artifactHighlightTimer) clearTimeout(this._artifactHighlightTimer);
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    requestAnimationFrame(() => {
+      const thread = this._messageThread;
+      const el = thread?.shadowRoot?.querySelector(`#msg-${sourceIdx}`) as HTMLElement | null;
+      if (!el) return;
+
+      if (reducedMotion) {
+        el.style.borderLeft = "2px solid var(--hu-accent)";
+        this._artifactHighlightTimer = setTimeout(() => {
+          el.style.borderLeft = "";
+          this._artifactHighlightTimer = null;
+        }, 1700);
+      } else {
+        el.style.borderLeft = "2px solid var(--hu-accent)";
+        el.style.transition = "border-left-color var(--hu-duration-fast) var(--hu-ease-out)";
+        this._artifactHighlightTimer = setTimeout(() => {
+          el.style.borderLeftColor = "transparent";
+          setTimeout(() => {
+            el.style.borderLeft = "";
+            el.style.transition = "";
+          }, 500);
+          this._artifactHighlightTimer = null;
+        }, 1700);
+      }
+    });
   }
 
   private async _handleEdit(content: string, _index: number): Promise<void> {
@@ -803,6 +855,7 @@ export class ScChatView extends GatewayAwareLitElement {
                       await import("../components/hu-artifact-panel.js");
                       this.chat.openArtifact(e.detail.id);
                       this._artifactsPanelOpen = true;
+                      this._highlightArtifactSource(e.detail.id);
                     }}
                     .artifacts=${Array.from(this.chat.artifacts.values())}
                   ></hu-message-thread>
