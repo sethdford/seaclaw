@@ -267,17 +267,31 @@ export class ScApp extends LitElement {
       }
     }
 
-    .disconnect-banner {
+    .disconnect-banner,
+    .demo-fallback-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: var(--hu-space-sm);
-      padding: var(--hu-space-xs) var(--hu-space-md);
-      background: color-mix(in srgb, var(--hu-error) 85%, var(--hu-bg));
+      padding: var(--hu-space-2xs) var(--hu-space-md);
       color: var(--hu-on-accent);
-      font-size: var(--hu-text-sm);
+      font-size: var(--hu-text-xs);
       font-weight: var(--hu-weight-medium);
       animation: hu-slide-down var(--hu-duration-normal) var(--hu-ease-out);
+    }
+    .disconnect-banner {
+      background: color-mix(in srgb, var(--hu-error) 85%, var(--hu-bg));
+    }
+    .demo-fallback-banner {
+      background: color-mix(in srgb, var(--hu-accent-secondary) 85%, var(--hu-bg));
+    }
+    .banner-fading {
+      animation: hu-fade-out var(--hu-duration-normal) var(--hu-ease-out) forwards;
     }
     @keyframes hu-slide-down {
       from {
@@ -287,48 +301,36 @@ export class ScApp extends LitElement {
         transform: translateY(0);
       }
     }
-    .disconnect-banner button {
-      background: color-mix(in srgb, var(--hu-on-accent) 20%, transparent);
-      border: 1px solid color-mix(in srgb, var(--hu-on-accent) 40%, transparent);
-      color: var(--hu-on-accent);
-      min-height: 2rem;
-      padding: var(--hu-space-xs) var(--hu-space-md);
-      border-radius: var(--hu-radius-sm);
-      font-size: var(--hu-text-xs);
-      font-family: var(--hu-font);
-      cursor: pointer;
-      transition: background var(--hu-duration-fast);
-    }
-    .disconnect-banner button:hover {
-      background: color-mix(in srgb, var(--hu-on-accent) 35%, transparent);
-    }
-
-    .demo-fallback-banner {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: var(--hu-space-sm);
-      padding: var(--hu-space-xs) var(--hu-space-md);
-      background: color-mix(in srgb, var(--hu-accent-secondary) 85%, var(--hu-bg));
-      color: var(--hu-on-accent);
-      font-size: var(--hu-text-sm);
-      font-weight: var(--hu-weight-medium);
-      animation: hu-slide-down var(--hu-duration-normal) var(--hu-ease-out);
-    }
+    .disconnect-banner button,
     .demo-fallback-banner button {
       background: color-mix(in srgb, var(--hu-on-accent) 20%, transparent);
       border: 1px solid color-mix(in srgb, var(--hu-on-accent) 40%, transparent);
       color: var(--hu-on-accent);
-      min-height: 2rem;
-      padding: var(--hu-space-xs) var(--hu-space-md);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
       border-radius: var(--hu-radius-sm);
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font);
       cursor: pointer;
       transition: background var(--hu-duration-fast);
+      line-height: 1;
     }
+    .disconnect-banner button:hover,
     .demo-fallback-banner button:hover {
       background: color-mix(in srgb, var(--hu-on-accent) 35%, transparent);
+    }
+    .banner-dismiss {
+      background: transparent;
+      border: none;
+      color: var(--hu-on-accent);
+      cursor: pointer;
+      padding: var(--hu-space-2xs);
+      font-size: var(--hu-text-xs);
+      line-height: 1;
+      opacity: 0.8;
+      margin-left: var(--hu-space-xs);
+    }
+    .banner-dismiss:hover {
+      opacity: 1;
     }
 
     .mobile-nav {
@@ -513,6 +515,8 @@ export class ScApp extends LitElement {
   @state() private _viewError: Error | null = null;
   @state() private _inFallbackWindow = false;
   @state() private _demoFallback = false;
+  @state() private _bannerDismissed = false;
+  private _bannerAutoTimer: ReturnType<typeof setTimeout> | null = null;
 
   gateway: GatewayClient | null = null;
   private _keyHandler = this._onGlobalKey.bind(this);
@@ -559,6 +563,7 @@ export class ScApp extends LitElement {
     super.connectedCallback();
 
     this.sidebarCollapsed = localStorage.getItem(SIDEBAR_KEY) === "true";
+    this._bannerDismissed = sessionStorage.getItem("hu-banner-dismissed") === "true";
     this._updateViewportBreakpoint();
     window.addEventListener("resize", this._resizeHandler);
     document.addEventListener("keydown", this._paletteEscapeCapture, true);
@@ -612,6 +617,11 @@ export class ScApp extends LitElement {
   }
 
   override updated(changedProperties: PropertyValues): void {
+    if (changedProperties.has("_demoFallback") && this._demoFallback && !this._bannerDismissed) {
+      this._bannerAutoTimer = setTimeout(() => {
+        this._dismissBanner();
+      }, 5000);
+    }
     if (changedProperties.has("moreSheetOpen")) {
       if (this.moreSheetOpen) {
         this._moreSheetPreviousElement = document.activeElement as HTMLElement | null;
@@ -653,6 +663,10 @@ export class ScApp extends LitElement {
     if (this._fallbackTimer) {
       clearTimeout(this._fallbackTimer);
       this._fallbackTimer = null;
+    }
+    if (this._bannerAutoTimer) {
+      clearTimeout(this._bannerAutoTimer);
+      this._bannerAutoTimer = null;
     }
     this.gateway?.removeEventListener("status", this._statusHandler);
     this.gateway?.disconnect();
@@ -1043,16 +1057,18 @@ export class ScApp extends LitElement {
       >
         Skip to content
       </button>
-      ${this.connectionStatus === "disconnected" && !this._inFallbackWindow
+      ${this.connectionStatus === "disconnected" && !this._inFallbackWindow && !this._bannerDismissed
         ? html`<div class="disconnect-banner" role="alert">
             Disconnected from server
             <button @click=${this._reconnect}>Reconnect</button>
+            <button class="banner-dismiss" @click=${this._dismissBanner} aria-label="Dismiss">\u00d7</button>
           </div>`
         : nothing}
-      ${this._demoFallback
+      ${this._demoFallback && !this._bannerDismissed
         ? html`<div class="demo-fallback-banner" role="status">
             Demo mode — gateway not reachable
             <button @click=${this._reconnect}>Retry</button>
+            <button class="banner-dismiss" @click=${this._dismissBanner} aria-label="Dismiss">\u00d7</button>
           </div>`
         : nothing}
       <div
@@ -1162,7 +1178,7 @@ export class ScApp extends LitElement {
         }}
       ></hu-shortcut-overlay>
 
-      ${this.tab !== "voice" ? html`<hu-floating-mic></hu-floating-mic>` : nothing}
+      ${this.tab === "chat" ? html`<hu-floating-mic></hu-floating-mic>` : nothing}
     `;
   }
 
@@ -1180,6 +1196,15 @@ export class ScApp extends LitElement {
   private _onViewRetry(): void {
     this._viewError = null;
     this.requestUpdate();
+  }
+
+  private _dismissBanner(): void {
+    this._bannerDismissed = true;
+    sessionStorage.setItem("hu-banner-dismissed", "true");
+    if (this._bannerAutoTimer) {
+      clearTimeout(this._bannerAutoTimer);
+      this._bannerAutoTimer = null;
+    }
   }
 
   private _reconnect(): void {

@@ -370,30 +370,24 @@ hu-card.hu-entrance.hu-visible {
   }
 }
 
-/* ─── Branded scrollbar ─────────────────────────────────────────────── */
+/* ─── Thin auto-hiding scrollbar ───────────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--hu-accent) 40%, transparent) transparent;
-}
-*:hover {
-  scrollbar-color: color-mix(in srgb, var(--hu-accent) 60%, transparent) transparent;
+  scrollbar-color: var(--hu-border-subtle) transparent;
 }
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--hu-accent) 40%, transparent);
-  border-radius: var(--hu-radius);
+  background: var(--hu-border-subtle);
+  border-radius: 3px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--hu-accent) 60%, transparent);
+  background: var(--hu-border);
 }
 
 /* ─── Status Breathing (ambient intelligence) ─────────────────────────── */

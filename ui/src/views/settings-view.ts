@@ -184,7 +184,7 @@ export class ScSettingsView extends LitElement {
 
     .header-area {
       padding: var(--hu-space-lg) var(--hu-space-lg) 0;
-      max-width: 72rem;
+      max-width: var(--hu-content-width-wide);
       margin: 0 auto;
     }
 
@@ -194,7 +194,7 @@ export class ScSettingsView extends LitElement {
       flex-wrap: wrap;
       align-items: center;
       padding: 0 var(--hu-space-lg);
-      max-width: 72rem;
+      max-width: var(--hu-content-width-wide);
       margin: 0 auto var(--hu-space-md);
       border-bottom: 1px solid var(--hu-border-subtle);
       padding-bottom: var(--hu-space-sm);
@@ -232,7 +232,7 @@ export class ScSettingsView extends LitElement {
       .tabs-accordion {
         display: block;
         padding: 0 var(--hu-space-lg);
-        max-width: 72rem;
+        max-width: var(--hu-content-width-wide);
         margin: 0 auto var(--hu-space-md);
       }
 

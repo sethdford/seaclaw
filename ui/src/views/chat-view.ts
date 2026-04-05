@@ -73,7 +73,7 @@ export class ScChatView extends GatewayAwareLitElement {
         flex-direction: column;
         flex: 1;
         min-height: 0;
-        max-width: 45rem;
+        max-width: var(--hu-content-width);
         margin: 0 auto;
         position: relative;
         width: 100%;
@@ -84,7 +84,7 @@ export class ScChatView extends GatewayAwareLitElement {
         display: flex;
         flex-direction: column;
         min-height: 0;
-        max-width: 48rem;
+        max-width: var(--hu-content-width);
         margin-inline: auto;
         width: 100%;
       }

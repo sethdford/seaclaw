@@ -117,6 +117,8 @@ export class ScChatBubble extends LitElement {
 
     .bubble {
       position: relative;
+      width: fit-content;
+      min-width: 3rem;
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
       line-height: var(--hu-leading-relaxed);

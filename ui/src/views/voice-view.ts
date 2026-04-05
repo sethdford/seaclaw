@@ -217,7 +217,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
         flex-direction: column;
         flex: 1;
         height: 100%;
-        max-width: 45rem;
+        max-width: var(--hu-content-width);
         margin: 0 auto;
         position: relative;
         width: 100%;
@@ -321,6 +321,20 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
       .input-row hu-button {
         min-height: 2.75rem;
+      }
+
+      /* ── Setup banner ──────────────────────────────────── */
+
+      .setup-banner {
+        background: var(--hu-surface-container);
+        border-radius: var(--hu-radius-lg);
+        padding: var(--hu-space-lg);
+        margin: var(--hu-space-md);
+        flex-shrink: 0;
+      }
+
+      .setup-banner fieldset {
+        gap: var(--hu-space-sm);
       }
 
       /* ── Skeleton ────────────────────────────────────── */
@@ -1212,7 +1226,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
           Choose a voice provider and enter your API key to start talking.
         </p>
         <fieldset
-          style="border:none;padding:0;margin:0 0 var(--hu-space-md) 0;display:flex;flex-direction:column;gap:var(--hu-space-xs)"
+          style="border:none;padding:0;margin:0 0 var(--hu-space-md) 0;display:flex;flex-direction:column;gap:var(--hu-space-sm)"
           role="radiogroup"
           aria-label="Voice provider"
         >

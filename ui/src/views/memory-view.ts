@@ -113,7 +113,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
         flex: 1;
         min-height: 0;
         color: var(--hu-text);
-        max-width: 72rem;
+        max-width: var(--hu-content-width-wide);
       }
       .layout {
         display: flex;
@@ -240,8 +240,16 @@ export class ScMemoryView extends GatewayAwareLitElement {
   @state() private graphEntities: GraphEntity[] = [];
   @state() private graphRelations: GraphRelation[] = [];
   private _scrollEntranceObserver: IntersectionObserver | null = null;
+  private _skeletonTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected override autoRefreshInterval = 30_000;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._skeletonTimer = setTimeout(() => {
+      if (this.loading) this.loading = false;
+    }, 3000);
+  }
 
   override updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
@@ -249,6 +257,10 @@ export class ScMemoryView extends GatewayAwareLitElement {
   }
 
   override disconnectedCallback(): void {
+    if (this._skeletonTimer) {
+      clearTimeout(this._skeletonTimer);
+      this._skeletonTimer = null;
+    }
     this._scrollEntranceObserver?.disconnect();
     this._scrollEntranceObserver = null;
     super.disconnectedCallback();

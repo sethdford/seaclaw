@@ -228,6 +228,9 @@ export class ScVoiceOrb extends LitElement {
       color: var(--hu-text-muted);
       position: relative;
       z-index: 1;
+      text-align: center;
+      max-width: 12rem;
+      margin-inline: auto;
     }
 
     .voice-status.listening,

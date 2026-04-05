@@ -419,9 +419,9 @@ export class ScDeliveryStatus extends LitElement {
       case "complete":
         return html`
           <span role="status" aria-live="polite" class="icon">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
+            <svg viewBox="0 0 256 256" aria-hidden="true">
               <path
-                d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm-4.24-.29l-5.66 5.66 1.41 1.41 5.66-5.66-1.41-1.41zM12 19.07l-5.66-5.66 1.41-1.41L12 16.24l5.66-5.66 1.41 1.41L12 19.07z"
+                d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"
                 fill="currentColor"
               />
             </svg>

@@ -159,6 +159,11 @@ export class ScMessageThread extends LitElement {
       background: var(--hu-accent-subtle);
       border-radius: var(--hu-radius);
       z-index: 0;
+      opacity: 0;
+      transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
+    }
+    .message-wrapper.swiping .swipe-action {
+      opacity: 1;
     }
     .swipe-action.left {
       left: var(--hu-space-sm);
