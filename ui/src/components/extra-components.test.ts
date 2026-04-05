@@ -3166,7 +3166,7 @@ describe("hu-chat-composer", () => {
     expect(el.value).toBe("");
     expect(el.waiting).toBe(false);
     expect(el.disabled).toBe(false);
-    expect(el.placeholder).toBe("Type a message...");
+    expect(el.placeholder).toBe("What would you like to work on?");
   });
   it("renders textarea and send button", async () => {
     const el = document.createElement("hu-chat-composer") as HTMLElement & {

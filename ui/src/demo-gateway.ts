@@ -1847,6 +1847,12 @@ export class DemoGatewayClient extends EventTarget {
           stt_model: "whisper-large-v3",
         };
 
+      case "voice.validate": {
+        const p = params as Record<string, unknown> | undefined;
+        const mode = typeof p?.mode === "string" && p.mode.length > 0 ? p.mode : "gemini_live";
+        return { ok: true, mode };
+      }
+
       case "persona.set":
         return { ok: true };
 
