@@ -113,17 +113,22 @@ hu_error_t hu_moderation_check_local(hu_allocator_t *alloc, const char *text, si
     {
         int high_sev = 0, low_sev = 0;
         if (mod_contains_word(text, text_len, "suicide") || mod_contains(norm, norm_len, "suicide")) high_sev++;
-        if (mod_contains(text, text_len, "self harm") || mod_contains(text, text_len, "self-harm")) high_sev++;
+        if (mod_contains(text, text_len, "self harm") || mod_contains(text, text_len, "self-harm") ||
+            mod_contains(norm, norm_len, "selfharm") || mod_contains(norm, norm_len, "self-harm")) high_sev++;
         if (mod_contains_word(text, text_len, "kms") || mod_contains(norm, norm_len, "kms")) high_sev++;
         if (mod_contains_word(text, text_len, "unalive") || mod_contains(norm, norm_len, "unalive")) high_sev++;
-        if (mod_contains(text, text_len, "end it all")) high_sev++;
-        if (mod_contains(text, text_len, "better off without me")) high_sev++;
+        if (mod_contains(text, text_len, "end it all") || mod_contains(norm, norm_len, "enditall")) high_sev++;
+        if (mod_contains(text, text_len, "better off without me") || mod_contains(norm, norm_len, "betteroffwithoutme")) high_sev++;
         /* Moderately concerning phrases — closer to crisis than casual venting */
-        if (mod_contains(text, text_len, "don't want to be here anymore")) high_sev++;
-        if (mod_contains(text, text_len, "no reason to go on")) high_sev++;
+        if (mod_contains(text, text_len, "don't want to be here anymore") ||
+            mod_contains(norm, norm_len, "don'twanttobehereanymore") ||
+            mod_contains(norm, norm_len, "dontwanttobehereanymore")) high_sev++;
+        if (mod_contains(text, text_len, "no reason to go on") || mod_contains(norm, norm_len, "noreasontogoon")) high_sev++;
         /* Ambiguous phrases — often venting, not imminent risk */
-        if (mod_contains(text, text_len, "what's the point")) low_sev++;
-        if (mod_contains(text, text_len, "i can't do this anymore")) low_sev++;
+        if (mod_contains(text, text_len, "what's the point") || mod_contains(norm, norm_len, "what'sthepoint") ||
+            mod_contains(norm, norm_len, "whatsthepoint")) low_sev++;
+        if (mod_contains(text, text_len, "i can't do this anymore") || mod_contains(norm, norm_len, "ican'tdothisanymore") ||
+            mod_contains(norm, norm_len, "icantdothisanymore")) low_sev++;
 
         if (high_sev > 0) {
             out->self_harm = true;
@@ -136,7 +141,7 @@ hu_error_t hu_moderation_check_local(hu_allocator_t *alloc, const char *text, si
             out->flagged = (out->self_harm_score >= 0.6);
         }
     }
-    if (mod_contains(text, text_len, "explicit sexual") ||
+    if (mod_contains(text, text_len, "explicit sexual") || mod_contains(norm, norm_len, "explicitsexual") ||
         mod_contains_word(text, text_len, "nsfw") ||
         mod_contains(norm, norm_len, "nsfw") ||
         mod_contains(text, text_len, "pornograph")) {

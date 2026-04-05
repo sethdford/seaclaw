@@ -529,15 +529,15 @@ static hu_error_t impl_list(void *ctx, hu_allocator_t *alloc, const hu_memory_ca
     if (cat_filter || (session_id && session_id_len > 0)) {
         size_t pos = strlen(url);
         if (cat_filter)
-            pos += (size_t)snprintf(url + pos, sizeof(url) - pos, "?category=%s", cat_filter);
+            pos = hu_buf_appendf(url, sizeof(url), pos, "?category=%s", cat_filter);
         if (session_id && session_id_len > 0) {
             char sid_buf[256];
             size_t sid_len =
                 session_id_len < sizeof(sid_buf) - 1 ? session_id_len : sizeof(sid_buf) - 1;
             memcpy(sid_buf, session_id, sid_len);
             sid_buf[sid_len] = '\0';
-            pos += (size_t)snprintf(url + pos, sizeof(url) - pos, "%csession_id=%s",
-                                    (pos > (size_t)ul) ? '&' : '?', sid_buf);
+            pos = hu_buf_appendf(url, sizeof(url), pos, "%csession_id=%s",
+                                 (pos > (size_t)ul) ? '&' : '?', sid_buf);
         }
     }
     char headers[320];
@@ -773,12 +773,23 @@ hu_memory_t hu_api_memory_create(hu_allocator_t *alloc, const char *base_url, co
         return (hu_memory_t){.ctx = NULL, .vtable = NULL};
     memset(self, 0, sizeof(hu_api_memory_t));
     self->alloc = alloc;
-    self->base_url = (char *)alloc->alloc(alloc->ctx, strlen(base_url) + 1);
-    if (self->base_url)
-        memcpy(self->base_url, base_url, strlen(base_url) + 1);
-    self->api_key = api_key ? (char *)alloc->alloc(alloc->ctx, strlen(api_key) + 1) : NULL;
-    if (api_key && self->api_key)
-        memcpy(self->api_key, api_key, strlen(api_key) + 1);
+    size_t blen = strlen(base_url);
+    self->base_url = (char *)alloc->alloc(alloc->ctx, blen + 1);
+    if (!self->base_url) {
+        alloc->free(alloc->ctx, self, sizeof(hu_api_memory_t));
+        return (hu_memory_t){.ctx = NULL, .vtable = NULL};
+    }
+    memcpy(self->base_url, base_url, blen + 1);
+    if (api_key) {
+        size_t klen = strlen(api_key);
+        self->api_key = (char *)alloc->alloc(alloc->ctx, klen + 1);
+        if (!self->api_key) {
+            alloc->free(alloc->ctx, self->base_url, blen + 1);
+            alloc->free(alloc->ctx, self, sizeof(hu_api_memory_t));
+            return (hu_memory_t){.ctx = NULL, .vtable = NULL};
+        }
+        memcpy(self->api_key, api_key, klen + 1);
+    }
     self->timeout_ms = timeout_ms;
     return (hu_memory_t){.ctx = self, .vtable = &api_vtable};
 }

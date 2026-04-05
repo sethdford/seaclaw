@@ -50,54 +50,52 @@ char *hu_diagnostics_format_report(hu_allocator_t *alloc, const hu_diagnostic_re
     if (!buf)
         return NULL;
 
-    int n = 0;
-    n += snprintf(buf + n, cap - (size_t)n,
-                  "=== Memory Doctor ===\n\n"
-                  "Backend\n"
-                  "  name:    %.*s\n"
-                  "  healthy: %s\n"
-                  "  entries: %zu\n\n"
-                  "Capabilities\n"
-                  "  keyword_rank:  %s\n"
-                  "  session_store: %s\n"
-                  "  transactions:  %s\n"
-                  "  outbox:        %s\n\n"
-                  "Vector Plane\n"
-                  "  active:  %s\n"
-                  "  vectors: %s\n\n"
-                  "Outbox\n"
-                  "  active:  %s\n"
-                  "  pending: %s\n\n"
-                  "Response Cache\n"
-                  "  active: %s\n"
-                  "  count:  %zu\n\n"
-                  "Retrieval\n"
-                  "  sources: %d\n"
-                  "  rollout: %.*s\n\n"
-                  "Pipeline Stages\n"
-                  "  query_expansion: %s\n"
-                  "  adaptive:        %s\n"
-                  "  llm_reranker:    %s\n"
-                  "  summarizer:      %s\n"
-                  "  semantic_cache:  %s\n",
-                  (int)report->backend_name_len, report->backend_name ? report->backend_name : "",
-                  report->backend_healthy ? "true" : "false", report->entry_count,
-                  report->capabilities.supports_keyword_rank ? "true" : "false",
-                  report->capabilities.supports_session_store ? "true" : "false",
-                  report->capabilities.supports_transactions ? "true" : "false",
-                  report->capabilities.supports_outbox ? "true" : "false",
-                  report->vector_store_active ? "true" : "false",
-                  report->vector_store_active ? (report->vector_entry_count ? "n/a" : "0") : "n/a",
-                  report->outbox_active ? "true" : "false", report->outbox_active ? "n/a" : "n/a",
-                  report->cache_active ? "true" : "false", report->cache_stats.count,
-                  (int)report->retrieval_sources, (int)report->rollout_mode_len,
-                  report->rollout_mode ? report->rollout_mode : "off",
-                  report->query_expansion_enabled ? "true" : "false",
-                  report->adaptive_retrieval_enabled ? "true" : "false",
-                  report->llm_reranker_enabled ? "true" : "false",
-                  report->summarizer_enabled ? "true" : "false",
-                  report->semantic_cache_active ? "true" : "false");
-
-    (void)n;
+    (void)hu_buf_appendf(
+        buf, cap, 0,
+        "=== Memory Doctor ===\n\n"
+        "Backend\n"
+        "  name:    %.*s\n"
+        "  healthy: %s\n"
+        "  entries: %zu\n\n"
+        "Capabilities\n"
+        "  keyword_rank:  %s\n"
+        "  session_store: %s\n"
+        "  transactions:  %s\n"
+        "  outbox:        %s\n\n"
+        "Vector Plane\n"
+        "  active:  %s\n"
+        "  vectors: %s\n\n"
+        "Outbox\n"
+        "  active:  %s\n"
+        "  pending: %s\n\n"
+        "Response Cache\n"
+        "  active: %s\n"
+        "  count:  %zu\n\n"
+        "Retrieval\n"
+        "  sources: %d\n"
+        "  rollout: %.*s\n\n"
+        "Pipeline Stages\n"
+        "  query_expansion: %s\n"
+        "  adaptive:        %s\n"
+        "  llm_reranker:    %s\n"
+        "  summarizer:      %s\n"
+        "  semantic_cache:  %s\n",
+        (int)report->backend_name_len, report->backend_name ? report->backend_name : "",
+        report->backend_healthy ? "true" : "false", report->entry_count,
+        report->capabilities.supports_keyword_rank ? "true" : "false",
+        report->capabilities.supports_session_store ? "true" : "false",
+        report->capabilities.supports_transactions ? "true" : "false",
+        report->capabilities.supports_outbox ? "true" : "false",
+        report->vector_store_active ? "true" : "false",
+        report->vector_store_active ? (report->vector_entry_count ? "n/a" : "0") : "n/a",
+        report->outbox_active ? "true" : "false", report->outbox_active ? "n/a" : "n/a",
+        report->cache_active ? "true" : "false", report->cache_stats.count,
+        (int)report->retrieval_sources, (int)report->rollout_mode_len,
+        report->rollout_mode ? report->rollout_mode : "off",
+        report->query_expansion_enabled ? "true" : "false",
+        report->adaptive_retrieval_enabled ? "true" : "false",
+        report->llm_reranker_enabled ? "true" : "false",
+        report->summarizer_enabled ? "true" : "false",
+        report->semantic_cache_active ? "true" : "false");
     return buf;
 }

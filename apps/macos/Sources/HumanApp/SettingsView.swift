@@ -31,14 +31,6 @@ struct SettingsView: View {
                     Text(status.isGatewayConnected ? "Connected" : "Disconnected")
                         .font(.custom("Avenir-Book", size: HUTokens.textSm))
                         .foregroundStyle(tokens.textMuted)
-                    if status.isGatewayConnected {
-                        Spacer()
-                        Text("42 ms")
-                            .font(.custom("Avenir-Book", size: HUTokens.textXs))
-                            .foregroundStyle(tokens.textMuted)
-                            .monospacedDigit()
-                            .accessibilityLabel("Connection latency: 42 milliseconds")
-                    }
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Gateway \(status.isGatewayConnected ? "connected" : "disconnected")")

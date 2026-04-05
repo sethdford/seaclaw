@@ -116,11 +116,28 @@ static hu_error_t irc_send(void *ctx, const char *target, size_t target_len, con
     if (max_chunk > 400)
         max_chunk = 400;
 
+    /* Reject targets with CR/LF to prevent IRC protocol injection */
+    for (size_t i = 0; i < target_len; i++) {
+        if (target[i] == '\r' || target[i] == '\n' || target[i] == ' ')
+            return HU_ERR_INVALID_ARGUMENT;
+    }
+
     size_t sent = 0;
     while (sent < message_len) {
         size_t chunk_len = message_len - sent;
         if (chunk_len > max_chunk)
             chunk_len = max_chunk;
+        /* Truncate chunk at first CR or LF to prevent protocol injection */
+        for (size_t i = 0; i < chunk_len; i++) {
+            if (message[sent + i] == '\r' || message[sent + i] == '\n') {
+                chunk_len = i;
+                break;
+            }
+        }
+        if (chunk_len == 0) {
+            sent++;
+            continue;
+        }
 
         char line[512];
         int n = snprintf(line, sizeof(line), "PRIVMSG %.*s :%.*s\r\n", (int)target_len, target,

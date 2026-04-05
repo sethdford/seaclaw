@@ -98,6 +98,7 @@ static const hu_tool_vtable_t schema_vtable = {
     .description = schema_desc,
     .parameters_json = schema_params,
     .deinit = schema_deinit,
+    .flags = HU_TOOL_FLAG_THREAD_SAFE,
 };
 
 hu_error_t hu_schema_create(hu_allocator_t *alloc, hu_tool_t *out) {

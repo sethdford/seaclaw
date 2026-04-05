@@ -7,6 +7,7 @@
 #include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/design_tokens.h"
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -277,20 +278,20 @@ static void draw(hu_tui_state_t *state) {
     {
         char title[256];
         int n;
-        int off = 0;
-        off =
-            snprintf(title, sizeof(title), " Human " HU_BOX_VERT " %s/%s " HU_BOX_VERT " %zu tools",
-                     state->provider_name ? state->provider_name : "?",
-                     state->model_name ? state->model_name : "?", state->tools_count);
-        if (state->session_cost_usd > 0.001 && off > 0 && (size_t)off < sizeof(title) - 20) {
-            off += snprintf(title + off, sizeof(title) - (size_t)off, " " HU_BOX_VERT " $%.2f",
-                            state->session_cost_usd);
+        size_t off = 0;
+        off = hu_buf_appendf(title, sizeof(title), off,
+                             " Human " HU_BOX_VERT " %s/%s " HU_BOX_VERT " %zu tools",
+                             state->provider_name ? state->provider_name : "?",
+                             state->model_name ? state->model_name : "?", state->tools_count);
+        if (state->session_cost_usd > 0.001 && off > 0 && off < sizeof(title) - 20) {
+            off = hu_buf_appendf(title, sizeof(title), off, " " HU_BOX_VERT " $%.2f",
+                                 state->session_cost_usd);
         }
-        if (state->tab_count > 1 && off > 0 && (size_t)off < sizeof(title) - 20) {
-            off += snprintf(title + off, sizeof(title) - (size_t)off, " " HU_BOX_VERT " tab %d/%d",
-                            state->active_tab + 1, state->tab_count);
+        if (state->tab_count > 1 && off > 0 && off < sizeof(title) - 20) {
+            off = hu_buf_appendf(title, sizeof(title), off, " " HU_BOX_VERT " tab %d/%d",
+                                 state->active_tab + 1, state->tab_count);
         }
-        n = off;
+        n = (off > (size_t)INT_MAX) ? INT_MAX : (int)off;
         if (n > 0)
             draw_text(0, l.title_y, title, l.w, FG_TITLE, BG_TITLE);
     }

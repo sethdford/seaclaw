@@ -35,6 +35,12 @@ hu_error_t hu_persona_examples_load_json(hu_allocator_t *alloc, const char *chan
     }
 
     size_t n = arr->data.array.len;
+    if (n > 10000 || n > SIZE_MAX / sizeof(hu_persona_example_t)) {
+        hu_json_free(alloc, root);
+        alloc->free(alloc->ctx, out->channel, channel_len + 1);
+        out->channel = NULL;
+        return HU_ERR_INVALID_ARGUMENT;
+    }
     hu_persona_example_t *examples =
         (hu_persona_example_t *)alloc->alloc(alloc->ctx, n * sizeof(hu_persona_example_t));
     if (!examples) {

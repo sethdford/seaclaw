@@ -8,6 +8,7 @@ typedef int hu_life_chapters_unused_;
 #include "human/core/string.h"
 #include "human/memory.h"
 #include "human/memory/life_chapters.h"
+#include "human/memory/sql_transaction.h"
 #include "human/persona.h"
 #include <sqlite3.h>
 #include <stdio.h>
@@ -139,27 +140,28 @@ hu_error_t hu_life_chapter_store(hu_allocator_t *alloc, hu_memory_t *memory,
     if (!db)
         return HU_ERR_NOT_SUPPORTED;
 
-    if (sqlite3_exec(db, "BEGIN", NULL, NULL, NULL) != SQLITE_OK)
+    hu_sql_txn_t txn = {0};
+    if (hu_sql_txn_begin(&txn, db) != HU_OK)
         return HU_ERR_MEMORY_BACKEND;
 
     /* Deactivate all previous chapters (rolled back if insert/json fails) */
     sqlite3_stmt *upd = NULL;
     int rc = sqlite3_prepare_v2(db, "UPDATE life_chapters SET active=0", -1, &upd, NULL);
     if (rc != SQLITE_OK) {
-        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_MEMORY_BACKEND;
     }
     rc = sqlite3_step(upd);
     sqlite3_finalize(upd);
     if (rc != SQLITE_DONE) {
-        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_MEMORY_BACKEND;
     }
 
     size_t kt_len = 0;
     char *key_threads_json = key_threads_to_json(alloc, chapter, &kt_len);
     if (!key_threads_json && chapter->key_threads_count > 0) {
-        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_OUT_OF_MEMORY;
     }
     const char *kt = key_threads_json ? key_threads_json : "[]";
@@ -174,7 +176,7 @@ hu_error_t hu_life_chapter_store(hu_allocator_t *alloc, hu_memory_t *memory,
     if (rc != SQLITE_OK) {
         if (key_threads_json)
             alloc->free(alloc->ctx, key_threads_json, kt_len + 1);
-        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_MEMORY_BACKEND;
     }
     sqlite3_bind_text(ins, 1, chapter->theme, -1, SQLITE_STATIC);
@@ -186,11 +188,11 @@ hu_error_t hu_life_chapter_store(hu_allocator_t *alloc, hu_memory_t *memory,
     if (key_threads_json)
         alloc->free(alloc->ctx, key_threads_json, kt_len + 1);
     if (rc != SQLITE_DONE) {
-        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_MEMORY_BACKEND;
     }
-    if (sqlite3_exec(db, "COMMIT", NULL, NULL, NULL) != SQLITE_OK) {
-        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+    if (hu_sql_txn_commit(&txn) != HU_OK) {
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_MEMORY_BACKEND;
     }
     return HU_OK;
@@ -214,10 +216,10 @@ char *hu_life_chapter_build_directive(hu_allocator_t *alloc,
          i++) {
         if (chapter->key_threads[i][0]) {
             if (pos > 0) {
-                pos += (size_t)snprintf(threads_buf + pos, sizeof(threads_buf) - pos, ", ");
+                pos = hu_buf_appendf(threads_buf, sizeof(threads_buf), pos, ", ");
             }
-            pos += (size_t)snprintf(threads_buf + pos, sizeof(threads_buf) - pos, "%.127s",
-                                   chapter->key_threads[i]);
+            pos = hu_buf_appendf(threads_buf, sizeof(threads_buf), pos, "%.127s",
+                                 chapter->key_threads[i]);
         }
     }
     const char *threads_str = threads_buf[0] ? threads_buf : "none";

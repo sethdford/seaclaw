@@ -476,7 +476,7 @@ hu_error_t hu_self_improve_get_tool_prefs_prompt(hu_self_improve_t *engine,
 
     char buf[2048];
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "Tool reliability:");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "Tool reliability:");
     bool first = true;
 
     while (sqlite3_step(stmt) == SQLITE_ROW && pos < sizeof(buf) - 64) {

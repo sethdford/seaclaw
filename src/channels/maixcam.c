@@ -1,5 +1,6 @@
 #include "human/channels/maixcam.h"
 #include "human/core/allocator.h"
+#include "human/core/json.h"
 #include "human/core/string.h"
 #include <stdint.h>
 #if defined(__linux__) && !HU_IS_TEST
@@ -79,16 +80,22 @@ static hu_error_t maixcam_send(void *ctx, const char *target, size_t target_len,
         close(fd);
         return HU_ERR_IO;
     }
-    char buf[4096];
-    int n = snprintf(buf, sizeof(buf), "{\"type\":\"message\",\"content\":\"%.*s\"}\n",
-                     (int)message_len, message);
-    if (n > 0 && (size_t)n < sizeof(buf)) {
-        ssize_t w = write(fd, buf, (size_t)n);
+    hu_json_buf_t jbuf;
+    hu_json_buf_init(&jbuf, c->alloc);
+    hu_json_buf_append_raw(&jbuf, "{", 1);
+    hu_json_append_key_value(&jbuf, "type", 4, "message", 7);
+    hu_json_buf_append_raw(&jbuf, ",", 1);
+    hu_json_append_key_value(&jbuf, "content", 7, message, message_len);
+    hu_json_buf_append_raw(&jbuf, "}\n", 2);
+    if (!jbuf.ptr || jbuf.len == 0) {
+        hu_json_buf_free(&jbuf);
         close(fd);
-        return (w > 0) ? HU_OK : HU_ERR_IO;
+        return HU_ERR_IO;
     }
+    ssize_t w = write(fd, jbuf.ptr, jbuf.len);
+    hu_json_buf_free(&jbuf);
     close(fd);
-    return HU_ERR_IO;
+    return (w > 0) ? HU_OK : HU_ERR_IO;
 #else
     (void)ctx;
     (void)message;

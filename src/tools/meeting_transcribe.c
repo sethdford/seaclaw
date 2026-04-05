@@ -274,10 +274,14 @@ static hu_error_t meeting_execute(void *ctx, hu_allocator_t *alloc, const hu_jso
     }
     memcpy(req + rn, b64, b64_len);
     rn += (int)b64_len;
-    if (use_v2)
-        rn += snprintf(req + rn, req_cap - (size_t)rn, "\"}");
-    else
-        rn += snprintf(req + rn, req_cap - (size_t)rn, "\"}}");
+    {
+        size_t req_pos = (size_t)rn;
+        if (use_v2)
+            req_pos = hu_buf_appendf(req, req_cap, req_pos, "\"}");
+        else
+            req_pos = hu_buf_appendf(req, req_cap, req_pos, "\"}}");
+        rn = (int)req_pos;
+    }
     alloc->free(alloc->ctx, b64, b64_len + 1);
 
     hu_http_response_t resp = {0};

@@ -108,6 +108,15 @@ static void test_mod_coded_crisis_no_reason(void) {
     HU_ASSERT(result.self_harm);
 }
 
+/* Spaced-letter evasion: norm collapses to "selfharm", raw phrase check misses */
+static void test_mod_spaced_self_harm(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_moderation_result_t result;
+    HU_ASSERT_EQ(hu_moderation_check_local(&alloc, "s e l f h a r m", 15, &result), HU_OK);
+    HU_ASSERT(result.self_harm);
+    HU_ASSERT(result.flagged);
+}
+
 /* SHIELD-005: Crisis response builder */
 static void test_crisis_response_build(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -256,6 +265,7 @@ void run_moderation_tests(void) {
     HU_RUN_TEST(test_mod_coded_crisis_end_it_all);
     HU_RUN_TEST(test_mod_coded_crisis_better_off_without_me);
     HU_RUN_TEST(test_mod_coded_crisis_no_reason);
+    HU_RUN_TEST(test_mod_spaced_self_harm);
 
     HU_TEST_SUITE("Crisis Response Builder (SHIELD-005)");
     HU_RUN_TEST(test_crisis_response_build);

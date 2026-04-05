@@ -519,8 +519,8 @@ hu_error_t hu_hula_compiler_chat_compile_execute(
 
         char diag[768];
         size_t dpos = 0;
-        dpos += (size_t)snprintf(
-            diag + dpos, sizeof(diag) - dpos,
+        dpos = hu_buf_appendf(
+            diag, sizeof(diag), dpos,
             "\n\nThe program failed validation. Fix and respond with JSON only.\n");
         for (size_t di = 0; di < hv.diag_count && di < HU_HULA_MAX_DIAGS && dpos + 2 < sizeof(diag);
              di++) {

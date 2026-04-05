@@ -144,9 +144,10 @@ static hu_error_t qq_send(void *ctx, const char *target, size_t target_len, cons
             hu_http_response_free(c->alloc, &resp);
         return HU_ERR_CHANNEL_SEND;
     }
+    bool ok = (resp.status_code >= 200 && resp.status_code < 300);
     if (resp.owned && resp.body)
         hu_http_response_free(c->alloc, &resp);
-    return HU_OK;
+    return ok ? HU_OK : HU_ERR_CHANNEL_SEND;
 jfail:
     hu_json_buf_free(&jbuf);
     return err;

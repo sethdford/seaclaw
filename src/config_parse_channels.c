@@ -22,6 +22,7 @@ static void parse_daemon_object(hu_allocator_t *a, hu_channel_daemon_config_t *d
     dcfg->poll_interval_sec =
         (int)hu_json_get_number(daemon_obj, "poll_interval_sec", (double)dcfg->poll_interval_sec);
     dcfg->voice_enabled = hu_json_get_bool(daemon_obj, "voice_enabled", dcfg->voice_enabled);
+    dcfg->llm_decides = hu_json_get_bool(daemon_obj, "llm_decides", dcfg->llm_decides);
 }
 
 static void parse_daemon_config(hu_allocator_t *a, hu_channel_daemon_config_t *dcfg,

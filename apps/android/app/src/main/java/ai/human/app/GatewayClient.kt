@@ -242,7 +242,10 @@ class GatewayClient {
                                 json.optJSONObject("data") ?: json
                             )
                         }
-                    } catch (_: Exception) { }
+                    } catch (e: Exception) {
+                        android.util.Log.w("GatewayClient", "Message handling error", e)
+                        _lastError.value = e.message ?: "Unknown error"
+                    }
                 }
             }
 

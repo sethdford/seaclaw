@@ -183,13 +183,15 @@ const tools = [
         }
       }
       body {
-        font-family:
+        font-family: var(
+          --font-sans,
           "Avenir",
           "Avenir Next",
           -apple-system,
           BlinkMacSystemFont,
           system-ui,
-          sans-serif;
+          sans-serif
+        );
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         background: var(--color-bg-inline);

@@ -248,6 +248,7 @@ static const hu_tool_vtable_t web_search_vtable = {
     .description = web_search_description,
     .parameters_json = web_search_parameters_json,
     .deinit = web_search_deinit,
+    .flags = HU_TOOL_FLAG_THREAD_SAFE,
 };
 
 hu_error_t hu_web_search_create(hu_allocator_t *alloc, const hu_config_t *config,

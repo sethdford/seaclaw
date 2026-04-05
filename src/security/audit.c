@@ -1,5 +1,6 @@
 #include "human/security/audit.h"
 #include "human/core/error.h"
+#include "human/core/string.h"
 #include "human/crypto.h"
 #include "human/security.h"
 #include <stdatomic.h>
@@ -78,7 +79,7 @@ static size_t escape_json_string(const char *s, char *out, size_t out_cap) {
             out[n++] = '\\';
             out[n++] = *s;
         } else if ((unsigned char)*s < 32) {
-            n += (size_t)snprintf(out + n, out_cap - n, "\\u%04x", (unsigned char)*s);
+            n = hu_buf_appendf(out, out_cap, n, "\\u%04x", (unsigned char)*s);
         } else {
             out[n++] = *s;
         }

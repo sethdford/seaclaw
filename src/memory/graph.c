@@ -12,6 +12,7 @@
 
 #ifdef HU_ENABLE_SQLITE
 #include "human/memory/sql_common.h"
+#include "human/memory/sql_transaction.h"
 #include <sqlite3.h>
 
 #define HU_SQLITE_BUSY_TIMEOUT_MS 5000
@@ -240,8 +241,8 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t 
     const char *cid = contact_id ? contact_id : "";
     int cid_len = contact_id ? (int)contact_id_len : 0;
 
-    int rc = sqlite3_exec(g->db, "BEGIN", NULL, NULL, NULL);
-    if (rc != SQLITE_OK)
+    hu_sql_txn_t txn = {0};
+    if (hu_sql_txn_begin(&txn, g->db) != HU_OK)
         return HU_ERR_IO;
 
     int64_t ts = now_ms();
@@ -249,9 +250,9 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t 
     const char *ins_sql =
         "INSERT INTO entities (contact_id, name, type, first_seen, last_seen, mention_count,"
         " metadata_json) VALUES (?, ?, ?, ?, ?, 1, ?)";
-    rc = sqlite3_prepare_v2(g->db, ins_sql, -1, &ins, NULL);
+    int rc = sqlite3_prepare_v2(g->db, ins_sql, -1, &ins, NULL);
     if (rc != SQLITE_OK) {
-        sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_IO;
     }
 
@@ -269,15 +270,15 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t 
     sqlite3_finalize(ins);
     if (rc == SQLITE_DONE) {
         int64_t new_id = sqlite3_last_insert_rowid(g->db);
-        if (sqlite3_exec(g->db, "COMMIT", NULL, NULL, NULL) != SQLITE_OK) {
-            sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+        if (hu_sql_txn_commit(&txn) != HU_OK) {
+            hu_sql_txn_rollback(&txn);
             return HU_ERR_MEMORY_BACKEND;
         }
         *out_id = new_id;
         return HU_OK;
     }
     if (rc != SQLITE_CONSTRAINT) {
-        sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_IO;
     }
 
@@ -287,7 +288,7 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t 
         " WHERE contact_id = ? AND name = ?";
     rc = sqlite3_prepare_v2(g->db, upd_sql, -1, &upd, NULL);
     if (rc != SQLITE_OK) {
-        sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_IO;
     }
     sqlite3_bind_int64(upd, 1, ts);
@@ -296,7 +297,7 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t 
     rc = sqlite3_step(upd);
     sqlite3_finalize(upd);
     if (rc != SQLITE_DONE) {
-        sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_IO;
     }
 
@@ -304,7 +305,7 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t 
     const char *sel_sql = "SELECT id FROM entities WHERE contact_id = ? AND name = ?";
     rc = sqlite3_prepare_v2(g->db, sel_sql, -1, &sel, NULL);
     if (rc != SQLITE_OK) {
-        sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_IO;
     }
     sqlite3_bind_text(sel, 1, cid, cid_len, SQLITE_STATIC);
@@ -313,19 +314,18 @@ hu_error_t hu_graph_upsert_entity(hu_graph_t *g, const char *contact_id, size_t 
     if (sel_rc == SQLITE_ROW) {
         *out_id = sqlite3_column_int64(sel, 0);
         sqlite3_finalize(sel);
-        rc = sqlite3_exec(g->db, "COMMIT", NULL, NULL, NULL);
-        if (rc != SQLITE_OK) {
-            sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+        if (hu_sql_txn_commit(&txn) != HU_OK) {
+            hu_sql_txn_rollback(&txn);
             return HU_ERR_IO;
         }
         return HU_OK;
     }
     sqlite3_finalize(sel);
     if (sel_rc == SQLITE_DONE) {
-        sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_NOT_FOUND;
     }
-    sqlite3_exec(g->db, "ROLLBACK", NULL, NULL, NULL);
+    hu_sql_txn_rollback(&txn);
     return HU_ERR_IO;
 }
 

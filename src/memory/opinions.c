@@ -7,6 +7,7 @@ typedef int hu_opinions_unused_; /* ISO C requires non-empty translation unit */
 #include "human/core/string.h"
 #include "human/memory.h"
 #include "human/memory/opinions.h"
+#include "human/memory/sql_transaction.h"
 #include <ctype.h>
 #include <sqlite3.h>
 #include <string.h>
@@ -65,7 +66,8 @@ hu_error_t hu_opinions_upsert(hu_allocator_t *alloc, hu_memory_t *memory,
         }
 
         /* Different position: insert new, then supersede old */
-        if (sqlite3_exec(db, "BEGIN", NULL, NULL, NULL) != SQLITE_OK)
+        hu_sql_txn_t txn = {0};
+        if (hu_sql_txn_begin(&txn, db) != HU_OK)
             return HU_ERR_MEMORY_BACKEND;
 
         sqlite3_stmt *ins = NULL;
@@ -74,7 +76,7 @@ hu_error_t hu_opinions_upsert(hu_allocator_t *alloc, hu_memory_t *memory,
                                 "last_expressed,superseded_by) VALUES(?,?,?,?,?,NULL)",
                                 -1, &ins, NULL);
         if (rc != SQLITE_OK) {
-            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+            hu_sql_txn_rollback(&txn);
             return HU_ERR_MEMORY_BACKEND;
         }
         sqlite3_bind_text(ins, 1, topic, (int)topic_len, SQLITE_STATIC);
@@ -85,7 +87,7 @@ hu_error_t hu_opinions_upsert(hu_allocator_t *alloc, hu_memory_t *memory,
         rc = sqlite3_step(ins);
         if (rc != SQLITE_DONE) {
             sqlite3_finalize(ins);
-            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+            hu_sql_txn_rollback(&txn);
             return HU_ERR_MEMORY_BACKEND;
         }
         int64_t new_id = sqlite3_last_insert_rowid(db);
@@ -95,7 +97,7 @@ hu_error_t hu_opinions_upsert(hu_allocator_t *alloc, hu_memory_t *memory,
         rc = sqlite3_prepare_v2(db, "UPDATE opinions SET superseded_by=? WHERE id=?",
                                 -1, &sup, NULL);
         if (rc != SQLITE_OK) {
-            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+            hu_sql_txn_rollback(&txn);
             return HU_ERR_MEMORY_BACKEND;
         }
         sqlite3_bind_int64(sup, 1, new_id);
@@ -103,11 +105,11 @@ hu_error_t hu_opinions_upsert(hu_allocator_t *alloc, hu_memory_t *memory,
         rc = sqlite3_step(sup);
         sqlite3_finalize(sup);
         if (rc != SQLITE_DONE) {
-            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+            hu_sql_txn_rollback(&txn);
             return HU_ERR_MEMORY_BACKEND;
         }
-        if (sqlite3_exec(db, "COMMIT", NULL, NULL, NULL) != SQLITE_OK) {
-            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        if (hu_sql_txn_commit(&txn) != HU_OK) {
+            hu_sql_txn_rollback(&txn);
             return HU_ERR_MEMORY_BACKEND;
         }
         return HU_OK;

@@ -1489,7 +1489,7 @@ char *hu_turing_build_contact_hint(hu_allocator_t *alloc, const int *dimension_a
                 memcpy(buf, hdr, sizeof(hdr) - 1);
                 pos = sizeof(hdr) - 1;
             }
-            pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "- %s\n", DIMENSION_HINTS[d]);
+            pos = hu_buf_appendf(buf, sizeof(buf), pos, "- %s\n", DIMENSION_HINTS[d]);
             weak_count++;
         }
     }

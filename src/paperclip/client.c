@@ -335,8 +335,8 @@ hu_error_t hu_paperclip_post_comment(hu_paperclip_client_t *client, const char *
     if (!json_buf)
         return HU_ERR_OUT_OF_MEMORY;
 
-    int jlen = snprintf(json_buf, json_cap, "{\"body\":\"");
-    for (size_t i = 0; i < body_len && (size_t)jlen < json_cap - 4; i++) {
+    size_t jlen = hu_buf_appendf(json_buf, json_cap, 0, "{\"body\":\"");
+    for (size_t i = 0; i < body_len && jlen < json_cap - 4; i++) {
         char c = body_text[i];
         if (c == '"' || c == '\\') {
             json_buf[jlen++] = '\\';
@@ -348,11 +348,11 @@ hu_error_t hu_paperclip_post_comment(hu_paperclip_client_t *client, const char *
             json_buf[jlen++] = c;
         }
     }
-    jlen += snprintf(json_buf + jlen, json_cap - (size_t)jlen, "\"}");
+    jlen = hu_buf_appendf(json_buf, json_cap, jlen, "\"}");
 
     char *auth = build_auth_header(client->alloc, client);
     hu_http_response_t resp = {0};
-    hu_error_t err = hu_http_post_json(client->alloc, url, auth, json_buf, (size_t)jlen, &resp);
+    hu_error_t err = hu_http_post_json(client->alloc, url, auth, json_buf, jlen, &resp);
     if (auth)
         client->alloc->free(client->alloc->ctx, auth, strlen(auth) + 1);
     client->alloc->free(client->alloc->ctx, json_buf, json_cap);

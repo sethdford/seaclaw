@@ -380,14 +380,14 @@ hu_error_t cmd_workspace(hu_allocator_t *alloc, int argc, char **argv) {
         if (err == HU_OK) {
             char json_buf[1024];
             size_t jp = 0;
-            jp += (size_t)snprintf(json_buf + jp, sizeof(json_buf) - jp, "{\"workspace\":\"");
+            jp = hu_buf_appendf(json_buf, sizeof(json_buf), jp, "{\"workspace\":\"");
             const char *s = argv[3];
             for (; *s && jp + 4 < sizeof(json_buf); s++) {
                 if (*s == '"' || *s == '\\')
                     json_buf[jp++] = '\\';
                 json_buf[jp++] = *s;
             }
-            jp += (size_t)snprintf(json_buf + jp, sizeof(json_buf) - jp, "\"}");
+            jp = hu_buf_appendf(json_buf, sizeof(json_buf), jp, "\"}");
             hu_error_t pe = hu_config_parse_json(&cfg, json_buf, jp);
             if (pe == HU_OK) {
                 hu_error_t se = hu_config_save(&cfg);

@@ -1,4 +1,5 @@
 #include "human/core/error.h"
+#include "human/core/string.h"
 #include "human/security/sandbox.h"
 #include "human/security/sandbox_internal.h"
 #include "human/platform.h"
@@ -61,8 +62,8 @@ static hu_error_t firecracker_write_config(hu_firecracker_ctx_t *fc, const char 
      * be valid inside a JSON double-quoted value (escape " and \). */
     char boot_args[4096];
     size_t pos = 0;
-    pos += (size_t)snprintf(boot_args + pos, sizeof(boot_args) - pos,
-                            "console=ttyS0 reboot=k panic=1 pci=off init=/bin/sh -- -c '");
+    pos = hu_buf_appendf(boot_args, sizeof(boot_args), pos,
+                         "console=ttyS0 reboot=k panic=1 pci=off init=/bin/sh -- -c '");
     for (size_t i = 0; i < argc && pos + 16 < sizeof(boot_args); i++) {
         if (i > 0 && pos < sizeof(boot_args) - 2)
             boot_args[pos++] = ' ';

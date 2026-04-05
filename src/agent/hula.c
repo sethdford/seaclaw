@@ -1454,7 +1454,10 @@ static hu_error_t exec_delegate(hu_hula_exec_t *exec, hu_hula_node_t *n) {
             static const char dcx[] = "Delegate context:\n";
             size_t old_len = cfg.system_prompt_len;
             const char *old = cfg.system_prompt;
-            size_t need = sizeof(dcx) - 1 + n->delegate_context_len + 2 + old_len + 1;
+            size_t need = sizeof(dcx) - 1;
+            if (need > SIZE_MAX - n->delegate_context_len - 3 - old_len)
+                return HU_ERR_OUT_OF_MEMORY;
+            need += n->delegate_context_len + 2 + old_len + 1;
             ctx_sp = exec->alloc.alloc(exec->alloc.ctx, need);
             if (ctx_sp) {
                 size_t pos = 0;
@@ -1482,7 +1485,14 @@ static hu_error_t exec_delegate(hu_hula_exec_t *exec, hu_hula_node_t *n) {
                 "Execute this HuLa JSON program (nested plan):\n";
             size_t old_len = cfg.system_prompt_len;
             const char *old = cfg.system_prompt;
-            size_t need = sizeof(pre) - 1 + embed_len + 2 + (old ? old_len : 0) + 1;
+            size_t tail = (old ? old_len : 0) + 3;
+            if (sizeof(pre) - 1 > SIZE_MAX - embed_len - tail) {
+                exec->alloc.free(exec->alloc.ctx, embed, embed_len + 1);
+                if (ctx_sp)
+                    exec->alloc.free(exec->alloc.ctx, ctx_sp, strlen(ctx_sp) + 1);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            size_t need = sizeof(pre) - 1 + embed_len + tail;
             combined_sp = exec->alloc.alloc(exec->alloc.ctx, need);
             if (combined_sp) {
                 size_t pos = 0;

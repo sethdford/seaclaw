@@ -97,7 +97,7 @@ static hu_error_t gcloud_execute(void *ctx, hu_allocator_t *alloc, const hu_json
     }
     size_t off = 0;
     if (!run.success && run.exit_code >= 0)
-        off += (size_t)snprintf(msg + off, out_len - off, "exit code %d\n", run.exit_code);
+        off = hu_buf_appendf(msg, out_len, off, "exit code %d\n", run.exit_code);
     if (run.stdout_len > 0) {
         size_t ncpy = run.stdout_len < out_len - off - 1 ? run.stdout_len : out_len - off - 1;
         memcpy(msg + off, run.stdout_buf, ncpy);

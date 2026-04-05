@@ -41,9 +41,8 @@ hu_error_t hu_persona_analyzer_build_prompt(const char **messages, size_t msg_co
     if (!messages || !buf || !out_len || cap < 128)
         return HU_ERR_INVALID_ARGUMENT;
 
-    size_t n = 0;
-    n += (size_t)snprintf(
-        buf + n, cap - n,
+    int hdr = snprintf(
+        buf, cap,
         "Analyze these %zu message samples from channel \"%s\" and extract a deep "
         "personality profile.\n\n"
         "Return valid JSON with ALL of these fields:\n"
@@ -83,15 +82,16 @@ hu_error_t hu_persona_analyzer_build_prompt(const char **messages, size_t msg_co
         "phatic_style (string), bonding_behaviors (array), anti_patterns (array)}\n"
         "\nMessages:\n",
         msg_count, channel ? channel : "unknown");
-    if ((size_t)n >= cap)
+    if (hdr < 0 || (size_t)hdr >= cap)
         return HU_ERR_INVALID_ARGUMENT;
+    size_t n = (size_t)hdr;
 
     for (size_t i = 0; i < msg_count && n < cap; i++) {
         if (messages[i]) {
             size_t len = strlen(messages[i]);
             if (n + len + 4 > cap)
                 break;
-            n += (size_t)snprintf(buf + n, cap - n, "%zu. %s\n", i + 1, messages[i]);
+            n = hu_buf_appendf(buf, cap, n, "%zu. %s\n", i + 1, messages[i]);
         }
     }
     *out_len = n;

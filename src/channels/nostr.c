@@ -58,6 +58,19 @@ static void nostr_stop(void *ctx) {
         c->running = false;
 }
 
+static bool nostr_is_shell_safe(const char *s) {
+    if (!s)
+        return false;
+    for (const char *p = s; *p; p++) {
+        unsigned char ch = (unsigned char)*p;
+        if (ch < 0x20 || ch == '\'' || ch == '"' || ch == '\\' || ch == '`' || ch == '$' ||
+            ch == ';' || ch == '&' || ch == '|' || ch == '<' || ch == '>' || ch == '(' ||
+            ch == ')' || ch == '{' || ch == '}' || ch == '\x7f')
+            return false;
+    }
+    return true;
+}
+
 static hu_error_t nostr_send(void *ctx, const char *target, size_t target_len, const char *message,
                              size_t message_len, const char *const *media, size_t media_count) {
     (void)media;
@@ -123,10 +136,18 @@ static hu_error_t nostr_send(void *ctx, const char *target, size_t target_len, c
         return HU_ERR_INVALID_ARGUMENT;
     }
 
-    /* sh -c 'nak event -k 14 -c "$(cat TMP)" -t p=X --sec S 2>/dev/null | nak event RELAY' */
+    /* Validate config values to reject shell metacharacters */
+    if (!nostr_is_shell_safe(c->nak_path) || !nostr_is_shell_safe(c->relay_url) ||
+        !nostr_is_shell_safe(c->seckey_hex)) {
+        unlink(tmppath);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    /* sh -c 'nak event ... | nak event RELAY' — config values validated above */
     char cmd[2048];
     int nc = snprintf(cmd, sizeof(cmd),
-                      "%s event -k 14 -c \"$(cat %s)\" -t %s --sec %s 2>/dev/null | %s event %s",
+                      "'%s' event -k 14 -c \"$(cat '%s')\" -t %s --sec '%s' 2>/dev/null"
+                      " | '%s' event '%s'",
                       c->nak_path, tmppath, p_tag, c->seckey_hex, c->nak_path, c->relay_url);
     unlink(tmppath);
     if (nc < 0 || nc >= (int)sizeof(cmd))
@@ -257,17 +278,23 @@ static hu_error_t nostr_load_conversation_history(void *ctx, hu_allocator_t *all
 
     size_t per_limit = (limit > 50 ? 50 : limit);
 
+    if (!nostr_is_shell_safe(c->nak_path) || !nostr_is_shell_safe(c->relay_url) ||
+        !nostr_is_shell_safe(c->bot_pubkey) || !nostr_is_shell_safe(contact_buf)) {
+        alloc->free(alloc->ctx, entries, cap * sizeof(*entries));
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
     for (int direction = 0; direction < 2 && cnt < cap; direction++) {
         char cmd[2048];
         int nc;
         if (direction == 0) {
             nc = snprintf(cmd, sizeof(cmd),
-                          "%s req -k 4 -a %s -p %s -r %s --limit %zu 2>/dev/null", c->nak_path,
-                          contact_buf, c->bot_pubkey, c->relay_url, per_limit);
+                          "'%s' req -k 4 -a '%s' -p '%s' -r '%s' --limit %zu 2>/dev/null",
+                          c->nak_path, contact_buf, c->bot_pubkey, c->relay_url, per_limit);
         } else {
             nc = snprintf(cmd, sizeof(cmd),
-                          "%s req -k 4 -a %s -p %s -r %s --limit %zu 2>/dev/null", c->nak_path,
-                          c->bot_pubkey, contact_buf, c->relay_url, per_limit);
+                          "'%s' req -k 4 -a '%s' -p '%s' -r '%s' --limit %zu 2>/dev/null",
+                          c->nak_path, c->bot_pubkey, contact_buf, c->relay_url, per_limit);
         }
         if (nc < 0 || nc >= (int)sizeof(cmd))
             continue;

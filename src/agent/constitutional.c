@@ -193,7 +193,7 @@ hu_error_t hu_constitutional_critique(hu_allocator_t *alloc, hu_provider_t *prov
         return HU_ERR_OUT_OF_MEMORY;
 
     size_t pos = 0;
-    pos += (size_t)snprintf(critique_prompt + pos, prompt_cap - pos, "Given these principles:\n");
+    pos = hu_buf_appendf(critique_prompt, prompt_cap, pos, "Given these principles:\n");
     for (size_t i = 0; i < config->principle_count && pos < prompt_cap - 1; i++) {
         const hu_principle_t *pr = &config->principles[i];
         int n = snprintf(critique_prompt + pos, prompt_cap - pos, "%zu. %.*s: %.*s\n", i + 1,

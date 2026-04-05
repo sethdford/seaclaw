@@ -80,6 +80,9 @@ struct ContentView: View {
         }
 #endif
         .task {
+            if !connectionManager.isConnected {
+                connectionManager.connect()
+            }
             connectionManager.prefetchDataForTab(selectedTab)
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToTab)) { notification in

@@ -715,6 +715,7 @@ jobs:
             "fuzz_visual_grounding" \
             "fuzz_ensemble_rerank" \
             "fuzz_contact_phone" \
+            "fuzz_normalize" \
             "fuzz_twilio_webhook"; do
             NAME=$(echo "$harness" | cut -d' ' -f1)
             echo "--- Running $NAME ---"

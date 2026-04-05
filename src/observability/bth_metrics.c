@@ -1,4 +1,5 @@
 #include "human/observability/bth_metrics.h"
+#include "human/core/string.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -74,9 +75,7 @@ void hu_bth_metrics_log(const hu_bth_metrics_t *m) {
 
 #define HU_BTH_SUMMARY_LINE(field, name) \
     do { \
-        pos += (size_t)snprintf(buf + pos, cap > pos ? cap - pos : 0, "%s=%u\n", name, m->field); \
-        if (pos >= cap) \
-            pos = cap - 1; \
+        pos = hu_buf_appendf(buf, cap, pos, "%s=%u\n", name, m->field); \
     } while (0)
 
 char *hu_bth_metrics_summary(hu_allocator_t *alloc, const hu_bth_metrics_t *m, size_t *out_len) {

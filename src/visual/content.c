@@ -502,7 +502,7 @@ hu_error_t hu_visual_build_prompt(hu_allocator_t *alloc, const hu_visual_candida
 
     char buf[4096];
     size_t pos = 0;
-    pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos, "[VISUAL CONTENT AVAILABLE]:\n");
+    pos = hu_buf_appendf(buf, sizeof(buf), pos, "[VISUAL CONTENT AVAILABLE]:\n");
 
     for (size_t i = 0; i < count && pos < sizeof(buf) - 256; i++) {
         const hu_visual_candidate_t *c = &candidates[i];
@@ -513,18 +513,14 @@ hu_error_t hu_visual_build_prompt(hu_allocator_t *alloc, const hu_visual_candida
             c->sharing_context && c->sharing_context_len > 0 ? c->sharing_context : "";
         size_t ctx_len = c->sharing_context_len;
 
-        int n =
-            snprintf(buf + pos, sizeof(buf) - pos, "%zu. %s: %.*s (relevance: %.2f) — \"%.*s\"\n",
-                     i + 1, type_str, (int)desc_len, desc, c->relevance_score, (int)ctx_len, ctx);
-        if (n > 0 && pos + (size_t)n < sizeof(buf))
-            pos += (size_t)n;
+        pos = hu_buf_appendf(buf, sizeof(buf), pos, "%zu. %s: %.*s (relevance: %.2f) — \"%.*s\"\n",
+                            i + 1, type_str, (int)desc_len, desc, c->relevance_score, (int)ctx_len,
+                            ctx);
     }
 
     if (pos + 50 < sizeof(buf)) {
-        pos += (size_t)snprintf(buf + pos, sizeof(buf) - pos,
-                                "\nYou may include one of these naturally if relevant.");
-        if (pos >= sizeof(buf))
-            pos = sizeof(buf) - 1;
+        pos = hu_buf_appendf(buf, sizeof(buf), pos,
+                             "\nYou may include one of these naturally if relevant.");
     }
 
     char *s = hu_strndup(alloc, buf, pos);

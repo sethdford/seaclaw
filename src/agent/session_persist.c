@@ -230,11 +230,20 @@ static hu_error_t deserialize_tool_calls(hu_allocator_t *alloc, const hu_json_va
 
         const char *s;
         s = hu_json_get_string(obj, "id");
-        if (s) { tcs[i].id = hu_strdup(alloc, s); tcs[i].id_len = strlen(s); }
+        if (s) {
+            tcs[i].id = hu_strdup(alloc, s);
+            tcs[i].id_len = tcs[i].id ? strlen(s) : 0;
+        }
         s = hu_json_get_string(obj, "name");
-        if (s) { tcs[i].name = hu_strdup(alloc, s); tcs[i].name_len = strlen(s); }
+        if (s) {
+            tcs[i].name = hu_strdup(alloc, s);
+            tcs[i].name_len = tcs[i].name ? strlen(s) : 0;
+        }
         s = hu_json_get_string(obj, "arguments");
-        if (s) { tcs[i].arguments = hu_strdup(alloc, s); tcs[i].arguments_len = strlen(s); }
+        if (s) {
+            tcs[i].arguments = hu_strdup(alloc, s);
+            tcs[i].arguments_len = tcs[i].arguments ? strlen(s) : 0;
+        }
     }
     *out = tcs;
     *out_count = n;

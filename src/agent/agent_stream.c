@@ -13,6 +13,7 @@
 #include "human/memory/fact_extract.h"
 #include "human/cognition/trust.h"
 #include "human/persona/humor.h"
+#include "human/context/humor.h"
 #include "human/persona/somatic.h"
 #include "human/agent/frontier_persist.h"
 #include "human/eval/consistency.h"
@@ -472,6 +473,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
 #endif
     /* Build frontier context for the streaming prompt (matching batch path) */
     bool had_humor_dir = false;
+    int humor_theory_saved = 0;
     char *somatic_ctx = NULL, *trust_ctx = NULL, *humor_dir = NULL;
     size_t somatic_ctx_len = 0, trust_ctx_len = 0, humor_dir_len = 0;
     char *syc_friction_ctx = NULL;
@@ -516,9 +518,11 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         hu_humor_evaluation_t heval;
         memset(&heval, 0, sizeof(heval));
         hu_humor_fw_evaluate_context(msg, msg_len, &hctx, &heval);
-        if (heval.should_attempt)
+        if (heval.should_attempt) {
             hu_humor_fw_build_directive(agent->alloc, &heval, &hctx,
                                         &humor_dir, &humor_dir_len);
+            humor_theory_saved = (int)heval.suggested_theory;
+        }
 
         /* Sycophancy pre-check: scan for opinion patterns */
         {
@@ -1092,8 +1096,28 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                             .value = humor_score}};
                     hu_observer_record_event(*agent->observer, &hev);
                 }
-                if (humor_score >= 0.3f && agent->frontiers.initialized)
+                bool landed = (humor_score >= 0.3f);
+                if (landed && agent->frontiers.initialized)
                     hu_tcal_update(&agent->frontiers.trust, 0.3f, 0.4f, 0.2f);
+#ifdef HU_ENABLE_SQLITE
+                if (agent->memory && agent->memory_session_id) {
+                    sqlite3 *ha_db = hu_sqlite_memory_get_db(agent->memory);
+                    if (ha_db) {
+                        static const hu_humor_type_t theory_to_type[] = {
+                            [HU_HUMOR_INCONGRUITY]      = HU_HUMOR_MISDIRECTION,
+                            [HU_HUMOR_BENIGN_VIOLATION] = HU_HUMOR_OBSERVATIONAL,
+                            [HU_HUMOR_SUPERIORITY]      = HU_HUMOR_SELF_DEPRECATION,
+                            [HU_HUMOR_RELIEF]           = HU_HUMOR_UNDERSTATEMENT,
+                        };
+                        hu_humor_type_t atype = HU_HUMOR_OBSERVATIONAL;
+                        if (humor_theory_saved >= 0 &&
+                            humor_theory_saved < HU_HUMOR_THEORY_COUNT)
+                            atype = theory_to_type[humor_theory_saved];
+                        (void)hu_humor_audience_record(ha_db,
+                            agent->memory_session_id, atype, landed);
+                    }
+                }
+#endif
             }
         }
 

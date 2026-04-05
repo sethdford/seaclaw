@@ -449,22 +449,28 @@ static hu_error_t signal_react(void *ctx, const char *target, size_t target_len,
     default: return HU_ERR_INVALID_ARGUMENT;
     }
 
-    char body[1024];
-    int n = snprintf(body, sizeof(body),
-                     "{\"jsonrpc\":\"2.0\",\"method\":\"sendReaction\","
-                     "\"params\":{\"account\":\"%.*s\","
-                     "\"recipient\":[\"%.*s\"],"
-                     "\"targetAuthor\":\"%.*s\","
-                     "\"targetTimestamp\":%" PRId64 ","
-                     "\"emoji\":\"%s\"},\"id\":\"1\"}",
-                     (int)c->account_len, c->account,
-                     (int)target_len, target,
-                     (int)target_len, target,
-                     message_id, emoji);
-    if (n < 0 || (size_t)n >= sizeof(body))
+    hu_json_buf_t jbuf;
+    hu_error_t err = hu_json_buf_init(&jbuf, c->alloc);
+    if (err)
+        return err;
+    hu_json_buf_append_raw(&jbuf, "{\"jsonrpc\":\"2.0\",\"method\":\"sendReaction\",\"params\":{", 50);
+    hu_json_append_key_value(&jbuf, "account", 7, c->account, c->account_len);
+    hu_json_buf_append_raw(&jbuf, ",\"recipient\":[", 14);
+    hu_json_append_string(&jbuf, target, target_len);
+    hu_json_buf_append_raw(&jbuf, "],", 2);
+    hu_json_append_key_value(&jbuf, "targetAuthor", 12, target, target_len);
+    hu_json_buf_append_raw(&jbuf, ",", 1);
+    hu_json_append_key_int(&jbuf, "targetTimestamp", 15, (long long)message_id);
+    hu_json_buf_append_raw(&jbuf, ",", 1);
+    hu_json_append_key_value(&jbuf, "emoji", 5, emoji, strlen(emoji));
+    hu_json_buf_append_raw(&jbuf, "},\"id\":\"1\"}", 11);
+    if (!jbuf.ptr || jbuf.len == 0) {
+        hu_json_buf_free(&jbuf);
         return HU_ERR_INTERNAL;
-
-    return send_rpc(c, body, (size_t)n);
+    }
+    err = send_rpc(c, jbuf.ptr, jbuf.len);
+    hu_json_buf_free(&jbuf);
+    return err;
 #endif
 }
 

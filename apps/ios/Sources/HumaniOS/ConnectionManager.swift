@@ -78,6 +78,9 @@ public final class ConnectionManager: ObservableObject {
     public func connect() {
         queue.async { [weak self] in
             guard let self = self else { return }
+            // Disconnect existing connection to prevent orphaned WebSockets
+            self.connection?.disconnect()
+            self.connection = nil
             let conn = HumanConnection(urlString: self.gatewayURL)
             conn.stateHandler = { [weak self] state in
                 DispatchQueue.main.async {

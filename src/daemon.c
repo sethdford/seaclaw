@@ -8266,9 +8266,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 /* Tapback-vs-text decision: gate reaction and/or LLM flow */
                 if (llm_decides) {
                     if (director_result_valid && director_result.action == DIR_SILENCE) {
-                        hu_log_info("human", agent ? agent->observer : NULL,
-                                    "director: silence (leave on read)");
-                        goto skip_llm_this_batch;
+                        bool has_question = memchr(combined, '?', combined_len) != NULL;
+                        bool looks_like_greeting = (combined_len < 30 &&
+                            (strstr(combined, "hey") || strstr(combined, "Hey") ||
+                             strstr(combined, "hi") || strstr(combined, "Hi") ||
+                             strstr(combined, "yo") || strstr(combined, "Yo") ||
+                             strstr(combined, "sup") || strstr(combined, "hello") ||
+                             strstr(combined, "Hello") || strstr(combined, "what")));
+                        if (has_question || looks_like_greeting) {
+                            hu_log_info("human", agent ? agent->observer : NULL,
+                                        "director: silence overridden (greeting/question detected)");
+                            director_result.action = DIR_TEXT;
+                        } else {
+                            hu_log_info("human", agent ? agent->observer : NULL,
+                                        "director: silence (leave on read)");
+                            goto skip_llm_this_batch;
+                        }
                     }
                     if (director_result_valid && director_result.action == DIR_TAPBACK &&
                         ch->channel->vtable->react) {
@@ -10050,7 +10063,31 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         const char *eff_ch = ch->channel->vtable->name
                                                  ? ch->channel->vtable->name(ch->channel->ctx)
                                                  : "unknown";
-                        /* F10: Missed-message acknowledgment — prepend if delay > 30 min */
+                        /* Strip invalid UTF-8 sequences (local models sometimes emit garbled bytes) */
+                        {
+                            size_t w = 0;
+                            for (size_t r = 0; r < response_len; ) {
+                                unsigned char b = (unsigned char)response[r];
+                                size_t seq = 0;
+                                if (b < 0x80) seq = 1;
+                                else if ((b & 0xE0) == 0xC0) seq = 2;
+                                else if ((b & 0xF0) == 0xE0) seq = 3;
+                                else if ((b & 0xF8) == 0xF0) seq = 4;
+                                if (seq == 0 || r + seq > response_len) { r++; continue; }
+                                bool ok = true;
+                                for (size_t k = 1; k < seq; k++) {
+                                    if (((unsigned char)response[r + k] & 0xC0) != 0x80) { ok = false; break; }
+                                }
+                                if (ok) {
+                                    if (w != r) memmove(response + w, response + r, seq);
+                                    w += seq; r += seq;
+                                } else { r++; }
+                            }
+                            if (w < response_len) {
+                                response[w] = '\0';
+                                response_len = w;
+                            }
+                        }
                         const char *send_ptr = response;
                         size_t send_len = response_len;
                         char *send_buf_ack = NULL;

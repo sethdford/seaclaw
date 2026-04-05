@@ -250,6 +250,7 @@ static const hu_tool_vtable_t http_request_vtable = {
     .description = http_request_desc,
     .parameters_json = http_request_params,
     .deinit = http_request_deinit,
+    .flags = HU_TOOL_FLAG_THREAD_SAFE,
 };
 
 hu_error_t hu_http_request_create(hu_allocator_t *alloc, bool allow_http, hu_tool_t *out) {

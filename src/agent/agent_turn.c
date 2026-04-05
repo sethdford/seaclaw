@@ -1188,11 +1188,18 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                          &contact_entries, &contact_count) == HU_OK &&
             contact_entries && contact_count > 0) {
             size_t extra_len = 0;
-            for (size_t i = 0; i < contact_count; i++)
+            for (size_t i = 0; i < contact_count; i++) {
+                if (extra_len > SIZE_MAX - contact_entries[i].content_len - 1)
+                    break;
                 extra_len += contact_entries[i].content_len + 1;
+            }
             if (extra_len > 0) {
                 size_t old_len = memory_ctx ? memory_ctx_len : 0;
-                size_t new_total = old_len + (old_len > 0 ? 2 : 0) + extra_len + 32;
+                size_t new_total = old_len + (old_len > 0 ? 2 : 0) + 32;
+                if (new_total > SIZE_MAX - extra_len)
+                    new_total = SIZE_MAX;
+                else
+                    new_total += extra_len;
                 char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, new_total);
                 if (merged) {
                     size_t pos = 0;
@@ -1202,9 +1209,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         merged[pos++] = '\n';
                         merged[pos++] = '\n';
                     }
-                    int n = snprintf(merged + pos, new_total - pos, "[About this contact]\n");
-                    if (n > 0)
-                        pos += (size_t)n;
+                    pos = hu_buf_appendf(merged, new_total, pos,
+                                         "[About this contact]\n");
                     for (size_t i = 0; i < contact_count && pos < new_total - 1; i++) {
                         size_t to_copy = contact_entries[i].content_len;
                         if (pos + to_copy + 1 > new_total)
@@ -2983,7 +2989,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         !somatic_ctx && !presence_ctx && !micro_expr_ctx && !novelty_ctx && !attachment_ctx &&
         !rupture_ctx && !narrative_self_ctx && !creative_voice_ctx && !growth_ctx &&
         !boundary_ctx && !rel_episode_ctx && !trust_ctx && !humor_dir &&
-        !syc_friction_ctx && !conv_goals_ctx) {
+        !syc_friction_ctx && !conv_goals_ctx && !outcome_ctx && !intelligence_ctx &&
+        !acp_context) {
         err = hu_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
@@ -3620,6 +3627,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
                 if (superhuman_ctx)
                     agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                if (outcome_ctx)
+                    agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
+                if (acp_context)
+                    agent->alloc->free(agent->alloc->ctx, acp_context, acp_context_len + 1);
                 hu_agent_clear_current_for_tools();
                 return HU_OK;
             }
