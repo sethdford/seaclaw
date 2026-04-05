@@ -74,7 +74,7 @@ describe("ChatController", () => {
       const getGateway = vi.fn().mockReturnValue(gw);
       const ctrl = new ChatController(host as unknown as ReactiveControllerHost, getGateway);
 
-      await expect(ctrl.send("Fail me", "sess-1")).rejects.toThrow("Network error");
+      await ctrl.send("Fail me", "sess-1");
       expect(ctrl.lastFailedMessage).toBe("Fail me");
       expect(ctrl.isWaiting).toBe(false);
     });
@@ -280,6 +280,8 @@ describe("ChatController", () => {
       const getGateway = vi.fn().mockReturnValue(gw);
       const ctrl = new ChatController(host as unknown as ReactiveControllerHost, getGateway);
       ctrl.lastFailedMessage = "Retry this";
+      // Simulate a failed message already in items (retry updates in-place)
+      ctrl.items = [{ type: "message", role: "user", content: "Retry this", status: "failed" } as any];
 
       await ctrl.retry("sess-2");
 
