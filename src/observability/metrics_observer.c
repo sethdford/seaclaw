@@ -83,6 +83,8 @@ static void metrics_record_metric(void *ctx, const hu_observer_metric_t *metric)
         c->active_sessions = metric->value;
         break;
     case HU_OBSERVER_METRIC_QUEUE_DEPTH:
+        /* Intentionally ignored: this observer aggregates totals only; queue depth is
+         * surfaced elsewhere (e.g. channel/agent metrics) when needed. */
         break;
     }
 }

@@ -59,14 +59,17 @@ export function rippleEffect(element: HTMLElement, event: PointerEvent): void {
     animation: hu-ripple var(--hu-duration-slow) var(--hu-ease-out, ease-out) forwards;
   `;
 
-  const pos = element.style.position;
-  if (pos === "static" || !pos) element.style.position = "relative";
+  const prevPosition = element.style.position;
+  const prevOverflow = element.style.overflow;
+  element.style.position = "relative";
   element.style.overflow = "hidden";
   element.appendChild(ripple);
 
   const duration = 350; // fallback if --hu-duration-slow unavailable
   setTimeout(() => {
     ripple.remove();
+    element.style.position = prevPosition;
+    element.style.overflow = prevOverflow;
   }, duration);
 }
 

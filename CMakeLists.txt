@@ -2014,6 +2014,8 @@ set(HU_TEST_SOURCES
     tests/test_string.c
     tests/test_slice.c
     tests/test_memory.c
+    tests/test_sql_transaction.c
+    tests/test_normalize.c
     tests/test_memory_util.c
     tests/test_tunnel.c
     tests/test_gateway.c

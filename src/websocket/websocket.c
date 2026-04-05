@@ -278,7 +278,7 @@ hu_error_t hu_ws_connect_with_headers(hu_allocator_t *alloc, const char *url,
     char port_str[8];
     snprintf(port_str, sizeof(port_str), "%u", (unsigned)port);
     struct addrinfo hints = {0}, *res = NULL;
-    hints.ai_family = AF_INET;
+    hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     if (getaddrinfo(host, port_str, &hints, &res) != 0)
         return HU_ERR_IO;
@@ -440,6 +440,9 @@ hu_error_t hu_ws_connect_with_headers(hu_allocator_t *alloc, const char *url,
         close(sockfd);
         return HU_ERR_IO;
     }
+    /* RFC 6455 §4.2.2: Sec-WebSocket-Accept should be verified against
+     * the SHA-1 hash of Sec-WebSocket-Key + GUID. Currently only checks
+     * for HTTP 101 + Upgrade header presence. */
     if (strncmp(resp, "HTTP/1.1 101", 12) != 0 && strncmp(resp, "HTTP/1.0 101", 12) != 0) {
 #ifdef HU_HAS_TLS
         if (ssl) {

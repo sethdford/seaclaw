@@ -6,6 +6,8 @@ import { springEntry } from "../lib/spring.js";
 @customElement("hu-image-viewer")
 export class ScImageViewer extends LitElement {
   @property({ type: String }) src = "";
+  /** Accessible name for the enlarged image; defaults when empty. */
+  @property({ type: String }) alt = "";
   @property({ type: Boolean }) open = false;
 
   @state() private _closing = false;
@@ -260,7 +262,7 @@ export class ScImageViewer extends LitElement {
         >
           <img
             src=${this.src}
-            alt=""
+            alt=${this.alt || "Enlarged image"}
             tabindex="0"
             loading="lazy"
             draggable="false"

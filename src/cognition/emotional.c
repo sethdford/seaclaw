@@ -154,10 +154,10 @@ void hu_emotional_cognition_perceive(hu_emotional_cognition_t *ec,
 
     /* Confidence: more sources and stronger agreement = higher confidence */
     int source_count = 0;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < HU_EMOTION_SRC_BIT_COUNT; i++) {
         if (mask & (1 << i)) source_count++;
     }
-    float conf = (float)source_count / 5.0f;
+    float conf = (float)source_count / (float)HU_EMOTION_SRC_BIT_COUNT;
     if (fused_intensity > EMOTIONAL_CONFIDENCE_INTENSITY_BOOST_THRESHOLD) conf += 0.1f;
     if (conf > 1.0f) conf = 1.0f;
 

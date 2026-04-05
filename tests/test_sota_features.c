@@ -453,6 +453,7 @@ static void fact_dedup_removes_duplicates(void) {
         .subject = "bob", .predicate = "works at", .object = "acme",
         .confidence = 0.8f,
     };
+    res.fact_count = 1;
     res.facts[0] = different;
     novel = hu_fact_dedup(&res, existing, 1);
     HU_ASSERT_EQ(novel, (size_t)1);

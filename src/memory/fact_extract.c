@@ -136,7 +136,7 @@ size_t hu_fact_dedup(hu_fact_extract_result_t *result,
     if (!result || !existing || existing_count == 0)
         return result ? result->fact_count : 0;
 
-    size_t novel = 0;
+    size_t write = 0;
     for (size_t i = 0; i < result->fact_count; i++) {
         bool dup = false;
         for (size_t j = 0; j < existing_count; j++) {
@@ -146,10 +146,14 @@ size_t hu_fact_dedup(hu_fact_extract_result_t *result,
                 break;
             }
         }
-        if (!dup)
-            novel++;
+        if (!dup) {
+            if (write != i)
+                result->facts[write] = result->facts[i];
+            write++;
+        }
     }
-    return novel;
+    result->fact_count = write;
+    return write;
 }
 
 hu_error_t hu_fact_format_for_store(hu_allocator_t *alloc,

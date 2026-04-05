@@ -1,9 +1,12 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { hapticFeedback } from "../utils/gesture.js";
 
 @customElement("hu-switch")
 export class ScSwitch extends LitElement {
+  private static _idSeq = 0;
+  private readonly _switchId = ++ScSwitch._idSeq;
+
   @property({ type: Boolean }) checked = false;
   @property({ type: Boolean }) disabled = false;
   @property({ type: String }) label = "";
@@ -128,7 +131,8 @@ export class ScSwitch extends LitElement {
         class="switch ${this.checked ? "checked" : ""} ${this._hasToggled ? "animated" : ""}"
         role="switch"
         aria-checked=${this.checked}
-        aria-label=${this.label || "Toggle"}
+        aria-labelledby=${this.label ? `switch-label-${this._switchId}` : nothing}
+        aria-label=${this.label ? nothing : "Toggle"}
         aria-disabled=${this.disabled}
         tabindex=${this.disabled ? -1 : 0}
         @click=${this._onClick}
@@ -136,7 +140,9 @@ export class ScSwitch extends LitElement {
       >
         <span class="thumb" aria-hidden="true"></span>
       </div>
-      ${this.label ? html`<span class="label">${this.label}</span>` : null}
+      ${this.label
+        ? html`<span id="switch-label-${this._switchId}" class="label">${this.label}</span>`
+        : null}
     `;
   }
 }

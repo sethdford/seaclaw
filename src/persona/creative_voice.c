@@ -2,6 +2,9 @@
 #include "human/core/string.h"
 #include <string.h>
 
+#define HU_CREATIVE_HIGH_EXPRESSIVENESS 0.7f
+#define HU_CREATIVE_LOW_EXPRESSIVENESS  0.3f
+
 void hu_creative_voice_init(hu_creative_voice_t *voice) {
     if (!voice)
         return;
@@ -124,9 +127,9 @@ hu_error_t hu_creative_voice_build_context(hu_allocator_t *alloc, const hu_creat
         n += sizeof(lens_open) - 1U + anc_joined + sizeof(after_anchors) - 1U;
     }
     n += sizeof(express_core) - 1U;
-    if (voice->expressiveness > 0.7f)
+    if (voice->expressiveness > HU_CREATIVE_HIGH_EXPRESSIVENESS)
         n += sizeof(lean) - 1U;
-    else if (voice->expressiveness < 0.3f)
+    else if (voice->expressiveness < HU_CREATIVE_LOW_EXPRESSIVENESS)
         n += sizeof(plain) - 1U;
     n += sizeof(close) - 1U;
 
@@ -159,10 +162,10 @@ hu_error_t hu_creative_voice_build_context(hu_allocator_t *alloc, const hu_creat
     memcpy(w, express_core, sizeof(express_core) - 1U);
     w += sizeof(express_core) - 1U;
 
-    if (voice->expressiveness > 0.7f) {
+    if (voice->expressiveness > HU_CREATIVE_HIGH_EXPRESSIVENESS) {
         memcpy(w, lean, sizeof(lean) - 1U);
         w += sizeof(lean) - 1U;
-    } else if (voice->expressiveness < 0.3f) {
+    } else if (voice->expressiveness < HU_CREATIVE_LOW_EXPRESSIVENESS) {
         memcpy(w, plain, sizeof(plain) - 1U);
         w += sizeof(plain) - 1U;
     }

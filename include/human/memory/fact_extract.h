@@ -50,8 +50,9 @@ hu_error_t hu_fact_extract(const char *text, size_t text_len,
 
 /*
  * Deduplicate facts against existing entries.
- * Marks facts that overlap with existing knowledge (by subject+predicate match).
- * Returns the number of novel facts after dedup.
+ * Removes facts that overlap with existing knowledge (by subject+predicate match),
+ * compacting the array in place and updating result->fact_count.
+ * Returns the number of novel (retained) facts.
  */
 size_t hu_fact_dedup(hu_fact_extract_result_t *result,
                      const hu_heuristic_fact_t *existing, size_t existing_count);

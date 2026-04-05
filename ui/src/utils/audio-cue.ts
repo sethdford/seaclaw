@@ -4,6 +4,13 @@
  * All sounds generated via Web Audio API — zero network requests.
  */
 
+let _sharedCtx: AudioContext | null = null;
+
+function getAudioContext(): AudioContext {
+  if (!_sharedCtx) _sharedCtx = new AudioContext();
+  return _sharedCtx;
+}
+
 export function isAudioEnabled(): boolean {
   try {
     return localStorage.getItem("hu-audio-cues") === "true";
@@ -17,7 +24,7 @@ export function playAudioCue(type: "send" | "receive" | "success" | "error"): vo
   if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
 
   try {
-    const ctx = new AudioContext();
+    const ctx = getAudioContext();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -46,7 +53,12 @@ export function playAudioCue(type: "send" | "receive" | "success" | "error"): vo
     osc.stop(ctx.currentTime + cfg.duration + 0.01);
 
     osc.onended = () => {
-      ctx.close();
+      try {
+        osc.disconnect();
+        gain.disconnect();
+      } catch {
+        /* nodes may already be torn down */
+      }
     };
   } catch {
     /* AudioContext not available */

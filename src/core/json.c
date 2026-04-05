@@ -96,6 +96,8 @@ static hu_error_t parse_string_raw(parser_t *p, char **out, size_t *out_len) {
                 c = '\t';
                 break;
             case 'u': {
+                /* Note: UTF-16 surrogate pairs (\uD800-\uDFFF) are not supported.
+                 * Codepoints >= U+10000 must use direct UTF-8 encoding. */
                 if (p->pos + 4 > p->len) {
                     p->alloc->free(p->alloc->ctx, buf, cap);
                     return HU_ERR_JSON_PARSE;

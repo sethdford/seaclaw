@@ -189,9 +189,28 @@ hu_error_t hu_frontier_persist_save(hu_allocator_t *alloc, sqlite3 *db,
     sqlite3_bind_double(stmt, 26, (double)state->trust.composite);
     sqlite3_bind_int(stmt, 27, (int)state->trust.level);
     sqlite3_bind_int(stmt, 28, (int)state->trust.interaction_count);
-    sqlite3_bind_int(stmt, 29, 0);
-    sqlite3_bind_int(stmt, 30, 0);
-    sqlite3_bind_int(stmt, 31, 0);
+    /* Preserve existing relationship data if the row already exists.
+     * Relationship is saved separately via save_relationship, but INSERT OR
+     * REPLACE would overwrite the whole row; use COALESCE to keep old values. */
+    {
+        int old_stage = 0, old_sc = 0, old_tt = 0;
+        static const char rsel[] =
+            "SELECT rel_stage, rel_session_count, rel_total_turns "
+            "FROM frontier_state WHERE contact_id = ?1";
+        sqlite3_stmt *rs = NULL;
+        if (sqlite3_prepare_v2(db, rsel, -1, &rs, NULL) == SQLITE_OK) {
+            sqlite3_bind_text(rs, 1, contact_id, (int)contact_id_len, SQLITE_STATIC);
+            if (sqlite3_step(rs) == SQLITE_ROW) {
+                old_stage = sqlite3_column_int(rs, 0);
+                old_sc = sqlite3_column_int(rs, 1);
+                old_tt = sqlite3_column_int(rs, 2);
+            }
+            sqlite3_finalize(rs);
+        }
+        sqlite3_bind_int(stmt, 29, old_stage);
+        sqlite3_bind_int(stmt, 30, old_sc);
+        sqlite3_bind_int(stmt, 31, old_tt);
+    }
     sqlite3_bind_int64(stmt, 32, (sqlite3_int64)time(NULL));
 
     rc = sqlite3_step(stmt);

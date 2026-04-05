@@ -33,7 +33,6 @@
 #include "human/tool.h"
 #include "human/tools/factory.h"
 #include "human/voice.h"
-#include "human/hook.h"
 #include "human/permission.h"
 #include "human/mcp_manager.h"
 #include "human/agent/agent_definition.h"

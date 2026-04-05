@@ -165,6 +165,14 @@ static void parse_imessage_channel(hu_allocator_t *a, hu_config_t *cfg,
 
     cfg->channels.imessage.use_imsg_cli = hu_json_get_bool(obj, "use_imsg_cli", false);
 
+    const char *lb = hu_json_get_string(obj, "loopback_handle");
+    if (lb) {
+        if (cfg->channels.imessage.loopback_handle)
+            a->free(a->ctx, cfg->channels.imessage.loopback_handle,
+                    strlen(cfg->channels.imessage.loopback_handle) + 1);
+        cfg->channels.imessage.loopback_handle = hu_strdup(a, lb);
+    }
+
     parse_daemon_config(a, &cfg->channels.imessage.daemon, obj);
     if (!cfg->channels.imessage.daemon.response_mode && cfg->channels.imessage.response_mode)
         cfg->channels.imessage.daemon.response_mode =

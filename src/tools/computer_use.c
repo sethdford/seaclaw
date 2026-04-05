@@ -72,6 +72,19 @@ static bool cu_path_json_safe(const char *path) {
     }
     return true;
 }
+
+static void cu_clamp_pointer_coords(double *x, double *y) {
+    if (!x || !y)
+        return;
+    if (*x < -32768.0)
+        *x = -32768.0;
+    if (*x > 32767.0)
+        *x = 32767.0;
+    if (*y < -32768.0)
+        *y = -32768.0;
+    if (*y > 32767.0)
+        *y = 32767.0;
+}
 #endif
 #endif
 
@@ -430,6 +443,7 @@ static hu_error_t cu_mac_screenshot(hu_allocator_t *alloc, hu_computer_use_ctx_t
 }
 
 static hu_error_t cu_mac_click(hu_allocator_t *alloc, double x, double y, hu_tool_result_t *out) {
+    cu_clamp_pointer_coords(&x, &y);
     CGPoint point = CGPointMake((CGFloat)x, (CGFloat)y);
     CGEventRef down = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
     CGEventRef up = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, point, kCGMouseButtonLeft);
@@ -632,6 +646,7 @@ static hu_error_t cu_linux_screenshot(hu_allocator_t *alloc, hu_computer_use_ctx
 
 static hu_error_t cu_linux_click(hu_allocator_t *alloc, double x, double y, hu_tool_result_t *out) {
     (void)alloc;
+    cu_clamp_pointer_coords(&x, &y);
     Display *dpy = XOpenDisplay(NULL);
     if (!dpy) {
         *out = hu_tool_result_fail("cannot open X11 display", 23);
@@ -674,6 +689,7 @@ static hu_error_t cu_linux_type(hu_allocator_t *alloc, hu_security_policy_t *pol
 static hu_error_t cu_linux_scroll(hu_allocator_t *alloc, double x, double y, int32_t scroll_delta,
                                   hu_tool_result_t *out) {
     (void)alloc;
+    cu_clamp_pointer_coords(&x, &y);
     Display *dpy = XOpenDisplay(NULL);
     if (!dpy) {
         *out = hu_tool_result_fail("cannot open X11 display", 23);
@@ -913,6 +929,7 @@ static hu_error_t computer_use_execute(void *ctx, hu_allocator_t *alloc, const h
         }
         if (scroll_delta == 0)
             scroll_delta = -1;
+        cu_clamp_pointer_coords(&x, &y);
         CGEventRef scroll =
             CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitLine, 1, scroll_delta);
         if (scroll) {

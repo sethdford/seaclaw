@@ -3,6 +3,8 @@
 #include <ctype.h>
 #include <string.h>
 
+#define HU_BOUNDARY_RELEVANCE_THRESHOLD 0.6f
+
 void hu_genuine_boundary_set_init(hu_genuine_boundary_set_t *set) {
     if (!set)
         return;
@@ -86,7 +88,7 @@ hu_error_t hu_genuine_boundary_check_relevance(hu_genuine_boundary_set_t *set,
 
     for (size_t i = 0; i < set->count; i++) {
         hu_genuine_boundary_t *b = &set->boundaries[i];
-        if (b->conviction <= 0.6f)
+        if (b->conviction <= HU_BOUNDARY_RELEVANCE_THRESHOLD)
             continue;
         if (!b->domain)
             continue;

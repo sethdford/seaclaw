@@ -138,6 +138,14 @@ All error codes are defined in `include/human/core/error.h` as `hu_error_t`. Use
 - Security errors should be specific — `COMMAND_NOT_ALLOWED` vs `HIGH_RISK_BLOCKED` vs `LOCKOUT` convey different user actions
 - `HU_ERR_INTERNAL` indicates a bug — investigate rather than handling gracefully
 
+### Module-specific patterns (SQLite / normalization)
+
+These helpers use the general codes above (`HU_ERR_IO`, `HU_ERR_INVALID_ARGUMENT`, `HU_ERR_OUT_OF_MEMORY`); behavior notes for callers:
+
+- **`hu_sql_txn_begin`** — returns `HU_ERR_IO` when SQLite reports `SQLITE_BUSY` or other lock contention while starting a transaction.
+- **`hu_sql_txn_commit`** — returns `HU_ERR_IO` on commit failure; the transaction remains active so the caller can roll back.
+- **`hu_normalize_confusables`** — returns `HU_ERR_INVALID_ARGUMENT` when `input`, `out`, or `out_len` is NULL, or when `out_cap` is zero.
+
 ### Sentinel Value
 
 `HU_ERR_COUNT` is a sentinel marking the end of the enum. It is **not** a valid error code

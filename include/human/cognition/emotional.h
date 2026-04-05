@@ -18,6 +18,9 @@ typedef enum hu_emotion_source {
     HU_EMOTION_SRC_VOICE        = 1 << 4,
 } hu_emotion_source_t;
 
+/* Number of distinct HU_EMOTION_SRC_* bits (used when counting sources in fusion). */
+#define HU_EMOTION_SRC_BIT_COUNT 5
+
 #define HU_EMOTIONAL_TRAJECTORY_LEN 8
 
 /* Fused per-turn emotional cognition produced by hu_emotional_cognition_perceive */

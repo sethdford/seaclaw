@@ -150,8 +150,8 @@ export class ChatController implements ReactiveController {
         }
         if (msgs.length === 0) this.trimmedCount = 0;
       }
-    } catch {
-      /* Gracefully degrade — leave existing items intact */
+    } catch (e) {
+      console.warn("Failed to load earlier messages:", e);
     } finally {
       this.loadingEarlier = false;
       this._requestUpdate();

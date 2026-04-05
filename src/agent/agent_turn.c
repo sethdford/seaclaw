@@ -825,6 +825,8 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     size_t trust_ctx_len = 0;
     char *humor_dir = NULL;
     size_t humor_dir_len = 0;
+    bool had_humor_dir = false;
+    int humor_theory_saved = 0;
     char *syc_friction_ctx = NULL;
     size_t syc_friction_ctx_len = 0;
     char *conv_goals_ctx = NULL;
@@ -2765,6 +2767,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             if (heval.should_attempt) {
                 hu_humor_fw_build_directive(agent->alloc, &heval, &hctx,
                                             &humor_dir, &humor_dir_len);
+                humor_theory_saved = (int)heval.suggested_theory;
                 if (humor_dir && agent->observer) {
                     hu_observer_event_t hev = {.tag = HU_OBSERVER_EVENT_FRONTIER,
                         .trace_id = agent->trace_id,
@@ -3084,7 +3087,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             .persona_prompt_len = persona_prompt_len,
             .preferences = pref_ctx,
             .preferences_len = pref_ctx_len,
-            .chain_of_thought = agent->chain_of_thought || cognition_budget.enable_planning,
+            .chain_of_thought = agent->chain_of_thought,
             .tone_hint = tone_hint,
             .tone_hint_len = tone_hint_len,
             .awareness_context = awareness_ctx,
@@ -3225,6 +3228,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         if (trust_ctx)
             agent->alloc->free(agent->alloc->ctx, trust_ctx, trust_ctx_len + 1);
         trust_ctx = NULL;
+        had_humor_dir = (humor_dir && humor_dir_len > 0);
         if (humor_dir)
             agent->alloc->free(agent->alloc->ctx, humor_dir, humor_dir_len + 1);
         humor_dir = NULL;
@@ -3948,6 +3952,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             turn_temp = agent->turn_temperature;
         if (agent->turn_thinking_budget > 0)
             req.thinking_budget = agent->turn_thinking_budget;
+
+        /* Planning mode: give the model more room to reason when the cognition
+         * system detects a complex task, without overriding explicit CoT config. */
+        if (cognition_budget.enable_planning && req.thinking_budget == 0)
+            req.thinking_budget = 2048;
 
         /* Somatic energy influence: low energy → shorter responses, lower creativity. */
         if (agent->frontiers.initialized && agent->frontiers.somatic.energy < HU_SOMATIC_TIRED_THRESHOLD) {
@@ -5501,7 +5510,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 
             /* Humor landing feedback: score the response if we injected a humor
              * directive, then log + update trust based on whether it landed. */
-            if (humor_dir && humor_dir_len > 0 &&
+            if (had_humor_dir &&
                 *response_out && response_len_out && *response_len_out > 0) {
                 float humor_score = 0.0f;
                 if (hu_humor_fw_score_response(*response_out, *response_len_out,
@@ -5520,10 +5529,20 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
 #ifdef HU_ENABLE_SQLITE
                     if (agent->memory && agent->memory_session_id) {
                         sqlite3 *ha_db = hu_sqlite_memory_get_db(agent->memory);
-                        if (ha_db)
+                        if (ha_db) {
+                            static const hu_humor_type_t theory_to_type[] = {
+                                [HU_HUMOR_INCONGRUITY]      = HU_HUMOR_MISDIRECTION,
+                                [HU_HUMOR_BENIGN_VIOLATION] = HU_HUMOR_OBSERVATIONAL,
+                                [HU_HUMOR_SUPERIORITY]      = HU_HUMOR_SELF_DEPRECATION,
+                                [HU_HUMOR_RELIEF]           = HU_HUMOR_UNDERSTATEMENT,
+                            };
+                            hu_humor_type_t atype = HU_HUMOR_OBSERVATIONAL;
+                            if (humor_theory_saved >= 0 &&
+                                humor_theory_saved < HU_HUMOR_THEORY_COUNT)
+                                atype = theory_to_type[humor_theory_saved];
                             (void)hu_humor_audience_record(ha_db,
-                                agent->memory_session_id,
-                                HU_HUMOR_OBSERVATIONAL, landed);
+                                agent->memory_session_id, atype, landed);
+                        }
                     }
 #endif
                 }

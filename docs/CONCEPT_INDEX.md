@@ -98,6 +98,7 @@ Use this to find the right files for a given task without searching the full cod
 | Concept                 | Primary Source Files                                                 | Test Files                                |
 | ----------------------- | -------------------------------------------------------------------- | ----------------------------------------- |
 | **Tool factory**        | `src/tools/factory.c`                                                | `test_tool.c`, `test_tools_all.c`         |
+| **Tool thread-safety flags** | `include/human/tool.h` (`hu_tool_flags_t`, `HU_TOOL_FLAG_THREAD_SAFE`) | `—`                                  |
 | **Shell / file tools**  | `src/tools/shell.c`, `file_read.c`, `file_write.c`                   | `test_tools_all.c` (Shell/File suite)     |
 | **Web / network tools** | `src/tools/http_request.c`, `web_fetch.c`                            | `test_tools_all.c` (Web/Network suite)    |
 | **Memory tools**        | `src/tools/memory_recall.c`, `memory_store.c`                        | `test_tools_all.c` (Memory/Message suite) |
@@ -112,11 +113,13 @@ Use this to find the right files for a given task without searching the full cod
 | Concept                         | Primary Source Files                                                                                           | Test Files                                                                       |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | **Memory factory / engines**    | `src/memory/factory.c`, `engines/registry.c`, `engines/sqlite.c`, `engines/markdown.c`, `engines/memory_lru.c` | `test_memory.c`, `test_memory_full.c`, `test_memory_engines_ext.c`               |
+| **SQL transaction helper**      | `src/memory/sql_transaction.c`, `include/human/memory/sql_transaction.h`                                       | `test_sql_transaction.c`                                                         |
 | **Retrieval / hybrid search**   | `src/memory/retrieval/engine.c`, `hybrid.c`, `keyword.c`, `reranker.c`                                         | `test_retrieval.c`                                                               |
 | **Vector / embeddings**         | `src/memory/vector/embeddings.c`, `store.c`, `chunker.c`                                                       | `test_vector.c`, `test_vector_full.c`, `test_vector_stores.c`                    |
 | **QMD (query memory dispatch)** | `src/memory/retrieval/qmd.c`                                                                                   | `test_qmd.c`                                                                     |
 | **Consolidation**               | `src/memory/consolidation.c`, `consolidation_engine.c`                                                         | `test_consolidation.c`, `test_consolidation_engine.c`                            |
 | **RAG pipeline**                | `src/rag.c`, `src/memory/rag_pipeline.c`                                                                       | `test_rag.c`, `test_rag_pipeline.c`                                              |
+| **Relational episodes**         | `src/memory/relational_episode.c`, `include/human/memory/relational_episode.h`                                 | `test_humanness_frontiers.c`                                                     |
 | **Episodic / STM**              | `src/memory/episodic.c`, `stm.c`                                                                               | `test_episodic.c`, `test_stm.c`                                                  |
 | **Emotional graph**             | `src/memory/emotional_graph.c`, `emotional_residue.c`, `emotional_moments.c`                                   | `test_emotional_graph.c`, `test_emotional_residue.c`, `test_emotional_moments.c` |
 | **Forgetting / degradation**    | `src/memory/forgetting.c`, `forgetting_curve.c`, `degradation.c`                                               | `test_forgetting_curve.c`, `test_degradation.c`, `test_memory_degradation.c`     |
@@ -142,6 +145,8 @@ Use this to find the right files for a given task without searching the full cod
 | **Privacy audit**   | `src/security/audit.c`                                               | `test_privacy_audit.c`                                                    |
 | **Arg inspector (AEGIS-style)** | `src/security/arg_inspector.c`, `include/human/security/arg_inspector.h`                       | `test_sota_wiring.c`                                                      |
 | **CoT audit**       | `src/security/cot_audit.c`, `include/human/security/cot_audit.h`     | `test_cot_audit.c`, `test_sota_wiring.c`                                  |
+| **Confusable normalization** | `src/security/normalize.c`, `include/human/security/normalize.h` | `test_normalize.c`                                                       |
+| **Content moderation** | `src/security/moderation.c` (word-boundary matching via `mod_contains_word`; `hu_normalize_confusables` for confusable-safe checks) | `test_moderation.c`, `test_companion_safety.c`                           |
 
 ## Gateway
 
@@ -191,6 +196,7 @@ Use this to find the right files for a given task without searching the full cod
 | **Presence Gradient**            | `src/cognition/presence.c`, `include/human/cognition/presence.h` | `test_humanness_frontiers.c` |
 | **Micro-Expression Text Layer**  | `src/persona/micro_expression.c`, `include/human/persona/micro_expression.h` | `test_humanness_frontiers.c` |
 | **Creative Voice Engine**        | `src/persona/creative_voice.c`, `include/human/persona/creative_voice.h` | `test_humanness_frontiers.c` |
+| **Frontier persistence**         | `src/agent/frontier_persist.c`, `include/human/agent/frontier_persist.h` | `test_humanness_frontiers.c` |
 | **Growth Narrative**             | `src/agent/growth_narrative.c`, `include/human/agent/growth_narrative.h` | `test_humanness_frontiers.c` |
 | **Genuine Boundaries**           | `src/persona/genuine_boundaries.c`, `include/human/persona/genuine_boundaries.h` | `test_humanness_frontiers.c` |
 
@@ -217,6 +223,7 @@ Use this to find the right files for a given task without searching the full cod
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | **Runtime (native/docker/wasm)**                       | `src/runtime/native.c`, `docker.c`, `wasm_rt.c`, `factory.c`                                                                    | `test_runtime.c`, `test_runtime_bundle.c`                                          |
 | **Feeds (social/google/apple/gmail/imessage/twitter)** | `src/feeds/processor.c`, `social.c`, `google.c`, `apple.c`, `gmail.c`, `imessage.c`, `twitter.c`, `research.c`, `file_ingest.c` | `test_feeds.c`, `test_feed_processor.c`, `test_research_feeds.c`                   |
+| **Feed content sandboxing**    | `src/feeds/research.c` (XML quarantine for feed content)                                                                                    | `test_research_feeds.c`                                                            |
 | **Intelligence / skills**                              | `src/intelligence/skills.c`, `skill_system.c`, `reflection.c`, `experience.c`                                                   | `test_skills.c`, `test_skill_system.c`, `test_intelligence.c`, `test_experience.c` |
 | **Peripherals**                                        | `src/peripherals/factory.c`, `arduino.c`, `stm32.c`, `rpi.c`                                                                    | `test_peripheral.c`                                                                |
 | **Observability**                                      | `src/observability/log_observer.c`, `metrics_observer.c`, `bth_metrics.c`                                                       | `test_observer.c`, `test_bth_metrics.c`                                            |

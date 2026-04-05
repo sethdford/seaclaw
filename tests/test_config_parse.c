@@ -370,6 +370,24 @@ static void test_config_parse_imessage_channel(void) {
     hu_arena_destroy(arena);
 }
 
+static void test_config_parse_imessage_loopback_handle(void) {
+    hu_allocator_t backing = hu_system_allocator();
+    hu_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    hu_arena_t *arena = hu_arena_create(backing);
+    HU_ASSERT_NOT_NULL(arena);
+    cfg.arena = arena;
+    cfg.allocator = hu_arena_allocator(arena);
+    const char *json = "{\"channels\":{\"imessage\":{\"default_target\":\"+15551234567\","
+                       "\"loopback_handle\":\"+14845661687\"}}}";
+    hu_error_t err = hu_config_parse_json(&cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(cfg.channels.imessage.default_target, "+15551234567");
+    HU_ASSERT_NOT_NULL(cfg.channels.imessage.loopback_handle);
+    HU_ASSERT_STR_EQ(cfg.channels.imessage.loopback_handle, "+14845661687");
+    hu_arena_destroy(arena);
+}
+
 static void test_config_parse_response_mode(void) {
     hu_allocator_t backing = hu_system_allocator();
     hu_config_t cfg;
@@ -935,6 +953,7 @@ void run_config_parse_tests(void) {
     HU_RUN_TEST(test_config_parse_email_channel);
     HU_RUN_TEST(test_config_parse_imap_channel_smtp);
     HU_RUN_TEST(test_config_parse_imessage_channel);
+    HU_RUN_TEST(test_config_parse_imessage_loopback_handle);
     HU_RUN_TEST(test_config_parse_response_mode);
     HU_RUN_TEST(test_config_parse_response_mode_selective);
     HU_RUN_TEST(test_config_parse_response_mode_normal);

@@ -129,6 +129,7 @@ static hu_model_usage_entry_t *hu_usage_find_or_create_model(hu_usage_tracker_t 
     size_t idx = tracker->model_count++;
     hu_model_usage_entry_t *entry = &tracker->models[idx];
     memset(entry, 0, sizeof(*entry));
+    /* Ensure NUL-termination after strncpy (truncation produces collisions). */
     strncpy(entry->model_name, model, sizeof(entry->model_name) - 1);
     entry->model_name[sizeof(entry->model_name) - 1] = '\0';
     return entry;
@@ -226,6 +227,7 @@ hu_error_t hu_usage_tracker_get_breakdown(const hu_usage_tracker_t *tracker,
 
         memset(out_entry, 0, sizeof(*out_entry));
         strncpy(out_entry->model_name, entry->model_name, sizeof(out_entry->model_name) - 1);
+        out_entry->model_name[sizeof(out_entry->model_name) - 1] = '\0';
         out_entry->input_tokens = entry->input_tokens;
         out_entry->output_tokens = entry->output_tokens;
         out_entry->cache_read_tokens = entry->cache_read_tokens;
