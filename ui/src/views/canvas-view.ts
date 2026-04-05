@@ -555,11 +555,7 @@ export class CanvasView extends GatewayAwareLitElement {
         <div class="detail-header">
           <h2>${c.title || c.id}</h2>
           <div class="detail-controls">
-            <div
-              class="format-selector"
-              role="tablist"
-              aria-label="Canvas format"
-            >
+            <div class="format-selector" role="tablist" aria-label="Canvas format">
               ${VALID_FORMATS.map(
                 (f) => html`
                   <button
