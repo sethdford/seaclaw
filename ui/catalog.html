@@ -95,6 +95,8 @@
       <a href="#hu-reasoning-block">hu-reasoning-block</a>
       <a href="#hu-code-block">hu-code-block</a>
       <a href="#hu-canvas">hu-canvas</a>
+      <a href="#hu-canvas-editor">hu-canvas-editor</a>
+      <a href="#hu-canvas-sandbox">hu-canvas-sandbox</a>
       <a href="#hu-latex">hu-latex</a>
       <a href="#hu-shortcut-overlay">hu-shortcut-overlay</a>
       <a href="#hu-context-menu">hu-context-menu</a>
@@ -1101,6 +1103,28 @@
         <div class="code-snippet"><pre><code>&lt;hu-canvas .title=${&quot;UI&quot;} .format=${&quot;html&quot;} .content=${htmlString}&gt;&lt;/hu-canvas&gt;</code></pre></div>
       </section>
 
+      <section class="component-section" id="hu-canvas-editor">
+        <h2>hu-canvas-editor</h2>
+        <p>CodeMirror 6 editor for Live Canvas source (HTML, JavaScript, Markdown).</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 36rem; min-height: 12rem;">
+            <hu-canvas-editor format="html" content="&lt;p&gt;Edit canvas source&lt;/p&gt;"></hu-canvas-editor>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-canvas-editor .format=${&quot;html&quot;} .content=${src}&gt;&lt;/hu-canvas-editor&gt;</code></pre></div>
+      </section>
+
+      <section class="component-section" id="hu-canvas-sandbox">
+        <h2>hu-canvas-sandbox</h2>
+        <p>Sandboxed iframe preview for canvas output (postMessage-only).</p>
+        <div class="playground">
+          <div class="preview" style="width: 100%; max-width: 36rem; min-height: 200px;">
+            <hu-canvas-sandbox format="html" content="&lt;p style=&quot;color:var(--hu-accent)&quot;&gt;Sandbox preview&lt;/p&gt;"></hu-canvas-sandbox>
+          </div>
+        </div>
+        <div class="code-snippet"><pre><code>&lt;hu-canvas-sandbox .format=${&quot;html&quot;} .content=${htmlString}&gt;&lt;/hu-canvas-sandbox&gt;</code></pre></div>
+      </section>
+
       <section class="component-section" id="hu-latex">
         <h2>hu-latex</h2>
         <div class="playground">
@@ -1832,6 +1856,8 @@
       import "/src/components/hu-reasoning-block.js";
       import "/src/components/hu-code-block.js";
       import "/src/components/hu-canvas.js";
+      import "/src/components/hu-canvas-editor.js";
+      import "/src/components/hu-canvas-sandbox.js";
       import "/src/components/hu-latex.js";
       import "/src/components/hu-shortcut-overlay.js";
       import "/src/components/hu-context-menu.js";

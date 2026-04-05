@@ -64,6 +64,10 @@ import "./hu-image-viewer.js";
 import "./hu-voice-orb.js";
 import "./hu-voice-conversation.js";
 import "./hu-canvas.js";
+import "./hu-canvas-editor.js";
+import "./hu-canvas-sandbox.js";
+import "./hu-memory-event.js";
+import "./hu-web-search-result.js";
 import "./hu-chart.js";
 import "./hu-json-viewer.js";
 import "./hu-pagination.js";
@@ -3822,5 +3826,49 @@ describe("hu-canvas", () => {
     const shadow = el.shadowRoot!;
     expect(shadow.querySelector(".empty")).toBeTruthy();
     el.remove();
+  });
+});
+
+describe("hu-canvas-editor", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("hu-canvas-editor")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("hu-canvas-editor");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+});
+
+describe("hu-canvas-sandbox", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("hu-canvas-sandbox")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("hu-canvas-sandbox");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+});
+
+describe("hu-memory-event", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("hu-memory-event")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("hu-memory-event");
+    expect(el).toBeInstanceOf(HTMLElement);
+  });
+});
+
+describe("hu-web-search-result", () => {
+  it("should be defined as a custom element", () => {
+    expect(customElements.get("hu-web-search-result")).toBeDefined();
+  });
+
+  it("should be creatable", () => {
+    const el = document.createElement("hu-web-search-result");
+    expect(el).toBeInstanceOf(HTMLElement);
   });
 });
