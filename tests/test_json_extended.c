@@ -64,6 +64,52 @@ static void test_json_unicode_bmp(void) {
     hu_json_free(&alloc, val);
 }
 
+static void test_json_unicode_surrogate_pair_emoji(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_json_value_t *val = NULL;
+    /* U+1F602 (😂) encoded as surrogate pair \uD83D\uDE02 */
+    const char *input = "\"\\uD83D\\uDE02\"";
+    HU_ASSERT_EQ(hu_json_parse(&alloc, input, strlen(input), &val), HU_OK);
+    HU_ASSERT_EQ(val->type, HU_JSON_STRING);
+    HU_ASSERT_EQ(val->data.string.len, 4);
+    /* UTF-8 for U+1F602: F0 9F 98 82 */
+    HU_ASSERT_EQ((unsigned char)val->data.string.ptr[0], 0xF0);
+    HU_ASSERT_EQ((unsigned char)val->data.string.ptr[1], 0x9F);
+    HU_ASSERT_EQ((unsigned char)val->data.string.ptr[2], 0x98);
+    HU_ASSERT_EQ((unsigned char)val->data.string.ptr[3], 0x82);
+    hu_json_free(&alloc, val);
+}
+
+static void test_json_unicode_surrogate_pair_thumbsup(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_json_value_t *val = NULL;
+    /* U+1F44D (👍) encoded as surrogate pair \uD83D\uDC4D */
+    const char *input = "\"\\uD83D\\uDC4D\"";
+    HU_ASSERT_EQ(hu_json_parse(&alloc, input, strlen(input), &val), HU_OK);
+    HU_ASSERT_EQ(val->type, HU_JSON_STRING);
+    HU_ASSERT_EQ(val->data.string.len, 4);
+    /* UTF-8 for U+1F44D: F0 9F 91 8D */
+    HU_ASSERT_EQ((unsigned char)val->data.string.ptr[0], 0xF0);
+    HU_ASSERT_EQ((unsigned char)val->data.string.ptr[1], 0x9F);
+    HU_ASSERT_EQ((unsigned char)val->data.string.ptr[2], 0x91);
+    HU_ASSERT_EQ((unsigned char)val->data.string.ptr[3], 0x8D);
+    hu_json_free(&alloc, val);
+}
+
+static void test_json_unicode_lone_high_surrogate_fails(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_json_value_t *val = NULL;
+    /* Lone high surrogate without low surrogate = parse error */
+    HU_ASSERT_EQ(hu_json_parse(&alloc, "\"\\uD83D\"", 8, &val), HU_ERR_JSON_PARSE);
+}
+
+static void test_json_unicode_lone_low_surrogate_fails(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_json_value_t *val = NULL;
+    /* Lone low surrogate = parse error */
+    HU_ASSERT_EQ(hu_json_parse(&alloc, "\"\\uDE02\"", 8, &val), HU_ERR_JSON_PARSE);
+}
+
 static void test_json_large_number(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_json_value_t *val = NULL;
@@ -709,6 +755,10 @@ void run_json_extended_tests(void) {
     HU_RUN_TEST(test_json_empty_string);
     HU_RUN_TEST(test_json_string_with_all_escapes);
     HU_RUN_TEST(test_json_unicode_bmp);
+    HU_RUN_TEST(test_json_unicode_surrogate_pair_emoji);
+    HU_RUN_TEST(test_json_unicode_surrogate_pair_thumbsup);
+    HU_RUN_TEST(test_json_unicode_lone_high_surrogate_fails);
+    HU_RUN_TEST(test_json_unicode_lone_low_surrogate_fails);
     HU_RUN_TEST(test_json_large_number);
     HU_RUN_TEST(test_json_negative_number);
     HU_RUN_TEST(test_json_float_precision);

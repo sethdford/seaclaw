@@ -44,4 +44,27 @@ hu_policy_action_t hu_agent_internal_evaluate_tool_policy(hu_agent_t *agent, con
                                                           const char *args_json);
 hu_tool_t *hu_agent_internal_find_tool(hu_agent_t *agent, const char *name, size_t name_len);
 
+/* Shared humanness thresholds used by both batch and streaming paths */
+#ifndef HU_SYCOPHANCY_THRESHOLD
+#define HU_SYCOPHANCY_THRESHOLD 0.5f
+#endif
+#ifndef HU_FACT_CONFIDENCE_MIN
+#define HU_FACT_CONFIDENCE_MIN 0.6f
+#endif
+#ifndef HU_CONSISTENCY_DRIFT_THRESHOLD
+#define HU_CONSISTENCY_DRIFT_THRESHOLD 0.3f
+#endif
+#ifndef HU_HUMOR_RISK_TOLERANCE
+#define HU_HUMOR_RISK_TOLERANCE 0.4f
+#endif
+#ifndef HU_SOMATIC_TIRED_THRESHOLD
+#define HU_SOMATIC_TIRED_THRESHOLD 0.3f
+#endif
+#ifndef HU_SOMATIC_LOW_THRESHOLD
+#define HU_SOMATIC_LOW_THRESHOLD 0.5f
+#endif
+#ifndef HU_OPINION_FRICTION_COUNT
+#define HU_OPINION_FRICTION_COUNT 2
+#endif
+
 #endif /* HU_AGENT_INTERNAL_H */

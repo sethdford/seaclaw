@@ -103,6 +103,10 @@ static int relationship_weight(const char *rel, size_t rel_len) {
         return 3;
     if (rel_len == 6 && memcmp(rel, "friend", 6) == 0)
         return 2;
+    if (rel_len == 7 && memcmp(rel, "trusted", 7) == 0)
+        return 2;
+    if (rel_len == 8 && memcmp(rel, "familiar", 8) == 0)
+        return 1;
     return 0;
 }
 
@@ -157,7 +161,7 @@ static int compute_heuristic_score(const char *msg, size_t msg_len,
     if (history_count > 6)
         score += 1;
 
-    if ((hour >= 23 || hour <= 4) && emotion > 0)
+    if (hour >= 0 && (hour >= 23 || hour <= 4) && emotion > 0)
         score += 1;
 
     return score;

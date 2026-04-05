@@ -155,14 +155,14 @@ static hu_error_t merge_overlays(hu_allocator_t *alloc, hu_persona_overlay_t **o
             if (ov->style_notes_count > 0 && ov->style_notes) {
                 buf[n].style_notes =
                     (char **)alloc->alloc(alloc->ctx, ov->style_notes_count * sizeof(char *));
-                if (buf[n].style_notes) {
-                    buf[n].style_notes_count = ov->style_notes_count;
-                    for (size_t k = 0; k < ov->style_notes_count; k++) {
-                        buf[n].style_notes[k] =
-                            ov->style_notes[k] ? hu_strdup(alloc, ov->style_notes[k]) : NULL;
-                        if (ov->style_notes[k] && !buf[n].style_notes[k])
-                            goto overlay_oom;
-                    }
+                if (!buf[n].style_notes)
+                    goto overlay_oom;
+                buf[n].style_notes_count = ov->style_notes_count;
+                for (size_t k = 0; k < ov->style_notes_count; k++) {
+                    buf[n].style_notes[k] =
+                        ov->style_notes[k] ? hu_strdup(alloc, ov->style_notes[k]) : NULL;
+                    if (ov->style_notes[k] && !buf[n].style_notes[k])
+                        goto overlay_oom;
                 }
             }
             n++;

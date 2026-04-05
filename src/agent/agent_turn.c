@@ -50,14 +50,8 @@ static const char *DEFAULT_SENTIMENT_POS[] = {
 
 /* Frontier tuning knobs — named constants for clarity.
  * Changing these requires recompilation; they are intentionally not
- * config-driven to keep the parameter surface small (YAGNI). */
-#define HU_HUMOR_RISK_TOLERANCE 0.4f
-#define HU_SYCOPHANCY_THRESHOLD 0.5f
-#define HU_FACT_CONFIDENCE_MIN 0.6f
-#define HU_SOMATIC_TIRED_THRESHOLD 0.3f
-#define HU_SOMATIC_LOW_THRESHOLD 0.5f
-#define HU_CONSISTENCY_DRIFT_THRESHOLD 0.3f
-#define HU_OPINION_FRICTION_COUNT 2
+ * config-driven to keep the parameter surface small (YAGNI).
+ * Canonical definitions live in agent_internal.h. */
 
 /* Runtime loaded patterns */
 static const char **s_multistep_needles = DEFAULT_MULTISTEP_NEEDLES;
@@ -1524,16 +1518,17 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         }
                         em_ctx[pos] = '\0';
                         if (pos > 0 && superhuman_ctx) {
-                            size_t merged_len = superhuman_ctx_len + 2 + pos + 1;
+                            size_t merged_len = superhuman_ctx_len + 2 + pos;
                             char *merged =
-                                (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len);
+                                (char *)agent->alloc->alloc(agent->alloc->ctx, merged_len + 1);
                             if (merged) {
                                 memcpy(merged, superhuman_ctx, superhuman_ctx_len);
                                 merged[superhuman_ctx_len] = '\n';
                                 merged[superhuman_ctx_len + 1] = '\n';
-                                memcpy(merged + superhuman_ctx_len + 2, em_ctx, pos + 1);
+                                memcpy(merged + superhuman_ctx_len + 2, em_ctx, pos);
+                                merged[merged_len] = '\0';
                                 agent->alloc->free(agent->alloc->ctx, superhuman_ctx,
-                                                   superhuman_ctx_len);
+                                                   superhuman_ctx_len + 1);
                                 agent->alloc->free(agent->alloc->ctx, em_ctx, em_len);
                                 superhuman_ctx = merged;
                                 superhuman_ctx_len = merged_len;
@@ -1567,12 +1562,13 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         "\nThey're often quiet at this time. Don't worry if no reply.";
                     size_t hint_len = sizeof(hint) - 1;
                     size_t ctx_str_len = strlen(superhuman_ctx);
-                    size_t new_len = ctx_str_len + hint_len + 1;
-                    char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len);
+                    size_t new_len = ctx_str_len + hint_len;
+                    char *merged = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
                     if (merged) {
                         memcpy(merged, superhuman_ctx, ctx_str_len);
-                        memcpy(merged + ctx_str_len, hint, hint_len + 1);
-                        agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                        memcpy(merged + ctx_str_len, hint, hint_len);
+                        merged[new_len] = '\0';
+                        agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
                         superhuman_ctx = merged;
                         superhuman_ctx_len = new_len;
                     }
@@ -1865,7 +1861,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             if (proactive_ctx)
                 agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
             if (superhuman_ctx)
-                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
             if (adaptive_ctx)
                 agent->alloc->free(agent->alloc->ctx, adaptive_ctx, adaptive_ctx_len + 1);
             if (awareness_ctx)
@@ -2990,7 +2986,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         !rupture_ctx && !narrative_self_ctx && !creative_voice_ctx && !growth_ctx &&
         !boundary_ctx && !rel_episode_ctx && !trust_ctx && !humor_dir &&
         !syc_friction_ctx && !conv_goals_ctx && !outcome_ctx && !intelligence_ctx &&
-        !acp_context) {
+        !acp_context && !plan_ctx && !instruction_ctx) {
         err = hu_prompt_build_with_cache(agent->alloc, agent->cached_static_prompt,
                                          agent->cached_static_prompt_len, memory_ctx,
                                          memory_ctx_len, &system_prompt, &system_prompt_len);
@@ -3015,7 +3011,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             if (proactive_ctx)
                 agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
             if (superhuman_ctx)
-                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
             if (outcome_ctx)
                 agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
             if (intelligence_ctx)
@@ -3175,15 +3171,22 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             agent->alloc->free(agent->alloc->ctx, stm_ctx, stm_ctx_len + 1);
             stm_ctx = NULL;
         }
-        if (awareness_ctx)
+        if (awareness_ctx) {
             agent->alloc->free(agent->alloc->ctx, awareness_ctx, awareness_ctx_len + 1);
-        if (outcome_ctx)
+            awareness_ctx = NULL;
+        }
+        if (outcome_ctx) {
             agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
-        if (intelligence_ctx)
+            outcome_ctx = NULL;
+        }
+        if (intelligence_ctx) {
             agent->alloc->free(agent->alloc->ctx, intelligence_ctx, intelligence_ctx_len + 1);
-        if (emotional_ctx)
+            intelligence_ctx = NULL;
+        }
+        if (emotional_ctx) {
             agent->alloc->free(agent->alloc->ctx, emotional_ctx, emotional_ctx_len + 1);
-        emotional_ctx = NULL;
+            emotional_ctx = NULL;
+        }
         if (episodic_replay)
             agent->alloc->free(agent->alloc->ctx, episodic_replay, episodic_replay_len + 1);
         episodic_replay = NULL;
@@ -3264,7 +3267,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             if (proactive_ctx)
                 agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
             if (superhuman_ctx)
-                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
             if (plan_ctx)
                 agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
             if (emotional_ctx)
@@ -3296,7 +3299,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         proactive_ctx = NULL;
     }
     if (superhuman_ctx) {
-        agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+        agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
         superhuman_ctx = NULL;
     }
     if (pref_ctx) {
@@ -3626,7 +3629,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 if (proactive_ctx)
                     agent->alloc->free(agent->alloc->ctx, proactive_ctx, proactive_ctx_len + 1);
                 if (superhuman_ctx)
-                    agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len);
+                    agent->alloc->free(agent->alloc->ctx, superhuman_ctx, superhuman_ctx_len + 1);
                 if (outcome_ctx)
                     agent->alloc->free(agent->alloc->ctx, outcome_ctx, outcome_ctx_len + 1);
                 if (acp_context)
@@ -5738,14 +5741,19 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                             char *ie = NULL;
                             sqlite3_exec(ep_db, insert_sql, NULL, NULL, &ie);
                             if (ie) sqlite3_free(ie);
-                            char prune_sql[256];
-                            snprintf(prune_sql, sizeof(prune_sql),
-                                "DELETE FROM relational_episodes WHERE contact_id = '%.*s' "
+                            {
+                            static const char prune[] =
+                                "DELETE FROM relational_episodes WHERE contact_id = ?1 "
                                 "AND id NOT IN (SELECT id FROM relational_episodes "
-                                "WHERE contact_id = '%.*s' ORDER BY significance DESC LIMIT 20)",
-                                (int)agent->memory_session_id_len, agent->memory_session_id,
-                                (int)agent->memory_session_id_len, agent->memory_session_id);
-                            sqlite3_exec(ep_db, prune_sql, NULL, NULL, NULL);
+                                "WHERE contact_id = ?1 ORDER BY significance DESC LIMIT 20)";
+                            sqlite3_stmt *ps = NULL;
+                            if (sqlite3_prepare_v2(ep_db, prune, -1, &ps, NULL) == SQLITE_OK) {
+                                sqlite3_bind_text(ps, 1, agent->memory_session_id,
+                                    (int)agent->memory_session_id_len, SQLITE_STATIC);
+                                sqlite3_step(ps);
+                                sqlite3_finalize(ps);
+                            }
+                        }
                         }
                     }
                     hu_relational_episode_free(agent->alloc, &ep);

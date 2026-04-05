@@ -772,6 +772,16 @@ size_t hu_conversation_select_sticker(const char *msg, size_t msg_len, uint32_t 
                                       const char *sticker_dir, size_t dir_len, char *out_path,
                                       size_t out_cap);
 
+/* Music teaser (iMessage rich previews): decide whether to send an Apple Music / Spotify link.
+ * history: recent channel messages; avoids repeats when a music URL appeared in the last 10. */
+bool hu_conversation_should_send_music(const char *incoming, size_t incoming_len,
+                                       const hu_channel_history_entry_t *history,
+                                       size_t history_count, uint32_t seed, float probability);
+
+/* Build user prompt for the LLM to pick a song + Apple Music search URL for the teaser. */
+size_t hu_conversation_build_music_prompt(const char *incoming, size_t incoming_len, char *out,
+                                          size_t out_cap);
+
 /* Build context hint for inline replies. original_text is the text of the message
  * they are replying to. Tells the LLM to respond in context of that original. */
 size_t hu_conversation_build_inline_reply_hint(const char *original_text, size_t original_len,

@@ -7249,6 +7249,96 @@ size_t hu_conversation_select_sticker(const char *msg, size_t msg_len, uint32_t 
     return 0;
 }
 
+/* ── Music teaser (iMessage link previews) ─────────────────────────── */
+
+static bool history_has_recent_music_url(const hu_channel_history_entry_t *entries, size_t count) {
+    if (!entries || count == 0)
+        return false;
+    size_t start = count > 10 ? count - 10 : 0;
+    for (size_t i = start; i < count; i++) {
+        const char *t = entries[i].text;
+        size_t tl = strlen(t);
+        if (str_contains_ci(t, tl, "music.apple.com") ||
+            str_contains_ci(t, tl, "open.spotify.com") ||
+            str_contains_ci(t, tl, "spotify.link"))
+            return true;
+    }
+    return false;
+}
+
+bool hu_conversation_should_send_music(const char *incoming, size_t incoming_len,
+                                       const hu_channel_history_entry_t *history,
+                                       size_t history_count, uint32_t seed, float probability) {
+    if (!incoming || incoming_len == 0 || probability <= 0.0f)
+        return false;
+
+    /* Skip crisis-heavy moments (music shares would feel tone-deaf). */
+    if (str_contains_ci(incoming, incoming_len, "died") ||
+        str_contains_ci(incoming, incoming_len, "funeral") ||
+        str_contains_ci(incoming, incoming_len, "depressed") ||
+        str_contains_ci(incoming, incoming_len, "help me") ||
+        str_contains_ci(incoming, incoming_len, "crying") ||
+        str_contains_ci(incoming, incoming_len, "suicide"))
+        return false;
+
+    if (history_has_recent_music_url(history, history_count))
+        return false;
+
+    bool keyword_hit =
+        str_contains_ci(incoming, incoming_len, "music") ||
+        str_contains_ci(incoming, incoming_len, "song") ||
+        str_contains_ci(incoming, incoming_len, "songs") ||
+        str_contains_ci(incoming, incoming_len, "listen") ||
+        str_contains_ci(incoming, incoming_len, "listening") ||
+        str_contains_ci(incoming, incoming_len, "playlist") ||
+        str_contains_ci(incoming, incoming_len, "album") ||
+        str_contains_ci(incoming, incoming_len, "artist") ||
+        str_contains_ci(incoming, incoming_len, "tune") ||
+        str_contains_ci(incoming, incoming_len, "jam") ||
+        str_contains_ci(incoming, incoming_len, "vibe") ||
+        str_contains_ci(incoming, incoming_len, "vibes") ||
+        str_contains_ci(incoming, incoming_len, "mood") ||
+        str_contains_ci(incoming, incoming_len, "spotify") ||
+        str_contains_ci(incoming, incoming_len, "apple music") ||
+        str_contains_ci(incoming, incoming_len, "track") ||
+        str_contains_ci(incoming, incoming_len, "lyrics") ||
+        str_contains_ci(incoming, incoming_len, "concert") ||
+        str_contains_ci(incoming, incoming_len, "band") ||
+        str_contains_ci(incoming, incoming_len, "sing") ||
+        str_contains_ci(incoming, incoming_len, "karaoke") ||
+        str_contains_ci(incoming, incoming_len, "what are you listening");
+
+    float effective = probability;
+    if (keyword_hit && effective < 1.0f) {
+        effective *= 2.5f;
+        if (effective > 1.0f)
+            effective = 1.0f;
+    }
+
+    uint32_t s = seed;
+    uint32_t roll = reaction_prng_next(&s) % 100u;
+    uint32_t threshold = (uint32_t)(effective * 100.0f);
+    if (threshold > 100u)
+        threshold = 100u;
+    return roll < threshold;
+}
+
+size_t hu_conversation_build_music_prompt(const char *incoming, size_t incoming_len, char *out,
+                                          size_t out_cap) {
+    if (!incoming || incoming_len == 0 || !out || out_cap < 128)
+        return 0;
+
+    size_t clip = incoming_len > 200 ? 200 : incoming_len;
+    int n = snprintf(
+        out, out_cap,
+        "Based on this conversation, suggest ONE song (artist - title) that fits the mood. "
+        "Include the Apple Music search URL. Format: ARTIST - TITLE | "
+        "https://music.apple.com/search?term=ARTIST+TITLE\n"
+        "Recent message context: \"%.*s\"",
+        (int)clip, incoming);
+    return (n > 0 && (size_t)n < out_cap) ? (size_t)n : 0;
+}
+
 /* ── Inline reply context builder ────────────────────────────────────── */
 
 size_t hu_conversation_build_inline_reply_hint(const char *original_text, size_t original_len,

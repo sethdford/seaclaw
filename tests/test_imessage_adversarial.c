@@ -134,6 +134,16 @@ static void imessage_inject_truncates_long_session_key(void) {
     hu_imessage_destroy(&ch);
 }
 
+static void imessage_send_records_media_in_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+1234567890", 12, NULL, 0, &ch), HU_OK);
+    const char *media[] = {"/tmp/test.gif"};
+    HU_ASSERT_EQ(ch.vtable->send(ch.ctx, "+1234567890", 12, "", 0, media, 1), HU_OK);
+    HU_ASSERT_EQ(hu_imessage_test_get_last_media_count(&ch), 1u);
+    hu_imessage_destroy(&ch);
+}
+
 static void imessage_inject_truncates_long_content(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
@@ -566,9 +576,11 @@ static void imessage_reaction_classify_on_funny_text(void) {
     hu_channel_history_entry_t entries[1] = {
         {.from_me = false, .text = "lmaooo", .timestamp = "10:00"},
     };
+    /* Seed 0 yields roll < 30 → HAHA for funny-pattern messages (see test_conversation). */
     hu_reaction_type_t r =
-        hu_conversation_classify_reaction(S("lmaooo"), false, entries, 1, 42);
-    (void)r;
+        hu_conversation_classify_reaction(S("lmaooo"), false, entries, 1, 0u);
+    HU_ASSERT_TRUE(r != HU_REACTION_NONE);
+    HU_ASSERT_EQ(r, HU_REACTION_HAHA);
 }
 
 static void imessage_self_reaction_mostly_none(void) {
@@ -613,6 +625,32 @@ static void imessage_gif_should_send_deterministic_false_on_serious(void) {
     bool send = hu_conversation_should_send_gif(S("my grandmother just died"), entries, 1, 42,
                                                  0.5f);
     HU_ASSERT_FALSE(send);
+}
+
+static void imessage_should_send_music_on_music_mention(void) {
+    hu_channel_history_entry_t hist[1] = {
+        {.from_me = false, .text = "hey", .timestamp = "10:00"},
+    };
+    bool result = hu_conversation_should_send_music("what are you listening to", 25, hist, 1, 42,
+                                                      1.0f);
+    HU_ASSERT_TRUE(result);
+}
+
+static void imessage_should_send_music_respects_zero_probability(void) {
+    hu_channel_history_entry_t hist[1] = {
+        {.from_me = false, .text = "hey", .timestamp = "10:00"},
+    };
+    bool result =
+        hu_conversation_should_send_music("hello there", 11, hist, 1, 42, 0.0f);
+    HU_ASSERT_FALSE(result);
+}
+
+static void imessage_build_music_prompt_includes_context(void) {
+    char out[256];
+    size_t len =
+        hu_conversation_build_music_prompt("I'm feeling nostalgic", 21, out, sizeof(out));
+    HU_ASSERT_TRUE(len > 0u);
+    HU_ASSERT_NOT_NULL(strstr(out, "nostalgic"));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -783,12 +821,15 @@ static void imessage_poll_multi_sender_batch(void) {
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 static void imessage_cold_restart_hint_on_fresh_convo(void) {
-    hu_channel_history_entry_t entries[1] = {
-        {.from_me = false, .text = "hello!", .timestamp = "2024-01-01 10:00:00"},
+    /* Cold restart needs ≥2 messages and ≥4h gap between prev and latest inbound. */
+    hu_channel_history_entry_t entries[2] = {
+        {.from_me = true, .text = "catch you later", .timestamp = "2024-01-01 08:00:00"},
+        {.from_me = false, .text = "hey again!", .timestamp = "2024-01-01 20:00:00"},
     };
     char buf[256];
-    size_t len = hu_conversation_build_cold_restart_hint(entries, 1, buf, sizeof(buf));
-    (void)len;
+    size_t len = hu_conversation_build_cold_restart_hint(entries, 2, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "COLD RESTART") != NULL);
 }
 
 static void imessage_group_mention_hint_non_empty_for_group(void) {
@@ -813,14 +854,16 @@ static void imessage_link_context_detects_url(void) {
 }
 
 static void imessage_emoji_mirror_hint_exists(void) {
-    hu_channel_history_entry_t entries[2] = {
-        {.from_me = false, .text = "omg yes!!! \xf0\x9f\x98\x8d\xf0\x9f\x94\xa5",
-         .timestamp = "10:00"},
-        {.from_me = true, .text = "nice!", .timestamp = "10:01"},
+    /* Emoji mirror needs ≥2 inbound messages; all-ASCII yields low emoji_rate directive. */
+    hu_channel_history_entry_t entries[3] = {
+        {.from_me = false, .text = "hey", .timestamp = "10:00"},
+        {.from_me = false, .text = "what's up", .timestamp = "10:01"},
+        {.from_me = true, .text = "nice!", .timestamp = "10:02"},
     };
     char buf[256];
-    size_t len = hu_conversation_build_emoji_mirror_hint(entries, 2, buf, sizeof(buf));
-    (void)len;
+    size_t len = hu_conversation_build_emoji_mirror_hint(entries, 3, buf, sizeof(buf));
+    HU_ASSERT_TRUE(len > 0);
+    HU_ASSERT_TRUE(strstr(buf, "EMOJI") != NULL);
 }
 
 static void imessage_gif_style_hint_for_friend(void) {
@@ -944,21 +987,23 @@ static void imessage_copy_bounded_null_and_empty(void) {
 }
 
 #if HU_IS_TEST
-static void imessage_typing_returns_ok_under_test(void) {
+static void imessage_start_typing_returns_ok(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
-    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
-    HU_ASSERT_EQ(ch.vtable->start_typing(ch.ctx, "+15551234567", 12), HU_OK);
-    HU_ASSERT_EQ(ch.vtable->stop_typing(ch.ctx, "+15551234567", 12), HU_OK);
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+1234567890", 12, NULL, 0, &ch), HU_OK);
+    HU_ASSERT_NOT_NULL(ch.vtable->start_typing);
+    HU_ASSERT_EQ(ch.vtable->start_typing(ch.ctx, "+1234567890", 12), HU_OK);
+    HU_ASSERT_NOT_NULL(ch.vtable->stop_typing);
+    HU_ASSERT_EQ(ch.vtable->stop_typing(ch.ctx, "+1234567890", 12), HU_OK);
     hu_imessage_destroy(&ch);
 }
 
-static void imessage_typing_null_ctx_no_crash(void) {
+static void imessage_start_typing_null_ctx_safe(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
-    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
-    (void)ch.vtable->start_typing(NULL, "+15551234567", 12);
-    (void)ch.vtable->stop_typing(NULL, "+15551234567", 12);
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+1234567890", 12, NULL, 0, &ch), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->start_typing(NULL, "+1234567890", 12), HU_OK);
+    HU_ASSERT_EQ(ch.vtable->stop_typing(NULL, "+1234567890", 12), HU_OK);
     hu_imessage_destroy(&ch);
 }
 
@@ -1003,6 +1048,7 @@ void run_imessage_adversarial_tests(void) {
     HU_RUN_TEST(imessage_send_rejects_empty_text_and_no_media);
     HU_RUN_TEST(imessage_send_media_only_accepted_as_voice_message);
     HU_RUN_TEST(imessage_send_truncates_overlong_text_to_4095);
+    HU_RUN_TEST(imessage_send_records_media_in_test);
     HU_RUN_TEST(imessage_poll_rejects_all_null_args);
     HU_RUN_TEST(imessage_poll_rejects_null_msgs_buffer);
     HU_RUN_TEST(imessage_poll_rejects_null_out_count);
@@ -1071,6 +1117,9 @@ void run_imessage_adversarial_tests(void) {
     HU_RUN_TEST(imessage_gif_cal_tracks_sends_and_reactions);
     HU_RUN_TEST(imessage_gif_probability_adjusts_by_relationship);
     HU_RUN_TEST(imessage_gif_should_send_deterministic_false_on_serious);
+    HU_RUN_TEST(imessage_should_send_music_on_music_mention);
+    HU_RUN_TEST(imessage_should_send_music_respects_zero_probability);
+    HU_RUN_TEST(imessage_build_music_prompt_includes_context);
 
     /* Part 9: Seen behavior / emotional intelligence */
     HU_RUN_TEST(imessage_seen_behavior_responds_to_question);
@@ -1118,8 +1167,8 @@ void run_imessage_adversarial_tests(void) {
 #if HU_IS_TEST
     HU_RUN_TEST(imessage_mark_read_returns_ok_under_test);
     HU_RUN_TEST(imessage_mark_read_null_ctx_no_crash);
-    HU_RUN_TEST(imessage_typing_returns_ok_under_test);
-    HU_RUN_TEST(imessage_typing_null_ctx_no_crash);
+    HU_RUN_TEST(imessage_start_typing_returns_ok);
+    HU_RUN_TEST(imessage_start_typing_null_ctx_safe);
     HU_RUN_TEST(imessage_set_use_imsg_cli_wires_to_context);
 #endif
 }

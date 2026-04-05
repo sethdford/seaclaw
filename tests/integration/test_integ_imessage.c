@@ -28,6 +28,11 @@
 
 #define S(lit) (lit), (sizeof(lit) - 1)
 
+static const char *get_test_target(void) {
+    const char *t = getenv("HU_IMESSAGE_TEST_TARGET");
+    return (t && t[0]) ? t : "test@example.com";
+}
+
 static bool chatdb_accessible(void) {
     const char *home = getenv("HOME");
     if (!home)
@@ -550,11 +555,12 @@ static void imessage_real_applescript_send_roundtrip(void) {
     sqlite3_close(db);
 
     /* Send a message to ourselves via the production channel */
+    const char *target = get_test_target();
+    size_t target_len = strlen(target);
     hu_channel_t ch;
-    hu_imessage_create(&alloc, "edisonsford@icloud.com", 22, NULL, 0, &ch);
+    hu_imessage_create(&alloc, target, target_len, NULL, 0, &ch);
     const char *probe = "h-uman integ roundtrip [probe-002]";
-    hu_error_t err =
-        ch.vtable->send(ch.ctx, "edisonsford@icloud.com", 22, probe, strlen(probe), NULL, 0);
+    hu_error_t err = ch.vtable->send(ch.ctx, target, target_len, probe, strlen(probe), NULL, 0);
     HU_ASSERT_EQ(err, HU_OK);
 
     /* Wait for chat.db to sync */
@@ -580,8 +586,10 @@ static void imessage_real_full_pipeline_end_to_end(void) {
     hu_allocator_t alloc = hu_system_allocator();
 
     /* 1. Create the iMessage channel (production, no HU_IS_TEST) */
+    const char *target = get_test_target();
+    size_t target_len = strlen(target);
     hu_channel_t ch;
-    hu_error_t err = hu_imessage_create(&alloc, "edisonsford@icloud.com", 22, NULL, 0, &ch);
+    hu_error_t err = hu_imessage_create(&alloc, target, target_len, NULL, 0, &ch);
     HU_ASSERT_EQ(err, HU_OK);
 
     /* 2. Health check — proves chat.db is readable */
@@ -594,11 +602,10 @@ static void imessage_real_full_pipeline_end_to_end(void) {
     HU_ASSERT_EQ(err, HU_OK);
 
     /* 4. Load real conversation history */
-    const char *contact = "+18012017497";
     hu_channel_history_entry_t *entries = NULL;
     size_t hist_count = 0;
-    err = ch.vtable->load_conversation_history(ch.ctx, &alloc, contact, strlen(contact), 10,
-                                                &entries, &hist_count);
+    err = ch.vtable->load_conversation_history(ch.ctx, &alloc, target, target_len, 10, &entries,
+                                                &hist_count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(hist_count > 0);
 
@@ -644,7 +651,7 @@ static void imessage_real_full_pipeline_end_to_end(void) {
         sqlite3_close(db);
     }
 
-    err = ch.vtable->send(ch.ctx, "edisonsford@icloud.com", 22, formatted, fmt_len, NULL, 0);
+    err = ch.vtable->send(ch.ctx, target, target_len, formatted, fmt_len, NULL, 0);
     HU_ASSERT_EQ(err, HU_OK);
 
     /* 9. Verify the message landed in chat.db */
@@ -666,7 +673,7 @@ static void imessage_real_full_pipeline_end_to_end(void) {
     }
 
     /* 10. Check bot suppression — human_active_recently should be true now */
-    bool active = ch.vtable->human_active_recently(ch.ctx, S("edisonsford@icloud.com"), 60);
+    bool active = ch.vtable->human_active_recently(ch.ctx, target, target_len, 60);
     HU_ASSERT_TRUE(active);
 
     /* Cleanup */

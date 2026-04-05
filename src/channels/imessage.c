@@ -111,6 +111,7 @@ typedef struct hu_imessage_ctx {
     size_t sent_ring_idx;
     char typing_last_target[128];
     size_t typing_last_target_len;
+    bool typing_active;
     bool use_imsg_cli;
     bool imsg_cli_checked;
     bool has_imsg_cli;
@@ -118,6 +119,8 @@ typedef struct hu_imessage_ctx {
 #if HU_IS_TEST
     char last_message[4096];
     size_t last_message_len;
+    size_t last_media_count;
+    char last_media_path[256];
     struct {
         char session_key[128];
         char content[4096];
@@ -504,6 +507,93 @@ size_t imessage_build_attach_script(char *out, size_t out_cap,
     return 0;
 }
 
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+/*
+ * Typing indicator with chat ID caching and group chat support.
+ * Caches target to skip expensive chat iteration on repeat sends.
+ * Skipped when the daemon already called start_typing (typing_active).
+ */
+static void imessage_simulate_typing(hu_imessage_ctx_t *c, const char *tgt, size_t tgt_len,
+                                     size_t message_len) {
+    if (!c || c->typing_active)
+        return;
+
+    unsigned int delay_ms = (unsigned int)(message_len * 25);
+    if (delay_ms < 800)
+        delay_ms = 800;
+    if (delay_ms > 4000)
+        delay_ms = 4000;
+
+    size_t tgt_esc_cap = tgt_len * 2 + 1;
+    if (tgt_esc_cap > 4096)
+        return;
+
+    char tgt_esc[4096];
+    escape_for_applescript(tgt_esc, sizeof(tgt_esc), tgt, tgt_len);
+
+    if (delay_ms <= 3000) {
+        bool same_target = (c->typing_last_target_len == tgt_len && tgt_len > 0 &&
+                            memcmp(c->typing_last_target, tgt, tgt_len) == 0);
+        if (tgt_len > 0 && tgt_len < sizeof(c->typing_last_target)) {
+            memcpy(c->typing_last_target, tgt, tgt_len);
+            c->typing_last_target[tgt_len] = '\0';
+            c->typing_last_target_len = tgt_len;
+        }
+
+        char typing_script[1024];
+        int ts_n;
+        if (same_target) {
+            ts_n = snprintf(typing_script, sizeof(typing_script),
+                            "tell application \"Messages\" to activate\n"
+                            "delay 0.2\n"
+                            "tell application \"System Events\" to tell process \"Messages\"\n"
+                            "  keystroke \".\"\n"
+                            "  delay %.1f\n"
+                            "  keystroke \"a\" using command down\n"
+                            "  key code 51\n"
+                            "end tell",
+                            (float)delay_ms / 1000.0f);
+        } else {
+            ts_n = snprintf(typing_script, sizeof(typing_script),
+                            "tell application \"Messages\"\n"
+                            "  activate\n"
+                            "  set targetHandle to \"%s\"\n"
+                            "  set targetChat to missing value\n"
+                            "  repeat with c in every chat\n"
+                            "    try\n"
+                            "      repeat with p in participants of c\n"
+                            "        if handle of p is targetHandle then\n"
+                            "          set targetChat to c\n"
+                            "          exit repeat\n"
+                            "        end if\n"
+                            "      end repeat\n"
+                            "    end try\n"
+                            "    if targetChat is not missing value then exit repeat\n"
+                            "  end repeat\n"
+                            "end tell\n"
+                            "delay 0.3\n"
+                            "tell application \"System Events\" to tell process \"Messages\"\n"
+                            "  keystroke \".\"\n"
+                            "  delay %.1f\n"
+                            "  keystroke \"a\" using command down\n"
+                            "  key code 51\n"
+                            "end tell",
+                            tgt_esc, (float)delay_ms / 1000.0f);
+        }
+        if (ts_n > 0 && (size_t)ts_n < sizeof(typing_script)) {
+            const char *ts_argv[] = {"osascript", "-e", typing_script, NULL};
+            hu_run_result_t ts_result = {0};
+            hu_error_t ts_err = hu_process_run(c->alloc, ts_argv, NULL, 65536, &ts_result);
+            hu_run_result_free(c->alloc, &ts_result);
+            if (ts_err != HU_OK && getenv("HU_DEBUG"))
+                hu_log_error("imessage", NULL, "typing indicator failed (accessibility?)");
+        }
+    } else {
+        usleep(delay_ms * 1000);
+    }
+}
+#endif
+
 #endif
 
 static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len,
@@ -521,8 +611,16 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
             return HU_ERR_INVALID_ARGUMENT;
         if (message_len == 0 && media_count == 0)
             return HU_ERR_INVALID_ARGUMENT;
-        (void)media;
-        (void)media_count;
+        c->last_media_count = media_count;
+        if (media && media_count > 0 && media[0]) {
+            size_t mp_len = strlen(media[0]);
+            if (mp_len > sizeof(c->last_media_path) - 1)
+                mp_len = sizeof(c->last_media_path) - 1;
+            memcpy(c->last_media_path, media[0], mp_len);
+            c->last_media_path[mp_len] = '\0';
+        } else {
+            c->last_media_path[0] = '\0';
+        }
         size_t len = message_len > 4095 ? 4095 : message_len;
         if (message && len > 0)
             memcpy(c->last_message, message, len);
@@ -626,6 +724,8 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
             }
         }
 
+        imessage_simulate_typing(c, tgt, tgt_len, message_len);
+
         {
             bool try_imsg = c->use_imsg_cli;
 #ifdef HU_IMESSAGE_SEND_IMSG
@@ -691,83 +791,6 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
                          "  send \"%s\" to targetBuddy\n"
                          "end tell",
                          tgt_esc, msg_esc);
-        /* Typing indicator with chat ID caching and group chat support.
-         * Caches target to skip expensive chat iteration on repeat sends. */
-#ifndef HU_IS_TEST
-        {
-            unsigned int delay_ms = (unsigned int)(message_len * 25);
-            if (delay_ms < 800)
-                delay_ms = 800;
-            if (delay_ms > 4000)
-                delay_ms = 4000;
-
-            if (delay_ms <= 3000) {
-                bool same_target = (c->typing_last_target_len == tgt_len && tgt_len > 0 &&
-                                    memcmp(c->typing_last_target, tgt, tgt_len) == 0);
-                if (tgt_len > 0 && tgt_len < sizeof(c->typing_last_target)) {
-                    memcpy(c->typing_last_target, tgt, tgt_len);
-                    c->typing_last_target[tgt_len] = '\0';
-                    c->typing_last_target_len = tgt_len;
-                }
-
-                char typing_script[1024];
-                int ts_n;
-                if (same_target) {
-                    /* Same conversation — type directly without navigation */
-                    ts_n =
-                        snprintf(typing_script, sizeof(typing_script),
-                                 "tell application \"Messages\" to activate\n"
-                                 "delay 0.2\n"
-                                 "tell application \"System Events\" to tell process \"Messages\"\n"
-                                 "  keystroke \".\"\n"
-                                 "  delay %.1f\n"
-                                 "  keystroke \"a\" using command down\n"
-                                 "  key code 51\n"
-                                 "end tell",
-                                 (float)delay_ms / 1000.0f);
-                } else {
-                    /* Navigate to conversation via scripting dictionary,
-                     * then simulate typing in System Events */
-                    ts_n =
-                        snprintf(typing_script, sizeof(typing_script),
-                                 "tell application \"Messages\"\n"
-                                 "  activate\n"
-                                 "  set targetHandle to \"%s\"\n"
-                                 "  set targetChat to missing value\n"
-                                 "  repeat with c in every chat\n"
-                                 "    try\n"
-                                 "      repeat with p in participants of c\n"
-                                 "        if handle of p is targetHandle then\n"
-                                 "          set targetChat to c\n"
-                                 "          exit repeat\n"
-                                 "        end if\n"
-                                 "      end repeat\n"
-                                 "    end try\n"
-                                 "    if targetChat is not missing value then exit repeat\n"
-                                 "  end repeat\n"
-                                 "end tell\n"
-                                 "delay 0.3\n"
-                                 "tell application \"System Events\" to tell process \"Messages\"\n"
-                                 "  keystroke \".\"\n"
-                                 "  delay %.1f\n"
-                                 "  keystroke \"a\" using command down\n"
-                                 "  key code 51\n"
-                                 "end tell",
-                                 tgt_esc, (float)delay_ms / 1000.0f);
-                }
-                if (ts_n > 0 && (size_t)ts_n < sizeof(typing_script)) {
-                    const char *ts_argv[] = {"osascript", "-e", typing_script, NULL};
-                    hu_run_result_t ts_result = {0};
-                    hu_error_t ts_err = hu_process_run(c->alloc, ts_argv, NULL, 65536, &ts_result);
-                    hu_run_result_free(c->alloc, &ts_result);
-                    if (ts_err != HU_OK && getenv("HU_DEBUG"))
-                        hu_log_error("imessage", NULL, "typing indicator failed (accessibility?)");
-                }
-            } else {
-                usleep(delay_ms * 1000);
-            }
-        }
-#endif
 
         c->alloc->free(c->alloc->ctx, msg_esc, msg_esc_cap);
         c->alloc->free(c->alloc->ctx, tgt_esc, tgt_esc_cap);
@@ -1963,6 +1986,8 @@ static hu_error_t imessage_start_typing(void *ctx, const char *recipient,
     hu_run_result_free(c->alloc, &result);
     if (!ok && getenv("HU_DEBUG"))
         hu_log_error("imessage", NULL, "start_typing failed (accessibility?)");
+    if (ok)
+        c->typing_active = true;
     return ok ? HU_OK : (err != HU_OK ? err : HU_ERR_INTERNAL);
 #endif
 }
@@ -1997,6 +2022,7 @@ static hu_error_t imessage_stop_typing(void *ctx, const char *recipient,
     hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
     bool ok = (err == HU_OK && result.exit_code == 0);
     hu_run_result_free(c->alloc, &result);
+    c->typing_active = false;
     return ok ? HU_OK : (err != HU_OK ? err : HU_ERR_INTERNAL);
 #endif
 }
@@ -2624,6 +2650,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
 
 #if !HU_IS_TEST && defined(HU_HTTP_CURL)
 #include "human/core/http.h"
+#include "human/core/json.h"
 
 /* Simple JSON string extractor: find "key":"value" and return value.
  * Writes into out (up to cap). Returns length or 0 on failure. */
@@ -2694,17 +2721,46 @@ char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t que
     char gif_url[512];
     size_t gif_url_len = 0;
 
-    /* Find "gif" media format section, then extract "url" within it */
-    const char *gif_section = NULL;
-    for (size_t i = 0; i + 5 < resp.body_len; i++) {
-        if (resp.body[i] == '"' && memcmp(resp.body + i, "\"gif\"", 5) == 0) {
-            gif_section = resp.body + i;
-            break;
+    hu_json_value_t *root = NULL;
+    if (hu_json_parse(alloc, resp.body, resp.body_len, &root) == HU_OK && root) {
+        hu_json_value_t *results = hu_json_object_get(root, "results");
+        hu_json_value_t *first = NULL;
+        if (results && results->type == HU_JSON_ARRAY && results->data.array.len > 0)
+            first = results->data.array.items[0];
+        if (first && first->type == HU_JSON_OBJECT) {
+            hu_json_value_t *media_formats = hu_json_object_get(first, "media_formats");
+            if (media_formats && media_formats->type == HU_JSON_OBJECT) {
+                hu_json_value_t *gif_obj = hu_json_object_get(media_formats, "gif");
+                if (gif_obj && gif_obj->type == HU_JSON_OBJECT) {
+                    const char *media_url = hu_json_get_string(gif_obj, "url");
+                    if (media_url) {
+                        size_t ulen = strlen(media_url);
+                        if (ulen >= sizeof(gif_url))
+                            ulen = sizeof(gif_url) - 1;
+                        memcpy(gif_url, media_url, ulen);
+                        gif_url[ulen] = '\0';
+                        gif_url_len = ulen;
+                    }
+                }
+            }
         }
+        hu_json_free(alloc, root);
     }
-    if (gif_section) {
-        size_t remaining = resp.body_len - (size_t)(gif_section - resp.body);
-        gif_url_len = gif_json_extract(gif_section, remaining, "url", gif_url, sizeof(gif_url));
+
+    if (gif_url_len == 0) {
+        /* Fallback if parse failed or response shape changed (field order, etc.) */
+        const char *gif_section = NULL;
+        for (size_t i = 0; i + 5 < resp.body_len; i++) {
+            if (resp.body[i] == '"' && memcmp(resp.body + i, "\"gif\"", 5) == 0) {
+                gif_section = resp.body + i;
+                break;
+            }
+        }
+        if (gif_section) {
+            size_t remaining = resp.body_len - (size_t)(gif_section - resp.body);
+            gif_url_len =
+                gif_json_extract(gif_section, remaining, "url", gif_url, sizeof(gif_url));
+        }
     }
 
     hu_http_response_free(alloc, &resp);
@@ -2896,5 +2952,12 @@ void hu_imessage_test_get_last_reaction(hu_channel_t *ch, hu_reaction_type_t *ou
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ch->ctx;
     *out_reaction = c->last_reaction;
     *out_message_id = c->last_reaction_message_id;
+}
+
+size_t hu_imessage_test_get_last_media_count(hu_channel_t *ch) {
+    if (!ch || !ch->ctx)
+        return 0;
+    hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ch->ctx;
+    return c->last_media_count;
 }
 #endif

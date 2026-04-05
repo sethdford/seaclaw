@@ -17,6 +17,7 @@
 #include "human/persona/somatic.h"
 #include "human/agent/frontier_persist.h"
 #include "human/eval/consistency.h"
+#include "human/cognition/episodic.h"
 #include "human/agent/model_router.h"
 #include "human/security/moderation.h"
 #include "human/core/string.h"
@@ -326,10 +327,21 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
 #ifdef HU_HAS_PERSONA
     if (agent->persona) {
         if (agent->lean_prompt) {
-            /* Lean persona: core_anchor + reinforcement + anti_patterns + style_rules
-             * + channel overlay only. ~3-4KB instead of ~22KB. */
+            /* Lean persona: hard output constraint + core_anchor + reinforcement
+             * + anti_patterns + style_rules + channel overlay. ~3-5KB. */
             char lp[8192];
             size_t lpo = 0;
+            {
+                static const char preamble[] =
+                    "You ARE Seth, 45, tech entrepreneur. You live alone with your cat. "
+                    "Your kids do NOT live with you. Output ONLY what Seth would type in "
+                    "iMessage — nothing else. No reasoning, no parentheses, no "
+                    "meta-commentary, no analysis. Just the raw text message, exactly as "
+                    "it would appear on screen. No emoji unless you'd actually use one. "
+                    "Keep it short, casual, lowercase-leaning. ASCII text only.\n\n";
+                int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s", preamble);
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            }
             const hu_persona_t *p = agent->persona;
             if (p->core_anchor) {
                 int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s\n\n", p->core_anchor);
@@ -757,7 +769,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * so we can run the quality pipeline before the user sees the response. */
         bool quality_buffered = false;
 #ifndef HU_IS_TEST
-        quality_buffered = agent->sota.gvr_config.enabled || agent->constitutional_enabled;
+        if (!agent->lean_prompt)
+            quality_buffered = agent->sota.gvr_config.enabled || agent->constitutional_enabled;
 #endif
         hu_emotional_weight_t v2_ew = hu_emotional_weight_classify(msg, msg_len);
         uint32_t v2_pacing = (uint32_t)hu_emotional_pacing_adjust(0, v2_ew);
@@ -943,7 +956,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
          * Short + in-persona + has follow-up question = good, skip rethink.
          * Short + formal/no-question = needs help, do rethink. */
         bool needs_rethink = false;
-        if (agent->persona && final_content_len > 0 && final_content_len < 100 && msg_len > 15 &&
+        if (agent->persona && !agent->lean_prompt && final_content_len > 0 &&
+            final_content_len < 100 && msg_len > 15 &&
             agent->provider.vtable && agent->provider.vtable->chat_with_system) {
             bool has_question = (memchr(final_content, '?', final_content_len) != NULL);
             bool starts_lowercase = (final_content[0] >= 'a' && final_content[0] <= 'z');
@@ -1006,8 +1020,9 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         }
 #endif /* HU_HAS_PERSONA */
 
-        /* 2. Constitutional AI: critique against principles, rewrite if needed */
-        if (agent->constitutional_enabled) {
+        /* 2. Constitutional AI: critique against principles, rewrite if needed.
+         * Skip in lean_prompt mode — extra LLM round-trip is too slow for texting. */
+        if (agent->constitutional_enabled && !agent->lean_prompt) {
             hu_constitutional_config_t const_cfg = hu_constitutional_config_default();
             hu_critique_result_t critique;
             memset(&critique, 0, sizeof(critique));
@@ -1126,7 +1141,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             hu_sycophancy_result_t syc_post;
             memset(&syc_post, 0, sizeof(syc_post));
             if (hu_sycophancy_check(final_content, final_content_len, msg, msg_len,
-                                    0.5f, &syc_post) == HU_OK && syc_post.flagged) {
+                                    HU_SYCOPHANCY_THRESHOLD, &syc_post) == HU_OK && syc_post.flagged) {
                 hu_log_info("agent_stream_v2", NULL,
                             "sycophancy flagged: risk=%.2f patterns=%zu",
                             syc_post.total_risk, syc_post.pattern_count);
@@ -1143,14 +1158,75 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             }
         }
 
-        /* Outbound moderation: check the response for safety */
+        /* Outbound moderation: check the response for safety (matches batch) */
         {
             hu_moderation_result_t mod_result;
+            memset(&mod_result, 0, sizeof(mod_result));
             if (hu_moderation_check_local(agent->alloc, final_content, final_content_len,
                                           &mod_result) == HU_OK && mod_result.flagged) {
                 hu_log_info("agent_stream_v2", NULL,
                             "outbound moderation flagged response (violence=%d self_harm=%d)",
                             mod_result.violence, mod_result.self_harm);
+                if (mod_result.self_harm) {
+                    static const char crisis[] =
+                        "\n\nIf you're in crisis, please reach out: "
+                        "988 Suicide & Crisis Lifeline (call/text 988), "
+                        "Crisis Text Line (text HOME to 741741)";
+                    size_t new_len = final_content_len + sizeof(crisis) - 1;
+                    char *expanded =
+                        (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
+                    if (expanded) {
+                        memcpy(expanded, final_content, final_content_len);
+                        memcpy(expanded + final_content_len, crisis, sizeof(crisis) - 1);
+                        expanded[new_len] = '\0';
+                        agent->alloc->free(agent->alloc->ctx, final_content,
+                                           final_content_len + 1);
+                        final_content = expanded;
+                        final_content_len = new_len;
+                    }
+                }
+                if (mod_result.violence) {
+                    static const char deesc[] =
+                        "[SAFETY] This response touches on violence. "
+                        "De-escalate: acknowledge feelings without "
+                        "endorsing harm. Redirect toward constructive alternatives.";
+                    size_t dir_len = sizeof(deesc) - 1;
+                    size_t new_len = dir_len + 2 + final_content_len;
+                    char *safe = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
+                    if (safe) {
+                        memcpy(safe, deesc, dir_len);
+                        safe[dir_len] = '\n';
+                        safe[dir_len + 1] = '\n';
+                        memcpy(safe + dir_len + 2, final_content, final_content_len);
+                        safe[new_len] = '\0';
+                        agent->alloc->free(agent->alloc->ctx, final_content,
+                                           final_content_len + 1);
+                        final_content = safe;
+                        final_content_len = new_len;
+                    }
+                }
+                if (mod_result.hate) {
+                    static const char boundary[] =
+                        "[SAFETY] This response contains content "
+                        "targeting groups based on identity. Set a "
+                        "clear boundary: \"I can't engage with content "
+                        "that targets people based on who they are.\" "
+                        "Redirect the conversation respectfully.";
+                    size_t dir_len = sizeof(boundary) - 1;
+                    size_t new_len = dir_len + 2 + final_content_len;
+                    char *safe = (char *)agent->alloc->alloc(agent->alloc->ctx, new_len + 1);
+                    if (safe) {
+                        memcpy(safe, boundary, dir_len);
+                        safe[dir_len] = '\n';
+                        safe[dir_len + 1] = '\n';
+                        memcpy(safe + dir_len + 2, final_content, final_content_len);
+                        safe[new_len] = '\0';
+                        agent->alloc->free(agent->alloc->ctx, final_content,
+                                           final_content_len + 1);
+                        final_content = safe;
+                        final_content_len = new_len;
+                    }
+                }
             }
         }
 
@@ -1160,7 +1236,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             if (hu_consistency_score_line(agent->conversation_context,
                                           agent->conversation_context_len,
                                           final_content, final_content_len,
-                                          &line_score) == HU_OK && line_score < 0.3f) {
+                                          &line_score) == HU_OK && line_score < HU_CONSISTENCY_DRIFT_THRESHOLD) {
                 hu_log_info("agent_stream_v2", NULL,
                             "consistency drift detected: score=%.2f", line_score);
                 if (agent->observer) {
@@ -1188,7 +1264,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     if (stored_count > 0)
                         hu_fact_dedup(&fact_res, stored_facts, stored_count);
                     for (size_t fi = 0; fi < fact_res.fact_count; fi++) {
-                        if (fact_res.facts[fi].confidence < 0.6f) continue;
+                        if (fact_res.facts[fi].confidence < HU_FACT_CONFIDENCE_MIN) continue;
                         bool dup = false;
                         for (size_t si = 0; si < stored_count && !dup; si++) {
                             if (strcmp(fact_res.facts[fi].subject, stored_facts[si].subject) == 0 &&
@@ -1217,11 +1293,60 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
     }
 
     if (final_content) {
+        /* If post-processing revised the content, update the stored history entry
+         * so conversation state matches the user-visible response. */
+        if (agent->history_count > 0 &&
+            agent->history[agent->history_count - 1].role == HU_ROLE_ASSISTANT &&
+            (agent->history[agent->history_count - 1].content_len != final_content_len ||
+             memcmp(agent->history[agent->history_count - 1].content,
+                    final_content, final_content_len) != 0)) {
+            char *revised = hu_strndup(agent->alloc, final_content, final_content_len);
+            if (revised) {
+                if (agent->history[agent->history_count - 1].content)
+                    agent->alloc->free(agent->alloc->ctx,
+                        (void *)agent->history[agent->history_count - 1].content,
+                        agent->history[agent->history_count - 1].content_len + 1);
+                agent->history[agent->history_count - 1].content = revised;
+                agent->history[agent->history_count - 1].content_len = final_content_len;
+            }
+        }
         *response_out = final_content;
         if (response_len_out)
             *response_len_out = final_content_len;
         hu_agent_internal_maybe_tts(agent, final_content, final_content_len);
     }
+
+    /* Episodic memory: extract patterns from this turn (matches batch path) */
+#ifdef HU_ENABLE_SQLITE
+    if (final_content && agent->infra.cognition_db && agent->memory_session_id) {
+        hu_episodic_session_summary_t esum = {
+            .session_id = agent->memory_session_id,
+            .session_id_len = agent->memory_session_id_len,
+            .tool_names = NULL,
+            .tool_count = 0,
+            .skill_names = NULL,
+            .skill_count = 0,
+            .had_positive_feedback = false,
+            .had_correction = false,
+            .topic = msg,
+            .topic_len = msg_len > 256 ? 256 : msg_len,
+        };
+        static const char tt[] = "tool_execution";
+        const char *ep_tool_row[1] = { tt };
+        if (agent->history_count > 1) {
+            for (size_t hi = agent->history_count; hi > 0; hi--) {
+                if (agent->history[hi - 1].role == HU_ROLE_TOOL) {
+                    esum.tool_names = ep_tool_row;
+                    esum.tool_count = 1;
+                    break;
+                }
+                if (agent->history[hi - 1].role == HU_ROLE_USER)
+                    break;
+            }
+        }
+        (void)hu_episodic_extract_and_store(agent->infra.cognition_db, agent->alloc, &esum);
+    }
+#endif
 
     /* Persist frontier state after streaming turn (matches batch path) */
 #ifdef HU_ENABLE_SQLITE

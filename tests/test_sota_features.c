@@ -396,10 +396,13 @@ static void trust_update_modifies_composite(void) {
     memset(&state, 0, sizeof(state));
     hu_tcal_init(&state);
     float before = state.composite;
+    HU_ASSERT_TRUE(before > 0.0f);
     hu_tcal_update(&state, 0.9f, 0.8f, 0.7f);
     HU_ASSERT_TRUE(state.dimensions.competence > before);
     HU_ASSERT_TRUE(state.dimensions.benevolence > before);
     HU_ASSERT_TRUE(state.dimensions.integrity > before);
+    HU_ASSERT_TRUE(state.composite != before);
+    HU_ASSERT_TRUE(state.composite > before);
 }
 
 static void somatic_low_energy_below_threshold(void) {
@@ -433,6 +436,14 @@ static void fact_extract_basic_statement(void) {
     memset(&res, 0, sizeof(res));
     HU_ASSERT_EQ(hu_fact_extract(text, strlen(text), &res), HU_OK);
     HU_ASSERT_TRUE(res.fact_count > 0);
+    bool found_name = false, found_location = false;
+    for (size_t i = 0; i < res.fact_count; i++) {
+        if (strstr(res.facts[i].subject, "lice") || strstr(res.facts[i].object, "lice"))
+            found_name = true;
+        if (strstr(res.facts[i].object, "oston") || strstr(res.facts[i].predicate, "live"))
+            found_location = true;
+    }
+    HU_ASSERT_TRUE(found_name || found_location);
 }
 
 static void fact_dedup_removes_duplicates(void) {

@@ -426,27 +426,30 @@ hu_error_t hu_contact_profile_build_context(hu_allocator_t *alloc, const hu_cont
     if (cp->dynamic) {
         pos = hu_buf_appendf(buf, cap, pos, "Dynamic: %s\n", cp->dynamic);
     }
-    if (cp->interests_count > 0) {
+    if (cp->interests_count > 0 && cp->interests) {
         pos = hu_buf_appendf(buf, cap, pos, "Interests:");
         for (size_t i = 0; i < cp->interests_count; i++) {
-            pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->interests[i],
-                                 i + 1 < cp->interests_count ? "," : "");
+            if (cp->interests[i])
+                pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->interests[i],
+                                     i + 1 < cp->interests_count ? "," : "");
         }
         pos = hu_buf_appendf(buf, cap, pos, "\n");
     }
-    if (cp->recent_topics_count > 0) {
+    if (cp->recent_topics_count > 0 && cp->recent_topics) {
         pos = hu_buf_appendf(buf, cap, pos, "Recent topics:");
         for (size_t i = 0; i < cp->recent_topics_count; i++) {
-            pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->recent_topics[i],
-                                 i + 1 < cp->recent_topics_count ? "," : "");
+            if (cp->recent_topics[i])
+                pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->recent_topics[i],
+                                     i + 1 < cp->recent_topics_count ? "," : "");
         }
         pos = hu_buf_appendf(buf, cap, pos, "\n");
     }
-    if (cp->sensitive_topics_count > 0) {
+    if (cp->sensitive_topics_count > 0 && cp->sensitive_topics) {
         pos = hu_buf_appendf(buf, cap, pos, "Sensitive topics (be careful):");
         for (size_t i = 0; i < cp->sensitive_topics_count; i++) {
-            pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->sensitive_topics[i],
-                                 i + 1 < cp->sensitive_topics_count ? "," : "");
+            if (cp->sensitive_topics[i])
+                pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->sensitive_topics[i],
+                                     i + 1 < cp->sensitive_topics_count ? "," : "");
         }
         pos = hu_buf_appendf(buf, cap, pos, "\n");
     }
@@ -458,11 +461,12 @@ hu_error_t hu_contact_profile_build_context(hu_allocator_t *alloc, const hu_cont
         pos = hu_buf_appendf(buf, cap, pos,
                              "Pattern: They prefer short texts. Keep yours short too.\n");
     }
-    if (cp->allowed_behaviors_count > 0) {
+    if (cp->allowed_behaviors_count > 0 && cp->allowed_behaviors) {
         pos = hu_buf_appendf(buf, cap, pos, "With this person you're allowed to:");
         for (size_t i = 0; i < cp->allowed_behaviors_count; i++) {
-            pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->allowed_behaviors[i],
-                                 i + 1 < cp->allowed_behaviors_count ? "," : "");
+            if (cp->allowed_behaviors[i])
+                pos = hu_buf_appendf(buf, cap, pos, " %s%s", cp->allowed_behaviors[i],
+                                     i + 1 < cp->allowed_behaviors_count ? "," : "");
         }
         pos = hu_buf_appendf(buf, cap, pos, "\n");
     }
@@ -786,6 +790,8 @@ static hu_error_t parse_string_array(hu_allocator_t *a, const hu_json_value_t *a
     size_t n = arr->data.array.len;
     if (n == 0)
         return HU_OK;
+    if (n > 100000 || n > SIZE_MAX / sizeof(char *))
+        return HU_ERR_INVALID_ARGUMENT;
     char **buf = (char **)a->alloc(a->ctx, n * sizeof(char *));
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;

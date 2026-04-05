@@ -191,14 +191,16 @@ hu_error_t hu_frontier_persist_save(hu_allocator_t *alloc, sqlite3 *db,
     sqlite3_bind_int(stmt, 28, (int)state->trust.interaction_count);
     /* Preserve existing relationship data if the row already exists.
      * Relationship is saved separately via save_relationship, but INSERT OR
-     * REPLACE would overwrite the whole row; use COALESCE to keep old values. */
+     * REPLACE would overwrite the whole row; read old values and re-bind them.
+     * If the pre-read fails, bail out rather than risk zeroing rel columns. */
     {
         int old_stage = 0, old_sc = 0, old_tt = 0;
         static const char rsel[] =
             "SELECT rel_stage, rel_session_count, rel_total_turns "
             "FROM frontier_state WHERE contact_id = ?1";
         sqlite3_stmt *rs = NULL;
-        if (sqlite3_prepare_v2(db, rsel, -1, &rs, NULL) == SQLITE_OK) {
+        int rrc = sqlite3_prepare_v2(db, rsel, -1, &rs, NULL);
+        if (rrc == SQLITE_OK) {
             sqlite3_bind_text(rs, 1, contact_id, (int)contact_id_len, SQLITE_STATIC);
             if (sqlite3_step(rs) == SQLITE_ROW) {
                 old_stage = sqlite3_column_int(rs, 0);
@@ -206,6 +208,9 @@ hu_error_t hu_frontier_persist_save(hu_allocator_t *alloc, sqlite3 *db,
                 old_tt = sqlite3_column_int(rs, 2);
             }
             sqlite3_finalize(rs);
+        } else {
+            sqlite3_finalize(stmt);
+            return HU_ERR_IO;
         }
         sqlite3_bind_int(stmt, 29, old_stage);
         sqlite3_bind_int(stmt, 30, old_sc);
@@ -310,24 +315,32 @@ hu_error_t hu_frontier_persist_save_growth(hu_allocator_t *alloc, sqlite3 *db,
     if (!state->initialized)
         return HU_OK;
 
-    static const char *del_sql = "DELETE FROM growth_records WHERE contact_id = ?1";
+    sqlite3_exec(db, "BEGIN", NULL, NULL, NULL);
+
+    static const char del_sql[] = "DELETE FROM growth_records WHERE contact_id = ?1";
     sqlite3_stmt *del_stmt = NULL;
     int del_rc = sqlite3_prepare_v2(db, del_sql, -1, &del_stmt, NULL);
-    if (del_rc != SQLITE_OK)
+    if (del_rc != SQLITE_OK) {
+        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
         return HU_ERR_IO;
+    }
     sqlite3_bind_text(del_stmt, 1, contact_id, (int)contact_id_len, SQLITE_STATIC);
     del_rc = sqlite3_step(del_stmt);
     sqlite3_finalize(del_stmt);
-    if (del_rc != SQLITE_DONE)
+    if (del_rc != SQLITE_DONE) {
+        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
         return HU_ERR_IO;
+    }
 
     static const char ins[] =
         "INSERT INTO growth_records (contact_id, type, text, evidence, confidence, "
         "significance, surfaced, timestamp) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)";
 
     sqlite3_stmt *ins_stmt = NULL;
-    if (sqlite3_prepare_v2(db, ins, -1, &ins_stmt, NULL) != SQLITE_OK)
+    if (sqlite3_prepare_v2(db, ins, -1, &ins_stmt, NULL) != SQLITE_OK) {
+        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
         return HU_ERR_IO;
+    }
 
     const hu_growth_narrative_t *gn = &state->growth;
     for (size_t i = 0; i < gn->observation_count; i++) {
@@ -346,6 +359,7 @@ hu_error_t hu_frontier_persist_save_growth(hu_allocator_t *alloc, sqlite3 *db,
         sqlite3_reset(ins_stmt);
         if (step_rc != SQLITE_DONE) {
             sqlite3_finalize(ins_stmt);
+            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
             return HU_ERR_IO;
         }
     }
@@ -364,10 +378,12 @@ hu_error_t hu_frontier_persist_save_growth(hu_allocator_t *alloc, sqlite3 *db,
         sqlite3_reset(ins_stmt);
         if (step_rc != SQLITE_DONE) {
             sqlite3_finalize(ins_stmt);
+            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
             return HU_ERR_IO;
         }
     }
     sqlite3_finalize(ins_stmt);
+    sqlite3_exec(db, "COMMIT", NULL, NULL, NULL);
     return HU_OK;
 }
 
@@ -417,7 +433,9 @@ hu_error_t hu_frontier_persist_save_relationship(sqlite3 *db, const char *contac
                                                   int session_count, int total_turns) {
     if (!db || !contact_id || contact_id_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
-    hu_frontier_persist_ensure_table(db);
+    hu_error_t et_err = hu_frontier_persist_ensure_table(db);
+    if (et_err != HU_OK)
+        return et_err;
 
     /* UPDATE first — fast path when the row already exists (the common case,
      * since hu_frontier_persist_save runs before this call). */

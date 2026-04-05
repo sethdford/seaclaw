@@ -217,7 +217,8 @@ static bool hu_daemon_director_call(hu_allocator_t *alloc, const char *combined,
 
     static const char director_system[] =
         "You are a dialogue director for a texting scene. The actor plays Seth, a 45yo "
-        "tech guy and single dad. Decide his BEHAVIOR — not just words.\n\n"
+        "tech entrepreneur. Lives alone with his cat. Kids don't live with him. "
+        "Decide his BEHAVIOR — not just words.\n\n"
         "Reply in this exact format (one line, pipe-separated):\n"
         "action:<text|tapback|silence>[|delay_s:N][|reaction:<heart|haha|thumbs_up|emphasis>]"
         "[|burst:true][|direction:...]\n\n"
@@ -8604,6 +8605,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 "agent turn result: err=%s response_len=%zu for %.*s",
                                 hu_error_string(err), response_len,
                                 (int)(key_len > 20 ? 20 : key_len), batch_key);
+                    /* Hex dump first 80 bytes of response for encoding diagnostics */
+                    if (err == HU_OK && response && response_len > 0) {
+                        char hex[256];
+                        size_t hlen = 0;
+                        size_t dump_n = response_len < 80 ? response_len : 80;
+                        for (size_t hi = 0; hi < dump_n && hlen + 3 < sizeof(hex); hi++) {
+                            static const char hx[] = "0123456789abcdef";
+                            unsigned char rb = (unsigned char)response[hi];
+                            hex[hlen++] = hx[rb >> 4];
+                            hex[hlen++] = hx[rb & 0xf];
+                            hex[hlen++] = ' ';
+                        }
+                        hex[hlen] = '\0';
+                        hu_log_info("human", agent ? agent->observer : NULL,
+                                    "response hex[0..%zu]: %s", dump_n, hex);
+                    }
                     if (err != HU_OK)
                         hu_log_error("human", agent ? agent->observer : NULL,
                                      "agent turn failed for %.*s: %s", (int)key_len, batch_key,
@@ -8618,6 +8635,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         hu_turing_score_heuristic(response, response_len, combined, combined_len, &best_ts);
                         if (agent->active_channel)
                             hu_turing_apply_channel_weights(&best_ts, agent->active_channel, agent->active_channel_len);
+#ifdef HU_HAS_PERSONA
+                        if (agent->persona && agent->persona->traits_count > 0)
+                            hu_turing_apply_persona_alignment(&best_ts, response, response_len,
+                                (const char *const *)agent->persona->traits, agent->persona->traits_count,
+                                (const char *const *)agent->persona->preferred_vocab, agent->persona->preferred_vocab_count,
+                                (const char *const *)agent->persona->avoided_vocab, agent->persona->avoided_vocab_count);
+#endif
                         int best_score = best_ts.overall;
                         double orig_temp = agent->turn_temperature;
                         for (uint32_t ci = 0; ci < n_extra; ci++) {
@@ -8639,6 +8663,13 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             hu_turing_score_t cand_ts;
                             hu_turing_score_heuristic(cand, cand_len, combined, combined_len, &cand_ts);
                             if (agent->active_channel) hu_turing_apply_channel_weights(&cand_ts, agent->active_channel, agent->active_channel_len);
+#ifdef HU_HAS_PERSONA
+                            if (agent->persona && agent->persona->traits_count > 0)
+                                hu_turing_apply_persona_alignment(&cand_ts, cand, cand_len,
+                                    (const char *const *)agent->persona->traits, agent->persona->traits_count,
+                                    (const char *const *)agent->persona->preferred_vocab, agent->persona->preferred_vocab_count,
+                                    (const char *const *)agent->persona->avoided_vocab, agent->persona->avoided_vocab_count);
+#endif
                             hu_log_info("human", agent ? agent->observer : NULL, "bon candidate %u/%u: score=%d (best=%d)", ci + 2, config->agent.best_of_n, cand_ts.overall, best_score);
                             if (cand_ts.overall > best_score) {
                                 hu_dpo_record_from_retry(&agent->sota.dpo_collector, combined, combined_len, response, response_len, cand, cand_len);
@@ -8831,6 +8862,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (pre_ts_err == HU_OK && agent->active_channel)
                             hu_turing_apply_channel_weights(&pre_tscore, agent->active_channel,
                                                             agent->active_channel_len);
+#ifdef HU_HAS_PERSONA
+                        if (pre_ts_err == HU_OK && agent->persona &&
+                            agent->persona->traits_count > 0)
+                            hu_turing_apply_persona_alignment(&pre_tscore, response, response_len,
+                                (const char *const *)agent->persona->traits, agent->persona->traits_count,
+                                (const char *const *)agent->persona->preferred_vocab, agent->persona->preferred_vocab_count,
+                                (const char *const *)agent->persona->avoided_vocab, agent->persona->avoided_vocab_count);
+#endif
                         if (pre_ts_err == HU_OK && pre_tscore.overall < 6) {
                             retried = true;
                             hu_log_info("human", agent ? agent->observer : NULL,
@@ -10063,29 +10102,73 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         const char *eff_ch = ch->channel->vtable->name
                                                  ? ch->channel->vtable->name(ch->channel->ctx)
                                                  : "unknown";
-                        /* Strip invalid UTF-8 sequences (local models sometimes emit garbled bytes) */
+                        /* Strip invalid UTF-8 and surrogate-encoded garbage.
+                         * Keeps: ASCII printable, newlines, valid multi-byte UTF-8 (including emoji).
+                         * Strips: invalid sequences, lone surrogates (U+D800-U+DFFF encoded as 3-byte). */
                         {
                             size_t w = 0;
                             for (size_t r = 0; r < response_len; ) {
                                 unsigned char b = (unsigned char)response[r];
-                                size_t seq = 0;
-                                if (b < 0x80) seq = 1;
-                                else if ((b & 0xE0) == 0xC0) seq = 2;
-                                else if ((b & 0xF0) == 0xE0) seq = 3;
-                                else if ((b & 0xF8) == 0xF0) seq = 4;
-                                if (seq == 0 || r + seq > response_len) { r++; continue; }
-                                bool ok = true;
-                                for (size_t k = 1; k < seq; k++) {
-                                    if (((unsigned char)response[r + k] & 0xC0) != 0x80) { ok = false; break; }
+                                if (b < 0x80) {
+                                    if (b >= 0x20 || b == '\n' || b == '\t')
+                                        response[w++] = response[r];
+                                    r++;
+                                } else {
+                                    size_t seq = 0;
+                                    if ((b & 0xE0) == 0xC0) seq = 2;
+                                    else if ((b & 0xF0) == 0xE0) seq = 3;
+                                    else if ((b & 0xF8) == 0xF0) seq = 4;
+                                    if (seq == 0 || r + seq > response_len) { r++; continue; }
+                                    bool valid = true;
+                                    for (size_t k = 1; k < seq; k++) {
+                                        if (((unsigned char)response[r + k] & 0xC0) != 0x80)
+                                            { valid = false; break; }
+                                    }
+                                    /* Reject 3-byte sequences encoding surrogates (U+D800-U+DFFF) */
+                                    if (valid && seq == 3) {
+                                        unsigned int s_cp = ((b & 0x0F) << 12) |
+                                            (((unsigned char)response[r+1] & 0x3F) << 6) |
+                                            ((unsigned char)response[r+2] & 0x3F);
+                                        if (s_cp >= 0xD800 && s_cp <= 0xDFFF) valid = false;
+                                    }
+                                    if (valid) {
+                                        if (w != r) memmove(response + w, response + r, seq);
+                                        w += seq;
+                                    }
+                                    r += valid ? seq : 1;
                                 }
-                                if (ok) {
-                                    if (w != r) memmove(response + w, response + r, seq);
-                                    w += seq; r += seq;
-                                } else { r++; }
                             }
                             if (w < response_len) {
                                 response[w] = '\0';
                                 response_len = w;
+                            }
+                        }
+                        /* Strip meta-reasoning: local models sometimes emit (parenthetical
+                         * analysis) instead of just the message. Remove any leading text
+                         * up to and including the last ')' if the response starts with '('. */
+                        if (llm_decides && response_len > 0 && response[0] == '(') {
+                            char *last_paren = NULL;
+                            for (size_t ri = 0; ri < response_len; ri++) {
+                                if (response[ri] == ')') last_paren = response + ri;
+                            }
+                            if (last_paren) {
+                                char *clean = last_paren + 1;
+                                while (*clean == ' ' || *clean == '\n' || *clean == '\r') clean++;
+                                size_t new_len = response_len - (size_t)(clean - response);
+                                if (new_len > 0 && new_len < response_len) {
+                                    memmove(response, clean, new_len);
+                                    response[new_len] = '\0';
+                                    response_len = new_len;
+                                    hu_log_info("human", agent ? agent->observer : NULL,
+                                                "stripped meta-reasoning, clean len=%zu", new_len);
+                                } else if (new_len == 0) {
+                                    /* Entire response was meta-reasoning; use a fallback */
+                                    static const char fb[] = "hey whats up";
+                                    memcpy(response, fb, sizeof(fb));
+                                    response_len = sizeof(fb) - 1;
+                                    hu_log_info("human", agent ? agent->observer : NULL,
+                                                "meta-reasoning fallback (entire response was reasoning)");
+                                }
                             }
                         }
                         const char *send_ptr = response;
@@ -10525,6 +10608,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             "voice-aware turing: %d/10 (text=%d, voice=%d)",
                                             blended, text_avg, voice_avg);
                                 tscore.overall = blended;
+                                tscore.verdict = blended >= 8 ? HU_TURING_HUMAN :
+                                    blended >= 6 ? HU_TURING_BORDERLINE : HU_TURING_AI_DETECTED;
                             }
                         }
 #endif
@@ -10560,7 +10645,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
-#if !defined(HU_IS_TEST) && defined(HU_HAS_PERSONA)
+#if !defined(HU_IS_TEST)
+#ifdef HU_HAS_PERSONA
                 /* F9: Double-text — natural afterthought follow-up.
                  * When llm_decides is active, use the fast classify provider. */
                 {
@@ -10633,6 +10719,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
                 } /* end dt_vtable scope */
+#endif /* HU_HAS_PERSONA */
 
                 /* Self-reaction: occasionally haha/emphasize own message (~2%) */
                 if (response && response_len > 0 && ch->channel->vtable->react) {
@@ -10834,6 +10921,62 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                 "sent sticker: %s", stk_path);
                                 }
                             }
+                        }
+                    }
+                }
+
+                /* Music teaser: share a song link when conversation mood calls for it */
+                if (combined_len > 0 && ch->channel->vtable->send && !gif_sent_this_turn) {
+                    float music_prob = 0.05f; /* lower than GIF — music shares are rarer */
+#ifdef HU_HAS_PERSONA
+                    if (agent->persona) {
+                        /* Use persona GIF interest as a proxy when set */
+                        music_prob = agent->persona->humanization.gif_probability > 0.0f
+                                         ? agent->persona->humanization.gif_probability * 0.3f
+                                         : 0.05f;
+                    }
+#endif
+                    uint32_t music_seed =
+                        (uint32_t)time(NULL) * 16807u + (uint32_t)(uintptr_t)combined;
+                    if (hu_conversation_should_send_music(combined, combined_len, history_entries,
+                                                          history_count, music_seed, music_prob)) {
+                        char music_prompt[512];
+                        size_t mp_len = hu_conversation_build_music_prompt(
+                            combined, combined_len, music_prompt, sizeof(music_prompt));
+                        if (mp_len > 0 && agent->provider.vtable &&
+                            agent->provider.vtable->chat_with_system) {
+                            char *music_suggestion = NULL;
+                            size_t music_suggestion_len = 0;
+                            static const char music_sys[] =
+                                "Return ONLY a music link message. Format: brief casual text then "
+                                "the URL. "
+                                "Example: 'this song has been stuck in my head "
+                                "https://music.apple.com/search?term=artist+title' "
+                                "Keep it under 100 chars. No quotes.";
+                            const char *music_model = agent->model_name
+                                                          ? agent->model_name
+                                                          : "gemini-3.1-flash-lite-preview";
+                            size_t music_model_len =
+                                agent->model_name ? agent->model_name_len : 31;
+                            (void)agent->provider.vtable->chat_with_system(
+                                agent->provider.ctx, alloc, music_sys, sizeof(music_sys) - 1,
+                                music_prompt, mp_len, music_model, music_model_len, 0.9,
+                                &music_suggestion, &music_suggestion_len);
+                            if (music_suggestion && music_suggestion_len > 0 &&
+                                music_suggestion_len < 300 &&
+                                (strstr(music_suggestion, "music.apple.com") != NULL ||
+                                 strstr(music_suggestion, "open.spotify.com") != NULL)) {
+                                usleep(3000000 + (music_seed % 4000000));
+                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                          music_suggestion, music_suggestion_len,
+                                                          NULL, 0);
+                                hu_log_info("human", agent ? agent->observer : NULL,
+                                            "sent music teaser: %.*s",
+                                            (int)music_suggestion_len, music_suggestion);
+                            }
+                            if (music_suggestion)
+                                alloc->free(alloc->ctx, music_suggestion,
+                                            music_suggestion_len + 1);
                         }
                     }
                 }

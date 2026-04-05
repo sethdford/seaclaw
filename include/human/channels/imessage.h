@@ -118,6 +118,7 @@ hu_error_t hu_imessage_test_inject_mock_ex2(hu_channel_t *ch, const char *sessio
 const char *hu_imessage_test_get_last_message(hu_channel_t *ch, size_t *out_len);
 void hu_imessage_test_get_last_reaction(hu_channel_t *ch, hu_reaction_type_t *out_reaction,
                                         int64_t *out_message_id);
+size_t hu_imessage_test_get_last_media_count(hu_channel_t *ch);
 #endif
 
 #endif /* HU_CHANNELS_IMESSAGE_H */

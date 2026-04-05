@@ -150,6 +150,8 @@ hu_error_t hu_persona_feedback_apply(hu_allocator_t *alloc, const char *persona_
         return load_err;
     }
 
+    bool had_oom = false;
+
     /* For each line: parse, add corrected as example to appropriate channel bank */
     while (fgets(line_buf, sizeof(line_buf), f)) {
         size_t line_len = strlen(line_buf);
@@ -196,13 +198,17 @@ hu_error_t hu_persona_feedback_apply(hu_allocator_t *alloc, const char *persona_
             hu_persona_example_bank_t *new_banks = (hu_persona_example_bank_t *)alloc->realloc(
                 alloc->ctx, persona.example_banks, bc * sizeof(hu_persona_example_bank_t),
                 (bc + 1) * sizeof(hu_persona_example_bank_t));
-            if (!new_banks)
+            if (!new_banks) {
+                had_oom = true;
                 continue;
+            }
             persona.example_banks = new_banks;
             memset(&persona.example_banks[bc], 0, sizeof(hu_persona_example_bank_t));
             persona.example_banks[bc].channel = hu_strndup(alloc, channel, channel_len);
-            if (!persona.example_banks[bc].channel)
+            if (!persona.example_banks[bc].channel) {
+                had_oom = true;
                 continue;
+            }
             persona.example_banks_count = bc + 1;
             bank = &persona.example_banks[bc];
         }
@@ -212,8 +218,10 @@ hu_error_t hu_persona_feedback_apply(hu_allocator_t *alloc, const char *persona_
         hu_persona_example_t *new_examples = (hu_persona_example_t *)alloc->realloc(
             alloc->ctx, bank->examples, n * sizeof(hu_persona_example_t),
             (n + 1) * sizeof(hu_persona_example_t));
-        if (!new_examples)
+        if (!new_examples) {
+            had_oom = true;
             continue;
+        }
         bank->examples = new_examples;
         bank->examples[n].context = hu_strdup(alloc, context);
         bank->examples[n].incoming = hu_strdup(alloc, incoming);
@@ -290,9 +298,10 @@ hu_error_t hu_persona_feedback_apply(hu_allocator_t *alloc, const char *persona_
         }
     }
 
-    (void)unlink(path);
+    if (!had_oom)
+        (void)unlink(path);
     hu_persona_deinit(alloc, &persona);
-    return HU_OK;
+    return had_oom ? HU_ERR_OUT_OF_MEMORY : HU_OK;
 #else
     (void)persona_name_len;
     return HU_OK;

@@ -67,7 +67,7 @@ Generated from designated initializers in each `src/channels/*.c` vtable. **hist
  *
  * **imap**: `hu_imap_poll` uses libcurl IMAP (SEARCH UNSEEN + FETCH) when `HU_HTTP_CURL`; `send` uses libcurl SMTP when `smtp_host` is configured, else in-memory outbox. `health_check` runs IMAP NOOP (non-test, libcurl builds).
  * **imessage platform capabilities & limitations**:
- *   - Typing indicators: AX-based (focus Messages.app input via System Events to trigger real "..." bubble; requires Accessibility permission)
+ *   - Typing indicators: AX-based — type a character via System Events to trigger the real bubble, then clear the draft. Requires Accessibility permission.
  *   - Sticker/Memoji detection: read-side via balloon_bundle_id in chat.db (poll shows [Sticker], [Memoji], or [iMessage App])
  *   - Message effects detection: read-side via expressive_send_style_id (poll shows [Sent with Slam], [Sent with Confetti], etc.)
  *   - Tapback send: JXA+AX (opt-in HU_IMESSAGE_TAPBACK_ENABLED) OR imsg CLI (auto-detected on $PATH, no AX needed)

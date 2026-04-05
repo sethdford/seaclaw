@@ -136,7 +136,10 @@ hu_error_t hu_growth_narrative_build_context(hu_allocator_t *alloc, hu_growth_na
             if (m->timestamp > now || now - m->timestamp > (uint64_t)HU_GROWTH_WEEK_SEC)
                 continue;
             size_t dlen = m->description ? strlen(m->description) : 0;
-            mile_total += sizeof(mpref) - 1U + dlen;
+            size_t add = sizeof(mpref) - 1U + dlen;
+            if (mile_total > SIZE_MAX - add)
+                break;
+            mile_total += add;
         }
     }
 

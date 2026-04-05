@@ -96,8 +96,6 @@ static hu_error_t parse_string_raw(parser_t *p, char **out, size_t *out_len) {
                 c = '\t';
                 break;
             case 'u': {
-                /* Note: UTF-16 surrogate pairs (\uD800-\uDFFF) are not supported.
-                 * Codepoints >= U+10000 must use direct UTF-8 encoding. */
                 if (p->pos + 4 > p->len) {
                     p->alloc->free(p->alloc->ctx, buf, cap);
                     return HU_ERR_JSON_PARSE;
@@ -112,41 +110,61 @@ static hu_error_t parse_string_raw(parser_t *p, char **out, size_t *out_len) {
                 }
                 p->pos += 4;
                 unsigned int cp = (unsigned int)((h0 << 12) | (h1 << 8) | (h2 << 4) | h3);
+                /* UTF-16 surrogate pair: \uD800-\uDBFF followed by \uDC00-\uDFFF */
+                if (cp >= 0xD800 && cp <= 0xDBFF) {
+                    if (p->pos + 6 > p->len || p->src[p->pos] != '\\' ||
+                        p->src[p->pos + 1] != 'u') {
+                        p->alloc->free(p->alloc->ctx, buf, cap);
+                        return HU_ERR_JSON_PARSE;
+                    }
+                    p->pos += 2;
+                    int l0 = hex_char_val(p->src[p->pos]);
+                    int l1 = hex_char_val(p->src[p->pos + 1]);
+                    int l2 = hex_char_val(p->src[p->pos + 2]);
+                    int l3 = hex_char_val(p->src[p->pos + 3]);
+                    if (l0 < 0 || l1 < 0 || l2 < 0 || l3 < 0) {
+                        p->alloc->free(p->alloc->ctx, buf, cap);
+                        return HU_ERR_JSON_PARSE;
+                    }
+                    p->pos += 4;
+                    unsigned int lo = (unsigned int)((l0 << 12) | (l1 << 8) | (l2 << 4) | l3);
+                    if (lo < 0xDC00 || lo > 0xDFFF) {
+                        p->alloc->free(p->alloc->ctx, buf, cap);
+                        return HU_ERR_JSON_PARSE;
+                    }
+                    cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                } else if (cp >= 0xDC00 && cp <= 0xDFFF) {
+                    /* Lone low surrogate is invalid */
+                    p->alloc->free(p->alloc->ctx, buf, cap);
+                    return HU_ERR_JSON_PARSE;
+                }
+                /* Ensure buffer capacity for up to 4 UTF-8 bytes */
+                if (len + 4 > cap) {
+                    size_t old_cap = cap;
+                    if (cap > SIZE_MAX / 2) {
+                        p->alloc->free(p->alloc->ctx, buf, cap);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
+                    cap *= 2;
+                    char *nb = (char *)p->alloc->realloc(p->alloc->ctx, buf, old_cap, cap);
+                    if (!nb) {
+                        p->alloc->free(p->alloc->ctx, buf, old_cap);
+                        return HU_ERR_OUT_OF_MEMORY;
+                    }
+                    buf = nb;
+                }
                 if (cp < 0x80) {
                     c = (char)cp;
                 } else if (cp < 0x800) {
-                    if (len + 2 > cap) {
-                        size_t old_cap = cap;
-                        if (cap > SIZE_MAX / 2) {
-                            p->alloc->free(p->alloc->ctx, buf, cap);
-                            return HU_ERR_OUT_OF_MEMORY;
-                        }
-                        cap *= 2;
-                        char *nb = (char *)p->alloc->realloc(p->alloc->ctx, buf, old_cap, cap);
-                        if (!nb) {
-                            p->alloc->free(p->alloc->ctx, buf, old_cap);
-                            return HU_ERR_OUT_OF_MEMORY;
-                        }
-                        buf = nb;
-                    }
                     buf[len++] = (char)(0xC0 | (cp >> 6));
                     c = (char)(0x80 | (cp & 0x3F));
                 } else if (cp < 0x10000) {
-                    if (len + 3 > cap) {
-                        size_t old_cap = cap;
-                        if (cap > SIZE_MAX / 2) {
-                            p->alloc->free(p->alloc->ctx, buf, cap);
-                            return HU_ERR_OUT_OF_MEMORY;
-                        }
-                        cap *= 2;
-                        char *nb = (char *)p->alloc->realloc(p->alloc->ctx, buf, old_cap, cap);
-                        if (!nb) {
-                            p->alloc->free(p->alloc->ctx, buf, old_cap);
-                            return HU_ERR_OUT_OF_MEMORY;
-                        }
-                        buf = nb;
-                    }
                     buf[len++] = (char)(0xE0 | (cp >> 12));
+                    buf[len++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+                    c = (char)(0x80 | (cp & 0x3F));
+                } else if (cp <= 0x10FFFF) {
+                    buf[len++] = (char)(0xF0 | (cp >> 18));
+                    buf[len++] = (char)(0x80 | ((cp >> 12) & 0x3F));
                     buf[len++] = (char)(0x80 | ((cp >> 6) & 0x3F));
                     c = (char)(0x80 | (cp & 0x3F));
                 } else {
