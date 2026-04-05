@@ -224,7 +224,7 @@ export class ScSettingsView extends LitElement {
       display: none;
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 600px) /* --hu-breakpoint-compact */ {
       .tabs {
         display: none;
       }

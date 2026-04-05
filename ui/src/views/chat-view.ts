@@ -57,7 +57,7 @@ export class ScChatView extends GatewayAwareLitElement {
         min-width: 0;
         overflow: hidden;
       }
-      @media (max-width: 600px) {
+      @media (max-width: 600px) /* --hu-breakpoint-compact */ {
         .main-wrap.sessions-open {
           grid-template-columns: 0fr 1fr 0fr;
         }
