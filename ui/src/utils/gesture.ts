@@ -12,6 +12,17 @@ export function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** Trigger device haptic feedback via the Vibration API. No-op on unsupported devices. */
+export function hapticFeedback(type: 'light' | 'medium' | 'heavy' | 'success' | 'error' = 'light'): void {
+  if (typeof navigator === 'undefined' || !('vibrate' in navigator)) return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const patterns: Record<string, number | number[]> = {
+    light: 10, medium: 20, heavy: 30,
+    success: [10, 50, 10], error: [30, 50, 30],
+  };
+  navigator.vibrate(patterns[type] ?? 10);
+}
+
 // ─── rippleEffect ─────────────────────────────────────────────────────────
 
 /**
@@ -145,6 +156,7 @@ export class DragDismissController implements ReactiveController {
     (this.host as HTMLElement).releasePointerCapture(e.pointerId);
     const dy = this.currentY - this.startY;
     if (dy >= DRAG_DISMISS_THRESHOLD) {
+      hapticFeedback('medium');
       this.host.dispatchEvent(new CustomEvent("dismiss", { bubbles: true, composed: true }));
     }
     this.resetTransform();
@@ -246,6 +258,7 @@ export class SwipeController implements ReactiveController {
     if (Math.abs(dx) > Math.abs(dy)) {
       if (Math.abs(dx) >= minDist && vx >= velThresh) {
         const dir: SwipeDirection = dx > 0 ? "swipe-right" : "swipe-left";
+        hapticFeedback('light');
         this.host.dispatchEvent(
           new CustomEvent(dir, { bubbles: true, composed: true, detail: { dx, dy, velocity: vx } }),
         );
@@ -253,6 +266,7 @@ export class SwipeController implements ReactiveController {
     } else {
       if (Math.abs(dy) >= minDist && vy >= velThresh) {
         const dir: SwipeDirection = dy > 0 ? "swipe-down" : "swipe-up";
+        hapticFeedback('light');
         this.host.dispatchEvent(
           new CustomEvent(dir, { bubbles: true, composed: true, detail: { dx, dy, velocity: vy } }),
         );
@@ -391,6 +405,7 @@ export class PullRefreshController implements ReactiveController {
     this.scrollTarget.releasePointerCapture(e.pointerId);
     const pull = this.currentY - this.startY;
     if (pull >= PULL_REFRESH_THRESHOLD) {
+      hapticFeedback('medium');
       this.host.dispatchEvent(new CustomEvent("refresh", { bubbles: true, composed: true }));
     }
     this.reset();

@@ -4,6 +4,7 @@ import { icons } from "../icons.js";
 import "./hu-file-preview.js";
 import "./hu-model-selector.js";
 import type { FilePreviewItem } from "./hu-file-preview.js";
+import { playAudioCue } from "../utils/audio-cue.js";
 
 const SUGGESTIONS = ["Explore the project", "Write code", "Debug an issue", "Ask anything"];
 
@@ -787,6 +788,7 @@ export class ScChatComposer extends LitElement {
   private _emitSend(): void {
     const msg = this.value.trim();
     if (!msg || this.waiting || this.disabled) return;
+    playAudioCue("send");
     const files = [...this._attachedFiles];
     const mentionedFiles = [...this._mentionedFiles];
     this._attachedFiles = [];

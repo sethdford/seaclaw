@@ -48,7 +48,22 @@ export class ScCheckbox extends LitElement {
       transition:
         border-color var(--hu-duration-fast) var(--hu-ease-out),
         background-color var(--hu-duration-fast) var(--hu-ease-out),
-        box-shadow var(--hu-duration-fast) var(--hu-ease-out);
+        box-shadow var(--hu-duration-fast) var(--hu-ease-out),
+        transform var(--hu-duration-fast) var(--hu-ease-spring);
+    }
+
+    .box.checked,
+    .box.indeterminate {
+      animation: hu-checkbox-pop var(--hu-duration-fast) var(--hu-ease-spring);
+    }
+
+    @keyframes hu-checkbox-pop {
+      from {
+        transform: scale(0.85);
+      }
+      to {
+        transform: scale(1);
+      }
     }
 
     .row:not(.disabled):hover .box {
@@ -106,6 +121,7 @@ export class ScCheckbox extends LitElement {
     @media (prefers-reduced-motion: reduce) {
       .box {
         transition: none;
+        animation: none;
       }
     }
   `;

@@ -97,7 +97,8 @@ export class ScAutomationCard extends LitElement {
       border-radius: var(--hu-radius-xl);
       transition:
         opacity var(--hu-duration-fast) var(--hu-ease-out),
-        border-color var(--hu-duration-fast) var(--hu-ease-out);
+        border-color var(--hu-duration-fast) var(--hu-ease-out),
+        transform var(--hu-duration-fast) var(--hu-ease-spring);
       &.paused {
         opacity: 0.7;
         border-left-color: var(--hu-accent-secondary);
@@ -105,6 +106,10 @@ export class ScAutomationCard extends LitElement {
       &.last-failed {
         border-left-color: var(--hu-error);
       }
+    }
+
+    .card-wrapper:hover {
+      transform: translateY(var(--hu-physics-card-hover-translateY, -2px));
     }
 
     hu-card {

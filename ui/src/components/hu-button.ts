@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { hapticFeedback } from "../utils/gesture.js";
 
 type ButtonVariant = "primary" | "secondary" | "destructive" | "ghost";
 type ButtonSize = "sm" | "md" | "lg";
@@ -209,6 +210,20 @@ export class ScButton extends LitElement {
       }
     }
   `;
+
+  private _onPointerDown = (): void => {
+    if (!this.disabled && !this.loading) hapticFeedback('light');
+  };
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.addEventListener('pointerdown', this._onPointerDown);
+  }
+
+  override disconnectedCallback(): void {
+    this.removeEventListener('pointerdown', this._onPointerDown);
+    super.disconnectedCallback();
+  }
 
   render() {
     const classes = [

@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { playAudioCue } from "../utils/audio-cue.js";
 
 export interface ToastOptions {
   message: string;
@@ -186,6 +187,9 @@ export class ScToast extends LitElement {
     };
     this._toasts = [...this._toasts.slice(-2), item];
     this.requestUpdate();
+    if (variant === "error") {
+      playAudioCue("error");
+    }
     if (duration > 0) {
       const t = setTimeout(() => this._dismiss(id), duration);
       this._timeouts.set(id, t);

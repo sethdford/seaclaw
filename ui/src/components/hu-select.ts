@@ -57,7 +57,7 @@ export class ScSelect extends LitElement {
       cursor: pointer;
       transition:
         border-color var(--hu-duration-fast) var(--hu-ease-out),
-        box-shadow var(--hu-duration-fast) var(--hu-ease-out);
+        box-shadow var(--hu-duration-fast) var(--hu-ease-spring);
       padding-right: var(--hu-space-xl);
     }
 
@@ -119,6 +119,12 @@ export class ScSelect extends LitElement {
       font-size: var(--hu-text-sm);
       color: var(--hu-error);
       margin-top: var(--hu-space-xs);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      select {
+        transition: none;
+      }
     }
   `;
 

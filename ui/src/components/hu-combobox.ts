@@ -54,7 +54,7 @@ export class ScCombobox extends LitElement {
       outline: none;
       transition:
         border-color var(--hu-duration-fast) var(--hu-ease-out),
-        box-shadow var(--hu-duration-fast) var(--hu-ease-out),
+        box-shadow var(--hu-duration-fast) var(--hu-ease-spring),
         background var(--hu-duration-fast) var(--hu-ease-out);
     }
 
@@ -100,6 +100,19 @@ export class ScCombobox extends LitElement {
       max-height: 240px;
       overflow-y: auto;
       z-index: 20;
+      animation: hu-dropdown-in var(--hu-duration-fast) var(--hu-ease-spring);
+      transform-origin: top center;
+    }
+
+    @keyframes hu-dropdown-in {
+      from {
+        opacity: 0;
+        transform: scaleY(0.96) translateY(calc(-1 * var(--hu-space-2xs)));
+      }
+      to {
+        opacity: 1;
+        transform: scaleY(1) translateY(0);
+      }
     }
 
     .option {
@@ -132,6 +145,9 @@ export class ScCombobox extends LitElement {
     }
 
     @media (prefers-reduced-motion: reduce) {
+      .dropdown {
+        animation: none;
+      }
       .option {
         transition: none;
       }

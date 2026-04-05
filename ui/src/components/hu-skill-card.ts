@@ -49,11 +49,14 @@ export class ScSkillCard extends LitElement {
 
     .skill-card {
       cursor: pointer;
-      transition: box-shadow var(--hu-duration-fast) var(--hu-ease-out);
+      transition:
+        box-shadow var(--hu-duration-fast) var(--hu-ease-out),
+        transform var(--hu-duration-fast) var(--hu-ease-spring);
     }
 
     .skill-card:hover {
       box-shadow: var(--hu-shadow-md);
+      transform: translateY(var(--hu-physics-card-hover-translateY, -2px));
     }
 
     .skill-card:focus-visible {

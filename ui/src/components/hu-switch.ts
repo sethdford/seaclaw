@@ -1,5 +1,6 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { hapticFeedback } from "../utils/gesture.js";
 
 @customElement("hu-switch")
 export class ScSwitch extends LitElement {
@@ -64,11 +65,11 @@ export class ScSwitch extends LitElement {
 
     .switch.animated .thumb {
       transition: none;
-      animation: hu-thumb-slide-off var(--hu-duration-normal) var(--hu-ease-out) forwards;
+      animation: hu-thumb-slide-off var(--hu-duration-normal) var(--hu-ease-spring) forwards;
     }
 
     .switch.animated.checked .thumb {
-      animation: hu-thumb-slide-on var(--hu-duration-normal) var(--hu-ease-out) forwards;
+      animation: hu-thumb-slide-on var(--hu-duration-normal) var(--hu-ease-spring) forwards;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -102,6 +103,7 @@ export class ScSwitch extends LitElement {
 
   private _onClick(): void {
     if (this.disabled) return;
+    hapticFeedback('light');
     this._hasToggled = true;
     this.checked = !this.checked;
     this.dispatchEvent(

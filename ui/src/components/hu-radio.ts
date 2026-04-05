@@ -69,6 +69,16 @@ export class ScRadio extends LitElement {
       height: 0.5rem;
       background: var(--hu-accent);
       border-radius: var(--hu-radius-full);
+      animation: hu-radio-dot-in var(--hu-duration-fast) var(--hu-ease-spring);
+    }
+
+    @keyframes hu-radio-dot-in {
+      from {
+        transform: scale(0);
+      }
+      to {
+        transform: scale(1);
+      }
     }
 
     .option input:focus-visible + .radio-wrap {
@@ -91,6 +101,9 @@ export class ScRadio extends LitElement {
     @media (prefers-reduced-motion: reduce) {
       .radio-wrap {
         transition: none;
+      }
+      .option input:checked + .radio-wrap::after {
+        animation: none;
       }
     }
   `;
