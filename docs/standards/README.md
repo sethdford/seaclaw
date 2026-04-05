@@ -61,6 +61,8 @@ AGENTS.md                <- Full engineering protocol
 | [design-strategy.md](design/design-strategy.md)             | Token philosophy, color hierarchy, theme support                       | Token values and design decisions |
 | [design-system.md](design/design-system.md)                 | Design system overview, component rules                                | Building UI components            |
 | [accessibility-testing.md](design/accessibility-testing.md) | WCAG compliance, Lighthouse, axe-core, screen reader, keyboard testing | Accessibility work, UI changes    |
+| [visual-minimalism.md](design/visual-minimalism.md)         | Visual minimalism principles, glass/banner/scrollbar rules, squint test | Any visual change, empty states   |
+| [spacing-discipline.md](design/spacing-discipline.md)       | Spacing scale semantics, content width tokens, component spacing contract | Spacing, layout, content width    |
 
 ## Engineering
 

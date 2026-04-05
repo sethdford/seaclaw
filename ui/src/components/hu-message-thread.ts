@@ -497,7 +497,7 @@ export class ScMessageThread extends LitElement {
       }
     }
     .hero-greeting {
-      font-family: var(--hu-font);
+      font-family: var(--hu-font-display, Georgia, 'Times New Roman', serif);
       font-size: clamp(1.5rem, 4vw, 2.25rem);
       font-weight: var(--hu-weight-medium, 500);
       color: var(--hu-text);

@@ -101,6 +101,11 @@ export class ScChatView extends GatewayAwareLitElement {
         -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
           saturate(var(--hu-glass-subtle-saturate, 120%));
         border-bottom: 1px solid var(--hu-border-subtle);
+        opacity: 0.7;
+        transition: opacity var(--hu-duration-fast);
+      }
+      .status-bar:hover {
+        opacity: 1;
       }
       .status-left,
       .status-right {
