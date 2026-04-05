@@ -3,6 +3,7 @@
 
 #include "core/allocator.h"
 #include "core/error.h"
+#include <stdbool.h>
 #include <stddef.h>
 
 /* ──────────────────────────────────────────────────────────────────────────

@@ -123,6 +123,21 @@ size_t hu_music_build_share_text(const hu_music_result_t *result, const char *ca
 
 /* ── LLM suggestion parser (pure, always compiled) ───────────────────── */
 
+static bool is_ws(char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+static void trim_inplace(char *s) {
+    size_t len = strlen(s);
+    while (len > 0 && is_ws(s[len - 1]))
+        s[--len] = '\0';
+    size_t start = 0;
+    while (start < len && is_ws(s[start]))
+        start++;
+    if (start > 0)
+        memmove(s, s + start, len - start + 1);
+}
+
 bool hu_music_parse_suggestion(const char *suggestion, size_t suggestion_len, char *query_out,
                                size_t query_cap, char *msg_out, size_t msg_cap) {
     if (!suggestion || suggestion_len == 0 || !query_out || query_cap < 8 || !msg_out ||
@@ -131,6 +146,12 @@ bool hu_music_parse_suggestion(const char *suggestion, size_t suggestion_len, ch
 
     query_out[0] = '\0';
     msg_out[0] = '\0';
+
+    /* Strip trailing whitespace from input length (LLMs love trailing \n) */
+    while (suggestion_len > 0 && is_ws(suggestion[suggestion_len - 1]))
+        suggestion_len--;
+    if (suggestion_len == 0)
+        return false;
 
     /* Find the " | " separator between "ARTIST - TITLE" and casual message */
     const char *pipe = NULL;
@@ -155,7 +176,6 @@ bool hu_music_parse_suggestion(const char *suggestion, size_t suggestion_len, ch
         memcpy(msg_out, msg_start, msg_len);
         msg_out[msg_len] = '\0';
     } else {
-        /* No pipe — treat entire string as the query, generate no casual message */
         size_t query_len = suggestion_len;
         if (query_len >= query_cap)
             query_len = query_cap - 1;
@@ -163,16 +183,8 @@ bool hu_music_parse_suggestion(const char *suggestion, size_t suggestion_len, ch
         query_out[query_len] = '\0';
     }
 
-    /* Strip leading/trailing whitespace from query */
-    size_t ql = strlen(query_out);
-    while (ql > 0 && query_out[ql - 1] == ' ')
-        query_out[--ql] = '\0';
-    size_t start = 0;
-    while (start < ql && query_out[start] == ' ')
-        start++;
-    if (start > 0) {
-        memmove(query_out, query_out + start, ql - start + 1);
-    }
+    trim_inplace(query_out);
+    trim_inplace(msg_out);
 
     return query_out[0] != '\0';
 }
@@ -278,11 +290,12 @@ hu_error_t hu_music_download_preview(hu_allocator_t *alloc, const char *preview_
         return HU_ERR_IO;
     }
 
-    size_t written = fwrite(resp.body, 1, resp.body_len, f);
+    size_t expected = resp.body_len;
+    size_t written = fwrite(resp.body, 1, expected, f);
     fclose(f);
     hu_http_response_free(alloc, &resp);
 
-    if (written != resp.body_len) {
+    if (written != expected) {
         unlink(tmpl);
         return HU_ERR_IO;
     }

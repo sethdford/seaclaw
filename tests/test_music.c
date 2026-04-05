@@ -211,13 +211,52 @@ static void test_music_parse_suggestion_trims_whitespace(void) {
 }
 
 static void test_music_parse_suggestion_pipe_in_message(void) {
-    /* Only first " | " is the separator */
     const char *s = "Artist - Song | message with | pipe char";
     char query[128], msg[128];
     bool ok = hu_music_parse_suggestion(s, strlen(s), query, sizeof(query), msg, sizeof(msg));
     HU_ASSERT(ok);
     HU_ASSERT_STR_EQ(query, "Artist - Song");
     HU_ASSERT_STR_EQ(msg, "message with | pipe char");
+}
+
+static void test_music_parse_suggestion_trailing_newline(void) {
+    const char *s = "Radiohead - Creep | such a classic\n";
+    char query[128], msg[128];
+    bool ok = hu_music_parse_suggestion(s, strlen(s), query, sizeof(query), msg, sizeof(msg));
+    HU_ASSERT(ok);
+    HU_ASSERT_STR_EQ(query, "Radiohead - Creep");
+    HU_ASSERT_STR_EQ(msg, "such a classic");
+}
+
+static void test_music_parse_suggestion_crlf_and_tabs(void) {
+    const char *s = "\tQueen - Radio Ga Ga | banger \r\n";
+    char query[128], msg[128];
+    bool ok = hu_music_parse_suggestion(s, strlen(s), query, sizeof(query), msg, sizeof(msg));
+    HU_ASSERT(ok);
+    HU_ASSERT_STR_EQ(query, "Queen - Radio Ga Ga");
+    HU_ASSERT_STR_EQ(msg, "banger");
+}
+
+static void test_music_parse_suggestion_only_whitespace(void) {
+    const char *s = "  \n\t  ";
+    char query[128], msg[128];
+    HU_ASSERT(!hu_music_parse_suggestion(s, strlen(s), query, sizeof(query), msg, sizeof(msg)));
+}
+
+static void test_music_parse_suggestion_unicode_artist(void) {
+    const char *s = "Bj\xc3\xb6rk - J\xc3\xb3ga | ethereal vibes";
+    char query[128], msg[128];
+    bool ok = hu_music_parse_suggestion(s, strlen(s), query, sizeof(query), msg, sizeof(msg));
+    HU_ASSERT(ok);
+    HU_ASSERT(strstr(query, "rk") != NULL); /* Björk */
+    HU_ASSERT_STR_EQ(msg, "ethereal vibes");
+}
+
+static void test_music_url_encode_unicode_passthrough(void) {
+    char buf[128];
+    size_t n = hu_music_url_encode_query("Bj\xc3\xb6rk", 6, buf, sizeof(buf));
+    HU_ASSERT(n > 0);
+    HU_ASSERT(strstr(buf, "Bj") != NULL);
 }
 
 /* ── Network stubs return NOT_SUPPORTED in test builds ───────────────── */
@@ -275,6 +314,11 @@ void run_music_tests(void) {
     HU_RUN_TEST(test_music_parse_suggestion_empty);
     HU_RUN_TEST(test_music_parse_suggestion_trims_whitespace);
     HU_RUN_TEST(test_music_parse_suggestion_pipe_in_message);
+    HU_RUN_TEST(test_music_parse_suggestion_trailing_newline);
+    HU_RUN_TEST(test_music_parse_suggestion_crlf_and_tabs);
+    HU_RUN_TEST(test_music_parse_suggestion_only_whitespace);
+    HU_RUN_TEST(test_music_parse_suggestion_unicode_artist);
+    HU_RUN_TEST(test_music_url_encode_unicode_passthrough);
 
     HU_RUN_TEST(test_music_search_returns_not_supported);
     HU_RUN_TEST(test_music_download_returns_not_supported);

@@ -60,6 +60,8 @@ for f in "${files[@]}"; do
             suites+=("context") ;;
         src/intelligence/*.c|include/human/intelligence/*.h)
             suites+=("intelligence") suites+=("skill") ;;
+        src/music.c|include/human/music.h)
+            suites+=("Music") ;;
         src/feeds/*.c|include/human/feeds/*.h)
             suites+=("feeds") ;;
         src/peripherals/*.c|include/human/peripherals/*.h)
