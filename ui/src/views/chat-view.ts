@@ -16,6 +16,7 @@ import "../components/hu-message-thread.js";
 import "../components/hu-tapback-menu.js";
 import "../components/hu-chat-search.js";
 import "../components/hu-chat-sessions-panel.js";
+import "../components/hu-artifact-panel.js";
 import "../components/hu-context-menu.js";
 import "../components/hu-status-dot.js";
 import "../components/hu-skeleton.js";
@@ -33,12 +34,38 @@ export class ScChatView extends GatewayAwareLitElement {
         min-height: 0;
       }
       .main-wrap {
-        display: flex;
-        flex-direction: row;
+        display: grid;
+        grid-template-columns: 0fr 1fr 0fr;
         flex: 1;
         min-width: 0;
         position: relative;
         width: 100%;
+        overflow: hidden;
+        transition: grid-template-columns var(--hu-duration-normal) var(--hu-ease-out);
+      }
+      .main-wrap.sessions-open {
+        grid-template-columns: 17.5rem 1fr 0fr;
+      }
+      .main-wrap.artifacts-open {
+        grid-template-columns: 0fr 1fr 25rem;
+      }
+      .main-wrap.sessions-open.artifacts-open {
+        grid-template-columns: 17.5rem 1fr 25rem;
+      }
+      .artifacts-column {
+        min-width: 0;
+        overflow: hidden;
+      }
+      @media (max-width: 600px) {
+        .main-wrap.sessions-open {
+          grid-template-columns: 0fr 1fr 0fr;
+        }
+        .main-wrap.artifacts-open {
+          grid-template-columns: 0fr 1fr 0fr;
+        }
+        .main-wrap.sessions-open.artifacts-open {
+          grid-template-columns: 0fr 1fr 0fr;
+        }
       }
       .container {
         display: flex;
@@ -250,6 +277,7 @@ export class ScChatView extends GatewayAwareLitElement {
     items: ContextMenuItem[];
   } = { open: false, x: 0, y: 0, items: [] };
   @state() private _sessionsPanelOpen = false;
+  @state() private _artifactsPanelOpen = false;
   @state() private _sessions: ChatSession[] = [];
   private _demoProjects: ChatProject[] = [
     {
@@ -294,6 +322,24 @@ export class ScChatView extends GatewayAwareLitElement {
     }
   };
 
+  private _onToggleSessions = (): void => {
+    this._sessionsPanelOpen = !this._sessionsPanelOpen;
+    localStorage.setItem("hu-sessions-panel-open", String(this._sessionsPanelOpen));
+  };
+
+  private _onToggleArtifacts = (): void => {
+    this._artifactsPanelOpen = !this._artifactsPanelOpen;
+  };
+
+  private _onClosePanel = (): void => {
+    if (this._artifactsPanelOpen) {
+      this._artifactsPanelOpen = false;
+    } else if (this._sessionsPanelOpen) {
+      this._sessionsPanelOpen = false;
+      localStorage.setItem("hu-sessions-panel-open", "false");
+    }
+  };
+
   private _getSearchMatchIndices(): number[] {
     const q = this._searchQuery.trim().toLowerCase();
     if (!q) return [];
@@ -331,6 +377,10 @@ export class ScChatView extends GatewayAwareLitElement {
       gw.addEventListener(GatewayClientClass.EVENT_STATUS, this.statusHandler as EventListener);
     }
     document.addEventListener("keydown", this._handleKeyDown);
+    document.addEventListener("toggle-sessions", this._onToggleSessions);
+    document.addEventListener("toggle-artifacts", this._onToggleArtifacts);
+    document.addEventListener("close-panel", this._onClosePanel);
+    this._sessionsPanelOpen = localStorage.getItem("hu-sessions-panel-open") === "true";
   }
 
   protected override onGatewaySwapped(
@@ -393,6 +443,9 @@ export class ScChatView extends GatewayAwareLitElement {
 
   override disconnectedCallback(): void {
     document.removeEventListener("keydown", this._handleKeyDown);
+    document.removeEventListener("toggle-sessions", this._onToggleSessions);
+    document.removeEventListener("toggle-artifacts", this._onToggleArtifacts);
+    document.removeEventListener("close-panel", this._onClosePanel);
     const gw = this.gateway;
     gw?.removeEventListener(GatewayClientClass.EVENT_GATEWAY, this.messageHandler);
     gw?.removeEventListener(GatewayClientClass.EVENT_STATUS, this.statusHandler as EventListener);
@@ -614,8 +667,15 @@ export class ScChatView extends GatewayAwareLitElement {
     }));
     const isEmpty =
       this.chat.items.length === 0 && !this.chat.historyLoading && !this.chat.isWaiting;
+    const wrapClasses = [
+      "main-wrap",
+      this._sessionsPanelOpen ? "sessions-open" : "",
+      this._artifactsPanelOpen || this.chat.activeArtifact ? "artifacts-open" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
     return html`
-      <div class="main-wrap">
+      <div class="${wrapClasses}">
         <hu-chat-sessions-panel
           .sessions=${sessionsWithActive}
           .projects=${this._demoProjects}
@@ -740,6 +800,7 @@ export class ScChatView extends GatewayAwareLitElement {
                     @open-artifact=${async (e: CustomEvent<{ id: string }>) => {
                       await import("../components/hu-artifact-panel.js");
                       this.chat.openArtifact(e.detail.id);
+                      this._artifactsPanelOpen = true;
                     }}
                     .artifacts=${Array.from(this.chat.artifacts.values())}
                   ></hu-message-thread>
@@ -797,13 +858,18 @@ export class ScChatView extends GatewayAwareLitElement {
             @hu-tapback-close=${() => (this._tapback = { ...this._tapback, open: false })}
           ></hu-tapback-menu>
         </div>
-        ${this.chat.activeArtifact
-          ? html`<hu-artifact-panel
-              .artifact=${this.chat.activeArtifact}
-              .open=${true}
-              @hu-artifact-close=${() => this.chat.closeArtifact()}
-            ></hu-artifact-panel>`
-          : nothing}
+        <div class="artifacts-column">
+          ${this.chat.activeArtifact
+            ? html`<hu-artifact-panel
+                .artifact=${this.chat.activeArtifact}
+                .open=${true}
+                @hu-artifact-close=${() => {
+                  this.chat.closeArtifact();
+                  this._artifactsPanelOpen = false;
+                }}
+              ></hu-artifact-panel>`
+            : nothing}
+        </div>
       </div>
     `;
   }
@@ -821,7 +887,7 @@ export class ScChatView extends GatewayAwareLitElement {
           <button
             type="button"
             class="sessions-toggle"
-            @click=${() => (this._sessionsPanelOpen = !this._sessionsPanelOpen)}
+            @click=${this._onToggleSessions}
             aria-label=${this._sessionsPanelOpen ? "Close sessions" : "Open sessions"}
           >
             ${icons["sidebar-toggle"]}

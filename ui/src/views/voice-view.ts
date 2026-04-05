@@ -8,6 +8,7 @@ import type { GatewayStatus } from "../gateway.js";
 import { GatewayAwareLitElement } from "../gateway-aware.js";
 import { SESSION_KEY_VOICE } from "../utils.js";
 import type { ChatItem } from "../controllers/chat-controller.js";
+import { icons } from "../icons.js";
 import { ScToast } from "../components/hu-toast.js";
 import { AudioRecorder, blobToBase64 } from "../audio-recorder.js";
 import { AudioPlaybackEngine } from "../audio-playback.js";
@@ -46,6 +47,169 @@ export class ScVoiceView extends GatewayAwareLitElement {
         max-height: calc(100vh - var(--hu-space-5xl));
         contain: layout style;
         container-type: inline-size;
+      }
+
+      /* ── Sessions panel + main wrap ─────────────────── */
+
+      .main-wrap {
+        display: flex;
+        flex-direction: row;
+        flex: 1;
+        min-width: 0;
+        position: relative;
+        width: 100%;
+        min-height: 0;
+      }
+
+      .sessions-panel {
+        width: 0;
+        overflow: hidden;
+        flex-shrink: 0;
+        transition: width var(--hu-duration-normal) var(--hu-ease-spring);
+        contain: layout style;
+      }
+
+      .sessions-panel.open {
+        width: 17.5rem;
+      }
+
+      .sessions-panel-inner {
+        width: 17.5rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: var(--hu-surface-container);
+        border-right: 1px solid var(--hu-border-subtle);
+      }
+
+      .sessions-panel-header {
+        padding: var(--hu-space-sm) var(--hu-space-md);
+        border-bottom: 1px solid var(--hu-border-subtle);
+        font-size: var(--hu-text-sm);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text);
+      }
+
+      .sessions-panel-section {
+        padding: var(--hu-space-sm) var(--hu-space-md);
+        border-bottom: 1px solid var(--hu-border-subtle);
+      }
+
+      .sessions-panel-section h4 {
+        margin: 0 0 var(--hu-space-xs);
+        font-size: var(--hu-text-xs);
+        font-weight: var(--hu-weight-semibold);
+        color: var(--hu-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .sessions-panel-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-2xs);
+        overflow-y: auto;
+        flex: 1;
+        padding: var(--hu-space-sm) var(--hu-space-md);
+      }
+
+      .session-item {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-sm);
+        padding: var(--hu-space-xs) var(--hu-space-sm);
+        border-radius: var(--hu-radius-sm);
+        border: none;
+        background: transparent;
+        color: var(--hu-text);
+        font-family: var(--hu-font);
+        font-size: var(--hu-text-sm);
+        cursor: pointer;
+        text-align: left;
+        width: 100%;
+        transition: background var(--hu-duration-fast) var(--hu-ease-out);
+      }
+
+      .session-item:hover {
+        background: var(--hu-hover-overlay);
+      }
+
+      .session-item:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: -2px;
+      }
+
+      .session-item.active {
+        background: color-mix(in srgb, var(--hu-accent) 12%, transparent);
+        color: var(--hu-accent);
+        font-weight: var(--hu-weight-medium);
+      }
+
+      .session-item-icon {
+        flex-shrink: 0;
+        width: 1rem;
+        height: 1rem;
+        color: var(--hu-text-secondary);
+      }
+
+      .session-item.active .session-item-icon {
+        color: var(--hu-accent);
+      }
+
+      .session-item-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .sessions-panel-empty {
+        padding: var(--hu-space-md);
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-tertiary);
+        text-align: center;
+      }
+
+      .sessions-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+        padding: var(--hu-space-2xs) var(--hu-space-sm);
+        background: transparent;
+        border: 1px solid var(--hu-border);
+        border-radius: var(--hu-radius-sm);
+        color: var(--hu-text);
+        cursor: pointer;
+        transition:
+          color var(--hu-duration-fast),
+          border-color var(--hu-duration-fast);
+      }
+
+      .sessions-toggle:hover {
+        color: var(--hu-text);
+        border-color: var(--hu-text-muted);
+      }
+
+      .sessions-toggle:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: -2px;
+      }
+
+      .sessions-toggle svg {
+        width: 1.125rem;
+        height: 1.125rem;
+      }
+
+      @media (max-width: 768px) /* --hu-breakpoint-lg */ {
+        .sessions-panel.open {
+          position: fixed;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          z-index: 20;
+          width: 17.5rem;
+        }
       }
 
       .container {
@@ -220,6 +384,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
   @state() private _speaking = false;
   @state() private _audioLevel = 0;
   @state() private _showClonePanel = false;
+  @state() private _sessionsPanelOpen = false;
   @state() private _geminiLiveMode = false;
   @state() private _userVadSpeaking = false;
   @state() private _voiceMode: "standard" | "gemini_live" | "openai_realtime" = "standard";
@@ -344,6 +509,11 @@ export class ScVoiceView extends GatewayAwareLitElement {
         /* ignore */
       }
       this._restoreFromCache();
+      try {
+        this._sessionsPanelOpen = localStorage.getItem("hu-voice-sessions-open") === "true";
+      } catch {
+        /* ignore */
+      }
       this.#playback.setOnPlaybackEnd(() => {
         this._speaking = false;
         if (this.voiceStatus !== "listening") {
@@ -998,6 +1168,15 @@ export class ScVoiceView extends GatewayAwareLitElement {
     this.updateComplete.then(() => this.send());
   }
 
+  private _toggleSessionsPanel(): void {
+    this._sessionsPanelOpen = !this._sessionsPanelOpen;
+    try {
+      localStorage.setItem("hu-voice-sessions-open", String(this._sessionsPanelOpen));
+    } catch {
+      /* ignore */
+    }
+  }
+
   private handleKeyDown(e: KeyboardEvent): void {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -1157,18 +1336,102 @@ export class ScVoiceView extends GatewayAwareLitElement {
   override render() {
     if (this._loading) return this._renderSkeleton();
     return html`
-      <div class="container hu-mesh-gradient">
-        ${this._renderStatusBar()} ${this._renderErrorBanner()}
-        ${this._showSetup ? this._renderSetupBanner() : nothing}
-        ${this._showClonePanel
-          ? html`<hu-voice-clone .gateway=${this.gateway ?? this._boundGateway}></hu-voice-clone>`
-          : nothing}
-        ${this._showCredPanel ? this._renderCredPanel() : nothing}
-        <hu-voice-conversation
-          .items=${this._chatItems}
-          .isWaiting=${this.voiceStatus === "processing"}
-        ></hu-voice-conversation>
-        ${this._renderControls()}
+      <div class="main-wrap">
+        ${this._renderSessionsPanel()}
+        <div class="container hu-mesh-gradient">
+          ${this._renderStatusBar()} ${this._renderErrorBanner()}
+          ${this._showSetup ? this._renderSetupBanner() : nothing}
+          ${this._showClonePanel
+            ? html`<hu-voice-clone .gateway=${this.gateway ?? this._boundGateway}></hu-voice-clone>`
+            : nothing}
+          ${this._showCredPanel ? this._renderCredPanel() : nothing}
+          <hu-voice-conversation
+            .items=${this._chatItems}
+            .isWaiting=${this.voiceStatus === "processing"}
+          ></hu-voice-conversation>
+          ${this._renderControls()}
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderSessionsPanel() {
+    const sessionCount = this._sessionCount;
+    return html`
+      <div
+        class="sessions-panel ${this._sessionsPanelOpen ? "open" : ""}"
+        role="navigation"
+        aria-label="Voice sessions"
+      >
+        <div class="sessions-panel-inner">
+          <div class="sessions-panel-header">Voice Sessions</div>
+
+          <div class="sessions-panel-section">
+            <h4>Sessions</h4>
+            <button
+              type="button"
+              class="session-item active"
+              role="option"
+              aria-selected="true"
+              aria-label="Current session"
+            >
+              <span class="session-item-icon">${icons.mic}</span>
+              <span class="session-item-label"
+                >Session ${sessionCount}
+                ${this._messages.length > 0
+                  ? html` · ${this._messages.length} msg${this._messages.length !== 1 ? "s" : ""}`
+                  : nothing}</span
+              >
+            </button>
+          </div>
+
+          <div class="sessions-panel-section">
+            <h4>Voice Clones</h4>
+            ${this._showClonePanel
+              ? html`<button
+                  type="button"
+                  class="session-item"
+                  @click=${() => {
+                    this._showClonePanel = true;
+                    if (window.innerWidth < 768) this._sessionsPanelOpen = false;
+                  }}
+                  aria-label="Manage voice clones"
+                >
+                  <span class="session-item-icon">${icons.radio}</span>
+                  <span class="session-item-label">Manage clones</span>
+                </button>`
+              : html`<button
+                  type="button"
+                  class="session-item"
+                  @click=${() => {
+                    this._showClonePanel = true;
+                    if (window.innerWidth < 768) this._sessionsPanelOpen = false;
+                  }}
+                  aria-label="Open voice clone panel"
+                >
+                  <span class="session-item-icon">${icons.radio}</span>
+                  <span class="session-item-label">Clone voice</span>
+                </button>`}
+          </div>
+
+          <div class="sessions-panel-section">
+            <h4>Transcripts</h4>
+            ${this._messages.length > 0
+              ? html`<button
+                  type="button"
+                  class="session-item"
+                  @click=${() => {
+                    this._exportConversation();
+                    if (window.innerWidth < 768) this._sessionsPanelOpen = false;
+                  }}
+                  aria-label="Export current transcript"
+                >
+                  <span class="session-item-icon">${icons["clock-counter-clockwise"]}</span>
+                  <span class="session-item-label">Export transcript</span>
+                </button>`
+              : html`<div class="sessions-panel-empty">No transcripts yet</div>`}
+          </div>
+        </div>
       </div>
     `;
   }
@@ -1200,6 +1463,14 @@ export class ScVoiceView extends GatewayAwareLitElement {
     return html`
       <div class="status-bar" role="region" aria-label="Voice status">
         <div class="status-left">
+          <button
+            type="button"
+            class="sessions-toggle"
+            @click=${this._toggleSessionsPanel}
+            aria-label=${this._sessionsPanelOpen ? "Close sessions panel" : "Open sessions panel"}
+          >
+            ${icons["sidebar-toggle"]}
+          </button>
           <hu-status-dot
             .status=${this._connectionStatus === "connected" ? "healthy" : "offline"}
           ></hu-status-dot>

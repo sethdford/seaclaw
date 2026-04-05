@@ -732,10 +732,23 @@ export class ScApp extends LitElement {
     if (mod && e.key === "k") {
       e.preventDefault();
       this.commandPaletteOpen = !this.commandPaletteOpen;
+      document.dispatchEvent(new CustomEvent("focus-search"));
     }
     if (mod && e.key === "b") {
       e.preventDefault();
       this._toggleSidebar();
+    }
+    if (modShift && e.key === "N") {
+      e.preventDefault();
+      document.dispatchEvent(new CustomEvent("new-chat"));
+    }
+    if (modShift && e.key === "S") {
+      e.preventDefault();
+      document.dispatchEvent(new CustomEvent("toggle-sessions"));
+    }
+    if (modShift && e.key === "A") {
+      e.preventDefault();
+      document.dispatchEvent(new CustomEvent("toggle-artifacts"));
     }
     if (modShift && e.key === "T") {
       e.preventDefault();
@@ -745,16 +758,20 @@ export class ScApp extends LitElement {
       e.preventDefault();
       this._dispatchExportLogs();
     }
-    if (e.key === "?") {
+    if (e.key === "?" && !this._isInputFocused()) {
       e.preventDefault();
       this.shortcutOverlayOpen = !this.shortcutOverlayOpen;
+      document.dispatchEvent(new CustomEvent("show-shortcuts"));
     }
-    if (e.key === "Escape" && this.moreSheetOpen) {
-      e.preventDefault();
-      this.moreSheetOpen = false;
-    }
-    if (e.key === "Escape" && this._pendingGKey) {
-      this._clearPendingG();
+    if (e.key === "Escape") {
+      if (this.moreSheetOpen) {
+        e.preventDefault();
+        this.moreSheetOpen = false;
+      }
+      if (this._pendingGKey) {
+        this._clearPendingG();
+      }
+      document.dispatchEvent(new CustomEvent("close-panel"));
     }
     if (!this._isInputFocused()) {
       this._handleVimKeys(e);

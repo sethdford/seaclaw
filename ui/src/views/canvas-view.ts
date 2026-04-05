@@ -226,6 +226,44 @@ export class CanvasView extends GatewayAwareLitElement {
         flex-shrink: 0;
       }
 
+      .format-selector {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: var(--hu-space-2xs);
+        border-radius: var(--hu-radius-md);
+        overflow: hidden;
+      }
+
+      .format-selector button {
+        padding: var(--hu-space-2xs) var(--hu-space-sm);
+        border: 1px solid var(--hu-border-subtle);
+        border-radius: var(--hu-radius-sm);
+        background: transparent;
+        color: var(--hu-text-secondary);
+        font-family: var(--hu-font);
+        font-size: var(--hu-text-xs);
+        cursor: pointer;
+        transition:
+          background var(--hu-duration-fast) var(--hu-ease-out),
+          border-color var(--hu-duration-fast) var(--hu-ease-out);
+      }
+
+      .format-selector button:hover {
+        background: var(--hu-hover-overlay);
+      }
+
+      .format-selector button:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: -2px;
+      }
+
+      .format-selector button.active {
+        background: color-mix(in srgb, var(--hu-accent) 15%, transparent);
+        border-color: var(--hu-accent);
+        color: var(--hu-accent);
+        font-weight: var(--hu-weight-semibold);
+      }
+
       .mode-toggle {
         display: inline-flex;
         border-radius: var(--hu-radius-md);
@@ -246,6 +284,11 @@ export class CanvasView extends GatewayAwareLitElement {
 
       .mode-toggle button:hover {
         background: var(--hu-hover-overlay);
+      }
+
+      .mode-toggle button:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: -2px;
       }
 
       .mode-toggle button.active {
@@ -496,15 +539,52 @@ export class CanvasView extends GatewayAwareLitElement {
     `;
   }
 
+  private _formatLabels: Record<CanvasFormat, string> = {
+    code: "Code",
+    react: "React",
+    svg: "SVG",
+    mermaid: "Mermaid",
+    html: "HTML",
+    markdown: "Markdown",
+    mockup: "Mockup",
+  };
+
   private _renderDetail(c: CanvasEntry) {
     return html`
       <div class="detail">
         <div class="detail-header">
           <h2>${c.title || c.id}</h2>
           <div class="detail-controls">
-            <div class="mode-toggle">
+            <div
+              class="format-selector"
+              role="tablist"
+              aria-label="Canvas format"
+            >
+              ${VALID_FORMATS.map(
+                (f) => html`
+                  <button
+                    type="button"
+                    role="tab"
+                    class=${c.format === f ? "active" : ""}
+                    aria-selected=${c.format === f ? "true" : "false"}
+                    aria-label="${this._formatLabels[f]} format"
+                    @click=${() => {
+                      this.canvases = this.canvases.map((cv) =>
+                        cv.id === c.id ? { ...cv, format: f } : cv,
+                      );
+                    }}
+                  >
+                    ${this._formatLabels[f]}
+                  </button>
+                `,
+              )}
+            </div>
+            <div class="mode-toggle" role="tablist" aria-label="View mode">
               <button
                 type="button"
+                role="tab"
+                aria-selected=${this._viewMode === "preview" ? "true" : "false"}
+                aria-label="Preview mode"
                 class=${this._viewMode === "preview" ? "active" : ""}
                 @click=${() => {
                   this._viewMode = "preview";
@@ -514,6 +594,9 @@ export class CanvasView extends GatewayAwareLitElement {
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected=${this._viewMode === "code" ? "true" : "false"}
+                aria-label="Code editor mode"
                 class=${this._viewMode === "code" ? "active" : ""}
                 @click=${() => {
                   this._viewMode = "code";
@@ -523,6 +606,9 @@ export class CanvasView extends GatewayAwareLitElement {
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected=${this._viewMode === "split" ? "true" : "false"}
+                aria-label="Split view mode"
                 class=${this._viewMode === "split" ? "active" : ""}
                 @click=${() => {
                   this._viewMode = "split";

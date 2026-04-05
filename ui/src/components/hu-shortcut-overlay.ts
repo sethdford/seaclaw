@@ -15,11 +15,10 @@ const SHORTCUTS: ShortcutCategory[] = [
   {
     title: "Navigation",
     rows: [
-      { shortcut: "Cmd+K / Ctrl+K", description: "Command palette" },
+      { shortcut: "Cmd+K / Ctrl+K", description: "Search / command palette" },
       { shortcut: "Cmd+B / Ctrl+B", description: "Toggle sidebar" },
       { shortcut: "Cmd+Shift+T / Ctrl+Shift+T", description: "Toggle theme" },
       { shortcut: "Cmd+Shift+E / Ctrl+Shift+E", description: "Export logs" },
-      { shortcut: "?", description: "Keyboard shortcuts" },
       { shortcut: "/", description: "Focus search (opens palette)" },
       {
         shortcut: "g then o/c/a/s/t/l",
@@ -31,14 +30,23 @@ const SHORTCUTS: ShortcutCategory[] = [
   {
     title: "Chat",
     rows: [
+      { shortcut: "Cmd+Shift+N / Ctrl+Shift+N", description: "New chat" },
       { shortcut: "Enter", description: "Send message" },
       { shortcut: "Shift+Enter", description: "New line" },
-      { shortcut: "Escape", description: "Cancel/close" },
+    ],
+  },
+  {
+    title: "Panels",
+    rows: [
+      { shortcut: "Cmd+Shift+S / Ctrl+Shift+S", description: "Toggle sessions panel" },
+      { shortcut: "Cmd+Shift+A / Ctrl+Shift+A", description: "Toggle artifacts panel" },
     ],
   },
   {
     title: "General",
     rows: [
+      { shortcut: "?", description: "Show shortcuts overlay" },
+      { shortcut: "Escape", description: "Close panels/modals" },
       { shortcut: "Tab", description: "Navigate focus" },
       { shortcut: "Space/Enter", description: "Activate button" },
       { shortcut: "Arrow keys", description: "Navigate lists" },
