@@ -53,7 +53,7 @@ export class ScChatComposer extends LitElement {
   @property({ type: Boolean }) disabled = false;
   @property({ type: Boolean, attribute: "show-suggestions" }) showSuggestions = false;
   @property({ type: String, attribute: "stream-elapsed" }) streamElapsed = "";
-  @property({ type: String }) placeholder = "Type a message...";
+  @property({ type: String }) placeholder = "What would you like to work on?";
   @property({ type: String }) model = "";
   @property({ type: Boolean, attribute: "voice-active" }) voiceActive = false;
   @property({ type: Boolean, attribute: "voice-supported" }) voiceSupported = true;
@@ -91,10 +91,10 @@ export class ScChatComposer extends LitElement {
       display: flex;
       flex-direction: column;
       gap: var(--hu-space-sm);
-      padding: var(--hu-space-sm) var(--hu-space-md);
-      background: color-mix(in srgb, var(--hu-surface-container) 65%, transparent);
-      backdrop-filter: blur(var(--hu-blur-md));
-      -webkit-backdrop-filter: blur(var(--hu-blur-md));
+      padding: var(--hu-space-xs) var(--hu-space-md);
+      background: color-mix(in srgb, var(--hu-surface-container) 35%, transparent);
+      backdrop-filter: blur(var(--hu-blur-sm));
+      -webkit-backdrop-filter: blur(var(--hu-blur-sm));
       border: 1px solid var(--hu-border-subtle);
       border-radius: var(--hu-radius-lg);
       transition:
@@ -310,7 +310,7 @@ export class ScChatComposer extends LitElement {
       }
       50% {
         box-shadow: 0 0 var(--hu-space-md) var(--hu-space-2xs)
-          color-mix(in srgb, var(--hu-accent) 25%, transparent);
+          color-mix(in srgb, var(--hu-accent) 10%, transparent);
       }
     }
     .send-btn {

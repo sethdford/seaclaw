@@ -144,8 +144,11 @@ export class ScFloatingMic extends LitElement {
     this._setupKeyboardShortcut();
     window.addEventListener("hu-composer-connected", this._onComposerConnected);
     window.addEventListener("hu-composer-disconnected", this._onComposerDisconnected);
-    // Check if composer already exists on the page
-    this._setComposerPresent(!!document.querySelector("hu-chat-composer"));
+    // If composer already in DOM, hide immediately — no fade on initial load
+    if (document.querySelector("hu-chat-composer")) {
+      this._composerPresent = true;
+      this._hidden = true;
+    }
   }
 
   override disconnectedCallback(): void {

@@ -8,7 +8,7 @@ export class ScMessageGroup extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      margin-bottom: var(--hu-space-lg, 1rem);
+      margin-bottom: 0;
     }
 
     .group {

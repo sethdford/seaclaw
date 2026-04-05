@@ -223,8 +223,8 @@ export class ScChatView extends GatewayAwareLitElement {
       /* Empty state: center composer vertically like Claude.ai / ChatGPT */
       .container.empty {
         justify-content: center;
-        --hu-hero-padding-bottom: var(--hu-space-lg);
-        --hu-messages-padding-bottom: var(--hu-space-sm);
+        --hu-hero-padding-bottom: 0;
+        --hu-messages-padding-bottom: 0;
       }
       .container.empty .thread-column {
         flex: none;
