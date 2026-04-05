@@ -296,6 +296,37 @@ static void imessage_fetch_gif_stub_returns_null(void) {
     HU_ASSERT_NULL(hu_imessage_fetch_gif(&alloc, S("cats"), S("key")));
 }
 
+static void imessage_fetch_gif_rejects_empty_query(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    HU_ASSERT_NULL(hu_imessage_fetch_gif(&alloc, "", 0, "key", 3));
+}
+
+static void imessage_gif_json_extract_finds_url_value(void) {
+    char out[256];
+    const char *j = "\"media_formats\":{\"gif\":{\"url\":\"https://c.example/g.gif\"}}";
+    size_t n = hu_imessage_test_gif_json_extract(j, strlen(j), "url", out, sizeof(out));
+    HU_ASSERT_EQ(n, strlen("https://c.example/g.gif"));
+    HU_ASSERT_STR_EQ(out, "https://c.example/g.gif");
+}
+
+static void imessage_gif_json_extract_returns_zero_when_key_missing(void) {
+    char out[64];
+    memset(out, 'x', sizeof(out));
+    const char *j = "{\"results\":[]}";
+    size_t n = hu_imessage_test_gif_json_extract(j, strlen(j), "url", out, sizeof(out));
+    HU_ASSERT_EQ(n, 0u);
+    HU_ASSERT_EQ(out[0], 'x');
+}
+
+static void imessage_gif_json_extract_truncates_to_out_cap(void) {
+    char out[12];
+    const char *j = "\"url\":\"https://x.test/a.gif\"";
+    size_t n = hu_imessage_test_gif_json_extract(j, strlen(j), "url", out, sizeof(out));
+    HU_ASSERT_EQ(n, 11u);
+    HU_ASSERT_EQ(strlen(out), 11u);
+    HU_ASSERT_EQ(out[11], '\0');
+}
+
 static void imessage_lookup_guid_not_supported_under_test(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char buf[64];
@@ -1072,6 +1103,10 @@ void run_imessage_adversarial_tests(void) {
     HU_RUN_TEST(imessage_build_tapback_context_noop_under_test);
     HU_RUN_TEST(imessage_build_read_receipt_context_noop_under_test);
     HU_RUN_TEST(imessage_fetch_gif_stub_returns_null);
+    HU_RUN_TEST(imessage_fetch_gif_rejects_empty_query);
+    HU_RUN_TEST(imessage_gif_json_extract_finds_url_value);
+    HU_RUN_TEST(imessage_gif_json_extract_returns_zero_when_key_missing);
+    HU_RUN_TEST(imessage_gif_json_extract_truncates_to_out_cap);
     HU_RUN_TEST(imessage_lookup_guid_not_supported_under_test);
     HU_RUN_TEST(imessage_start_stop_idempotent);
 #endif

@@ -292,13 +292,16 @@ static hu_error_t openrouter_chat(void *ctx, hu_allocator_t *alloc,
             if (content) {
                 size_t clen = strlen(content);
                 out->content = hu_strndup(alloc, content, clen);
-                out->content_len = clen;
+                out->content_len = out->content ? clen : 0;
             }
             hu_json_value_t *tc_arr = hu_json_object_get(msg, "tool_calls");
             if (tc_arr && tc_arr->type == HU_JSON_ARRAY && tc_arr->data.array.len > 0) {
                 size_t tc_count = tc_arr->data.array.len;
-                hu_tool_call_t *tcs =
-                    (hu_tool_call_t *)alloc->alloc(alloc->ctx, tc_count * sizeof(hu_tool_call_t));
+                if (tc_count > SIZE_MAX / sizeof(hu_tool_call_t))
+                    tc_count = 0;
+                hu_tool_call_t *tcs = tc_count
+                    ? (hu_tool_call_t *)alloc->alloc(alloc->ctx, tc_count * sizeof(hu_tool_call_t))
+                    : NULL;
                 if (tcs) {
                     memset(tcs, 0, tc_count * sizeof(hu_tool_call_t));
                     size_t valid = 0;
@@ -312,13 +315,16 @@ static hu_error_t openrouter_chat(void *ctx, hu_allocator_t *alloc,
                         const char *fn_args = hu_json_get_string(fn, "arguments");
                         if (!fn_name)
                             continue;
-                        tcs[valid].id = tc_id ? hu_strndup(alloc, tc_id, strlen(tc_id)) : NULL;
-                        tcs[valid].id_len = tc_id ? (size_t)strlen(tc_id) : 0;
                         tcs[valid].name = hu_strndup(alloc, fn_name, strlen(fn_name));
-                        tcs[valid].name_len = (size_t)strlen(fn_name);
+                        if (!tcs[valid].name)
+                            continue;
+                        tcs[valid].name_len = strlen(fn_name);
+                        tcs[valid].id = tc_id ? hu_strndup(alloc, tc_id, strlen(tc_id)) : NULL;
+                        tcs[valid].id_len = tcs[valid].id && tc_id ? strlen(tc_id) : 0;
                         tcs[valid].arguments =
                             fn_args ? hu_strndup(alloc, fn_args, strlen(fn_args)) : NULL;
-                        tcs[valid].arguments_len = fn_args ? (size_t)strlen(fn_args) : 0;
+                        tcs[valid].arguments_len =
+                            tcs[valid].arguments && fn_args ? strlen(fn_args) : 0;
                         valid++;
                     }
                     out->tool_calls = tcs;

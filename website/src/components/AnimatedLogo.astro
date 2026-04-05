@@ -44,7 +44,8 @@ const { size = 180, interactive = true } = Astro.props;
   .hu-orb-container {
     position: relative;
     margin: 0 auto;
-    animation: hu-orbEntry 1.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    /* Duration: intentional hero overshoot; longer than --hu-duration-slowest (700ms) */
+    animation: hu-orbEntry 1.4s var(--hu-spring) both;
     will-change: transform;
   }
   .hu-orb-container:focus-visible {
@@ -65,7 +66,8 @@ const { size = 180, interactive = true } = Astro.props;
     );
     border-radius: 50%;
     opacity: 0.6;
-    transition: opacity 0.8s ease;
+    /* 800ms glow fade: no exact token between --hu-duration-slower (500ms) and slowest (700ms) */
+    transition: opacity 0.8s var(--hu-ease-in-out);
     will-change: opacity, transform;
   }
   .hu-orb-ring {
@@ -95,7 +97,8 @@ const { size = 180, interactive = true } = Astro.props;
       transparent 60%
     );
     border-radius: 50%;
-    animation: hu-glowPulse 5s ease infinite;
+    /* 5s loop: intentional; shorter than --hu-duration-ambient (25s) for visible pulse */
+    animation: hu-glowPulse 5s var(--hu-ease-in-out) infinite;
   }
   .hu-orb {
     position: absolute;
@@ -115,10 +118,14 @@ const { size = 180, interactive = true } = Astro.props;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
+    cursor: default;
     will-change: transform;
-    transition: box-shadow 0.6s ease;
-    animation: hu-orbBreathe 5s ease-in-out infinite;
+    /* 600ms shadow: between --hu-duration-slower and --hu-duration-slowest */
+    transition: box-shadow 0.6s var(--hu-ease-in-out);
+    animation: hu-orbBreathe 5s var(--hu-ease-in-out) infinite;
+  }
+  .hu-orb-container[data-interactive="true"] .hu-orb {
+    cursor: pointer;
   }
   .hu-orb-container:hover .hu-orb {
     box-shadow:

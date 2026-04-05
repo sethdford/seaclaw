@@ -94,13 +94,12 @@ hu_error_t hu_moderation_check_local(hu_allocator_t *alloc, const char *text, si
     if (nerr != HU_OK)
         return nerr;
 
-    /* norm buffer is fixed; at capacity we may have truncated mapped output. Raw-text
-     * checks still scan the full input; log so operators can monitor edge cases. */
-    if (norm_len >= sizeof(norm) - 1)
+    if (norm_len >= sizeof(norm) - 1) {
         hu_log_warn("moderation", NULL,
-                    "normalization buffer exhausted (%zu bytes in, %zu normalized); "
-                    "relying on raw-text pattern checks for tail content",
-                    text_len, norm_len);
+                    "normalization truncated (%zu bytes input, %zu norm cap) — "
+                    "tail content checked by raw-text only",
+                    text_len, sizeof(norm));
+    }
 
     if (mod_contains_word(text, text_len, "kill") || mod_contains_word(norm, norm_len, "kill") || mod_norm_has_kill_not_skill(norm, norm_len) ||
         mod_contains_word(text, text_len, "murder") || mod_contains_word(norm, norm_len, "murder") || mod_contains(norm, norm_len, "murder") ||

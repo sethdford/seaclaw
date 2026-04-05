@@ -129,8 +129,22 @@ public final class ConnectionManager: ObservableObject {
     }
 
     public func request(method: String, params: [String: AnyCodable]? = nil) async throws -> ControlResponse {
-        guard let conn = connection else { throw HumanConnectionError.notConnected }
-        return try await conn.request(method: method, params: params)
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async { [weak self] in
+                guard let self = self, let conn = self.connection else {
+                    continuation.resume(throwing: HumanConnectionError.notConnected)
+                    return
+                }
+                Task {
+                    do {
+                        let result = try await conn.request(method: method, params: params)
+                        continuation.resume(returning: result)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        }
     }
 
     public func registerPushToken(token: String) {

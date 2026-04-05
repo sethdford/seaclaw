@@ -296,6 +296,13 @@ typedef struct dag_parallel_work {
     hu_dag_t *dag;
 } dag_parallel_work_t;
 
+/* Thread-safety invariant: only tool->execute runs in parallel.
+ * Agent lookup, variable resolution, and result collection are
+ * serialized by this mutex. Only the actual tool execution benefits
+ * from parallelism (which is where the latency savings come from,
+ * since tools typically do I/O). */
+static pthread_mutex_t g_dag_parallel_prep_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static void agent_turn_hula_append_histories(hu_agent_t *agent, const hu_hula_program_t *prog,
                                              const hu_hula_exec_t *exec) {
     if (!agent || !prog || !exec)
@@ -458,6 +465,8 @@ static void *dag_parallel_worker(void *arg) {
     char *resolved_args = NULL;
     size_t resolved_len = 0;
     const char *use_args = node->args_json;
+    hu_tool_t *dag_tool = NULL;
+    pthread_mutex_lock(&g_dag_parallel_prep_mutex);
     if (node->args_json) {
         if (hu_dag_resolve_vars(w->agent->alloc, w->dag, node->args_json, strlen(node->args_json),
                                 &resolved_args, &resolved_len) == HU_OK &&
@@ -465,8 +474,9 @@ static void *dag_parallel_worker(void *arg) {
             use_args = resolved_args;
     }
 
-    hu_tool_t *dag_tool = hu_agent_internal_find_tool(
+    dag_tool = hu_agent_internal_find_tool(
         w->agent, node->tool_name, node->tool_name ? strlen(node->tool_name) : 0);
+    pthread_mutex_unlock(&g_dag_parallel_prep_mutex);
     if (!dag_tool) {
         node->status = HU_DAG_FAILED;
         if (resolved_args)

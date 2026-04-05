@@ -6,6 +6,7 @@
 #include <string.h>
 
 #ifdef HU_ENABLE_SQLITE
+#include "human/memory/sql_transaction.h"
 #include <sqlite3.h>
 #include <time.h>
 
@@ -315,20 +316,22 @@ hu_error_t hu_frontier_persist_save_growth(hu_allocator_t *alloc, sqlite3 *db,
     if (!state->initialized)
         return HU_OK;
 
-    sqlite3_exec(db, "BEGIN", NULL, NULL, NULL);
+    hu_sql_txn_t txn = {0};
+    if (hu_sql_txn_begin(&txn, db) != HU_OK)
+        return HU_ERR_IO;
 
     static const char del_sql[] = "DELETE FROM growth_records WHERE contact_id = ?1";
     sqlite3_stmt *del_stmt = NULL;
     int del_rc = sqlite3_prepare_v2(db, del_sql, -1, &del_stmt, NULL);
     if (del_rc != SQLITE_OK) {
-        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_IO;
     }
     sqlite3_bind_text(del_stmt, 1, contact_id, (int)contact_id_len, SQLITE_STATIC);
     del_rc = sqlite3_step(del_stmt);
     sqlite3_finalize(del_stmt);
     if (del_rc != SQLITE_DONE) {
-        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_IO;
     }
 
@@ -338,7 +341,7 @@ hu_error_t hu_frontier_persist_save_growth(hu_allocator_t *alloc, sqlite3 *db,
 
     sqlite3_stmt *ins_stmt = NULL;
     if (sqlite3_prepare_v2(db, ins, -1, &ins_stmt, NULL) != SQLITE_OK) {
-        sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+        hu_sql_txn_rollback(&txn);
         return HU_ERR_IO;
     }
 
@@ -359,7 +362,7 @@ hu_error_t hu_frontier_persist_save_growth(hu_allocator_t *alloc, sqlite3 *db,
         sqlite3_reset(ins_stmt);
         if (step_rc != SQLITE_DONE) {
             sqlite3_finalize(ins_stmt);
-            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+            hu_sql_txn_rollback(&txn);
             return HU_ERR_IO;
         }
     }
@@ -378,12 +381,15 @@ hu_error_t hu_frontier_persist_save_growth(hu_allocator_t *alloc, sqlite3 *db,
         sqlite3_reset(ins_stmt);
         if (step_rc != SQLITE_DONE) {
             sqlite3_finalize(ins_stmt);
-            sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+            hu_sql_txn_rollback(&txn);
             return HU_ERR_IO;
         }
     }
     sqlite3_finalize(ins_stmt);
-    sqlite3_exec(db, "COMMIT", NULL, NULL, NULL);
+    if (hu_sql_txn_commit(&txn) != HU_OK) {
+        hu_sql_txn_rollback(&txn);
+        return HU_ERR_IO;
+    }
     return HU_OK;
 }
 

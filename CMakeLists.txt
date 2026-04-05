@@ -964,6 +964,9 @@ list(APPEND HU_CORE_SOURCES
     src/tools/db_introspect.c
 )
 
+# Music preview integration (iTunes Search API + 30s preview download)
+list(APPEND HU_CORE_SOURCES src/music.c)
+
 # Paperclip integration (requires libcurl for API calls)
 if(HU_ENABLE_CURL)
     list(APPEND HU_CORE_SOURCES
@@ -1555,6 +1558,11 @@ endif()
 # --- Main executable ---
 add_executable(human src/main.c src/bootstrap.c)
 target_link_libraries(human human_core)
+# Embed Info.plist for macOS TCC (accessibility, AppleEvents) identity
+if(APPLE AND EXISTS "${CMAKE_SOURCE_DIR}/resources/Info.plist")
+    target_link_options(human PRIVATE
+        "LINKER:-sectcreate,__TEXT,__info_plist,${CMAKE_SOURCE_DIR}/resources/Info.plist")
+endif()
 if(HU_ENABLE_CURL)
     target_compile_definitions(human PRIVATE HU_ENABLE_CURL=1)
 endif()
@@ -2304,6 +2312,9 @@ endif()
 if(HU_ENABLE_AUTHENTIC)
     list(APPEND HU_TEST_SOURCES tests/test_cognitive_load.c tests/test_phase9_integration.c)
 endif()
+
+# Music preview tests (pure computation — always compiled)
+list(APPEND HU_TEST_SOURCES tests/test_music.c)
 
 # Paperclip tests (requires libcurl)
 if(HU_ENABLE_CURL)

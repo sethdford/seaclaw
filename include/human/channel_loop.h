@@ -44,7 +44,7 @@ typedef struct hu_channel_loop_msg {
     char content[4096];
     bool is_group;
     int64_t message_id;     /* platform message ID for reactions; -1 if unknown */
-    bool has_attachment;    /* true if message has image attachment (for vision pipeline) */
+    bool has_attachment;    /* true if message has image or audio attachment (vision/transcription) */
     bool has_video;         /* true if message has video attachment (.mov, .mp4, .m4v) */
     char guid[96];          /* iMessage message GUID for inline reply tracking */
     bool was_edited;        /* message was edited after initial send (iMessage) */

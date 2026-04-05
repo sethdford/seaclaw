@@ -5,6 +5,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/feeds/ingest.h"
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -81,14 +82,30 @@ hu_error_t hu_imessage_feed_fetch(hu_allocator_t *alloc, int64_t since_epoch,
 
     int64_t since_apple = (since_epoch - IMESSAGE_EPOCH_OFFSET) * IMESSAGE_NS_PER_SEC;
 
+    /* Read channel's high-water ROWID to avoid re-ingesting messages the
+     * daemon already processed via the live iMessage channel. */
+    int64_t channel_rowid = 0;
+    {
+        char rowid_path[512];
+        int rp = snprintf(rowid_path, sizeof(rowid_path), "%s/.human/imessage.rowid", home);
+        if (rp > 0 && (size_t)rp < sizeof(rowid_path)) {
+            FILE *rf = fopen(rowid_path, "r");
+            if (rf) {
+                if (fscanf(rf, "%" SCNd64, &channel_rowid) != 1)
+                    channel_rowid = 0;
+                fclose(rf);
+            }
+        }
+    }
+
     const char *sql =
         "SELECT m.text, m.date, m.is_from_me, h.id AS handle_id, m.attributedBody "
         "FROM message m "
         "LEFT JOIN handle h ON m.handle_id = h.ROWID "
         "WHERE ((m.text IS NOT NULL AND m.text != '') "
         "    OR (m.attributedBody IS NOT NULL AND LENGTH(m.attributedBody) > 0)) "
-        "AND m.date > ? "
-        "ORDER BY m.date DESC LIMIT ?";
+        "AND m.date > ?1 AND m.ROWID > ?3 "
+        "ORDER BY m.date DESC LIMIT ?2";
 
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
@@ -98,6 +115,7 @@ hu_error_t hu_imessage_feed_fetch(hu_allocator_t *alloc, int64_t since_epoch,
 
     sqlite3_bind_int64(stmt, 1, since_apple);
     sqlite3_bind_int(stmt, 2, (int)items_cap);
+    sqlite3_bind_int64(stmt, 3, channel_rowid);
 
     size_t cnt = 0;
     while (sqlite3_step(stmt) == SQLITE_ROW && cnt < items_cap) {

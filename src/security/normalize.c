@@ -1,6 +1,23 @@
 #include "human/security/normalize.h"
 #include <string.h>
 
+static size_t unicode_space_len(const unsigned char *p, size_t remaining) {
+    if (remaining >= 2 && p[0] == 0xC2 && p[1] == 0xA0)
+        return 2; /* NBSP */
+    if (remaining >= 3) {
+        if (p[0] == 0xE2 && p[1] == 0x80 && p[2] >= 0x80 && p[2] <= 0x8B)
+            return 3;
+        if (p[0] == 0xE2 && p[1] == 0x80 &&
+            (p[2] == 0xA8 || p[2] == 0xA9 || p[2] == 0xAF))
+            return 3;
+        if (p[0] == 0xE2 && p[1] == 0x81 && p[2] == 0x9F)
+            return 3;
+        if (p[0] == 0xE3 && p[1] == 0x80 && p[2] == 0x80)
+            return 3;
+    }
+    return 0;
+}
+
 hu_error_t hu_normalize_confusables(const char *input, size_t input_len,
                                      char *out, size_t out_cap, size_t *out_len) {
     if (!input || !out || !out_len || out_cap == 0)
@@ -27,6 +44,14 @@ hu_error_t hu_normalize_confusables(const char *input, size_t input_len,
             /* U+FEFF BOM (ef bb bf) */
             if (b1 == 0xBB && b2 == 0xBF) {
                 i += 3;
+                continue;
+            }
+        }
+
+        {
+            size_t usp = unicode_space_len((const unsigned char *)input + i, input_len - i);
+            if (usp > 0) {
+                i += usp;
                 continue;
             }
         }

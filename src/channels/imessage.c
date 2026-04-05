@@ -7,6 +7,7 @@
 #ifndef HU_CODENAME
 #define HU_CODENAME "human"
 #endif
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,7 +112,7 @@ typedef struct hu_imessage_ctx {
     size_t sent_ring_idx;
     char typing_last_target[128];
     size_t typing_last_target_len;
-    bool typing_active;
+    _Atomic bool typing_active;
     bool use_imsg_cli;
     bool imsg_cli_checked;
     bool has_imsg_cli;
@@ -262,8 +263,10 @@ static hu_error_t imessage_start(void *ctx) {
 
 static void imessage_stop(void *ctx) {
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
-    if (c)
+    if (c) {
         c->running = false;
+        atomic_store(&c->typing_active, false);
+    }
 }
 
 #if (defined(__APPLE__) && defined(__MACH__)) || HU_IS_TEST
@@ -515,7 +518,7 @@ size_t imessage_build_attach_script(char *out, size_t out_cap,
  */
 static void imessage_simulate_typing(hu_imessage_ctx_t *c, const char *tgt, size_t tgt_len,
                                      size_t message_len) {
-    if (!c || c->typing_active)
+    if (!c || atomic_load(&c->typing_active))
         return;
 
     unsigned int delay_ms = (unsigned int)(message_len * 25);
@@ -589,7 +592,78 @@ static void imessage_simulate_typing(hu_imessage_ctx_t *c, const char *tgt, size
                 hu_log_error("imessage", NULL, "typing indicator failed (accessibility?)");
         }
     } else {
-        usleep(delay_ms * 1000);
+        /* Longer messages: re-trigger typing indicator every ~2.5s so the
+         * bubble stays visible for the entire simulated composing period. */
+        bool same_target = (c->typing_last_target_len == tgt_len && tgt_len > 0 &&
+                            memcmp(c->typing_last_target, tgt, tgt_len) == 0);
+        if (tgt_len > 0 && tgt_len < sizeof(c->typing_last_target)) {
+            memcpy(c->typing_last_target, tgt, tgt_len);
+            c->typing_last_target[tgt_len] = '\0';
+            c->typing_last_target_len = tgt_len;
+        }
+
+        unsigned int remaining = delay_ms;
+        while (remaining > 0) {
+            unsigned int chunk = remaining > 2500 ? 2500 : remaining;
+            char typing_script[1024];
+            int ts_n;
+            if (same_target) {
+                ts_n = snprintf(typing_script, sizeof(typing_script),
+                                "tell application \"Messages\" to activate\n"
+                                "delay 0.2\n"
+                                "tell application \"System Events\" to tell process "
+                                "\"Messages\"\n"
+                                "  keystroke \".\"\n"
+                                "  delay %.1f\n"
+                                "  keystroke \"a\" using command down\n"
+                                "  key code 51\n"
+                                "end tell",
+                                (float)chunk / 1000.0f);
+            } else {
+                ts_n = snprintf(typing_script, sizeof(typing_script),
+                                "tell application \"Messages\"\n"
+                                "  activate\n"
+                                "  set targetHandle to \"%s\"\n"
+                                "  set targetChat to missing value\n"
+                                "  repeat with c in every chat\n"
+                                "    try\n"
+                                "      repeat with p in participants of c\n"
+                                "        if handle of p is targetHandle then\n"
+                                "          set targetChat to c\n"
+                                "          exit repeat\n"
+                                "        end if\n"
+                                "      end repeat\n"
+                                "    end try\n"
+                                "    if targetChat is not missing value then exit repeat\n"
+                                "  end repeat\n"
+                                "end tell\n"
+                                "delay 0.3\n"
+                                "tell application \"System Events\" to tell process "
+                                "\"Messages\"\n"
+                                "  keystroke \".\"\n"
+                                "  delay %.1f\n"
+                                "  keystroke \"a\" using command down\n"
+                                "  key code 51\n"
+                                "end tell",
+                                tgt_esc, (float)chunk / 1000.0f);
+                same_target = true;
+            }
+            if (ts_n > 0 && (size_t)ts_n < sizeof(typing_script)) {
+                const char *ts_argv[] = {"osascript", "-e", typing_script, NULL};
+                hu_run_result_t ts_result = {0};
+                hu_error_t ts_err =
+                    hu_process_run(c->alloc, ts_argv, NULL, 65536, &ts_result);
+                hu_run_result_free(c->alloc, &ts_result);
+                if (ts_err != HU_OK) {
+                    usleep((unsigned int)(remaining) * 1000);
+                    break;
+                }
+            } else {
+                usleep((unsigned int)(remaining) * 1000);
+                break;
+            }
+            remaining -= chunk;
+        }
     }
 }
 #endif
@@ -1237,6 +1311,52 @@ int hu_imessage_count_recent_gif_tapbacks(const char *contact_id, size_t contact
     return result;
 }
 
+int64_t hu_imessage_get_latest_sent_rowid(const char *handle, size_t handle_len) {
+    if (!handle || handle_len == 0)
+        return -1;
+
+    const char *home = getenv("HOME");
+    if (!home)
+        return -1;
+
+    char db_path[512];
+    int dp = snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home);
+    if (dp < 0 || (size_t)dp >= sizeof(db_path))
+        return -1;
+
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+        if (db)
+            sqlite3_close(db);
+        return -1;
+    }
+
+    const char *sql =
+        "SELECT MAX(m.ROWID) FROM message m "
+        "JOIN handle h ON m.handle_id = h.ROWID "
+        "WHERE m.is_from_me = 1 AND h.id = ?1";
+
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return -1;
+    }
+
+    char hbuf[128];
+    size_t hlen = handle_len < sizeof(hbuf) - 1 ? handle_len : sizeof(hbuf) - 1;
+    memcpy(hbuf, handle, hlen);
+    hbuf[hlen] = '\0';
+    sqlite3_bind_text(stmt, 1, hbuf, (int)hlen, SQLITE_STATIC);
+
+    int64_t rowid = -1;
+    if (sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_type(stmt, 0) != SQLITE_NULL)
+        rowid = sqlite3_column_int64(stmt, 0);
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return rowid;
+}
+
 hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const char *contact_id,
                                                   size_t contact_id_len, char **out,
                                                   size_t *out_len) {
@@ -1362,6 +1482,12 @@ int hu_imessage_count_recent_gif_tapbacks(const char *contact_id, size_t contact
     (void)contact_id;
     (void)contact_id_len;
     return 0;
+}
+
+int64_t hu_imessage_get_latest_sent_rowid(const char *handle, size_t handle_len) {
+    (void)handle;
+    (void)handle_len;
+    return -1;
 }
 
 hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const char *contact_id,
@@ -1987,7 +2113,7 @@ static hu_error_t imessage_start_typing(void *ctx, const char *recipient,
     if (!ok && getenv("HU_DEBUG"))
         hu_log_error("imessage", NULL, "start_typing failed (accessibility?)");
     if (ok)
-        c->typing_active = true;
+        atomic_store(&c->typing_active, true);
     return ok ? HU_OK : (err != HU_OK ? err : HU_ERR_INTERNAL);
 #endif
 }
@@ -2022,7 +2148,7 @@ static hu_error_t imessage_stop_typing(void *ctx, const char *recipient,
     hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
     bool ok = (err == HU_OK && result.exit_code == 0);
     hu_run_result_free(c->alloc, &result);
-    c->typing_active = false;
+    atomic_store(&c->typing_active, false);
     return ok ? HU_OK : (err != HU_OK ? err : HU_ERR_INTERNAL);
 #endif
 }
@@ -2509,7 +2635,6 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         int has_image = sqlite3_column_int(stmt, 5);
         int has_video = sqlite3_column_int(stmt, 6);
         int has_audio = sqlite3_column_int(stmt, 7);
-        (void)has_audio;
         int was_edited = sqlite3_column_int(stmt, 8);
         const char *reply_to = (const char *)sqlite3_column_text(stmt, 9);
 
@@ -2594,7 +2719,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         msgs[count].content[text_len] = '\0';
         msgs[count].message_id = rowid;
         msgs[count].is_group = (participant_count > 2);
-        msgs[count].has_attachment = (has_image != 0);
+        msgs[count].has_attachment = (has_image != 0 || has_audio != 0);
         msgs[count].has_video = (has_video != 0);
         if (guid && strlen(guid) > 0) {
             size_t g_len = strlen(guid);
@@ -2646,11 +2771,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
 #endif
 }
 
-/* ── GIF search + download via Tenor API v2 ──────────────────────────── */
-
-#if !HU_IS_TEST && defined(HU_HTTP_CURL)
-#include "human/core/http.h"
-#include "human/core/json.h"
+/* ── Tenor JSON fallback + GIF download (v2) ─────────────────────────── */
 
 /* Simple JSON string extractor: find "key":"value" and return value.
  * Writes into out (up to cap). Returns length or 0 on failure. */
@@ -2680,6 +2801,17 @@ static size_t gif_json_extract(const char *json, size_t json_len, const char *ke
     }
     return 0;
 }
+
+#if HU_IS_TEST
+size_t hu_imessage_test_gif_json_extract(const char *json, size_t json_len, const char *key,
+                                         char *out, size_t cap) {
+    return gif_json_extract(json, json_len, key, out, cap);
+}
+#endif
+
+#if !HU_IS_TEST && defined(HU_HTTP_CURL)
+#include "human/core/http.h"
+#include "human/core/json.h"
 
 char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t query_len,
                             const char *api_key, size_t api_key_len) {
@@ -2778,9 +2910,10 @@ char *hu_imessage_fetch_gif(hu_allocator_t *alloc, const char *query, size_t que
     }
 
     char tmp_path[256];
-    static unsigned gif_counter;
+    static _Atomic unsigned gif_counter;
+    unsigned gc = atomic_fetch_add(&gif_counter, 1);
     snprintf(tmp_path, sizeof(tmp_path), "/tmp/human_gif_%u_%d_%u.gif", (unsigned)time(NULL),
-             (int)getpid(), ++gif_counter);
+             (int)getpid(), gc);
 
     FILE *f = fopen(tmp_path, "wb");
     if (!f) {

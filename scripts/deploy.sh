@@ -96,6 +96,12 @@ else
     cp "$BUILD_DIR/human" "$INSTALL_PATH"
 fi
 chmod +x "$INSTALL_PATH"
+# Sign with entitlements + stable identifier for TCC (accessibility, AppleEvents)
+ENTITLEMENTS="$REPO/resources/human.entitlements"
+if [ -f "$ENTITLEMENTS" ]; then
+    codesign --force --sign - --entitlements "$ENTITLEMENTS" \
+        --identifier ai.human.daemon "$INSTALL_PATH" 2>/dev/null || true
+fi
 
 APP_BUNDLE="$HOME/Applications/Human.app"
 if [ -d "$APP_BUNDLE" ]; then

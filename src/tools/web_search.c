@@ -29,6 +29,7 @@
 #define HU_MAX_COUNT     10
 
 typedef struct hu_web_search_ctx {
+    hu_allocator_t *alloc;
     char *provider;
     size_t provider_len;
     char *api_key;
@@ -216,15 +217,15 @@ static const char *web_search_parameters_json(void *ctx) {
     return HU_WEB_SEARCH_PARAMS;
 }
 static void web_search_deinit(void *ctx, hu_allocator_t *alloc) {
-    (void)alloc;
     hu_web_search_ctx_t *c = (hu_web_search_ctx_t *)ctx;
-    if (c) {
-        if (c->provider)
-            free(c->provider);
-        if (c->api_key)
-            free(c->api_key);
-        free(c);
-    }
+    if (!c)
+        return;
+    hu_allocator_t *a = c->alloc ? c->alloc : alloc;
+    if (c->provider)
+        a->free(a->ctx, c->provider, c->provider_len + 1);
+    if (c->api_key)
+        a->free(a->ctx, c->api_key, c->api_key_len + 1);
+    a->free(a->ctx, c, sizeof(*c));
 }
 
 static hu_error_t
@@ -257,6 +258,7 @@ hu_error_t hu_web_search_create(hu_allocator_t *alloc, const hu_config_t *config
     if (!c)
         return HU_ERR_OUT_OF_MEMORY;
     memset(c, 0, sizeof(*c));
+    c->alloc = alloc;
     const char *prov = config ? hu_config_get_web_search_provider(config) : "duckduckgo";
     size_t prov_len = strlen(prov);
     if (prov_len > 0) {

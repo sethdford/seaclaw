@@ -47,6 +47,11 @@ hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const c
  * Returns 0 on non-macOS or when SQLite unavailable. */
 int hu_imessage_count_recent_gif_tapbacks(const char *contact_id, size_t contact_id_len);
 
+/** Look up the ROWID of the most recent is_from_me=1 message to the given handle.
+ * Used for self-reaction targeting instead of fragile ROWID+1 guessing.
+ * Returns -1 on failure or when SQLite/macOS unavailable. */
+int64_t hu_imessage_get_latest_sent_rowid(const char *handle, size_t handle_len);
+
 #ifndef HU_IS_TEST
 /** Check if the real user sent a message to `handle` within the last
  * `within_seconds` seconds.  Queries chat.db for is_from_me=1 rows.
@@ -119,6 +124,9 @@ const char *hu_imessage_test_get_last_message(hu_channel_t *ch, size_t *out_len)
 void hu_imessage_test_get_last_reaction(hu_channel_t *ch, hu_reaction_type_t *out_reaction,
                                         int64_t *out_message_id);
 size_t hu_imessage_test_get_last_media_count(hu_channel_t *ch);
+/** Test hook for Tenor fallback JSON string extraction (`gif_json_extract`). */
+size_t hu_imessage_test_gif_json_extract(const char *json, size_t json_len, const char *key,
+                                         char *out, size_t cap);
 #endif
 
 #endif /* HU_CHANNELS_IMESSAGE_H */

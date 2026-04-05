@@ -48,6 +48,30 @@ static void test_normalize_strip_bom(void) {
     HU_ASSERT_STR_EQ(out, "hello");
 }
 
+static void test_normalize_strips_nbsp(void) {
+    char out[64];
+    size_t len;
+    /* "a\xC2\xA0b" = a + NBSP + b */
+    HU_ASSERT_EQ(hu_normalize_confusables("a\xC2\xA0" "b", 4, out, sizeof(out), &len), HU_OK);
+    HU_ASSERT_STR_EQ(out, "ab");
+}
+
+static void test_normalize_strips_em_space(void) {
+    char out[64];
+    size_t len;
+    /* "a\xE2\x80\x83""b" = a + EM SPACE + b */
+    HU_ASSERT_EQ(hu_normalize_confusables("a\xE2\x80\x83" "b", 5, out, sizeof(out), &len), HU_OK);
+    HU_ASSERT_STR_EQ(out, "ab");
+}
+
+static void test_normalize_strips_ideographic_space(void) {
+    char out[64];
+    size_t len;
+    /* "a\xE3\x80\x80""b" = a + Ideographic Space + b */
+    HU_ASSERT_EQ(hu_normalize_confusables("a\xE3\x80\x80" "b", 5, out, sizeof(out), &len), HU_OK);
+    HU_ASSERT_STR_EQ(out, "ab");
+}
+
 static void test_normalize_null_args(void) {
     char out[64];
     size_t len;
@@ -81,6 +105,9 @@ void run_normalize_tests(void) {
     HU_RUN_TEST(test_normalize_collapse_spaces);
     HU_RUN_TEST(test_normalize_strip_zwsp);
     HU_RUN_TEST(test_normalize_strip_bom);
+    HU_RUN_TEST(test_normalize_strips_nbsp);
+    HU_RUN_TEST(test_normalize_strips_em_space);
+    HU_RUN_TEST(test_normalize_strips_ideographic_space);
     HU_RUN_TEST(test_normalize_null_args);
     HU_RUN_TEST(test_normalize_empty_input);
     HU_RUN_TEST(test_normalize_buffer_cap);

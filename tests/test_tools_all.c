@@ -818,6 +818,25 @@ static void test_http_request_rejects_http_url(void) {
         tool.vtable->deinit(tool.ctx, &alloc);
 }
 
+static void test_http_request_parse_headers_grows_for_oversized_value(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char val[5000];
+    memset(val, 'a', sizeof(val) - 1);
+    val[sizeof(val) - 1] = '\0';
+    hu_json_value_t *headers = hu_json_object_new(&alloc);
+    HU_ASSERT_NOT_NULL(headers);
+    hu_json_object_set(&alloc, headers, "X-Custom", hu_json_string_new(&alloc, val, strlen(val)));
+    char *out = NULL;
+    size_t out_len = 0;
+    hu_error_t err = hu_http_request_test_parse_headers(&alloc, headers, &out, &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(out);
+    HU_ASSERT_TRUE(out_len > 4000u);
+    HU_ASSERT_NOT_NULL(strstr(out, "X-Custom: "));
+    alloc.free(alloc.ctx, out, out_len + 1);
+    hu_json_free(&alloc, headers);
+}
+
 static void test_web_fetch_execute_missing_url(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_tool_t tool;
@@ -2667,6 +2686,7 @@ void run_tools_all_tests(void) {
     HU_RUN_TEST(test_http_request_description_non_empty);
     HU_RUN_TEST(test_http_request_name);
     HU_RUN_TEST(test_http_request_execute_empty);
+    HU_RUN_TEST(test_http_request_parse_headers_grows_for_oversized_value);
     HU_RUN_TEST(test_browser_create);
     HU_RUN_TEST(test_browser_name);
     HU_RUN_TEST(test_browser_execute_empty);

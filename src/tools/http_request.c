@@ -55,7 +55,6 @@ static int method_valid(const char *method) {
     return 0;
 }
 
-#if !HU_IS_TEST
 static bool header_value_safe(const char *s, size_t len) {
     for (size_t i = 0; i < len; i++) {
         if (s[i] == '\r' || s[i] == '\n' || s[i] == '\0')
@@ -88,8 +87,12 @@ static hu_error_t parse_headers(hu_allocator_t *alloc, const hu_json_value_t *he
         size_t vlen = pair->value->data.string.len;
         if (!header_value_safe(k, klen) || !header_value_safe(v, vlen))
             continue;
-        if (len + klen + vlen + 4 > cap) {
+        while (len + klen + vlen + 4 > cap) {
             size_t nc = cap * 2;
+            if (nc < cap) {
+                alloc->free(alloc->ctx, buf, cap);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
             char *nb = (char *)alloc->realloc(alloc->ctx, buf, cap, nc);
             if (!nb) {
                 alloc->free(alloc->ctx, buf, cap);
@@ -110,6 +113,12 @@ static hu_error_t parse_headers(hu_allocator_t *alloc, const hu_json_value_t *he
     *out = buf;
     *out_len = len;
     return HU_OK;
+}
+
+#if HU_IS_TEST
+hu_error_t hu_http_request_test_parse_headers(hu_allocator_t *alloc, const hu_json_value_t *headers_val,
+                                              char **out, size_t *out_len) {
+    return parse_headers(alloc, headers_val, out, out_len);
 }
 #endif
 

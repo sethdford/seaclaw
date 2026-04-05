@@ -7316,10 +7316,10 @@ bool hu_conversation_should_send_music(const char *incoming, size_t incoming_len
     }
 
     uint32_t s = seed;
-    uint32_t roll = reaction_prng_next(&s) % 100u;
-    uint32_t threshold = (uint32_t)(effective * 100.0f);
-    if (threshold > 100u)
-        threshold = 100u;
+    uint32_t roll = reaction_prng_next(&s) % 10000u;
+    uint32_t threshold = (uint32_t)(effective * 10000.0f);
+    if (threshold > 10000u)
+        threshold = 10000u;
     return roll < threshold;
 }
 
@@ -7331,9 +7331,9 @@ size_t hu_conversation_build_music_prompt(const char *incoming, size_t incoming_
     size_t clip = incoming_len > 200 ? 200 : incoming_len;
     int n = snprintf(
         out, out_cap,
-        "Based on this conversation, suggest ONE song (artist - title) that fits the mood. "
-        "Include the Apple Music search URL. Format: ARTIST - TITLE | "
-        "https://music.apple.com/search?term=ARTIST+TITLE\n"
+        "Based on this conversation, suggest ONE song that fits the mood. "
+        "Return ONLY in this format: ARTIST - TITLE | brief casual message\n"
+        "The casual message should feel like a natural text — not a recommendation.\n"
         "Recent message context: \"%.*s\"",
         (int)clip, incoming);
     return (n > 0 && (size_t)n < out_cap) ? (size_t)n : 0;

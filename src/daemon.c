@@ -46,6 +46,8 @@
 #include "human/security/companion_safety.h"
 #include "human/security/moderation.h"
 
+/* Music preview integration */
+#include "human/music.h"
 /* Daemon modules */
 #include "human/daemon_cron.h"
 #include "human/daemon_lifecycle.h"
@@ -10727,10 +10729,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         response, response_len, (uint32_t)time(NULL));
                     if (self_r != HU_REACTION_NONE) {
                         usleep(1500000 + ((uint32_t)time(NULL) % 3000000));
-                        int64_t last_msg_id = msgs[batch_end].message_id;
-                        if (last_msg_id > 0) {
+#ifdef HU_HAS_IMESSAGE
+                        int64_t sent_id = hu_imessage_get_latest_sent_rowid(
+                            batch_key, key_len);
+#else
+                        int64_t sent_id = msgs[batch_end].message_id + 1;
+#endif
+                        if (sent_id > 0) {
                             ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len,
-                                                       last_msg_id + 1, self_r);
+                                                       sent_id, self_r);
                             hu_log_info("human", agent ? agent->observer : NULL,
                                         "self-reaction on own message: %d", (int)self_r);
                         }
@@ -10828,6 +10835,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 gif_prompt[gp_len] = '\0';
                             }
                             if (gp_len > 0) {
+#ifdef HU_HAS_IMESSAGE
                                 char *gif_query = NULL;
                                 size_t gif_query_len = 0;
                                 const char *gif_model = agent->model_name
@@ -10845,7 +10853,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         &gif_query, &gif_query_len);
                                 }
                                 if (gif_query && gif_query_len > 0 && gif_query_len < 100) {
-#ifdef HU_HAS_IMESSAGE
                                     char *gif_path =
                                         hu_imessage_fetch_gif(alloc, gif_query, gif_query_len,
                                                               tenor_key, strlen(tenor_key));
@@ -10878,10 +10885,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         size_t gp_path_len = strlen(gif_path);
                                         alloc->free(alloc->ctx, gif_path, gp_path_len + 1);
                                     }
-#endif /* HU_HAS_IMESSAGE */
                                 }
                                 if (gif_query)
                                     alloc->free(alloc->ctx, gif_query, gif_query_len + 1);
+#endif /* HU_HAS_IMESSAGE */
                             }
                         }
                     }
@@ -10925,12 +10932,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* Music teaser: share a song link when conversation mood calls for it */
+                /* Music teaser: share a song with 30s preview when conversation mood fits */
                 if (combined_len > 0 && ch->channel->vtable->send && !gif_sent_this_turn) {
-                    float music_prob = 0.05f; /* lower than GIF — music shares are rarer */
+                    float music_prob = 0.05f;
 #ifdef HU_HAS_PERSONA
                     if (agent->persona) {
-                        /* Use persona GIF interest as a proxy when set */
                         music_prob = agent->persona->humanization.gif_probability > 0.0f
                                          ? agent->persona->humanization.gif_probability * 0.3f
                                          : 0.05f;
@@ -10948,11 +10954,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             char *music_suggestion = NULL;
                             size_t music_suggestion_len = 0;
                             static const char music_sys[] =
-                                "Return ONLY a music link message. Format: brief casual text then "
-                                "the URL. "
-                                "Example: 'this song has been stuck in my head "
-                                "https://music.apple.com/search?term=artist+title' "
-                                "Keep it under 100 chars. No quotes.";
+                                "Suggest ONE song that fits the conversation mood. "
+                                "Return in this exact format:\n"
+                                "ARTIST - TITLE | your brief casual message\n"
+                                "Example: Radiohead - Everything In Its Right Place | "
+                                "this track is perfect for right now\n"
+                                "Keep the message under 80 chars. No quotes, no URLs.";
                             const char *music_model = agent->model_name
                                                           ? agent->model_name
                                                           : "gemini-3.1-flash-lite-preview";
@@ -10962,17 +10969,76 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 agent->provider.ctx, alloc, music_sys, sizeof(music_sys) - 1,
                                 music_prompt, mp_len, music_model, music_model_len, 0.9,
                                 &music_suggestion, &music_suggestion_len);
-                            if (music_suggestion && music_suggestion_len > 0 &&
-                                music_suggestion_len < 300 &&
-                                (strstr(music_suggestion, "music.apple.com") != NULL ||
-                                 strstr(music_suggestion, "open.spotify.com") != NULL)) {
-                                usleep(3000000 + (music_seed % 4000000));
-                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
-                                                          music_suggestion, music_suggestion_len,
-                                                          NULL, 0);
-                                hu_log_info("human", agent ? agent->observer : NULL,
-                                            "sent music teaser: %.*s",
-                                            (int)music_suggestion_len, music_suggestion);
+
+                            hu_moderation_result_t music_mod = {0};
+                            if (hu_moderation_check_local(alloc, music_suggestion,
+                                                          music_suggestion_len, &music_mod) ==
+                                    HU_OK &&
+                                music_mod.flagged) {
+                                hu_log_warn("human", agent ? agent->observer : NULL,
+                                            "music teaser blocked by moderation");
+                            } else if (music_suggestion && music_suggestion_len > 0 &&
+                                       music_suggestion_len < 300) {
+                                char search_query[256];
+                                char casual_msg[256];
+                                bool parsed = hu_music_parse_suggestion(
+                                    music_suggestion, music_suggestion_len, search_query,
+                                    sizeof(search_query), casual_msg, sizeof(casual_msg));
+
+                                if (parsed && search_query[0] != '\0') {
+                                    hu_music_result_t song = {0};
+                                    hu_error_t search_err = hu_music_search(
+                                        alloc, search_query, strlen(search_query), &song);
+
+                                    if (search_err == HU_OK && song.track_view_url) {
+                                        char share_text[512];
+                                        size_t casual_len = strlen(casual_msg);
+                                        size_t st_len = hu_music_build_share_text(
+                                            &song, casual_len > 0 ? casual_msg : NULL, casual_len,
+                                            share_text, sizeof(share_text));
+
+                                        char preview_path[256] = {0};
+                                        bool has_preview = false;
+                                        if (song.preview_url) {
+                                            has_preview =
+                                                hu_music_download_preview(alloc, song.preview_url,
+                                                                         preview_path,
+                                                                         sizeof(preview_path)) ==
+                                                HU_OK;
+                                        }
+
+                                        usleep(3000000 + (music_seed % 4000000));
+
+                                        if (st_len > 0 && has_preview) {
+                                            const char *media[] = {preview_path};
+                                            ch->channel->vtable->send(ch->channel->ctx, batch_key,
+                                                                      key_len, share_text, st_len,
+                                                                      media, 1);
+                                            hu_log_info("human", agent ? agent->observer : NULL,
+                                                        "sent music preview: %s - %s (%s)",
+                                                        song.artist_name ? song.artist_name : "?",
+                                                        song.track_name ? song.track_name : "?",
+                                                        preview_path);
+                                        } else if (st_len > 0) {
+                                            ch->channel->vtable->send(ch->channel->ctx, batch_key,
+                                                                      key_len, share_text, st_len,
+                                                                      NULL, 0);
+                                            hu_log_info("human", agent ? agent->observer : NULL,
+                                                        "sent music link: %s - %s",
+                                                        song.artist_name ? song.artist_name : "?",
+                                                        song.track_name ? song.track_name : "?");
+                                        }
+
+                                        if (has_preview)
+                                            (void)unlink(preview_path);
+                                        hu_music_result_free(alloc, &song);
+                                    } else {
+                                        hu_music_result_free(alloc, &song);
+                                        hu_log_info(
+                                            "human", agent ? agent->observer : NULL,
+                                            "iTunes search failed for: %s", search_query);
+                                    }
+                                }
                             }
                             if (music_suggestion)
                                 alloc->free(alloc->ctx, music_suggestion,
