@@ -1,7 +1,12 @@
 export function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
-  if (msg.includes("timeout")) return "Request timed out. Please try again.";
-  if (msg.includes("WebSocket")) return "Connection lost. Reconnecting...";
+  if (msg.includes("timeout")) return "Request timed out — retrying...";
+  if (
+    msg.includes("WebSocket") ||
+    msg.includes("not connected") ||
+    msg.includes("Connection closed")
+  )
+    return "Connection lost — reconnecting...";
   if (msg.includes("404")) return "Resource not found.";
   if (msg.includes("401") || msg.includes("unauthorized"))
     return "Authentication failed. Please check your credentials.";

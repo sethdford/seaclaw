@@ -100,6 +100,13 @@ export class ChatController implements ReactiveController {
   private _streamStartTime = 0;
   private _streamTimer = 0;
   private _completingTimer = 0;
+  private _messageQueue: Array<{
+    text: string;
+    sessionKey: string;
+    attachments?: Array<{ name: string; type: string; data: string }>;
+    mentionedFiles?: string[];
+    options?: { thinkingEnabled?: boolean };
+  }> = [];
 
   constructor(
     private host: ReactiveControllerHost,
@@ -175,7 +182,23 @@ export class ChatController implements ReactiveController {
     options?: { thinkingEnabled?: boolean },
   ): Promise<void> {
     const gw = this._getGateway();
-    if (!gw) return;
+    if (!gw || gw.status === "disconnected") {
+      /* Queue message for delivery when connection is restored */
+      this._messageQueue.push({ text, sessionKey, attachments, mentionedFiles, options });
+      const userMsg: ChatItem = {
+        type: "message",
+        role: "user",
+        content: text,
+        ts: Date.now(),
+        status: "failed",
+      };
+      this.items = [...this.items, userMsg];
+      this._trimIfNeeded();
+      this.lastFailedMessage = text;
+      this.cacheMessages(sessionKey);
+      this._requestUpdate();
+      return;
+    }
 
     const userMsg: ChatItem = {
       type: "message",
@@ -201,13 +224,20 @@ export class ChatController implements ReactiveController {
         ...(options?.thinkingEnabled != null ? { thinkingEnabled: options.thinkingEnabled } : {}),
       });
       this._setLastUserStatus("sent");
-    } catch (err) {
+    } catch {
       this.isWaiting = false;
       this._stopStreamTimer();
       this._setLastUserStatus("failed");
       this.lastFailedMessage = text;
       this._requestUpdate();
-      throw err;
+    }
+  }
+
+  /** Flush queued messages after reconnection. */
+  async flushQueue(): Promise<void> {
+    const queued = this._messageQueue.splice(0);
+    for (const entry of queued) {
+      await this.send(entry.text, entry.sessionKey, entry.attachments, entry.mentionedFiles, entry.options);
     }
   }
 
@@ -230,10 +260,32 @@ export class ChatController implements ReactiveController {
     if (!msg) return;
     const failedIdx = this._findLastFailedIndex();
     if (failedIdx >= 0) {
-      this.items = [...this.items.slice(0, failedIdx), ...this.items.slice(failedIdx + 1)];
+      const item = this.items[failedIdx];
+      if (item.type === "message") {
+        this.items = [
+          ...this.items.slice(0, failedIdx),
+          { ...item, status: "sending" as MessageStatus },
+          ...this.items.slice(failedIdx + 1),
+        ];
+      }
     }
     this.lastFailedMessage = "";
-    await this.send(msg, sessionKey);
+    this.isWaiting = true;
+    this._startStreamTimer();
+    this._requestUpdate();
+
+    const gw = this._getGateway();
+    if (!gw) return;
+    try {
+      await gw.request("chat.send", { message: msg, sessionKey });
+      this._setLastUserStatus("sent");
+    } catch {
+      this.isWaiting = false;
+      this._stopStreamTimer();
+      this._setLastUserStatus("failed");
+      this.lastFailedMessage = msg;
+      this._requestUpdate();
+    }
   }
 
   private _findLastFailedContent(): string {

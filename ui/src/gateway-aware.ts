@@ -20,7 +20,10 @@ export const AUTH_FAILED = "hu-auth-failed";
  */
 export class GatewayAwareLitElement extends LitElement {
   private _statusHandler = ((e: CustomEvent<string>) => {
-    if (e.detail === "connected") this._doLoad();
+    if (e.detail === "connected") {
+      this.clearError();
+      this._doLoad();
+    }
   }) as EventListener;
 
   private _gatewayChangedHandler = ((e: CustomEvent<GatewayChangedDetail>) => {
@@ -29,6 +32,7 @@ export class GatewayAwareLitElement extends LitElement {
     current.addEventListener("status", this._statusHandler);
     this.onGatewaySwapped(previous, current);
     if (current.status === "connected") {
+      this.clearError();
       this._doLoad();
     }
   }) as EventListener;
@@ -124,6 +128,9 @@ export class GatewayAwareLitElement extends LitElement {
       this._refreshTimer = null;
     }
   }
+
+  /** Clear error state on reconnect. Subclasses with error state should override. */
+  protected clearError(): void {}
 
   protected load(): void | Promise<void> {}
 }

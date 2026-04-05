@@ -1,23 +1,23 @@
-#include "human/core/log.h"
-#include "human/agent.h"
 #include "human/gateway.h"
+#include "human/agent.h"
 #include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/crypto.h"
 #include "human/eval/turing_score.h"
-#include "human/memory.h"
 #include "human/gateway/control_protocol.h"
 #include "human/gateway/event_bridge.h"
-#include "human/gateway/voice_stream.h"
 #include "human/gateway/oauth.h"
 #include "human/gateway/openai_compat.h"
 #include "human/gateway/rate_limit.h"
 #include "human/gateway/thread_pool.h"
+#include "human/gateway/voice_stream.h"
 #include "human/gateway/ws_server.h"
 #include "human/health.h"
+#include "human/memory.h"
 #include "human/security.h"
 #include "human/version.h"
 #include <stdint.h>
@@ -151,8 +151,7 @@ static void oauth_pending_store(void *ctx, const char *state, const char *verifi
         memmove(&gw->oauth_pending[0], &gw->oauth_pending[1],
                 (HU_OAUTH_PENDING_MAX - 1) * sizeof(hu_oauth_pending_entry_t));
         gw->oauth_pending_count--;
-        memset(&gw->oauth_pending[gw->oauth_pending_count], 0,
-               sizeof(hu_oauth_pending_entry_t));
+        memset(&gw->oauth_pending[gw->oauth_pending_count], 0, sizeof(hu_oauth_pending_entry_t));
     }
     hu_oauth_pending_entry_t *e = &gw->oauth_pending[gw->oauth_pending_count++];
     size_t sl = strlen(state);
@@ -505,21 +504,22 @@ static bool send_response(int fd, int status, const char *content_type, const ch
     }
     if (status == 429 && retry_after_secs > 0)
         snprintf(retry_line, sizeof(retry_line), "Retry-After: %d\r\n", retry_after_secs);
-    int n = snprintf(hdr, sizeof(hdr),
-                     "HTTP/1.1 %s\r\n"
-                     "Content-Type: %s\r\n"
-                     "Connection: close\r\n"
-                     "Content-Length: %zu\r\n"
-                     "X-Frame-Options: DENY\r\n"
-                     "X-Content-Type-Options: nosniff\r\n"
-                     "Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; "
-                     "script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:\r\n"
-                     "Strict-Transport-Security: max-age=63072000; includeSubDomains\r\n"
-                     "Referrer-Policy: strict-origin-when-cross-origin\r\n"
-                     "%s"
-                     "%s"
-                     "\r\n",
-                     status_str, content_type, body_len, cors_line, retry_line);
+    int n =
+        snprintf(hdr, sizeof(hdr),
+                 "HTTP/1.1 %s\r\n"
+                 "Content-Type: %s\r\n"
+                 "Connection: close\r\n"
+                 "Content-Length: %zu\r\n"
+                 "X-Frame-Options: DENY\r\n"
+                 "X-Content-Type-Options: nosniff\r\n"
+                 "Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; "
+                 "script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:\r\n"
+                 "Strict-Transport-Security: max-age=63072000; includeSubDomains\r\n"
+                 "Referrer-Policy: strict-origin-when-cross-origin\r\n"
+                 "%s"
+                 "%s"
+                 "\r\n",
+                 status_str, content_type, body_len, cors_line, retry_line);
     if (n < 0)
         return false;
     if ((size_t)n >= sizeof(hdr))
@@ -599,21 +599,22 @@ static bool send_json_with_cookie(int fd, int status, const char *body, const ch
     if (cors_origin[0] != '\0')
         snprintf(cors_line, sizeof(cors_line), "Access-Control-Allow-Origin: %s\r\n", cors_origin);
     size_t body_len = body ? strlen(body) : 0;
-    int n = snprintf(hdr, sizeof(hdr),
-                     "HTTP/1.1 %s\r\n"
-                     "Content-Type: application/json\r\n"
-                     "Connection: close\r\n"
-                     "Content-Length: %zu\r\n"
-                     "X-Frame-Options: DENY\r\n"
-                     "X-Content-Type-Options: nosniff\r\n"
-                     "Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; "
-                     "script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:\r\n"
-                     "Strict-Transport-Security: max-age=63072000; includeSubDomains\r\n"
-                     "Referrer-Policy: strict-origin-when-cross-origin\r\n"
-                     "%s"
-                     "%s"
-                     "\r\n",
-                     status_str, body_len, cors_line, cookie_line);
+    int n =
+        snprintf(hdr, sizeof(hdr),
+                 "HTTP/1.1 %s\r\n"
+                 "Content-Type: application/json\r\n"
+                 "Connection: close\r\n"
+                 "Content-Length: %zu\r\n"
+                 "X-Frame-Options: DENY\r\n"
+                 "X-Content-Type-Options: nosniff\r\n"
+                 "Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; "
+                 "script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:\r\n"
+                 "Strict-Transport-Security: max-age=63072000; includeSubDomains\r\n"
+                 "Referrer-Policy: strict-origin-when-cross-origin\r\n"
+                 "%s"
+                 "%s"
+                 "\r\n",
+                 status_str, body_len, cors_line, cookie_line);
     if (n > 0 && (size_t)n < sizeof(hdr)) {
         if (!send_all(fd, hdr, (size_t)n))
             return false;
@@ -625,7 +626,8 @@ static bool send_json_with_cookie(int fd, int status, const char *body, const ch
 }
 
 static bool send_json_rate_limited(int fd, const char *body, int retry_after_secs) {
-    return send_response(fd, 429, "application/json", body, body ? strlen(body) : 0, retry_after_secs);
+    return send_response(fd, 429, "application/json", body, body ? strlen(body) : 0,
+                         retry_after_secs);
 }
 
 /* ── Static file serving ────────────────────────────────────────────────── */
@@ -815,13 +817,13 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
 
     if (gw->config.test_mode) {
         hu_log_info("gateway", NULL, "%s %s %s body=%zu", method ? method : "?", path ? path : "/",
-                client_ip ? client_ip : "unknown", body_len);
+                    client_ip ? client_ip : "unknown", body_len);
     }
 
     if (gw->rate_limiter && !hu_rate_limiter_allow(gw->rate_limiter, client_ip)) {
         (void)send_json_rate_limited(fd, "{\"error\":\"rate limited\"}",
-                               gw->config.rate_limit_window > 0 ? gw->config.rate_limit_window
-                                                                : 60);
+                                     gw->config.rate_limit_window > 0 ? gw->config.rate_limit_window
+                                                                      : 60);
         return;
     }
 
@@ -846,35 +848,39 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         char *buf = (char *)a.alloc(a.ctx, cap);
         if (!buf) {
             (void)send_json(fd, 503, "{\"error\":\"out of memory\"}");
-            if (snap.components) free(snap.components);
+            if (snap.components)
+                free(snap.components);
             return;
         }
         size_t off = 0;
         off += (size_t)snprintf(buf + off, cap - off,
-            "# HELP human_uptime_seconds Time since process start\n"
-            "# TYPE human_uptime_seconds gauge\n"
-            "human_uptime_seconds %llu\n",
-            (unsigned long long)snap.uptime_seconds);
+                                "# HELP human_uptime_seconds Time since process start\n"
+                                "# TYPE human_uptime_seconds gauge\n"
+                                "human_uptime_seconds %llu\n",
+                                (unsigned long long)snap.uptime_seconds);
         off += (size_t)snprintf(buf + off, cap - off,
-            "# HELP human_websocket_connections Active WebSocket connections\n"
-            "# TYPE human_websocket_connections gauge\n"
-            "human_websocket_connections %zu\n",
-            gw->ws.conn_count);
+                                "# HELP human_websocket_connections Active WebSocket connections\n"
+                                "# TYPE human_websocket_connections gauge\n"
+                                "human_websocket_connections %zu\n",
+                                gw->ws.conn_count);
         if (snap.component_count > 0 && snap.components) {
-            off += (size_t)snprintf(buf + off, cap - off,
-                "# HELP human_component_healthy Component health (1=ok, 0=error)\n"
-                "# TYPE human_component_healthy gauge\n");
+            off +=
+                (size_t)snprintf(buf + off, cap - off,
+                                 "# HELP human_component_healthy Component health (1=ok, 0=error)\n"
+                                 "# TYPE human_component_healthy gauge\n");
             hu_readiness_result_t r = hu_health_check_readiness(&a);
             for (size_t i = 0; i < r.check_count; i++) {
                 off += (size_t)snprintf(buf + off, cap - off,
-                    "human_component_healthy{component=\"%s\"} %d\n",
-                    r.checks[i].name, r.checks[i].healthy ? 1 : 0);
+                                        "human_component_healthy{component=\"%s\"} %d\n",
+                                        r.checks[i].name, r.checks[i].healthy ? 1 : 0);
             }
-            if (r.checks) a.free(a.ctx, (void *)r.checks, r.check_count * sizeof(hu_component_check_t));
+            if (r.checks)
+                a.free(a.ctx, (void *)r.checks, r.check_count * sizeof(hu_component_check_t));
         }
         (void)send_response(fd, 200, "text/plain; version=0.0.4; charset=utf-8", buf, off, 0);
         a.free(a.ctx, buf, cap);
-        if (snap.components) free(snap.components);
+        if (snap.components)
+            free(snap.components);
         return;
     }
 
@@ -893,17 +899,20 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
                 for (size_t i = 0; i < snap.component_count; i++) {
                     if (i > 0)
                         off += (size_t)snprintf(components_json + off, components_cap - off, ",");
-                    off += (size_t)snprintf(components_json + off, components_cap - off,
-                        "{\"status\":\"%s\",\"updated_at\":\"%s\"}",
-                        snap.components[i].status, snap.components[i].updated_at);
+                    off +=
+                        (size_t)snprintf(components_json + off, components_cap - off,
+                                         "{\"status\":\"%s\",\"updated_at\":\"%s\"}",
+                                         snap.components[i].status, snap.components[i].updated_at);
                 }
                 off += (size_t)snprintf(components_json + off, components_cap - off, "]");
             }
         }
-        char *json = hu_sprintf(&a,
-            "{\"status\":\"ok\",\"version\":\"%s\",\"pid\":%u,\"uptime_seconds\":%llu,\"components\":%s}",
-            hu_version_string(), snap.pid, (unsigned long long)snap.uptime_seconds,
-            components_json ? components_json : "[]");
+        char *json =
+            hu_sprintf(&a,
+                       "{\"status\":\"ok\",\"version\":\"%s\",\"pid\":%u,\"uptime_seconds\":%llu,"
+                       "\"components\":%s}",
+                       hu_version_string(), snap.pid, (unsigned long long)snap.uptime_seconds,
+                       components_json ? components_json : "[]");
         (void)send_json(fd, 200, json ? json : "{\"status\":\"ok\"}");
         if (json)
             a.free(a.ctx, json, strlen(json) + 1);
@@ -927,7 +936,7 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         hu_openai_compat_handle_chat_completions(body, body_len, gw->alloc, gw->config.app_ctx,
                                                  &status, &resp_body, &resp_len, &content_type);
         (void)send_response(fd, status, content_type, resp_body ? resp_body : "{}",
-                      resp_body ? resp_len : 2, 0);
+                            resp_body ? resp_len : 2, 0);
         if (resp_body && gw->alloc)
             gw->alloc->free(gw->alloc->ctx, resp_body, resp_len + 1);
         return;
@@ -943,8 +952,8 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         hu_openai_compat_handle_models(gw->alloc, gw->config.app_ctx, &status, &resp_body,
                                        &resp_len);
         (void)send_response(fd, status, "application/json",
-                      resp_body ? resp_body : "{\"object\":\"list\",\"data\":[]}",
-                      resp_body ? resp_len : 24, 0);
+                            resp_body ? resp_body : "{\"object\":\"list\",\"data\":[]}",
+                            resp_body ? resp_len : 24, 0);
         if (resp_body && gw->alloc)
             gw->alloc->free(gw->alloc->ctx, resp_body, resp_len + 1);
         return;
@@ -996,16 +1005,16 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             if (i > 0)
                 off += (size_t)snprintf(buf + off, cap - off, ",");
             off += (size_t)snprintf(buf + off, cap - off,
-                                   "{\"contact_id\":\"%s\",\"timestamp\":%lld,\"overall\":%d,"
-                                   "\"verdict\":\"%s\",\"dimensions\":{",
-                                   contact_ids[i], (long long)timestamps[i], scores[i].overall,
-                                   hu_turing_verdict_name(scores[i].verdict));
+                                    "{\"contact_id\":\"%s\",\"timestamp\":%lld,\"overall\":%d,"
+                                    "\"verdict\":\"%s\",\"dimensions\":{",
+                                    contact_ids[i], (long long)timestamps[i], scores[i].overall,
+                                    hu_turing_verdict_name(scores[i].verdict));
             for (int d = 0; d < HU_TURING_DIM_COUNT && off < cap - 64; d++) {
                 if (d > 0)
                     off += (size_t)snprintf(buf + off, cap - off, ",");
                 off += (size_t)snprintf(buf + off, cap - off, "\"%s\":%d",
-                                       hu_turing_dimension_name((hu_turing_dimension_t)d),
-                                       scores[i].dimensions[d]);
+                                        hu_turing_dimension_name((hu_turing_dimension_t)d),
+                                        scores[i].dimensions[d]);
             }
             off += (size_t)snprintf(buf + off, cap - off, "}}");
         }
@@ -1051,8 +1060,8 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
             if (i > 0)
                 off += (size_t)snprintf(buf + off, cap - off, ",");
             off += (size_t)snprintf(buf + off, cap - off,
-                                   "{\"contact_id\":\"%s\",\"timestamp\":%lld,\"overall\":%d}",
-                                   contact_ids[i], (long long)timestamps[i], scores[i].overall);
+                                    "{\"contact_id\":\"%s\",\"timestamp\":%lld,\"overall\":%d}",
+                                    contact_ids[i], (long long)timestamps[i], scores[i].overall);
         }
         off += (size_t)snprintf(buf + off, cap - off, "]}");
         (void)send_json(fd, 200, buf);
@@ -1083,9 +1092,9 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         for (int d = 0; d < HU_TURING_DIM_COUNT; d++) {
             if (d > 0)
                 off += (size_t)snprintf(buf + off, sizeof(buf) - off, ",");
-            off += (size_t)snprintf(buf + off, sizeof(buf) - off, "\"%s\":%d",
-                                   hu_turing_dimension_name((hu_turing_dimension_t)d),
-                                   dim_avgs[d]);
+            off +=
+                (size_t)snprintf(buf + off, sizeof(buf) - off, "\"%s\":%d",
+                                 hu_turing_dimension_name((hu_turing_dimension_t)d), dim_avgs[d]);
         }
         off += (size_t)snprintf(buf + off, sizeof(buf) - off, "}}");
         (void)send_json(fd, 200, buf);
@@ -1219,10 +1228,10 @@ static void handle_http_request(hu_gateway_state_t *gw, int fd, const char *meth
         strcmp(method, "GET") == 0) {
         size_t code_len = 0, state_len = 0;
         char code_dec[256], state_dec[HU_OAUTH_STATE_LEN];
-        const char *code = query_param_value_ex(path, "code", &code_len,
-                                                code_dec, sizeof(code_dec));
-        const char *state = query_param_value_ex(path, "state", &state_len,
-                                                 state_dec, sizeof(state_dec));
+        const char *code =
+            query_param_value_ex(path, "code", &code_len, code_dec, sizeof(code_dec));
+        const char *state =
+            query_param_value_ex(path, "state", &state_len, state_dec, sizeof(state_dec));
         if (!code || code_len == 0 || !state || state_len == 0) {
             (void)send_json(fd, 400, "{\"error\":\"missing code or state\"}");
             return;
@@ -1481,7 +1490,8 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
         if (gw->pairing_guard) {
             const char *code = hu_pairing_guard_pairing_code(gw->pairing_guard);
             if (code)
-                hu_log_info("gateway", NULL, "Pairing code ready (use /pair endpoint or UI to view)");
+                hu_log_info("gateway", NULL,
+                            "Pairing code ready (use /pair endpoint or UI to view)");
             (void)code;
         }
     }
@@ -1509,17 +1519,31 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
     struct sockaddr_in addr = {0};
     addr.sin_family = AF_INET;
     addr.sin_port = htons(cfg.port);
-    inet_pton(AF_INET, cfg.host, &addr.sin_addr);
+    {
+        int pton_rc = inet_pton(AF_INET, cfg.host, &addr.sin_addr);
+        if (pton_rc == 0) {
+            hu_health_mark_error("gateway", "inet_pton: invalid address format");
+            err = HU_ERR_INVALID_ARGUMENT;
+            goto cleanup;
+        }
+    }
 
     {
         int bind_ok = 0;
-        for (int attempt = 0; attempt < 3; attempt++) {
+        for (int attempt = 0; attempt < 5; attempt++) {
             if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
                 bind_ok = 1;
                 break;
             }
-            if (errno == EADDRINUSE && attempt < 2) {
-                usleep(100000);
+            int bind_errno = errno;
+            {
+                char bind_msg[128];
+                snprintf(bind_msg, sizeof(bind_msg), "bind failed: %s (attempt %d/5)",
+                         strerror(bind_errno), attempt + 1);
+                hu_health_mark_error("gateway", bind_msg);
+            }
+            if (bind_errno == EADDRINUSE && attempt < 4) {
+                usleep(500000);
                 close(fd);
                 fd = socket(AF_INET, SOCK_STREAM, 0);
                 if (fd < 0)
@@ -1530,7 +1554,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
             break;
         }
         if (!bind_ok) {
-            hu_health_mark_error("gateway", "bind failed");
+            hu_health_mark_error("gateway", "bind failed after 5 attempts");
             err = HU_ERR_IO;
             goto cleanup;
         }
@@ -1579,7 +1603,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
     }
 
     hu_log_info("gateway", NULL, "listening on %s:%u (ws: enabled, ui: %s)", cfg.host,
-            (unsigned)cfg.port, cfg.control_ui_dir ? cfg.control_ui_dir : "disabled");
+                (unsigned)cfg.port, cfg.control_ui_dir ? cfg.control_ui_dir : "disabled");
 
     /* Poll-based event loop: listen socket + WebSocket connections */
     while (gw->running && !s_gateway_stop) {
@@ -1691,7 +1715,7 @@ hu_error_t hu_gateway_run(hu_allocator_t *alloc, const char *host, uint16_t port
                     if (!gw->config.require_pairing)
                         conn->authenticated = true;
                     hu_log_info("gateway", NULL, "ws connected id=%llu ip=%s",
-                            (unsigned long long)conn->id, client_ip);
+                                (unsigned long long)conn->id, client_ip);
                 }
                 continue;
             }

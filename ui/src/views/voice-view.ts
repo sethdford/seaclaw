@@ -430,6 +430,9 @@ export class ScVoiceView extends GatewayAwareLitElement {
     if (prev !== "disconnected" && this._connectionStatus === "disconnected") {
       void this.#onGatewayDisconnectedDuringVoice();
     }
+    if (prev === "disconnected" && this._connectionStatus === "connected") {
+      void this.#onGatewayReconnected();
+    }
   };
   private _boundGateway: GatewayClient | null = null;
 
@@ -707,6 +710,27 @@ export class ScVoiceView extends GatewayAwareLitElement {
         variant: "info",
       });
     }
+    this.requestUpdate();
+  }
+
+  async #onGatewayReconnected(): Promise<void> {
+    /* Stop any active voice session and reset to idle on reconnect.
+       Don't auto-start — let the user choose when to resume. */
+    const gw = this.gateway ?? this._boundGateway;
+    gw?.setOnBinaryChunk?.(null);
+    if (this._recorder.isRecording) {
+      this._recorder.dispose();
+    }
+    if (this.#voiceStreaming && gw && typeof gw.voiceSessionStop === "function") {
+      void gw.voiceSessionStop().catch(() => {});
+    }
+    this.#voiceStreaming = false;
+    this.#activeSessionIsGL = false;
+    this.#clearProcessingTimeout();
+    this.#playback.interrupt();
+    this._speaking = false;
+    this._userVadSpeaking = false;
+    this.voiceStatus = "idle";
     this.requestUpdate();
   }
 

@@ -925,7 +925,7 @@ export class ScApp extends LitElement {
     this._inFallbackWindow = true;
     this._fallbackTimer = setTimeout(() => {
       this._switchToDemo();
-    }, 2500);
+    }, 5000);
     gw.addEventListener("features", (() => {
       if (this._fallbackTimer) {
         clearTimeout(this._fallbackTimer);
@@ -942,7 +942,8 @@ export class ScApp extends LitElement {
     this._inFallbackWindow = false;
     this._demoFallback = true;
     this.gateway?.removeEventListener("status", this._statusHandler);
-    this.gateway?.disconnect();
+    // Don't disconnect the real gateway — let it keep reconnecting in background
+    // so it can recover if the server comes up later
     this._createDemoGateway().then((demo) => {
       this.gateway = demo;
       setGateway(demo);

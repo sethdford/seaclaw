@@ -288,6 +288,11 @@ export class ScMemoryView extends GatewayAwareLitElement {
     elements.forEach((el) => this._scrollEntranceObserver!.observe(el));
   }
 
+  protected override clearError(): void {
+    this.error = "";
+    this.actionError = "";
+  }
+
   protected override async load(): Promise<void> {
     const gw = this.gateway;
     if (!gw) return;

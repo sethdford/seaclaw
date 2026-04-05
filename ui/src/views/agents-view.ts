@@ -159,6 +159,10 @@ export class ScAgentsView extends GatewayAwareLitElement {
   @state() private loading = false;
   @state() private error = "";
 
+  protected override clearError(): void {
+    this.error = "";
+  }
+
   protected override async load(): Promise<void> {
     const gw = this.gateway;
     if (!gw) return;

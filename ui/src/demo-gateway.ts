@@ -1057,6 +1057,7 @@ export class DemoGatewayClient extends EventTarget {
   #nextId = 100;
   #onBinary: ((data: ArrayBuffer) => void) | null = null;
   #glMode = false;
+  #userHasSentMessage = false;
 
   private state = {
     sessions: makeSessions(),
@@ -1091,7 +1092,6 @@ export class DemoGatewayClient extends EventTarget {
       };
       this.dispatchEvent(new CustomEvent("features", { detail: this.#features }));
       this.#seedInitialEvents();
-      this.#startActivityStream();
     }, 400);
   }
 
@@ -1103,15 +1103,7 @@ export class DemoGatewayClient extends EventTarget {
 
   #seedInitialEvents(): void {
     const seed = [
-      {
-        event: "chat",
-        payload: { channel: "Telegram", user: "Alice", preview: "PR review ready" },
-      },
-      { event: "agent.tool", payload: { tool: "shell", command: "git status" } },
       { event: "health", payload: { status: "operational", uptime_secs: 172800 } },
-      { event: "chat", payload: { channel: "Discord", user: "Bob", preview: "Deploy looks good" } },
-      { event: "agent.tool", payload: { tool: "web_search", command: "Rust async patterns" } },
-      { event: "chat", payload: { channel: "Email", user: "Team", preview: "Weekly sync notes" } },
     ];
     for (const s of seed) {
       this.dispatchEvent(new CustomEvent(DemoGatewayClient.EVENT_GATEWAY, { detail: s }));
@@ -1761,6 +1753,10 @@ export class DemoGatewayClient extends EventTarget {
       case "chat.send": {
         const msg = (params?.message as string) ?? "";
         const sk = (params?.sessionKey as string) ?? undefined;
+        if (!this.#userHasSentMessage) {
+          this.#userHasSentMessage = true;
+          this.#startActivityStream();
+        }
         this.#emitChatResponse(msg, sk);
         return {};
       }

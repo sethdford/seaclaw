@@ -42,6 +42,14 @@ export class GatewayClient extends EventTarget {
       timeout: ReturnType<typeof setTimeout>;
     }
   >();
+  #pendingReconnect: Array<{
+    id: string;
+    resolve: PendingResolve;
+    reject: PendingReject;
+    timeout: ReturnType<typeof setTimeout>;
+    raw: string;
+  }> = [];
+  #pendingReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   #status: GatewayStatus = "disconnected";
   #reconnectAttempts = 0;
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -76,10 +84,11 @@ export class GatewayClient extends EventTarget {
       this.#ws.onopen = () => {
         this.#reconnectAttempts = 0;
         this.#setStatus("connected");
+        this.#replayPendingReconnect();
         this.#sendConnect();
       };
       this.#ws.onclose = () => {
-        this.#rejectPending("Connection closed");
+        this.#holdPendingForReconnect();
         this.#setStatus("disconnected");
         this.#scheduleReconnect();
       };
@@ -135,6 +144,50 @@ export class GatewayClient extends EventTarget {
       p.reject(new Error(reason));
     }
     this.#pending.clear();
+  }
+
+  #holdPendingForReconnect(): void {
+    // Move pending requests to reconnect buffer instead of rejecting immediately
+    for (const [id, p] of this.#pending.entries()) {
+      clearTimeout(p.timeout);
+      // We don't have the raw JSON anymore, so store enough to replay
+      this.#pendingReconnect.push({
+        id,
+        resolve: p.resolve,
+        reject: p.reject,
+        timeout: p.timeout,
+        raw: "", // original message already sent; responses keyed by id
+      });
+    }
+    this.#pending.clear();
+
+    // Start a 5-second timer — if no reconnection, reject all
+    if (this.#pendingReconnect.length > 0 && !this.#pendingReconnectTimer) {
+      this.#pendingReconnectTimer = setTimeout(() => {
+        this.#pendingReconnectTimer = null;
+        for (const p of this.#pendingReconnect) {
+          p.reject(new Error("Connection closed"));
+        }
+        this.#pendingReconnect = [];
+      }, 5000);
+    }
+  }
+
+  #replayPendingReconnect(): void {
+    if (this.#pendingReconnectTimer) {
+      clearTimeout(this.#pendingReconnectTimer);
+      this.#pendingReconnectTimer = null;
+    }
+    // Re-register held requests so responses are matched by id
+    for (const p of this.#pendingReconnect) {
+      const timeout = setTimeout(() => {
+        if (this.#pending.delete(p.id)) {
+          p.reject(new Error("Request timeout"));
+        }
+      }, 10000);
+      this.#pending.set(p.id, { resolve: p.resolve, reject: p.reject, timeout });
+    }
+    this.#pendingReconnect = [];
   }
 
   #scheduleReconnect(): void {
@@ -296,6 +349,14 @@ export class GatewayClient extends EventTarget {
       clearTimeout(this.#reconnectTimer);
       this.#reconnectTimer = null;
     }
+    if (this.#pendingReconnectTimer) {
+      clearTimeout(this.#pendingReconnectTimer);
+      this.#pendingReconnectTimer = null;
+    }
+    for (const p of this.#pendingReconnect) {
+      p.reject(new Error("Disconnected"));
+    }
+    this.#pendingReconnect = [];
     for (const p of this.#pending.values()) {
       clearTimeout(p.timeout);
       p.reject(new Error("Disconnected"));
