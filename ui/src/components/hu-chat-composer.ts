@@ -2,6 +2,7 @@ import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import "./hu-file-preview.js";
+import "./hu-model-selector.js";
 import type { FilePreviewItem } from "./hu-file-preview.js";
 
 const SUGGESTIONS = ["Explore the project", "Write code", "Debug an issue", "Ask anything"];
@@ -58,6 +59,7 @@ export class ScChatComposer extends LitElement {
   @property({ type: Boolean, attribute: "voice-supported" }) voiceSupported = true;
   @property({ type: Boolean, attribute: "thinking-enabled" }) thinkingEnabled = false;
   @property({ type: Number, attribute: "active-memories" }) activeMemories = 0;
+  @property({ type: Array }) models: Array<{ id: string; name: string; provider?: string }> = [];
 
   @state() private _dragOver = false;
   @state() private _attachedFiles: FilePreviewItem[] = [];
@@ -145,23 +147,8 @@ export class ScChatComposer extends LitElement {
       align-items: flex-end;
       gap: var(--hu-space-sm);
     }
-    .model-chip {
+    hu-model-selector {
       flex-shrink: 0;
-      padding: var(--hu-space-2xs) var(--hu-space-sm);
-      background: var(--hu-bg-elevated);
-      border: 1px solid var(--hu-border-subtle);
-      border-radius: var(--hu-radius-full);
-      font-size: var(--hu-text-xs);
-      font-family: var(--hu-font);
-      color: var(--hu-text-muted);
-      cursor: pointer;
-      transition:
-        color var(--hu-duration-fast),
-        border-color var(--hu-duration-fast);
-    }
-    .model-chip:hover {
-      color: var(--hu-text);
-      border-color: var(--hu-border);
     }
     .thinking-toggle {
       flex-shrink: 0;
@@ -903,9 +890,7 @@ export class ScChatComposer extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.dispatchEvent(
-      new CustomEvent("hu-composer-connected", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("hu-composer-connected", { bubbles: true, composed: true }));
   }
 
   override disconnectedCallback(): void {
@@ -1077,16 +1062,10 @@ export class ScChatComposer extends LitElement {
             : nothing}
           <div class="input-row">
             ${this.model
-              ? html`<button
-                  class="model-chip"
-                  type="button"
-                  @click=${() =>
-                    this.dispatchEvent(
-                      new CustomEvent("hu-model-select", { bubbles: true, composed: true }),
-                    )}
-                >
-                  ${this.model}
-                </button>`
+              ? html`<hu-model-selector
+                  .value=${this.model}
+                  .models=${this.models}
+                ></hu-model-selector>`
               : nothing}
             <button
               class="thinking-toggle ${this.thinkingEnabled ? "active" : ""}"

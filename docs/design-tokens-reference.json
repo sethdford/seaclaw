@@ -1,5 +1,5 @@
 {
-  "generated": "2026-04-04T22:38:28.503Z",
+  "generated": "2026-04-05T00:19:45.677Z",
   "groups": {
     "color.neutral": [
       {
@@ -121,28 +121,28 @@
       },
       {
         "name": "light-container",
-        "value": "#f9f7f4",
-        "hex": "#f9f7f4"
+        "value": "#f8f8f6",
+        "hex": "#f8f8f6"
       },
       {
         "name": "light-container-high",
-        "value": "#f0ede9",
-        "hex": "#f0ede9"
+        "value": "#f0eeed",
+        "hex": "#f0eeed"
       },
       {
         "name": "light-container-highest",
-        "value": "#e9e5e0",
-        "hex": "#e9e5e0"
+        "value": "#e8e7e4",
+        "hex": "#e8e7e4"
       },
       {
         "name": "light-dim",
-        "value": "#e6e2de",
-        "hex": "#e6e2de"
+        "value": "#e5e4e1",
+        "hex": "#e5e4e1"
       },
       {
         "name": "light-bright",
-        "value": "#fffefa",
-        "hex": "#fffefa"
+        "value": "#ffffff",
+        "hex": "#ffffff"
       }
     ],
     "color.teal": [
@@ -2024,18 +2024,18 @@
     "light": [
       {
         "name": "bg",
-        "value": "#F4F1EE",
-        "hex": "#F4F1EE"
+        "value": "#F5F5F3",
+        "hex": "#F5F5F3"
       },
       {
         "name": "bg-inset",
-        "value": "#EBE7E3",
-        "hex": "#EBE7E3"
+        "value": "#EDEDEB",
+        "hex": "#EDEDEB"
       },
       {
         "name": "bg-surface",
-        "value": "#FFFEFA",
-        "hex": "#FFFEFA"
+        "value": "#FFFFFF",
+        "hex": "#FFFFFF"
       },
       {
         "name": "bg-warm",
@@ -2044,38 +2044,38 @@
       },
       {
         "name": "bg-elevated",
-        "value": "#F9F7F4",
-        "hex": "#F9F7F4"
+        "value": "#FAFAF8",
+        "hex": "#FAFAF8"
       },
       {
         "name": "bg-overlay",
-        "value": "#FFFEFA",
-        "hex": "#FFFEFA"
+        "value": "#FFFFFF",
+        "hex": "#FFFFFF"
       },
       {
         "name": "surface-container",
-        "value": "#f9f7f4",
-        "hex": "#f9f7f4"
+        "value": "#f8f8f6",
+        "hex": "#f8f8f6"
       },
       {
         "name": "surface-container-high",
-        "value": "#f0ede9",
-        "hex": "#f0ede9"
+        "value": "#f0eeed",
+        "hex": "#f0eeed"
       },
       {
         "name": "surface-container-highest",
-        "value": "#e9e5e0",
-        "hex": "#e9e5e0"
+        "value": "#e8e7e4",
+        "hex": "#e8e7e4"
       },
       {
         "name": "surface-dim",
-        "value": "#e6e2de",
-        "hex": "#e6e2de"
+        "value": "#e5e4e1",
+        "hex": "#e5e4e1"
       },
       {
         "name": "surface-bright",
-        "value": "#fffefa",
-        "hex": "#fffefa"
+        "value": "#ffffff",
+        "hex": "#ffffff"
       },
       {
         "name": "text",
@@ -2191,13 +2191,13 @@
       },
       {
         "name": "border",
-        "value": "#D8D2CC",
-        "hex": "#D8D2CC"
+        "value": "#DCDAD8",
+        "hex": "#DCDAD8"
       },
       {
         "name": "border-subtle",
-        "value": "#E6E1DB",
-        "hex": "#E6E1DB"
+        "value": "#E8E6E3",
+        "hex": "#E8E6E3"
       },
       {
         "name": "success",
@@ -2334,7 +2334,7 @@
       },
       {
         "name": "surface-gradient",
-        "value": "linear-gradient(180deg, #FFFEFA 0%, #F4F1EE 100%)"
+        "value": "linear-gradient(180deg, #FFFFFF 0%, #F5F5F3 100%)"
       },
       {
         "name": "surface-glow",
