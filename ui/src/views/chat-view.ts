@@ -32,6 +32,7 @@ export class ScChatView extends GatewayAwareLitElement {
         contain: layout style;
         flex: 1;
         min-height: 0;
+        --hu-artifacts-width: 25rem;
       }
       .main-wrap {
         display: grid;
@@ -47,10 +48,10 @@ export class ScChatView extends GatewayAwareLitElement {
         grid-template-columns: 17.5rem 1fr 0fr;
       }
       .main-wrap.artifacts-open {
-        grid-template-columns: 0fr 1fr 25rem;
+        grid-template-columns: 0fr 1fr var(--hu-artifacts-width);
       }
       .main-wrap.sessions-open.artifacts-open {
-        grid-template-columns: 17.5rem 1fr 25rem;
+        grid-template-columns: 17.5rem 1fr var(--hu-artifacts-width);
       }
       .artifacts-column {
         min-width: 0;
@@ -91,7 +92,7 @@ export class ScChatView extends GatewayAwareLitElement {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: var(--hu-space-xs) var(--hu-space-md);
+        padding: var(--hu-space-2xs) var(--hu-space-md);
         font-size: var(--hu-text-xs);
         color: var(--hu-text);
         background: color-mix(in srgb, var(--hu-surface-container) 60%, transparent);
@@ -137,7 +138,7 @@ export class ScChatView extends GatewayAwareLitElement {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: var(--hu-space-md);
+        padding: var(--hu-space-sm) var(--hu-space-md);
         background: var(--hu-error-dim);
         border: 1px solid var(--hu-error);
         border-radius: var(--hu-radius);
@@ -231,6 +232,7 @@ export class ScChatView extends GatewayAwareLitElement {
       .container.empty hu-chat-composer {
         position: static;
         background: transparent;
+        margin-bottom: var(--hu-space-2xl);
       }
       @container (max-width: 640px) /* --hu-breakpoint-md */ {
         .container {

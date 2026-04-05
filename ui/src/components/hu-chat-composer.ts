@@ -90,13 +90,13 @@ export class ScChatComposer extends LitElement {
     .composer {
       display: flex;
       flex-direction: column;
-      gap: var(--hu-space-xs);
-      padding: var(--hu-space-md) var(--hu-space-lg);
+      gap: var(--hu-space-sm);
+      padding: var(--hu-space-sm) var(--hu-space-md);
       background: color-mix(in srgb, var(--hu-surface-container) 65%, transparent);
       backdrop-filter: blur(var(--hu-blur-md));
       -webkit-backdrop-filter: blur(var(--hu-blur-md));
       border: 1px solid var(--hu-border-subtle);
-      border-radius: var(--hu-radius-xl);
+      border-radius: var(--hu-radius-lg);
       transition:
         border-color var(--hu-duration-fast),
         box-shadow var(--hu-duration-fast);
@@ -111,7 +111,7 @@ export class ScChatComposer extends LitElement {
     }
     .suggestions {
       display: flex;
-      gap: var(--hu-space-xs);
+      gap: var(--hu-space-sm);
       overflow-x: auto;
       scrollbar-width: none;
       padding: var(--hu-space-xs) 0;
@@ -144,7 +144,7 @@ export class ScChatComposer extends LitElement {
     }
     .input-row {
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       gap: var(--hu-space-sm);
     }
     hu-model-selector {
@@ -248,7 +248,7 @@ export class ScChatComposer extends LitElement {
     .actions {
       display: flex;
       align-items: center;
-      gap: var(--hu-space-xs);
+      gap: var(--hu-space-sm);
     }
     .icon-btn {
       display: flex;
@@ -317,9 +317,9 @@ export class ScChatComposer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 2.5rem;
-      height: 2.5rem;
-      min-width: 2.5rem;
+      width: 2.25rem;
+      height: 2.25rem;
+      min-width: 2.25rem;
       padding: 0;
       border: none;
       border-radius: var(--hu-radius-full);
@@ -358,7 +358,7 @@ export class ScChatComposer extends LitElement {
         hu-send-glow var(--hu-duration-slowest) var(--hu-ease-in-out) infinite;
     }
     .send-btn:disabled {
-      opacity: 0.4;
+      opacity: 0.5;
       cursor: not-allowed;
     }
     .send-btn:focus-visible {

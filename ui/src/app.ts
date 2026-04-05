@@ -166,7 +166,7 @@ export class ScApp extends LitElement {
       flex-direction: column;
       overflow: hidden;
       min-height: 0;
-      padding: var(--hu-space-2xl);
+      padding: var(--hu-space-lg);
       background: var(--hu-bg);
       view-transition-name: hu-main-content;
       position: relative;
@@ -273,7 +273,7 @@ export class ScApp extends LitElement {
       justify-content: center;
       gap: var(--hu-space-sm);
       padding: var(--hu-space-xs) var(--hu-space-md);
-      background: var(--hu-error);
+      background: color-mix(in srgb, var(--hu-error) 85%, var(--hu-bg));
       color: var(--hu-on-accent);
       font-size: var(--hu-text-sm);
       font-weight: var(--hu-weight-medium);
@@ -291,7 +291,7 @@ export class ScApp extends LitElement {
       background: color-mix(in srgb, var(--hu-on-accent) 20%, transparent);
       border: 1px solid color-mix(in srgb, var(--hu-on-accent) 40%, transparent);
       color: var(--hu-on-accent);
-      min-height: 2.75rem;
+      min-height: 2rem;
       padding: var(--hu-space-xs) var(--hu-space-md);
       border-radius: var(--hu-radius-sm);
       font-size: var(--hu-text-xs);
@@ -309,7 +309,7 @@ export class ScApp extends LitElement {
       justify-content: center;
       gap: var(--hu-space-sm);
       padding: var(--hu-space-xs) var(--hu-space-md);
-      background: var(--hu-accent-secondary);
+      background: color-mix(in srgb, var(--hu-accent-secondary) 85%, var(--hu-bg));
       color: var(--hu-on-accent);
       font-size: var(--hu-text-sm);
       font-weight: var(--hu-weight-medium);
@@ -319,7 +319,7 @@ export class ScApp extends LitElement {
       background: color-mix(in srgb, var(--hu-on-accent) 20%, transparent);
       border: 1px solid color-mix(in srgb, var(--hu-on-accent) 40%, transparent);
       color: var(--hu-on-accent);
-      min-height: 2.75rem;
+      min-height: 2rem;
       padding: var(--hu-space-xs) var(--hu-space-md);
       border-radius: var(--hu-radius-sm);
       font-size: var(--hu-text-xs);

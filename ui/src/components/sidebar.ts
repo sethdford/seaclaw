@@ -62,9 +62,9 @@ export class ScSidebar extends LitElement {
         transparent
       );
       backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
-        saturate(var(--hu-glass-standard-saturate, 180%));
+        saturate(var(--hu-glass-standard-saturate, 120%));
       -webkit-backdrop-filter: blur(var(--hu-glass-standard-blur, 24px))
-        saturate(var(--hu-glass-standard-saturate, 180%));
+        saturate(var(--hu-glass-standard-saturate, 120%));
       border-right: 1px solid
         color-mix(
           in srgb,
@@ -219,7 +219,7 @@ export class ScSidebar extends LitElement {
     }
 
     .settings-item {
-      border-left: 2px solid transparent;
+      border-left: 1px solid transparent;
       margin-bottom: var(--hu-space-xs);
     }
 
@@ -232,7 +232,7 @@ export class ScSidebar extends LitElement {
       padding: var(--hu-space-sm) var(--hu-space-md);
       background: transparent;
       border: none;
-      border-left: 2px solid transparent;
+      border-left: 1px solid transparent;
       border-radius: var(--hu-radius-sm);
       font-size: var(--hu-text-sm);
       color: var(--hu-text);
@@ -242,7 +242,7 @@ export class ScSidebar extends LitElement {
         color var(--hu-duration-fast) var(--hu-ease-spring),
         border-color var(--hu-duration-fast) var(--hu-ease-spring),
         transform var(--hu-duration-fast) var(--hu-ease-spring);
-      margin-bottom: var(--hu-space-xs);
+      margin-bottom: var(--hu-space-sm);
       text-align: left;
       font-family: var(--hu-font);
     }
@@ -265,7 +265,7 @@ export class ScSidebar extends LitElement {
 
       &[aria-current] {
         background: var(--hu-surface-container-high);
-        border-left: 2px solid var(--hu-accent);
+        border-left: 1px solid var(--hu-accent);
         border-radius: var(--hu-radius-sm) 0 0 var(--hu-radius-sm);
         color: var(--hu-accent-text, var(--hu-accent));
       }

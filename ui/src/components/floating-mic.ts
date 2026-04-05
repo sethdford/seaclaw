@@ -17,6 +17,11 @@ export class ScFloatingMic extends LitElement {
       right: var(--hu-space-lg);
       bottom: var(--hu-space-lg);
       z-index: 9999;
+      opacity: 1;
+      transition: opacity var(--hu-duration-normal) var(--hu-ease-out);
+    }
+    :host([fading]) {
+      opacity: 0;
     }
     .btn {
       width: 3rem;
@@ -67,6 +72,9 @@ export class ScFloatingMic extends LitElement {
       height: var(--hu-icon-lg);
     }
     @media (prefers-reduced-motion: reduce) {
+      :host {
+        transition: none;
+      }
       .btn.listening {
         animation: none;
         box-shadow: 0 0 0 var(--hu-space-xs) color-mix(in srgb, var(--hu-error) 30%, transparent);
@@ -94,7 +102,9 @@ export class ScFloatingMic extends LitElement {
   @state() private isTranscribing = false;
   @state() private overlayText = "";
   @state() private _composerPresent = false;
+  @state() private _hidden = false;
   private _recorder = new AudioRecorder();
+  private _fadeTimer: ReturnType<typeof setTimeout> | null = null;
   #streamChunks: Blob[] = [];
   readonly #silence = createVoiceSilenceController({
     isActive: () => this.isListening,
@@ -104,11 +114,30 @@ export class ScFloatingMic extends LitElement {
   });
 
   private _onComposerConnected = (): void => {
-    this._composerPresent = true;
+    this._setComposerPresent(true);
   };
   private _onComposerDisconnected = (): void => {
-    this._composerPresent = false;
+    this._setComposerPresent(false);
   };
+
+  private _setComposerPresent(present: boolean): void {
+    if (present === this._composerPresent) return;
+    this._composerPresent = present;
+    if (present) {
+      this.setAttribute("fading", "");
+      this._fadeTimer = setTimeout(() => {
+        this._hidden = true;
+        this._fadeTimer = null;
+      }, 200);
+    } else {
+      if (this._fadeTimer !== null) {
+        clearTimeout(this._fadeTimer);
+        this._fadeTimer = null;
+      }
+      this._hidden = false;
+      this.removeAttribute("fading");
+    }
+  }
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -116,7 +145,7 @@ export class ScFloatingMic extends LitElement {
     window.addEventListener("hu-composer-connected", this._onComposerConnected);
     window.addEventListener("hu-composer-disconnected", this._onComposerDisconnected);
     // Check if composer already exists on the page
-    this._composerPresent = !!document.querySelector("hu-chat-composer");
+    this._setComposerPresent(!!document.querySelector("hu-chat-composer"));
   }
 
   override disconnectedCallback(): void {
@@ -124,6 +153,10 @@ export class ScFloatingMic extends LitElement {
     this._removeKeyboardShortcut();
     window.removeEventListener("hu-composer-connected", this._onComposerConnected);
     window.removeEventListener("hu-composer-disconnected", this._onComposerDisconnected);
+    if (this._fadeTimer !== null) {
+      clearTimeout(this._fadeTimer);
+      this._fadeTimer = null;
+    }
     this._recorder.dispose();
   }
 
@@ -272,7 +305,7 @@ export class ScFloatingMic extends LitElement {
   }
 
   override render() {
-    if (this._composerPresent) return nothing;
+    if (this._hidden) return nothing;
     const btnClass = this.isListening ? "listening" : this.isTranscribing ? "transcribing" : "";
     return html`
       <div>
