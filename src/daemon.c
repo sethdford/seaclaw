@@ -231,9 +231,16 @@ static bool hu_daemon_director_call(hu_allocator_t *alloc, const char *combined,
         "- DEFAULT is action:text. When in doubt, respond.\n"
         "- action:text — Seth sends a text. Include delay_s (seconds to wait before replying, "
         "2-8 for normal, 15-60 for busy/low-priority) and direction for tone/length.\n"
-        "- action:tapback — Seth reacts instead of texting. ONLY for messages that are clearly "
-        "just reactions ('haha nice', 'lol', 'omg'), standalone photos, or simple acknowledgments "
-        "where a tapback is the most natural human move. Include reaction type.\n"
+        "- action:tapback — Seth REACTS instead of texting. This is what real humans do "
+        "constantly. Use tapback for:\n"
+        "  * Standalone photos/images — ALWAYS heart or haha, never text a photo description\n"
+        "  * Pure reactions: 'haha nice', 'lol', 'omg', 'damn', 'yooo'\n"
+        "  * Simple acknowledgments: 'ok', 'sounds good', 'got it', 'bet'\n"
+        "  * Conversation closers: last message in a natural exchange ending\n"
+        "  * Memes, GIFs, links to funny content\n"
+        "  * When they share good news and a heart says it all\n"
+        "  Reaction types: heart (love/appreciation/photos), haha (funny), "
+        "thumbs_up (agreement/acknowledgment), emphasis (surprise/excitement)\n"
         "- action:silence — RARE. Only use when they're being toxic/abusive, or after 3+ "
         "unanswered low-effort messages in a row ('k', 'ok', '...'). NEVER use silence for "
         "greetings, questions, or any message that expects a reply.\n"
@@ -243,7 +250,9 @@ static bool hu_daemon_director_call(hu_allocator_t *alloc, const char *combined,
         "Examples:\n"
         "action:text|delay_s:3|direction:Short empathetic reaction, 5 words max\n"
         "action:text|delay_s:2|direction:Casual greeting back, match their energy\n"
-        "action:tapback|reaction:haha\n"
+        "action:tapback|reaction:heart (they sent a photo)\n"
+        "action:tapback|reaction:haha (they said something funny)\n"
+        "action:tapback|reaction:thumbs_up (simple acknowledgment)\n"
         "action:text|delay_s:2|burst:true|direction:Match urgency, 3 rapid messages\n"
         "action:text|delay_s:45|direction:He's busy, one-word reply when he gets back";
 
@@ -3872,15 +3881,31 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         uint32_t jitter = delay_seed % (delay_ms / 5 + 1);
                         delay_ms += (delay_seed & 1) ? jitter : 0;
                         if (delay_ms > 120000) delay_ms = 120000;
+                        /* Seen-then-reply choreography: mark as read early,
+                         * then pause before typing — like a real human who
+                         * picks up their phone, reads, thinks, then replies. */
+                        uint32_t read_wait;
+                        if (delay_ms <= 5000) {
+                            /* Quick reply: read fast (200-800ms) */
+                            read_wait = 200 + (delay_seed >> 16u) % 601u;
+                        } else if (delay_ms <= 15000) {
+                            /* Normal reply: read in 1-3s */
+                            read_wait = 1000 + (delay_seed >> 16u) % 2001u;
+                        } else {
+                            /* Slow reply (busy): read in 2-8s */
+                            read_wait = 2000 + (delay_seed >> 16u) % 6001u;
+                        }
+                        if (read_wait > delay_ms) read_wait = delay_ms / 2;
                         hu_log_info("human", agent ? agent->observer : NULL,
-                                    "director delay: %u ms", delay_ms);
-                        if (ch->channel->vtable->mark_read) {
-                            uint32_t read_wait = 500 + (delay_seed >> 16u) % 2001u;
-                            usleep(read_wait * 1000u);
+                                    "director delay: %u ms (read after %ums)",
+                                    delay_ms, read_wait);
+                        usleep(read_wait * 1000u);
+                        if (ch->channel->vtable->mark_read)
                             ch->channel->vtable->mark_read(ch->channel->ctx, batch_key,
                                                            key_len);
-                        }
-                        usleep((delay_ms > 2500 ? delay_ms - 2500 : 0) * 1000u);
+                        uint32_t remaining = delay_ms > read_wait
+                                                 ? delay_ms - read_wait : 0;
+                        if (remaining > 0) usleep(remaining * 1000u);
                     }
                     goto llm_decides_skip_delays;
                 }
@@ -8296,9 +8321,21 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         ch->channel->vtable->react) {
                         int64_t msg_id = msgs[batch_end].message_id;
                         if (msg_id > 0 && director_result.reaction != HU_REACTION_NONE) {
+                            /* Natural delay: humans see a message, then react 1-3s later */
+                            unsigned int tapback_delay_ms =
+                                1000 + (unsigned int)(rand() % 2001);
                             hu_log_info("human", agent ? agent->observer : NULL,
-                                        "director: tapback reaction=%d msg_id=%lld",
-                                        (int)director_result.reaction, (long long)msg_id);
+                                        "director: tapback reaction=%d msg_id=%lld "
+                                        "(delay %ums)",
+                                        (int)director_result.reaction, (long long)msg_id,
+                                        tapback_delay_ms);
+                            if (ch->channel->vtable->mark_read)
+                                ch->channel->vtable->mark_read(ch->channel->ctx,
+                                                               batch_key, key_len);
+                            struct timespec ts = {
+                                .tv_sec = tapback_delay_ms / 1000,
+                                .tv_nsec = (long)(tapback_delay_ms % 1000) * 1000000L};
+                            nanosleep(&ts, NULL);
                             hu_error_t react_err = ch->channel->vtable->react(
                                 ch->channel->ctx, batch_key, key_len,
                                 msg_id, director_result.reaction);

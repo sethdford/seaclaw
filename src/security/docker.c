@@ -1,4 +1,5 @@
 #include "human/core/error.h"
+#include "human/core/log.h"
 #include "human/security/sandbox.h"
 #include "human/security/sandbox_internal.h"
 
@@ -29,6 +30,8 @@ static hu_error_t docker_wrap(void *ctx, const char *const *argv, size_t argc, c
     if (!buf || !out_count)
         return HU_ERR_INVALID_ARGUMENT;
     if (buf_count < total)
+        return HU_ERR_INVALID_ARGUMENT;
+    if (!dk->mount_arg[0])
         return HU_ERR_INVALID_ARGUMENT;
 
     size_t i = 0;
@@ -105,12 +108,16 @@ void hu_docker_sandbox_init(hu_docker_ctx_t *ctx, const char *workspace_dir, con
     ctx->image[ilen] = '\0';
 
     if (workspace_dir && workspace_dir[0]) {
-        size_t wlen = strlen(workspace_dir);
-        if (wlen > HU_DOCKER_MOUNT_MAX)
-            wlen = HU_DOCKER_MOUNT_MAX;
-        int n = snprintf(ctx->mount_arg, sizeof(ctx->mount_arg), "%.*s:%.*s", (int)wlen,
-                         workspace_dir, (int)wlen, workspace_dir);
-        if (n > 0 && (size_t)n < sizeof(ctx->mount_arg))
-            ctx->mount_len = (size_t)n;
+        if (strchr(workspace_dir, ':')) {
+            hu_log_error("docker", NULL, "workspace path contains ':' — invalid for -v mount");
+        } else {
+            size_t wlen = strlen(workspace_dir);
+            if (wlen > HU_DOCKER_MOUNT_MAX)
+                wlen = HU_DOCKER_MOUNT_MAX;
+            int n = snprintf(ctx->mount_arg, sizeof(ctx->mount_arg), "%.*s:%.*s", (int)wlen,
+                             workspace_dir, (int)wlen, workspace_dir);
+            if (n > 0 && (size_t)n < sizeof(ctx->mount_arg))
+                ctx->mount_len = (size_t)n;
+        }
     }
 }

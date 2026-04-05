@@ -366,7 +366,7 @@ hu_error_t hu_ws_server_upgrade(hu_ws_server_t *srv, int fd, const char *req, si
                      "Sec-WebSocket-Accept: %s\r\n"
                      "\r\n",
                      accept);
-    if (n < 0 || (size_t)n > sizeof(resp))
+    if (n < 0 || (size_t)n >= sizeof(resp))
         return HU_ERR_INTERNAL;
 
     size_t sent = 0;
@@ -516,19 +516,38 @@ void hu_ws_server_broadcast(hu_ws_server_t *srv, const char *data, size_t data_l
     }
 }
 
-void hu_ws_server_close_conn(hu_ws_server_t *srv, hu_ws_conn_t *conn) {
+#ifdef HU_GATEWAY_POSIX
+/* status_code 0: empty close payload; else 2-byte network-order status (e.g. 1002 protocol error). */
+static void ws_server_send_close_frame(int fd, uint16_t status_code) {
+    if (status_code == 0) {
+        char close_frame[2];
+        close_frame[0] = (char)(0x80 | HU_WS_OP_CLOSE);
+        close_frame[1] = 0;
+        ssize_t n = send(fd, close_frame, 2, MSG_NOSIGNAL);
+        if (n < 0)
+            hu_log_error("ws", NULL, "close frame send failed: %s", strerror(errno));
+        else if ((size_t)n < 2)
+            hu_log_info("ws", NULL, "close frame partial send (%zd/2)", n);
+    } else {
+        char close_frame[4];
+        close_frame[0] = (char)(0x80 | HU_WS_OP_CLOSE);
+        close_frame[1] = 2;
+        close_frame[2] = (char)((status_code >> 8) & 0xFF);
+        close_frame[3] = (char)(status_code & 0xFF);
+        ssize_t n = send(fd, close_frame, 4, MSG_NOSIGNAL);
+        if (n < 0)
+            hu_log_error("ws", NULL, "close frame send failed: %s", strerror(errno));
+        else if ((size_t)n < 4)
+            hu_log_info("ws", NULL, "close frame partial send (%zd/4)", n);
+    }
+}
+#endif
+
+static void ws_server_terminate_conn(hu_ws_server_t *srv, hu_ws_conn_t *conn, uint16_t ws_status) {
     if (!conn || !conn->active)
         return;
 #ifdef HU_GATEWAY_POSIX
-    /* Send close frame */
-    char close_frame[4];
-    close_frame[0] = (char)(0x80 | HU_WS_OP_CLOSE);
-    close_frame[1] = 0;
-    ssize_t n = send(conn->fd, close_frame, 2, MSG_NOSIGNAL);
-    if (n < 0)
-        hu_log_error("ws", NULL, "close frame send failed: %s", strerror(errno));
-    else if ((size_t)n < 2)
-        hu_log_info("ws", NULL, "close frame partial send (%zd/2)", n);
+    ws_server_send_close_frame(conn->fd, ws_status);
     close(conn->fd);
 #endif
     if (srv && srv->on_close)
@@ -543,6 +562,10 @@ void hu_ws_server_close_conn(hu_ws_server_t *srv, hu_ws_conn_t *conn) {
     conn->recv_len = 0;
     if (srv && srv->conn_count > 0)
         srv->conn_count--;
+}
+
+void hu_ws_server_close_conn(hu_ws_server_t *srv, hu_ws_conn_t *conn) {
+    ws_server_terminate_conn(srv, conn, 0);
 }
 
 hu_error_t hu_ws_server_read_and_process(hu_ws_server_t *srv, hu_ws_conn_t *conn) {
@@ -603,6 +626,23 @@ hu_error_t hu_ws_server_process(hu_ws_server_t *srv, hu_ws_conn_t *conn) {
         char *payload = conn->recv_buf + hdr.header_bytes;
         size_t plen = (size_t)hdr.payload_len;
 
+        {
+            int is_control = (hdr.opcode == HU_WS_OP_PING || hdr.opcode == HU_WS_OP_PONG ||
+                              hdr.opcode == HU_WS_OP_CLOSE);
+            if (is_control && hdr.payload_len > 125) {
+                /* RFC 6455: control frame payload must not exceed 125 bytes */
+                ws_server_terminate_conn(srv, conn, 1002);
+                return HU_ERR_IO;
+            }
+        }
+
+        if ((hdr.opcode == HU_WS_OP_TEXT || hdr.opcode == HU_WS_OP_BINARY) && !hdr.masked) {
+            /* RFC 6455: server MUST close on unmasked client data frame */
+            hu_log_warn("ws", NULL, "rejecting unmasked client frame");
+            ws_server_terminate_conn(srv, conn, 1002);
+            return HU_ERR_IO;
+        }
+
         if (hdr.masked && plen > 0) {
             unsigned char mask[4];
             memcpy(mask, conn->recv_buf + hdr.header_bytes - 4, 4);
@@ -617,10 +657,7 @@ hu_error_t hu_ws_server_process(hu_ws_server_t *srv, hu_ws_conn_t *conn) {
             break;
         case HU_WS_OP_PING: {
 #ifdef HU_GATEWAY_POSIX
-            /* RFC 6455 s5.5: control frame payload max is 125 bytes.
-               Always reply with PONG echoing the payload. */
-            if (plen > 125)
-                plen = 125;
+            /* RFC 6455 s5.5: control frame payload max is 125 bytes (enforced above). */
             char pong[2 + 125];
             pong[0] = (char)(0x80 | HU_WS_OP_PONG);
             pong[1] = (char)(plen & 0x7F);

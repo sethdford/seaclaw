@@ -160,7 +160,8 @@ static bool router_supports_vision_for_model(void *ctx, const char *model, size_
         return false;
     const hu_provider_vtable_t *vt = r->providers[res.provider_index].vtable;
     return vt && vt->supports_vision_for_model &&
-           vt->supports_vision_for_model(r->providers[res.provider_index].ctx, model, model_len);
+           vt->supports_vision_for_model(r->providers[res.provider_index].ctx, res.model,
+                                         res.model_len);
 }
 
 static bool router_supports_streaming(void *ctx) {
@@ -288,6 +289,7 @@ hu_error_t hu_router_create(hu_allocator_t *alloc, const char *const *provider_n
                 return HU_ERR_OUT_OF_MEMORY;
             }
             ri[i].hint_len = hint_len;
+            ri[i].provider_index = provider_count; /* sentinel: unmatched */
             for (size_t j = 0; j < provider_count; j++) {
                 if (provider_name_lens[j] == routes[i].route.provider_name_len &&
                     memcmp(provider_names[j], routes[i].route.provider_name,

@@ -176,8 +176,9 @@ static char *run_git(hu_allocator_t *alloc, const char *cwd, const char **argv, 
     int status;
     waitpid(pid, &status, 0);
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
         char err_buf[48];
-        int n = snprintf(err_buf, sizeof(err_buf), "Git failed: exit %d", WEXITSTATUS(status));
+        int n = snprintf(err_buf, sizeof(err_buf), "Git failed: exit %d", exit_code);
         char *err_msg = hu_strndup(alloc, err_buf, (size_t)n);
         alloc->free(alloc->ctx, buf, cap);
         *out = err_msg ? hu_tool_result_fail_owned(err_msg, (size_t)n)

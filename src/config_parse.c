@@ -2,6 +2,7 @@
 #include "human/config.h"
 #include "human/core/log.h"
 #include "human/core/string.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -1262,13 +1263,15 @@ hu_error_t hu_config_parse_json(hu_config_t *cfg, const char *content, size_t le
         hu_json_value_t *res = hu_json_object_get(sec, "resources");
         if (res && res->type == HU_JSON_OBJECT) {
             double mfs = hu_json_get_number(res, "max_file_size",
-                                            cfg->security.resource_limits.max_file_size);
-            if (mfs >= 0)
-                cfg->security.resource_limits.max_file_size = (uint64_t)mfs;
+                                            (double)cfg->security.resource_limits.max_file_size);
+            if (!isfinite(mfs) || mfs < 0.0 || mfs > 1e15)
+                mfs = 0.0; /* use default */
+            cfg->security.resource_limits.max_file_size = (uint64_t)mfs;
             double mrs = hu_json_get_number(res, "max_read_size",
-                                            cfg->security.resource_limits.max_read_size);
-            if (mrs >= 0)
-                cfg->security.resource_limits.max_read_size = (uint64_t)mrs;
+                                            (double)cfg->security.resource_limits.max_read_size);
+            if (!isfinite(mrs) || mrs < 0.0 || mrs > 1e15)
+                mrs = 0.0; /* use default */
+            cfg->security.resource_limits.max_read_size = (uint64_t)mrs;
             double mmb = hu_json_get_number(res, "max_memory_mb",
                                             cfg->security.resource_limits.max_memory_mb);
             if (mmb >= 0 && mmb <= 1048576)

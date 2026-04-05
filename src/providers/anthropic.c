@@ -476,6 +476,8 @@ static hu_error_t anthropic_chat(void *ctx, hu_allocator_t *alloc, const hu_chat
         if (tcs && tc_valid > 0) {
             out->tool_calls = tcs;
             out->tool_calls_count = tc_valid;
+        } else if (tcs) {
+            alloc->free(alloc->ctx, tcs, block_count * sizeof(hu_tool_call_t));
         }
     }
     hu_json_value_t *usage = hu_json_object_get(parsed, "usage");

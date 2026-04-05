@@ -710,7 +710,40 @@ hu_error_t hu_ws_recv(hu_ws_client_t *ws, hu_allocator_t *alloc, char **data_out
             }
             if (payload)
                 alloc->free(alloc->ctx, payload, hdr.payload_len + 1);
-            ws->sockfd = HU_WS_INVALID_SOCK;
+            if (ws->sockfd != HU_WS_INVALID_SOCK) {
+                char close_buf[16];
+                unsigned char mask[4] = {0, 0, 0, 0};
+                size_t n = hu_ws_build_frame(close_buf, sizeof(close_buf), HU_WS_OP_CLOSE, "", 0,
+                                             mask);
+                if (n > 0) {
+                    size_t sent = 0;
+                    while (sent < n) {
+#ifdef HU_HAS_TLS
+                        ssize_t r =
+                            ws->ssl ? (ssize_t)SSL_write(ws->ssl, close_buf + sent, (int)(n - sent))
+                                    : send(ws->sockfd, close_buf + sent, n - sent, 0);
+#else
+                        ssize_t r = send(ws->sockfd, close_buf + sent, n - sent, 0);
+#endif
+                        if (r <= 0)
+                            break;
+                        sent += (size_t)r;
+                    }
+                }
+#ifdef HU_HAS_TLS
+                if (ws->ssl) {
+                    SSL_shutdown(ws->ssl);
+                    SSL_free(ws->ssl);
+                    ws->ssl = NULL;
+                }
+                if (ws->ssl_ctx) {
+                    SSL_CTX_free(ws->ssl_ctx);
+                    ws->ssl_ctx = NULL;
+                }
+#endif
+                close(ws->sockfd);
+                ws->sockfd = HU_WS_INVALID_SOCK;
+            }
             return HU_ERR_IO;
         case HU_WS_OP_TEXT:
         case HU_WS_OP_BINARY:

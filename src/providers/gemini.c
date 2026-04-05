@@ -853,6 +853,7 @@ static hu_error_t gemini_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
             if (parts && parts->type == HU_JSON_ARRAY) {
                 hu_tool_call_t *tcs = NULL;
                 size_t tc_valid = 0;
+                size_t tc_alloc_n = 0;
                 for (size_t p = 0; p < parts->data.array.len; p++) {
                     hu_json_value_t *part = parts->data.array.items[p];
                     const char *text = hu_json_get_string(part, "text");
@@ -867,14 +868,14 @@ static hu_error_t gemini_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
                         if (!fname)
                             continue;
                         if (!tcs) {
-                            size_t tc_alloc = parts->data.array.len;
-                            if (tc_alloc > SIZE_MAX / sizeof(hu_tool_call_t))
+                            tc_alloc_n = parts->data.array.len;
+                            if (tc_alloc_n > SIZE_MAX / sizeof(hu_tool_call_t))
                                 break;
                             tcs = (hu_tool_call_t *)alloc->alloc(
-                                alloc->ctx, tc_alloc * sizeof(hu_tool_call_t));
+                                alloc->ctx, tc_alloc_n * sizeof(hu_tool_call_t));
                             if (!tcs)
                                 break;
-                            memset(tcs, 0, tc_alloc * sizeof(hu_tool_call_t));
+                            memset(tcs, 0, tc_alloc_n * sizeof(hu_tool_call_t));
                         }
                         hu_json_value_t *args = hu_json_object_get(fc, "args");
                         char *args_str = NULL;
@@ -899,6 +900,8 @@ static hu_error_t gemini_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
                 if (tcs && tc_valid > 0) {
                     out->tool_calls = tcs;
                     out->tool_calls_count = tc_valid;
+                } else if (tcs) {
+                    alloc->free(alloc->ctx, tcs, tc_alloc_n * sizeof(hu_tool_call_t));
                 }
             }
         }

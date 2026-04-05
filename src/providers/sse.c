@@ -8,6 +8,7 @@
 #include <string.h>
 
 #define HU_SSE_PARSER_INIT_CAP 256
+#define HU_SSE_MAX_LINE_SIZE (256 * 1024)
 
 static bool field_eq(const char *a, size_t alen, const char *b) {
     size_t blen = strlen(b);
@@ -69,6 +70,13 @@ hu_error_t hu_sse_parser_feed(hu_sse_parser_t *p, const char *bytes, size_t len,
         return HU_ERR_INVALID_ARGUMENT;
     if (len == 0)
         return HU_OK;
+
+    if (len > HU_SSE_MAX_LINE_SIZE || p->buf_len > HU_SSE_MAX_LINE_SIZE - len) {
+        p->buf_len = 0;
+        if (p->buffer)
+            p->buffer[0] = '\0';
+        return HU_ERR_INVALID_ARGUMENT;
+    }
 
     while (p->buf_len + len + 1 > p->buf_cap) {
         size_t new_cap = p->buf_cap ? p->buf_cap * 2 : HU_SSE_PARSER_INIT_CAP;

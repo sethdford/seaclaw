@@ -1540,9 +1540,7 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
             imsg_cli_available(c_try) && message_id > 0) {
             const char *tapback_name = hu_imessage_reaction_to_tapback_name(reaction);
             if (tapback_name) {
-                /* Look up chat GUID and message GUID from chat.db */
-                char msg_guid[96] = {0};
-                char chat_guid[128] = {0};
+                char chat_rowid_str[32] = {0};
 #if defined(HU_ENABLE_SQLITE)
                 const char *home_env = getenv("HOME");
                 if (home_env) {
@@ -1553,42 +1551,17 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
                         sqlite3 *db = NULL;
                         if (sqlite3_open_v2(db_p, &db, SQLITE_OPEN_READONLY, NULL) ==
                             SQLITE_OK) {
-                            sqlite3_stmt *gs = NULL;
-                            if (sqlite3_prepare_v2(
-                                    db, "SELECT m.guid FROM message m WHERE m.ROWID = ?",
-                                    -1, &gs, NULL) == SQLITE_OK) {
-                                sqlite3_bind_int64(gs, 1, message_id);
-                                if (sqlite3_step(gs) == SQLITE_ROW) {
-                                    const char *g =
-                                        (const char *)sqlite3_column_text(gs, 0);
-                                    if (g) {
-                                        size_t gl = strlen(g);
-                                        if (gl >= sizeof(msg_guid))
-                                            gl = sizeof(msg_guid) - 1;
-                                        memcpy(msg_guid, g, gl);
-                                        msg_guid[gl] = '\0';
-                                    }
-                                }
-                                sqlite3_finalize(gs);
-                            }
                             sqlite3_stmt *cs = NULL;
                             if (sqlite3_prepare_v2(
                                     db,
-                                    "SELECT c.guid FROM chat c "
-                                    "JOIN chat_message_join cmj ON cmj.chat_id = c.ROWID "
+                                    "SELECT cmj.chat_id FROM chat_message_join cmj "
                                     "WHERE cmj.message_id = ? LIMIT 1",
                                     -1, &cs, NULL) == SQLITE_OK) {
                                 sqlite3_bind_int64(cs, 1, message_id);
                                 if (sqlite3_step(cs) == SQLITE_ROW) {
-                                    const char *cg =
-                                        (const char *)sqlite3_column_text(cs, 0);
-                                    if (cg) {
-                                        size_t cgl = strlen(cg);
-                                        if (cgl >= sizeof(chat_guid))
-                                            cgl = sizeof(chat_guid) - 1;
-                                        memcpy(chat_guid, cg, cgl);
-                                        chat_guid[cgl] = '\0';
-                                    }
+                                    int64_t rowid = sqlite3_column_int64(cs, 0);
+                                    snprintf(chat_rowid_str, sizeof(chat_rowid_str),
+                                             "%lld", (long long)rowid);
                                 }
                                 sqlite3_finalize(cs);
                             }
@@ -1597,10 +1570,9 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
                     }
                 }
 #endif
-                if (msg_guid[0] && chat_guid[0]) {
+                if (chat_rowid_str[0]) {
                     const char *react_argv[] = {"imsg",       "react",
-                                                "--chat-id",  chat_guid,
-                                                "--message-guid", msg_guid,
+                                                "--chat-id",  chat_rowid_str,
                                                 "--reaction", tapback_name,
                                                 NULL};
                     hu_run_result_t rr = {0};
@@ -1610,9 +1582,8 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
                     hu_run_result_free(c_try->alloc, &rr);
                     if (rok)
                         return HU_OK;
-                    if (getenv("HU_DEBUG"))
-                        hu_log_info("imessage", NULL,
-                                    "imsg react failed (exit=%d)", rr.exit_code);
+                    hu_log_info("imessage", NULL,
+                                "imsg react failed (exit=%d)", rr.exit_code);
                 }
             }
         }
@@ -1634,12 +1605,13 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
     if (!target || target_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
 
-    /* Prefer imsg CLI when enabled — faster and more reliable than JXA/AX */
+    /* Prefer imsg CLI when enabled — faster and more reliable than JXA/AX.
+     * imsg v0.5 react takes --chat-id (numeric ROWID) and --reaction;
+     * it reacts to the most recent incoming message in that chat. */
     if (c->use_imsg_cli && imsg_cli_available(c) && message_id > 0) {
         const char *tapback_name = hu_imessage_reaction_to_tapback_name(reaction);
         if (tapback_name) {
-            char msg_guid[96] = {0};
-            char chat_guid[128] = {0};
+            char chat_rowid_str[32] = {0};
 #if defined(HU_ENABLE_SQLITE)
             const char *home_env = getenv("HOME");
             if (home_env) {
@@ -1648,40 +1620,17 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
                 if (dp > 0 && (size_t)dp < sizeof(db_p)) {
                     sqlite3 *db = NULL;
                     if (sqlite3_open_v2(db_p, &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK) {
-                        sqlite3_stmt *gs = NULL;
-                        if (sqlite3_prepare_v2(
-                                db, "SELECT m.guid FROM message m WHERE m.ROWID = ?",
-                                -1, &gs, NULL) == SQLITE_OK) {
-                            sqlite3_bind_int64(gs, 1, message_id);
-                            if (sqlite3_step(gs) == SQLITE_ROW) {
-                                const char *g = (const char *)sqlite3_column_text(gs, 0);
-                                if (g) {
-                                    size_t gl = strlen(g);
-                                    if (gl >= sizeof(msg_guid))
-                                        gl = sizeof(msg_guid) - 1;
-                                    memcpy(msg_guid, g, gl);
-                                    msg_guid[gl] = '\0';
-                                }
-                            }
-                            sqlite3_finalize(gs);
-                        }
                         sqlite3_stmt *cs = NULL;
                         if (sqlite3_prepare_v2(
                                 db,
-                                "SELECT c.guid FROM chat c "
-                                "JOIN chat_message_join cmj ON cmj.chat_id = c.ROWID "
+                                "SELECT cmj.chat_id FROM chat_message_join cmj "
                                 "WHERE cmj.message_id = ? LIMIT 1",
                                 -1, &cs, NULL) == SQLITE_OK) {
                             sqlite3_bind_int64(cs, 1, message_id);
                             if (sqlite3_step(cs) == SQLITE_ROW) {
-                                const char *cg = (const char *)sqlite3_column_text(cs, 0);
-                                if (cg) {
-                                    size_t cgl = strlen(cg);
-                                    if (cgl >= sizeof(chat_guid))
-                                        cgl = sizeof(chat_guid) - 1;
-                                    memcpy(chat_guid, cg, cgl);
-                                    chat_guid[cgl] = '\0';
-                                }
+                                int64_t rowid = sqlite3_column_int64(cs, 0);
+                                snprintf(chat_rowid_str, sizeof(chat_rowid_str), "%lld",
+                                         (long long)rowid);
                             }
                             sqlite3_finalize(cs);
                         }
@@ -1690,22 +1639,26 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
                 }
             }
 #endif
-            if (msg_guid[0] && chat_guid[0]) {
+            if (chat_rowid_str[0]) {
                 const char *react_argv[] = {"imsg",       "react",
-                                            "--chat-id",  chat_guid,
-                                            "--message-guid", msg_guid,
+                                            "--chat-id",  chat_rowid_str,
                                             "--reaction", tapback_name,
                                             NULL};
                 hu_run_result_t rr = {0};
                 hu_error_t re = hu_process_run(c->alloc, react_argv, NULL, 65536, &rr);
                 bool rok = (re == HU_OK && rr.success && rr.exit_code == 0);
+                if (!rok)
+                    hu_log_info("imessage", NULL,
+                                "imsg react failed (exit=%d stdout=%.*s stderr=%.*s), "
+                                "falling back to JXA",
+                                rr.exit_code,
+                                (int)(rr.stdout_len < 200 ? rr.stdout_len : 200),
+                                rr.stdout_buf ? rr.stdout_buf : "",
+                                (int)(rr.stderr_len < 200 ? rr.stderr_len : 200),
+                                rr.stderr_buf ? rr.stderr_buf : "");
                 hu_run_result_free(c->alloc, &rr);
                 if (rok)
                     return HU_OK;
-                if (getenv("HU_DEBUG"))
-                    hu_log_info("imessage", NULL,
-                                "imsg react failed, falling back to JXA (exit=%d)",
-                                rr.exit_code);
             }
         }
     }

@@ -465,6 +465,34 @@ static void build_setup_json_with_tools(void) {
     alloc.free(alloc.ctx, json, len + 1);
 }
 
+static void build_setup_json_invalid_tools_json_skipped(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gemini_live_config_t cfg = {
+        .model = "test-model",
+        .voice = "Puck",
+        .tools_json = "not valid json",
+    };
+    char *json = NULL;
+    size_t len = 0;
+    HU_ASSERT(hu_gemini_live_build_setup_json(&alloc, &cfg, NULL, &json, &len) == HU_OK);
+    HU_ASSERT(strstr(json, "functionDeclarations") == NULL);
+    alloc.free(alloc.ctx, json, len + 1);
+}
+
+static void build_setup_json_non_array_tools_json_skipped(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_gemini_live_config_t cfg = {
+        .model = "test-model",
+        .voice = "Puck",
+        .tools_json = "{}",
+    };
+    char *json = NULL;
+    size_t len = 0;
+    HU_ASSERT(hu_gemini_live_build_setup_json(&alloc, &cfg, NULL, &json, &len) == HU_OK);
+    HU_ASSERT(strstr(json, "functionDeclarations") == NULL);
+    alloc.free(alloc.ctx, json, len + 1);
+}
+
 static void build_setup_json_vertex_model_path(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_gemini_live_config_t cfg = {
@@ -741,6 +769,8 @@ void run_gemini_live_tests(void) {
     HU_RUN_TEST(build_setup_json_with_transcription);
     HU_RUN_TEST(build_setup_json_escapes_system_instruction);
     HU_RUN_TEST(build_setup_json_with_tools);
+    HU_RUN_TEST(build_setup_json_invalid_tools_json_skipped);
+    HU_RUN_TEST(build_setup_json_non_array_tools_json_skipped);
     HU_RUN_TEST(build_setup_json_vertex_model_path);
 
     HU_RUN_TEST(reconnect_without_handle_fails);

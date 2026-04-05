@@ -483,8 +483,12 @@ static hu_error_t openai_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_re
                             tcs[valid].arguments && fn_args ? strlen(fn_args) : 0;
                         valid++;
                     }
-                    out->tool_calls = tcs;
-                    out->tool_calls_count = valid;
+                    if (valid > 0) {
+                        out->tool_calls = tcs;
+                        out->tool_calls_count = valid;
+                    } else {
+                        alloc->free(alloc->ctx, tcs, tc_count * sizeof(hu_tool_call_t));
+                    }
                 }
             }
         }

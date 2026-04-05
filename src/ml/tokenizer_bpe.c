@@ -9,6 +9,8 @@
 
 #define HBPE_MAGIC 0x45504248 /* "HBPE" in little-endian */
 #define HBPE_VERSION 1
+#define HU_BPE_MAX_VOCAB (1u << 20)  /* 1M tokens max */
+#define HU_BPE_MAX_MERGES (1u << 20) /* 1M merges max */
 #define BPE_INITIAL_VOCAB 256
 #define BPE_INITIAL_MERGE_CAP 256
 #define BPE_INITIAL_VOCAB_CAP 512
@@ -534,6 +536,11 @@ hu_error_t hu_bpe_tokenizer_load(hu_bpe_tokenizer_t *tok, const char *path)
     if (magic != HBPE_MAGIC || version != HBPE_VERSION) {
         fclose(f);
         return HU_ERR_PARSE;
+    }
+
+    if (vsz > HU_BPE_MAX_VOCAB || mcount > HU_BPE_MAX_MERGES) {
+        fclose(f);
+        return HU_ERR_INVALID_ARGUMENT;
     }
 
     /* Free existing vocab (except base 256 if we're replacing). We'll rebuild. */

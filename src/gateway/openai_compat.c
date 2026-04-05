@@ -8,6 +8,7 @@
 #include "human/core/string.h"
 #include "human/provider.h"
 #include "human/providers/factory.h"
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -236,8 +237,10 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
     }
 
     double temperature = hu_json_get_number(root, "temperature", 0.7);
-    double max_tokens_val = hu_json_get_number(root, "max_tokens", 1024.0);
-    uint32_t max_tokens = (uint32_t)(max_tokens_val > 0 ? max_tokens_val : 1024);
+    double mt_raw = hu_json_get_number(root, "max_tokens", 4096.0);
+    if (!isfinite(mt_raw) || mt_raw < 1.0 || mt_raw > 1000000.0)
+        mt_raw = 4096.0; /* safe default */
+    uint32_t max_tokens = (uint32_t)mt_raw;
 
     /* Convert messages to hu_chat_message_t */
     size_t msg_count = messages_val->data.array.len;

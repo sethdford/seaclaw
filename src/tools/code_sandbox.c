@@ -216,7 +216,14 @@ static hu_error_t code_sandbox_execute(void *ctx, hu_allocator_t *alloc,
         return HU_OK;
     }
 
-    /* Output: stdout (or summary on error) */
+    if (result.exit_code != 0) {
+        const char *err_src = result.stderr_len > 0 ? result.stderr_buf : result.stdout_buf;
+        size_t err_len = result.stderr_len > 0 ? result.stderr_len : result.stdout_len;
+        char *buf = hu_strndup(alloc, err_src, err_len);
+        *out = buf ? hu_tool_result_fail_owned(buf, err_len)
+                   : hu_tool_result_fail("sandbox: non-zero exit", 22);
+        return HU_OK;
+    }
     char *buf = hu_strndup(alloc, result.stdout_buf, result.stdout_len);
     if (!buf) {
         *out = hu_tool_result_fail("out of memory", 13);

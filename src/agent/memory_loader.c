@@ -98,7 +98,9 @@ hu_error_t hu_memory_loader_load(hu_memory_loader_t *loader, const char *query, 
         err =
             loader->retrieval_engine->vtable->retrieve(loader->retrieval_engine->ctx, loader->alloc,
                                                        query ? query : "", query_len, &opts, &res);
-        if (err == HU_OK && res.count > 0) {
+        if (err != HU_OK)
+            return err;
+        if (res.count > 0) {
             entries = res.entries;
             count = res.count;
             if (res.scores)

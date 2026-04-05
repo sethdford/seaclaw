@@ -26,10 +26,12 @@ static void strip_markdown_json(const char *in, size_t in_len, const char **out,
     while (p < end && (*p == '\n' || *p == '\r'))
         p++;
     const char *close = end;
-    for (const char *s = end - 1; s >= p; s--) {
-        if (*s == '`' && s >= p + 2 && s[-1] == '`' && s[-2] == '`') {
-            close = s - 2;
-            break;
+    if (end > p + 2) {
+        for (const char *s = end - 1; s >= p + 2; s--) {
+            if (*s == '`' && s[-1] == '`' && s[-2] == '`') {
+                close = s - 2;
+                break;
+            }
         }
     }
     while (close > p &&

@@ -481,6 +481,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         if (sb_storage)
             hu_sandbox_storage_destroy(sb_storage, &sb_alloc);
         hu_awareness_deinit(&cli_awareness);
+        hu_bus_deinit(&cli_bus);
 #ifdef HU_HAS_VOICE_CHANNEL
         hu_channel_voice_destroy(&cli_voice_ch);
 #endif
@@ -728,6 +729,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         if (sb_storage)
             hu_sandbox_storage_destroy(sb_storage, &sb_alloc);
         hu_awareness_deinit(&cli_awareness);
+        hu_bus_deinit(&cli_bus);
 #ifdef HU_HAS_VOICE_CHANNEL
         hu_channel_voice_destroy(&cli_voice_ch);
 #endif

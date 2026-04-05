@@ -64,9 +64,14 @@ hu_error_t hu_ml_train(hu_allocator_t *alloc, hu_model_t *model, hu_ml_optimizer
     for (;;) {
         hu_ml_batch_t batch = {0};
         hu_error_t err = hu_ml_dataloader_next(train_loader, &batch);
-        if (err != HU_OK || !batch.input_ids || !batch.target_ids || batch.batch_size == 0 ||
-            batch.seq_len == 0)
+        if (err != HU_OK) {
+            result->converged = 0;
+            return err;
+        }
+        if (!batch.input_ids || !batch.target_ids || batch.batch_size == 0 || batch.seq_len == 0) {
+            hu_ml_batch_free(alloc, &batch);
             break;
+        }
 
         size_t batch_tokens = batch.batch_size * batch.seq_len;
         size_t logits_size = batch_tokens * vocab_size * sizeof(float);

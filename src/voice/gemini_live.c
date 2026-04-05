@@ -22,27 +22,35 @@ static const char *GOOGLE_AI_WS_BASE =
     "wss://generativelanguage.googleapis.com/ws/"
     "google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
 
+/*
+ * URL-encode src into dst. Returns encoded length excluding NUL on success.
+ * Returns SIZE_MAX if the result would not fit (dst[0] set to '\\0' when dst_cap > 0).
+ */
 static size_t gl_url_encode(const char *src, char *dst, size_t dst_cap) {
     static const char hex[] = "0123456789ABCDEF";
+    if (!src)
+        src = "";
     size_t w = 0;
     for (size_t i = 0; src[i]; i++) {
         unsigned char c = (unsigned char)src[i];
         bool safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
                     (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~';
+        size_t need = safe ? 1u : 3u;
+        if (w + need + 1u > dst_cap) {
+            if (dst_cap > 0 && dst)
+                dst[0] = '\0';
+            return SIZE_MAX;
+        }
         if (safe) {
-            if (w < dst_cap) dst[w] = (char)c;
-            w++;
+            dst[w++] = (char)c;
         } else {
-            if (w + 2 < dst_cap) {
-                dst[w] = '%';
-                dst[w + 1] = hex[c >> 4];
-                dst[w + 2] = hex[c & 0x0F];
-            }
-            w += 3;
+            dst[w++] = '%';
+            dst[w++] = hex[c >> 4];
+            dst[w++] = hex[c & 0x0F];
         }
     }
-    if (w < dst_cap) dst[w] = '\0';
-    else if (dst_cap > 0) dst[dst_cap - 1] = '\0';
+    if (dst_cap > 0 && dst)
+        dst[w] = '\0';
     return w;
 }
 
@@ -58,7 +66,8 @@ static int build_ws_url(const hu_gemini_live_config_t *cfg, char *buf, size_t ca
     if (cfg->region && cfg->region[0] && cfg->project_id && cfg->project_id[0]) {
         const char *token = cfg->access_token ? cfg->access_token : "";
         char encoded_token[4096];
-        gl_url_encode(token, encoded_token, sizeof(encoded_token));
+        if (gl_url_encode(token, encoded_token, sizeof(encoded_token)) == SIZE_MAX)
+            return -1;
         return snprintf(buf, cap,
                         "wss://%s-aiplatform.googleapis.com/ws/"
                         "google.cloud.aiplatform.v1beta1.LlmBidiService/"
@@ -66,7 +75,10 @@ static int build_ws_url(const hu_gemini_live_config_t *cfg, char *buf, size_t ca
                         cfg->region, encoded_token);
     }
     const char *key = cfg->api_key ? cfg->api_key : "";
-    return snprintf(buf, cap, "%s?key=%s", GOOGLE_AI_WS_BASE, key);
+    char encoded_key[512];
+    if (gl_url_encode(key, encoded_key, sizeof(encoded_key)) == SIZE_MAX)
+        return -1;
+    return snprintf(buf, cap, "%s?key=%s", GOOGLE_AI_WS_BASE, encoded_key);
 }
 #endif
 
@@ -265,13 +277,23 @@ hu_error_t hu_gemini_live_build_setup_json(hu_allocator_t *alloc,
 
     /* tools (setup-level) — pre-built JSON array of functionDeclarations */
     if (config->tools_json && config->tools_json[0]) {
-        err = hu_json_buf_append_raw(&buf, ",\"tools\":[{\"functionDeclarations\":", 33);
-        if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, config->tools_json, strlen(config->tools_json));
-        if (err == HU_OK)
-            err = hu_json_buf_append_raw(&buf, "}]", 2);
-        if (err != HU_OK)
-            goto fail;
+        size_t tj_len = strlen(config->tools_json);
+        hu_json_value_t *tools_check = NULL; /* parse failure may not assign *out */
+        hu_error_t pe = hu_json_parse(alloc, config->tools_json, tj_len, &tools_check);
+        if (pe != HU_OK || !tools_check || tools_check->type != HU_JSON_ARRAY) {
+            if (tools_check)
+                hu_json_free(alloc, tools_check);
+            hu_log_warn("gemini_live", NULL, "invalid tools_json — skipping");
+        } else {
+            hu_json_free(alloc, tools_check);
+            err = hu_json_buf_append_raw(&buf, ",\"tools\":[{\"functionDeclarations\":", 33);
+            if (err == HU_OK)
+                err = hu_json_buf_append_raw(&buf, config->tools_json, tj_len);
+            if (err == HU_OK)
+                err = hu_json_buf_append_raw(&buf, "}]", 2);
+            if (err != HU_OK)
+                goto fail;
+        }
     }
 
     /* close setup + envelope */

@@ -5,8 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define HU_SSE_MAX_EVENT_SIZE  (256 * 1024)
-#define HU_SSE_MAX_BUFFER_SIZE 8192
+#define HU_SSE_MAX_EVENT_SIZE (256 * 1024)
+#ifndef HU_SSE_MAX_BUFFER_SIZE
+#define HU_SSE_MAX_BUFFER_SIZE (1024 * 1024)
+#endif
 
 #if HU_IS_TEST
 static hu_error_t hu_sse_connect_impl(hu_allocator_t *alloc, const char *url,
@@ -252,12 +254,14 @@ static hu_error_t process_buffer(sse_ctx_t *ctx) {
         }
     }
 
-    /* Move unprocessed data to front */
+    /* Move unprocessed data to front; keep partial line (no trailing newline) */
     size_t keep = (size_t)(line_start - buf);
-    if (keep < len && keep > 0) {
-        memmove(buf, line_start, len - keep);
-        ctx->len = len - keep;
-    } else if (keep == 0 && len > 0) {
+    if (keep < len) {
+        size_t remainder = len - keep;
+        if (keep > 0)
+            memmove(buf, line_start, remainder);
+        ctx->len = remainder;
+    } else {
         ctx->len = 0;
     }
 
@@ -276,6 +280,9 @@ static size_t sse_write_cb(char *ptr, size_t size, size_t nmemb, void *userdata)
     size_t n = size * nmemb;
     if (n == 0)
         return 0;
+
+    if (n > HU_SSE_MAX_BUFFER_SIZE || ctx->len > HU_SSE_MAX_BUFFER_SIZE - n)
+        return 0; /* abort curl: would exceed buffer limit */
 
     while (ctx->len + n + 1 > ctx->cap) {
         size_t new_cap = ctx->cap ? ctx->cap * 2 : 4096;
@@ -300,9 +307,14 @@ static size_t sse_write_cb(char *ptr, size_t size, size_t nmemb, void *userdata)
     return n;
 }
 
-static void add_header(struct curl_slist **list, const char *header) {
-    if (header && header[0])
-        *list = curl_slist_append(*list, header);
+static hu_error_t add_header(struct curl_slist **list, const char *header) {
+    if (!header || !header[0])
+        return HU_OK;
+    struct curl_slist *tmp = curl_slist_append(*list, header);
+    if (!tmp)
+        return HU_ERR_OUT_OF_MEMORY;
+    *list = tmp;
+    return HU_OK;
 }
 
 static hu_error_t hu_sse_connect_impl(hu_allocator_t *alloc, const char *url,
@@ -326,13 +338,20 @@ static hu_error_t hu_sse_connect_impl(hu_allocator_t *alloc, const char *url,
     }
     ctx.cap = 4096;
 
+    CURLcode res = CURLE_OK;
     struct curl_slist *headers = NULL;
-    add_header(&headers, "Accept: text/event-stream");
+    hu_error_t hdr_err = add_header(&headers, "Accept: text/event-stream");
+    if (hdr_err != HU_OK)
+        goto sse_connect_done;
+
     char auth_buf[512];
     if (auth_header && auth_header[0]) {
         int n = snprintf(auth_buf, sizeof(auth_buf), "Authorization: %s", auth_header);
-        if (n > 0 && (size_t)n < sizeof(auth_buf))
-            add_header(&headers, auth_buf);
+        if (n > 0 && (size_t)n < sizeof(auth_buf)) {
+            hdr_err = add_header(&headers, auth_buf);
+            if (hdr_err != HU_OK)
+                goto sse_connect_done;
+        }
     }
     if (extra_headers && extra_headers[0]) {
         const char *p = extra_headers;
@@ -345,7 +364,9 @@ static hu_error_t hu_sse_connect_impl(hu_allocator_t *alloc, const char *url,
                 line[linelen] = '\0';
                 if (linelen > 0 && line[linelen - 1] == '\r')
                     line[--linelen] = '\0';
-                add_header(&headers, line);
+                hdr_err = add_header(&headers, line);
+                if (hdr_err != HU_OK)
+                    goto sse_connect_done;
             }
             if (!eol)
                 break;
@@ -363,12 +384,16 @@ static hu_error_t hu_sse_connect_impl(hu_allocator_t *alloc, const char *url,
     curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
     curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 120L);
 
-    CURLcode res = curl_easy_perform(curl);
+    res = curl_easy_perform(curl);
+
+sse_connect_done:
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
     alloc->free(alloc->ctx, ctx.buf, ctx.cap);
 
+    if (hdr_err != HU_OK)
+        return hdr_err;
     if (ctx.last_error != HU_OK)
         return ctx.last_error;
     if (res != CURLE_OK) {
