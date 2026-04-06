@@ -1,20 +1,39 @@
 ---
 title: Installation
-description: Install Human on macOS or Linux. Mac users get on-device AI with zero configuration.
+description: Install Human on macOS, Linux, or Windows. Mac users get on-device AI with zero configuration.
 ---
 
 ## One-command install
 
 The fastest path — downloads the pre-built binary for your platform:
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+<Tabs>
+  <TabItem label="macOS / Linux">
 ```bash
 curl -fsSL https://h-uman.ai/install.sh | sh
 ```
+  </TabItem>
+  <TabItem label="Windows (PowerShell)">
+```powershell
+irm https://h-uman.ai/install.ps1 | iex
+```
+  </TabItem>
+  <TabItem label="Docker">
+```bash
+docker pull ghcr.io/sethdford/h-uman:latest
+docker run -it ghcr.io/sethdford/h-uman:latest agent
+```
+  </TabItem>
+</Tabs>
 
 **Mac users:** The installer offers to set up [Apple Intelligence](../providers/apple/) automatically — on-device AI with no API keys, no cloud, no cost.
 
+**Windows users:** Human runs inside WSL (Windows Subsystem for Linux). The PowerShell script installs WSL if needed, then installs human inside it.
+
 :::tip Other install methods
-**Homebrew:** `brew install --HEAD ./Formula/human.rb` | **Docker:** `docker pull ghcr.io/sethdford/h-uman:latest` | **Nix:** `nix run github:sethdford/h-uman`
+**Homebrew:** `brew install --HEAD ./Formula/human.rb` | **Debian/Ubuntu:** `.deb` packages available in GitHub releases | **Nix:** `nix run github:sethdford/h-uman`
 :::
 
 ## Prerequisites

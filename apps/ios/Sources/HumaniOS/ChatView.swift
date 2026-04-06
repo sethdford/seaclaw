@@ -195,6 +195,10 @@ struct ChatView: View {
                     Text("Connected")
                         .font(.custom("Avenir-Book", size: HUTokens.textXs, relativeTo: .caption))
                         .foregroundStyle(.secondary)
+                } else if connectionManager.onDeviceAvailable {
+                    Text("On-Device")
+                        .font(.custom("Avenir-Book", size: HUTokens.textXs, relativeTo: .caption))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -239,30 +243,34 @@ struct ChatView: View {
         }
 
         Task {
-            do {
-                _ = try await connectionManager.request(
-                    method: Methods.chatSend,
-                    params: ["message": AnyCodable(trimmed)]
-                )
-            } catch {
-                await MainActor.run {
-                    isSending = false
-                    if reduceMotion {
-                        messages.append(ChatMessage(
-                            id: UUID(),
-                            text: "Failed to send: \(error.localizedDescription)",
-                            role: .assistant
-                        ))
-                    } else {
-                        withAnimation(HUTokens.springInteractive) {
-                            messages.append(ChatMessage(
-                                id: UUID(),
-                                text: "Failed to send: \(error.localizedDescription)",
-                                role: .assistant
-                            ))
-                        }
-                    }
+            if connectionManager.isConnected {
+                do {
+                    _ = try await connectionManager.request(
+                        method: Methods.chatSend,
+                        params: ["message": AnyCodable(trimmed)]
+                    )
+                } catch {
+                    await tryOnDeviceFallback(trimmed, gatewayError: error)
                 }
+            } else {
+                await tryOnDeviceFallback(trimmed, gatewayError: nil)
+            }
+        }
+    }
+
+    private func tryOnDeviceFallback(_ message: String, gatewayError: Error?) async {
+        if let reply = await connectionManager.chatOnDevice(message: message) {
+            await MainActor.run {
+                isSending = false
+                let append = { self.messages.append(ChatMessage(id: UUID(), text: reply, role: .assistant)) }
+                if reduceMotion { append() } else { withAnimation(HUTokens.springInteractive) { append() } }
+            }
+        } else {
+            let desc = gatewayError?.localizedDescription ?? "Gateway disconnected and on-device AI unavailable"
+            await MainActor.run {
+                isSending = false
+                let append = { self.messages.append(ChatMessage(id: UUID(), text: "Failed to send: \(desc)", role: .assistant)) }
+                if reduceMotion { append() } else { withAnimation(HUTokens.springInteractive) { append() } }
             }
         }
     }

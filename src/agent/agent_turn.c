@@ -1,5 +1,6 @@
 /* Core turn execution: hu_agent_turn and turn-local helpers */
 #include "agent_internal.h"
+#include "human/config.h"
 #include "human/core/string.h"
 #include "human/data/loader.h"
 #include "human/core/json.h"
@@ -4113,6 +4114,24 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             err = agent->provider.vtable->chat(agent->provider.ctx, agent->alloc, &req, turn_model,
                                                turn_model_len, turn_temp, &resp);
         }
+
+        /* On-device → cloud fallback: if on-device model failed, retry with cloud reflexive */
+        if (err != HU_OK && turn_model && turn_model_len > 0 &&
+            agent->config && agent->config->agent.mr_on_device_enabled) {
+            hu_model_router_config_t fb_cfg = hu_model_router_default_config();
+            if (fb_cfg.on_device_model && turn_model_len == fb_cfg.on_device_model_len &&
+                memcmp(turn_model, fb_cfg.on_device_model, turn_model_len) == 0 &&
+                fb_cfg.reflexive_model) {
+                hu_log_info("agent_turn", agent->observer,
+                            "on-device failed (err=%d), falling back to cloud: %s",
+                            err, fb_cfg.reflexive_model);
+                memset(&resp, 0, sizeof(resp));
+                err = agent->provider.vtable->chat(
+                    agent->provider.ctx, agent->alloc, &req, fb_cfg.reflexive_model,
+                    fb_cfg.reflexive_model_len, turn_temp, &resp);
+            }
+        }
+
         (void)degrade_strategy;
         uint64_t llm_duration_ms = hu_agent_internal_clock_diff_ms(llm_start, clock());
         if (llm_span)

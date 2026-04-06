@@ -122,8 +122,23 @@ sudo dpkg -i human_*.deb
 ### Install Script
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sethdford/h-uman/main/install.sh | bash
+# macOS / Linux
+curl -fsSL https://h-uman.ai/install.sh | sh
+
+# Windows (PowerShell) — installs via WSL
+irm https://h-uman.ai/install.ps1 | iex
 ```
+
+### Windows
+
+Human runs inside WSL (Windows Subsystem for Linux). If WSL isn't installed:
+
+```powershell
+wsl --install          # then restart
+irm https://h-uman.ai/install.ps1 | iex
+```
+
+Or use Docker: `docker run -it ghcr.io/sethdford/h-uman:latest agent`
 
 ### From Source
 

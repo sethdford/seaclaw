@@ -96,39 +96,63 @@ main() {
     tmpdir="${TMPDIR:-/tmp}"
     tmp="$tmpdir/human-$$.bin"
 
-    printf "Installing human %s (%s-%s)...\n" "$version" "$os" "$arch"
-    if ! download "$url" "$tmp"; then
-        red "Download failed: $url"
-        rm -f "$tmp" 2>/dev/null
-        exit 1
-    fi
-
-    # Choose install dir
-    install_dir="/usr/local/bin"
-    if [ ! -w "/usr/local/bin" ] 2>/dev/null; then
-        install_dir="$HOME/.local/bin"
-        mkdir -p "$install_dir" 2>/dev/null
-        if [ ! -d "$install_dir" ] || [ ! -w "$install_dir" ]; then
-            red "Cannot write to /usr/local/bin or $install_dir. Run with sudo or fix permissions."
-            rm -f "$tmp" 2>/dev/null
-            exit 1
+    # Debian/Ubuntu: prefer .deb package when dpkg is available
+    used_deb=false
+    if [ "$os" = "linux" ] && [ "$arch" = "x86_64" ] && command -v dpkg >/dev/null 2>&1; then
+        deb_ver="${version#v}"
+        deb_name="human_${deb_ver}_amd64.deb"
+        deb_url="https://github.com/$REPO/releases/download/$version/$deb_name"
+        deb_tmp="$tmpdir/$deb_name"
+        printf "Debian/Ubuntu detected — trying .deb package...\n"
+        if download "$deb_url" "$deb_tmp" 2>/dev/null; then
+            if sudo dpkg -i "$deb_tmp" 2>/dev/null; then
+                green "human v$version installed via .deb package"
+                rm -f "$deb_tmp" 2>/dev/null
+                install_path="$(command -v human 2>/dev/null || echo /usr/bin/human)"
+                used_deb=true
+            else
+                printf "dpkg install failed, falling back to binary install...\n"
+                rm -f "$deb_tmp" 2>/dev/null
+            fi
+        else
+            printf ".deb not available for this release, using binary install...\n"
         fi
     fi
 
-    install_path="$install_dir/human"
-    if ! mv "$tmp" "$install_path" 2>/dev/null; then
-        red "Failed to move binary to $install_path"
-        rm -f "$tmp" 2>/dev/null
-        exit 1
-    fi
+    if [ "$used_deb" = "false" ]; then
+        printf "Installing human %s (%s-%s)...\n" "$version" "$os" "$arch"
+        if ! download "$url" "$tmp"; then
+            red "Download failed: $url"
+            rm -f "$tmp" 2>/dev/null
+            exit 1
+        fi
 
-    chmod +x "$install_path"
+        install_dir="/usr/local/bin"
+        if [ ! -w "/usr/local/bin" ] 2>/dev/null; then
+            install_dir="$HOME/.local/bin"
+            mkdir -p "$install_dir" 2>/dev/null
+            if [ ! -d "$install_dir" ] || [ ! -w "$install_dir" ]; then
+                red "Cannot write to /usr/local/bin or $install_dir. Run with sudo or fix permissions."
+                rm -f "$tmp" 2>/dev/null
+                exit 1
+            fi
+        fi
 
-    green "human v$version installed to $install_path"
+        install_path="$install_dir/human"
+        if ! mv "$tmp" "$install_path" 2>/dev/null; then
+            red "Failed to move binary to $install_path"
+            rm -f "$tmp" 2>/dev/null
+            exit 1
+        fi
 
-    if [ "$install_dir" = "$HOME/.local/bin" ]; then
-        printf "\nEnsure %s is in your PATH:\n" "$install_dir"
-        printf "  export PATH=\"\$PATH:%s\"\n" "$install_dir"
+        chmod +x "$install_path"
+
+        green "human v$version installed to $install_path"
+
+        if [ "$install_dir" = "$HOME/.local/bin" ]; then
+            printf "\nEnsure %s is in your PATH:\n" "$install_dir"
+            printf "  export PATH=\"\$PATH:%s\"\n" "$install_dir"
+        fi
     fi
 
     "$install_path" --version 2>/dev/null

@@ -82,6 +82,42 @@ jobs:
       - name: Package completions and man pages
         run: tar czf human-extras.tar.gz completions/ docs/man/ install.sh LICENSE
 
+      - name: Build .deb package (x86_64)
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          PKG=human_${VER}_amd64
+          mkdir -p "${PKG}/DEBIAN"
+          mkdir -p "${PKG}/usr/bin"
+          mkdir -p "${PKG}/usr/share/man/man1"
+          mkdir -p "${PKG}/usr/share/bash-completion/completions"
+          mkdir -p "${PKG}/usr/share/zsh/vendor-completions"
+          cp human-linux-x86_64.bin "${PKG}/usr/bin/human"
+          chmod 755 "${PKG}/usr/bin/human"
+          if [ -d docs/man ]; then
+            cp docs/man/*.1 "${PKG}/usr/share/man/man1/" 2>/dev/null || true
+          fi
+          if [ -f completions/human.bash ]; then
+            cp completions/human.bash "${PKG}/usr/share/bash-completion/completions/human"
+          fi
+          if [ -f completions/_human ]; then
+            cp completions/_human "${PKG}/usr/share/zsh/vendor-completions/_human"
+          fi
+          cat > "${PKG}/DEBIAN/control" <<CTRL
+          Package: human
+          Version: ${VER}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Seth Ford <seth@h-uman.ai>
+          Homepage: https://h-uman.ai
+          Description: The smallest fully autonomous AI assistant infrastructure
+           Zero-dependency C11 runtime for autonomous AI assistants.
+           Sub-2 MB binary, <6 MB RAM, <30 ms startup.
+          CTRL
+          sed -i 's/^          //' "${PKG}/DEBIAN/control"
+          dpkg-deb --build --root-owner-group "${PKG}"
+          mv "${PKG}.deb" "human_${VER}_amd64.deb"
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
@@ -89,6 +125,7 @@ jobs:
             human-linux-x86_64.bin
             human-linux-aarch64.bin
             human-macos-aarch64.bin
+            human_*_amd64.deb
             human-extras.tar.gz
             sha256sums.txt
             install.sh

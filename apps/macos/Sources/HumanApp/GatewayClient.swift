@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import HumanClient
+import HumanOnDevice
 import HumanProtocol
 
 /// Bridges `HumanConnection` to the macOS app’s completion-based API and `ObservableObject` updates.
@@ -15,6 +16,12 @@ final class GatewayClient: ObservableObject {
 
     private let connection: HumanConnection
     private let chatEvents = PassthroughSubject<(String, [String: Any]?), Never>()
+
+    /// On-device Apple Intelligence adapter for offline/fallback inference.
+    let onDevice = OnDeviceChatAdapter()
+
+    /// Whether on-device Apple Intelligence inference is available on this device.
+    var onDeviceAvailable: Bool { onDevice.isAvailable }
 
     /// Stream of gateway `event` frames for SwiftUI `onReceive`.
     var chatEventsPublisher: AnyPublisher<(String, [String: Any]?), Never> {
@@ -48,6 +55,25 @@ final class GatewayClient: ObservableObject {
 
     func disconnect() {
         connection.disconnect()
+    }
+
+    /// Send a message using on-device Apple Intelligence when the gateway is disconnected.
+    func chatOnDevice(message: String, systemPrompt: String? = nil) async -> String? {
+        guard onDeviceAvailable else { return nil }
+        guard onDevice.fitsInContext(message) else { return nil }
+
+        var messages: [OnDeviceChatAdapter.ChatMessage] = []
+        if let systemPrompt {
+            messages.append(.init(role: .system, content: systemPrompt))
+        }
+        messages.append(.init(role: .user, content: message))
+
+        do {
+            let response = try await onDevice.chat(messages: messages)
+            return response.content
+        } catch {
+            return nil
+        }
     }
 
     func request(method: String, params: [String: Any] = [:],
