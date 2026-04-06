@@ -3,6 +3,7 @@
 #include "human/core/string.h"
 #include "human/multimodal.h"
 #include "human/websocket/websocket.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -118,6 +119,11 @@ hu_error_t hu_voice_rt_send_audio(hu_voice_rt_session_t *session, const void *da
     hu_error_t err = hu_multimodal_encode_base64(session->alloc, data, data_len, &b64, &b64_len);
     if (err != HU_OK || !b64)
         return err;
+
+    if (b64_len > SIZE_MAX / 2 - 64 || b64_len > 50U * 1024U * 1024U) {
+        session->alloc->free(session->alloc->ctx, b64, b64_len + 1);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
 
     size_t json_cap = 64 + b64_len * 2;
     char *json = (char *)session->alloc->alloc(session->alloc->ctx, json_cap);

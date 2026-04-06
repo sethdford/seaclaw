@@ -216,8 +216,14 @@ static hu_error_t process_buffer(sse_ctx_t *ctx) {
                                     new_cap *= 2;
                                 char *nd = (char *)ctx->alloc->realloc(
                                     ctx->alloc->ctx, data, data_cap ? data_cap : 0, new_cap);
-                                if (!nd)
+                                if (!nd) {
+                                    if (event_type)
+                                        ctx->alloc->free(ctx->alloc->ctx, event_type,
+                                                         event_type_len + 1);
+                                    if (data)
+                                        ctx->alloc->free(ctx->alloc->ctx, data, data_cap);
                                     return HU_ERR_OUT_OF_MEMORY;
+                                }
                                 data = nd;
                                 data_cap = new_cap;
                             }

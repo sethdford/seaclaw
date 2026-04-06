@@ -404,23 +404,37 @@ static hu_error_t cu_mac_screenshot(hu_allocator_t *alloc, hu_computer_use_ctx_t
 
     if (path && path[0]) {
         size_t plen = strlen(path);
-        size_t need = 64 + plen + b64_len;
-        char *json = (char *)alloc->alloc(alloc->ctx, need + 1);
-        if (!json) {
+        hu_json_buf_t jb = {0};
+        hu_error_t jerr = hu_json_buf_init(&jb, alloc);
+        if (jerr != HU_OK) {
             alloc->free(alloc->ctx, b64, b64_len + 1);
             *out = hu_tool_result_fail("out of memory", 13);
-            return HU_ERR_OUT_OF_MEMORY;
+            return jerr;
         }
-        int n = snprintf(json, need + 1,
-                         "{\"format\":\"png\",\"path\":\"%s\",\"base64\":\"%.*s\"}", path,
-                         (int)b64_len, b64);
+        jerr = hu_json_buf_append_raw(&jb, "{", 1);
+        if (jerr == HU_OK)
+            jerr = hu_json_append_key_value(&jb, "format", 6, "png", 3);
+        if (jerr == HU_OK)
+            jerr = hu_json_buf_append_raw(&jb, ",", 1);
+        if (jerr == HU_OK)
+            jerr = hu_json_append_key_value(&jb, "path", 4, path, plen);
+        if (jerr == HU_OK)
+            jerr = hu_json_buf_append_raw(&jb, ",", 1);
+        if (jerr == HU_OK)
+            jerr = hu_json_append_key_value(&jb, "base64", 6, b64, b64_len);
+        if (jerr == HU_OK)
+            jerr = hu_json_buf_append_raw(&jb, "}", 1);
         alloc->free(alloc->ctx, b64, b64_len + 1);
-        if (n <= 0 || (size_t)n > need) {
-            alloc->free(alloc->ctx, json, need + 1);
-            *out = hu_tool_result_fail("output overflow", 15);
-            return HU_OK;
+        if (jerr != HU_OK) {
+            hu_json_buf_free(&jb);
+            *out = hu_tool_result_fail("failed to build screenshot json", 31);
+            return jerr == HU_ERR_OUT_OF_MEMORY ? jerr : HU_OK;
         }
-        *out = hu_tool_result_ok_owned(json, (size_t)n);
+        *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+        jb.ptr = NULL;
+        jb.len = 0;
+        jb.cap = 0;
+        hu_json_buf_free(&jb);
         return HU_OK;
     }
 
@@ -606,23 +620,37 @@ static hu_error_t cu_linux_screenshot(hu_allocator_t *alloc, hu_computer_use_ctx
 
     if (path && path[0]) {
         size_t plen = strlen(path);
-        size_t need = 64 + plen + b64_len;
-        char *json = (char *)alloc->alloc(alloc->ctx, need + 1);
-        if (!json) {
+        hu_json_buf_t jb = {0};
+        hu_error_t jerr = hu_json_buf_init(&jb, alloc);
+        if (jerr != HU_OK) {
             alloc->free(alloc->ctx, b64, b64_len + 1);
             *out = hu_tool_result_fail("out of memory", 13);
-            return HU_ERR_OUT_OF_MEMORY;
+            return jerr;
         }
-        int n = snprintf(json, need + 1,
-                         "{\"format\":\"png\",\"path\":\"%s\",\"base64\":\"%.*s\"}", path,
-                         (int)b64_len, b64);
+        jerr = hu_json_buf_append_raw(&jb, "{", 1);
+        if (jerr == HU_OK)
+            jerr = hu_json_append_key_value(&jb, "format", 6, "png", 3);
+        if (jerr == HU_OK)
+            jerr = hu_json_buf_append_raw(&jb, ",", 1);
+        if (jerr == HU_OK)
+            jerr = hu_json_append_key_value(&jb, "path", 4, path, plen);
+        if (jerr == HU_OK)
+            jerr = hu_json_buf_append_raw(&jb, ",", 1);
+        if (jerr == HU_OK)
+            jerr = hu_json_append_key_value(&jb, "base64", 6, b64, b64_len);
+        if (jerr == HU_OK)
+            jerr = hu_json_buf_append_raw(&jb, "}", 1);
         alloc->free(alloc->ctx, b64, b64_len + 1);
-        if (n <= 0 || (size_t)n > need) {
-            alloc->free(alloc->ctx, json, need + 1);
-            *out = hu_tool_result_fail("output overflow", 15);
-            return HU_OK;
+        if (jerr != HU_OK) {
+            hu_json_buf_free(&jb);
+            *out = hu_tool_result_fail("failed to build screenshot json", 31);
+            return jerr == HU_ERR_OUT_OF_MEMORY ? jerr : HU_OK;
         }
-        *out = hu_tool_result_ok_owned(json, (size_t)n);
+        *out = hu_tool_result_ok_owned(jb.ptr, jb.len);
+        jb.ptr = NULL;
+        jb.len = 0;
+        jb.cap = 0;
+        hu_json_buf_free(&jb);
         return HU_OK;
     }
 

@@ -97,7 +97,7 @@ static const char *webhook_register_params(void *ctx) {
 
 static void webhook_register_deinit(void *ctx, hu_allocator_t *alloc) {
     webhook_register_ctx_t *c = (webhook_register_ctx_t *)ctx;
-    if (!c)
+    if (!c || !alloc)
         return;
     alloc->free(alloc->ctx, c, sizeof(*c));
 }
@@ -163,6 +163,10 @@ static hu_error_t webhook_poll_execute(void *ctx, hu_allocator_t *alloc,
     *out = hu_tool_result_ok_owned(result, result ? strlen(result) : 0);
     return HU_OK;
 #else
+    if (!c || !c->mgr) {
+        *out = hu_tool_result_fail("webhook manager not configured", 30);
+        return HU_OK;
+    }
     hu_webhook_event_t *events = NULL;
     size_t event_count = 0;
     hu_error_t err = hu_webhook_poll(alloc, c->mgr, webhook_id, &events, &event_count);
@@ -240,7 +244,7 @@ static const char *webhook_poll_params(void *ctx) {
 
 static void webhook_poll_deinit(void *ctx, hu_allocator_t *alloc) {
     webhook_poll_ctx_t *c = (webhook_poll_ctx_t *)ctx;
-    if (!c)
+    if (!c || !alloc)
         return;
     alloc->free(alloc->ctx, c, sizeof(*c));
 }
@@ -367,7 +371,7 @@ static const char *webhook_list_params(void *ctx) {
 
 static void webhook_list_deinit(void *ctx, hu_allocator_t *alloc) {
     webhook_list_ctx_t *c = (webhook_list_ctx_t *)ctx;
-    if (!c)
+    if (!c || !alloc)
         return;
     alloc->free(alloc->ctx, c, sizeof(*c));
 }

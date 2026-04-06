@@ -153,6 +153,10 @@ hu_error_t hu_graph_open(hu_allocator_t *alloc, const char *db_path, size_t db_p
     (void)db_path_len;
     path_to_use = ":memory:";
 #else
+    if (!db_path && db_path_len > 0) {
+        alloc->free(alloc->ctx, g, sizeof(hu_graph_t));
+        return HU_ERR_INVALID_ARGUMENT;
+    }
     char path_buf[1024];
     if (ensure_parent_dir(alloc, db_path, db_path_len) != HU_OK) {
         alloc->free(alloc->ctx, g, sizeof(hu_graph_t));
@@ -721,9 +725,13 @@ hu_error_t hu_graph_build_context(hu_graph_t *g, hu_allocator_t *alloc, const ch
     if (!buf)
         return HU_ERR_OUT_OF_MEMORY;
 
-    int n = snprintf(buf, max_chars + 1, "### Knowledge Graph (from your conversations)\n");
-    if (n > 0)
-        total_len = (size_t)n;
+    size_t rem = max_chars + 1;
+    int n = snprintf(buf, rem, "### Knowledge Graph (from your conversations)\n");
+    if (n <= 0) {
+        alloc->free(alloc->ctx, buf, max_chars + 1);
+        return HU_ERR_IO;
+    }
+    total_len = ((size_t)n < rem) ? (size_t)n : rem - 1;
 
     for (size_t s = 0; s < seed_count && total_len < max_chars; s++) {
         hu_graph_entity_t *entities = NULL;
@@ -751,11 +759,14 @@ hu_error_t hu_graph_build_context(hu_graph_t *g, hu_allocator_t *alloc, const ch
                 }
             }
             const char *rel_str = hu_relation_type_to_string(relations[i].type);
+            rem = max_chars - total_len + 1;
             int w =
-                snprintf(buf + total_len, max_chars - total_len + 1, "- [%.*s] (%s) -> [%.*s]\n",
+                snprintf(buf + total_len, rem, "- [%.*s] (%s) -> [%.*s]\n",
                          (int)src_len, src_name, rel_str, (int)tgt_len, tgt_name);
-            if (w > 0 && total_len + (size_t)w <= max_chars)
-                total_len += (size_t)w;
+            if (w <= 0)
+                continue;
+            size_t written = ((size_t)w < rem) ? (size_t)w : rem - 1;
+            total_len += written;
         }
         hu_graph_entities_free(alloc, entities, count);
         hu_graph_relations_free(alloc, relations, count);
@@ -801,9 +812,11 @@ hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, cons
     }
     size_t total_len = 0;
 
-    int n = snprintf(buf, max_chars + 1, "### Topic Clusters\n");
-    if (n > 0)
-        total_len = (size_t)n;
+    size_t rem = max_chars + 1;
+    int n = snprintf(buf, rem, "### Topic Clusters\n");
+    if (n <= 0)
+        goto free_remaining;
+    total_len = ((size_t)n < rem) ? (size_t)n : rem - 1;
 
     /* Group entities by type as we collect neighbors */
     const char *type_labels[] = {"People", "Places",   "Organizations", "Events",
@@ -845,10 +858,12 @@ hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, cons
 
         if (total_len < max_chars) {
             const char *label = type_labels[t];
-            int w = snprintf(buf + total_len, max_chars - total_len + 1, "- %s: [", label);
+            rem = max_chars - total_len + 1;
+            int w = snprintf(buf + total_len, rem, "- %s: [", label);
             if (w <= 0)
                 goto free_remaining;
-            total_len += (size_t)w;
+            size_t written = ((size_t)w < rem) ? (size_t)w : rem - 1;
+            total_len += written;
         }
 
         for (size_t i = 0; i < type_counts[t]; i++) {
@@ -858,9 +873,12 @@ hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, cons
             size_t nlen = strlen(nm);
             if (total_len < max_chars) {
                 if (i > 0) {
-                    int c = snprintf(buf + total_len, max_chars - total_len + 1, ", ");
-                    if (c > 0)
-                        total_len += (size_t)c;
+                    rem = max_chars - total_len + 1;
+                    int c = snprintf(buf + total_len, rem, ", ");
+                    if (c <= 0)
+                        goto free_remaining;
+                    size_t cw = ((size_t)c < rem) ? (size_t)c : rem - 1;
+                    total_len += cw;
                 }
                 if (total_len + nlen + 2 <= max_chars) {
                     memcpy(buf + total_len, nm, nlen + 1);
@@ -871,9 +889,12 @@ hu_error_t hu_graph_build_communities(hu_graph_t *g, hu_allocator_t *alloc, cons
         }
 
         if (total_len < max_chars) {
-            int c = snprintf(buf + total_len, max_chars - total_len + 1, "]\n");
-            if (c > 0)
-                total_len += (size_t)c;
+            rem = max_chars - total_len + 1;
+            int c = snprintf(buf + total_len, rem, "]\n");
+            if (c <= 0)
+                goto free_remaining;
+            size_t cw = ((size_t)c < rem) ? (size_t)c : rem - 1;
+            total_len += cw;
         }
     }
     goto done;
@@ -887,6 +908,10 @@ free_remaining:
             }
         }
     }
+    alloc->free(alloc->ctx, buf, max_chars + 1);
+    *out = NULL;
+    *out_len = 0;
+    return HU_ERR_IO;
 
 done:
 
@@ -1308,18 +1333,26 @@ hu_error_t hu_graph_query_temporal(hu_graph_t *g, hu_allocator_t *alloc, const c
         return HU_ERR_OUT_OF_MEMORY;
     }
     size_t pos = 0;
-    int w = snprintf(buf, cap, "### Timeline\n");
-    if (w > 0)
-        pos = (size_t)w;
+    size_t rem = cap;
+    int w = snprintf(buf, rem, "### Timeline\n");
+    if (w <= 0) {
+        sqlite3_finalize(stmt);
+        alloc->free(alloc->ctx, buf, cap);
+        return HU_ERR_IO;
+    }
+    pos = ((size_t)w < rem) ? (size_t)w : rem - 1;
     while (sqlite3_step(stmt) == SQLITE_ROW && pos < cap - 128) {
         const char *name = (const char *)sqlite3_column_text(stmt, 0);
         const char *desc = (const char *)sqlite3_column_text(stmt, 1);
         int64_t ts = sqlite3_column_int64(stmt, 2);
         if (!name || !desc)
             continue;
-        w = snprintf(buf + pos, cap - pos, "- [%lld] %s: %s\n", (long long)ts, name, desc);
-        if (w > 0)
-            pos += (size_t)w;
+        rem = cap - pos;
+        w = snprintf(buf + pos, rem, "- [%lld] %s: %s\n", (long long)ts, name, desc);
+        if (w <= 0)
+            break;
+        size_t written = ((size_t)w < rem) ? (size_t)w : rem - 1;
+        pos += written;
     }
     sqlite3_finalize(stmt);
     buf[pos] = '\0';
@@ -1387,9 +1420,14 @@ hu_error_t hu_graph_query_causal(hu_graph_t *g, hu_allocator_t *alloc, const cha
         return HU_ERR_OUT_OF_MEMORY;
     }
     size_t pos = 0;
-    int w = snprintf(buf, cap, "### Cause-Effect\n");
-    if (w > 0)
-        pos = (size_t)w;
+    size_t rem = cap;
+    int w = snprintf(buf, rem, "### Cause-Effect\n");
+    if (w <= 0) {
+        sqlite3_finalize(stmt);
+        alloc->free(alloc->ctx, buf, cap);
+        return HU_ERR_IO;
+    }
+    pos = ((size_t)w < rem) ? (size_t)w : rem - 1;
     while (sqlite3_step(stmt) == SQLITE_ROW && pos < cap - 128) {
         const char *action = (const char *)sqlite3_column_text(stmt, 0);
         const char *outcome = (const char *)sqlite3_column_text(stmt, 1);
@@ -1397,18 +1435,27 @@ hu_error_t hu_graph_query_causal(hu_graph_t *g, hu_allocator_t *alloc, const cha
         double conf = sqlite3_column_double(stmt, 3);
         if (!action || !outcome)
             continue;
-        w = snprintf(buf + pos, cap - pos, "- %s -> %s (%.0f%%", action, outcome, conf * 100);
-        if (w > 0)
-            pos += (size_t)w;
+        rem = cap - pos;
+        w = snprintf(buf + pos, rem, "- %s -> %s (%.0f%%", action, outcome, conf * 100);
+        if (w <= 0)
+            break;
+        size_t written = ((size_t)w < rem) ? (size_t)w : rem - 1;
+        pos += written;
         if (ctx && pos < cap - 64) {
-            w = snprintf(buf + pos, cap - pos, ", %s", ctx);
-            if (w > 0)
-                pos += (size_t)w;
+            rem = cap - pos;
+            w = snprintf(buf + pos, rem, ", %s", ctx);
+            if (w <= 0)
+                break;
+            written = ((size_t)w < rem) ? (size_t)w : rem - 1;
+            pos += written;
         }
         if (pos < cap - 4) {
-            w = snprintf(buf + pos, cap - pos, ")\n");
-            if (w > 0)
-                pos += (size_t)w;
+            rem = cap - pos;
+            w = snprintf(buf + pos, rem, ")\n");
+            if (w <= 0)
+                break;
+            written = ((size_t)w < rem) ? (size_t)w : rem - 1;
+            pos += written;
         }
     }
     sqlite3_finalize(stmt);

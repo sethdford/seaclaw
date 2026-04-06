@@ -797,7 +797,7 @@ static void honesty_detects_action_query(void) {
     char *result = hu_conversation_honesty_check(&alloc, "did you call mom?", 17);
     HU_ASSERT_NOT_NULL(result);
     HU_ASSERT_TRUE(strstr(result, "HONESTY") != NULL);
-    alloc.free(alloc.ctx, result, 512);
+    alloc.free(alloc.ctx, result, strlen(result) + 1);
 }
 
 static void honesty_null_for_normal_message(void) {

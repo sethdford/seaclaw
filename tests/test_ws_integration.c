@@ -3,6 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(HU_GATEWAY_POSIX)
+static void test_sec_websocket_accept_matches_rfc6455_vector(void) {
+    /* RFC 6455 section 1.3 example handshake */
+    HU_ASSERT_TRUE(hu_ws_sec_websocket_accept_valid("dGhlIHNhbXBsZSBub25jZQ==",
+                                                    "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="));
+    HU_ASSERT_FALSE(hu_ws_sec_websocket_accept_valid("dGhlIHNhbXBsZSBub25jZQ==", "bogus===="));
+}
+#endif
+
 static void test_ws_upgrade_request_includes_auth_header(void) {
     char buf[2048];
     size_t n = hu_ws_build_upgrade_request(buf, sizeof(buf), "api.example.com", "/v1/ws", "dGVzdA==",
@@ -62,4 +71,7 @@ void run_ws_integration_tests(void) {
     HU_RUN_TEST(test_ws_upgrade_request_empty_extra_same_as_null);
     HU_RUN_TEST(test_ws_upgrade_request_sizing_matches_buffer_write);
     HU_RUN_TEST(test_ws_upgrade_request_invalid_args_returns_zero);
+#if defined(HU_GATEWAY_POSIX)
+    HU_RUN_TEST(test_sec_websocket_accept_matches_rfc6455_vector);
+#endif
 }

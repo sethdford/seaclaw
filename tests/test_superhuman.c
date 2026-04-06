@@ -412,7 +412,7 @@ static void superhuman_micro_moment_store_and_list(void) {
     HU_ASSERT_TRUE(strstr(json, "Micro-moments") != NULL);
     HU_ASSERT_TRUE(strstr(json, "loves") != NULL);
 
-    alloc.free(alloc.ctx, json, len);
+    alloc.free(alloc.ctx, json, len + 1);
     mem.vtable->deinit(mem.ctx);
 }
 
@@ -430,7 +430,7 @@ static void superhuman_avoidance_record_and_list(void) {
     HU_ASSERT_NOT_NULL(json);
     HU_ASSERT_TRUE(strstr(json, "work") != NULL);
 
-    alloc.free(alloc.ctx, json, len);
+    alloc.free(alloc.ctx, json, len + 1);
     mem.vtable->deinit(mem.ctx);
 }
 
@@ -453,7 +453,7 @@ static void superhuman_topic_baseline_and_absence(void) {
     HU_ASSERT_TRUE(strstr(json, "pets") != NULL || strstr(json, "absent") != NULL ||
         strstr(json, "days") != NULL);
 
-    alloc.free(alloc.ctx, json, len);
+    alloc.free(alloc.ctx, json, len + 1);
     mem.vtable->deinit(mem.ctx);
 }
 
@@ -476,7 +476,7 @@ static void superhuman_topic_baseline_record_multiple_topics(void) {
     HU_ASSERT_TRUE(strstr(json, "pets") != NULL);
     HU_ASSERT_TRUE(strstr(json, "gym") != NULL);
 
-    alloc.free(alloc.ctx, json, len);
+    alloc.free(alloc.ctx, json, len + 1);
     mem.vtable->deinit(mem.ctx);
 }
 
@@ -497,7 +497,7 @@ static void superhuman_topic_absence_list_empty_when_recently_mentioned(void) {
     HU_ASSERT_NOT_NULL(json);
     HU_ASSERT_TRUE(strstr(json, "(none)") != NULL);
 
-    alloc.free(alloc.ctx, json, len);
+    alloc.free(alloc.ctx, json, len + 1);
     mem.vtable->deinit(mem.ctx);
 }
 
@@ -521,7 +521,7 @@ static void superhuman_topic_baseline_upsert_increments_mention_count(void) {
     HU_ASSERT_TRUE(strstr(json, "work") != NULL);
     HU_ASSERT_TRUE(strstr(json, "- ") != NULL);
 
-    alloc.free(alloc.ctx, json, len);
+    alloc.free(alloc.ctx, json, len + 1);
     mem.vtable->deinit(mem.ctx);
 }
 
@@ -541,7 +541,7 @@ static void superhuman_growth_store_and_list(void) {
     HU_ASSERT_TRUE(strstr(json, "sedentary") != NULL);
     HU_ASSERT_TRUE(strstr(json, "active") != NULL);
 
-    alloc.free(alloc.ctx, json, len);
+    alloc.free(alloc.ctx, json, len + 1);
     mem.vtable->deinit(mem.ctx);
 }
 
@@ -560,7 +560,7 @@ static void superhuman_pattern_record_and_list(void) {
     HU_ASSERT_TRUE(strstr(json, "weekend") != NULL);
     HU_ASSERT_TRUE(strstr(json, "casual") != NULL);
 
-    alloc.free(alloc.ctx, json, len);
+    alloc.free(alloc.ctx, json, len + 1);
     mem.vtable->deinit(mem.ctx);
 }
 
@@ -588,7 +588,7 @@ static void superhuman_memory_build_context_aggregates_sections(void) {
     HU_ASSERT_TRUE(strstr(ctx, "Inside jokes") != NULL || strstr(ctx, "remember when") != NULL);
     HU_ASSERT_TRUE(strstr(ctx, "Growth") != NULL || strstr(ctx, "fitness") != NULL);
 
-    alloc.free(alloc.ctx, ctx, ctx_len); /* ctx_len is allocated size */
+    alloc.free(alloc.ctx, ctx, ctx_len + 1);
     mem.vtable->deinit(mem.ctx);
 }
 

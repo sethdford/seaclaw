@@ -104,6 +104,10 @@ static hu_error_t agent_spawn_execute(void *ctx, hu_allocator_t *alloc, const hu
     (void)c;
     return agent_spawn_ok_json(alloc, 1u, label, out);
 #else
+    if (!c) {
+        *out = hu_tool_result_fail("agent spawn not configured", 27);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
     if (!c->pool) {
         *out = hu_tool_result_fail("agent pool not configured", 25);
         return HU_OK;
@@ -175,8 +179,9 @@ static const char *agent_spawn_params(void *ctx) {
     return TOOL_PARAMS;
 }
 static void agent_spawn_deinit(void *ctx, hu_allocator_t *alloc) {
-    if (ctx)
-        alloc->free(alloc->ctx, ctx, sizeof(agent_spawn_ctx_t));
+    if (!ctx || !alloc)
+        return;
+    alloc->free(alloc->ctx, ctx, sizeof(agent_spawn_ctx_t));
 }
 
 static const hu_tool_vtable_t agent_spawn_vtable = {

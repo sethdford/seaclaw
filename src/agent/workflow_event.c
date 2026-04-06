@@ -201,14 +201,17 @@ hu_error_t hu_workflow_event_log_append(hu_workflow_event_log_t *log, hu_allocat
                                            event->step_id_len);
         }
     }
-    if (err == HU_OK && event->data_json_len > 0) {
-        err = hu_json_buf_append_raw(&buf, ",", 1);
-        if (err == HU_OK) {
-            err = hu_json_append_key(&buf, "data", 4);
+    if (err == HU_OK && event->data_json && event->data_json_len > 0) {
+        hu_json_value_t *parsed = NULL;
+        hu_error_t perr = hu_json_parse(alloc, event->data_json, event->data_json_len, &parsed);
+        if (perr == HU_OK) {
+            err = hu_json_buf_append_raw(&buf, ",\"data\":", 8);
+            if (err == HU_OK) {
+                err = hu_json_buf_append_raw(&buf, event->data_json, event->data_json_len);
+            }
         }
-        if (err == HU_OK) {
-            /* data_json is already raw JSON, just append it directly after the key colon */
-            err = hu_json_buf_append_raw(&buf, event->data_json, event->data_json_len);
+        if (parsed) {
+            hu_json_free(alloc, parsed);
         }
     }
     if (err == HU_OK && event->idempotency_key_len > 0) {

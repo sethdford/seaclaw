@@ -462,14 +462,16 @@ void hu_conversation_data_cleanup(void) {
 
 /* Safe pos advance: snprintf returns the would-be length even when truncated.
  * Clamp to remaining buffer capacity to prevent out-of-bounds writes. */
-#define POS_ADVANCE(w, pos, cap)       \
-    do {                               \
-        if ((w) > 0) {                 \
-            size_t _add = (size_t)(w); \
-            if (_add > (cap) - (pos))  \
-                _add = (cap) - (pos);  \
-            (pos) += _add;             \
-        }                              \
+#define POS_ADVANCE(w, pos, cap)           \
+    do {                                   \
+        if ((w) > 0) {                     \
+            size_t _add = (size_t)(w);     \
+            if ((pos) >= (cap) - 1)        \
+                break;                     \
+            if (_add > (cap) - 1 - (pos))  \
+                _add = (cap) - 1 - (pos);  \
+            (pos) += _add;                 \
+        }                                  \
     } while (0)
 
 static bool str_contains_ci(const char *haystack, size_t hlen, const char *needle)
@@ -1352,6 +1354,12 @@ char *hu_conversation_build_awareness(hu_allocator_t *alloc,
 
     buf[pos] = '\0';
     *out_len = pos;
+    if (pos + 1 < CTX_BUF_CAP && alloc->realloc) {
+        char *shrunk =
+            (char *)alloc->realloc(alloc->ctx, buf, CTX_BUF_CAP, pos + 1);
+        if (shrunk)
+            buf = shrunk;
+    }
     return buf;
 }
 
@@ -1683,6 +1691,13 @@ char *hu_conversation_honesty_check(hu_allocator_t *alloc, const char *message,
     if (n <= 0 || (size_t)n >= 512) {
         alloc->free(alloc->ctx, buf, 512);
         return NULL;
+    }
+    size_t actual_len = (size_t)n;
+    if (actual_len + 1 < 512 && alloc->realloc) {
+        char *shrunk =
+            (char *)alloc->realloc(alloc->ctx, buf, 512, actual_len + 1);
+        if (shrunk)
+            buf = shrunk;
     }
     return buf;
 }

@@ -98,9 +98,14 @@ typedef struct hu_daemon_contact_trust {
 } hu_daemon_contact_trust_t;
 
 /* Thread-safe per-contact trust state lookup with LRU eviction.
- * Returns pointer to existing or newly-created trust state for contact_id.
- * When the cache is full (4096 entries), evicts the least recently updated entry. */
-hu_trust_state_t *hu_daemon_get_trust_state(const char *contact_id, size_t cid_len);
+ * Copies existing or newly-created trust state into *out (under lock).
+ * When the cache is full (4096 entries), evicts the least recently updated entry.
+ * Persists mutations with hu_daemon_set_trust_state. */
+hu_error_t hu_daemon_get_trust_state(const char *contact_id, size_t cid_len, hu_trust_state_t *out);
+
+/* Write trust state for contact_id (find-or-create, same eviction rules as get). */
+hu_error_t hu_daemon_set_trust_state(const char *contact_id, size_t cid_len,
+                                     const hu_trust_state_t *state);
 
 #ifdef HU_IS_TEST
 /* Test helpers for trust cache */

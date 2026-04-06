@@ -858,6 +858,12 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                         char ctx_buf[128];
                         int cl = snprintf(ctx_buf, sizeof(ctx_buf), "Agent failed: %s",
                                           hu_error_string(err));
+                        if (cl < 0) {
+                            cl = 0;
+                        }
+                        if ((size_t)cl >= sizeof(ctx_buf)) {
+                            cl = (int)(sizeof(ctx_buf) - 1);
+                        }
                         sqlite3_bind_text(fb, 1, ctx_buf, cl, SQLITE_STATIC);
                         sqlite3_bind_int64(fb, 2, (int64_t)time(NULL));
                         sqlite3_step(fb);

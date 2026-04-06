@@ -12,7 +12,10 @@
 char *hu_context_build_system_prompt(hu_allocator_t *alloc, const char *base, size_t base_len,
                                      const char *workspace_dir, size_t workspace_dir_len);
 
-/* include_mask: if non-NULL, length must be >= history_count; false skips that entry. */
+/* Format history messages for provider request. Allocates messages array.
+ * Message content/tool_call pointers are BORROWED from history — do NOT free them.
+ * Caller must free only the returned array itself (not individual message contents).
+ * include_mask: if non-NULL, length must be >= history_count; false skips that entry. */
 hu_error_t hu_context_format_messages(hu_allocator_t *alloc, const hu_owned_message_t *history,
                                       size_t history_count, size_t max_messages,
                                       const bool *include_mask, hu_chat_message_t **out_messages,

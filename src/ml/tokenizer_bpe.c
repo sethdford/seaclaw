@@ -3,6 +3,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/ml/tokenizer_ml.h"
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -252,6 +253,12 @@ hu_error_t hu_bpe_tokenizer_train(hu_bpe_tokenizer_t *tok, const char **texts,
         if (len == 0)
             continue;
 
+        if (len > SIZE_MAX / 2) {
+            for (size_t k = 0; k < i; k++)
+                alloc->free(alloc->ctx, seqs[k].ids, seqs[k].cap * sizeof(int32_t));
+            alloc->free(alloc->ctx, seqs, texts_count * sizeof(seq_t));
+            return HU_ERR_INVALID_ARGUMENT;
+        }
         size_t cap = len > 64 ? len * 2 : 64;
         int32_t *ids = (int32_t *)alloc->alloc(alloc->ctx, cap * sizeof(int32_t));
         if (!ids) {
@@ -346,6 +353,9 @@ hu_error_t hu_bpe_tokenizer_encode(const hu_bpe_tokenizer_t *tok, const char *te
         *ids_count = 0;
         return HU_OK;
     }
+
+    if (text_len > SIZE_MAX / 2)
+        return HU_ERR_INVALID_ARGUMENT;
 
     size_t cap = text_len > 64 ? text_len * 2 : 64;
     int32_t *ids = (int32_t *)alloc->alloc(alloc->ctx, cap * sizeof(int32_t));

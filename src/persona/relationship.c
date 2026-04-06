@@ -247,8 +247,17 @@ hu_error_t hu_relationship_build_prompt(hu_allocator_t *alloc, const hu_relation
     if (!alloc || !state || !out || !out_len)
         return HU_ERR_INVALID_ARGUMENT;
 
-    const char *stage_name = s_stage_names[(size_t)state->stage];
-    const char *guidance = s_stage_guidance[(size_t)state->stage];
+    size_t stage_ix = (size_t)state->stage;
+    const char *stage_name;
+    const char *guidance;
+    if (stage_ix >= s_stage_count) {
+        stage_name = "unknown";
+        guidance =
+            "Relationship stage is indeterminate; be clear, professional, and avoid assuming depth.";
+    } else {
+        stage_name = s_stage_names[stage_ix];
+        guidance = s_stage_guidance[stage_ix];
+    }
 
 #define HU_REL_BUF_CAP 256
     char *buf = (char *)alloc->alloc(alloc->ctx, HU_REL_BUF_CAP);

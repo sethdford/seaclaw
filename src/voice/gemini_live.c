@@ -509,6 +509,11 @@ hu_error_t hu_gemini_live_send_audio(hu_gemini_live_session_t *session, const vo
     if (err != HU_OK || !b64)
         return err;
 
+    if (b64_len > SIZE_MAX - 128 || b64_len > 50U * 1024U * 1024U) {
+        session->alloc->free(session->alloc->ctx, b64, b64_len + 1);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
     int rate = session->config.sample_rate_in > 0 ? session->config.sample_rate_in : 16000;
     size_t json_cap = 128 + b64_len;
     char *json = (char *)session->alloc->alloc(session->alloc->ctx, json_cap);

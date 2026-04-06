@@ -3,6 +3,7 @@
 #include "human/core/log.h"
 #include "human/core/string.h"
 #include <ctype.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -205,6 +206,10 @@ static hu_error_t read_pipe_all(hu_allocator_t *alloc, FILE *fp, char **out, siz
 
     for (;;) {
         if (len + 1 >= cap) {
+            if (cap > SIZE_MAX / 2) {
+                alloc->free(alloc->ctx, buf, cap);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
             size_t nc = cap * 2;
             char *nb = (char *)alloc->realloc(alloc->ctx, buf, cap, nc);
             if (!nb) {

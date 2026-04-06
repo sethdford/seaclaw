@@ -312,6 +312,8 @@ export class ScChatView extends GatewayAwareLitElement {
   @state() private _tapback = { open: false, x: 0, y: 0, index: -1, content: "" };
   @state() private _sessionsLoading = false;
   private _artifactHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+  private _artifactHighlightCleanupTimer: ReturnType<typeof setTimeout> | null = null;
+  private _artifactHighlightRaf = 0;
   @query("hu-chat-composer") private _composer!: HTMLElement & { focus?: () => void };
   @query("hu-message-thread") private _messageThread!: HTMLElement & {
     scrollToBottom: () => void;
@@ -463,6 +465,8 @@ export class ScChatView extends GatewayAwareLitElement {
 
   override disconnectedCallback(): void {
     if (this._artifactHighlightTimer) clearTimeout(this._artifactHighlightTimer);
+    if (this._artifactHighlightCleanupTimer) clearTimeout(this._artifactHighlightCleanupTimer);
+    if (this._artifactHighlightRaf) cancelAnimationFrame(this._artifactHighlightRaf);
     document.removeEventListener("keydown", this._handleKeyDown);
     document.removeEventListener("toggle-sessions", this._onToggleSessions);
     document.removeEventListener("toggle-artifacts", this._onToggleArtifacts);
@@ -572,10 +576,13 @@ export class ScChatView extends GatewayAwareLitElement {
     if (sourceIdx < 0) return;
 
     if (this._artifactHighlightTimer) clearTimeout(this._artifactHighlightTimer);
+    if (this._artifactHighlightCleanupTimer) clearTimeout(this._artifactHighlightCleanupTimer);
+    if (this._artifactHighlightRaf) cancelAnimationFrame(this._artifactHighlightRaf);
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    requestAnimationFrame(() => {
+    this._artifactHighlightRaf = requestAnimationFrame(() => {
+      this._artifactHighlightRaf = 0;
       const thread = this._messageThread;
       const el = thread?.shadowRoot?.querySelector(`#msg-${sourceIdx}`) as HTMLElement | null;
       if (!el) return;
@@ -591,9 +598,10 @@ export class ScChatView extends GatewayAwareLitElement {
         el.style.transition = "border-left-color var(--hu-duration-fast) var(--hu-ease-out)";
         this._artifactHighlightTimer = setTimeout(() => {
           el.style.borderLeftColor = "transparent";
-          setTimeout(() => {
+          this._artifactHighlightCleanupTimer = setTimeout(() => {
             el.style.borderLeft = "";
             el.style.transition = "";
+            this._artifactHighlightCleanupTimer = null;
           }, 500);
           this._artifactHighlightTimer = null;
         }, 1700);

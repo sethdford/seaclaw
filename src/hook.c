@@ -267,6 +267,15 @@ static const hu_hook_mock_config_t *hu_hook_mock_next(void) {
  * Build the full shell command with escaped context vars
  * ────────────────────────────────────────────────────────────────────────── */
 
+#define HU_HOOK_CMD_MAX ((size_t)(1u << 20)) /* 1 MiB cap for hook command string */
+
+static bool hu_hook_size_add(size_t a, size_t b, size_t *out) {
+    if (a > SIZE_MAX - b)
+        return false;
+    *out = a + b;
+    return true;
+}
+
 static hu_error_t hu_hook_build_command(hu_allocator_t *alloc, const hu_hook_entry_t *hook,
                                         const hu_hook_context_t *ctx, char **cmd_out,
                                         size_t *cmd_len_out) {
@@ -297,9 +306,32 @@ static hu_error_t hu_hook_build_command(hu_allocator_t *alloc, const hu_hook_ent
     }
 
     /* Build: HOOK_TOOL_NAME=<escaped> HOOK_ARGS=<escaped> [HOOK_OUTPUT=<escaped>] <command> */
-    size_t total = 16 + esc_tool_len + 12 + esc_args_len + hook->command_len + 8;
-    if (esc_output)
-        total += 14 + esc_output_len + 32; /* HOOK_OUTPUT= + HOOK_SUCCESS= */
+    size_t total = 16;
+    if (!hu_hook_size_add(total, esc_tool_len, &total) || !hu_hook_size_add(total, 12, &total) ||
+        !hu_hook_size_add(total, esc_args_len, &total) ||
+        !hu_hook_size_add(total, hook->command_len, &total) || !hu_hook_size_add(total, 8, &total)) {
+        alloc->free(alloc->ctx, esc_tool, esc_tool_len + 1);
+        alloc->free(alloc->ctx, esc_args, esc_args_len + 1);
+        if (esc_output)
+            alloc->free(alloc->ctx, esc_output, esc_output_len + 1);
+        return HU_ERR_LIMIT_REACHED;
+    }
+    if (esc_output) {
+        size_t extra = 14 + esc_output_len + 32; /* HOOK_OUTPUT= + HOOK_SUCCESS= */
+        if (!hu_hook_size_add(total, extra, &total)) {
+            alloc->free(alloc->ctx, esc_tool, esc_tool_len + 1);
+            alloc->free(alloc->ctx, esc_args, esc_args_len + 1);
+            alloc->free(alloc->ctx, esc_output, esc_output_len + 1);
+            return HU_ERR_LIMIT_REACHED;
+        }
+    }
+    if (total > HU_HOOK_CMD_MAX) {
+        alloc->free(alloc->ctx, esc_tool, esc_tool_len + 1);
+        alloc->free(alloc->ctx, esc_args, esc_args_len + 1);
+        if (esc_output)
+            alloc->free(alloc->ctx, esc_output, esc_output_len + 1);
+        return HU_ERR_LIMIT_REACHED;
+    }
 
     char *cmd = alloc->alloc(alloc->ctx, total + 1);
     if (!cmd) {
@@ -456,7 +488,6 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
 
     /* Parent: read stdout and wait with timeout */
     close(pipefd[1]);
-    alloc->free(alloc->ctx, cmd, cmd_len + 1);
 
     /* Declare status early for limit check below */
     int status = 0;
@@ -499,6 +530,7 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
         waitpid(pid, &status, 0);
         if (buf)
             alloc->free(alloc->ctx, buf, buf_cap);
+        alloc->free(alloc->ctx, cmd, cmd_len + 1);
         return HU_ERR_IO;
     }
 
@@ -526,6 +558,7 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
         if (buf)
             alloc->free(alloc->ctx, buf, buf_cap);
         *exit_code = -1;
+        alloc->free(alloc->ctx, cmd, cmd_len + 1);
         return HU_ERR_TIMEOUT;
     }
 
@@ -542,6 +575,7 @@ hu_error_t hu_hook_shell_execute(hu_allocator_t *alloc, const hu_hook_entry_t *h
         alloc->free(alloc->ctx, buf, buf_cap);
     }
 
+    alloc->free(alloc->ctx, cmd, cmd_len + 1);
     return HU_OK;
 #endif /* HU_IS_TEST */
 }

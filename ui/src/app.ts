@@ -952,12 +952,17 @@ export class ScApp extends LitElement {
     this.gateway?.removeEventListener("features", this._onGatewayFeatures);
     // Don't disconnect the real gateway — let it keep reconnecting in background
     // so it can recover if the server comes up later
-    this._createDemoGateway().then((demo) => {
-      this.gateway = demo;
-      setGateway(demo);
-      demo.addEventListener("status", this._statusHandler);
-      demo.connect("demo://fallback");
-    });
+    this._createDemoGateway()
+      .then((demo) => {
+        if (!this.isConnected) return;
+        this.gateway = demo;
+        setGateway(demo);
+        demo.addEventListener("status", this._statusHandler);
+        demo.connect("demo://fallback");
+      })
+      .catch(() => {
+        if (!this.isConnected) return;
+      });
   }
 
   private async _ensureLoaded(tab: TabId): Promise<void> {

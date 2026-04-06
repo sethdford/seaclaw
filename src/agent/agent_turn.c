@@ -1400,18 +1400,18 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                         merged[content_len] = '\0';
                         agent->alloc->free(agent->alloc->ctx, superhuman_ctx,
                                            superhuman_ctx_len + 1);
-                        agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len);
+                        agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len + 1);
                         superhuman_ctx = merged;
                         superhuman_ctx_len = content_len;
                     } else {
-                        agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len);
+                        agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len + 1);
                     }
                 } else {
                     superhuman_ctx = memory_sh_ctx;
                     superhuman_ctx_len = memory_sh_len;
                 }
             } else if (memory_sh_ctx) {
-                agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len);
+                agent->alloc->free(agent->alloc->ctx, memory_sh_ctx, memory_sh_len + 1);
             }
         }
         /* Per-contact style evolution guidance */
@@ -3864,6 +3864,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
                 if (plan_ctx)
                     agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+                if (turn_cache)
+                    hu_tool_cache_destroy(agent->alloc, turn_cache);
+                if (routed_specs)
+                    agent->alloc->free(agent->alloc->ctx, routed_specs,
+                                       routed_specs_count * sizeof(hu_tool_spec_t));
                 return err;
             }
             size_t total = (hist_msgs ? hist_count : 0) + 1;
@@ -3878,6 +3883,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     agent->alloc->free(agent->alloc->ctx, system_prompt, system_prompt_len + 1);
                 if (plan_ctx)
                     agent->alloc->free(agent->alloc->ctx, plan_ctx, plan_ctx_len + 1);
+                if (turn_cache)
+                    hu_tool_cache_destroy(agent->alloc, turn_cache);
+                if (routed_specs)
+                    agent->alloc->free(agent->alloc->ctx, routed_specs,
+                                       routed_specs_count * sizeof(hu_tool_spec_t));
                 return HU_ERR_OUT_OF_MEMORY;
             }
             all[0].role = HU_ROLE_SYSTEM;

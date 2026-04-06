@@ -48,7 +48,8 @@ char *hu_conversation_build_callback(hu_allocator_t *alloc,
  * Includes: conversation thread, emotional analysis, verbosity mirroring,
  * conversation phase, time-of-day triggers, detected user states.
  * When persona is non-NULL and has style_rules, uses those; otherwise uses built-in rules.
- * Caller owns returned string. Returns NULL if no entries. */
+ * Caller owns returned string. Returns NULL if no entries.
+ * *out_len is content length; free with *out_len + 1 bytes. */
 char *hu_conversation_build_awareness(hu_allocator_t *alloc,
                                       const hu_channel_history_entry_t *entries, size_t count,
                                       const struct hu_persona *persona, size_t *out_len);
@@ -73,7 +74,7 @@ hu_quality_score_t hu_conversation_evaluate_quality(const char *response, size_t
 
 /* Honesty guardrail: detect "did you do X?" questions and inject honest context.
  * Returns a context string if an honesty injection is needed, NULL otherwise.
- * Caller owns returned string. */
+ * Caller owns returned string; free with strlen(result) + 1 bytes. */
 char *hu_conversation_honesty_check(hu_allocator_t *alloc, const char *message, size_t message_len);
 
 /* Narrative arc phase for the conversation.

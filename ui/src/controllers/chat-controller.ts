@@ -506,6 +506,10 @@ export class ChatController implements ReactiveController {
   }
 
   private _beginCompleting(sessionKey: string): void {
+    if (this._completingTimer) {
+      window.clearTimeout(this._completingTimer);
+      this._completingTimer = 0;
+    }
     this.isWaiting = false;
     this.isCompleting = true;
     this._stopStreamTimer();

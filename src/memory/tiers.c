@@ -89,6 +89,8 @@ hu_error_t hu_tier_manager_update_core(hu_tier_manager_t *mgr, const char *field
                                        size_t field_len, const char *value, size_t value_len) {
     if (!mgr || !field || field_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
+    if (!value && value_len != 0)
+        return HU_ERR_INVALID_ARGUMENT;
 
     struct { const char *name; char *buf; size_t cap; } fields[] = {
         {"user_name",             mgr->core.user_name,             sizeof(mgr->core.user_name)},

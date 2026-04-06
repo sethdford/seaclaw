@@ -301,6 +301,7 @@ export class PullRefreshController implements ReactiveController {
   private startY = 0;
   private currentY = 0;
   private pointerId: number | null = null;
+  private _resetTimer = 0;
   private boundHandlers: {
     down: (e: PointerEvent) => void;
     move: (e: PointerEvent) => void;
@@ -329,6 +330,10 @@ export class PullRefreshController implements ReactiveController {
   }
 
   hostDisconnected(): void {
+    if (this._resetTimer) {
+      clearTimeout(this._resetTimer);
+      this._resetTimer = 0;
+    }
     const el = this.scrollTarget;
     el.removeEventListener("pointerdown", this.boundHandlers.down);
     el.removeEventListener("pointermove", this.boundHandlers.move);
@@ -428,10 +433,15 @@ export class PullRefreshController implements ReactiveController {
   private reset(): void {
     if (prefersReducedMotion()) return;
     if (this.indicatorElement) {
+      if (this._resetTimer) {
+        clearTimeout(this._resetTimer);
+        this._resetTimer = 0;
+      }
       this.indicatorElement.style.opacity = "0";
       this.indicatorElement.style.transform = "translate(-50%, -100%)";
       this.indicatorElement.style.transition = `opacity var(--hu-duration-fast, 100ms) var(--hu-ease-out), transform var(--hu-duration-normal, 200ms) var(--hu-ease-out, ease-out)`;
-      setTimeout(() => {
+      this._resetTimer = window.setTimeout(() => {
+        this._resetTimer = 0;
         this.indicatorElement?.remove();
         this.indicatorElement = null;
       }, 250);

@@ -201,7 +201,8 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
                               "\nRESPONSE LIMIT: Maximum %u characters. Truncate gracefully.\n",
                               config->max_response_chars);
             if (ln > 0) {
-                err = append(alloc, &buf, &len, &cap, lbuf, (size_t)ln);
+                size_t w = ((size_t)ln < sizeof(lbuf)) ? (size_t)ln : sizeof(lbuf) - 1;
+                err = append(alloc, &buf, &len, &cap, lbuf, w);
                 if (err != HU_OK)
                     goto fail;
             }
@@ -228,7 +229,8 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
                                                      : lt->tm_hour,
                                   lt->tm_min, lt->tm_hour >= 12 ? "PM" : "AM");
                 if (tn > 0) {
-                    err = append(alloc, &buf, &len, &cap, tbuf, (size_t)tn);
+                    size_t w = ((size_t)tn < sizeof(tbuf)) ? (size_t)tn : sizeof(tbuf) - 1;
+                    err = append(alloc, &buf, &len, &cap, tbuf, w);
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -298,7 +300,8 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
         int n = snprintf(line, sizeof(line), "Provider: %.*s\n", (int)config->provider_name_len,
                          config->provider_name);
         if (n > 0) {
-            err = append(alloc, &buf, &len, &cap, line, (size_t)n);
+            size_t w = ((size_t)n < sizeof(line)) ? (size_t)n : sizeof(line) - 1;
+            err = append(alloc, &buf, &len, &cap, line, w);
             if (err != HU_OK)
                 goto fail;
         }
@@ -308,7 +311,8 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
         int n = snprintf(line, sizeof(line), "Model: %.*s\n", (int)config->model_name_len,
                          config->model_name);
         if (n > 0) {
-            err = append(alloc, &buf, &len, &cap, line, (size_t)n);
+            size_t w = ((size_t)n < sizeof(line)) ? (size_t)n : sizeof(line) - 1;
+            err = append(alloc, &buf, &len, &cap, line, w);
             if (err != HU_OK)
                 goto fail;
         }
@@ -328,7 +332,8 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
                         char line[256];
                         int n = snprintf(line, sizeof(line), "- %s\n", name);
                         if (n > 0) {
-                            err = append(alloc, &buf, &len, &cap, line, (size_t)n);
+                            size_t w = ((size_t)n < sizeof(line)) ? (size_t)n : sizeof(line) - 1;
+                            err = append(alloc, &buf, &len, &cap, line, w);
                             if (err != HU_OK)
                                 goto fail;
                         }
@@ -350,7 +355,8 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
                 char hdr[512];
                 int hn = snprintf(hdr, sizeof(hdr), "### %s\n", name);
                 if (hn > 0) {
-                    err = append(alloc, &buf, &len, &cap, hdr, (size_t)hn);
+                    size_t w = ((size_t)hn < sizeof(hdr)) ? (size_t)hn : sizeof(hdr) - 1;
+                    err = append(alloc, &buf, &len, &cap, hdr, w);
                     if (err != HU_OK)
                         goto fail;
                 }
@@ -1058,7 +1064,8 @@ hu_error_t hu_prompt_build_system(hu_allocator_t *alloc, const hu_prompt_config_
         int ln = snprintf(lbuf, sizeof(lbuf), "\nRESPONSE LIMIT: Maximum %u characters.\n",
                           config->max_response_chars);
         if (ln > 0) {
-            err = append(alloc, &buf, &len, &cap, lbuf, (size_t)ln);
+            size_t w = ((size_t)ln < sizeof(lbuf)) ? (size_t)ln : sizeof(lbuf) - 1;
+            err = append(alloc, &buf, &len, &cap, lbuf, w);
             if (err != HU_OK)
                 goto fail;
         }

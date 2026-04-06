@@ -15,6 +15,7 @@
 #include "human/core/string.h"
 #include "human/core/vertex_auth.h"
 #include "human/tool.h"
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -311,6 +312,11 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
         }
 
         size_t b64_len = strlen(b64_data);
+        if (b64_len > SIZE_MAX / 3) {
+            hu_json_free(alloc, json);
+            *out = hu_tool_result_fail("base64 payload too large", 24);
+            return HU_OK;
+        }
         size_t raw_cap = (b64_len * 3) / 4 + 4;
         unsigned char *raw = (unsigned char *)alloc->alloc(alloc->ctx, raw_cap);
         if (!raw) {
@@ -512,6 +518,11 @@ static hu_error_t mi_execute(void *ctx, hu_allocator_t *alloc, const hu_json_val
         }
 
         size_t b64_len = strlen(b64_data);
+        if (b64_len > SIZE_MAX / 3) {
+            hu_json_free(alloc, json);
+            *out = hu_tool_result_fail("base64 payload too large", 24);
+            return HU_OK;
+        }
         size_t raw_cap = (b64_len * 3) / 4 + 4;
         unsigned char *raw = (unsigned char *)alloc->alloc(alloc->ctx, raw_cap);
         if (!raw) {

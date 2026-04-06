@@ -714,7 +714,7 @@ bool hu_proactive_check_curiosity(hu_allocator_t *alloc, hu_memory_t *memory,
     }
 
     if (fact_count == 0) {
-        alloc->free(alloc->ctx, mm_json, mm_len);
+        alloc->free(alloc->ctx, mm_json, mm_len + 1);
         return false;
     }
 
@@ -738,7 +738,7 @@ bool hu_proactive_check_curiosity(hu_allocator_t *alloc, hu_memory_t *memory,
     }
 
     /* Free mm_json AFTER we've used the fact pointers */
-    alloc->free(alloc->ctx, mm_json, mm_len);
+    alloc->free(alloc->ctx, mm_json, mm_len + 1);
 
     if (n <= 0 || (size_t)n >= msg_cap)
         return false;

@@ -6,6 +6,7 @@
 #include "human/core/http.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -126,6 +127,9 @@ static hu_error_t vertex_auth_refresh(hu_vertex_auth_t *auth, hu_allocator_t *al
         hu_json_free(alloc, root);
         return HU_ERR_PROVIDER_AUTH;
     }
+
+    if (!isfinite(expires_in) || expires_in < 0.0 || expires_in > (double)(86400 * 7))
+        expires_in = 3600.0;
 
     if (auth->access_token)
         alloc->free(alloc->ctx, auth->access_token, auth->access_token_len + 1);

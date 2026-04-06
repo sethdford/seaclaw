@@ -11,6 +11,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include <stddef.h>
+#include <stdbool.h>
 
 typedef struct hu_ws_client hu_ws_client_t;
 
@@ -53,5 +54,11 @@ int hu_ws_parse_header(const char *bytes, size_t bytes_len, hu_ws_parsed_header_
  * Returns 0 if host/path/ws_key are missing or buffer too small. */
 size_t hu_ws_build_upgrade_request(char *buf, size_t buf_cap, const char *host, const char *path,
                                    const char *ws_key, const char *extra_headers);
+
+#if defined(HU_GATEWAY_POSIX)
+/* True if sec_websocket_accept equals base64(SHA-1(client_key_b64 || RFC6455 magic)) (RFC 6455). */
+bool hu_ws_sec_websocket_accept_valid(const char *client_key_b64,
+                                      const char *sec_websocket_accept);
+#endif
 
 #endif

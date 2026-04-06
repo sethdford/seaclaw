@@ -713,8 +713,10 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
             tools_alloc = new_alloc;
             memcpy(&tools[idx], mcp_tools, mcp_count * sizeof(hu_tool_t));
             idx += mcp_count;
+            alloc->free(alloc->ctx, mcp_tools, mcp_count * sizeof(hu_tool_t));
+        } else {
+            hu_mcp_free_tools(alloc, mcp_tools, mcp_count);
         }
-        alloc->free(alloc->ctx, mcp_tools, mcp_count * sizeof(hu_tool_t));
     }
 
     if (config) {

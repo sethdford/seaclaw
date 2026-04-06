@@ -93,6 +93,8 @@ void hu_superhuman_delayed_followup_free(hu_allocator_t *alloc, hu_delayed_follo
  * Micro-moments
  * ────────────────────────────────────────────────────────────────────────── */
 
+/* Formatted list strings: *out_len is content length (bytes before NUL). Free with *out_len + 1. */
+
 hu_error_t hu_superhuman_micro_moment_store(void *sqlite_ctx, hu_allocator_t *alloc,
     const char *contact_id, size_t contact_id_len, const char *fact, size_t fact_len,
     const char *significance, size_t sig_len);

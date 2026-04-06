@@ -41,6 +41,10 @@ hu_error_t hu_opinions_upsert(hu_allocator_t *alloc, hu_memory_t *memory,
 
     sqlite3_bind_text(sel, 1, topic, (int)topic_len, SQLITE_STATIC);
     rc = sqlite3_step(sel);
+    if (rc != SQLITE_ROW && rc != SQLITE_DONE) {
+        sqlite3_finalize(sel);
+        return HU_ERR_MEMORY_BACKEND;
+    }
 
     if (rc == SQLITE_ROW) {
         int64_t old_id = sqlite3_column_int64(sel, 0);

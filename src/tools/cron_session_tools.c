@@ -128,8 +128,9 @@ static const char *cron_create_params(void *ctx) {
     return CRON_CREATE_PARAMS;
 }
 static void cron_create_deinit(void *ctx, hu_allocator_t *alloc) {
-    if (ctx)
-        alloc->free(alloc->ctx, ctx, sizeof(cron_session_ctx_t));
+    if (!ctx || !alloc)
+        return;
+    alloc->free(alloc->ctx, ctx, sizeof(cron_session_ctx_t));
 }
 
 static const hu_tool_vtable_t cron_create_vtable = {
@@ -224,8 +225,9 @@ static const char *cron_delete_params(void *ctx) {
     return CRON_DELETE_PARAMS;
 }
 static void cron_delete_deinit(void *ctx, hu_allocator_t *alloc) {
-    if (ctx)
-        alloc->free(alloc->ctx, ctx, sizeof(cron_session_ctx_t));
+    if (!ctx || !alloc)
+        return;
+    alloc->free(alloc->ctx, ctx, sizeof(cron_session_ctx_t));
 }
 
 static const hu_tool_vtable_t cron_delete_vtable = {
@@ -346,8 +348,9 @@ static const char *cron_list_params(void *ctx) {
     return CRON_LIST_PARAMS;
 }
 static void cron_list_deinit(void *ctx, hu_allocator_t *alloc) {
-    if (ctx)
-        alloc->free(alloc->ctx, ctx, sizeof(cron_session_ctx_t));
+    if (!ctx || !alloc)
+        return;
+    alloc->free(alloc->ctx, ctx, sizeof(cron_session_ctx_t));
 }
 
 static const hu_tool_vtable_t cron_list_vtable = {

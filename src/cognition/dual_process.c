@@ -101,11 +101,11 @@ hu_error_t hu_dual_process_data_init(hu_allocator_t *alloc) {
 
 static void free_patterns(hu_allocator_t *alloc, const char **arr, const char **default_arr) {
     if (arr != default_arr && arr) {
+        size_t count = 0;
         for (size_t i = 0; arr[i]; i++) {
+            count++;
             alloc->free(alloc->ctx, (char *)arr[i], strlen(arr[i]) + 1);
         }
-        size_t count = 0;
-        for (size_t i = 0; arr[i]; i++) count++;
         alloc->free(alloc->ctx, (void *)arr, (count + 1) * sizeof(const char *));
     }
 }

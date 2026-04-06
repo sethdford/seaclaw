@@ -21,7 +21,8 @@ char *hu_context_build_system_prompt(hu_allocator_t *alloc, const char *base, si
 }
 
 /* Format history messages for provider request. Allocates messages array.
- * Caller must free each message's content and the array. */
+ * Message content/tool_call pointers are BORROWED from history — do NOT free them.
+ * Caller must free only the returned array itself (not individual message contents). */
 hu_error_t hu_context_format_messages(hu_allocator_t *alloc, const hu_owned_message_t *history,
                                       size_t history_count, size_t max_messages,
                                       const bool *include_mask, hu_chat_message_t **out_messages,

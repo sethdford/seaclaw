@@ -161,7 +161,7 @@ static hu_error_t vision_ocr_execute(void *ctx, hu_allocator_t *alloc,
         int n = snprintf(numfmt, sizeof(numfmt),
                          ",\"confidence\":%.2f,\"x\":%.1f,\"y\":%.1f}",
                          results[i].confidence, results[i].x, results[i].y);
-        if (n > 0)
+        if (n > 0 && (size_t)n < sizeof(numfmt))
             hu_json_buf_append_raw(&jb, numfmt, (size_t)n);
     }
     hu_json_buf_append_raw(&jb, "]}", 2);

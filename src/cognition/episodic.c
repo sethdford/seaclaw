@@ -241,6 +241,13 @@ hu_error_t hu_episodic_retrieve(sqlite3 *db, hu_allocator_t *alloc,
     }
     sqlite3_finalize(stmt);
 
+    if (rc != SQLITE_DONE) {
+        hu_episodic_free_patterns(alloc, arr, count);
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_IO;
+    }
+
     if (count == 0) {
         alloc->free(alloc->ctx, arr, cap * sizeof(hu_episodic_pattern_t));
         *out = NULL;

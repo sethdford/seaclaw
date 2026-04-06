@@ -388,7 +388,12 @@ static hu_error_t load_json_file(hu_config_t *cfg, const char *path) {
         fclose(f);
         return HU_ERR_IO;
     }
-    if (sz > 0 && sz < 65536) {
+    if (sz >= 65536) {
+        fclose(f);
+        hu_log_warn("config", NULL, "config file too large (%ld bytes, max 65535): %s", sz, path);
+        return HU_ERR_LIMIT_REACHED;
+    }
+    if (sz > 0) {
         char *buf = (char *)a->alloc(a->ctx, (size_t)sz + 1);
         if (buf) {
             size_t read_len = fread(buf, 1, (size_t)sz, f);
@@ -454,7 +459,10 @@ static hu_error_t config_load_impl(hu_allocator_t *backing, hu_config_t *out,
             out->config_path = hu_strdup(&a, "");
             out->workspace_dir = hu_strdup(&a, ".");
             sync_flat_fields(out);
-            return hu_config_validate(out);
+            hu_error_t verr = hu_config_validate(out);
+            if (verr != HU_OK)
+                hu_config_deinit(out);
+            return verr;
         }
         strncpy(global_path, path_buf, sizeof(global_path) - 1);
         global_path[sizeof(global_path) - 1] = '\0';
@@ -477,7 +485,10 @@ static hu_error_t config_load_impl(hu_allocator_t *backing, hu_config_t *out,
         hu_config_apply_env_overrides(out);
         sync_autonomy_level_from_string(out);
         sync_flat_fields(out);
-        return hu_config_validate(out);
+        hu_error_t verr = hu_config_validate(out);
+        if (verr != HU_OK)
+            hu_config_deinit(out);
+        return verr;
     }
     if (err != HU_OK) {
         hu_config_deinit(out);
@@ -536,10 +547,17 @@ static hu_error_t config_load_impl(hu_allocator_t *backing, hu_config_t *out,
             }
         }
         hu_error_t verr = hu_config_validate_strict(out, validation_root, strict);
-        if (verr != HU_OK)
+        if (verr != HU_OK) {
+            hu_config_deinit(out);
             return verr;
+        }
     }
-    return hu_config_validate(out);
+    {
+        hu_error_t verr = hu_config_validate(out);
+        if (verr != HU_OK)
+            hu_config_deinit(out);
+        return verr;
+    }
 }
 
 hu_error_t hu_config_load(hu_allocator_t *backing, hu_config_t *out) {

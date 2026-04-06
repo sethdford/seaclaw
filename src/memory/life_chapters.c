@@ -179,8 +179,8 @@ hu_error_t hu_life_chapter_store(hu_allocator_t *alloc, hu_memory_t *memory,
         hu_sql_txn_rollback(&txn);
         return HU_ERR_MEMORY_BACKEND;
     }
-    sqlite3_bind_text(ins, 1, chapter->theme, -1, SQLITE_STATIC);
-    sqlite3_bind_text(ins, 2, chapter->mood, -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 1, chapter->theme[0] ? chapter->theme : "", -1, SQLITE_STATIC);
+    sqlite3_bind_text(ins, 2, chapter->mood[0] ? chapter->mood : "", -1, SQLITE_STATIC);
     sqlite3_bind_int64(ins, 3, chapter->started_at);
     sqlite3_bind_text(ins, 4, kt, (int)kt_len, SQLITE_STATIC);
     rc = sqlite3_step(ins);

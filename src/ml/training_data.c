@@ -7,6 +7,7 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/ml/training_data.h"
+#include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -219,6 +220,13 @@ hu_error_t hu_training_data_export_json(hu_allocator_t *alloc, sqlite3 *db,
             }
             need = step.len + 1;
             while (len + need > cap) {
+                if (cap > SIZE_MAX / 2) {
+                    hu_json_buf_free(&step);
+                    sqlite3_finalize(sstmt);
+                    sqlite3_finalize(stmt);
+                    alloc->free(alloc->ctx, buf, cap);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
                 size_t new_cap = cap * 2;
                 char *nb = (char *)alloc->realloc(alloc->ctx, buf, cap, new_cap);
                 if (!nb) {

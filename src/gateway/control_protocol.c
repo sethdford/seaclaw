@@ -269,10 +269,13 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
 
     if (!proto->require_pairing && conn && !conn->authenticated &&
         is_sensitive_rpc_namespace(method)) {
-        size_t method_len = strlen(method);
-        hu_log_warn("control", NULL,
-                      "sensitive RPC without pairing: %.*s (recommend enabling require_pairing)",
-                      (int)method_len, method);
+        hu_log_warn("control", NULL, "blocked sensitive RPC '%s' - authentication required",
+                    method);
+        hu_control_send_response(proto, conn, id_raw, false,
+                                 "{\"error\":\"unauthorized\",\"message\":\"Authentication "
+                                 "required for sensitive operations\"}");
+        hu_json_free(proto->alloc, root);
+        return;
     }
 
     size_t id_slen = strlen(id_raw);
@@ -375,15 +378,17 @@ void hu_control_on_message(hu_ws_conn_t *conn, const char *data, size_t data_len
                 pos += payload_len;
                 res_buf[pos++] = '}';
                 res_buf[pos] = '\0';
+                hu_error_t send_err = hu_ws_server_send(proto->ws, conn, res_buf, pos);
+                if (send_err != HU_OK) {
+                    hu_log_error("control", NULL, "send response failed: %s",
+                                 hu_error_string(send_err));
+                }
+                proto->alloc->free(proto->alloc->ctx, res_buf, res_cap);
             } else {
-                pos = hu_buf_appendf(res_buf, res_cap, pos, "}");
+                proto->alloc->free(proto->alloc->ctx, res_buf, res_cap);
+                (void)hu_control_send_response(proto, conn, id, false,
+                                               "{\"error\":\"response_too_large\"}");
             }
-            hu_error_t send_err = hu_ws_server_send(proto->ws, conn, res_buf, pos);
-            if (send_err != HU_OK) {
-                hu_log_error("control", NULL, "send response failed: %s",
-                             hu_error_string(send_err));
-            }
-            proto->alloc->free(proto->alloc->ctx, res_buf, res_cap);
         }
         if (err == HU_OK && payload) {
             proto->alloc->free(proto->alloc->ctx, payload, payload_len + 1);

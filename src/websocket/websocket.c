@@ -170,6 +170,160 @@ size_t hu_ws_build_upgrade_request(char *buf, size_t buf_cap, const char *host, 
     return (size_t)n;
 }
 
+#if defined(HU_GATEWAY_POSIX)
+/* Minimal SHA-1 for RFC 6455 Sec-WebSocket-Accept verification (client side). */
+
+typedef struct {
+    uint32_t state[5];
+    uint64_t count;
+    uint8_t buffer[64];
+} ws_sha1_ctx;
+
+static uint32_t ws_sha1_rotl(uint32_t v, int n) {
+    return (v << n) | (v >> (32 - n));
+}
+
+static void ws_sha1_transform(uint32_t state[5], const uint8_t block[64]) {
+    uint32_t w[80];
+    for (int i = 0; i < 16; i++)
+        w[i] = ((uint32_t)block[i * 4] << 24) | ((uint32_t)block[i * 4 + 1] << 16) |
+               ((uint32_t)block[i * 4 + 2] << 8) | block[i * 4 + 3];
+    for (int i = 16; i < 80; i++)
+        w[i] = ws_sha1_rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+
+    uint32_t a = state[0], b = state[1], c = state[2], d = state[3], e = state[4];
+    for (int i = 0; i < 80; i++) {
+        uint32_t f, k;
+        if (i < 20) {
+            f = (b & c) | ((~b) & d);
+            k = 0x5A827999;
+        } else if (i < 40) {
+            f = b ^ c ^ d;
+            k = 0x6ED9EBA1;
+        } else if (i < 60) {
+            f = (b & c) | (b & d) | (c & d);
+            k = 0x8F1BBCDC;
+        } else {
+            f = b ^ c ^ d;
+            k = 0xCA62C1D6;
+        }
+        uint32_t t = ws_sha1_rotl(a, 5) + f + e + k + w[i];
+        e = d;
+        d = c;
+        c = ws_sha1_rotl(b, 30);
+        b = a;
+        a = t;
+    }
+    state[0] += a;
+    state[1] += b;
+    state[2] += c;
+    state[3] += d;
+    state[4] += e;
+}
+
+static void ws_sha1_init(ws_sha1_ctx *ctx) {
+    ctx->state[0] = 0x67452301;
+    ctx->state[1] = 0xEFCDAB89;
+    ctx->state[2] = 0x98BADCFE;
+    ctx->state[3] = 0x10325476;
+    ctx->state[4] = 0xC3D2E1F0;
+    ctx->count = 0;
+    memset(ctx->buffer, 0, 64);
+}
+
+static void ws_sha1_update(ws_sha1_ctx *ctx, const uint8_t *data, size_t len) {
+    size_t i = 0;
+    size_t idx = (size_t)(ctx->count & 63);
+    ctx->count += len;
+    if (idx) {
+        size_t fill = 64 - idx;
+        if (len < fill) {
+            memcpy(ctx->buffer + idx, data, len);
+            return;
+        }
+        memcpy(ctx->buffer + idx, data, fill);
+        ws_sha1_transform(ctx->state, ctx->buffer);
+        i = fill;
+    }
+    for (; i + 64 <= len; i += 64)
+        ws_sha1_transform(ctx->state, data + i);
+    if (i < len)
+        memcpy(ctx->buffer, data + i, len - i);
+}
+
+static void ws_sha1_final(ws_sha1_ctx *ctx, uint8_t out[20]) {
+    uint64_t bits = ctx->count * 8;
+    size_t idx = (size_t)(ctx->count & 63);
+    ctx->buffer[idx++] = 0x80;
+    if (idx > 56) {
+        memset(ctx->buffer + idx, 0, 64 - idx);
+        ws_sha1_transform(ctx->state, ctx->buffer);
+        idx = 0;
+    }
+    memset(ctx->buffer + idx, 0, 56 - idx);
+    for (int i = 0; i < 8; i++)
+        ctx->buffer[56 + i] = (uint8_t)(bits >> (56 - i * 8));
+    ws_sha1_transform(ctx->state, ctx->buffer);
+    for (int i = 0; i < 5; i++) {
+        out[i * 4] = (uint8_t)(ctx->state[i] >> 24);
+        out[i * 4 + 1] = (uint8_t)(ctx->state[i] >> 16);
+        out[i * 4 + 2] = (uint8_t)(ctx->state[i] >> 8);
+        out[i * 4 + 3] = (uint8_t)(ctx->state[i]);
+    }
+}
+
+static size_t ws_b64_encode_bytes(const uint8_t *in, size_t in_len, char *out, size_t out_size) {
+    static const char tbl[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    size_t olen = 4 * ((in_len + 2) / 3);
+    if (olen + 1 > out_size)
+        return 0;
+    size_t j = 0;
+    for (size_t i = 0; i < in_len; i += 3) {
+        uint32_t v = (uint32_t)in[i] << 16;
+        if (i + 1 < in_len)
+            v |= (uint32_t)in[i + 1] << 8;
+        if (i + 2 < in_len)
+            v |= in[i + 2];
+        out[j++] = tbl[(v >> 18) & 63];
+        out[j++] = tbl[(v >> 12) & 63];
+        out[j++] = (i + 1 < in_len) ? tbl[(v >> 6) & 63] : '=';
+        out[j++] = (i + 2 < in_len) ? tbl[v & 63] : '=';
+    }
+    out[j] = '\0';
+    return j;
+}
+
+static bool ws_compute_sec_websocket_accept(const char *client_key, char *out, size_t out_size) {
+    if (!client_key || out_size < 29)
+        return false;
+    size_t key_len = strlen(client_key);
+    size_t magic_len = strlen(HU_WS_MAGIC);
+    if (key_len + magic_len >= 128)
+        return false;
+    char cat[128];
+    memcpy(cat, client_key, key_len);
+    memcpy(cat + key_len, HU_WS_MAGIC, magic_len);
+
+    ws_sha1_ctx ctx;
+    ws_sha1_init(&ctx);
+    ws_sha1_update(&ctx, (const uint8_t *)cat, key_len + magic_len);
+    uint8_t hash[20];
+    ws_sha1_final(&ctx, hash);
+
+    return ws_b64_encode_bytes(hash, 20, out, out_size) > 0;
+}
+
+bool hu_ws_sec_websocket_accept_valid(const char *client_key_b64,
+                                      const char *sec_websocket_accept) {
+    if (!client_key_b64 || !sec_websocket_accept)
+        return false;
+    char expected[32];
+    if (!ws_compute_sec_websocket_accept(client_key_b64, expected, sizeof(expected)))
+        return false;
+    return strcmp(expected, sec_websocket_accept) == 0;
+}
+#endif /* HU_GATEWAY_POSIX */
+
 #if defined(HU_GATEWAY_POSIX) && !HU_IS_TEST
 /* Base64 encode 16 bytes into 24 chars. RFC 6455 accepts padding. */
 static void ws_b64_encode_16(const unsigned char *in, char *out) {
@@ -240,6 +394,59 @@ static int ws_parse_url(const char *url, char *host, size_t host_size, uint16_t 
         path[1] = '\0';
     }
     return 0;
+}
+
+static bool ws_http_extract_header(const char *block, size_t block_len, const char *name, char *out,
+                                   size_t out_size) {
+    const char *block_end = block + block_len;
+    const char *p = block;
+    size_t name_len = strlen(name);
+    while (p < block_end) {
+        if (name_len < (size_t)(block_end - p) && strncasecmp(p, name, name_len) == 0 &&
+            p[name_len] == ':') {
+            const char *v = p + name_len + 1;
+            while (v < block_end && *v == ' ')
+                v++;
+            const char *end = v;
+            while (end < block_end && *end && *end != '\r' && *end != '\n')
+                end++;
+            size_t vlen = (size_t)(end - v);
+            if (vlen >= out_size)
+                return false;
+            memcpy(out, v, vlen);
+            out[vlen] = '\0';
+            return true;
+        }
+        while (p < block_end && *p && *p != '\n')
+            p++;
+        if (p < block_end && *p == '\n')
+            p++;
+    }
+    return false;
+}
+
+static void ws_trim_ows_tail(char *s) {
+    size_t n = strlen(s);
+    while (n > 0 && (s[n - 1] == ' ' || s[n - 1] == '\t'))
+        s[--n] = '\0';
+}
+
+static bool ws_response_sec_websocket_accept_ok(const char *client_key_b64, const char *resp,
+                                                size_t resp_len) {
+    size_t hdr_end = (size_t)-1;
+    for (size_t i = 0; i + 3 < resp_len; i++) {
+        if (resp[i] == '\r' && resp[i + 1] == '\n' && resp[i + 2] == '\r' && resp[i + 3] == '\n') {
+            hdr_end = i;
+            break;
+        }
+    }
+    if (hdr_end == (size_t)-1)
+        return false;
+    char accept[96];
+    if (!ws_http_extract_header(resp, hdr_end, "Sec-WebSocket-Accept", accept, sizeof(accept)))
+        return false;
+    ws_trim_ows_tail(accept);
+    return hu_ws_sec_websocket_accept_valid(client_key_b64, accept);
 }
 #endif
 
@@ -440,9 +647,6 @@ hu_error_t hu_ws_connect_with_headers(hu_allocator_t *alloc, const char *url,
         close(sockfd);
         return HU_ERR_IO;
     }
-    /* RFC 6455 §4.2.2: Sec-WebSocket-Accept should be verified against
-     * the SHA-1 hash of Sec-WebSocket-Key + GUID. Currently only checks
-     * for HTTP 101 + Upgrade header presence. */
     if (strncmp(resp, "HTTP/1.1 101", 12) != 0 && strncmp(resp, "HTTP/1.0 101", 12) != 0) {
 #ifdef HU_HAS_TLS
         if (ssl) {
@@ -454,6 +658,16 @@ hu_error_t hu_ws_connect_with_headers(hu_allocator_t *alloc, const char *url,
         return HU_ERR_IO; /* Expected 101 Switching Protocols */
     }
     if (!strstr(resp, "Upgrade:") || !strstr(resp, "websocket")) {
+#ifdef HU_HAS_TLS
+        if (ssl) {
+            SSL_free(ssl);
+            SSL_CTX_free(ssl_ctx);
+        }
+#endif
+        close(sockfd);
+        return HU_ERR_IO;
+    }
+    if (!ws_response_sec_websocket_accept_ok(key_b64, resp, resp_len)) {
 #ifdef HU_HAS_TLS
         if (ssl) {
             SSL_free(ssl);
@@ -523,12 +737,21 @@ hu_error_t hu_ws_send(hu_ws_client_t *ws, const char *data, size_t data_len) {
             mask_key[i] = (unsigned char)((i * 17 + (unsigned long)data) & 0xFF);
     }
 
-    char buf[HU_WS_MAX_MSG + 14]; /* max header 14 bytes for len 64K */
-    size_t frame_len = hu_ws_build_frame(buf, sizeof(buf), HU_WS_OP_TEXT, data, data_len, mask_key);
-    if (frame_len == 0)
+    bool use_heap = (data_len > 4096);
+    char stack_buf[4096 + 14];
+    char *buf = use_heap ? (char *)malloc(data_len + 14) : stack_buf;
+    if (use_heap && !buf)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t buf_cap = use_heap ? (data_len + 14) : sizeof(stack_buf);
+    size_t frame_len = hu_ws_build_frame(buf, buf_cap, HU_WS_OP_TEXT, data, data_len, mask_key);
+    if (frame_len == 0) {
+        if (use_heap)
+            free(buf);
         return HU_ERR_INVALID_ARGUMENT;
+    }
 
     size_t sent = 0;
+    hu_error_t werr = HU_OK;
     while (sent < frame_len) {
 #ifdef HU_HAS_TLS
         ssize_t n = ws->ssl ? (ssize_t)SSL_write(ws->ssl, buf + sent, (int)(frame_len - sent))
@@ -536,11 +759,15 @@ hu_error_t hu_ws_send(hu_ws_client_t *ws, const char *data, size_t data_len) {
 #else
         ssize_t n = send(ws->sockfd, buf + sent, frame_len - sent, 0);
 #endif
-        if (n <= 0)
-            return HU_ERR_IO;
+        if (n <= 0) {
+            werr = HU_ERR_IO;
+            break;
+        }
         sent += (size_t)n;
     }
-    return HU_OK;
+    if (use_heap)
+        free(buf);
+    return werr;
 #else
     (void)data_len;
     return HU_ERR_NOT_SUPPORTED;

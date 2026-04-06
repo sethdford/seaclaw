@@ -105,7 +105,8 @@ hu_error_t hu_superhuman_inside_joke_list(void *sqlite_ctx, hu_allocator_t *allo
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    int step_rc;
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         if (count >= cap) {
             cap *= 2;
             hu_inside_joke_t *n =
@@ -137,6 +138,14 @@ hu_error_t hu_superhuman_inside_joke_list(void *sqlite_ctx, hu_allocator_t *allo
         count++;
     }
     sqlite3_finalize(stmt);
+
+    if (step_rc != SQLITE_DONE) {
+        if (arr)
+            alloc->free(alloc->ctx, arr, cap * sizeof(hu_inside_joke_t));
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
 
     if (count == 0 && arr) {
         alloc->free(alloc->ctx, arr, cap * sizeof(hu_inside_joke_t));
@@ -248,7 +257,8 @@ hu_error_t hu_superhuman_commitment_list_due(void *sqlite_ctx, hu_allocator_t *a
         return HU_ERR_OUT_OF_MEMORY;
     }
 
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    int step_rc;
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         if (count >= cap) {
             cap *= 2;
             hu_superhuman_commitment_t *n = (hu_superhuman_commitment_t *)alloc->alloc(
@@ -283,6 +293,14 @@ hu_error_t hu_superhuman_commitment_list_due(void *sqlite_ctx, hu_allocator_t *a
         count++;
     }
     sqlite3_finalize(stmt);
+
+    if (step_rc != SQLITE_DONE) {
+        if (arr)
+            alloc->free(alloc->ctx, arr, cap * sizeof(hu_superhuman_commitment_t));
+        *out = NULL;
+        *out_count = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
 
     if (count == 0 && arr) {
         alloc->free(alloc->ctx, arr, cap * sizeof(hu_superhuman_commitment_t));
@@ -432,6 +450,8 @@ hu_error_t hu_superhuman_temporal_get_quiet_hours(void *sqlite_ctx, hu_allocator
         *out_hour_end = *out_hour_start + 1;
     }
     sqlite3_finalize(stmt);
+    if (rc != SQLITE_ROW && rc != SQLITE_DONE)
+        return HU_ERR_MEMORY_BACKEND;
     return HU_OK;
 }
 
@@ -638,6 +658,21 @@ static hu_error_t append_formatted(char **buf, size_t *len, size_t *cap, hu_allo
     return HU_OK;
 }
 
+/* Shrink to buf_len + 1 bytes so caller frees with *out_len + 1 (tracking alloc contract). */
+static void superhuman_shrink_formatted_buf(char **buf, size_t buf_len, size_t *buf_cap,
+                                            hu_allocator_t *alloc) {
+    if (!buf || !*buf || !buf_cap || !alloc || !alloc->realloc)
+        return;
+    if (buf_len + 1 < *buf_cap) {
+        char *shrunk =
+            (char *)alloc->realloc(alloc->ctx, *buf, *buf_cap, buf_len + 1);
+        if (shrunk) {
+            *buf = shrunk;
+            *buf_cap = buf_len + 1;
+        }
+    }
+}
+
 hu_error_t hu_superhuman_micro_moment_list(void *sqlite_ctx, hu_allocator_t *alloc,
                                            const char *contact_id, size_t contact_id_len,
                                            size_t limit, char **out_json, size_t *out_len) {
@@ -671,7 +706,8 @@ hu_error_t hu_superhuman_micro_moment_list(void *sqlite_ctx, hu_allocator_t *all
     }
 
     int row_count = 0;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    int step_rc;
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         const char *fact = (const char *)sqlite3_column_text(stmt, 0);
         const char *sig = (const char *)sqlite3_column_text(stmt, 1);
         const char *fact_s = fact ? fact : "";
@@ -687,6 +723,14 @@ hu_error_t hu_superhuman_micro_moment_list(void *sqlite_ctx, hu_allocator_t *all
     }
     sqlite3_finalize(stmt);
 
+    if (step_rc != SQLITE_DONE) {
+        if (buf)
+            alloc->free(alloc->ctx, buf, buf_cap);
+        *out_json = NULL;
+        *out_len = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
+
     if (row_count == 0 && buf) {
         err = append_formatted(&buf, &buf_len, &buf_cap, alloc, "(none)\n");
         if (err != HU_OK) {
@@ -694,6 +738,7 @@ hu_error_t hu_superhuman_micro_moment_list(void *sqlite_ctx, hu_allocator_t *all
             return err;
         }
     }
+    superhuman_shrink_formatted_buf(&buf, buf_len, &buf_cap, alloc);
     *out_json = buf;
     *out_len = buf_len;
     return HU_OK;
@@ -802,7 +847,8 @@ hu_error_t hu_superhuman_avoidance_list(void *sqlite_ctx, hu_allocator_t *alloc,
     }
 
     int row_count = 0;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    int step_rc;
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         const char *topic = (const char *)sqlite3_column_text(stmt, 0);
         int mention = sqlite3_column_int(stmt, 1);
         int change = sqlite3_column_int(stmt, 2);
@@ -819,6 +865,14 @@ hu_error_t hu_superhuman_avoidance_list(void *sqlite_ctx, hu_allocator_t *alloc,
     }
     sqlite3_finalize(stmt);
 
+    if (step_rc != SQLITE_DONE) {
+        if (buf)
+            alloc->free(alloc->ctx, buf, buf_cap);
+        *out_json = NULL;
+        *out_len = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
+
     if (row_count == 0 && buf) {
         err = append_formatted(&buf, &buf_len, &buf_cap, alloc, "(none)\n");
         if (err != HU_OK) {
@@ -826,6 +880,7 @@ hu_error_t hu_superhuman_avoidance_list(void *sqlite_ctx, hu_allocator_t *alloc,
             return err;
         }
     }
+    superhuman_shrink_formatted_buf(&buf, buf_len, &buf_cap, alloc);
     *out_json = buf;
     *out_len = buf_len;
     return HU_OK;
@@ -936,7 +991,8 @@ hu_error_t hu_superhuman_topic_absence_list(void *sqlite_ctx, hu_allocator_t *al
     }
 
     int row_count = 0;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    int step_rc;
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         const char *topic = (const char *)sqlite3_column_text(stmt, 0);
         int64_t last = sqlite3_column_int64(stmt, 1);
         const char *t = topic ? topic : "";
@@ -952,6 +1008,14 @@ hu_error_t hu_superhuman_topic_absence_list(void *sqlite_ctx, hu_allocator_t *al
     }
     sqlite3_finalize(stmt);
 
+    if (step_rc != SQLITE_DONE) {
+        if (buf)
+            alloc->free(alloc->ctx, buf, buf_cap);
+        *out_json = NULL;
+        *out_len = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
+
     if (row_count == 0 && buf) {
         err = append_formatted(&buf, &buf_len, &buf_cap, alloc, "(none)\n");
         if (err != HU_OK) {
@@ -959,6 +1023,7 @@ hu_error_t hu_superhuman_topic_absence_list(void *sqlite_ctx, hu_allocator_t *al
             return err;
         }
     }
+    superhuman_shrink_formatted_buf(&buf, buf_len, &buf_cap, alloc);
     *out_json = buf;
     *out_len = buf_len;
     return HU_OK;
@@ -1038,7 +1103,8 @@ hu_error_t hu_superhuman_growth_list_recent(void *sqlite_ctx, hu_allocator_t *al
     }
 
     int row_count = 0;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    int step_rc;
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         const char *topic = (const char *)sqlite3_column_text(stmt, 0);
         const char *before = (const char *)sqlite3_column_text(stmt, 1);
         const char *after = (const char *)sqlite3_column_text(stmt, 2);
@@ -1056,6 +1122,14 @@ hu_error_t hu_superhuman_growth_list_recent(void *sqlite_ctx, hu_allocator_t *al
     }
     sqlite3_finalize(stmt);
 
+    if (step_rc != SQLITE_DONE) {
+        if (buf)
+            alloc->free(alloc->ctx, buf, buf_cap);
+        *out_json = NULL;
+        *out_len = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
+
     if (row_count == 0 && buf) {
         err = append_formatted(&buf, &buf_len, &buf_cap, alloc, "(none)\n");
         if (err != HU_OK) {
@@ -1063,6 +1137,7 @@ hu_error_t hu_superhuman_growth_list_recent(void *sqlite_ctx, hu_allocator_t *al
             return err;
         }
     }
+    superhuman_shrink_formatted_buf(&buf, buf_len, &buf_cap, alloc);
     *out_json = buf;
     *out_len = buf_len;
     return HU_OK;
@@ -1140,7 +1215,8 @@ hu_error_t hu_superhuman_pattern_list(void *sqlite_ctx, hu_allocator_t *alloc,
     }
 
     int row_count = 0;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    int step_rc;
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         const char *topic = (const char *)sqlite3_column_text(stmt, 0);
         const char *tone = (const char *)sqlite3_column_text(stmt, 1);
         int dow = sqlite3_column_int(stmt, 2);
@@ -1159,6 +1235,14 @@ hu_error_t hu_superhuman_pattern_list(void *sqlite_ctx, hu_allocator_t *alloc,
     }
     sqlite3_finalize(stmt);
 
+    if (step_rc != SQLITE_DONE) {
+        if (buf)
+            alloc->free(alloc->ctx, buf, buf_cap);
+        *out_json = NULL;
+        *out_len = 0;
+        return HU_ERR_MEMORY_BACKEND;
+    }
+
     if (row_count == 0 && buf) {
         err = append_formatted(&buf, &buf_len, &buf_cap, alloc, "(none)\n");
         if (err != HU_OK) {
@@ -1166,6 +1250,7 @@ hu_error_t hu_superhuman_pattern_list(void *sqlite_ctx, hu_allocator_t *alloc,
             return err;
         }
     }
+    superhuman_shrink_formatted_buf(&buf, buf_len, &buf_cap, alloc);
     *out_json = buf;
     *out_len = buf_len;
     return HU_OK;
@@ -1304,13 +1389,13 @@ hu_error_t hu_superhuman_memory_build_context(void *sqlite_ctx, hu_allocator_t *
                                         &mm_len) == HU_OK &&
         mm && mm_len > 0 && strstr(mm, "(none)") == NULL) {
         err = append_formatted(&buf, &buf_len, &buf_cap, alloc, "%s\n", mm);
-        alloc->free(alloc->ctx, mm, mm_len);
+        alloc->free(alloc->ctx, mm, mm_len + 1);
         if (err != HU_OK) {
             alloc->free(alloc->ctx, buf, buf_cap);
             return err;
         }
     } else if (mm) {
-        alloc->free(alloc->ctx, mm, mm_len);
+        alloc->free(alloc->ctx, mm, mm_len + 1);
     }
 
     hu_inside_joke_t *jokes = NULL;
@@ -1342,13 +1427,13 @@ hu_error_t hu_superhuman_memory_build_context(void *sqlite_ctx, hu_allocator_t *
                                          &growth_len) == HU_OK &&
         growth && growth_len > 0 && strstr(growth, "(none)") == NULL) {
         err = append_formatted(&buf, &buf_len, &buf_cap, alloc, "\n%s\n", growth);
-        alloc->free(alloc->ctx, growth, growth_len);
+        alloc->free(alloc->ctx, growth, growth_len + 1);
         if (err != HU_OK) {
             alloc->free(alloc->ctx, buf, buf_cap);
             return err;
         }
     } else if (growth) {
-        alloc->free(alloc->ctx, growth, growth_len);
+        alloc->free(alloc->ctx, growth, growth_len + 1);
     }
 
     if (include_avoidance) {
@@ -1358,13 +1443,13 @@ hu_error_t hu_superhuman_memory_build_context(void *sqlite_ctx, hu_allocator_t *
                                          &avoid_len) == HU_OK &&
             avoid && avoid_len > 0 && strstr(avoid, "(none)") == NULL) {
             err = append_formatted(&buf, &buf_len, &buf_cap, alloc, "\n%s\n", avoid);
-            alloc->free(alloc->ctx, avoid, avoid_len);
+            alloc->free(alloc->ctx, avoid, avoid_len + 1);
             if (err != HU_OK) {
                 alloc->free(alloc->ctx, buf, buf_cap);
                 return err;
             }
         } else if (avoid) {
-            alloc->free(alloc->ctx, avoid, avoid_len);
+            alloc->free(alloc->ctx, avoid, avoid_len + 1);
         }
     }
 
@@ -1375,6 +1460,7 @@ hu_error_t hu_superhuman_memory_build_context(void *sqlite_ctx, hu_allocator_t *
         return HU_OK;
     }
 
+    superhuman_shrink_formatted_buf(&buf, buf_len, &buf_cap, alloc);
     *out = buf;
     *out_len = buf_len;
     return HU_OK;

@@ -54,6 +54,7 @@
 #include "human/context_tokens.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/hook.h"
 #include "human/memory/stm.h"
 #include "human/observer.h"
 #include "human/persona/narrative_self.h"
@@ -971,6 +972,10 @@ void hu_agent_deinit(hu_agent_t *agent) {
     if (agent->infra.delegation_registry) {
         hu_delegation_registry_destroy(agent->infra.delegation_registry);
         agent->infra.delegation_registry = NULL;
+    }
+    if (agent->hook_registry) {
+        hu_hook_registry_destroy(agent->hook_registry, agent->alloc);
+        agent->hook_registry = NULL;
     }
     if (agent->infra.webhook_manager) {
         hu_webhook_manager_destroy(agent->alloc, agent->infra.webhook_manager);

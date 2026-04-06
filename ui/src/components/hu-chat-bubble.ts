@@ -525,8 +525,8 @@ export class ScChatBubble extends LitElement {
   `;
 
   override disconnectedCallback(): void {
-    super.disconnectedCallback();
     this._clearReleaseTimer();
+    super.disconnectedCallback();
   }
 
   private static readonly _OUTLINE_CHAR_THRESHOLD = 2000;

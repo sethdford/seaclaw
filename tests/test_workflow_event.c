@@ -43,7 +43,7 @@ static void test_workflow_event_append_single(void) {
     event.workflow_id = (char *)"wf-001";
     event.workflow_id_len = 6;
     event.data_json = (char *)"{\"status\":\"started\"}";
-    event.data_json_len = 19;
+    event.data_json_len = strlen(event.data_json);
 
     err = hu_workflow_event_log_append(log, &alloc, &event);
     HU_ASSERT_EQ(err, HU_OK);

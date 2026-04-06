@@ -750,24 +750,22 @@ static pthread_mutex_t g_trust_mutex = PTHREAD_MUTEX_INITIALIZER;
 #define TRUST_UNLOCK() ((void)0)
 #endif
 
-hu_trust_state_t *hu_daemon_get_trust_state(const char *contact_id, size_t cid_len) {
-    if (!contact_id || cid_len == 0)
-        return NULL;
-    TRUST_LOCK();
-    /* Lookup existing entry */
+static hu_error_t trust_find_or_create_slot(const char *contact_id, size_t cid_len, size_t *slot_out) {
+    if (!contact_id || cid_len == 0 || !slot_out)
+        return HU_ERR_INVALID_ARGUMENT;
+
     for (size_t i = 0; i < g_contact_trust_count; i++) {
         if (strlen(g_contact_trust[i].contact_id) == cid_len &&
             memcmp(g_contact_trust[i].contact_id, contact_id, cid_len) == 0) {
-            TRUST_UNLOCK();
-            return &g_contact_trust[i].state;
+            *slot_out = i;
+            return HU_OK;
         }
     }
-    /* Create new entry; evict LRU if full */
+
     size_t slot;
     if (g_contact_trust_count < HU_DAEMON_TRUST_CAP) {
         slot = g_contact_trust_count++;
     } else {
-        /* Find entry with oldest last_updated_at */
         slot = 0;
         int64_t oldest = g_contact_trust[0].state.last_updated_at;
         for (size_t i = 1; i < g_contact_trust_count; i++) {
@@ -777,13 +775,40 @@ hu_trust_state_t *hu_daemon_get_trust_state(const char *contact_id, size_t cid_l
             }
         }
     }
-    if (cid_len >= sizeof(g_contact_trust[slot].contact_id))
-        cid_len = sizeof(g_contact_trust[slot].contact_id) - 1;
-    memcpy(g_contact_trust[slot].contact_id, contact_id, cid_len);
-    g_contact_trust[slot].contact_id[cid_len] = '\0';
+
+    size_t copy_len = cid_len;
+    if (copy_len >= sizeof(g_contact_trust[slot].contact_id))
+        copy_len = sizeof(g_contact_trust[slot].contact_id) - 1;
+    memcpy(g_contact_trust[slot].contact_id, contact_id, copy_len);
+    g_contact_trust[slot].contact_id[copy_len] = '\0';
     hu_trust_init(&g_contact_trust[slot].state);
+    *slot_out = slot;
+    return HU_OK;
+}
+
+hu_error_t hu_daemon_get_trust_state(const char *contact_id, size_t cid_len, hu_trust_state_t *out) {
+    if (!out)
+        return HU_ERR_INVALID_ARGUMENT;
+    TRUST_LOCK();
+    size_t slot;
+    hu_error_t err = trust_find_or_create_slot(contact_id, cid_len, &slot);
+    if (err == HU_OK)
+        *out = g_contact_trust[slot].state;
     TRUST_UNLOCK();
-    return &g_contact_trust[slot].state;
+    return err;
+}
+
+hu_error_t hu_daemon_set_trust_state(const char *contact_id, size_t cid_len,
+                                     const hu_trust_state_t *state) {
+    if (!state)
+        return HU_ERR_INVALID_ARGUMENT;
+    TRUST_LOCK();
+    size_t slot;
+    hu_error_t err = trust_find_or_create_slot(contact_id, cid_len, &slot);
+    if (err == HU_OK)
+        g_contact_trust[slot].state = *state;
+    TRUST_UNLOCK();
+    return err;
 }
 
 #ifdef HU_IS_TEST
@@ -1406,9 +1431,9 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                         prompt = merged;
                         prompt_len = pos;
                     }
-                    alloc->free(alloc->ctx, topic_absence_json, topic_absence_len);
+                    alloc->free(alloc->ctx, topic_absence_json, topic_absence_len + 1);
                 } else if (topic_absence_json) {
-                    alloc->free(alloc->ctx, topic_absence_json, topic_absence_len);
+                    alloc->free(alloc->ctx, topic_absence_json, topic_absence_len + 1);
                 }
             }
             /* F24: Growth celebration — 15% chance, inject milestone to celebrate */
@@ -1438,11 +1463,11 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                             prompt_len = merged_len - 1;
                         }
                     }
-                    alloc->free(alloc->ctx, growth_pro, growth_pro_len);
+                    alloc->free(alloc->ctx, growth_pro, growth_pro_len + 1);
                     growth_pro = NULL;
                 }
                 if (growth_pro)
-                    alloc->free(alloc->ctx, growth_pro, growth_pro_len);
+                    alloc->free(alloc->ctx, growth_pro, growth_pro_len + 1);
             }
             /* F30: Spontaneous curiosity — 10–15% chance, inject random question from micro-moments
              */
@@ -6548,11 +6573,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 /* TRUST-006: Inject trust-level directive when trust is below neutral */
                 {
-                    hu_trust_state_t *ts = hu_daemon_get_trust_state(batch_key, key_len);
-                    if (ts) {
+                    hu_trust_state_t ts;
+                    if (hu_daemon_get_trust_state(batch_key, key_len, &ts) == HU_OK) {
                         char *trust_dir = NULL;
                         size_t trust_dir_len = 0;
-                        if (hu_trust_build_directive(alloc, ts, &trust_dir, &trust_dir_len) ==
+                        if (hu_trust_build_directive(alloc, &ts, &trust_dir, &trust_dir_len) ==
                                 HU_OK &&
                             trust_dir && trust_dir_len > 0) {
                             if (convo_ctx) {
@@ -7035,7 +7060,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             }
                         }
                     }
-                    alloc->free(alloc->ctx, mm_json, mm_len);
+                    alloc->free(alloc->ctx, mm_json, mm_len + 1);
                 }
                 /* F21: Avoidance patterns — inject for context, don't push.
                  * Skip in llm_decides mode. */
@@ -7073,7 +7098,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             }
                         }
                     }
-                    alloc->free(alloc->ctx, avoidance_json, avoidance_len);
+                    alloc->free(alloc->ctx, avoidance_json, avoidance_len + 1);
                     avoidance_json = NULL;
                     avoidance_len = 0;
                 }
@@ -7117,7 +7142,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                             }
                         }
-                        alloc->free(alloc->ctx, pattern_json, pattern_len);
+                        alloc->free(alloc->ctx, pattern_json, pattern_len + 1);
                     }
                 }
                 /* F24: Growth celebration — inject recent milestones for natural celebration.
@@ -7159,7 +7184,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                             }
                         }
-                        alloc->free(alloc->ctx, growth_json, growth_len);
+                        alloc->free(alloc->ctx, growth_json, growth_len + 1);
                     }
                 }
                 if (episodic_ctx && episodic_ctx_len > 0) {
@@ -9702,6 +9727,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                 size_t response_alloc_len = response_len;
                 uint32_t typo_seed = 0;
+                char *original_response = NULL;
+                size_t original_len = 0;
 #ifndef HU_HAS_PERSONA
                 (void)typo_seed;
 #endif
@@ -9843,8 +9870,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
 
-                    char *original_response = NULL;
-                    size_t original_len = response_len;
+                    original_len = response_len;
                     if (has_typo_quirk && response && response_len > 0) {
                         original_response = (char *)alloc->alloc(alloc->ctx, response_len + 1);
                         if (original_response) {
@@ -10310,17 +10336,25 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 hu_claim_result_t claim_r;
                                 if (hu_memory_verify_claim(alloc, vc_db, batch_key, key_len,
                                                            send_ptr, send_len, &claim_r) == HU_OK) {
-                                    hu_trust_state_t *ts =
-                                        hu_daemon_get_trust_state(batch_key, key_len);
+                                    hu_trust_state_t ts;
+                                    bool have_ts =
+                                        (hu_daemon_get_trust_state(batch_key, key_len, &ts) ==
+                                         HU_OK);
                                     int64_t now_ts = (int64_t)time(NULL);
                                     if (claim_r.confidence >= 0.15) {
                                         /* Verified claim — boost trust */
-                                        if (ts)
-                                            hu_trust_update(ts, HU_TRUST_VERIFIED_CLAIM, now_ts);
+                                        if (have_ts) {
+                                            hu_trust_update(&ts, HU_TRUST_VERIFIED_CLAIM, now_ts);
+                                            (void)hu_daemon_set_trust_state(batch_key, key_len,
+                                                                              &ts);
+                                        }
                                     } else {
                                         /* Unverified claim — erode trust and hedge */
-                                        if (ts)
-                                            hu_trust_update(ts, HU_TRUST_FABRICATION, now_ts);
+                                        if (have_ts) {
+                                            hu_trust_update(&ts, HU_TRUST_FABRICATION, now_ts);
+                                            (void)hu_daemon_set_trust_state(batch_key, key_len,
+                                                                              &ts);
+                                        }
                                         char *hedged = NULL;
                                         size_t hedged_len = 0;
                                         if (hu_memory_hedge_claim(alloc, send_ptr, send_len,
@@ -10340,12 +10374,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                     claim_r.confidence, claim_r.has_provenance,
                                                     claim_r.contact_match);
                                     }
-                                    if (ts && hu_trust_detect_erosion(ts)) {
+                                    if (have_ts && hu_trust_detect_erosion(&ts)) {
                                         hu_log_info("human", agent ? agent->observer : NULL,
                                                     "TRUST-006: trust eroded for "
                                                     "%.*s (level=%.2f)",
                                                     (int)(key_len > 20 ? 20 : key_len), batch_key,
-                                                    ts->trust_level);
+                                                    ts.trust_level);
                                     }
                                 }
                             }
@@ -11185,6 +11219,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
 #ifndef HU_IS_TEST
             skip_send:
+                if (original_response)
+                    alloc->free(alloc->ctx, original_response, original_len + 1);
                 if (ch && ch->channel && ch->channel->vtable && ch->channel->vtable->stop_typing) {
                     ch->channel->vtable->stop_typing(ch->channel->ctx, batch_key, key_len);
                 }

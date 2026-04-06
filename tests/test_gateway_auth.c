@@ -18,6 +18,28 @@
 static char s_last_response[1024];
 static size_t s_last_response_len;
 
+/* hu_ws_server_send wraps JSON in a WebSocket text frame; skip RFC 6455 header for substring checks. */
+#ifdef HU_GATEWAY_POSIX
+static const char *gw_auth_ws_json_payload(const char *buf, size_t len) {
+    if (len < 2u || (unsigned char)buf[0] != 0x81u)
+        return buf;
+    unsigned char b1 = (unsigned char)buf[1];
+    if (b1 <= 125u && len >= 2u + (size_t)b1)
+        return buf + 2u;
+    if (b1 == 126u && len >= 4u) {
+        size_t plen = ((size_t)(unsigned char)buf[2] << 8u) | (unsigned char)buf[3];
+        if (len >= 4u + plen)
+            return buf + 4u;
+    }
+    return buf;
+}
+#else
+static const char *gw_auth_ws_json_payload(const char *buf, size_t len) {
+    (void)len;
+    return buf;
+}
+#endif
+
 static void capture_response(hu_ws_conn_t *conn, const char *data, size_t data_len, void *ctx) {
     (void)conn;
     (void)ctx;
@@ -112,9 +134,12 @@ static void test_rpc_unauthorized_when_pairing_required(void) {
     send_and_capture(&conn, &proto, msg);
 
     HU_ASSERT_TRUE(s_last_response_len > 0);
-    HU_ASSERT_TRUE(strstr(s_last_response, "\"ok\":false") != NULL);
-    HU_ASSERT_TRUE(strstr(s_last_response, "unauthorized") != NULL);
-    HU_ASSERT_TRUE(strstr(s_last_response, "Authentication required") != NULL);
+    {
+        const char *j = gw_auth_ws_json_payload(s_last_response, s_last_response_len);
+        HU_ASSERT_TRUE(strstr(j, "\"ok\":false") != NULL);
+        HU_ASSERT_TRUE(strstr(j, "unauthorized") != NULL);
+        HU_ASSERT_TRUE(strstr(j, "Authentication required") != NULL);
+    }
 
     teardown_proto(&ws, &proto, NULL, &cfg);
 }
@@ -137,8 +162,11 @@ static void test_rpc_health_no_auth_needed(void) {
     send_and_capture(&conn, &proto, msg);
 
     HU_ASSERT_TRUE(s_last_response_len > 0);
-    HU_ASSERT_TRUE(strstr(s_last_response, "\"ok\":true") != NULL);
-    HU_ASSERT_TRUE(strstr(s_last_response, "ok") != NULL);
+    {
+        const char *j = gw_auth_ws_json_payload(s_last_response, s_last_response_len);
+        HU_ASSERT_TRUE(strstr(j, "\"ok\":true") != NULL);
+        HU_ASSERT_TRUE(strstr(j, "ok") != NULL);
+    }
 
     teardown_proto(&ws, &proto, NULL, &cfg);
 }
@@ -162,8 +190,11 @@ static void test_rpc_auth_with_valid_token(void) {
     send_and_capture(&conn, &proto, msg);
 
     HU_ASSERT_TRUE(s_last_response_len > 0);
-    HU_ASSERT_TRUE(strstr(s_last_response, "\"ok\":true") != NULL);
-    HU_ASSERT_TRUE(strstr(s_last_response, "authenticated") != NULL);
+    {
+        const char *j = gw_auth_ws_json_payload(s_last_response, s_last_response_len);
+        HU_ASSERT_TRUE(strstr(j, "\"ok\":true") != NULL);
+        HU_ASSERT_TRUE(strstr(j, "authenticated") != NULL);
+    }
     HU_ASSERT_TRUE(conn.authenticated);
 
     teardown_proto(&ws, &proto, NULL, &cfg);
@@ -188,14 +219,17 @@ static void test_rpc_auth_with_invalid_token(void) {
     send_and_capture(&conn, &proto, msg);
 
     HU_ASSERT_TRUE(s_last_response_len > 0);
-    HU_ASSERT_TRUE(strstr(s_last_response, "\"ok\":false") != NULL);
-    HU_ASSERT_TRUE(strstr(s_last_response, "invalid_token") != NULL);
+    {
+        const char *j = gw_auth_ws_json_payload(s_last_response, s_last_response_len);
+        HU_ASSERT_TRUE(strstr(j, "\"ok\":false") != NULL);
+        HU_ASSERT_TRUE(strstr(j, "invalid_token") != NULL);
+    }
     HU_ASSERT_FALSE(conn.authenticated);
 
     teardown_proto(&ws, &proto, NULL, &cfg);
 }
 
-static void test_rpc_no_auth_when_pairing_disabled(void) {
+static void test_rpc_sensitive_blocked_when_pairing_off_unauthenticated(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_ws_server_t ws;
     hu_control_protocol_t proto;
@@ -214,7 +248,38 @@ static void test_rpc_no_auth_when_pairing_disabled(void) {
     send_and_capture(&conn, &proto, msg);
 
     HU_ASSERT_TRUE(s_last_response_len > 0);
-    HU_ASSERT_TRUE(strstr(s_last_response, "\"ok\":true") != NULL);
+    {
+        const char *j = gw_auth_ws_json_payload(s_last_response, s_last_response_len);
+        HU_ASSERT_TRUE(strstr(j, "\"ok\":false") != NULL);
+        HU_ASSERT_TRUE(strstr(j, "unauthorized") != NULL);
+        HU_ASSERT_TRUE(strstr(j, "sensitive operations") != NULL);
+    }
+
+    teardown_proto(&ws, &proto, NULL, &cfg);
+}
+
+static void test_rpc_health_still_public_when_pairing_off(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_ws_server_t ws;
+    hu_control_protocol_t proto;
+    hu_app_context_t app;
+    hu_bus_t bus;
+    hu_config_t cfg;
+    setup_proto_with_auth(&alloc, &ws, &proto, &app, &bus, &cfg, false, NULL, NULL);
+
+    hu_ws_conn_t conn;
+    memset(&conn, 0, sizeof(conn));
+    conn.active = true;
+    conn.authenticated = false;
+
+    const char *msg = "{\"type\":\"req\",\"id\":\"5b\",\"method\":\"health\"}";
+    send_and_capture(&conn, &proto, msg);
+
+    HU_ASSERT_TRUE(s_last_response_len > 0);
+    {
+        const char *j = gw_auth_ws_json_payload(s_last_response, s_last_response_len);
+        HU_ASSERT_TRUE(strstr(j, "\"ok\":true") != NULL);
+    }
 
     teardown_proto(&ws, &proto, NULL, &cfg);
 }
@@ -237,8 +302,11 @@ static void test_rpc_connect_no_auth_needed(void) {
     send_and_capture(&conn, &proto, msg);
 
     HU_ASSERT_TRUE(s_last_response_len > 0);
-    HU_ASSERT_TRUE(strstr(s_last_response, "\"ok\":true") != NULL);
-    HU_ASSERT_TRUE(strstr(s_last_response, "hello-ok") != NULL);
+    {
+        const char *j = gw_auth_ws_json_payload(s_last_response, s_last_response_len);
+        HU_ASSERT_TRUE(strstr(j, "\"ok\":true") != NULL);
+        HU_ASSERT_TRUE(strstr(j, "hello-ok") != NULL);
+    }
 
     teardown_proto(&ws, &proto, NULL, &cfg);
 }
@@ -261,7 +329,10 @@ static void test_rpc_capabilities_no_auth_needed(void) {
     send_and_capture(&conn, &proto, msg);
 
     HU_ASSERT_TRUE(s_last_response_len > 0);
-    HU_ASSERT_TRUE(strstr(s_last_response, "\"ok\":true") != NULL);
+    {
+        const char *j = gw_auth_ws_json_payload(s_last_response, s_last_response_len);
+        HU_ASSERT_TRUE(strstr(j, "\"ok\":true") != NULL);
+    }
 
     teardown_proto(&ws, &proto, NULL, &cfg);
 }
@@ -292,7 +363,10 @@ static void test_rpc_auth_token_after_valid_allows_protected(void) {
     send_and_capture(&conn, &proto, set_msg);
 
     HU_ASSERT_TRUE(s_last_response_len > 0);
-    HU_ASSERT_TRUE(strstr(s_last_response, "\"ok\":true") != NULL);
+    {
+        const char *j = gw_auth_ws_json_payload(s_last_response, s_last_response_len);
+        HU_ASSERT_TRUE(strstr(j, "\"ok\":true") != NULL);
+    }
 
     teardown_proto(&ws, &proto, NULL, &cfg);
 }
@@ -333,13 +407,15 @@ static void test_pairing_flow(void) {
 
     send_and_capture(&conn, &proto, auth_msg);
     HU_ASSERT_TRUE(conn.authenticated);
-    HU_ASSERT_TRUE(strstr(s_last_response, "\"ok\":true") != NULL);
+    HU_ASSERT_TRUE(strstr(gw_auth_ws_json_payload(s_last_response, s_last_response_len),
+                          "\"ok\":true") != NULL);
 
     /* config.set should now succeed */
     const char *set_msg = "{\"type\":\"req\",\"id\":\"pf2\",\"method\":\"config.set\","
                           "\"params\":{\"raw\":\"{}\"}}";
     send_and_capture(&conn, &proto, set_msg);
-    HU_ASSERT_TRUE(strstr(s_last_response, "\"ok\":true") != NULL);
+    HU_ASSERT_TRUE(strstr(gw_auth_ws_json_payload(s_last_response, s_last_response_len),
+                          "\"ok\":true") != NULL);
 
     alloc.free(alloc.ctx, token, strlen(token) + 1);
     teardown_proto(&ws, &proto, guard, &cfg);
@@ -354,7 +430,8 @@ void run_gateway_auth_tests(void) {
     HU_RUN_TEST(test_rpc_health_no_auth_needed);
     HU_RUN_TEST(test_rpc_auth_with_valid_token);
     HU_RUN_TEST(test_rpc_auth_with_invalid_token);
-    HU_RUN_TEST(test_rpc_no_auth_when_pairing_disabled);
+    HU_RUN_TEST(test_rpc_sensitive_blocked_when_pairing_off_unauthenticated);
+    HU_RUN_TEST(test_rpc_health_still_public_when_pairing_off);
     HU_RUN_TEST(test_rpc_connect_no_auth_needed);
     HU_RUN_TEST(test_rpc_capabilities_no_auth_needed);
     HU_RUN_TEST(test_rpc_auth_token_after_valid_allows_protected);
