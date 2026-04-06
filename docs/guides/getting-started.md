@@ -19,7 +19,7 @@ Get from zero to your first AI chat in under 5 minutes.
 
 ```bash
 git clone https://github.com/sethdford/h-uman.git
-cd human
+cd h-uman
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON
 cmake --build .
@@ -40,21 +40,24 @@ Check [releases](https://github.com/sethdford/h-uman/releases) for your platform
 Run the interactive wizard to create your config:
 
 ```bash
-human onboard --interactive
+human onboard
 ```
+
+**Mac users:** The wizard defaults to Apple Intelligence (on-device, no API key needed).
+Requires macOS 26+, Apple Silicon, and [apfel](https://github.com/Arthur-Ficial/apfel) installed.
 
 The wizard will:
 
-- Choose a provider (OpenAI, Anthropic, OpenRouter, Ollama, etc.)
-- Prompt for an API key (or skip for local providers)
+- Choose a provider (Apple Intelligence on Mac, Gemini, OpenAI, Anthropic, Ollama, etc.)
+- Prompt for an API key (or skip for on-device/local providers)
 - Pick a default model
-- Optionally configure channels (Telegram, Discord, Nostr, etc.)
 - Create `~/.human/config.json` and workspace templates
 
 **Fast path** (skip wizard):
 
 ```bash
-human onboard --api-key sk-... --provider openrouter
+human onboard --apple                                # Mac: Apple Intelligence, zero prompts
+human onboard --provider openrouter --api-key sk-... # Any provider with API key
 ```
 
 ## 3. First chat

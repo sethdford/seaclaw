@@ -41,7 +41,11 @@ Recurring checkpoints that prevent standards drift. Each ceremony has a cadence,
    ```bash
    bash scripts/doc-stats.sh
    ```
-7. Log results as a commit message or in the remediation PR description
+7. Run the install red team (docs consistency, CLI flags, platform defaults):
+   ```bash
+   bash scripts/redteam-install.sh
+   ```
+8. Log results as a commit message or in the remediation PR description
 
 ### What "Pass" Looks Like
 

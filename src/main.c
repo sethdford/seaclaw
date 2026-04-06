@@ -806,9 +806,21 @@ static hu_error_t cmd_cron(hu_allocator_t *alloc, int argc, char **argv) {
 #endif /* HU_HAS_CRON */
 
 static hu_error_t cmd_onboard(hu_allocator_t *alloc, int argc, char **argv) {
-    (void)argc;
-    (void)argv;
-    return hu_onboard_run(alloc);
+    const char *cli_provider = NULL;
+    const char *cli_api_key = NULL;
+    bool apple_shortcut = false;
+
+    for (int i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--apple") == 0) {
+            apple_shortcut = true;
+        } else if (strcmp(argv[i], "--provider") == 0 && i + 1 < argc) {
+            cli_provider = argv[++i];
+        } else if (strcmp(argv[i], "--api-key") == 0 && i + 1 < argc) {
+            cli_api_key = argv[++i];
+        }
+    }
+
+    return hu_onboard_run_with_args(alloc, cli_provider, cli_api_key, apple_shortcut);
 }
 
 static hu_error_t cmd_service(hu_allocator_t *alloc, int argc, char **argv) {
@@ -2714,6 +2726,14 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Run 'human help' for usage.\n");
         return 1;
     }
+
+#ifndef HU_IS_TEST
+    if (hu_onboard_check_first_run() &&
+        strcmp(cmd_name, "onboard") != 0 && strcmp(cmd_name, "init") != 0 &&
+        strcmp(cmd_name, "help") != 0 && strcmp(cmd_name, "version") != 0) {
+        fprintf(stderr, "No config found. Run 'human onboard' to set up.\n\n");
+    }
+#endif
 
 #if defined(HU_HAS_UPDATE) && !HU_IS_TEST
     if (strcmp(cmd_name, "update") != 0 && strcmp(cmd_name, "version") != 0 &&

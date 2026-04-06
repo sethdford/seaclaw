@@ -131,9 +131,52 @@ main() {
         printf "  export PATH=\"\$PATH:%s\"\n" "$install_dir"
     fi
 
-    if "$install_path" --version 2>/dev/null; then
-        green "Run 'human help' to get started."
+    "$install_path" --version 2>/dev/null
+
+    # macOS Apple Silicon: offer to install apfel for on-device Apple Intelligence
+    if [ "$os" = "macos" ]; then
+        printf "\n"
+        bold "Apple Intelligence (on-device, free)"
+        printf "\n"
+        printf "Your Mac has a built-in LLM via Apple Intelligence.\n"
+        printf "Install apfel to use it with human (no API keys, no cloud).\n\n"
+        if command -v brew >/dev/null 2>&1; then
+            printf "Install apfel via Homebrew? [Y/n] "
+            read -r answer </dev/tty 2>/dev/null || answer="y"
+            case "$answer" in
+                [nN]*) printf "Skipping apfel install.\n" ;;
+                *)
+                    printf "Installing apfel...\n"
+                    brew tap Arthur-Ficial/tap 2>/dev/null
+                    if brew install apfel 2>/dev/null; then
+                        green "apfel installed — Apple Intelligence is ready."
+                    else
+                        red "apfel install failed. You can install it later:"
+                        printf "  brew tap Arthur-Ficial/tap && brew install apfel\n"
+                    fi
+                    ;;
+            esac
+        else
+            printf "To enable Apple Intelligence, install Homebrew then run:\n"
+            printf "  brew tap Arthur-Ficial/tap && brew install apfel\n\n"
+        fi
     fi
+
+    # Run onboard if this is a fresh install (no existing config)
+    if [ ! -f "$HOME/.human/config.json" ]; then
+        printf "\n"
+        bold "First-time setup"
+        printf "\n"
+        if [ "$os" = "macos" ]; then
+            printf "Configuring with Apple Intelligence defaults...\n"
+            "$install_path" onboard --apple 2>/dev/null || "$install_path" onboard 2>/dev/null || true
+        else
+            printf "Run 'human onboard' to configure your provider and API key.\n"
+        fi
+    fi
+
+    printf "\n"
+    green "You're ready! Run 'human agent' to start chatting."
 }
 
 main "$@"

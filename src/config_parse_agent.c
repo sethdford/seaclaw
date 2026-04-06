@@ -246,8 +246,9 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
     }
 
     hu_json_value_t *ct_obj = hu_json_object_get(obj, "persona_contacts");
-    if (ct_obj && ct_obj->type == HU_JSON_OBJECT) {
-        /* Free previous persona_contacts to prevent leak on config reload */
+    if (ct_obj) {
+        /* Free previous persona_contacts to prevent leak on config reload.
+         * Clears even if the new value is non-object (malformed config). */
         if (cfg->agent.persona_contacts && cfg->agent.persona_contacts_count > 0) {
             for (size_t i = 0; i < cfg->agent.persona_contacts_count; i++) {
                 if (cfg->agent.persona_contacts[i].channel)
@@ -262,36 +263,38 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
             cfg->agent.persona_contacts = NULL;
             cfg->agent.persona_contacts_count = 0;
         }
-        size_t n = ct_obj->data.object.pairs ? ct_obj->data.object.len : 0;
-        if (n > 0) {
-            hu_persona_channel_entry_t *arr = (hu_persona_channel_entry_t *)a->alloc(
-                a->ctx, n * sizeof(hu_persona_channel_entry_t));
-            if (arr) {
-                memset(arr, 0, n * sizeof(hu_persona_channel_entry_t));
-                size_t count = 0;
-                for (size_t i = 0; i < n && count < n; i++) {
-                    hu_json_pair_t *p = &ct_obj->data.object.pairs[i];
-                    if (!p->key || !p->value || p->value->type != HU_JSON_STRING)
-                        continue;
-                    arr[count].channel = hu_strdup(a, p->key);
-                    arr[count].persona =
-                        hu_strndup(a, p->value->data.string.ptr, p->value->data.string.len);
-                    if (arr[count].channel && arr[count].persona)
-                        count++;
-                    else {
-                        if (arr[count].channel)
-                            a->free(a->ctx, arr[count].channel,
-                                    strlen(arr[count].channel) + 1);
-                        if (arr[count].persona)
-                            a->free(a->ctx, arr[count].persona,
-                                    strlen(arr[count].persona) + 1);
+        if (ct_obj->type == HU_JSON_OBJECT) {
+            size_t n = ct_obj->data.object.pairs ? ct_obj->data.object.len : 0;
+            if (n > 0) {
+                hu_persona_channel_entry_t *arr = (hu_persona_channel_entry_t *)a->alloc(
+                    a->ctx, n * sizeof(hu_persona_channel_entry_t));
+                if (arr) {
+                    memset(arr, 0, n * sizeof(hu_persona_channel_entry_t));
+                    size_t count = 0;
+                    for (size_t i = 0; i < n && count < n; i++) {
+                        hu_json_pair_t *p = &ct_obj->data.object.pairs[i];
+                        if (!p->key || !p->value || p->value->type != HU_JSON_STRING)
+                            continue;
+                        arr[count].channel = hu_strdup(a, p->key);
+                        arr[count].persona =
+                            hu_strndup(a, p->value->data.string.ptr, p->value->data.string.len);
+                        if (arr[count].channel && arr[count].persona)
+                            count++;
+                        else {
+                            if (arr[count].channel)
+                                a->free(a->ctx, arr[count].channel,
+                                        strlen(arr[count].channel) + 1);
+                            if (arr[count].persona)
+                                a->free(a->ctx, arr[count].persona,
+                                        strlen(arr[count].persona) + 1);
+                        }
                     }
-                }
-                if (count > 0) {
-                    cfg->agent.persona_contacts = arr;
-                    cfg->agent.persona_contacts_count = count;
-                } else {
-                    a->free(a->ctx, arr, n * sizeof(hu_persona_channel_entry_t));
+                    if (count > 0) {
+                        cfg->agent.persona_contacts = arr;
+                        cfg->agent.persona_contacts_count = count;
+                    } else {
+                        a->free(a->ctx, arr, n * sizeof(hu_persona_channel_entry_t));
+                    }
                 }
             }
         }
@@ -315,6 +318,12 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
         if (bv >= 0.0 && bv <= 5.0)
             cfg->agent.best_of_n = (uint32_t)bv;
     }
+
+    /* Default on-device to enabled (overridable by JSON) */
+#ifdef __APPLE__
+    if (!cfg->agent.mr_on_device_enabled)
+        cfg->agent.mr_on_device_enabled = true;
+#endif
 
     hu_json_value_t *mr_obj = hu_json_object_get(obj, "model_router");
     if (mr_obj && mr_obj->type == HU_JSON_OBJECT) {
@@ -361,6 +370,15 @@ hu_error_t parse_agent(hu_allocator_t *a, hu_config_t *cfg, const hu_json_value_
                         strlen(cfg->agent.s3_local_model) + 1);
             cfg->agent.s3_local_model = hu_strdup(a, s3_local);
         }
+        const char *mr_on_dev = hu_json_get_string(mr_obj, "on_device_model");
+        if (mr_on_dev) {
+            if (cfg->agent.mr_on_device_model)
+                a->free(a->ctx, cfg->agent.mr_on_device_model,
+                        strlen(cfg->agent.mr_on_device_model) + 1);
+            cfg->agent.mr_on_device_model = hu_strdup(a, mr_on_dev);
+        }
+        cfg->agent.mr_on_device_enabled =
+            hu_json_get_bool(mr_obj, "on_device_enabled", cfg->agent.mr_on_device_enabled);
     }
 
     return HU_OK;

@@ -606,6 +606,23 @@ static void test_onboard_run_with_null_alloc(void) {
     HU_ASSERT_EQ(err, HU_OK); /* In HU_IS_TEST, returns OK without using alloc */
 }
 
+static void test_onboard_run_with_args_apple_shortcut(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_error_t err = hu_onboard_run_with_args(&alloc, NULL, NULL, true);
+    HU_ASSERT_EQ(err, HU_OK);
+}
+
+static void test_onboard_run_with_args_provider_override(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_error_t err = hu_onboard_run_with_args(&alloc, "gemini", "test-key", false);
+    HU_ASSERT_EQ(err, HU_OK);
+}
+
+static void test_onboard_run_with_args_null_alloc(void) {
+    hu_error_t err = hu_onboard_run_with_args(NULL, NULL, NULL, false);
+    HU_ASSERT_EQ(err, HU_OK); /* In HU_IS_TEST, returns OK */
+}
+
 /* ─── Skillforge tests (~30) ──────────────────────────────────────────────── */
 static void test_skillforge_create_destroy(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -1749,6 +1766,9 @@ void run_new_modules_tests(void) {
     HU_RUN_TEST(test_onboard_run_returns_ok_in_test_mode);
     HU_RUN_TEST(test_onboard_check_first_run_invoked);
     HU_RUN_TEST(test_onboard_run_with_null_alloc);
+    HU_RUN_TEST(test_onboard_run_with_args_apple_shortcut);
+    HU_RUN_TEST(test_onboard_run_with_args_provider_override);
+    HU_RUN_TEST(test_onboard_run_with_args_null_alloc);
 
     /* Skillforge */
     HU_RUN_TEST(test_skillforge_create_destroy);

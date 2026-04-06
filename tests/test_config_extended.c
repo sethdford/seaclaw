@@ -1311,6 +1311,77 @@ static void test_config_parse_model_router_judge_disabled_by_default(void) {
     free_config(cfg);
 }
 
+static void test_config_parse_on_device_model(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *json =
+        "{\"agent\":{\"model_router\":{\"on_device_model\":\"custom-model\","
+        "\"on_device_enabled\":false}}}";
+    hu_error_t err = hu_config_parse_json(cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NOT_NULL(cfg->agent.mr_on_device_model);
+    HU_ASSERT_STR_EQ(cfg->agent.mr_on_device_model, "custom-model");
+    HU_ASSERT_FALSE(cfg->agent.mr_on_device_enabled);
+    free_config(cfg);
+}
+
+static void test_config_parse_on_device_enabled_default(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *json = "{\"agent\":{\"model_router\":{\"reflexive_model\":\"test\"}}}";
+    hu_error_t err = hu_config_parse_json(cfg, json, strlen(json));
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_NULL(cfg->agent.mr_on_device_model);
+#ifdef __APPLE__
+    HU_ASSERT_TRUE(cfg->agent.mr_on_device_enabled);
+#else
+    HU_ASSERT_FALSE(cfg->agent.mr_on_device_enabled);
+#endif
+    free_config(cfg);
+}
+
+static void test_config_parse_persona_contacts_populated(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *j = "{\"agent\":{\"persona_contacts\":{\"alice\":\"friendly\",\"bob\":\"formal\"}}}";
+    hu_config_parse_json(cfg, j, strlen(j));
+    HU_ASSERT_EQ(cfg->agent.persona_contacts_count, 2u);
+    HU_ASSERT_NOT_NULL(cfg->agent.persona_contacts);
+    free_config(cfg);
+}
+
+static void test_config_parse_persona_contacts_empty_object(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *j = "{\"agent\":{\"persona_contacts\":{}}}";
+    hu_config_parse_json(cfg, j, strlen(j));
+    HU_ASSERT_EQ(cfg->agent.persona_contacts_count, 0u);
+    HU_ASSERT_NULL(cfg->agent.persona_contacts);
+    free_config(cfg);
+}
+
+static void test_config_parse_persona_contacts_reload_clears(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *j1 = "{\"agent\":{\"persona_contacts\":{\"alice\":\"friendly\"}}}";
+    hu_config_parse_json(cfg, j1, strlen(j1));
+    HU_ASSERT_EQ(cfg->agent.persona_contacts_count, 1u);
+
+    const char *j2 = "{\"agent\":{\"persona_contacts\":{}}}";
+    hu_config_parse_json(cfg, j2, strlen(j2));
+    HU_ASSERT_EQ(cfg->agent.persona_contacts_count, 0u);
+    HU_ASSERT_NULL(cfg->agent.persona_contacts);
+    free_config(cfg);
+}
+
+static void test_config_parse_persona_contacts_non_object_clears(void) {
+    hu_config_t *cfg = make_config_with_arena();
+    const char *j1 = "{\"agent\":{\"persona_contacts\":{\"alice\":\"friendly\"}}}";
+    hu_config_parse_json(cfg, j1, strlen(j1));
+    HU_ASSERT_EQ(cfg->agent.persona_contacts_count, 1u);
+
+    const char *j2 = "{\"agent\":{\"persona_contacts\":\"invalid\"}}";
+    hu_config_parse_json(cfg, j2, strlen(j2));
+    HU_ASSERT_EQ(cfg->agent.persona_contacts_count, 0u);
+    HU_ASSERT_NULL(cfg->agent.persona_contacts);
+    free_config(cfg);
+}
+
 void run_config_extended_tests(void) {
     HU_TEST_SUITE("Config Extended");
     HU_RUN_TEST(test_config_load_from_null_uses_default_path);
@@ -1437,4 +1508,12 @@ void run_config_extended_tests(void) {
     HU_RUN_TEST(test_config_parse_very_long_key_value);
     HU_RUN_TEST(test_config_parse_model_router_judge);
     HU_RUN_TEST(test_config_parse_model_router_judge_disabled_by_default);
+    HU_RUN_TEST(test_config_parse_on_device_model);
+    HU_RUN_TEST(test_config_parse_on_device_enabled_default);
+
+    /* Persona contacts leak-fix */
+    HU_RUN_TEST(test_config_parse_persona_contacts_populated);
+    HU_RUN_TEST(test_config_parse_persona_contacts_empty_object);
+    HU_RUN_TEST(test_config_parse_persona_contacts_reload_clears);
+    HU_RUN_TEST(test_config_parse_persona_contacts_non_object_clears);
 }

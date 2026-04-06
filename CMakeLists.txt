@@ -37,6 +37,11 @@ option(HU_ENABLE_FEEDS "Build feed ingestion and research agent" OFF)
 option(HU_ENABLE_SOCIAL "Build social feed ingestion (Facebook, Instagram)" OFF)
 option(HU_ENABLE_EMBEDDED_MODEL "Enable embedded model provider (llama.cpp/llama-cli)" OFF)
 option(HU_ENABLE_COREML "Enable CoreML/MLX provider (macOS only)" OFF)
+if(APPLE)
+    option(HU_ENABLE_APPLE_INTELLIGENCE "Enable Apple Intelligence provider (apfel on-device)" ON)
+else()
+    option(HU_ENABLE_APPLE_INTELLIGENCE "Enable Apple Intelligence provider (apfel on-device)" OFF)
+endif()
 option(HU_ENABLE_MCP "Enable MCP client (multi-server tool discovery)" ON)
 
 # WASM build: cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/wasm32-wasi.cmake -DHU_BUILD_WASM=ON ..
@@ -883,6 +888,10 @@ if(HU_ENABLE_COREML)
     list(APPEND HU_CORE_SOURCES src/providers/coreml.c)
 endif()
 
+if(HU_ENABLE_APPLE_INTELLIGENCE)
+    list(APPEND HU_CORE_SOURCES src/providers/apple.c)
+endif()
+
 # Persona system (~138 KB; disable for minimal/embedded builds)
 if(HU_ENABLE_PERSONA)
     list(APPEND HU_CORE_SOURCES
@@ -1451,6 +1460,13 @@ else()
     message(STATUS "Embedded model provider: disabled")
 endif()
 
+if(HU_ENABLE_APPLE_INTELLIGENCE)
+    target_compile_definitions(human_core PRIVATE HU_ENABLE_APPLE_INTELLIGENCE=1)
+    message(STATUS "Apple Intelligence provider: enabled (apfel on-device)")
+else()
+    message(STATUS "Apple Intelligence provider: disabled")
+endif()
+
 if(HU_ENABLE_COREML)
     target_compile_definitions(human_core PRIVATE HU_ENABLE_COREML=1)
     message(STATUS "CoreML/MLX provider: enabled")
@@ -1789,6 +1805,9 @@ if(NOT HU_ENABLE_PERSONA)
         src/memory/degradation.c src/memory/opinions.c src/memory/life_chapters.c
         src/memory/rag_pipeline.c src/persona/training.c)
 endif()
+if(NOT HU_ENABLE_APPLE_INTELLIGENCE)
+    list(APPEND HU_TEST_EXTRA_MODULES src/providers/apple.c)
+endif()
 if(NOT HU_ENABLE_CARTESIA)
     list(APPEND HU_TEST_EXTRA_MODULES
         src/tts/audio_pipeline.c
@@ -1815,6 +1834,9 @@ add_library(human_core_test STATIC ${HU_CORE_SOURCES} ${HU_TEST_EXTRA_CHANNELS} 
 target_include_directories(human_core_test PUBLIC ${HU_ROOT}/include)
 target_include_directories(human_core_test PRIVATE ${HU_ROOT}/asm/generic)
 target_compile_definitions(human_core_test PRIVATE HU_IS_TEST=1)
+if(HU_ENABLE_APPLE_INTELLIGENCE)
+    target_compile_definitions(human_core_test PRIVATE HU_ENABLE_APPLE_INTELLIGENCE=1)
+endif()
 if(HU_ENABLE_COREML)
     target_compile_definitions(human_core_test PRIVATE HU_ENABLE_COREML=1)
 endif()
@@ -2338,6 +2360,7 @@ list(APPEND HU_TEST_SOURCES tests/test_plugin_hooks.c)
 list(APPEND HU_TEST_SOURCES
     tests/test_gvr.c
     tests/test_provider_degradation.c
+    tests/test_apple_provider.c
     tests/test_escalate.c
     tests/test_a2a.c
     tests/test_eval.c
@@ -2418,6 +2441,9 @@ target_include_directories(human_tests PRIVATE ${HU_ROOT}/tests ${HU_ROOT}/src/g
 target_compile_definitions(human_tests PRIVATE "HU_EVAL_SUITES_DIR=\"${HU_ROOT}/eval_suites\"")
 # HU_HAS_PERSONA always set for tests: test lib has persona (main or extra), struct layout must match
 target_compile_definitions(human_tests PRIVATE HU_IS_TEST=1 HU_GATEWAY_TEST_MODE=1 HU_HAS_NONE_ENGINE=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1 HU_HAS_RUNTIME_EXOTIC=1)
+if(HU_ENABLE_APPLE_INTELLIGENCE)
+    target_compile_definitions(human_tests PRIVATE HU_ENABLE_APPLE_INTELLIGENCE=1)
+endif()
 if(HU_ENABLE_COREML)
     target_compile_definitions(human_tests PRIVATE HU_ENABLE_COREML=1)
 endif()

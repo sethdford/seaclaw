@@ -32,6 +32,9 @@
 #include "human/channels/channel_embed.h"
 /* Provider factory for classify provider creation */
 #include "human/providers/factory.h"
+#ifdef HU_ENABLE_APPLE_INTELLIGENCE
+#include "human/providers/apple.h"
+#endif
 
 /* Plan 2: Background observer registry */
 #include "human/background_observer.h"
@@ -87,14 +90,18 @@ hu_error_t hu_style_clone_from_history(hu_allocator_t *alloc, const char **own_m
 
 /* Lightweight classification provider (e.g. Gemini Flash Lite) for hybrid routing.
  * When llm_decides is active, the primary agent turn uses the local model while
- * classification/scoring calls use this fast cloud provider. */
+ * classification/scoring calls use this fast cloud provider.
+ * Only meaningful in production — test builds early-return before these are accessed. */
+#if !(defined(HU_IS_TEST) && HU_IS_TEST)
 static hu_provider_t g_classify_provider;
 static bool g_classify_provider_ok = false;
 static const char *g_classify_model = "gemini-3.1-flash-lite-preview";
 static size_t g_classify_model_len = 29;
+#endif
 
-/* Emotion call sites are under #ifndef HU_IS_TEST in several branches; test lib still compiles
- * daemon.c with HU_IS_TEST=1, so the helper may be unreferenced. */
+/* Emotion detection: test builds use heuristic-only (no LLM), production uses hybrid
+ * routing via g_classify_provider when available. May appear unreferenced in test builds
+ * because some call sites are behind #ifndef HU_IS_TEST. */
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((unused))
 #endif
@@ -133,6 +140,9 @@ typedef struct {
     char direction[512];
 } hu_director_result_t;
 
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((unused))
+#endif
 static void hu_daemon_parse_director_result(const char *raw, size_t len,
                                             hu_director_result_t *out) {
     memset(out, 0, sizeof(*out));
@@ -8233,6 +8243,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         mr_cfg.deep_model = config->agent.mr_deep_model;
                         mr_cfg.deep_model_len = strlen(config->agent.mr_deep_model);
                     }
+                    if (config && config->agent.mr_on_device_model) {
+                        mr_cfg.on_device_model = config->agent.mr_on_device_model;
+                        mr_cfg.on_device_model_len = strlen(config->agent.mr_on_device_model);
+                    }
+#ifdef HU_ENABLE_APPLE_INTELLIGENCE
+                    if (!config || config->agent.mr_on_device_enabled) {
+                        mr_cfg.on_device_available =
+                            hu_apple_probe(agent->alloc, NULL, 0);
+                    }
+#endif
                     const char *rel = NULL;
                     size_t rel_len = 0;
 #ifdef HU_HAS_PERSONA

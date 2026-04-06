@@ -14,6 +14,9 @@
 #include "human/config.h"
 #include "human/core/error.h"
 #include "human/core/string.h"
+#ifdef HU_ENABLE_APPLE_INTELLIGENCE
+#include "human/providers/apple.h"
+#endif
 #ifdef HU_HAS_CRON
 #include "human/cron.h"
 #endif
@@ -1033,6 +1036,16 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
                 mr_cfg.deep_model = cfg.agent.mr_deep_model;
                 mr_cfg.deep_model_len = strlen(cfg.agent.mr_deep_model);
             }
+            if (cfg.agent.mr_on_device_model) {
+                mr_cfg.on_device_model = cfg.agent.mr_on_device_model;
+                mr_cfg.on_device_model_len = strlen(cfg.agent.mr_on_device_model);
+            }
+#ifdef HU_ENABLE_APPLE_INTELLIGENCE
+            if (cfg.agent.mr_on_device_enabled) {
+                mr_cfg.on_device_available =
+                    hu_apple_probe(agent.alloc, NULL, 0);
+            }
+#endif
             time_t now_rt = time(NULL);
             struct tm *lt = localtime(&now_rt);
             int hour = lt ? lt->tm_hour : 12;

@@ -417,6 +417,77 @@ static void parse_judge_markdown_wrapped(void) {
     HU_ASSERT(tier == HU_TIER_CONVERSATIONAL);
 }
 
+/* ── On-device routing ──────────────────────────────────────────────── */
+
+static void default_config_has_on_device_fields(void) {
+    cfg = hu_model_router_default_config();
+    HU_ASSERT_NOT_NULL(cfg.on_device_model);
+    HU_ASSERT(cfg.on_device_model_len > 0);
+    HU_ASSERT_FALSE(cfg.on_device_available);
+}
+
+static void on_device_suitable_reflexive_only(void) {
+    HU_ASSERT_TRUE(hu_model_router_on_device_suitable(HU_TIER_REFLEXIVE));
+    HU_ASSERT_FALSE(hu_model_router_on_device_suitable(HU_TIER_CONVERSATIONAL));
+    HU_ASSERT_FALSE(hu_model_router_on_device_suitable(HU_TIER_ANALYTICAL));
+    HU_ASSERT_FALSE(hu_model_router_on_device_suitable(HU_TIER_DEEP));
+}
+
+static void reflexive_uses_on_device_when_available(void) {
+    cfg = hu_model_router_default_config();
+    cfg.on_device_available = true;
+    hu_model_selection_t sel = hu_model_route(&cfg, "ok", 2, NULL, 0, 14, 0);
+    HU_ASSERT(sel.tier == HU_TIER_REFLEXIVE);
+    HU_ASSERT_STR_EQ(sel.model, cfg.on_device_model);
+}
+
+static void reflexive_uses_cloud_when_on_device_unavailable(void) {
+    cfg = hu_model_router_default_config();
+    cfg.on_device_available = false;
+    hu_model_selection_t sel = hu_model_route(&cfg, "ok", 2, NULL, 0, 14, 0);
+    HU_ASSERT(sel.tier == HU_TIER_REFLEXIVE);
+    HU_ASSERT_STR_EQ(sel.model, cfg.reflexive_model);
+}
+
+static void reflexive_uses_custom_on_device_model(void) {
+    cfg = hu_model_router_default_config();
+    cfg.on_device_available = true;
+    cfg.on_device_model = "custom-local-model";
+    cfg.on_device_model_len = 18;
+    hu_model_selection_t sel = hu_model_route(&cfg, "yep", 3, NULL, 0, 14, 0);
+    HU_ASSERT(sel.tier == HU_TIER_REFLEXIVE);
+    HU_ASSERT_STR_EQ(sel.model, "custom-local-model");
+}
+
+static void conversational_never_uses_on_device(void) {
+    cfg = hu_model_router_default_config();
+    cfg.on_device_available = true;
+    const char *msg = "hey what are you up to today? want to grab lunch or something";
+    hu_model_selection_t sel = hu_model_route(&cfg, msg, strlen(msg), NULL, 0, 12, 2);
+    HU_ASSERT(sel.tier >= HU_TIER_CONVERSATIONAL);
+    HU_ASSERT_STR_EQ(sel.model, cfg.conversational_model);
+}
+
+static void judge_cached_reflexive_uses_on_device(void) {
+    hu_model_router_config_t c = hu_model_router_default_config();
+    c.on_device_available = true;
+    hu_provider_t dummy;
+    memset(&dummy, 0, sizeof(dummy));
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_route_cache_t cache;
+    hu_route_cache_init(&cache);
+
+    int64_t now = (int64_t)time(NULL);
+    hu_route_cache_put(&cache, "ok sounds good", 14, now, HU_TIER_REFLEXIVE);
+
+    hu_model_selection_t sel = hu_model_route_with_judge(
+        &c, "ok sounds good", 14, NULL, 0, 12, 0,
+        &dummy, "test-model", 10, &alloc, &cache);
+    HU_ASSERT(sel.source == HU_ROUTE_JUDGE_CACHED);
+    HU_ASSERT(sel.tier == HU_TIER_REFLEXIVE);
+    HU_ASSERT_STR_EQ(sel.model, c.on_device_model);
+}
+
 void run_model_router_tests(void) {
     HU_TEST_SUITE("Model Router");
 
@@ -482,4 +553,13 @@ void run_model_router_tests(void) {
     /* SOTA gap fixes */
     HU_RUN_TEST(analytical_and_deep_use_different_models);
     HU_RUN_TEST(very_long_message_scores_higher);
+
+    /* On-device routing */
+    HU_RUN_TEST(default_config_has_on_device_fields);
+    HU_RUN_TEST(on_device_suitable_reflexive_only);
+    HU_RUN_TEST(reflexive_uses_on_device_when_available);
+    HU_RUN_TEST(reflexive_uses_cloud_when_on_device_unavailable);
+    HU_RUN_TEST(reflexive_uses_custom_on_device_model);
+    HU_RUN_TEST(conversational_never_uses_on_device);
+    HU_RUN_TEST(judge_cached_reflexive_uses_on_device);
 }

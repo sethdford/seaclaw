@@ -43,6 +43,14 @@ hu_error_t hu_onboard_run(hu_allocator_t *alloc) {
     (void)alloc;
     return HU_OK;
 }
+hu_error_t hu_onboard_run_with_args(hu_allocator_t *alloc, const char *cli_provider,
+                                    const char *cli_api_key, bool apple_shortcut) {
+    (void)alloc;
+    (void)cli_provider;
+    (void)cli_api_key;
+    (void)apple_shortcut;
+    return HU_OK;
+}
 #else
 
 static const char *const HU_AGENTS_TEMPLATE = "# AGENTS.md — Project Agent Protocol\n"
@@ -94,7 +102,16 @@ static char *read_line(char *buf, size_t buf_size) {
     return buf;
 }
 
+static bool is_apple_provider(const char *provider) {
+    return strcmp(provider, "apple") == 0;
+}
+
 hu_error_t hu_onboard_run(hu_allocator_t *alloc) {
+    return hu_onboard_run_with_args(alloc, NULL, NULL, false);
+}
+
+hu_error_t hu_onboard_run_with_args(hu_allocator_t *alloc, const char *cli_provider,
+                                    const char *cli_api_key, bool apple_shortcut) {
     if (!alloc)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -108,30 +125,82 @@ hu_error_t hu_onboard_run(hu_allocator_t *alloc) {
 
     char buf[512];
     char *line;
+    const char *provider = NULL;
+    const char *api_key = "";
+    const char *model = NULL;
 
-    static const hu_choice_t provider_choices[] = {
-        {"OpenAI (GPT-4, etc.)", "openai", true},
-        {"Anthropic (Claude)", "anthropic", false},
-        {"Ollama (local)", "ollama", false},
-        {"OpenRouter", "openrouter", false},
-    };
-    hu_choice_result_t provider_result;
-    hu_error_t err =
-        hu_choices_prompt("Choose your default provider:", provider_choices,
-                          sizeof(provider_choices) / sizeof(provider_choices[0]), &provider_result);
-    const char *provider = (err == HU_OK && provider_result.selected_value)
-                               ? provider_result.selected_value
-                               : "openai";
+    if (apple_shortcut) {
+        provider = "apple";
+        model = "apple-foundationmodel";
+    } else if (cli_provider) {
+        provider = cli_provider;
+    }
 
-    printf("API key (or set %s env var): ", "OPENAI_API_KEY");
-    fflush(stdout);
-    line = read_line(buf, sizeof(buf));
-    const char *api_key = line && line[0] ? line : "";
+    if (!provider) {
+#if defined(__APPLE__) && defined(HU_ENABLE_APPLE_INTELLIGENCE)
+        static const hu_choice_t provider_choices[] = {
+            {"Apple Intelligence (on-device, no API key)", "apple", true},
+            {"Gemini (cloud)", "gemini", false},
+            {"OpenAI (GPT-4, etc.)", "openai", false},
+            {"Anthropic (Claude)", "anthropic", false},
+            {"Ollama (local)", "ollama", false},
+            {"OpenRouter", "openrouter", false},
+        };
+#else
+        static const hu_choice_t provider_choices[] = {
+            {"Gemini (cloud)", "gemini", true},
+            {"OpenAI (GPT-4, etc.)", "openai", false},
+            {"Anthropic (Claude)", "anthropic", false},
+            {"Ollama (local)", "ollama", false},
+            {"OpenRouter", "openrouter", false},
+        };
+#endif
+        hu_choice_result_t provider_result;
+        hu_error_t err = hu_choices_prompt(
+            "Choose your default provider:", provider_choices,
+            sizeof(provider_choices) / sizeof(provider_choices[0]), &provider_result);
+        provider = (err == HU_OK && provider_result.selected_value)
+                       ? provider_result.selected_value
+                       : provider_choices[0].value;
+    }
 
-    printf("Model (e.g. gpt-4o): ");
-    fflush(stdout);
-    line = read_line(buf, sizeof(buf));
-    const char *model = line && line[0] ? line : "gpt-4o";
+    if (is_apple_provider(provider)) {
+        model = "apple-foundationmodel";
+        printf("\nApple Intelligence selected — no API key needed.\n");
+        printf("Requires: macOS 26+, Apple Silicon, Apple Intelligence enabled.\n");
+        printf("Install apfel if not already installed:\n");
+        printf("  brew tap Arthur-Ficial/tap && brew install apfel\n\n");
+    } else {
+        if (cli_api_key) {
+            api_key = cli_api_key;
+        } else {
+            const char *env_hint = "OPENAI_API_KEY";
+            if (strcmp(provider, "anthropic") == 0)
+                env_hint = "ANTHROPIC_API_KEY";
+            else if (strcmp(provider, "gemini") == 0)
+                env_hint = "GOOGLE_APPLICATION_CREDENTIALS";
+
+            printf("API key (or set %s env var): ", env_hint);
+            fflush(stdout);
+            line = read_line(buf, sizeof(buf));
+            api_key = line && line[0] ? line : "";
+        }
+
+        if (!model) {
+            const char *default_model = "gpt-4o";
+            if (strcmp(provider, "anthropic") == 0)
+                default_model = "claude-sonnet-4-20250514";
+            else if (strcmp(provider, "gemini") == 0)
+                default_model = "gemini-3.1-flash-lite-preview";
+            else if (strcmp(provider, "ollama") == 0)
+                default_model = "llama3";
+
+            printf("Model (default: %s): ", default_model);
+            fflush(stdout);
+            line = read_line(buf, sizeof(buf));
+            model = line && line[0] ? line : default_model;
+        }
+    }
 
     const char *home = getenv("HOME");
     if (!home)
@@ -152,7 +221,6 @@ hu_error_t hu_onboard_run(hu_allocator_t *alloc) {
     if (n <= 0 || (size_t)n >= sizeof(config_path))
         return HU_ERR_IO;
 
-    /* Minimal config JSON */
     char *ws_dir = hu_sprintf(alloc, "%s/%s/workspace", home, HU_CONFIG_DIR);
     if (!ws_dir)
         return HU_ERR_OUT_OF_MEMORY;
@@ -202,6 +270,10 @@ hu_error_t hu_onboard_run(hu_allocator_t *alloc) {
     alloc->free(alloc->ctx, ws_dir, strlen(ws_dir) + 1);
 
     printf("\nConfig written to %s\n", config_path);
+    if (is_apple_provider(provider))
+        printf("Run 'human agent' to start chatting with Apple Intelligence.\n");
+    else
+        printf("Run 'human agent' to start chatting.\n");
     return HU_OK;
 }
 #endif

@@ -102,6 +102,11 @@ if [ "${VERIFY_REDTEAM:-0}" = 1 ] && [ -f "scripts/redteam-eval-fleet.sh" ]; the
   run_check "Red-team eval fleet" bash scripts/redteam-eval-fleet.sh
 fi
 
+# 11. Install red team (docs consistency, CLI flag parity, platform defaults)
+if [ -f "scripts/redteam-install.sh" ]; then
+  run_check "Install red team" bash scripts/redteam-install.sh
+fi
+
 # Summary
 echo ""
 echo "=============================="

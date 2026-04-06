@@ -127,6 +127,8 @@ typedef struct hu_agent_config {
     bool mr_judge_enabled;               /* model router: enable LLM-as-Judge classification */
     char *mr_judge_model;                /* model router: model to use for judge (default: reflexive) */
     char *s3_local_model;                /* dedicated model for S3 (private) content; NULL = use degradation fallback */
+    char *mr_on_device_model;            /* model router: on-device model name (default: apple-foundationmodel) */
+    bool mr_on_device_enabled;           /* model router: enable on-device routing (default: true on macOS) */
     bool prompt_cache_enabled;           /* enable cross-turn system prompt dedup (default true) */
     bool agent_comm_enabled;
     uint32_t best_of_n;                  /* best-of-N candidates (0 or 1 = disabled, max 5) */

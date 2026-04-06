@@ -68,6 +68,18 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->providers = NULL;
     cfg->providers_len = 0;
     cfg->api_key = NULL;
+#if defined(__APPLE__) && defined(HU_ENABLE_APPLE_INTELLIGENCE)
+    cfg->default_provider = hu_strdup(a, "apple");
+    if (!cfg->default_provider) {
+        set_defaults_rollback(cfg, a);
+        return;
+    }
+    cfg->default_model = hu_strdup(a, "apple-foundationmodel");
+    if (!cfg->default_model) {
+        set_defaults_rollback(cfg, a);
+        return;
+    }
+#else
     cfg->default_provider = hu_strdup(a, "gemini");
     if (!cfg->default_provider) {
         set_defaults_rollback(cfg, a);
@@ -78,6 +90,7 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
         set_defaults_rollback(cfg, a);
         return;
     }
+#endif
     cfg->default_temperature = 0.7;
     cfg->temperature = 0.7;
     cfg->max_tokens = 0;
@@ -179,6 +192,9 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->agent.persona_channels_count = 0;
     cfg->agent.persona_contacts = NULL;
     cfg->agent.persona_contacts_count = 0;
+#ifdef __APPLE__
+    cfg->agent.mr_on_device_enabled = true;
+#endif
     cfg->policy.enabled = false;
     cfg->policy.rules_json = NULL;
     cfg->plugins.enabled = false;

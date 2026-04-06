@@ -62,6 +62,7 @@ export default defineConfig({
           label: "Providers",
           items: [
             { label: "Overview", slug: "providers/overview" },
+            { label: "Apple Intelligence", slug: "providers/apple" },
             { label: "Cloud Providers", slug: "providers/cloud" },
             { label: "Local Models", slug: "providers/local" },
             { label: "OpenAI-Compatible", slug: "providers/compatible" },

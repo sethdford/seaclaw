@@ -1,12 +1,20 @@
 ---
 title: Installation
-description: Build Human from source on macOS and Linux.
+description: Install Human on macOS or Linux. Mac users get on-device AI with zero configuration.
 ---
 
-Human can be installed via pre-built binaries or built from source with CMake.
+## One-command install
 
-:::tip Pre-built binaries
-Pre-built binaries are available via **Homebrew** (`brew install --HEAD ./Formula/human.rb`), **Docker** (`docker pull ghcr.io/sethdford/h-uman:latest`), **Nix** (`nix run github:sethdford/h-uman`), and **Debian** (`.deb` from [Releases](https://github.com/sethdford/h-uman/releases)). See the main [README](https://github.com/sethdford/h-uman#installation) for details.
+The fastest path — downloads the pre-built binary for your platform:
+
+```bash
+curl -fsSL https://h-uman.ai/install.sh | sh
+```
+
+**Mac users:** The installer offers to set up [Apple Intelligence](../providers/apple/) automatically — on-device AI with no API keys, no cloud, no cost.
+
+:::tip Other install methods
+**Homebrew:** `brew install --HEAD ./Formula/human.rb` | **Docker:** `docker pull ghcr.io/sethdford/h-uman:latest` | **Nix:** `nix run github:sethdford/h-uman`
 :::
 
 ## Prerequisites
@@ -44,7 +52,7 @@ Clone the repository, then build:
 
 ```bash
 git clone https://github.com/sethdford/h-uman.git
-cd human
+cd h-uman
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON -DHU_ENABLE_CURL=ON
 cmake --build . -j$(nproc)

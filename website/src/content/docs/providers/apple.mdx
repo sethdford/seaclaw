@@ -1,0 +1,113 @@
+---
+title: Apple Intelligence
+description: On-device AI with zero configuration. No API keys, no cloud, no cost.
+---
+
+Apple Intelligence is the **default provider** for Human on Mac. It runs entirely on your device using Apple's built-in foundation model — no API keys, no cloud accounts, no per-token billing.
+
+## Requirements
+
+- **Apple Silicon Mac** (M1 or later)
+- **macOS 26 (Tahoe)** or newer
+- **Apple Intelligence** enabled in System Settings
+- [**apfel**](https://github.com/Arthur-Ficial/apfel) installed (bridges Apple's FoundationModels framework)
+
+## Install
+
+```bash
+brew tap Arthur-Ficial/tap
+brew install apfel
+```
+
+Verify it works:
+
+```bash
+apfel "Hello from Apple Intelligence"
+```
+
+## Setup with Human
+
+Apple Intelligence is selected by default when you run `human onboard` on a Mac:
+
+```bash
+human onboard
+```
+
+Or skip all prompts:
+
+```bash
+human onboard --apple
+```
+
+This creates `~/.human/config.json` with:
+
+```json
+{
+  "default_provider": "apple",
+  "default_model": "apple-foundationmodel"
+}
+```
+
+## How it works
+
+Human talks to apfel's OpenAI-compatible HTTP server at `127.0.0.1:11434`:
+
+```
+human agent → HTTP → apfel server → FoundationModels API → on-device LLM
+```
+
+All inference runs locally on the Neural Engine. No data leaves your machine.
+
+## Model routing
+
+Human's adaptive model router uses Apple Intelligence for **reflexive-tier** messages — quick replies, acknowledgments, and simple questions. More complex messages (emotional, analytical, multi-step reasoning) automatically route to a cloud provider if one is configured.
+
+To configure a cloud fallback for complex messages:
+
+```json
+{
+  "default_provider": "apple",
+  "default_model": "apple-foundationmodel",
+  "providers": [
+    { "name": "gemini" }
+  ],
+  "agent": {
+    "model_router": {
+      "conversational_model": "gemini-3-flash-preview",
+      "analytical_model": "gemini-3-flash-preview",
+      "deep_model": "gemini-3.1-pro-preview"
+    }
+  }
+}
+```
+
+## Limitations
+
+| Constraint | Detail |
+|------------|--------|
+| Context window | 4,096 tokens (~3,000 words) |
+| Model | Single model (apple-foundationmodel), not configurable |
+| Guardrails | Apple's safety system may block some prompts |
+| Speed | On-device inference, not cloud-scale |
+| No embeddings | Vector embeddings not available |
+| No vision | Image/multimodal input not supported |
+| No streaming | Responses arrive complete (no token-by-token streaming) |
+
+## Configuration reference
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `default_provider` | `"apple"` | Set to `"apple"` to use Apple Intelligence |
+| `default_model` | `"apple-foundationmodel"` | The on-device model name |
+| `agent.model_router.on_device_model` | `"apple-foundationmodel"` | Override the on-device model name |
+| `agent.model_router.on_device_enabled` | `true` (macOS) | Set to `false` to disable on-device routing |
+
+## Troubleshooting
+
+**"Model unavailable"** — Ensure Apple Intelligence is enabled in System Settings > Apple Intelligence & Siri, and that apfel is running.
+
+**Slow responses** — On-device inference depends on your Mac's Neural Engine. First responses may be slower while the model loads.
+
+**Guardrail blocks** — Apple's safety system is conservative. Try rephrasing the prompt, or use `apfel --permissive` for relaxed guardrails (CLI only).
+
+**apfel not found** — Install via Homebrew: `brew tap Arthur-Ficial/tap && brew install apfel`

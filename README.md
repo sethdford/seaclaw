@@ -152,11 +152,14 @@ cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNE
 cmake --build .
 cd ..
 
-# Quick setup
-human onboard --api-key sk-... --provider openrouter
+# Mac users: zero-config with Apple Intelligence (on-device, free)
+human onboard --apple
+
+# Or pick any provider
+human onboard --provider openrouter --api-key sk-...
 
 # Or interactive wizard
-human onboard --interactive
+human onboard
 
 # Chat
 human agent -m "Hello, human!"
@@ -311,7 +314,7 @@ Nostr additionally: the `owner_pubkey` is **always** allowed regardless of `dm_a
 **Setup via onboarding wizard:**
 
 ```bash
-human onboard --interactive   # Step 7 configures Nostr
+human onboard   # configures Nostr when selected
 ```
 
 The wizard will:
@@ -587,8 +590,9 @@ Use `channels.web` for browser UI events (WebChannel v1):
 
 | Command                                                                  | Description                                            |
 | ------------------------------------------------------------------------ | ------------------------------------------------------ |
-| `onboard --api-key sk-... --provider openrouter`                         | Quick setup with API key and provider                  |
-| `onboard --interactive`                                                  | Full interactive wizard                                |
+| `onboard --apple`                                                        | Mac: zero-config Apple Intelligence setup              |
+| `onboard --provider openrouter --api-key sk-...`                         | Quick setup with API key and provider                  |
+| `onboard`                                                                | Interactive setup wizard                               |
 | `onboard --channels-only`                                                | Reconfigure channels/allowlists only                   |
 | `agent -m "..."`                                                         | Single message mode                                    |
 | `agent`                                                                  | Interactive chat mode (CLI)                            |

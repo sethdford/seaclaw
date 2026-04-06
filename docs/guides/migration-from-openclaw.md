@@ -27,7 +27,7 @@ This guide walks you through migrating from [OpenClaw](https://github.com/opencl
 
      ```bash
      git clone https://github.com/sethdford/h-uman.git
-     cd human
+     cd h-uman
      mkdir -p build && cd build
      cmake .. -DCMAKE_BUILD_TYPE=MinSizeRel -DHU_ENABLE_LTO=ON -DHU_ENABLE_ALL_CHANNELS=ON
      cmake --build .
