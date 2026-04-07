@@ -14,6 +14,7 @@ let package = Package(
                 .product(name: "HumanClient", package: "HumanKit"),
                 .product(name: "HumanChatUI", package: "HumanKit"),
                 .product(name: "HumanOnDevice", package: "HumanKit"),
+                .product(name: "HumanOnDeviceServer", package: "HumanKit"),
             ],
             path: "Sources/HumanApp"
         ),

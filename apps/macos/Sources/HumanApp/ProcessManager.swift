@@ -16,7 +16,7 @@ class ProcessManager {
         }
     }
 
-    var isApfelRunning: Bool {
+    var isOnDeviceServerRunning: Bool {
         queue.sync {
             guard let p = apfelProcess else { return false }
             return p.isRunning
@@ -27,8 +27,8 @@ class ProcessManager {
         resolveBinary("human")
     }
 
-    func apfelPath() -> String? {
-        resolveBinary("apfel")
+    func onDeviceServerPath() -> String? {
+        resolveBinary("human-ondevice") ?? resolveBinary("apfel")
     }
 
     private func resolveBinary(_ name: String) -> String? {
@@ -72,25 +72,28 @@ class ProcessManager {
                 }
             }
         }
-        startApfelIfAvailable()
+        startOnDeviceServerIfAvailable()
     }
 
-    /// Launch the apfel on-device server if the binary is installed.
-    func startApfelIfAvailable() {
+    /// Launch the on-device inference server if a binary is installed.
+    /// Prefers human-ondevice (our own), falls back to apfel.
+    func startOnDeviceServerIfAvailable() {
         queue.async { [weak self] in
             guard let self = self else { return }
             guard self.apfelProcess == nil || (self.apfelProcess?.isRunning == false) else { return }
-            guard let path = self.apfelPath() else { return }
+            guard let path = self.onDeviceServerPath() else { return }
             let p = Process()
             p.executableURL = URL(fileURLWithPath: path)
-            p.arguments = ["--serve"]
+            if path.hasSuffix("apfel") {
+                p.arguments = ["--serve"]
+            }
             p.standardOutput = nil
             p.standardError = nil
             do {
                 try p.run()
                 self.apfelProcess = p
             } catch {
-                // apfel is optional; silently ignore launch failures
+                // on-device server is optional; silently ignore launch failures
             }
         }
     }

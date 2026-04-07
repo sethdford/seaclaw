@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import HumanClient
 import HumanOnDevice
+import HumanOnDeviceServer
 import HumanProtocol
 
 /// Bridges `HumanConnection` to the macOS app’s completion-based API and `ObservableObject` updates.
@@ -20,8 +21,24 @@ final class GatewayClient: ObservableObject {
     /// On-device Apple Intelligence adapter for offline/fallback inference.
     let onDevice = OnDeviceChatAdapter()
 
+    /// In-process on-device HTTP server (started lazily when gateway is unavailable).
+    private var onDeviceHTTPServer: OnDeviceServer?
+
     /// Whether on-device Apple Intelligence inference is available on this device.
     var onDeviceAvailable: Bool { onDevice.isAvailable }
+
+    /// Start the in-process on-device server so the C backend can connect to it.
+    /// Safe to call multiple times — only starts once.
+    func ensureOnDeviceServer() {
+        guard onDeviceAvailable, onDeviceHTTPServer == nil else { return }
+        let server = OnDeviceServer(port: 11435)
+        do {
+            try server.start()
+            onDeviceHTTPServer = server
+        } catch {
+            // In-process server is best-effort
+        }
+    }
 
     /// Stream of gateway `event` frames for SwiftUI `onReceive`.
     var chatEventsPublisher: AnyPublisher<(String, [String: Any]?), Never> {

@@ -1469,7 +1469,7 @@ export class DemoGatewayClient extends EventTarget {
             {
               name: "apple",
               has_key: false,
-              base_url: "http://127.0.0.1:11434/v1",
+              base_url: "http://127.0.0.1:11435/v1",
               native_tools: true,
               is_default: (this.state.config.default_provider ?? "openrouter") === "apple",
               on_device: true,

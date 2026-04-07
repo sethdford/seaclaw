@@ -290,6 +290,10 @@ static hu_error_t apple_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_req
                             (fn_args && tcs[valid].arguments) ? strlen(fn_args) : 0;
                         valid++;
                     }
+                    if (valid == 0) {
+                        alloc->free(alloc->ctx, tcs, tc_count * sizeof(hu_tool_call_t));
+                        tcs = NULL;
+                    }
                     out->tool_calls = tcs;
                     out->tool_calls_count = valid;
                 }
@@ -383,6 +387,22 @@ hu_error_t hu_apple_provider_create(hu_allocator_t *alloc, const hu_apple_config
     return HU_OK;
 }
 
+static bool probe_url(hu_allocator_t *alloc, const char *base, size_t blen) {
+    while (blen > 0 && base[blen - 1] == '/')
+        blen--;
+    char url_buf[512];
+    int n = snprintf(url_buf, sizeof(url_buf), "%.*s/models", (int)blen, base);
+    if (n <= 0 || (size_t)n >= sizeof(url_buf))
+        return false;
+    hu_http_response_t hresp = {0};
+    hu_error_t err = hu_http_get(alloc, url_buf, NULL, &hresp);
+    if (err != HU_OK)
+        return false;
+    bool ok = (hresp.status_code >= 200 && hresp.status_code < 300);
+    hu_http_response_free(alloc, &hresp);
+    return ok;
+}
+
 bool hu_apple_probe(hu_allocator_t *alloc, const char *base_url, size_t base_url_len) {
 #if HU_IS_TEST
     (void)alloc;
@@ -393,28 +413,13 @@ bool hu_apple_probe(hu_allocator_t *alloc, const char *base_url, size_t base_url
     if (!alloc)
         return false;
 
-    const char *base = base_url;
-    size_t blen = base_url_len;
-    if (!base || blen == 0) {
-        base = HU_APPLE_DEFAULT_BASE_URL;
-        blen = sizeof(HU_APPLE_DEFAULT_BASE_URL) - 1;
-    }
+    /* If an explicit URL was given, probe only that. */
+    if (base_url && base_url_len > 0)
+        return probe_url(alloc, base_url, base_url_len);
 
-    while (blen > 0 && base[blen - 1] == '/')
-        blen--;
-
-    char url_buf[512];
-    int n = snprintf(url_buf, sizeof(url_buf), "%.*s/models", (int)blen, base);
-    if (n <= 0 || (size_t)n >= sizeof(url_buf))
-        return false;
-
-    hu_http_response_t hresp = {0};
-    hu_error_t err = hu_http_get(alloc, url_buf, NULL, &hresp);
-    if (err != HU_OK)
-        return false;
-
-    bool ok = (hresp.status_code >= 200 && hresp.status_code < 300);
-    hu_http_response_free(alloc, &hresp);
-    return ok;
+    /* Try human-ondevice (port 11435) first, then apfel (port 11434). */
+    if (probe_url(alloc, HU_APPLE_DEFAULT_BASE_URL, sizeof(HU_APPLE_DEFAULT_BASE_URL) - 1))
+        return true;
+    return probe_url(alloc, HU_APPLE_FALLBACK_BASE_URL, sizeof(HU_APPLE_FALLBACK_BASE_URL) - 1);
 #endif
 }

@@ -7,8 +7,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-/* Default apfel server endpoint (OpenAI-compatible). */
-#define HU_APPLE_DEFAULT_BASE_URL "http://127.0.0.1:11434/v1"
+/* Default on-device server endpoint (human-ondevice or apfel, OpenAI-compatible). */
+#define HU_APPLE_DEFAULT_BASE_URL "http://127.0.0.1:11435/v1"
+#define HU_APPLE_FALLBACK_BASE_URL "http://127.0.0.1:11434/v1"
 #define HU_APPLE_MODEL_NAME "apple-foundationmodel"
 #define HU_APPLE_CONTEXT_WINDOW 4096
 

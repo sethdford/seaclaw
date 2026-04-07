@@ -2005,18 +2005,31 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 PERSONA_STRDUP_OPT(cp->closing_style, s);
             hu_json_value_t *arr;
             arr = hu_json_object_get(cval, "interests");
-            if (arr)
-                parse_string_array(alloc, arr, &cp->interests, &cp->interests_count);
+            if (arr) {
+                err = parse_string_array(alloc, arr, &cp->interests, &cp->interests_count);
+                if (err != HU_OK)
+                    goto contacts_parse_fail;
+            }
             arr = hu_json_object_get(cval, "recent_topics");
-            if (arr)
-                parse_string_array(alloc, arr, &cp->recent_topics, &cp->recent_topics_count);
+            if (arr) {
+                err = parse_string_array(alloc, arr, &cp->recent_topics, &cp->recent_topics_count);
+                if (err != HU_OK)
+                    goto contacts_parse_fail;
+            }
             arr = hu_json_object_get(cval, "sensitive_topics");
-            if (arr)
-                parse_string_array(alloc, arr, &cp->sensitive_topics, &cp->sensitive_topics_count);
+            if (arr) {
+                err =
+                    parse_string_array(alloc, arr, &cp->sensitive_topics, &cp->sensitive_topics_count);
+                if (err != HU_OK)
+                    goto contacts_parse_fail;
+            }
             arr = hu_json_object_get(cval, "allowed_behaviors");
-            if (arr)
-                parse_string_array(alloc, arr, &cp->allowed_behaviors,
-                                   &cp->allowed_behaviors_count);
+            if (arr) {
+                err = parse_string_array(alloc, arr, &cp->allowed_behaviors,
+                                         &cp->allowed_behaviors_count);
+                if (err != HU_OK)
+                    goto contacts_parse_fail;
+            }
             hu_json_value_t *comm = hu_json_object_get(cval, "communication_patterns");
             if (comm && comm->type == HU_JSON_OBJECT) {
                 cp->texts_in_bursts = hu_json_get_bool(comm, "texts_in_bursts", false);
@@ -2048,6 +2061,17 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         }
         out->contacts = contacts;
         out->contacts_count = count;
+        goto contacts_parse_done;
+
+contacts_parse_fail:
+        for (size_t j = 0; j <= count; j++)
+            free_contact_profile(alloc, &contacts[j]);
+        alloc->free(alloc->ctx, contacts, n * sizeof(hu_contact_profile_t));
+        hu_persona_deinit(alloc, out);
+        hu_json_free(alloc, root);
+        return err;
+
+contacts_parse_done:;
     }
 
     hu_json_value_t *overlays_obj = hu_json_object_get(root, "channel_overlays");

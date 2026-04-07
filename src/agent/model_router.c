@@ -552,6 +552,24 @@ const char *hu_route_judge_system_prompt(void) {
     return JUDGE_SYSTEM_PROMPT;
 }
 
+/* Global routing log static state (must appear before hu_route_log_* uses it). */
+static hu_route_decision_log_t s_global_log;
+static bool s_global_log_initialized = false;
+static pthread_mutex_t s_global_log_mutex;
+static pthread_once_t s_global_log_mutex_once = PTHREAD_ONCE_INIT;
+
+static void hu_route_global_log_mutex_init_once(void) {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&s_global_log_mutex, &attr);
+    pthread_mutexattr_destroy(&attr);
+}
+
+static void hu_route_ensure_global_log_mutex(void) {
+    pthread_once(&s_global_log_mutex_once, hu_route_global_log_mutex_init_once);
+}
+
 /* ── Routing decision log ─────────────────────────────────────────────── */
 
 void hu_route_log_init(hu_route_decision_log_t *log) {
@@ -564,6 +582,11 @@ void hu_route_log_record(hu_route_decision_log_t *log, const hu_model_selection_
                          int heuristic_score, int64_t timestamp) {
     if (!log || !sel)
         return;
+    bool global = (log == &s_global_log);
+    if (global) {
+        hu_route_ensure_global_log_mutex();
+        pthread_mutex_lock(&s_global_log_mutex);
+    }
     hu_route_decision_t *entry = &log->entries[log->head];
     entry->tier = sel->tier;
     entry->source = sel->source;
@@ -579,15 +602,32 @@ void hu_route_log_record(hu_route_decision_log_t *log, const hu_model_selection_
     log->head = (log->head + 1) % HU_ROUTE_LOG_SIZE;
     if (log->count < HU_ROUTE_LOG_SIZE)
         log->count++;
+    if (global)
+        pthread_mutex_unlock(&s_global_log_mutex);
 }
 
 size_t hu_route_log_count(const hu_route_decision_log_t *log) {
-    return log ? log->count : 0;
+    if (!log)
+        return 0;
+    bool global = (log == &s_global_log);
+    if (global) {
+        hu_route_ensure_global_log_mutex();
+        pthread_mutex_lock(&s_global_log_mutex);
+    }
+    size_t c = log->count;
+    if (global)
+        pthread_mutex_unlock(&s_global_log_mutex);
+    return c;
 }
 
 const hu_route_decision_t *hu_route_log_get(const hu_route_decision_log_t *log, size_t index) {
     if (!log || index >= log->count)
         return NULL;
+    bool global = (log == &s_global_log);
+    if (global) {
+        hu_route_ensure_global_log_mutex();
+        pthread_mutex_lock(&s_global_log_mutex);
+    }
     /* Entries are stored newest-at-head. Index 0 = oldest visible entry. */
     size_t start;
     if (log->count < HU_ROUTE_LOG_SIZE)
@@ -595,18 +635,29 @@ const hu_route_decision_t *hu_route_log_get(const hu_route_decision_log_t *log, 
     else
         start = log->head; /* oldest is at head (about to be overwritten) */
     size_t actual = (start + index) % HU_ROUTE_LOG_SIZE;
-    return &log->entries[actual];
+    const hu_route_decision_t *out = &log->entries[actual];
+    if (global)
+        pthread_mutex_unlock(&s_global_log_mutex);
+    return out;
 }
 
 void hu_route_log_tier_counts(const hu_route_decision_log_t *log, size_t counts[4]) {
     memset(counts, 0, sizeof(size_t) * 4);
     if (!log)
         return;
+    bool global = (log == &s_global_log);
+    if (global) {
+        hu_route_ensure_global_log_mutex();
+        pthread_mutex_lock(&s_global_log_mutex);
+    }
+    size_t start = (log->count < HU_ROUTE_LOG_SIZE) ? 0 : log->head;
     for (size_t i = 0; i < log->count; i++) {
-        const hu_route_decision_t *d = hu_route_log_get(log, i);
-        if (d && d->tier <= HU_TIER_DEEP)
+        const hu_route_decision_t *d = &log->entries[(start + i) % HU_ROUTE_LOG_SIZE];
+        if (d->tier <= HU_TIER_DEEP)
             counts[d->tier]++;
     }
+    if (global)
+        pthread_mutex_unlock(&s_global_log_mutex);
 }
 
 /* ── String conversions ───────────────────────────────────────────────── */
@@ -643,11 +694,8 @@ const char *hu_route_source_str(hu_route_source_t source) {
 
 /* ── Global decision log ──────────────────────────────────────────────── */
 
-static hu_route_decision_log_t s_global_log;
-static bool s_global_log_initialized = false;
-static pthread_mutex_t s_global_log_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 hu_route_decision_log_t *hu_route_global_log(void) {
+    hu_route_ensure_global_log_mutex();
     pthread_mutex_lock(&s_global_log_mutex);
     if (!s_global_log_initialized) {
         hu_route_log_init(&s_global_log);
@@ -658,6 +706,7 @@ hu_route_decision_log_t *hu_route_global_log(void) {
 }
 
 void hu_route_global_log_lock(void) {
+    hu_route_ensure_global_log_mutex();
     pthread_mutex_lock(&s_global_log_mutex);
 }
 

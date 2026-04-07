@@ -92,6 +92,11 @@ Configuration is loaded from `~/.human/config.json` (or `$HU_CONFIG_FILE`):
       "name": "openai",
       "api_key": "${HU_OPENAI_API_KEY}",
       "model": "gpt-4"
+    },
+    {
+      "name": "apple",
+      "base_url": "http://127.0.0.1:11435/v1",
+      "model": "apple-foundationmodel"
     }
   ],
   "channels": [
