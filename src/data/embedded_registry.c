@@ -52,6 +52,8 @@ extern const unsigned char data_memory_relationship_words_json[];
 extern const size_t data_memory_relationship_words_json_len;
 extern const unsigned char data_memory_topic_patterns_json[];
 extern const size_t data_memory_topic_patterns_json_len;
+extern const unsigned char data_personas_default_json[];
+extern const size_t data_personas_default_json_len;
 extern const unsigned char data_persona_circadian_phases_json[];
 extern const size_t data_persona_circadian_phases_json_len;
 extern const unsigned char data_persona_relationship_stages_json[];
@@ -137,6 +139,7 @@ static const hu_embedded_data_entry_t hu_embedded_data_registry[] = {
     { "memory/emotion_prefixes.json", data_memory_emotion_prefixes_json, &data_memory_emotion_prefixes_json_len },
     { "memory/relationship_words.json", data_memory_relationship_words_json, &data_memory_relationship_words_json_len },
     { "memory/topic_patterns.json", data_memory_topic_patterns_json, &data_memory_topic_patterns_json_len },
+    { "personas/default.json", data_personas_default_json, &data_personas_default_json_len },
     { "persona/circadian_phases.json", data_persona_circadian_phases_json, &data_persona_circadian_phases_json_len },
     { "persona/relationship_stages.json", data_persona_relationship_stages_json, &data_persona_relationship_stages_json_len },
     { "prompts/autonomy_full.txt", data_prompts_autonomy_full_txt, &data_prompts_autonomy_full_txt_len },
@@ -152,7 +155,7 @@ static const hu_embedded_data_entry_t hu_embedded_data_registry[] = {
     { NULL, NULL, NULL }  /* Sentinel */
 };
 
-static const size_t hu_embedded_data_count = 37;  /* excluding sentinel */
+static const size_t hu_embedded_data_count = 38;  /* excluding sentinel */
 
 typedef struct {
     const char *path;
