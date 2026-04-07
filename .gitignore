@@ -117,6 +117,9 @@ eval_blinded_results.json
 eval_success_criteria.json
 
 # Training data and model weights
+convo-training-*/
+training-data/
+debug/
 data/imessage/
 data/facebook/
 data/merged/

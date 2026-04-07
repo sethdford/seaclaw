@@ -37,9 +37,9 @@
       "$type": "number"
     },
     "min-height": {
-      "$value": "36px",
+      "$value": "44px",
       "$type": "dimension",
-      "$description": "Touch target minimum"
+      "$description": "Touch target minimum (WCAG 2.1 AA / Apple HIG 44pt)"
     }
   },
   "card": {
@@ -120,8 +120,9 @@
       "$type": "dimension"
     },
     "min-height": {
-      "$value": "40px",
-      "$type": "dimension"
+      "$value": "44px",
+      "$type": "dimension",
+      "$description": "Touch target minimum (WCAG 2.1 AA / Apple HIG 44pt)"
     }
   },
   "tooltip": {

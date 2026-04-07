@@ -1,5 +1,5 @@
 {
-  "generated": "2026-04-05T20:45:57.375Z",
+  "generated": "2026-04-06T20:15:56.735Z",
   "groups": {
     "color.neutral": [
       {
@@ -773,6 +773,42 @@
         "value": "8px 12px"
       }
     ],
+    "spacing-adaptive": [
+      {
+        "name": "page-x",
+        "value": "clamp(1rem, 3vw, 2.5rem)"
+      },
+      {
+        "name": "page-y",
+        "value": "clamp(1rem, 2vw, 2rem)"
+      },
+      {
+        "name": "section-gap",
+        "value": "clamp(1.5rem, 3vw, 3rem)"
+      },
+      {
+        "name": "card-padding",
+        "value": "clamp(1rem, 2vw, 1.5rem)"
+      },
+      {
+        "name": "content-gap",
+        "value": "clamp(0.75rem, 1.5vw, 1.5rem)"
+      }
+    ],
+    "grid": [
+      {
+        "name": "track-sm",
+        "value": "12rem"
+      },
+      {
+        "name": "track-md",
+        "value": "16rem"
+      },
+      {
+        "name": "track-lg",
+        "value": "20rem"
+      }
+    ],
     "radius": [
       {
         "name": "none",
@@ -858,7 +894,7 @@
     "fontFamily": [
       {
         "name": "sans",
-        "value": "'Avenir', 'Avenir Next', -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+        "value": "'Avenir', 'Avenir Next', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
       },
       {
         "name": "mono",
@@ -868,35 +904,35 @@
     "fontSize": [
       {
         "name": "2xs",
-        "value": "0.625rem"
-      },
-      {
-        "name": "xs",
         "value": "0.6875rem"
       },
       {
-        "name": "sm",
-        "value": "0.8125rem"
+        "name": "xs",
+        "value": "0.75rem"
       },
       {
-        "name": "base",
+        "name": "sm",
         "value": "0.875rem"
       },
       {
-        "name": "lg",
+        "name": "base",
         "value": "1rem"
       },
       {
+        "name": "lg",
+        "value": "clamp(1.125rem, 1.5vw, 1.25rem)"
+      },
+      {
         "name": "xl",
-        "value": "1.25rem"
+        "value": "clamp(1.375rem, 2vw, 1.625rem)"
       },
       {
         "name": "2xl",
-        "value": "clamp(1.25rem, 3vw, 1.75rem)"
+        "value": "clamp(1.5rem, 3vw, 2rem)"
       },
       {
         "name": "3xl",
-        "value": "clamp(1.5rem, 4vw, 2.25rem)"
+        "value": "clamp(1.75rem, 4vw, 2.5rem)"
       },
       {
         "name": "hero",
@@ -1006,7 +1042,7 @@
     "typeRole.display-md": [
       {
         "name": "fontSize",
-        "value": "clamp(1.5rem, 4vw, 2.25rem)"
+        "value": "clamp(1.75rem, 4vw, 2.5rem)"
       },
       {
         "name": "fontWeight",
@@ -1024,7 +1060,7 @@
     "typeRole.headline-lg": [
       {
         "name": "fontSize",
-        "value": "clamp(1.25rem, 3vw, 1.75rem)"
+        "value": "clamp(1.5rem, 3vw, 2rem)"
       },
       {
         "name": "fontWeight",
@@ -1042,7 +1078,7 @@
     "typeRole.headline-md": [
       {
         "name": "fontSize",
-        "value": "1.25rem"
+        "value": "clamp(1.375rem, 2vw, 1.625rem)"
       },
       {
         "name": "fontWeight",
@@ -1060,7 +1096,7 @@
     "typeRole.headline-sm": [
       {
         "name": "fontSize",
-        "value": "1rem"
+        "value": "clamp(1.125rem, 1.5vw, 1.25rem)"
       },
       {
         "name": "fontWeight",
@@ -1078,7 +1114,7 @@
     "typeRole.title-lg": [
       {
         "name": "fontSize",
-        "value": "1rem"
+        "value": "clamp(1.125rem, 1.5vw, 1.25rem)"
       },
       {
         "name": "fontWeight",
@@ -1096,7 +1132,7 @@
     "typeRole.title-md": [
       {
         "name": "fontSize",
-        "value": "0.875rem"
+        "value": "1rem"
       },
       {
         "name": "fontWeight",
@@ -1114,7 +1150,7 @@
     "typeRole.title-sm": [
       {
         "name": "fontSize",
-        "value": "0.8125rem"
+        "value": "0.875rem"
       },
       {
         "name": "fontWeight",
@@ -1132,7 +1168,7 @@
     "typeRole.body-lg": [
       {
         "name": "fontSize",
-        "value": "1rem"
+        "value": "clamp(1.125rem, 1.5vw, 1.25rem)"
       },
       {
         "name": "fontWeight",
@@ -1150,7 +1186,7 @@
     "typeRole.body-md": [
       {
         "name": "fontSize",
-        "value": "0.875rem"
+        "value": "1rem"
       },
       {
         "name": "fontWeight",
@@ -1168,7 +1204,7 @@
     "typeRole.body-sm": [
       {
         "name": "fontSize",
-        "value": "0.8125rem"
+        "value": "0.875rem"
       },
       {
         "name": "fontWeight",
@@ -1186,7 +1222,7 @@
     "typeRole.label-lg": [
       {
         "name": "fontSize",
-        "value": "0.875rem"
+        "value": "1rem"
       },
       {
         "name": "fontWeight",
@@ -1204,7 +1240,7 @@
     "typeRole.label-md": [
       {
         "name": "fontSize",
-        "value": "0.8125rem"
+        "value": "0.875rem"
       },
       {
         "name": "fontWeight",
@@ -1222,7 +1258,7 @@
     "typeRole.label-sm": [
       {
         "name": "fontSize",
-        "value": "0.6875rem"
+        "value": "0.75rem"
       },
       {
         "name": "fontWeight",
@@ -1240,7 +1276,7 @@
     "typeRole.caption": [
       {
         "name": "fontSize",
-        "value": "0.6875rem"
+        "value": "0.75rem"
       },
       {
         "name": "fontWeight",
@@ -2551,7 +2587,7 @@
       },
       {
         "name": "font-size",
-        "value": "0.8125rem"
+        "value": "0.875rem"
       },
       {
         "name": "font-weight",
@@ -2559,7 +2595,7 @@
       },
       {
         "name": "min-height",
-        "value": "36px"
+        "value": "44px"
       }
     ],
     "card": [
@@ -2601,7 +2637,7 @@
       },
       {
         "name": "font-size",
-        "value": "0.6875rem"
+        "value": "0.75rem"
       },
       {
         "name": "font-weight",
@@ -2637,11 +2673,11 @@
       },
       {
         "name": "font-size",
-        "value": "0.875rem"
+        "value": "1rem"
       },
       {
         "name": "min-height",
-        "value": "40px"
+        "value": "44px"
       }
     ],
     "tooltip": [
@@ -2659,7 +2695,7 @@
       },
       {
         "name": "font-size",
-        "value": "0.6875rem"
+        "value": "0.75rem"
       },
       {
         "name": "max-width",
@@ -2703,7 +2739,7 @@
       },
       {
         "name": "font-size",
-        "value": "0.8125rem"
+        "value": "0.875rem"
       },
       {
         "name": "font-weight",
@@ -2729,7 +2765,7 @@
       },
       {
         "name": "font-size",
-        "value": "0.6875rem"
+        "value": "0.75rem"
       },
       {
         "name": "font-weight",
@@ -2918,24 +2954,20 @@
     ],
     "breakpoint": [
       {
-        "name": "sm",
-        "value": "480px"
+        "name": "compact",
+        "value": "600px"
       },
       {
-        "name": "md",
-        "value": "640px"
+        "name": "medium",
+        "value": "905px"
       },
       {
-        "name": "lg",
-        "value": "768px"
+        "name": "expanded",
+        "value": "1240px"
       },
       {
-        "name": "xl",
-        "value": "1024px"
-      },
-      {
-        "name": "2xl",
-        "value": "1536px"
+        "name": "wide",
+        "value": "1440px"
       }
     ],
     "glass.subtle": [

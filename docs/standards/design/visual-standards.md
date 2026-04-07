@@ -543,6 +543,45 @@ All narrative animations must be:
 
 ---
 
+## 9.5 Container Query Guidelines
+
+Components and views use container queries (`@container`) for intrinsic responsive behavior, independent of the viewport.
+
+### Setup
+
+Every view and layout component must set `container-type: inline-size` on `:host`:
+
+```css
+:host {
+  display: block;
+  container-type: inline-size;
+  min-width: 0; /* prevent flex/grid overflow */
+}
+```
+
+### Canonical Container Breakpoints
+
+Use `rem` units (container-relative, immune to root font changes). Document the canonical name in a comment:
+
+| Name         | Value    | ~px   | Use                                |
+| ------------ | -------- | ----- | ---------------------------------- |
+| `cq-sm`      | 30rem    | 480px | Narrow cards, single-column stack  |
+| `cq-compact` | 37.5rem  | 600px | Compact layout boundary            |
+| `cq-medium`  | 48rem    | 768px | Medium layout, 2→1 column grids   |
+| `cq-expanded`| 56.5rem  | 904px | Expanded content boundary          |
+
+Example: `@container (max-width: 48rem) /* cq-medium */`
+
+### Rules
+
+- Prefer `@container` over `@media` for component-level adaptation
+- Always use `rem` units in container queries (not `px`)
+- Document the canonical breakpoint name in a CSS comment
+- Use `min-width: 0` on all flex/grid hosts to prevent overflow
+- Grids should use `auto-fill` / `auto-fit` with `minmax()` for fluid column counts, plus a `@container` fallback for single-column stacking
+
+---
+
 ## 10. Quality Checklist
 
 Before shipping any visual change, verify:

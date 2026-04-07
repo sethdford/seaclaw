@@ -497,6 +497,30 @@ function generateCSS(
       lines.push(`  --hu-space-${k.replace("spacing.", "")}: ${v};`);
   }
 
+  // Base: Adaptive (fluid) spacing
+  lines.push("  /* Base: Adaptive Spacing (fluid clamp) */");
+  const adaptiveKeys = Object.keys(tokens)
+    .filter((k) => k.startsWith("spacing-adaptive."))
+    .sort();
+  for (const k of adaptiveKeys) {
+    const v = tokens[k];
+    if (v != null)
+      lines.push(
+        `  --hu-space-adaptive-${k.replace("spacing-adaptive.", "")}: ${v};`,
+      );
+  }
+
+  // Base: Grid track tokens
+  lines.push("  /* Base: Grid Tracks */");
+  const gridKeys = Object.keys(tokens)
+    .filter((k) => k.startsWith("grid."))
+    .sort();
+  for (const k of gridKeys) {
+    const v = tokens[k];
+    if (v != null)
+      lines.push(`  --hu-${k.replace(".", "-")}: ${v};`);
+  }
+
   // Base: Radius
   lines.push("  /* Base: Radius */");
   lines.push(`  --hu-radius: ${tokens["radius.md"] ?? "8px"};`);

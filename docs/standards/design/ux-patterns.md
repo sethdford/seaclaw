@@ -45,21 +45,23 @@ Shadows must match elevation: `--hu-shadow-sm` for surface, `--hu-shadow-md` for
 
 ### 1.3 Responsive Adaptation (Material 3: Window Size Classes)
 
-Views must adapt across four breakpoints. Use Material 3's window size class model:
+Views must adapt across four breakpoints aligned with M3 window size classes. Source of truth: `design-tokens/breakpoints.tokens.json`.
 
-| Class    | Breakpoint | Columns | Behavior                                    |
-| -------- | ---------- | ------- | ------------------------------------------- |
-| Compact  | < 480px    | 1       | Single-column, bottom nav, stacked controls |
-| Medium   | 480–768px  | 1–2     | Collapsible sidebar, 2-column grids         |
-| Expanded | 768–1024px | 2–3     | Persistent sidebar, multi-pane layouts      |
-| Wide     | > 1024px   | 3+      | Full canonical layout, supporting panes     |
+| Class    | Breakpoint             | Columns | Behavior                                    |
+| -------- | ---------------------- | ------- | ------------------------------------------- |
+| Compact  | < 600px                | 1       | Single-column, bottom nav, stacked controls |
+| Medium   | 600–904px              | 1–2     | Collapsed sidebar, 2-column grids           |
+| Expanded | 905–1239px             | 2–3     | Full sidebar, multi-pane layouts            |
+| Wide     | ≥ 1240px               | 3+      | Full canonical layout, detail panels        |
 
 Rules:
 
-- Navigation collapses to bottom bar below `--hu-breakpoint-md` (768px)
+- Navigation collapses to bottom bar below `--hu-breakpoint-compact` (600px)
 - Grid columns reduce: 3→2→1 as width decreases
-- Touch targets minimum 44×44px on all breakpoints (Apple HIG)
-- Content padding reduces: `--hu-space-2xl` → `--hu-space-md` on compact
+- Touch targets minimum 44×44px on all breakpoints (WCAG 2.1 AA / Apple HIG)
+- Content padding uses adaptive tokens: `--hu-space-adaptive-page-x` / `--hu-space-adaptive-page-y`
+- Components use `container-type: inline-size` and `@container` queries with canonical `rem` breakpoints (see `design-strategy.md` §Breakpoints)
+- All flex/grid containers set `min-width: 0` on `:host` to prevent overflow
 
 ---
 

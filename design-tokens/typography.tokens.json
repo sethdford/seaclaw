@@ -7,8 +7,9 @@
   "$description": "Typography tokens — font families, sizes, weights, line-heights, letter-spacing, and type roles",
   "fontFamily": {
     "sans": {
-      "$value": "'Avenir', 'Avenir Next', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
-      "$type": "fontFamily"
+      "$value": "'Avenir', 'Avenir Next', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+      "$type": "fontFamily",
+      "$description": "Avenir (macOS local), Inter (cross-platform web fallback with similar metrics), then system"
     },
     "mono": {
       "$value": "'Geist Mono', ui-monospace, 'SF Mono', monospace",
@@ -17,49 +18,49 @@
   },
   "fontSize": {
     "2xs": {
-      "$value": "0.625rem",
-      "$type": "dimension",
-      "$description": "10px — smallest readable size, used for badges and secondary metadata"
-    },
-    "xs": {
       "$value": "0.6875rem",
       "$type": "dimension",
-      "$description": "11px"
+      "$description": "11px — smallest readable size, used for badges and secondary metadata"
+    },
+    "xs": {
+      "$value": "0.75rem",
+      "$type": "dimension",
+      "$description": "12px — captions, timestamps"
     },
     "sm": {
-      "$value": "0.8125rem",
-      "$type": "dimension",
-      "$description": "13px"
-    },
-    "base": {
       "$value": "0.875rem",
       "$type": "dimension",
-      "$description": "14px"
+      "$description": "14px — secondary text, labels"
     },
-    "lg": {
+    "base": {
       "$value": "1rem",
       "$type": "dimension",
-      "$description": "16px"
+      "$description": "16px — body text (matches Claude, Apple, ChatGPT)"
+    },
+    "lg": {
+      "$value": "clamp(1.125rem, 1.5vw, 1.25rem)",
+      "$type": "dimension",
+      "$description": "Fluid 18-20px — large body, emphasized text"
     },
     "xl": {
-      "$value": "1.25rem",
+      "$value": "clamp(1.375rem, 2vw, 1.625rem)",
       "$type": "dimension",
-      "$description": "20px"
+      "$description": "Fluid 22-26px — section headers"
     },
     "2xl": {
-      "$value": "clamp(1.25rem, 3vw, 1.75rem)",
+      "$value": "clamp(1.5rem, 3vw, 2rem)",
       "$type": "dimension",
-      "$description": "Fluid 20-28px"
+      "$description": "Fluid 24-32px — page headers"
     },
     "3xl": {
-      "$value": "clamp(1.5rem, 4vw, 2.25rem)",
+      "$value": "clamp(1.75rem, 4vw, 2.5rem)",
       "$type": "dimension",
-      "$description": "Fluid 24-36px"
+      "$description": "Fluid 28-40px — display text"
     },
     "hero": {
       "$value": "clamp(2rem, 5vw, 3.5rem)",
       "$type": "dimension",
-      "$description": "Fluid 32-56px"
+      "$description": "Fluid 32-56px — hero headlines"
     }
   },
   "fontWeight": {

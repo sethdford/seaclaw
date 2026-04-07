@@ -358,16 +358,41 @@ Use `--hu-chart-sequential-100` through `--hu-chart-sequential-800` for ordered 
 
 ## Breakpoints
 
-| Token                | Value  | Behavior |
-| -------------------- | ------ | -------- |
-| `--hu-breakpoint-sm` | 480px  | Mobile   |
-| `--hu-breakpoint-md` | 768px  | Tablet   |
-| `--hu-breakpoint-lg` | 1024px | Desktop  |
-| `--hu-breakpoint-xl` | 1280px | Wide     |
+Canonical 4-tier system aligned with M3 window size classes. Source of truth: `design-tokens/breakpoints.tokens.json`.
 
-Note: CSS custom properties cannot be used inside `@media` queries directly.
-Views should use the raw px values in media queries but document the token name
-in a comment: `@media (max-width: 768px) /* --hu-breakpoint-md */`.
+### Viewport Breakpoints (for `@media` queries)
+
+| Token                     | Value  | Use                                           |
+| ------------------------- | ------ | --------------------------------------------- |
+| `--hu-breakpoint-compact` | 600px  | Mobile: single column, bottom nav             |
+| `--hu-breakpoint-medium`  | 905px  | Tablet: collapsed sidebar, 2-column layout    |
+| `--hu-breakpoint-expanded`| 1240px | Desktop: full sidebar, multi-column content   |
+| `--hu-breakpoint-wide`    | 1440px | Ultrawide: detail panels, wider grids         |
+
+CSS custom properties cannot be used inside `@media` queries directly. Views use raw px values and document the token name in a comment: `@media (max-width: 599px) /* --hu-breakpoint-compact */`.
+
+### Container Query Breakpoints (for `@container` rules)
+
+Use `rem` units so breakpoints respond to container inline-size, not the viewport.
+
+| Name         | Value    | ~px   | Use                                |
+| ------------ | -------- | ----- | ---------------------------------- |
+| `cq-sm`      | 30rem    | 480px | Narrow cards, single-column stack  |
+| `cq-compact` | 37.5rem  | 600px | Compact layout boundary            |
+| `cq-medium`  | 48rem    | 768px | Medium layout, 2→1 column grids   |
+| `cq-expanded`| 56.5rem  | 904px | Expanded content boundary          |
+
+### Adaptive Spacing
+
+Fluid spacing tokens that scale with viewport via `clamp()`:
+
+| Token                            | Value                        | Range            |
+| -------------------------------- | ---------------------------- | ---------------- |
+| `--hu-space-adaptive-page-x`     | `clamp(1rem, 3vw, 2.5rem)`  | 16px → 40px      |
+| `--hu-space-adaptive-page-y`     | `clamp(1rem, 2vw, 2rem)`    | 16px → 32px      |
+| `--hu-space-adaptive-section-gap`| `clamp(1.5rem, 3vw, 3rem)`  | 24px → 48px      |
+| `--hu-space-adaptive-card-padding`| `clamp(1rem, 2vw, 1.5rem)` | 16px → 24px      |
+| `--hu-space-adaptive-content-gap`| `clamp(0.75rem, 1.5vw, 1.5rem)` | 12px → 24px |
 
 ## Accessibility Contract
 

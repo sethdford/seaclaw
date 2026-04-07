@@ -2,34 +2,29 @@
   "$schema": "https://design-tokens.github.io/community-group/format/",
   "$extensions": {
     "com.human.platform": "all",
-    "com.human.version": "0.5.0"
+    "com.human.version": "0.6.0"
   },
-  "$description": "Responsive breakpoint tokens",
+  "$description": "Responsive breakpoint tokens — canonical 4-tier system aligned with M3 window size classes. CSS @media cannot use custom properties; duplicate raw px and comment the token name.",
   "breakpoint": {
-    "sm": {
-      "$value": "480px",
+    "compact": {
+      "$value": "600px",
       "$type": "dimension",
-      "$description": "Small — compact mobile"
+      "$description": "Compact — mobile: single column, bottom nav. @media (max-width: 599px)"
     },
-    "md": {
-      "$value": "640px",
+    "medium": {
+      "$value": "905px",
       "$type": "dimension",
-      "$description": "Medium — mobile landscape"
+      "$description": "Medium — tablet: collapsed sidebar, 2-column layout. @media (min-width: 600px) and (max-width: 904px)"
     },
-    "lg": {
-      "$value": "768px",
+    "expanded": {
+      "$value": "1240px",
       "$type": "dimension",
-      "$description": "Large — tablets"
+      "$description": "Expanded — desktop: full sidebar, multi-column content. @media (min-width: 905px)"
     },
-    "xl": {
-      "$value": "1024px",
+    "wide": {
+      "$value": "1440px",
       "$type": "dimension",
-      "$description": "Extra-large — desktop"
-    },
-    "2xl": {
-      "$value": "1536px",
-      "$type": "dimension",
-      "$description": "2x extra-large — ultrawide"
+      "$description": "Wide — ultrawide: detail panels, wider grids. @media (min-width: 1240px)"
     }
   }
 }

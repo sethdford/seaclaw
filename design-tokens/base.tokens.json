@@ -668,6 +668,52 @@
       "$type": "dimension"
     }
   },
+  "spacing-adaptive": {
+    "$description": "Fluid spacing that scales with viewport. Use for page-level padding, section gaps, and card interiors instead of static spacing tokens at layout boundaries.",
+    "page-x": {
+      "$value": "clamp(1rem, 3vw, 2.5rem)",
+      "$type": "dimension",
+      "$description": "Horizontal page padding: 16px on mobile → 40px on desktop"
+    },
+    "page-y": {
+      "$value": "clamp(1rem, 2vw, 2rem)",
+      "$type": "dimension",
+      "$description": "Vertical page padding: 16px on mobile → 32px on desktop"
+    },
+    "section-gap": {
+      "$value": "clamp(1.5rem, 3vw, 3rem)",
+      "$type": "dimension",
+      "$description": "Gap between major sections: 24px on mobile → 48px on desktop"
+    },
+    "card-padding": {
+      "$value": "clamp(1rem, 2vw, 1.5rem)",
+      "$type": "dimension",
+      "$description": "Card interior padding: 16px on mobile → 24px on desktop"
+    },
+    "content-gap": {
+      "$value": "clamp(0.75rem, 1.5vw, 1.5rem)",
+      "$type": "dimension",
+      "$description": "Gap between content items: 12px on mobile → 24px on desktop"
+    }
+  },
+  "grid": {
+    "$description": "Grid track minimum widths for repeat(auto-fill, minmax(token, 1fr)) patterns",
+    "track-sm": {
+      "$value": "12rem",
+      "$type": "dimension",
+      "$description": "Small cards, stat tiles (~192px)"
+    },
+    "track-md": {
+      "$value": "16rem",
+      "$type": "dimension",
+      "$description": "Standard cards, list items (~256px)"
+    },
+    "track-lg": {
+      "$value": "20rem",
+      "$type": "dimension",
+      "$description": "Large cards, featured content (~320px)"
+    }
+  },
   "radius": {
     "$description": "Border radius scale",
     "none": {

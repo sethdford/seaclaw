@@ -3,6 +3,27 @@
 @import "./high-contrast.css";
 @import "./scroll-driven.css";
 
+/* Inter: cross-platform fallback when Avenir is unavailable (Windows, Linux).
+   Only loads if Avenir isn't found locally — browsers skip unused @font-face.
+   Metric overrides approximate Avenir's geometry to minimize CLS during swap.
+   Note: hosted on fonts.gstatic.com — exception to no-Google-Fonts rule
+   because Inter is only a fallback, not the primary typeface. */
+@font-face {
+  font-family: "Inter";
+  src: url("https://fonts.gstatic.com/s/inter/v18/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2JL7SUc.woff2")
+    format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 107%;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
 :root {
   --hu-color-white: #ffffff;
   --hu-color-black: #0c0a08;
@@ -10,11 +31,23 @@
   --hu-ambient-warmth: 0;
   --hu-ambient-breathing-duration: 4000ms;
   --hu-ambient-gradient-angle: 135deg;
-  /* Canonical breakpoints (4-tier responsive system) */
+  /* Canonical breakpoints (4-tier M3 window size classes)
+     Source of truth: design-tokens/breakpoints.tokens.json
+     compact  (<600px)    — mobile: single column, bottom nav
+     medium   (600–904px) — tablet: collapsed sidebar, 2-column
+     expanded (905+)      — desktop: full sidebar, multi-column
+     wide     (1240+)     — ultrawide: detail panels, wider grids */
   --hu-breakpoint-compact: 600px;
-  --hu-breakpoint-medium: 904px;
-  --hu-breakpoint-expanded: 1239px;
-  --hu-breakpoint-wide: 1240px;
+  --hu-breakpoint-medium: 905px;
+  --hu-breakpoint-expanded: 1240px;
+  --hu-breakpoint-wide: 1440px;
+  /* Container query breakpoints (rem-based, for use inside components/views)
+     These mirror the viewport tiers but use rem so they respond to container
+     inline-size, not the viewport. Use these with @container queries.
+     cq-sm:      30rem   (~480px)  — narrow cards, single-column stacking
+     cq-compact: 37.5rem (~600px)  — compact layout boundary
+     cq-medium:  48rem   (~768px)  — medium layout, 2→1 column grids
+     cq-expanded: 56.5rem (~904px) — expanded content boundary */
   --hu-detail-panel-width: 400px;
   --hu-glass-card-bg-mix: 65%;
   /* Frost bias: warm white + surface — reads as milky glass, not brand-green wash */
@@ -76,7 +109,12 @@ a,
 input,
 textarea,
 select {
-  transition: all var(--hu-duration-fast) var(--hu-ease-out);
+  transition:
+    background-color var(--hu-duration-fast) var(--hu-ease-out),
+    color var(--hu-duration-fast) var(--hu-ease-out),
+    border-color var(--hu-duration-fast) var(--hu-ease-out),
+    box-shadow var(--hu-duration-fast) var(--hu-ease-out),
+    opacity var(--hu-duration-fast) var(--hu-ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -808,13 +846,24 @@ hu-card.hu-entrance.hu-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .hu-stagger > *,
+  .hu-cascade > *,
+  .view-enter,
+  .hu-entrance,
+  .hu-ambient-breathe,
+  .hu-status-breathing,
+  .hu-glass-enter,
+  .hu-glass-exit,
+  .hu-physics-press:active,
+  .hu-physics-hover,
+  .hu-anticipate-enter,
+  .hu-path-motion {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  html {
+    scroll-behavior: auto;
   }
 }
 
@@ -1440,6 +1489,36 @@ hu-card.hu-entrance.hu-visible {
   }
 }
 
+/* Save-data / reduced-data: strip heavy decorative assets */
+@media (prefers-reduced-data: reduce) {
+  .hu-mesh-gradient,
+  .hu-aurora-gradient {
+    background: var(--hu-bg);
+    animation: none;
+  }
+
+  .hu-film-grain::before {
+    display: none;
+  }
+
+  .hu-glass-subtle,
+  .hu-glass-standard,
+  .hu-glass-prominent {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .hu-text-gradient,
+  .hu-text-gradient-warm,
+  .hu-text-gradient-aurora {
+    background: none;
+    -webkit-text-fill-color: var(--hu-text);
+    color: var(--hu-text);
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
+}
+
 /* ── Focus Management Utilities ── */
 
 /* Visible focus ring for all interactive elements */
@@ -1776,6 +1855,11 @@ dd {
 .hu-cv-defer {
   content-visibility: auto;
   contain-intrinsic-size: auto 300px;
+}
+
+.hu-cv-card-grid > * {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 12rem;
 }
 
 /* :has() — contextual layout and state (progressive enhancement; host props pierce shadow via CSS vars) */

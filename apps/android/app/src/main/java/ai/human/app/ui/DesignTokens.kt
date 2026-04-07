@@ -137,13 +137,13 @@ object HUTokens {
     val radiusXl = 16.dp
 
     // Font sizes
-    val textXs = 11.sp
-    val textSm = 13.sp
-    val textBase = 14.sp
-    val textLg = 16.sp
-    val textXl = 20.sp
-    val text2xl = 24.sp
-    val text3xl = 30.sp
+    val textXs = 12.sp
+    val textSm = 14.sp
+    val textBase = 16.sp
+    val textLg = 19.sp
+    val textXl = 24.sp
+    val text2xl = 28.sp
+    val text3xl = 34.sp
     val textHero = 44.sp
 
     // Font weights
