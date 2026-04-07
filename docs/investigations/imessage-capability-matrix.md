@@ -20,7 +20,8 @@ Canonical reference for every iMessage platform capability, our implementation s
 | **Classic tapback (send)** | Very high (70%+ of users) | JXA + AX automation | Implemented (fragile) | High | Requires AX permission, varies by macOS version. `HU_IMESSAGE_TAPBACK_ENABLED` opt-in. |
 | **Classic tapback (read)** | Very high | chat.db types 2000-2005 | Implemented | — | `hu_imessage_build_tapback_context()` |
 | **Custom emoji reaction (read)** | Growing (iOS 17+) | chat.db type 2006 | **Implemented** (this overhaul) | — | Added in this overhaul, aggregated in tapback context |
-| **Custom emoji reaction (send)** | Growing | imsg CLI or private API | Not implemented | Medium | imsg v0.5.0 `react` command supports custom emoji |
+| **Custom emoji reaction (send)** | Growing | imsg CLI or private API | **Blocked** | Medium | imsg CLI accepts emoji directly as `--reaction` value (e.g., `-r 🎉`); requires vtable extension to carry emoji string through `react()` |
+| **Proactive image generation** | High | DALL-E 3 + iMessage attachment | **Implemented** | — | 2% trigger, LLM prompt → DALL-E → download → send as attachment |
 | **Read receipts (read)** | ~77% of users enable | chat.db date_read column | Implemented | — | `hu_imessage_build_read_receipt_context()` |
 | **Read receipts (send)** | — | No public API | Not possible | — | Apple controls this per-contact |
 | **Typing indicator (send)** | High (humanizing) | System Events AX automation | **Implemented** (AX-based) | — | System Events AX automation: focus Messages.app input field + keystroke to trigger real '...' bubble. No private entitlements needed. Requires Accessibility permission. |
@@ -30,7 +31,7 @@ Canonical reference for every iMessage platform capability, our implementation s
 | **Edit message (send)** | 1 in 50 messages | Not feasible (see investigation) | Not implemented | — | See `imessage-edit-feasibility.md`. IMCore private API only. |
 | **Unsend message** | 1 in 50 messages | Partially feasible (AX automation) | Not implemented | Low | See `imessage-unsend-feasibility.md`. 2-minute window, fragile. |
 | **Abandoned typing** | Humanizing pattern | Not feasible (see investigation) | Not implemented | — | See `imessage-abandoned-typing-feasibility.md` |
-| **Music preview send (30s)** | Common | iTunes/Spotify API + AppleScript attachment | **Implemented** | — | iTunes .m4a preview + optional album art + Spotify/Apple Music rich link (auto-detected from user preference). Taste learning tracks reactions. See `src/music.c`. |
+| **Music preview send (30s)** | Common | iTunes/Spotify API + AppleScript attachment | **Implemented** | — | iTunes .m4a preview + optional album art + Spotify/Apple Music rich link (auto-detected from user preference). Taste learning tracks reactions with persistent storage (~/.human/music_taste.json). Spotify token cached with expiry. See `src/music.c`. |
 | **GIF send** | Common | Tenor API + AppleScript attachment | Implemented | — | `hu_imessage_fetch_gif()` + send as attachment |
 | **GIF tapback tracking** | — | chat.db | Implemented | — | `hu_imessage_count_recent_gif_tapbacks()` (now includes type 2006) |
 | **Message effects (read)** | Common | chat.db expressive_send_style_id | **Implemented** (this overhaul) | — | Detects all 13 bubble/screen effects (Slam, Loud, Gentle, Invisible Ink, Confetti, Echo, Fireworks, Happy Birthday, Heart, Lasers, Shooting Star, Sparkles, Spotlight) and shows `[Sent with <effect>]` prefix in content. |

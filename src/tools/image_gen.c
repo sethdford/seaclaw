@@ -5,10 +5,12 @@
 #include "human/core/error.h"
 #include "human/core/http.h"
 #include "human/core/json.h"
+#include "human/platform.h"
 #include "human/tool.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define IG_PROMPT_MAX 4000
 
@@ -376,4 +378,65 @@ hu_error_t hu_image_gen_url_into_buffer(hu_allocator_t *alloc, const char *query
     memcpy(out_url, tr.output, olen + 1);
     hu_tool_result_free(alloc, &tr);
     return HU_OK;
+}
+
+hu_error_t hu_image_gen_download(hu_allocator_t *alloc, const char *prompt, size_t prompt_len,
+                                 char *out_path, size_t out_path_cap) {
+    if (!alloc || !prompt || !prompt_len || !out_path || out_path_cap < 32)
+        return HU_ERR_INVALID_ARGUMENT;
+
+#if defined(HU_IS_TEST) && HU_IS_TEST
+    int n = snprintf(out_path, out_path_cap, "/tmp/hu_test_image_%.*s.png",
+                     (int)(prompt_len > 20 ? 20 : prompt_len), prompt);
+    return (n > 0 && (size_t)n < out_path_cap) ? HU_OK : HU_ERR_IO;
+#else
+    char url[2048];
+    hu_error_t err = hu_image_gen_url_into_buffer(alloc, prompt, prompt_len, url, sizeof(url));
+    if (err != HU_OK)
+        return err;
+
+    hu_http_response_t resp = {0};
+    err = hu_http_get(alloc, url, NULL, &resp);
+    if (err != HU_OK || resp.status_code != 200 || !resp.body || resp.body_len == 0) {
+        hu_http_response_free(alloc, &resp);
+        return HU_ERR_IO;
+    }
+
+    char *tmpdir = hu_platform_get_temp_dir(alloc);
+    if (!tmpdir) {
+        hu_http_response_free(alloc, &resp);
+        return HU_ERR_IO;
+    }
+    char tpl[512];
+    int tn = snprintf(tpl, sizeof(tpl), "%s/hu_img_XXXXXX.png", tmpdir);
+    alloc->free(alloc->ctx, tmpdir, strlen(tmpdir) + 1);
+    if (tn <= 0 || (size_t)tn >= sizeof(tpl)) {
+        hu_http_response_free(alloc, &resp);
+        return HU_ERR_IO;
+    }
+
+    int fd = mkstemps(tpl, 4);
+    if (fd < 0) {
+        hu_http_response_free(alloc, &resp);
+        return HU_ERR_IO;
+    }
+
+    size_t body_len = resp.body_len;
+    ssize_t written = write(fd, resp.body, body_len);
+    hu_http_response_free(alloc, &resp);
+    close(fd);
+
+    if (written < 0 || (size_t)written != body_len) {
+        unlink(tpl);
+        return HU_ERR_IO;
+    }
+
+    size_t pl = strlen(tpl);
+    if (pl >= out_path_cap) {
+        unlink(tpl);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    memcpy(out_path, tpl, pl + 1);
+    return HU_OK;
+#endif
 }

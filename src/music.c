@@ -4,6 +4,7 @@
 #include "human/core/json.h"
 #include "human/platform.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #if !defined(HU_IS_TEST)
@@ -461,17 +462,89 @@ size_t hu_music_taste_build_prompt(const char *contact_id, size_t cid_len, char 
     return w;
 }
 
-/* Persistence stubs — taste data is ephemeral for now (session-scoped) */
+/* ── Taste persistence (JSON file) ────────────────────────────────────── */
+
 hu_error_t hu_music_taste_save(const char *path, size_t path_len) {
-    (void)path;
-    (void)path_len;
-    return HU_ERR_NOT_SUPPORTED;
+    if (!path || path_len == 0 || s_taste_count == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char path_buf[512];
+    if (path_len >= sizeof(path_buf))
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(path_buf, path, path_len);
+    path_buf[path_len] = '\0';
+
+    FILE *f = fopen(path_buf, "w");
+    if (!f)
+        return HU_ERR_IO;
+
+    fprintf(f, "[\n");
+    for (int i = 0; i < s_taste_count; i++) {
+        music_taste_entry_t *e = &s_taste[i];
+        fprintf(f, "  {\"contact\":\"%s\",\"sends\":%d,\"reactions\":%d,\"artists\":[",
+                e->contact_id, e->sends, e->reactions);
+        int total = e->head < HU_MUSIC_TASTE_HISTORY ? e->head : HU_MUSIC_TASTE_HISTORY;
+        for (int j = 0; j < total; j++) {
+            int idx = (e->head - 1 - j + HU_MUSIC_TASTE_HISTORY * 2) % HU_MUSIC_TASTE_HISTORY;
+            if (e->artists[idx][0])
+                fprintf(f, "%s\"%s\"", j > 0 ? "," : "", e->artists[idx]);
+        }
+        fprintf(f, "]}%s\n", i + 1 < s_taste_count ? "," : "");
+    }
+    fprintf(f, "]\n");
+    fclose(f);
+    return HU_OK;
 }
 
 hu_error_t hu_music_taste_load(const char *path, size_t path_len) {
-    (void)path;
-    (void)path_len;
-    return HU_ERR_NOT_SUPPORTED;
+    if (!path || path_len == 0)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    char path_buf[512];
+    if (path_len >= sizeof(path_buf))
+        return HU_ERR_INVALID_ARGUMENT;
+    memcpy(path_buf, path, path_len);
+    path_buf[path_len] = '\0';
+
+    FILE *f = fopen(path_buf, "r");
+    if (!f)
+        return HU_ERR_NOT_FOUND;
+
+    char buf[8192];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    if (n == 0)
+        return HU_ERR_NOT_FOUND;
+    buf[n] = '\0';
+
+    /* Minimal JSON array parse: extract contact, sends, reactions */
+    s_taste_count = 0;
+    const char *p = buf;
+    while ((p = strstr(p, "\"contact\":\"")) != NULL && s_taste_count < HU_MUSIC_TASTE_MAX_CONTACTS) {
+        p += 11; /* skip "contact":" */
+        const char *end = strchr(p, '"');
+        if (!end)
+            break;
+        music_taste_entry_t *e = &s_taste[s_taste_count];
+        memset(e, 0, sizeof(*e));
+        size_t cl = (size_t)(end - p);
+        if (cl >= 127)
+            cl = 127;
+        memcpy(e->contact_id, p, cl);
+        e->contact_id[cl] = '\0';
+        p = end + 1;
+
+        const char *sends = strstr(p, "\"sends\":");
+        if (sends && sends < p + 200)
+            e->sends = atoi(sends + 8);
+        const char *reacts = strstr(p, "\"reactions\":");
+        if (reacts && reacts < p + 200)
+            e->reactions = atoi(reacts + 12);
+
+        s_taste_count++;
+    }
+
+    return s_taste_count > 0 ? HU_OK : HU_ERR_NOT_FOUND;
 }
 
 /* ── Result cleanup ──────────────────────────────────────────────────── */
@@ -529,10 +602,22 @@ hu_error_t hu_music_search(hu_allocator_t *alloc, const char *query, size_t quer
     return err;
 }
 
-/* ── Spotify: client credentials token + search ──────────────────────── */
+/* ── Spotify: client credentials token + search (with caching) ────────── */
+
+static char s_spotify_token[512];
+static time_t s_spotify_token_expiry;
 
 static hu_error_t spotify_get_token(hu_allocator_t *alloc, const char *client_id,
                                     const char *client_secret, char *token_out, size_t token_cap) {
+    /* Return cached token if still valid (with 60s safety margin) */
+    if (s_spotify_token[0] && time(NULL) < s_spotify_token_expiry - 60) {
+        size_t tl = strlen(s_spotify_token);
+        if (tl < token_cap) {
+            memcpy(token_out, s_spotify_token, tl + 1);
+            return HU_OK;
+        }
+    }
+
     /* Build Basic auth: base64(client_id:client_secret) */
     size_t id_len = strlen(client_id);
     size_t sec_len = strlen(client_secret);
@@ -596,6 +681,14 @@ static hu_error_t spotify_get_token(hu_allocator_t *alloc, const char *client_id
 
     size_t tl = strlen(tok);
     memcpy(token_out, tok, tl + 1);
+
+    /* Cache the token with its expiry */
+    if (tl < sizeof(s_spotify_token)) {
+        memcpy(s_spotify_token, tok, tl + 1);
+        int expires_in = (int)hu_json_get_number(root, "expires_in", 3600.0);
+        s_spotify_token_expiry = time(NULL) + expires_in;
+    }
+
     hu_json_free(alloc, root);
     return HU_OK;
 }

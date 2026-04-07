@@ -396,7 +396,7 @@ static void test_security_path_allowed_with_allowlist(void) {
         .allowed_paths = allowed,
         .allowed_paths_count = 1,
     };
-    HU_ASSERT_TRUE(hu_security_path_allowed(&p, "/tmp/ws/file", 11));
+    HU_ASSERT_TRUE(hu_security_path_allowed(&p, "/tmp/ws/file", 12));
     HU_ASSERT_FALSE(hu_security_path_allowed(&p, "/etc/passwd", 11));
 }
 
@@ -407,10 +407,10 @@ static void test_security_path_allowed_workspace_only(void) {
         .allowed_paths = NULL,
         .allowed_paths_count = 0,
     };
-    HU_ASSERT_TRUE(hu_security_path_allowed(&p, "/tmp/human_deep_test/test_input.txt", 32));
-    HU_ASSERT_TRUE(hu_security_path_allowed(&p, "/tmp/human_deep_test/sub/file.txt", 32));
+    HU_ASSERT_TRUE(hu_security_path_allowed(&p, "/tmp/human_deep_test/test_input.txt", 35));
+    HU_ASSERT_TRUE(hu_security_path_allowed(&p, "/tmp/human_deep_test/sub/file.txt", 33));
     HU_ASSERT_FALSE(hu_security_path_allowed(&p, "/etc/passwd", 11));
-    HU_ASSERT_FALSE(hu_security_path_allowed(&p, "/tmp/human_deep_test_evil/file", 31));
+    HU_ASSERT_FALSE(hu_security_path_allowed(&p, "/tmp/human_deep_test_evil/file", 29));
 }
 
 static void test_path_is_safe_null(void) {
@@ -609,7 +609,7 @@ static void test_policy_file_ops_path_allowed_subpath(void) {
         .allowed_paths = allowed,
         .allowed_paths_count = 1,
     };
-    HU_ASSERT_TRUE(hu_security_path_allowed(&p, "/tmp/ws/sub/file", 14));
+    HU_ASSERT_TRUE(hu_security_path_allowed(&p, "/tmp/ws/sub/file", 16));
 }
 
 static void test_policy_bypass_pipe_blocked(void) {

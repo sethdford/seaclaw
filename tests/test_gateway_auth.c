@@ -71,9 +71,8 @@ static void send_and_capture(hu_ws_conn_t *conn, hu_control_protocol_t *proto, c
     if (n > 0) {
         s_last_response[n] = '\0';
         s_last_response_len = (size_t)n;
-    } else {
-        s_last_response_len = 0;
     }
+    /* If socketpair read got nothing, keep capture_response callback data */
 #else
     (void)conn;
     (void)proto;

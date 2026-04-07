@@ -286,7 +286,8 @@ Use this to find the right files for a given task without searching the full cod
 | **Vertex auth (ADC)**       | `src/core/vertex_auth.c`, `include/human/core/vertex_auth.h`                                             | `test_media_gen.c`       |
 | **Vision OCR tool**         | `src/tools/vision_ocr.c`, `vision_ocr_apple.m`, `include/human/tools/vision_ocr.h`                      | `test_vision_ocr.c`      |
 | **Media generation**        | `src/tools/media_image.c`, `media_video.c`, `media_gif.c`                                                | `test_media_gen.c`       |
-| **Music (iTunes + Spotify + taste)** | `src/music.c`, `include/human/music.h`                                                            | `test_music.c`           |
+| **Music (iTunes + Spotify + taste + persistence)** | `src/music.c`, `include/human/music.h`                                                            | `test_music.c`           |
+| **Image gen (proactive + download)** | `src/tools/image_gen.c`, `include/human/tools/image_gen.h`                                            | `test_image_gen.c`       |
 | **Send voice message**      | `src/tools/send_voice_message.c`, `include/human/tools/send_voice_message.h`                             | `test_send_voice_message.c` |
 
 ## Native client apps (`apps/`)

@@ -2,6 +2,7 @@
 #include "human/music.h"
 #include "human/core/allocator.h"
 #include <string.h>
+#include <unistd.h>
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * PART 1 — URL encoding (now with %XX for non-ASCII)
@@ -375,6 +376,36 @@ static void test_music_taste_null_args(void) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * PART 7b — Taste persistence
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void test_music_taste_save_and_load(void) {
+    hu_music_taste_record_send("+15551234567", 12, "Radiohead", "Creep");
+    hu_music_taste_record_send("+15551234567", 12, "Nirvana", "Come As You Are");
+    hu_music_taste_record_reaction("+15551234567", 12);
+
+    const char *path = "/tmp/hu_test_music_taste.json";
+    size_t path_len = strlen(path);
+    HU_ASSERT_EQ(hu_music_taste_save(path, path_len), HU_OK);
+
+    /* Verify file exists by loading into a separate state */
+    hu_music_taste_record_send("+15559999999", 12, "Other", "Song");
+    HU_ASSERT_EQ(hu_music_taste_load(path, path_len), HU_OK);
+
+    (void)unlink(path);
+}
+
+static void test_music_taste_save_null_args(void) {
+    HU_ASSERT_EQ(hu_music_taste_save(NULL, 0), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_music_taste_save("", 0), HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_music_taste_load(NULL, 0), HU_ERR_INVALID_ARGUMENT);
+}
+
+static void test_music_taste_load_missing_file(void) {
+    HU_ASSERT_EQ(hu_music_taste_load("/tmp/hu_nonexistent_taste.json", 30), HU_ERR_NOT_FOUND);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * PART 8 — Network stubs + cleanup
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -471,6 +502,11 @@ void run_music_tests(void) {
     HU_RUN_TEST(test_music_taste_record_and_rate);
     HU_RUN_TEST(test_music_taste_prompt_has_artists);
     HU_RUN_TEST(test_music_taste_null_args);
+
+    /* Taste persistence */
+    HU_RUN_TEST(test_music_taste_save_and_load);
+    HU_RUN_TEST(test_music_taste_save_null_args);
+    HU_RUN_TEST(test_music_taste_load_missing_file);
 
     /* Network stubs + cleanup */
     HU_RUN_TEST(test_music_search_returns_not_supported);

@@ -51,6 +51,8 @@
 
 /* Music preview integration */
 #include "human/music.h"
+/* Proactive image generation */
+#include "human/tools/image_gen.h"
 /* Daemon modules */
 #include "human/daemon_cron.h"
 #include "human/daemon_lifecycle.h"
@@ -1427,8 +1429,10 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                     char *merged = (char *)alloc->alloc(alloc->ctx, merged_len);
                     if (merged) {
                         size_t pos = 0;
-                        memcpy(merged, prompt, prompt_len);
-                        pos += prompt_len;
+                        if (prompt && prompt_len > 0) {
+                            memcpy(merged, prompt, prompt_len);
+                            pos += prompt_len;
+                        }
                         merged[pos++] = '\n';
                         memcpy(merged + pos, topic_absence_json, topic_absence_len);
                         pos += topic_absence_len;
@@ -1437,7 +1441,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                         pos += hint_len;
                         merged[pos++] = '\n';
                         merged[pos] = '\0';
-                        alloc->free(alloc->ctx, prompt, prompt_len + 1);
+                        if (prompt)
+                            alloc->free(alloc->ctx, prompt, prompt_len + 1);
                         prompt = merged;
                         prompt_len = pos;
                     }
@@ -10885,8 +10890,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 }
 #endif
 
-                /* GIF reaction: send a GIF when the moment calls for it */
-                bool gif_sent_this_turn = false;
+                /* Load calibration data on first pass */
                 {
                     static bool gif_cal_loaded;
                     if (!gif_cal_loaded) {
@@ -10900,7 +10904,21 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 hu_conversation_gif_cal_load(gcp, (size_t)gn);
                         }
                     }
+                    static bool music_taste_loaded;
+                    if (!music_taste_loaded) {
+                        music_taste_loaded = true;
+                        const char *mh = getenv("HOME");
+                        if (mh) {
+                            char mtp[512];
+                            int mn = snprintf(mtp, sizeof(mtp), "%s/.human/music_taste.json", mh);
+                            if (mn > 0 && (size_t)mn < sizeof(mtp))
+                                hu_music_taste_load(mtp, (size_t)mn);
+                        }
+                    }
                 }
+
+                /* GIF reaction: send a GIF when the moment calls for it */
+                bool gif_sent_this_turn = false;
                 if (combined_len > 0 && ch->channel->vtable->send) {
                     float gif_prob = 0.10f;
                     const char *contact_rel = NULL;
@@ -11224,10 +11242,25 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                                         has_spotify ? "spotify" : "itunes",
                                                         has_artwork ? "+art" : "");
 
-                                            /* Record for taste learning */
+                                            /* Record for taste learning + periodic save */
                                             hu_music_taste_record_send(
                                                 batch_key, key_len,
                                                 song.artist_name, song.track_name);
+                                            {
+                                                static uint64_t last_taste_save_ms;
+                                                uint64_t tnow = (uint64_t)time(NULL) * 1000ULL;
+                                                if (tnow - last_taste_save_ms > 30000) {
+                                                    last_taste_save_ms = tnow;
+                                                    const char *th = getenv("HOME");
+                                                    if (th) {
+                                                        char tp[512];
+                                                        int tn2 = snprintf(tp, sizeof(tp),
+                                                            "%s/.human/music_taste.json", th);
+                                                        if (tn2 > 0 && (size_t)tn2 < sizeof(tp))
+                                                            hu_music_taste_save(tp, (size_t)tn2);
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         if (has_preview)
@@ -11248,6 +11281,50 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 alloc->free(alloc->ctx, music_suggestion,
                                             music_suggestion_len + 1);
                         }
+                    }
+                }
+
+                /* Proactive image generation: occasionally create and send an image */
+                if (combined_len > 0 && ch->channel->vtable->send &&
+                    !gif_sent_this_turn && agent->provider.vtable &&
+                    agent->provider.vtable->chat_with_system) {
+                    float img_prob = 0.02f;
+                    float roll_img = (float)(rand() % 10000) / 10000.0f;
+                    if (roll_img < img_prob && getenv("OPENAI_API_KEY")) {
+                        static const char img_sys[] =
+                            "Given the conversation, suggest a fun image to generate "
+                            "and share. Return ONLY a DALL-E prompt (under 200 chars) or SKIP.\n"
+                            "Example: A cozy cat reading a tiny newspaper with coffee\n"
+                            "Only suggest when the moment genuinely calls for a visual — "
+                            "funny, sweet, or illustrative. Reply SKIP if it doesn't fit.";
+                        char *img_suggest = NULL;
+                        size_t img_suggest_len = 0;
+                        const char *img_model = agent->model_name
+                                                    ? agent->model_name
+                                                    : "gemini-3.1-flash-lite-preview";
+                        size_t img_model_len =
+                            agent->model_name ? agent->model_name_len : 31;
+                        (void)agent->provider.vtable->chat_with_system(
+                            agent->provider.ctx, alloc, img_sys, sizeof(img_sys) - 1,
+                            combined, combined_len, img_model, img_model_len, 0.7,
+                            &img_suggest, &img_suggest_len);
+                        if (img_suggest && img_suggest_len > 0 && img_suggest_len < 300 &&
+                            strstr(img_suggest, "SKIP") == NULL) {
+                            char img_path[512];
+                            hu_error_t ierr = hu_image_gen_download(
+                                alloc, img_suggest, img_suggest_len, img_path, sizeof(img_path));
+                            if (ierr == HU_OK) {
+                                const char *img_media[] = {img_path};
+                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                                          NULL, 0, img_media, 1);
+                                hu_log_info("human", agent ? agent->observer : NULL,
+                                            "proactive image sent: %.*s",
+                                            (int)img_suggest_len, img_suggest);
+                                (void)unlink(img_path);
+                            }
+                        }
+                        if (img_suggest)
+                            alloc->free(alloc->ctx, img_suggest, img_suggest_len + 1);
                     }
                 }
 #endif
