@@ -108,6 +108,7 @@ export class ScMessageThread extends LitElement {
   static override styles = css`
     :host {
       display: flex;
+      min-width: 0;
       flex-direction: column;
       flex: 1;
       contain: layout style;
@@ -177,10 +178,10 @@ export class ScMessageThread extends LitElement {
         var(--hu-ease-spring-gentle, ease-out) both;
     }
     .bubble-wrapper.user {
-      margin-left: auto;
+      margin-inline-start: auto;
     }
     .bubble-wrapper.assistant {
-      margin-right: auto;
+      margin-inline-end: auto;
     }
     .bubble-wrapper:hover hu-message-actions {
       opacity: 1;
@@ -380,7 +381,7 @@ export class ScMessageThread extends LitElement {
     .reaction-count {
       color: var(--hu-text-secondary);
     }
-    @container (max-width: 640px) /* --hu-breakpoint-md */ {
+    @container (max-width: 40rem) /* cq-compact */ {
       .messages {
         padding: var(--hu-space-sm);
       }
@@ -497,15 +498,17 @@ export class ScMessageThread extends LitElement {
       }
     }
     .hero-greeting {
-      font-family: var(--hu-font-display, Georgia, "Times New Roman", serif);
-      font-size: clamp(1.5rem, 4vw, 2.25rem);
-      font-weight: var(--hu-weight-medium, 500);
+      font-family: var(--hu-font);
+      font-size: var(--hu-text-3xl);
+      font-weight: var(--hu-weight-bold, 700);
+      letter-spacing: var(--hu-tracking-2xl, -0.02em);
       color: var(--hu-text);
-      letter-spacing: -0.03em;
-      line-height: 1.1;
+      line-height: var(--hu-leading-tight, 1.25);
     }
     .hero-sub {
-      display: none;
+      font-size: var(--hu-text-lg);
+      color: var(--hu-text-muted);
+      margin-top: var(--hu-space-sm);
     }
     .hero-suggestions {
       display: flex;

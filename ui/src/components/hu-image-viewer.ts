@@ -82,6 +82,7 @@ export class ScImageViewer extends LitElement {
     .image-wrap {
       max-width: 90vw;
       max-height: 90vh;
+      max-height: 90dvh;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -95,6 +96,7 @@ export class ScImageViewer extends LitElement {
     .image-wrap img {
       max-width: 100%;
       max-height: 90vh;
+      max-height: 90dvh;
       object-fit: contain;
       border-radius: var(--hu-radius-md);
       box-shadow: var(--hu-shadow-lg);

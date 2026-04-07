@@ -31,7 +31,7 @@ export class ScButton extends LitElement {
       justify-content: center;
       gap: var(--hu-space-xs);
       box-sizing: border-box;
-      min-height: 2.75rem;
+      min-height: var(--hu-button-min-height, 2.75rem);
       border: none;
       outline: none;
       font-family: var(--hu-font);
@@ -68,14 +68,14 @@ export class ScButton extends LitElement {
     button.variant-primary:hover:not(:disabled) {
       background: var(--hu-accent-hover);
       background-image: var(--hu-button-gradient-primary);
-      transform: translateY(var(--hu-physics-card-hover-translateY, -2px)) scale(1.02);
+      transform: translateY(-1px);
       box-shadow:
-        var(--hu-shadow-glow-accent),
+        var(--hu-shadow-md),
         inset 0 1px 0 color-mix(in srgb, var(--hu-color-white) 35%, transparent),
         inset 0 -1px 0 color-mix(in srgb, var(--hu-color-black) 15%, transparent);
     }
     button.variant-primary:active:not(:disabled) {
-      transform: translateY(0) scale(0.96);
+      transform: translateY(0) scale(0.98);
       box-shadow:
         var(--hu-shadow-xs),
         inset 0 1px 0 color-mix(in srgb, var(--hu-color-white) 20%, transparent),
@@ -97,7 +97,7 @@ export class ScButton extends LitElement {
     button.variant-secondary:hover:not(:disabled) {
       background: var(--hu-bg-overlay);
       background-image: var(--hu-surface-gradient);
-      transform: translateY(var(--hu-physics-card-hover-translateY, -2px)) scale(1.02);
+      transform: translateY(-1px);
       box-shadow:
         var(--hu-shadow-sm),
         inset 0 1px 0 color-mix(in srgb, var(--hu-color-white) 90%, transparent),
@@ -105,7 +105,7 @@ export class ScButton extends LitElement {
     }
     button.variant-secondary:active:not(:disabled) {
       background: var(--hu-pressed-overlay);
-      transform: translateY(0) scale(0.96);
+      transform: translateY(0) scale(0.98);
       box-shadow:
         inset 0 1px 2px color-mix(in srgb, var(--hu-text) 6%, transparent),
         inset 0 -1px 0 color-mix(in srgb, var(--hu-text) 4%, transparent);
@@ -121,7 +121,7 @@ export class ScButton extends LitElement {
         inset 0 -1px 0 color-mix(in srgb, var(--hu-color-black) 8%, transparent);
     }
     button.variant-destructive:hover:not(:disabled) {
-      transform: translateY(var(--hu-physics-card-hover-translateY, -2px)) scale(1.02);
+      transform: translateY(-1px);
       box-shadow:
         0 4px 16px color-mix(in srgb, var(--hu-error) 20%, transparent),
         0 2px 6px color-mix(in srgb, var(--hu-text) 8%, transparent),
@@ -129,7 +129,7 @@ export class ScButton extends LitElement {
         inset 0 -1px 0 color-mix(in srgb, var(--hu-color-black) 8%, transparent);
     }
     button.variant-destructive:active:not(:disabled) {
-      transform: translateY(0) scale(0.96);
+      transform: translateY(0) scale(0.98);
       transition-duration: var(--hu-duration-fast);
     }
 
@@ -140,10 +140,9 @@ export class ScButton extends LitElement {
     button.variant-ghost:hover:not(:disabled) {
       background: var(--hu-hover-overlay);
       color: var(--hu-text);
-      transform: translateY(var(--hu-physics-card-hover-translateY, -2px)) scale(1.02);
     }
     button.variant-ghost:active:not(:disabled) {
-      transform: translateY(0) scale(0.96);
+      transform: scale(0.98);
       background: var(--hu-accent-subtle);
       transition-duration: var(--hu-duration-fast);
     }
@@ -208,6 +207,11 @@ export class ScButton extends LitElement {
         border: 2px solid currentColor;
         box-shadow: none;
       }
+    }
+
+    :host([full-width]) button {
+      width: 100%;
+      justify-content: center;
     }
   `;
 

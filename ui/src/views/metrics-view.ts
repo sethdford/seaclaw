@@ -110,6 +110,8 @@ export class ScMetricsView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-metrics;
         display: block;
+        width: 100%;
+        min-width: 0;
         color: var(--hu-text);
         max-width: 60rem;
         container-type: inline-size;
@@ -125,7 +127,7 @@ export class ScMetricsView extends GatewayAwareLitElement {
       }
       .metric-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(var(--hu-grid-track-sm), 1fr));
         gap: var(--hu-space-md);
       }
       .metric-item {
@@ -185,7 +187,7 @@ export class ScMetricsView extends GatewayAwareLitElement {
         color: var(--hu-text-muted);
       }
 
-      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .metric-grid {
           grid-template-columns: 1fr;
         }

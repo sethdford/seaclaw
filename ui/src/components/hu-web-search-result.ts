@@ -76,7 +76,7 @@ export class ScWebSearchResult extends LitElement {
     }
 
     .query-text {
-      margin-left: var(--hu-space-xs);
+      margin-inline-start: var(--hu-space-xs);
       font-style: italic;
       color: var(--hu-text-muted);
       overflow: hidden;

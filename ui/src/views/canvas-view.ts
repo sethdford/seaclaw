@@ -119,11 +119,13 @@ export class CanvasView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-canvas;
         display: block;
+        width: 100%;
+        min-width: 0;
         color: var(--hu-text);
         max-width: 90rem;
         contain: layout style;
         container-type: inline-size;
-        padding: var(--hu-space-lg) var(--hu-space-xl);
+        padding: var(--hu-space-adaptive-page-y) var(--hu-space-adaptive-page-x);
       }
 
       .layout {
@@ -317,7 +319,7 @@ export class CanvasView extends GatewayAwareLitElement {
         flex: 1;
       }
 
-      @media (max-width: 768px) /* --hu-breakpoint-lg */ {
+      @media (max-width: 904px) /* --hu-breakpoint-medium */ {
         .split-body {
           grid-template-columns: 1fr;
         }

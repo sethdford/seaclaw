@@ -491,8 +491,7 @@ export class ScToolResult extends LitElement {
     el.addEventListener("animationend", onEnd);
   }
 
-  override updated(changed: PropertyValues): void {
-    super.updated(changed);
+  override willUpdate(changed: PropertyValues): void {
     if (changed.has("status")) {
       const prev = changed.get("status") as ToolStatus | undefined;
       if (prev === "running" && (this.status === "success" || this.status === "error")) {
@@ -503,6 +502,10 @@ export class ScToolResult extends LitElement {
       }
       this._syncRunningTimer();
     }
+  }
+
+  override updated(changed: PropertyValues): void {
+    super.updated(changed);
     if (changed.has("_flashActive") && this._flashActive) {
       requestAnimationFrame(() => {
         const el = this.shadowRoot?.querySelector(".container") as HTMLElement | null;

@@ -27,6 +27,7 @@ export class ScChatView extends GatewayAwareLitElement {
     staggerMotion9Styles,
     css`
       :host {
+        view-transition-name: view-chat;
         display: flex;
         flex-direction: column;
         contain: layout style;
@@ -57,7 +58,7 @@ export class ScChatView extends GatewayAwareLitElement {
         min-width: 0;
         overflow: hidden;
       }
-      @media (max-width: 600px) /* --hu-breakpoint-compact */ {
+      @media (max-width: 599px) /* --hu-breakpoint-compact */ {
         .main-wrap.sessions-open {
           grid-template-columns: 0fr 1fr 0fr;
         }
@@ -239,7 +240,7 @@ export class ScChatView extends GatewayAwareLitElement {
         background: transparent;
         margin-bottom: var(--hu-space-2xl);
       }
-      @container (max-width: 640px) /* --hu-breakpoint-md */ {
+      @container (max-width: 40rem) /* cq-compact */ {
         .container {
           padding: 0 var(--hu-space-sm);
         }
@@ -251,7 +252,7 @@ export class ScChatView extends GatewayAwareLitElement {
           padding: var(--hu-space-sm);
         }
       }
-      @container (max-width: 480px) /* --hu-breakpoint-sm */ {
+      @container (max-width: 30rem) /* cq-sm */ {
         .status-left span:not(.status-title),
         .status-right .kbd-hint {
           display: none;
@@ -387,10 +388,22 @@ export class ScChatView extends GatewayAwareLitElement {
     }
   }
 
-  override firstUpdated(): void {
+  override connectedCallback(): void {
+    super.connectedCallback();
     const gw = this.gateway;
     if (gw) {
       this.connectionStatus = gw.status;
+    }
+    try {
+      this._sessionsPanelOpen = localStorage.getItem("hu-sessions-panel-open") === "true";
+    } catch {
+      /* test env */
+    }
+  }
+
+  override firstUpdated(): void {
+    const gw = this.gateway;
+    if (gw) {
       gw.addEventListener(GatewayClientClass.EVENT_GATEWAY, this.messageHandler);
       gw.addEventListener(GatewayClientClass.EVENT_STATUS, this.statusHandler as EventListener);
     }
@@ -398,11 +411,6 @@ export class ScChatView extends GatewayAwareLitElement {
     document.addEventListener("toggle-sessions", this._onToggleSessions);
     document.addEventListener("toggle-artifacts", this._onToggleArtifacts);
     document.addEventListener("close-panel", this._onClosePanel);
-    try {
-      this._sessionsPanelOpen = localStorage.getItem("hu-sessions-panel-open") === "true";
-    } catch {
-      /* test env */
-    }
   }
 
   protected override onGatewaySwapped(

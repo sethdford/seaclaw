@@ -107,6 +107,8 @@ export class ScMemoryView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-memory;
         display: flex;
+        width: 100%;
+        min-width: 0;
         flex-direction: column;
         contain: layout style;
         container-type: inline-size;
@@ -128,7 +130,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
       }
       .controls hu-input {
         flex: 1;
-        min-width: 12rem;
+        min-width: min(12rem, 100%);
       }
       .controls hu-segmented-control {
         flex-shrink: 0;
@@ -137,7 +139,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
       }
       .memory-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-lg), 100%), 1fr));
         gap: var(--hu-space-md);
       }
       .memory-card {
@@ -186,7 +188,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
       .memory-card .timestamp {
         font-size: var(--hu-text-xs);
         color: var(--hu-text-faint);
-        margin-left: auto;
+        margin-inline-start: auto;
       }
       .insight-card {
         border-left: 3px solid var(--hu-accent-tertiary);
@@ -209,11 +211,11 @@ export class ScMemoryView extends GatewayAwareLitElement {
       }
       .skeleton-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-lg), 100%), 1fr));
         gap: var(--hu-space-md);
       }
 
-      @container (max-width: 48rem) /* --hu-breakpoint-lg (48rem ≈ 768px at 16px root) */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .memory-grid {
           grid-template-columns: 1fr;
         }
@@ -478,11 +480,10 @@ export class ScMemoryView extends GatewayAwareLitElement {
 
   override render() {
     return html`
-      <hu-page-hero
-        heading="Memory"
-        description="Browse, search, and manage stored memories and auto-generated insights."
-        .icon=${icons.brain}
-      ></hu-page-hero>
+      <hu-page-hero>
+        <hu-section-header heading="Memory" description="Browse, search, and manage stored memories and auto-generated insights.">
+        </hu-section-header>
+      </hu-page-hero>
 
       <div class="layout">
         ${this.loading

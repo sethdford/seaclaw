@@ -81,6 +81,7 @@ export class ScModelsView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-models;
         display: block;
+        width: 100%;
         max-width: 75rem;
         contain: layout style;
         container-type: inline-size;
@@ -88,7 +89,7 @@ export class ScModelsView extends GatewayAwareLitElement {
       .info-section {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: var(--hu-space-xl);
+        gap: var(--hu-space-adaptive-section-gap);
         margin-bottom: var(--hu-space-2xl);
       }
       .info-item {
@@ -114,8 +115,8 @@ export class ScModelsView extends GatewayAwareLitElement {
       }
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
-        gap: var(--hu-space-xl);
+        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-md), 100%), 1fr));
+        gap: var(--hu-space-adaptive-section-gap);
       }
       .card-header {
         display: flex;
@@ -165,7 +166,7 @@ export class ScModelsView extends GatewayAwareLitElement {
         display: flex;
         justify-content: flex-end;
       }
-      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .info-section {
           grid-template-columns: 1fr;
         }
@@ -173,7 +174,7 @@ export class ScModelsView extends GatewayAwareLitElement {
           grid-template-columns: 1fr 1fr;
         }
       }
-      @container (max-width: 40rem) /* --hu-breakpoint-md */ {
+      @container (max-width: 40rem) /* cq-compact */ {
         .grid {
           grid-template-columns: 1fr;
         }
@@ -181,7 +182,7 @@ export class ScModelsView extends GatewayAwareLitElement {
       .search-wrap {
         margin-bottom: var(--hu-space-xl);
       }
-      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+      @container (max-width: 30rem) /* cq-sm */ {
         .grid {
           grid-template-columns: 1fr;
         }

@@ -84,8 +84,8 @@ export class ScFloatingMic extends LitElement {
       position: absolute;
       bottom: calc(100% + var(--hu-space-sm));
       right: 0;
-      min-width: 12.5rem;
-      max-width: 18.75rem;
+      min-width: min(12.5rem, calc(100vw - var(--hu-space-xl)));
+      max-width: min(18.75rem, calc(100vw - var(--hu-space-xl)));
       padding: var(--hu-space-sm) var(--hu-space-md);
       background: var(--hu-bg-elevated);
       border: 1px solid var(--hu-border);

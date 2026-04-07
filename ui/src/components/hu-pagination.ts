@@ -62,7 +62,7 @@ export class ScPagination extends LitElement {
     }
 
     .label {
-      margin-right: var(--hu-space-sm);
+      margin-inline-end: var(--hu-space-sm);
     }
 
     .nav {
@@ -158,7 +158,7 @@ export class ScPagination extends LitElement {
       width: auto;
       min-width: 4rem;
       padding: var(--hu-space-xs) var(--hu-space-sm);
-      padding-right: var(--hu-space-xl);
+      padding-inline-end: var(--hu-space-xl);
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
       background: var(--hu-bg-surface);

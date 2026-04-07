@@ -215,13 +215,13 @@ export class ScSkillRegistry extends LitElement {
       gap: var(--hu-space-lg);
     }
 
-    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* cq-sm */ {
       .skills-grid {
         grid-template-columns: 1fr;
       }
     }
 
-    @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+    @container (max-width: 48rem) /* cq-medium */ {
       .skills-grid {
         grid-template-columns: 1fr 1fr;
       }

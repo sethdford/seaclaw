@@ -57,7 +57,7 @@ export class ScChatSearch extends LitElement {
       flex: 1;
       min-width: 0;
       padding: var(--hu-space-xs) var(--hu-space-md);
-      padding-right: calc(var(--hu-space-md) + 1.25rem);
+      padding-inline-end: calc(var(--hu-space-md) + 1.25rem);
       background: var(--hu-bg);
       border: 1px solid var(--hu-border);
       border-radius: var(--hu-radius);

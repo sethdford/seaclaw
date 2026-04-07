@@ -42,10 +42,13 @@ export class HuDesignSystemView extends LitElement {
     :host {
       view-transition-name: view-design-system;
       display: block;
+      width: 100%;
       color: var(--hu-text);
       max-width: 60rem;
+      min-width: 0;
       margin: 0 auto;
       padding-bottom: var(--hu-space-3xl);
+      contain: layout style;
       container-type: inline-size;
     }
 
@@ -58,18 +61,19 @@ export class HuDesignSystemView extends LitElement {
       color: var(--hu-text-muted);
       margin: 0 0 var(--hu-space-lg);
       line-height: 1.5;
+      overflow-wrap: break-word;
     }
 
     .foundations-grid {
       display: grid;
-      gap: var(--hu-space-lg);
-      grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+      gap: var(--hu-space-adaptive-content-gap);
+      grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-md), 100%), 1fr));
     }
 
     .viz-grid {
       display: grid;
-      gap: var(--hu-space-lg);
-      grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+      gap: var(--hu-space-adaptive-content-gap);
+      grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-lg), 100%), 1fr));
     }
 
     .card-title {
@@ -165,6 +169,7 @@ export class HuDesignSystemView extends LitElement {
       font-family: var(--hu-font-mono);
       font-size: var(--hu-text-xs);
       color: var(--hu-accent-text, var(--hu-accent));
+      overflow-wrap: anywhere;
     }
   `;
 

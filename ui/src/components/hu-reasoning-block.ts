@@ -229,7 +229,7 @@ export class ScReasoningBlock extends LitElement {
 
     .md-blockquote {
       border-left: 0.1875rem solid var(--hu-accent);
-      padding-left: var(--hu-space-md);
+      padding-inline-start: var(--hu-space-md);
       margin: var(--hu-space-sm) 0;
       color: var(--hu-text-muted);
       font-style: italic;
@@ -237,7 +237,7 @@ export class ScReasoningBlock extends LitElement {
 
     .md-list {
       margin: var(--hu-space-sm) 0;
-      padding-left: var(--hu-space-lg);
+      padding-inline-start: var(--hu-space-lg);
     }
 
     .md-list-item {

@@ -29,7 +29,7 @@ export class ScToast extends LitElement {
       pointer-events: none;
     }
 
-    @media (max-width: 640px) /* --hu-breakpoint-md */ {
+    @media (max-width: 599px) /* --hu-breakpoint-compact */ {
       :host {
         left: 50%;
         right: auto;

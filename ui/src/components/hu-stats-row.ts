@@ -21,13 +21,13 @@ export class ScStatsRow extends LitElement {
       margin-bottom: var(--hu-space-2xl);
     }
 
-    @container (max-width: 40rem) /* --hu-breakpoint-md */ {
+    @container (max-width: 40rem) /* cq-compact */ {
       .stats-row {
         grid-template-columns: 1fr 1fr;
       }
     }
 
-    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* cq-sm */ {
       .stats-row {
         grid-template-columns: 1fr;
       }

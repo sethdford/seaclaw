@@ -35,14 +35,17 @@ export class HuWorkflowView extends GatewayAwareLitElement {
 
   static override styles = css`
     :host {
+      view-transition-name: view-workflow;
       display: block;
+      width: 100%;
+      min-width: 0;
       color: var(--hu-text);
       contain: layout style;
       container-type: inline-size;
     }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-md), 100%), 1fr));
       gap: var(--hu-space-lg);
       margin-bottom: var(--hu-space-2xl);
     }

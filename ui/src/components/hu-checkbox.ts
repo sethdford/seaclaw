@@ -115,7 +115,7 @@ export class ScCheckbox extends LitElement {
     .error-msg {
       font-size: var(--hu-text-sm);
       color: var(--hu-error);
-      margin-left: calc(1.125rem + var(--hu-space-sm));
+      margin-inline-start: calc(1.125rem + var(--hu-space-sm));
     }
 
     @media (prefers-reduced-motion: reduce) {

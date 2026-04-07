@@ -54,7 +54,7 @@ export class ScMetricRow extends LitElement {
       }
     }
 
-    @container (max-width: 480px) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* cq-sm */ {
       .divider {
         display: none;
       }

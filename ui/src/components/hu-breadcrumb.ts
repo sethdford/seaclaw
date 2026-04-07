@@ -39,7 +39,7 @@ export class ScBreadcrumb extends LitElement {
     .item:not(:last-child)::after {
       content: "/";
       color: var(--hu-text-faint);
-      margin-left: var(--hu-space-xs);
+      margin-inline-start: var(--hu-space-xs);
     }
 
     .link {

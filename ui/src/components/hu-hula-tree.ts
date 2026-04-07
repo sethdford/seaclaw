@@ -31,7 +31,7 @@ export class HuHulaTree extends LitElement {
     }
     .meta {
       color: var(--hu-text-muted);
-      margin-left: var(--hu-space-sm);
+      margin-inline-start: var(--hu-space-sm);
     }
   `;
 

@@ -5,10 +5,10 @@ type SheetSize = "sm" | "md" | "lg" | "full";
 type SnapPoint = "collapsed" | "half" | "full";
 
 const SIZE_MAP: Record<SheetSize, string> = {
-  sm: "30vh",
-  md: "50vh",
-  lg: "75vh",
-  full: "95vh",
+  sm: "30dvh",
+  md: "50dvh",
+  lg: "75dvh",
+  full: "95dvh",
 };
 
 @customElement("hu-sheet")
@@ -44,6 +44,7 @@ export class ScSheet extends LitElement {
       left: 0;
       right: 0;
       max-height: 95vh;
+      max-height: 95dvh;
       background: color-mix(in srgb, var(--hu-surface-container-high) 85%, transparent);
       backdrop-filter: blur(var(--hu-glass-standard-blur))
         saturate(var(--hu-glass-standard-saturate));
@@ -145,11 +146,11 @@ export class ScSheet extends LitElement {
   private get _height(): string {
     switch (this._snapPoint) {
       case "collapsed":
-        return "min(15vh, 120px)";
+        return "min(15dvh, 120px)";
       case "half":
         return SIZE_MAP[this.size];
       case "full":
-        return "95vh";
+        return "95dvh";
       default:
         return SIZE_MAP[this.size];
     }

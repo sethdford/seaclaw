@@ -108,7 +108,7 @@ export class ScThinking extends LitElement {
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
       color: var(--hu-text);
-      padding-left: var(--hu-space-md);
+      padding-inline-start: var(--hu-space-md);
       position: relative;
     }
 

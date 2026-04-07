@@ -39,7 +39,7 @@ export class ScWelcome extends LitElement {
       margin-bottom: var(--hu-space-2xl, 2rem);
     }
     .greeting h2 {
-      font-size: clamp(1.75rem, 3vw, 2.25rem);
+      font-size: var(--hu-text-3xl);
       font-weight: var(--hu-weight-bold, 700);
       letter-spacing: -0.035em;
       color: var(--hu-text);

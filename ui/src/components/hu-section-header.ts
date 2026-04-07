@@ -20,6 +20,11 @@ export class ScSectionHeader extends LitElement {
       margin-bottom: var(--hu-space-xl);
     }
 
+    .text {
+      flex: 1;
+      min-width: 0;
+    }
+
     .heading {
       margin: 0;
       font-size: var(--hu-text-xl);
@@ -40,8 +45,18 @@ export class ScSectionHeader extends LitElement {
       flex-shrink: 0;
     }
 
-    @container (max-width: 40rem) /* --hu-breakpoint-md */ {
+    .actions ::slotted(*) {
+      flex-shrink: 0;
+    }
+
+    @container (max-width: 40rem) /* cq-compact */ {
       .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--hu-space-md);
+      }
+      .actions {
+        width: 100%;
         flex-wrap: wrap;
       }
     }

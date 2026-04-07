@@ -40,6 +40,8 @@ export class ScSkillsView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-skills;
         display: block;
+        width: 100%;
+        min-width: 0;
         color: var(--hu-text);
         contain: layout style;
         container-type: inline-size;
@@ -57,7 +59,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
         align-items: center;
         gap: var(--hu-space-sm);
         flex: 1;
-        min-width: 12.5rem;
+        min-width: min(12.5rem, 100%);
         max-width: 22.5rem;
       }
       .toolbar-right {
@@ -123,18 +125,18 @@ export class ScSkillsView extends GatewayAwareLitElement {
       }
       .skills-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
-        gap: var(--hu-space-lg);
+        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-md), 100%), 1fr));
+        gap: var(--hu-space-adaptive-content-gap);
       }
       .grid-full {
         grid-column: 1 / -1;
       }
-      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+      @container (max-width: 30rem) /* cq-sm */ {
         .skills-grid {
           grid-template-columns: 1fr;
         }
       }
-      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .skills-grid {
           grid-template-columns: 1fr 1fr;
         }

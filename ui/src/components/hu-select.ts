@@ -58,7 +58,7 @@ export class ScSelect extends LitElement {
       transition:
         border-color var(--hu-duration-fast) var(--hu-ease-out),
         box-shadow var(--hu-duration-fast) var(--hu-ease-spring);
-      padding-right: var(--hu-space-xl);
+      padding-inline-end: var(--hu-space-xl);
     }
 
     select:hover:not(:disabled):not(:focus) {
@@ -83,21 +83,21 @@ export class ScSelect extends LitElement {
     select.size-sm {
       font-size: var(--hu-text-sm);
       padding: var(--hu-space-xs) var(--hu-space-sm);
-      padding-right: var(--hu-space-xl);
+      padding-inline-end: var(--hu-space-xl);
       min-height: calc(var(--hu-input-min-height) - var(--hu-space-sm));
     }
 
     select.size-md {
       font-size: var(--hu-text-base);
       padding: var(--hu-space-sm) var(--hu-space-md);
-      padding-right: var(--hu-space-xl);
+      padding-inline-end: var(--hu-space-xl);
       min-height: var(--hu-input-min-height);
     }
 
     select.size-lg {
       font-size: var(--hu-text-base);
       padding: var(--hu-space-sm) var(--hu-space-md);
-      padding-right: var(--hu-space-xl);
+      padding-inline-end: var(--hu-space-xl);
       min-height: calc(var(--hu-input-min-height) + var(--hu-space-sm));
     }
 

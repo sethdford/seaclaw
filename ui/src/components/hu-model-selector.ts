@@ -114,7 +114,7 @@ export class ScModelSelector extends LitElement {
     .provider {
       font-size: var(--hu-text-2xs, 0.625rem);
       color: var(--hu-text-faint);
-      margin-left: var(--hu-space-xs);
+      margin-inline-start: var(--hu-space-xs);
     }
 
     @media (prefers-reduced-motion: reduce) {

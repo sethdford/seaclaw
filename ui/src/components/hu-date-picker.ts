@@ -65,7 +65,7 @@ export class ScDatePicker extends LitElement {
       color: var(--hu-text);
       outline: none;
       padding: var(--hu-space-sm) var(--hu-space-md);
-      padding-left: calc(var(--hu-space-md) + 1.125rem + var(--hu-space-xs));
+      padding-inline-start: calc(var(--hu-space-md) + 1.125rem + var(--hu-space-xs));
       min-height: var(--hu-input-min-height);
       font-size: var(--hu-text-base);
       transition:

@@ -42,9 +42,11 @@ export class ScVoiceView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-voice;
         display: flex;
+        width: 100%;
         flex-direction: column;
         height: 100%;
         max-height: calc(100vh - var(--hu-space-5xl));
+        max-height: calc(100dvh - var(--hu-space-5xl));
         contain: layout style;
         container-type: inline-size;
       }
@@ -201,7 +203,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
         height: 1.125rem;
       }
 
-      @media (max-width: 768px) /* --hu-breakpoint-lg */ {
+      @media (max-width: 904px) /* --hu-breakpoint-medium */ {
         .sessions-panel.open {
           position: fixed;
           left: 0;
@@ -354,7 +356,7 @@ export class ScVoiceView extends GatewayAwareLitElement {
 
       /* ── Responsive ──────────────────────────────────── */
 
-      @container (max-width: 480px) /* --hu-breakpoint-sm */ {
+      @container (max-width: 30rem) /* cq-sm */ {
         .input-row {
           flex-direction: column;
           align-items: stretch;

@@ -114,6 +114,7 @@ export class ScChatComposer extends LitElement {
       display: flex;
       gap: var(--hu-space-sm);
       overflow-x: auto;
+      scroll-snap-type: x proximity;
       scrollbar-width: none;
       padding: var(--hu-space-xs) 0;
       &::-webkit-scrollbar {
@@ -122,6 +123,7 @@ export class ScChatComposer extends LitElement {
     }
     .pill {
       flex-shrink: 0;
+      scroll-snap-align: start;
       padding: var(--hu-space-xs) var(--hu-space-md);
       background: var(--hu-bg-elevated);
       border: 1px solid var(--hu-border);
@@ -343,20 +345,16 @@ export class ScChatComposer extends LitElement {
       width: var(--hu-icon-md);
       height: var(--hu-icon-md);
     }
-    .send-btn:not(:disabled) {
-      animation: hu-send-glow var(--hu-duration-slowest) var(--hu-ease-in-out) infinite;
-    }
     .send-btn:hover:not(:disabled) {
       filter: brightness(1.1);
-      box-shadow: 0 0 var(--hu-space-md) var(--hu-space-2xs)
-        color-mix(in srgb, var(--hu-accent) 30%, transparent);
-      transform: scale(1.06);
+      box-shadow: 0 0 var(--hu-space-sm) 1px
+        color-mix(in srgb, var(--hu-accent) 20%, transparent);
+      transform: scale(1.04);
     }
     .send-btn:active:not(:disabled) {
-      animation:
-        hu-send-spring var(--hu-duration-normal)
-          var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
-        hu-send-glow var(--hu-duration-slowest) var(--hu-ease-in-out) infinite;
+      animation: hu-send-spring var(--hu-duration-normal)
+        var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+      transform: scale(0.95);
     }
     .send-btn:disabled {
       opacity: 0.5;
@@ -383,7 +381,7 @@ export class ScChatComposer extends LitElement {
       border: 1px solid var(--hu-border);
       border-radius: var(--hu-radius-lg);
       box-shadow: var(--hu-shadow-md);
-      min-width: 12.5rem;
+      min-width: min(12.5rem, calc(100vw - var(--hu-space-xl)));
       z-index: 10;
       overflow: hidden;
     }
@@ -423,7 +421,7 @@ export class ScChatComposer extends LitElement {
       border: 1px solid var(--hu-border);
       border-radius: var(--hu-radius-lg);
       box-shadow: var(--hu-shadow-md);
-      min-width: 12.5rem;
+      min-width: min(12.5rem, calc(100vw - var(--hu-space-xl)));
       max-height: 12.5rem;
       overflow-y: auto;
       z-index: 10;
@@ -459,7 +457,7 @@ export class ScChatComposer extends LitElement {
       border: 1px solid var(--hu-border);
       border-radius: var(--hu-radius-lg);
       box-shadow: var(--hu-shadow-md);
-      min-width: 18rem;
+      min-width: min(18rem, calc(100vw - var(--hu-space-xl)));
       max-height: 16rem;
       overflow-y: auto;
       z-index: 10;
@@ -590,7 +588,7 @@ export class ScChatComposer extends LitElement {
         background: var(--hu-surface-container);
       }
     }
-    @container (max-width: 640px) /* --hu-breakpoint-md */ {
+    @container (max-width: 40rem) /* cq-compact */ {
       .input-row {
         flex-wrap: wrap;
       }
@@ -602,7 +600,8 @@ export class ScChatComposer extends LitElement {
       .send-btn {
         transition: none;
       }
-      .send-btn:not(:disabled) {
+      .send-btn:not(:disabled),
+      .send-btn:active:not(:disabled) {
         animation: none;
       }
     }

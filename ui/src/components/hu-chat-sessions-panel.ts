@@ -70,7 +70,7 @@ export class ScChatSessionsPanel extends LitElement {
       border-right: 1px solid var(--hu-border-subtle);
     }
 
-    @media (max-width: 768px) /* --hu-breakpoint-lg */ {
+    @media (max-width: 904px) /* --hu-breakpoint-medium */ {
       :host([open]) {
         position: fixed;
         left: 0;
@@ -388,7 +388,7 @@ export class ScChatSessionsPanel extends LitElement {
       height: var(--hu-space-xs);
       border-radius: 50%;
       flex-shrink: 0;
-      margin-right: var(--hu-space-2xs);
+      margin-inline-end: var(--hu-space-2xs);
     }
     @media (prefers-reduced-motion: reduce) {
       :host {

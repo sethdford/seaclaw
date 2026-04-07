@@ -30,7 +30,7 @@ export class HuWorkflowTimeline extends LitElement {
       flex-direction: column;
       gap: var(--hu-space-md);
       position: relative;
-      padding-left: var(--hu-space-lg);
+      padding-inline-start: var(--hu-space-lg);
     }
 
     .timeline::before {

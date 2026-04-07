@@ -64,14 +64,14 @@ export class ScTooltip extends LitElement {
       right: 100%;
       top: 50%;
       transform: translateY(-50%);
-      margin-right: var(--hu-space-xs);
+      margin-inline-end: var(--hu-space-xs);
     }
 
     .tip.right {
       left: 100%;
       top: 50%;
       transform: translateY(-50%);
-      margin-left: var(--hu-space-xs);
+      margin-inline-start: var(--hu-space-xs);
     }
 
     @media (prefers-reduced-motion: reduce) {

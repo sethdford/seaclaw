@@ -167,6 +167,7 @@ export class ScCommandPalette extends LitElement {
 
     .results {
       max-height: min(24rem, 70vh);
+      max-height: min(24rem, 70dvh);
       overflow-y: auto;
       padding: var(--hu-space-xs);
     }

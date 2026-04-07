@@ -94,7 +94,7 @@ export class ScPopover extends LitElement {
       &.position-left {
         right: 100%;
         top: 50%;
-        margin-right: var(--hu-space-xs);
+        margin-inline-end: var(--hu-space-xs);
         transform: translateY(-50%) scale(0.96);
         &.open {
           transform: translateY(-50%) scale(1);
@@ -104,7 +104,7 @@ export class ScPopover extends LitElement {
       &.position-right {
         left: 100%;
         top: 50%;
-        margin-left: var(--hu-space-xs);
+        margin-inline-start: var(--hu-space-xs);
         transform: translateY(-50%) scale(0.96);
         &.open {
           transform: translateY(-50%) scale(1);

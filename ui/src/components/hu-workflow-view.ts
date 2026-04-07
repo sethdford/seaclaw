@@ -34,6 +34,7 @@ export class HuWorkflowView extends LitElement {
     :host {
       display: block;
       font-family: var(--hu-font);
+      container-type: inline-size;
       background: var(--hu-bg);
     }
 
@@ -46,7 +47,7 @@ export class HuWorkflowView extends LitElement {
       margin: 0 auto;
     }
 
-    @media (max-width: var(--hu-breakpoint-2xl)) {
+    @container (max-width: 48rem) /* cq-medium */ {
       .workflow-view {
         grid-template-columns: 1fr;
       }
@@ -121,7 +122,7 @@ export class HuWorkflowView extends LitElement {
       grid-column: 2;
     }
 
-    @media (max-width: var(--hu-breakpoint-2xl)) {
+    @container (max-width: 48rem) /* cq-medium */ {
       .timeline-panel {
         grid-row: 1;
         grid-column: 1;

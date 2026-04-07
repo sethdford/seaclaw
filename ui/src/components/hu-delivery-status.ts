@@ -247,10 +247,10 @@ export class ScDeliveryStatus extends LitElement {
     }
   `;
 
-  override updated(changed: Map<string, unknown>): void {
+  override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("status") || (changed.has("errorType") && this.status === "failed")) {
       if (this.status === "failed") {
-        this._startAutoRetry();
+        queueMicrotask(() => this._startAutoRetry());
       } else {
         this._clearCountdown();
         if (this.status === "sent" || this.status === "complete" || this.status === "streaming") {

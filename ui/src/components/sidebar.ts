@@ -215,7 +215,7 @@ export class ScSidebar extends LitElement {
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
-      padding: var(--hu-space-sm);
+      padding: var(--hu-space-md);
     }
 
     .settings-item {
@@ -226,25 +226,26 @@ export class ScSidebar extends LitElement {
     .nav-item {
       display: flex;
       align-items: center;
-      gap: var(--hu-space-sm);
+      gap: var(--hu-space-md);
       width: 100%;
-      min-height: 2.75rem;
+      min-height: 3rem;
       padding: var(--hu-space-sm) var(--hu-space-md);
       background: transparent;
       border: none;
-      border-left: 1px solid transparent;
+      border-left: 2px solid transparent;
       border-radius: var(--hu-radius-sm);
       font-size: var(--hu-text-sm);
-      color: var(--hu-text);
+      color: var(--hu-text-secondary);
       cursor: pointer;
       transition:
-        background var(--hu-duration-fast) var(--hu-ease-spring),
-        color var(--hu-duration-fast) var(--hu-ease-spring),
-        border-color var(--hu-duration-fast) var(--hu-ease-spring),
-        transform var(--hu-duration-fast) var(--hu-ease-spring);
-      margin-bottom: var(--hu-space-sm);
+        background-color var(--hu-duration-fast) var(--hu-ease-out),
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        border-color var(--hu-duration-fast) var(--hu-ease-out),
+        transform var(--hu-duration-fast) var(--hu-ease-out);
+      margin-bottom: var(--hu-space-xs);
       text-align: left;
       font-family: var(--hu-font);
+      font-weight: var(--hu-weight-medium);
     }
 
     .nav-item {
@@ -265,9 +266,10 @@ export class ScSidebar extends LitElement {
 
       &[aria-current] {
         background: var(--hu-surface-container-high);
-        border-left: 1px solid var(--hu-accent);
+        border-left: 2px solid var(--hu-accent);
         border-radius: var(--hu-radius-sm) 0 0 var(--hu-radius-sm);
-        color: var(--hu-accent-text, var(--hu-accent));
+        color: var(--hu-text);
+        font-weight: var(--hu-weight-semibold);
       }
     }
 
@@ -413,7 +415,7 @@ export class ScSidebar extends LitElement {
     }
 
     .collapse-btn .label {
-      margin-left: var(--hu-space-sm);
+      margin-inline-start: var(--hu-space-sm);
     }
 
     .nav-item-wrap {
@@ -436,7 +438,7 @@ export class ScSidebar extends LitElement {
       left: 100%;
       top: 50%;
       transform: translateY(-50%);
-      margin-left: var(--hu-space-sm);
+      margin-inline-start: var(--hu-space-sm);
       padding: var(--hu-space-2xs) var(--hu-space-sm);
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font-mono);

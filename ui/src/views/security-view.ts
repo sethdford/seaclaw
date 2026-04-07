@@ -70,14 +70,16 @@ export class ScSecurityView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-security;
         display: block;
+        width: 100%;
+        min-width: 0;
         color: var(--hu-text);
         contain: layout style;
         container-type: inline-size;
       }
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
-        gap: var(--hu-space-xl);
+        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-md), 100%), 1fr));
+        gap: var(--hu-space-adaptive-section-gap);
         margin-bottom: var(--hu-space-2xl);
       }
       .card-inner {
@@ -217,12 +219,12 @@ export class ScSecurityView extends GatewayAwareLitElement {
         color: var(--hu-text-secondary);
         margin-top: var(--hu-space-xs);
       }
-      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .grid {
           grid-template-columns: 1fr 1fr;
         }
       }
-      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+      @container (max-width: 30rem) /* cq-sm */ {
         .grid {
           grid-template-columns: 1fr;
         }

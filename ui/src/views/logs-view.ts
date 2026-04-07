@@ -67,6 +67,7 @@ export class ScLogsView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-logs;
         display: flex;
+        width: 100%;
         flex-direction: column;
         contain: layout style;
         container-type: inline-size;
@@ -112,7 +113,7 @@ export class ScLogsView extends GatewayAwareLitElement {
         color: var(--hu-text);
         font-size: var(--hu-text-sm);
         font-family: var(--hu-font-mono);
-        width: 13.75rem;
+        width: min(13.75rem, 100%);
         transition:
           border-color var(--hu-duration-fast) var(--hu-ease-out),
           box-shadow var(--hu-duration-fast) var(--hu-ease-out);
@@ -202,7 +203,7 @@ export class ScLogsView extends GatewayAwareLitElement {
         width: 12rem;
       }
       .skeleton-filter {
-        width: 13.75rem;
+        width: min(13.75rem, 100%);
       }
       .skeleton-action {
         width: 4rem;
@@ -229,7 +230,7 @@ export class ScLogsView extends GatewayAwareLitElement {
       .skeleton-line-70 {
         width: 70%;
       }
-      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .header {
           flex-wrap: wrap;
         }
@@ -237,9 +238,12 @@ export class ScLogsView extends GatewayAwareLitElement {
           flex-wrap: wrap;
         }
       }
-      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+      @container (max-width: 30rem) /* cq-sm */ {
         .filter-input {
           width: 100%;
+        }
+        .btn-label {
+          display: none;
         }
       }
       @media (prefers-reduced-motion: reduce) {
@@ -314,26 +318,29 @@ export class ScLogsView extends GatewayAwareLitElement {
     }, 10_000);
   }
 
-  override updated(): void {
+  override willUpdate(): void {
     const entries = this.filteredLogs;
     const total = entries.length;
     if (total === 0) return;
     const { start, end } = this._visibleRange;
-    // Follow mode: keep visible range at bottom
     if (!this._paused) {
       const newEnd = total;
       const newStart = Math.max(0, newEnd - WINDOW_SIZE - BUFFER * 2);
       if (start !== newStart || end !== newEnd) {
         this._visibleRange = { start: newStart, end: newEnd };
       }
-      this.scrollToBottom();
     } else {
-      // Clamp when total shrinks (e.g. filter change)
       const clampedEnd = Math.min(end, total);
       const clampedStart = Math.min(start, Math.max(0, clampedEnd - 1));
       if (clampedStart !== start || clampedEnd !== end) {
         this._visibleRange = { start: clampedStart, end: clampedEnd };
       }
+    }
+  }
+
+  override updated(): void {
+    if (!this._paused) {
+      this.scrollToBottom();
     }
   }
 
@@ -608,7 +615,7 @@ export class ScLogsView extends GatewayAwareLitElement {
             @click=${this._exportLogs}
             aria-label="Export logs to file"
           >
-            ${icons.export} Export
+            ${icons.export}<span class="btn-label"> Export</span>
           </hu-button>
           <hu-button
             variant="ghost"
@@ -616,10 +623,10 @@ export class ScLogsView extends GatewayAwareLitElement {
             @click=${this.togglePause}
             aria-label=${this._paused ? "Resume" : "Pause"}
           >
-            ${this._paused ? icons.play : icons.pause} ${this._paused ? "Resume" : "Pause"}
+            ${this._paused ? icons.play : icons.pause}<span class="btn-label"> ${this._paused ? "Resume" : "Pause"}</span>
           </hu-button>
           <hu-button variant="ghost" size="sm" @click=${this.clearLogs} aria-label="Clear all logs">
-            Clear
+            ${icons.trash}<span class="btn-label"> Clear</span>
           </hu-button>
         </div>
       </div>

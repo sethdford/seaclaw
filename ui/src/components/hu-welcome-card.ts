@@ -57,7 +57,7 @@ export class ScWelcomeCard extends LitElement {
     }
 
     .hero h2 {
-      font-size: clamp(1.5rem, 2.5vw, 1.75rem);
+      font-size: var(--hu-text-2xl);
       font-weight: var(--hu-weight-bold);
       letter-spacing: -0.03em;
       color: var(--hu-text);
@@ -109,7 +109,7 @@ export class ScWelcomeCard extends LitElement {
       justify-content: center;
     }
 
-    @container (max-width: 480px) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* cq-sm */ {
       .features {
         grid-template-columns: 1fr;
       }

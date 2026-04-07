@@ -64,6 +64,8 @@ export class ScUsageView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-usage;
         display: block;
+        width: 100%;
+        min-width: 0;
         color: var(--hu-text);
         max-width: 60rem;
         contain: layout style;
@@ -139,7 +141,7 @@ export class ScUsageView extends GatewayAwareLitElement {
         min-width: 2.5rem;
         text-align: right;
       }
-      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+      @container (max-width: 30rem) /* cq-sm */ {
         .provider-name {
           width: 5rem;
         }

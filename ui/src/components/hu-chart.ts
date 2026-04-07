@@ -109,7 +109,7 @@ export class ScChart extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     // Use the npm package so Vitest/Node can resolve the module (https: imports fail there).
-    this._chartLoadPromise = import("chart.js").catch(() => {
+    this._chartLoadPromise = import("chart.js/auto").catch(() => {
       this._chartUnavailable = true;
       this.requestUpdate();
       return null;

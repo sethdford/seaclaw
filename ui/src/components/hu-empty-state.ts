@@ -11,6 +11,7 @@ export class ScEmptyState extends LitElement {
       justify-content: center;
       text-align: center;
       padding: var(--hu-space-2xl) var(--hu-space-xl);
+      font-family: var(--hu-font);
     }
 
     .icon {

@@ -221,7 +221,7 @@ export class ScDataTableV2 extends LitElement {
 
     .sort-indicator {
       display: inline-flex;
-      margin-left: var(--hu-space-xs);
+      margin-inline-start: var(--hu-space-xs);
       color: var(--hu-text-muted);
     }
 
@@ -298,7 +298,7 @@ export class ScDataTableV2 extends LitElement {
       margin-top: var(--hu-space-md);
     }
 
-    @container (max-width: 640px) /* --hu-breakpoint-md */ {
+    @container (max-width: 40rem) /* cq-compact */ {
       .table-wrap table {
         display: none;
       }
@@ -338,7 +338,7 @@ export class ScDataTableV2 extends LitElement {
       }
     }
 
-    @container (min-width: 641px) /* --hu-breakpoint-md */ {
+    @container (min-width: 40.0625rem) /* cq-compact */ {
       .cards {
         display: none;
       }

@@ -71,9 +71,10 @@ export class ScOverviewView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-overview;
         display: block;
+        width: 100%;
         max-width: 75rem;
         contain: layout style;
-        padding: var(--hu-space-lg) var(--hu-space-xl);
+        padding: var(--hu-space-adaptive-page-y) var(--hu-space-adaptive-page-x);
       }
 
       /* ── Hero zone ────────────────────────────────────── */
@@ -124,6 +125,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
         display: flex;
         align-items: center;
         gap: var(--hu-space-sm);
+        flex-wrap: wrap;
       }
 
       .staleness {
@@ -136,7 +138,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
       .details {
         display: flex;
         flex-direction: column;
-        gap: var(--hu-space-xl);
+        gap: var(--hu-space-adaptive-section-gap);
         container-type: inline-size;
       }
 
@@ -147,7 +149,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
           "activity activity channels channels"
           "activity activity heatmap heatmap"
           "activity activity sessions sessions";
-        gap: var(--hu-space-xl);
+        gap: var(--hu-space-adaptive-section-gap);
       }
 
       .bento .activity {
@@ -226,7 +228,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
           "activity activity channels channels"
           "activity activity heatmap heatmap"
           "activity activity sessions sessions";
-        gap: var(--hu-space-xl);
+        gap: var(--hu-space-adaptive-section-gap);
       }
 
       .skeleton-bento .activity {
@@ -247,7 +249,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
       /* ── Responsive (container queries) ─────────────────── */
 
-      @container (max-width: 768px) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .bento {
           grid-template-columns: 1fr;
           grid-template-areas:
@@ -272,10 +274,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
         }
       }
 
-      @container (max-width: 480px) /* --hu-breakpoint-sm */ {
-        :host {
-          padding: var(--hu-space-md) var(--hu-space-lg);
-        }
+      @container (max-width: 30rem) /* cq-sm */ {
         .skeleton-metrics {
           grid-template-columns: 1fr;
         }
@@ -348,7 +347,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
         outline: 2px solid var(--hu-accent-tertiary);
         outline-offset: 2px;
       }
-      @container (max-width: 768px) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .quick-actions {
           grid-template-columns: 1fr;
         }

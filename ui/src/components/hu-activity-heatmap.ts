@@ -17,6 +17,7 @@ export class HuActivityHeatmap extends LitElement {
       display: flex;
       gap: var(--hu-space-2xs);
       overflow-x: auto;
+      scroll-snap-type: x proximity;
       scrollbar-width: none;
     }
 

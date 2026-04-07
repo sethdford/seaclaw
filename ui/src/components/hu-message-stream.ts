@@ -41,12 +41,12 @@ export class ScMessageStream extends LitElement {
     }
 
     .bubble.role-user {
-      margin-left: auto;
+      margin-inline-start: auto;
       background: var(--hu-surface-container-high);
     }
 
     .bubble.role-assistant {
-      margin-right: auto;
+      margin-inline-end: auto;
       background: var(--hu-surface-container);
       border: 1px solid var(--hu-border-subtle);
     }
@@ -86,7 +86,7 @@ export class ScMessageStream extends LitElement {
 
     .md-blockquote {
       border-left: 3px solid var(--hu-accent);
-      padding-left: var(--hu-space-md);
+      padding-inline-start: var(--hu-space-md);
       margin: var(--hu-space-sm) 0;
       color: var(--hu-text-muted);
       font-style: italic;
@@ -94,7 +94,7 @@ export class ScMessageStream extends LitElement {
 
     .md-list {
       margin: var(--hu-space-sm) 0;
-      padding-left: var(--hu-space-lg);
+      padding-inline-start: var(--hu-space-lg);
     }
 
     .md-list-item {
@@ -161,7 +161,7 @@ export class ScMessageStream extends LitElement {
       width: 2px;
       height: 1em;
       background: var(--hu-accent);
-      margin-left: var(--hu-space-2xs);
+      margin-inline-start: var(--hu-space-2xs);
       vertical-align: text-bottom;
       border-radius: var(--hu-radius-xs);
       animation: hu-cursor-glow-stream var(--hu-duration-slow) var(--hu-ease-in-out) infinite;

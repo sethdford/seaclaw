@@ -54,6 +54,8 @@ export class ScToolsView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-tools;
         display: block;
+        width: 100%;
+        min-width: 0;
         max-width: 75rem;
         contain: layout style;
         container-type: inline-size;
@@ -77,7 +79,7 @@ export class ScToolsView extends GatewayAwareLitElement {
         font-size: var(--hu-text-base);
         color: var(--hu-text);
       }
-      @container (max-width: 480px) /* --hu-breakpoint-sm */ {
+      @container (max-width: 30rem) /* cq-sm */ {
         .expand-panel {
           padding: var(--hu-space-sm);
         }

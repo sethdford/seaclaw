@@ -3,6 +3,7 @@ import type { TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import "../components/hu-page-hero.js";
+import "../components/hu-section-header.js";
 
 type SectionId =
   | "config"
@@ -179,6 +180,7 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
 export class ScSettingsView extends LitElement {
   static override styles = css`
     :host {
+      view-transition-name: view-settings;
       display: block;
     }
 
@@ -224,7 +226,7 @@ export class ScSettingsView extends LitElement {
       display: none;
     }
 
-    @media (max-width: 600px) /* --hu-breakpoint-compact */ {
+    @media (max-width: 599px) /* --hu-breakpoint-compact */ {
       .tabs {
         display: none;
       }
@@ -355,7 +357,9 @@ export class ScSettingsView extends LitElement {
       SETTINGS_SECTIONS.find((s) => s.id === this._activeSection) ?? SETTINGS_SECTIONS[0];
     return html`
       <div class="header-area">
-        <hu-page-hero heading="Settings" subheading="Configure your h-uman instance"></hu-page-hero>
+        <hu-page-hero>
+          <hu-section-header heading="Settings" description="Configure your h-uman instance"></hu-section-header>
+        </hu-page-hero>
       </div>
 
       <!-- Desktop: grouped horizontal tabs -->
@@ -460,8 +464,8 @@ export class ScSettingsView extends LitElement {
     }
   }
 
-  override async firstUpdated(): Promise<void> {
-    await this._selectSection(this._activeSection);
+  override firstUpdated(): void {
+    queueMicrotask(() => void this._selectSection(this._activeSection));
   }
 }
 

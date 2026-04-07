@@ -114,24 +114,24 @@ export class ScSearch extends LitElement {
     input.size-sm {
       font-size: var(--hu-text-sm);
       padding: var(--hu-space-xs) var(--hu-space-sm);
-      padding-left: calc(var(--hu-space-sm) + 1.125rem + var(--hu-space-xs));
-      padding-right: calc(var(--hu-space-sm) + 1.125rem + var(--hu-space-xs));
+      padding-inline-start: calc(var(--hu-space-sm) + 1.125rem + var(--hu-space-xs));
+      padding-inline-end: calc(var(--hu-space-sm) + 1.125rem + var(--hu-space-xs));
       min-height: calc(var(--hu-input-min-height) - var(--hu-space-sm));
     }
 
     input.size-md {
       font-size: var(--hu-text-base);
       padding: var(--hu-space-sm) var(--hu-space-md);
-      padding-left: calc(var(--hu-space-md) + 1.125rem + var(--hu-space-xs));
-      padding-right: calc(var(--hu-space-md) + 1.125rem + var(--hu-space-xs));
+      padding-inline-start: calc(var(--hu-space-md) + 1.125rem + var(--hu-space-xs));
+      padding-inline-end: calc(var(--hu-space-md) + 1.125rem + var(--hu-space-xs));
       min-height: var(--hu-input-min-height);
     }
 
     input.size-lg {
       font-size: var(--hu-text-base);
       padding: var(--hu-space-sm) var(--hu-space-md);
-      padding-left: calc(var(--hu-space-md) + 1.125rem + var(--hu-space-xs));
-      padding-right: calc(var(--hu-space-md) + 1.125rem + var(--hu-space-xs));
+      padding-inline-start: calc(var(--hu-space-md) + 1.125rem + var(--hu-space-xs));
+      padding-inline-end: calc(var(--hu-space-md) + 1.125rem + var(--hu-space-xs));
       min-height: calc(var(--hu-input-min-height) + var(--hu-space-sm));
     }
   `;

@@ -41,11 +41,12 @@ export class ScSessionsView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-sessions;
         display: block;
+        width: 100%;
         color: var(--hu-text);
         max-width: 75rem;
         contain: layout style;
         container-type: inline-size;
-        padding: var(--hu-space-lg) var(--hu-space-xl);
+        padding: var(--hu-space-adaptive-page-y) var(--hu-space-adaptive-page-x);
       }
 
       .staleness {
@@ -77,8 +78,8 @@ export class ScSessionsView extends GatewayAwareLitElement {
 
       .sessions-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-        gap: var(--hu-space-lg);
+        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-lg), 100%), 1fr));
+        gap: var(--hu-space-adaptive-content-gap);
       }
 
       .session-detail {
@@ -180,7 +181,7 @@ export class ScSessionsView extends GatewayAwareLitElement {
         height: 1em;
       }
 
-      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .sessions-grid {
           grid-template-columns: 1fr;
         }

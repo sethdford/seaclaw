@@ -11,7 +11,7 @@ export class ScCard extends LitElement {
   @property({ type: Boolean, reflect: true }) clickable = false;
   @property({ type: Boolean }) accent = false;
   @property({ type: Boolean }) elevated = false;
-  @property({ type: Boolean }) glass = true;
+  @property({ type: Boolean }) glass = false;
   @property({ type: Boolean }) solid = false;
   /** Opt-in 3D perspective tilt following pointer (overview-style cards). */
   @property({ type: Boolean, reflect: true }) tilt = false;
@@ -45,7 +45,7 @@ export class ScCard extends LitElement {
       contain: layout style paint;
     }
 
-    /* Gradient border glow — bright top edge fading to transparent bottom (Apple Liquid Glass) */
+    /* Subtle inset highlight — top edge only, Apple-like depth cue */
     .card::before {
       content: "";
       position: absolute;
@@ -53,9 +53,8 @@ export class ScCard extends LitElement {
       border-radius: inherit;
       background: linear-gradient(
         180deg,
-        color-mix(in srgb, var(--hu-color-white) 70%, transparent),
-        color-mix(in srgb, var(--hu-color-white) 10%, transparent) 30%,
-        transparent 60%
+        color-mix(in srgb, var(--hu-color-white) 40%, transparent),
+        transparent 20%
       );
       mask:
         linear-gradient(var(--hu-color-white) 0 0) content-box,
@@ -70,28 +69,10 @@ export class ScCard extends LitElement {
       z-index: 1;
     }
 
-    /* Ambient teal surface glow from top */
-    .card::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 6.25rem;
-      background: radial-gradient(
-        ellipse 90% 70% at 50% -20%,
-        color-mix(in srgb, var(--hu-accent) 6%, transparent),
-        transparent
-      );
-      border-radius: inherit;
-      pointer-events: none;
-      z-index: 0;
-    }
-
     .card > ::slotted(*),
     .card > * {
       position: relative;
-      z-index: 2;
+      z-index: 1;
     }
 
     .card.elevated {
@@ -101,20 +82,26 @@ export class ScCard extends LitElement {
         inset 0 -1px 0 color-mix(in srgb, var(--hu-text) 4%, transparent);
     }
 
-    /* Accent top-band — teal gradient bar + tinted wash below */
+    /* Accent top-band — gradient bar along top edge */
     .card.accent {
       border-top: none;
       padding-top: calc(var(--hu-space-xl) + var(--hu-space-xs));
     }
     .card.accent::after {
-      height: var(--hu-space-xs);
+      content: "";
+      position: absolute;
       top: 0;
+      left: 0;
+      right: 0;
+      height: var(--hu-space-xs);
       background: linear-gradient(
         90deg,
         var(--hu-accent),
         color-mix(in srgb, var(--hu-accent) 40%, transparent)
       );
       border-radius: var(--hu-radius-xl) var(--hu-radius-xl) 0 0;
+      pointer-events: none;
+      z-index: 1;
     }
     .card.accent::before {
       background: linear-gradient(
@@ -283,9 +270,16 @@ export class ScCard extends LitElement {
       }
     }
 
-    @container (max-width: 280px) {
+    @container (max-width: 37.5rem) /* cq-compact */ {
       .card {
-        padding: var(--hu-space-md);
+        padding: var(--hu-space-adaptive-card-padding, var(--hu-space-md));
+      }
+    }
+
+    @container (max-width: 17.5rem) {
+      .card {
+        padding: var(--hu-space-sm);
+        border-radius: var(--hu-radius-md);
       }
     }
 
@@ -533,7 +527,7 @@ export class ScCard extends LitElement {
       this.clickable ? "clickable" : "",
       this.accent ? "accent" : "",
       this.elevated ? "elevated" : "",
-      !this.solid ? "glass" : "",
+      this.glass ? "glass" : "",
       this.mesh ? "mesh" : "",
       this.chromatic ? "chromatic" : "",
     ]

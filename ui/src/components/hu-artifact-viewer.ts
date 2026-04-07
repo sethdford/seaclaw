@@ -260,7 +260,7 @@ export class ScArtifactViewer extends LitElement {
     }
     .diff-content {
       flex: 1;
-      padding-left: var(--hu-space-xs);
+      padding-inline-start: var(--hu-space-xs);
     }
     @media (prefers-reduced-motion: reduce) {
       .copy-btn,

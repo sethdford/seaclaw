@@ -48,6 +48,8 @@ export class ScNodesView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-nodes;
         display: block;
+        width: 100%;
+        min-width: 0;
         max-width: 75rem;
         container-type: inline-size;
       }
@@ -90,7 +92,7 @@ export class ScNodesView extends GatewayAwareLitElement {
         font-family: var(--hu-font-mono);
       }
 
-      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .header-actions {
           flex-direction: column;
           align-items: flex-start;

@@ -110,6 +110,7 @@ export class ScApp extends LitElement {
     :host {
       display: block;
       height: 100vh;
+      height: 100dvh;
       font-family: var(--hu-font);
     }
     .hu-skip-link {
@@ -177,6 +178,7 @@ export class ScApp extends LitElement {
     .main-scroll {
       flex: 1;
       min-height: 0;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       overflow: auto;
@@ -247,6 +249,7 @@ export class ScApp extends LitElement {
     .view-enter {
       flex: 1;
       min-height: 0;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       animation: hu-view-enter var(--hu-duration-moderate) var(--hu-spring-out) both;
@@ -327,7 +330,7 @@ export class ScApp extends LitElement {
       font-size: var(--hu-text-xs);
       line-height: 1;
       opacity: 0.8;
-      margin-left: var(--hu-space-xs);
+      margin-inline-start: var(--hu-space-xs);
     }
     .banner-dismiss:hover {
       opacity: 1;
@@ -405,7 +408,7 @@ export class ScApp extends LitElement {
     }
 
     /* Medium (600–904px): collapsed sidebar, 2-column content */
-    @media (min-width: 600px) and (max-width: 904px) /* --hu-breakpoint-medium */ {
+    @media (min-width: 600px) and (max-width: 904px) /* --hu-breakpoint-compact to --hu-breakpoint-medium */ {
       .layout {
         grid-template-columns: var(--hu-sidebar-collapsed) 1fr;
       }
@@ -454,6 +457,7 @@ export class ScApp extends LitElement {
         calc(var(--hu-space-lg) + env(safe-area-inset-bottom, 0));
       animation: hu-sheet-up var(--hu-duration-normal) var(--hu-ease-spring) both;
       max-height: 70vh;
+      max-height: 70dvh;
       overflow-y: auto;
     }
     @keyframes hu-sheet-up {
@@ -1092,8 +1096,7 @@ export class ScApp extends LitElement {
           </div>`
         : nothing}
       <div
-        class="layout hu-film-grain ${this._effectiveSidebarCollapsed ? "collapsed" : ""} ${this
-          ._hasDetail
+        class="layout ${this._effectiveSidebarCollapsed ? "collapsed" : ""} ${this._hasDetail
           ? "has-detail"
           : ""}"
       >

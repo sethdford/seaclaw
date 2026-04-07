@@ -244,7 +244,7 @@ export class ScVoiceOrb extends LitElement {
       font-weight: var(--hu-weight-medium);
     }
 
-    @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+    @container (max-width: 30rem) /* cq-sm */ {
       .mic-btn {
         width: 4.5rem;
         height: 4.5rem;

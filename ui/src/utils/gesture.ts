@@ -49,7 +49,7 @@ export function rippleEffect(element: HTMLElement, event: PointerEvent): void {
     top: ${y}px;
     width: 1.25rem;
     height: 1.25rem;
-    margin-left: calc(-1 * var(--hu-space-md));
+    margin-inline-start: calc(-1 * var(--hu-space-md));
     margin-top: calc(-1 * var(--hu-space-md));
     border-radius: 50%;
     background: currentColor;

@@ -85,6 +85,7 @@ export class ScConfigView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-config;
         display: block;
+        min-width: 0;
         width: 100%;
         max-width: 40rem;
         contain: layout style;
@@ -99,7 +100,7 @@ export class ScConfigView extends GatewayAwareLitElement {
       .form {
         display: flex;
         flex-direction: column;
-        gap: var(--hu-space-xl);
+        gap: var(--hu-space-adaptive-section-gap);
       }
       .section {
         border: 1px solid var(--hu-border);
@@ -202,7 +203,7 @@ export class ScConfigView extends GatewayAwareLitElement {
         display: flex;
         gap: var(--hu-space-sm);
       }
-      @container (max-width: 30rem) /* --hu-breakpoint-sm */ {
+      @container (max-width: 30rem) /* cq-sm */ {
         :host {
           max-width: 100%;
         }

@@ -130,9 +130,12 @@ export class ScTuringView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-turing;
         display: block;
+        width: 100%;
+        container-type: inline-size;
+        min-width: 0;
         max-width: 75rem;
         contain: layout style;
-        padding: var(--hu-space-lg) var(--hu-space-xl);
+        padding: var(--hu-space-adaptive-page-y) var(--hu-space-adaptive-page-x);
         font-family: var(--hu-font);
       }
 
@@ -169,8 +172,8 @@ export class ScTuringView extends GatewayAwareLitElement {
 
       .dimensions-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-        gap: var(--hu-space-lg);
+        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-md), 100%), 1fr));
+        gap: var(--hu-space-adaptive-content-gap);
         margin-bottom: var(--hu-space-2xl);
       }
 
@@ -243,9 +246,16 @@ export class ScTuringView extends GatewayAwareLitElement {
 
       .trajectory-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-        gap: var(--hu-space-lg);
+        grid-template-columns: repeat(auto-fill, minmax(var(--hu-grid-track-sm), 1fr));
+        gap: var(--hu-space-adaptive-content-gap);
         margin-bottom: var(--hu-space-2xl);
+      }
+
+      @container (max-width: 30rem) /* cq-sm */ {
+        .dimensions-grid,
+        .trajectory-grid {
+          grid-template-columns: 1fr;
+        }
       }
 
       .trajectory-card {

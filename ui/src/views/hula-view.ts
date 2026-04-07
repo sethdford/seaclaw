@@ -68,6 +68,8 @@ export class ScHulaView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-hula;
         display: block;
+        width: 100%;
+        min-width: 0;
         max-width: 72rem;
         color: var(--hu-text);
         container-type: inline-size;
@@ -163,7 +165,7 @@ export class ScHulaView extends GatewayAwareLitElement {
         gap: var(--hu-space-md);
         margin-bottom: var(--hu-space-xl);
       }
-      @container (max-width: 52rem) /* --hu-breakpoint-xl approx */ {
+      @container (max-width: 52rem) /* cq-expanded */ {
         .layout {
           grid-template-columns: 1fr;
         }

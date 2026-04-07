@@ -42,6 +42,7 @@ export class ScChannelsView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-channels;
         display: block;
+        min-width: 0;
         width: 100%;
         max-width: 75rem;
         container-type: inline-size;
@@ -76,7 +77,7 @@ export class ScChannelsView extends GatewayAwareLitElement {
         margin-bottom: var(--hu-space-lg);
       }
 
-      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .table-section {
           margin-top: var(--hu-space-lg);
         }

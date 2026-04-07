@@ -87,6 +87,7 @@ export class ScChatBubble extends LitElement {
 
     :host {
       display: block;
+      min-width: 0;
       contain: layout style;
     }
     @keyframes hu-cursor-fade-out {
@@ -120,13 +121,13 @@ export class ScChatBubble extends LitElement {
       width: fit-content;
       min-width: 3rem;
       font-family: var(--hu-font);
-      font-size: var(--hu-text-sm);
+      font-size: var(--hu-text-base);
       line-height: var(--hu-leading-relaxed);
-      padding: var(--hu-space-sm) var(--hu-space-md);
+      padding: var(--hu-space-md) var(--hu-space-lg);
     }
 
     .bubble.role-user {
-      margin-left: auto;
+      margin-inline-start: auto;
       max-width: 75%;
       background: var(--hu-surface-container-high);
       color: var(--hu-text);
@@ -138,7 +139,7 @@ export class ScChatBubble extends LitElement {
     }
 
     .bubble.role-assistant {
-      margin-right: auto;
+      margin-inline-end: auto;
       max-width: 90%;
       background: var(--hu-surface-container);
       color: var(--hu-text);
@@ -235,7 +236,7 @@ export class ScChatBubble extends LitElement {
 
     .md-blockquote {
       border-left: 3px solid var(--hu-accent);
-      padding-left: var(--hu-space-md);
+      padding-inline-start: var(--hu-space-md);
       margin: var(--hu-space-sm) 0;
       color: var(--hu-text);
       font-style: italic;
@@ -248,7 +249,7 @@ export class ScChatBubble extends LitElement {
 
     .md-list {
       margin: var(--hu-space-sm) 0;
-      padding-left: var(--hu-space-lg);
+      padding-inline-start: var(--hu-space-lg);
     }
 
     .md-list-item {
@@ -347,7 +348,7 @@ export class ScChatBubble extends LitElement {
       width: 2px;
       height: 1.1em;
       background: var(--hu-accent);
-      margin-left: var(--hu-space-2xs);
+      margin-inline-start: var(--hu-space-2xs);
       vertical-align: text-bottom;
       border-radius: var(--hu-radius-xs);
       animation: hu-cursor-glow var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
@@ -394,17 +395,18 @@ export class ScChatBubble extends LitElement {
     }
 
     .meta-slot {
-      opacity: 0;
+      opacity: 0.5;
       transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
       font-size: var(--hu-text-xs);
-      color: var(--hu-text);
+      color: var(--hu-text-muted);
     }
 
     .bubble.role-user .meta-slot {
-      color: var(--hu-text-secondary);
+      color: var(--hu-text-muted);
     }
 
-    .bubble:hover .meta-slot {
+    .bubble:hover .meta-slot,
+    .bubble:focus-within .meta-slot {
       opacity: 1;
     }
 
@@ -473,10 +475,10 @@ export class ScChatBubble extends LitElement {
       background: color-mix(in srgb, var(--hu-accent) 6%, transparent);
     }
     .outline-item[data-level="2"] {
-      padding-left: var(--hu-space-md);
+      padding-inline-start: var(--hu-space-md);
     }
     .outline-item[data-level="3"] {
-      padding-left: var(--hu-space-lg);
+      padding-inline-start: var(--hu-space-lg);
     }
 
     /* Threaded reply quote */

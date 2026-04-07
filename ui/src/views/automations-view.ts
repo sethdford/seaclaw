@@ -60,10 +60,13 @@ export class ScAutomationsView extends GatewayAwareLitElement {
       :host {
         view-transition-name: view-automations;
         display: block;
+        width: 100%;
         max-width: 60rem;
+        min-width: 0;
         margin: 0 auto;
         font-family: var(--hu-font);
         color: var(--hu-text);
+        contain: layout style;
         container-type: inline-size;
       }
 
@@ -106,7 +109,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
 
       .templates-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(var(--hu-grid-track-sm), 1fr));
         gap: var(--hu-space-md);
       }
 
@@ -137,7 +140,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
         color: var(--hu-text);
       }
 
-      @container (max-width: 48rem) /* --hu-breakpoint-lg */ {
+      @container (max-width: 48rem) /* cq-medium */ {
         .templates-grid {
           grid-template-columns: 1fr;
         }
