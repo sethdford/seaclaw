@@ -67,7 +67,7 @@ export class ScPageHero extends LitElement {
         transparent 70%
       );
       pointer-events: none;
-      animation: hu-hero-shimmer 8s var(--hu-ease-in-out) infinite;
+      animation: hu-hero-shimmer 8s var(--hu-ease-in-out) infinite; /* hu-lint-ok: ambient shimmer cycle */
       will-change: transform, opacity;
     }
     .content {

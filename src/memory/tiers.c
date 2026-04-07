@@ -117,7 +117,7 @@ hu_error_t hu_tier_manager_update_core(hu_tier_manager_t *mgr, const char *field
     if (target_cap > sizeof(saved))
         return HU_ERR_INVALID_ARGUMENT;
     memcpy(saved, target, target_cap);
-    int64_t old_updated_at = mgr->core.updated_at;
+    int64_t old_updated_at = mgr->core.updated_at; (void)old_updated_at;
 
     size_t copy_len = value_len < target_cap - 1 ? value_len : target_cap - 1;
     if (value && copy_len > 0)

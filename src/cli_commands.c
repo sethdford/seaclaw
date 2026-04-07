@@ -257,6 +257,15 @@ hu_error_t cmd_memory(hu_allocator_t *alloc, int argc, char **argv) {
         printf("Usage: human memory <stats|count|list|search|get|forget>\n");
         return HU_OK;
     }
+    const char *sub = argv[2];
+    if ((strcmp(sub, "search") == 0 || strcmp(sub, "get") == 0) && argc < 4) {
+        fprintf(stderr, "Usage: human memory %s <query>\n", sub);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+    if (strcmp(sub, "forget") == 0 && argc < 4) {
+        fprintf(stderr, "Usage: human memory forget <key>\n");
+        return HU_ERR_INVALID_ARGUMENT;
+    }
     hu_config_t cfg;
     hu_error_t err = hu_config_load(alloc, &cfg);
     if (err != HU_OK) {
@@ -271,7 +280,6 @@ hu_error_t cmd_memory(hu_allocator_t *alloc, int argc, char **argv) {
         return HU_OK;
     }
     const char *name = mem.vtable->name ? mem.vtable->name(mem.ctx) : "unknown";
-    const char *sub = argv[2];
 
     if (strcmp(sub, "stats") == 0 || strcmp(sub, "status") == 0) {
         size_t count = 0;
