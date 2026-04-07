@@ -12,7 +12,7 @@
 #include "human/persona/voice_maturity.h"
 #endif
 
-#ifdef HU_ENABLE_SQLITE
+#if defined(HU_ENABLE_SQLITE) && defined(HU_ENABLE_PERSONA) && HU_ENABLE_PERSONA
 #include "human/persona/mood.h"
 #endif
 
@@ -94,8 +94,8 @@ hu_error_t hu_agent_build_turn_context(hu_agent_t *agent) {
     }
 #endif
 
-    /* 2. Mood directive (SQLite-backed) */
-#ifdef HU_ENABLE_SQLITE
+    /* 2. Mood directive (SQLite-backed, persona-dependent) */
+#if defined(HU_ENABLE_SQLITE) && defined(HU_ENABLE_PERSONA) && HU_ENABLE_PERSONA
     if (agent->memory) {
         hu_mood_state_t mood_state;
         memset(&mood_state, 0, sizeof(mood_state));

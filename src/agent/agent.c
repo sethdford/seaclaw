@@ -59,10 +59,10 @@
 #include "human/memory/stm.h"
 #include "human/observer.h"
 #include "human/persona/narrative_self.h"
-#include "human/persona/creative_voice.h"
-#include "human/persona/genuine_boundaries.h"
 #ifdef HU_HAS_PERSONA
 #include "human/persona.h"
+#include "human/persona/creative_voice.h"
+#include "human/persona/genuine_boundaries.h"
 #endif
 #include "human/provider.h"
 #include "human/security/arg_inspector.h"
@@ -717,11 +717,15 @@ hu_error_t hu_agent_set_persona(hu_agent_t *agent, const char *name, size_t name
     /* Re-seed frontier state from new persona (narrative, creative voice, boundaries, trust) */
     if (agent->frontiers.initialized) {
         hu_narrative_self_deinit(agent->alloc, &agent->frontiers.narrative);
+#ifdef HU_HAS_PERSONA
         hu_creative_voice_deinit(agent->alloc, &agent->frontiers.creative_voice);
         hu_genuine_boundary_set_deinit(agent->alloc, &agent->frontiers.boundaries);
+#endif
         hu_narrative_self_init(&agent->frontiers.narrative);
+#ifdef HU_HAS_PERSONA
         hu_creative_voice_init(&agent->frontiers.creative_voice);
         hu_genuine_boundary_set_init(&agent->frontiers.boundaries);
+#endif
         hu_tcal_init(&agent->frontiers.trust);
 
         if (new_persona->identity)
@@ -941,11 +945,13 @@ void hu_agent_deinit(hu_agent_t *agent) {
     hu_stm_deinit(&agent->stm);
     if (agent->frontiers.initialized) {
         hu_narrative_self_deinit(agent->alloc, &agent->frontiers.narrative);
+#ifdef HU_HAS_PERSONA
         hu_creative_voice_deinit(agent->alloc, &agent->frontiers.creative_voice);
+        hu_genuine_boundary_set_deinit(agent->alloc, &agent->frontiers.boundaries);
+#endif
         hu_attachment_deinit(agent->alloc, &agent->frontiers.attachment);
         hu_rupture_deinit(agent->alloc, &agent->frontiers.rupture);
         hu_growth_narrative_deinit(agent->alloc, &agent->frontiers.growth);
-        hu_genuine_boundary_set_deinit(agent->alloc, &agent->frontiers.boundaries);
         agent->frontiers.initialized = false;
     }
     if (agent->sota.sota_initialized) {

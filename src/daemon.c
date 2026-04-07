@@ -4786,7 +4786,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
 
                     /* 2. Current mood (F60) — persona mood directive */
-#ifdef HU_ENABLE_SQLITE
+#if defined(HU_ENABLE_SQLITE) && defined(HU_ENABLE_PERSONA) && HU_ENABLE_PERSONA
                     if (agent->memory) {
                         hu_mood_state_t mood_state;
                         memset(&mood_state, 0, sizeof(mood_state));

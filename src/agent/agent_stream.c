@@ -14,7 +14,9 @@
 #include "human/memory/fact_extract.h"
 #include "human/cognition/trust.h"
 #include "human/persona/humor.h"
+#ifdef HU_ENABLE_PERSONA
 #include "human/context/humor.h"
+#endif
 #include "human/persona/somatic.h"
 #include "human/agent/frontier_persist.h"
 #include "human/eval/consistency.h"
@@ -1197,6 +1199,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 if (agent->memory && agent->memory_session_id) {
                     sqlite3 *ha_db = hu_sqlite_memory_get_db(agent->memory);
                     if (ha_db) {
+#ifdef HU_ENABLE_PERSONA
                         static const hu_humor_type_t theory_to_type[] = {
                             [HU_HUMOR_INCONGRUITY]      = HU_HUMOR_MISDIRECTION,
                             [HU_HUMOR_BENIGN_VIOLATION] = HU_HUMOR_OBSERVATIONAL,
@@ -1209,6 +1212,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                             atype = theory_to_type[humor_theory_saved];
                         (void)hu_humor_audience_record(ha_db,
                             agent->memory_session_id, atype, landed);
+#endif
                     }
                 }
 #endif

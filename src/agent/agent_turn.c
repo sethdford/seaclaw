@@ -15,14 +15,18 @@
 #include "human/memory/relational_episode.h"
 #include "human/agent/frontier_persist.h"
 #include "human/cognition/presence.h"
+#ifdef HU_ENABLE_PERSONA
 #include "human/persona/micro_expression.h"
+#endif
 #include "human/persona/creative_voice.h"
 #include "human/agent/growth_narrative.h"
 #include "human/persona/genuine_boundaries.h"
 
 #include "human/cognition/trust.h"
 #include "human/persona/humor.h"
+#ifdef HU_ENABLE_PERSONA
 #include "human/context/humor.h"
+#endif
 #include "human/security/sycophancy_guard.h"
 #include "human/memory/hallucination_guard.h"
 #include "human/memory/fact_extract.h"
@@ -2334,9 +2338,11 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             hu_attachment_init(&agent->frontiers.attachment);
             hu_rupture_init(&agent->frontiers.rupture);
             hu_narrative_self_init(&agent->frontiers.narrative);
+#ifdef HU_ENABLE_PERSONA
             hu_creative_voice_init(&agent->frontiers.creative_voice);
-            hu_growth_narrative_init(&agent->frontiers.growth);
             hu_genuine_boundary_set_init(&agent->frontiers.boundaries);
+#endif
+            hu_growth_narrative_init(&agent->frontiers.growth);
 
 #ifdef HU_HAS_PERSONA
             /* Warm-start attachment from contact profile if available */
@@ -2529,17 +2535,22 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         hu_presence_deinit(agent->alloc, &pres);
 
         /* F9: Micro-Expression — use relationship closeness from presence */
-        float f9_closeness = (float)f8_rel_depth / 10.0f;
-        if (f9_closeness > 1.0f) f9_closeness = 1.0f;
-        hu_micro_expression_t mexp;
-        hu_micro_expression_init(&mexp);
-        hu_micro_expression_compute(&mexp, agent->frontiers.somatic.energy,
-                                    agent->frontiers.somatic.social_battery,
-                                    agent->infra.emotional_cognition.state.valence,
-                                    agent->infra.emotional_cognition.state.intensity,
-                                    f9_closeness);
-        hu_micro_expression_build_context(agent->alloc, &mexp, &micro_expr_ctx, &micro_expr_ctx_len);
-        hu_micro_expression_deinit(agent->alloc, &mexp);
+#ifdef HU_ENABLE_PERSONA
+        {
+            float f9_closeness = (float)f8_rel_depth / 10.0f;
+            if (f9_closeness > 1.0f) f9_closeness = 1.0f;
+            hu_micro_expression_t mexp;
+            hu_micro_expression_init(&mexp);
+            hu_micro_expression_compute(&mexp, agent->frontiers.somatic.energy,
+                                        agent->frontiers.somatic.social_battery,
+                                        agent->infra.emotional_cognition.state.valence,
+                                        agent->infra.emotional_cognition.state.intensity,
+                                        f9_closeness);
+            hu_micro_expression_build_context(agent->alloc, &mexp, &micro_expr_ctx,
+                                              &micro_expr_ctx_len);
+            hu_micro_expression_deinit(agent->alloc, &mexp);
+        }
+#endif
 
         /* F4: Novelty Detection — feed STM topics as known context */
         {
@@ -2695,8 +2706,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                         &narrative_self_ctx, &narrative_self_ctx_len);
 
         /* F10: Creative Voice */
+#ifdef HU_ENABLE_PERSONA
         hu_creative_voice_build_context(agent->alloc, &agent->frontiers.creative_voice,
                                         &creative_voice_ctx, &creative_voice_ctx_len);
+#endif
 
         /* F11: Growth Narrative */
         hu_growth_narrative_build_context(agent->alloc, &agent->frontiers.growth,
@@ -2704,6 +2717,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                           &growth_ctx, &growth_ctx_len);
 
         /* F12: Genuine Boundaries */
+#ifdef HU_ENABLE_PERSONA
         {
             uint32_t boundary_rel_stage = 0;
 #ifdef HU_HAS_PERSONA
@@ -2729,6 +2743,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                                   &boundary_ctx, &boundary_ctx_len);
             }
         }
+#endif
 
         /* Trust calibration: update and build context */
         {
@@ -5603,6 +5618,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                     if (agent->memory && agent->memory_session_id) {
                         sqlite3 *ha_db = hu_sqlite_memory_get_db(agent->memory);
                         if (ha_db) {
+#ifdef HU_ENABLE_PERSONA
                             static const hu_humor_type_t theory_to_type[] = {
                                 [HU_HUMOR_INCONGRUITY]      = HU_HUMOR_MISDIRECTION,
                                 [HU_HUMOR_BENIGN_VIOLATION] = HU_HUMOR_OBSERVATIONAL,
@@ -5615,6 +5631,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                                 atype = theory_to_type[humor_theory_saved];
                             (void)hu_humor_audience_record(ha_db,
                                 agent->memory_session_id, atype, landed);
+#endif
                         }
                     }
 #endif
