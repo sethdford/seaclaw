@@ -839,7 +839,7 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
             bi->agent.on_device_available = hu_apple_probe(alloc, NULL, 0);
             if (bi->agent.on_device_available)
                 hu_log_info("bootstrap", obs,
-                            "Apple Intelligence on-device provider detected (apfel at 127.0.0.1:11434)");
+                            "Apple Intelligence on-device provider detected");
         }
 #endif
         memset(&bi->voice_cfg, 0, sizeof(bi->voice_cfg));

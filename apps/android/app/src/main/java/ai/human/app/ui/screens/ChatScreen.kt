@@ -174,7 +174,7 @@ private fun AnnotatedString.Builder.appendInlineMarkdown(
 // MARK: - Chat Screen
 
 @Composable
-fun ChatScreen(gateway: GatewayClient = GatewayClient()) {
+fun ChatScreen(gateway: GatewayClient) {
     val colorScheme = MaterialTheme.colorScheme
     val reducedMotion = isReducedMotionEnabled()
     val nextId = remember { mutableIntStateOf(1) }

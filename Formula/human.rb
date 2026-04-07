@@ -33,7 +33,7 @@ class Human < Formula
   depends_on "curl" => :optional
 
   on_macos do
-    depends_on "Arthur-Ficial/tap/apfel" => :recommended
+    depends_on xcode: ["16.0", :build]
   end
 
   def install
@@ -54,6 +54,14 @@ class Human < Formula
       bin.install Dir["human-*"].first => "human"
     end
 
+    # Build and install on-device server on macOS
+    if OS.mac? && File.exist?("apps/tools/human-ondevice/Package.swift")
+      Dir.chdir("apps/tools/human-ondevice") do
+        system "swift", "build", "-c", "release"
+        bin.install ".build/release/human-ondevice"
+      end
+    end
+
     man1.install "docs/man/human.1" if File.exist?("docs/man/human.1")
     man1.install "docs/man/human-gateway.1" if File.exist?("docs/man/human-gateway.1")
 
@@ -69,10 +77,10 @@ class Human < Formula
       <<~EOS
         Apple Intelligence (on-device, free):
           If you have macOS 26+ and Apple Silicon, human uses Apple
-          Intelligence by default. Install apfel if you haven't:
-            brew tap Arthur-Ficial/tap && brew install apfel
+          Intelligence by default. human-ondevice was built and installed
+          alongside human — no third-party dependencies needed.
 
-          Then run: human onboard --apple
+          Run: human onboard --apple
       EOS
     end
   end

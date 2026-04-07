@@ -1,0 +1,27 @@
+{
+  "object" : {
+    "artifacts" : [
+
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "humankit",
+          "kind" : "fileSystem",
+          "location" : "/Users/sethford/Documents/h-uman/apps/shared/HumanKit",
+          "name" : "HumanKit"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/sethford/Documents/h-uman/apps/shared/HumanKit"
+        },
+        "subpath" : "humankit"
+      }
+    ],
+    "prebuilts" : [
+
+    ]
+  },
+  "version" : 7
+}

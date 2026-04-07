@@ -22,6 +22,7 @@ import statistics
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -30,10 +31,45 @@ OUTPUT_PATH = os.path.join(SCRIPT_DIR, "..", "eval_baselines.json")
 HU_BIN = os.path.expanduser("~/bin/hu")
 CONFIG_PATH = os.path.expanduser("~/.human/config.json")
 
-API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY}"
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "johnb-2025")
+EVAL_MODEL = "gemini-3.1-flash-lite-preview"
 
 N_SAMPLES = 10
+
+_adc_token_cache = {"token": None, "expires": 0}
+
+
+def _get_adc_token():
+    if _adc_token_cache["token"] and time.time() < _adc_token_cache["expires"] - 60:
+        return _adc_token_cache["token"]
+    creds_path = os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
+    if not os.path.exists(creds_path):
+        return None
+    with open(creds_path) as f:
+        creds = json.load(f)
+    payload = urllib.parse.urlencode({
+        "client_id": creds["client_id"],
+        "client_secret": creds["client_secret"],
+        "refresh_token": creds["refresh_token"],
+        "grant_type": "refresh_token",
+    }).encode()
+    req = urllib.request.Request(
+        "https://oauth2.googleapis.com/token",
+        data=payload,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    resp = urllib.request.urlopen(req, timeout=10)
+    data = json.loads(resp.read())
+    _adc_token_cache["token"] = data["access_token"]
+    _adc_token_cache["expires"] = time.time() + data.get("expires_in", 3600)
+    return data["access_token"]
+
+
+def _gemini_url():
+    return (
+        f"https://aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/global/"
+        f"publishers/google/models/{EVAL_MODEL}:generateContent"
+    )
 
 AI_TELL_PATTERNS = [
     r"\bcertainly\b", r"\babsolutely\b", r"\bi'd be happy to\b",
@@ -67,15 +103,19 @@ def save_config(cfg):
 
 
 def call_gemini_raw(message):
-    """Call Gemini directly — no persona, no hu agent."""
+    """Call Gemini directly via Vertex AI ADC — no persona, no hu agent."""
     payload = json.dumps({
         "contents": [{"parts": [{"text": f"Reply to this text message casually: \"{message}\""}]}],
         "generationConfig": {"temperature": 0.9, "maxOutputTokens": 200}
     }).encode()
     for attempt in range(3):
         try:
-            req = urllib.request.Request(GEMINI_URL, data=payload, headers={"Content-Type": "application/json"})
-            resp = urllib.request.urlopen(req)
+            token = _get_adc_token()
+            if not token:
+                return "(error: no ADC credentials — run: gcloud auth application-default login)"
+            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
+            req = urllib.request.Request(_gemini_url(), data=payload, headers=headers)
+            resp = urllib.request.urlopen(req, timeout=30)
             data = json.loads(resp.read())
             return data["candidates"][0]["content"]["parts"][0]["text"].strip()
         except Exception as e:
@@ -176,7 +216,7 @@ def main():
     samples = gt_pairs[:N_SAMPLES]
 
     print(f"  Samples: {N_SAMPLES} from {len(gt_pairs)} ground truth pairs")
-    print(f"  Sources: Raw Gemini | Gemini+Persona | Fine-tuned 4B | Real Seth")
+    print(f"  Sources: Raw Gemini | Gemini+Persona | Gemma4 31B LoRA | Real Seth")
     print("=" * 70)
 
     original_config = load_config()
@@ -194,7 +234,7 @@ def main():
 
     # Phase 2: Gemini + Persona (via hu agent)
     print("\n--- Phase 2: Gemini + Persona (via hu agent) ---")
-    set_provider("gemini", "gemini-2.0-flash")
+    set_provider("gemini", "gemini-3.1-flash-lite-preview")
     for i, s in enumerate(samples):
         resp = get_hu_response(s["incoming"])
         scores = score_response(resp, len(s["seth_reply"]))
@@ -202,9 +242,9 @@ def main():
         print(f"  [{i+1}] \"{s['incoming'][:40]}...\" -> \"{resp[:50]}...\" ({scores['overall']}/10)")
         time.sleep(0.5)
 
-    # Phase 3: Fine-tuned Gemma 3 4B (via hu agent)
-    print("\n--- Phase 3: Fine-tuned Gemma 3 4B (via hu agent) ---")
-    set_provider("compatible", "/Users/sethford/Documents/nullclaw/data/imessage/seth-gemma3-4b-fused")
+    # Phase 3: Fine-tuned Gemma 4 31B (via local MLX server with LoRA)
+    print("\n--- Phase 3: Fine-tuned Gemma 4 31B (via MLX LoRA) ---")
+    set_provider("compatible", "http://127.0.0.1:8741/v1")
     for i, s in enumerate(samples):
         resp = get_hu_response(s["incoming"])
         scores = score_response(resp, len(s["seth_reply"]))
@@ -228,7 +268,7 @@ def main():
     print("=" * 70)
 
     metrics = ["length_match", "brevity", "ai_tells", "human_markers", "sentence_structure", "overall"]
-    source_names = {"raw_gemini": "Raw Gemini", "gemini_persona": "Gemini+Persona", "finetune": "Fine-tuned 4B", "real_seth": "Real Seth"}
+    source_names = {"raw_gemini": "Raw Gemini", "gemini_persona": "Gemini+Persona", "finetune": "Gemma4 31B LoRA", "real_seth": "Real Seth"}
 
     print(f"\n  {'Metric':<22}", end="")
     for src in source_names.values():
@@ -273,7 +313,7 @@ def main():
     print(f"  Fine-tuning adds: +{ft_overall - raw_overall:.1f} points over raw Gemini")
     print(f"  Gap to real Seth: {real_overall - max(persona_overall, ft_overall):.1f} points")
 
-    best_ai = "Gemini+Persona" if persona_overall >= ft_overall else "Fine-tuned 4B"
+    best_ai = "Gemini+Persona" if persona_overall >= ft_overall else "Gemma4 31B LoRA"
     print(f"\n  Best AI source: {best_ai} ({max(persona_overall, ft_overall):.1f}/10)")
     print(f"  Real Seth baseline: {real_overall:.1f}/10")
 

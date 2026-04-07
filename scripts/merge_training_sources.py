@@ -29,6 +29,7 @@ OUT_DIR = os.path.join(DATA_ROOT, "merged")
 SOURCES = {
     "imessage": os.path.join(DATA_ROOT, "imessage", "training_pairs.jsonl"),
     "facebook": os.path.join(DATA_ROOT, "facebook", "training_pairs.jsonl"),
+    "photos": os.path.join(DATA_ROOT, "photos", "training_pairs.jsonl"),
 }
 
 AUGMENTED_PATH = os.path.join(DATA_ROOT, "imessage", "augmented_pairs.jsonl")

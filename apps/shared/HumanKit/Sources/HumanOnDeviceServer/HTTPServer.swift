@@ -5,6 +5,9 @@ import Network
 /// Handles only the routes needed for OpenAI-compatible on-device inference.
 @available(macOS 14.0, iOS 17.0, *)
 public final class HTTPServer: @unchecked Sendable {
+    /// Upper bound for total bytes read per connection (headers + body).
+    public static let maxRequestSize = 10 * 1024 * 1024
+
     private var listener: NWListener?
     private let port: UInt16
     private let queue = DispatchQueue(label: "com.human.ondevice.http", attributes: .concurrent)
@@ -19,7 +22,8 @@ public final class HTTPServer: @unchecked Sendable {
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
         let nwPort = NWEndpoint.Port(rawValue: port)!
-        listener = try NWListener(using: params, on: nwPort)
+        params.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: nwPort)
+        listener = try NWListener(using: params)
 
         listener?.stateUpdateHandler = { state in
             switch state {
@@ -66,6 +70,11 @@ public final class HTTPServer: @unchecked Sendable {
                 data.append(content)
             }
 
+            if data.count > Self.maxRequestSize {
+                connection.cancel()
+                return
+            }
+
             if let request = HTTPRequest.parse(data) {
                 Task {
                     let response = await self.router.handle(request)
@@ -80,7 +89,7 @@ public final class HTTPServer: @unchecked Sendable {
     }
 
     private func sendResponse(connection: NWConnection, response: HTTPResponse, streaming: Bool) {
-        let headerData = response.headerData()
+        let headerData = response.headerData(accessControlAllowOrigin: "http://127.0.0.1:\(port)")
         connection.send(content: headerData, completion: .contentProcessed { _ in
             if let chunks = response.streamChunks {
                 self.sendStreamChunks(connection: connection, chunks: chunks)

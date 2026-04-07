@@ -3,15 +3,23 @@ import HumanOnDevice
 
 /// OpenAI-compatible HTTP router backed by Apple's on-device FoundationModels.
 /// Implements /v1/models and /v1/chat/completions — zero external dependencies.
-@available(macOS 14.0, iOS 17.0, *)
+@available(macOS 26.0, iOS 26.0, *)
 public final class OnDeviceRouter: HTTPRouter, @unchecked Sendable {
     private let provider = OnDeviceProvider()
+    private let requiredToken: String
 
-    public init() {}
+    public init(requiredToken: String) {
+        self.requiredToken = requiredToken
+    }
 
     public func handle(_ request: HTTPRequest) async -> HTTPResponse {
         if request.method == "OPTIONS" {
             return corsPreflightResponse()
+        }
+
+        let auth = request.headers["authorization"] ?? ""
+        guard auth == "Bearer \(requiredToken)" else {
+            return .error("Unauthorized", status: 401)
         }
 
         let path = request.path.split(separator: "?").first.map(String.init) ?? request.path
@@ -162,7 +170,8 @@ public final class OnDeviceRouter: HTTPRouter, @unchecked Sendable {
                 continuation.yield(Data(doneFinal.utf8))
                 continuation.finish()
             } catch {
-                let errMsg = "data: {\"error\":{\"message\":\"\(error)\"}}\n\n"
+                let escaped = Self.jsonEscapedForSSE(String(describing: error))
+                let errMsg = "data: {\"error\":{\"message\":\"\(escaped)\"}}\n\n"
                 let errLen = String(errMsg.utf8.count, radix: 16)
                 continuation.yield(Data("\(errLen)\r\n\(errMsg)\r\n0\r\n\r\n".utf8))
                 continuation.finish()
@@ -190,8 +199,18 @@ public final class OnDeviceRouter: HTTPRouter, @unchecked Sendable {
             statusText: "No Content",
             contentType: "text/plain",
             body: Data(),
-            streamChunks: nil
+            streamChunks: nil,
+            accessControlAllowMethods: "GET, POST, OPTIONS",
+            accessControlAllowHeaders: "Authorization, Content-Type"
         )
+    }
+
+    private static func jsonEscapedForSSE(_ s: String) -> String {
+        s
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
     }
 
     // MARK: - Error Mapping

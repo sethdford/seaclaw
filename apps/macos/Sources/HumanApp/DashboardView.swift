@@ -352,6 +352,7 @@ struct MacChatPane: View {
     @State private var errorBanner: String?
     @State private var sendTrigger = 0
     @State private var isSending = false
+    @State private var isSendingWatchdogGeneration = 0
 
     private static let suggestionChips = ["What can you do?", "Summarize my notes", "Help me plan my day"]
 
@@ -495,6 +496,14 @@ struct MacChatPane: View {
         } else {
             withAnimation(HUTokens.springInteractive) {
                 messages.append(MacChatMessage(id: UUID(), text: trimmed, role: .user))
+            }
+        }
+
+        isSendingWatchdogGeneration += 1
+        let watchdogId = isSendingWatchdogGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+            if watchdogId == isSendingWatchdogGeneration {
+                isSending = false
             }
         }
 

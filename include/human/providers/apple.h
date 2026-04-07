@@ -21,8 +21,8 @@ typedef struct hu_apple_config {
 hu_error_t hu_apple_provider_create(hu_allocator_t *alloc, const hu_apple_config_t *config,
                                     hu_provider_t *out);
 
-/* Probe whether an apfel server is reachable at the given base URL (or default).
- * Returns true if the /models endpoint responds with a 200. */
+/* Probe whether an on-device server (human-ondevice or apfel) is reachable.
+ * Tries default URL first, then fallback. Returns true if /models responds 200. */
 bool hu_apple_probe(hu_allocator_t *alloc, const char *base_url, size_t base_url_len);
 
 #endif /* HU_PROVIDERS_APPLE_H */

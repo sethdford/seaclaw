@@ -301,7 +301,7 @@ struct hu_agent {
     struct hu_outcome_tracker *outcomes; /* optional; tracks tool results and user corrections */
 
     bool chain_of_thought;      /* inject reasoning instructions into prompt */
-    bool on_device_available;    /* true if on-device provider (e.g. apfel) was detected at startup */
+    bool on_device_available;    /* true if on-device inference server was detected at startup */
     char *persona_prompt;  /* custom identity override; owned */
     size_t persona_prompt_len;
 

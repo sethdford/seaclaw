@@ -7,8 +7,29 @@ public struct HTTPResponse: Sendable {
     public let contentType: String
     public let body: Data
     public let streamChunks: AsyncStream<Data>?
+    /// When set (e.g. CORS preflight), emitted after `Access-Control-Allow-Origin`.
+    public let accessControlAllowMethods: String?
+    public let accessControlAllowHeaders: String?
 
     public var isStreaming: Bool { streamChunks != nil }
+
+    public init(
+        statusCode: Int,
+        statusText: String,
+        contentType: String,
+        body: Data,
+        streamChunks: AsyncStream<Data>?,
+        accessControlAllowMethods: String? = nil,
+        accessControlAllowHeaders: String? = nil
+    ) {
+        self.statusCode = statusCode
+        self.statusText = statusText
+        self.contentType = contentType
+        self.body = body
+        self.streamChunks = streamChunks
+        self.accessControlAllowMethods = accessControlAllowMethods
+        self.accessControlAllowHeaders = accessControlAllowHeaders
+    }
 
     public static func json(_ object: Any, status: Int = 200) -> HTTPResponse {
         let body = (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data()
@@ -17,7 +38,9 @@ public struct HTTPResponse: Sendable {
             statusText: statusText(for: status),
             contentType: "application/json",
             body: body,
-            streamChunks: nil
+            streamChunks: nil,
+            accessControlAllowMethods: nil,
+            accessControlAllowHeaders: nil
         )
     }
 
@@ -27,7 +50,9 @@ public struct HTTPResponse: Sendable {
             statusText: "OK",
             contentType: "text/event-stream",
             body: Data(),
-            streamChunks: chunks
+            streamChunks: chunks,
+            accessControlAllowMethods: nil,
+            accessControlAllowHeaders: nil
         )
     }
 
@@ -43,10 +68,18 @@ public struct HTTPResponse: Sendable {
         error("Method not allowed", status: 405)
     }
 
-    func headerData() -> Data {
+    func headerData(accessControlAllowOrigin: String? = nil) -> Data {
         var header = "HTTP/1.1 \(statusCode) \(statusText)\r\n"
         header += "Content-Type: \(contentType)\r\n"
-        header += "Access-Control-Allow-Origin: *\r\n"
+        if let origin = accessControlAllowOrigin {
+            header += "Access-Control-Allow-Origin: \(origin)\r\n"
+        }
+        if let methods = accessControlAllowMethods {
+            header += "Access-Control-Allow-Methods: \(methods)\r\n"
+        }
+        if let allowHeaders = accessControlAllowHeaders {
+            header += "Access-Control-Allow-Headers: \(allowHeaders)\r\n"
+        }
         header += "Connection: close\r\n"
         if !isStreaming {
             header += "Content-Length: \(body.count)\r\n"
@@ -63,6 +96,7 @@ public struct HTTPResponse: Sendable {
         case 200: return "OK"
         case 400: return "Bad Request"
         case 404: return "Not Found"
+        case 401: return "Unauthorized"
         case 405: return "Method Not Allowed"
         case 500: return "Internal Server Error"
         case 503: return "Service Unavailable"

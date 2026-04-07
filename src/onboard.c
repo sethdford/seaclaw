@@ -168,8 +168,7 @@ hu_error_t hu_onboard_run_with_args(hu_allocator_t *alloc, const char *cli_provi
         model = "apple-foundationmodel";
         printf("\nApple Intelligence selected — no API key needed.\n");
         printf("Requires: macOS 26+, Apple Silicon, Apple Intelligence enabled.\n");
-        printf("Install apfel if not already installed:\n");
-        printf("  brew tap Arthur-Ficial/tap && brew install apfel\n\n");
+        printf("The human-ondevice server handles on-device inference automatically.\n\n");
     } else {
         if (cli_api_key) {
             api_key = cli_api_key;

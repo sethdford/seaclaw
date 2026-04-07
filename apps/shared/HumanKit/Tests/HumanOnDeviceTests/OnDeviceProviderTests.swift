@@ -3,21 +3,29 @@ import Testing
 
 @Suite("OnDeviceProvider")
 struct OnDeviceProviderTests {
-    @Test("Init succeeds")
+    #if canImport(FoundationModels)
+    @Test("Init succeeds on macOS 26+")
     func initSucceeds() {
-        let provider = OnDeviceProvider()
-        _ = provider.isAvailable
+        if #available(macOS 26.0, iOS 26.0, *) {
+            let provider = OnDeviceProvider()
+            _ = provider.isAvailable
+        }
     }
 
     @Test("Model name is apple-foundationmodel")
     func modelName() {
-        #expect(OnDeviceProvider.modelName == "apple-foundationmodel")
+        if #available(macOS 26.0, iOS 26.0, *) {
+            #expect(OnDeviceProvider.modelName == "apple-foundationmodel")
+        }
     }
 
     @Test("Context window is 4096")
     func contextWindow() {
-        #expect(OnDeviceProvider.contextWindow == 4096)
+        if #available(macOS 26.0, iOS 26.0, *) {
+            #expect(OnDeviceProvider.contextWindow == 4096)
+        }
     }
+    #endif
 }
 
 @Suite("OnDeviceChatAdapter")

@@ -157,33 +157,36 @@ main() {
 
     "$install_path" --version 2>/dev/null
 
-    # macOS Apple Silicon: offer to install apfel for on-device Apple Intelligence
+    # macOS: build and install human-ondevice for on-device Apple Intelligence
     if [ "$os" = "macos" ]; then
         printf "\n"
         bold "Apple Intelligence (on-device, free)"
         printf "\n"
         printf "Your Mac has a built-in LLM via Apple Intelligence.\n"
-        printf "Install apfel to use it with human (no API keys, no cloud).\n\n"
-        if command -v brew >/dev/null 2>&1; then
-            printf "Install apfel via Homebrew? [Y/n] "
-            read -r answer </dev/tty 2>/dev/null || answer="y"
-            case "$answer" in
-                [nN]*) printf "Skipping apfel install.\n" ;;
-                *)
-                    printf "Installing apfel...\n"
-                    brew tap Arthur-Ficial/tap 2>/dev/null
-                    if brew install apfel 2>/dev/null; then
-                        green "apfel installed — Apple Intelligence is ready."
-                    else
-                        red "apfel install failed. You can install it later:"
-                        printf "  brew tap Arthur-Ficial/tap && brew install apfel\n"
+        printf "Build human-ondevice server for zero-dependency on-device inference? [Y/n] "
+        read -r answer </dev/tty 2>/dev/null || answer="y"
+        case "$answer" in
+            [nN]*) printf "Skipping on-device server build.\n" ;;
+            *)
+                if command -v swift >/dev/null 2>&1; then
+                    printf "Building human-ondevice...\n"
+                    ondevice_dir="$(mktemp -d)"
+                    if git clone --depth 1 https://github.com/h-uman/human.git "$ondevice_dir" 2>/dev/null; then
+                        if (cd "$ondevice_dir/apps/tools/human-ondevice" && swift build -c release 2>/dev/null); then
+                            cp "$ondevice_dir/apps/tools/human-ondevice/.build/release/human-ondevice" "$(dirname "$install_path")/"
+                            green "human-ondevice installed — Apple Intelligence is ready."
+                        else
+                            red "Build failed. You can build it later from the source tree:"
+                            printf "  cd apps/tools/human-ondevice && swift build -c release\n"
+                        fi
                     fi
-                    ;;
-            esac
-        else
-            printf "To enable Apple Intelligence, install Homebrew then run:\n"
-            printf "  brew tap Arthur-Ficial/tap && brew install apfel\n\n"
-        fi
+                    rm -rf "$ondevice_dir"
+                else
+                    printf "Swift toolchain not found. Install Xcode Command Line Tools then build:\n"
+                    printf "  cd apps/tools/human-ondevice && swift build -c release\n\n"
+                fi
+                ;;
+        esac
     fi
 
     # Run onboard if this is a fresh install (no existing config)

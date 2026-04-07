@@ -1,0 +1,14 @@
+{
+  "total_photos": 24545,
+  "geotagged_photos": 24545,
+  "oldest_photo": "1969-12-31T19:00:00",
+  "newest_photo": "2026-04-06T19:58:24",
+  "extracted": {
+    "memories": 676,
+    "people": 0,
+    "places": 0,
+    "captions": 0,
+    "comments": 0,
+    "training_pairs": 676
+  }
+}

@@ -9,12 +9,13 @@ public struct HTTPRequest: Sendable {
 
     /// Parse an HTTP request from raw data. Returns nil if incomplete.
     static func parse(_ data: Data) -> HTTPRequest? {
-        guard let str = String(data: data, encoding: .utf8) else { return nil }
-        guard let headerEnd = str.range(of: "\r\n\r\n") else { return nil }
+        let separator = Data([0x0D, 0x0A, 0x0D, 0x0A]) // \r\n\r\n
+        guard let sepRange = data.range(of: separator) else { return nil }
+        let headerData = data[data.startIndex..<sepRange.lowerBound]
+        guard let headerStr = String(data: headerData, encoding: .utf8) else { return nil }
 
-        let headerSection = String(str[str.startIndex..<headerEnd.lowerBound])
-        let lines = headerSection.split(separator: "\r\n", omittingEmptySubsequences: false)
-        guard let requestLine = lines.first else { return nil }
+        let lines = headerStr.components(separatedBy: "\r\n")
+        guard let requestLine = lines.first, !requestLine.isEmpty else { return nil }
 
         let parts = requestLine.split(separator: " ", maxSplits: 2)
         guard parts.count >= 2 else { return nil }
@@ -22,7 +23,7 @@ public struct HTTPRequest: Sendable {
         let path = String(parts[1])
 
         var headers: [String: String] = [:]
-        for line in lines.dropFirst() {
+        for line in lines.dropFirst() where !line.isEmpty {
             if let colonIdx = line.firstIndex(of: ":") {
                 let key = String(line[line.startIndex..<colonIdx]).trimmingCharacters(in: .whitespaces).lowercased()
                 let val = String(line[line.index(after: colonIdx)...]).trimmingCharacters(in: .whitespaces)
@@ -30,21 +31,21 @@ public struct HTTPRequest: Sendable {
             }
         }
 
-        let bodyStart = data.index(data.startIndex, offsetBy: str.distance(from: str.startIndex, to: headerEnd.upperBound))
+        let bodyStart = sepRange.upperBound
         let remaining = data.count - bodyStart
 
         if let contentLength = headers["content-length"], let expected = Int(contentLength) {
+            guard expected >= 0, expected <= HTTPServer.maxRequestSize else { return nil }
             guard remaining >= expected else { return nil }
             let body = data.subdata(in: bodyStart..<(bodyStart + expected))
             return HTTPRequest(method: method, path: path, headers: headers, body: body)
         }
 
-        let body = remaining > 0 ? data.subdata(in: bodyStart..<data.count) : nil
-        return HTTPRequest(method: method, path: path, headers: headers, body: body)
+        return HTTPRequest(method: method, path: path, headers: headers, body: remaining > 0 ? data.subdata(in: bodyStart..<data.endIndex) : nil)
     }
 
     public var json: [String: Any]? {
-        guard let body = body else { return nil }
+        guard let body = body, !body.isEmpty else { return nil }
         return try? JSONSerialization.jsonObject(with: body) as? [String: Any]
     }
 }

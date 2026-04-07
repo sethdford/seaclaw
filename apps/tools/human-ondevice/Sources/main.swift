@@ -22,7 +22,7 @@ for (i, arg) in args.enumerated() {
           --port, -p    Port to listen on (default: 11435)
           --help, -h    Show this help message
         
-        Endpoints:
+        Endpoints (require `Authorization: Bearer <token>`; token is printed on startup):
           GET  /v1/models              List available models
           POST /v1/chat/completions    Chat completion (streaming supported)
           GET  /health                 Health check
@@ -31,7 +31,7 @@ for (i, arg) in args.enumerated() {
     }
 }
 
-if #available(macOS 14.0, *) {
+if #available(macOS 26.0, *) {
     let server = OnDeviceServer(port: port)
     do {
         try server.start()
@@ -43,6 +43,6 @@ if #available(macOS 14.0, *) {
         exit(1)
     }
 } else {
-    fputs("[human-ondevice] requires macOS 14.0 or later\n", stderr)
+    fputs("[human-ondevice] requires macOS 26.0 or later with Apple Intelligence\n", stderr)
     exit(1)
 }

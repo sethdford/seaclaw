@@ -71,7 +71,7 @@ fi
 
 if [ -f "$ROOT/install.sh" ]; then
     pass "install.sh exists in repo root"
-    if grep -q 'apfel\|Apple Intelligence' "$ROOT/install.sh" 2>/dev/null; then
+    if grep -q 'human-ondevice\|Apple Intelligence' "$ROOT/install.sh" 2>/dev/null; then
         pass "install.sh includes Apple Intelligence setup"
     else
         fail "install.sh missing Apple Intelligence setup for macOS"

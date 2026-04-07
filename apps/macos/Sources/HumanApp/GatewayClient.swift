@@ -22,7 +22,7 @@ final class GatewayClient: ObservableObject {
     let onDevice = OnDeviceChatAdapter()
 
     /// In-process on-device HTTP server (started lazily when gateway is unavailable).
-    private var onDeviceHTTPServer: OnDeviceServer?
+    private var onDeviceHTTPServer: Any?
 
     /// Whether on-device Apple Intelligence inference is available on this device.
     var onDeviceAvailable: Bool { onDevice.isAvailable }
@@ -31,12 +31,14 @@ final class GatewayClient: ObservableObject {
     /// Safe to call multiple times — only starts once.
     func ensureOnDeviceServer() {
         guard onDeviceAvailable, onDeviceHTTPServer == nil else { return }
-        let server = OnDeviceServer(port: 11435)
-        do {
-            try server.start()
-            onDeviceHTTPServer = server
-        } catch {
-            // In-process server is best-effort
+        if #available(macOS 26.0, *) {
+            let server = OnDeviceServer(port: 11435)
+            do {
+                try server.start()
+                onDeviceHTTPServer = server
+            } catch {
+                // In-process server is best-effort
+            }
         }
     }
 

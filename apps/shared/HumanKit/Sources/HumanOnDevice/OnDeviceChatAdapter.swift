@@ -3,8 +3,10 @@ import Foundation
 /// Adapts OnDeviceProvider to a simple chat interface compatible with the native app's
 /// conversation flow. Uses on-device inference when available, with graceful fallback
 /// indication when the model is unavailable.
+///
+/// Uses runtime `#available` checks internally so consumers don't need `@available`.
 public final class OnDeviceChatAdapter: @unchecked Sendable {
-    private let provider = OnDeviceProvider()
+    private var _provider: Any?
 
     public struct ChatMessage: Sendable {
         public let role: Role
@@ -27,45 +29,57 @@ public final class OnDeviceChatAdapter: @unchecked Sendable {
         public let isOnDevice: Bool
     }
 
-    public init() {}
-
-    /// Whether on-device inference is available on this device.
-    public var isAvailable: Bool { provider.isAvailable }
-
-    /// Send a message and get a response using on-device inference.
-    public func chat(messages: [ChatMessage]) async throws -> ChatResponse {
-        let systemPrompt = messages.first(where: { $0.role == .system })?.content
-        let userMessage = messages.last(where: { $0.role == .user })?.content ?? ""
-
-        let response = try await provider.generate(
-            prompt: userMessage,
-            systemPrompt: systemPrompt
-        )
-
-        return ChatResponse(content: response, isOnDevice: true)
+    public init() {
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, iOS 26.0, *) {
+            _provider = OnDeviceProvider()
+        }
+        #endif
     }
 
-    /// Send a message and stream the response using on-device inference.
+    public var isAvailable: Bool {
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, iOS 26.0, *) {
+            return (_provider as? OnDeviceProvider)?.isAvailable ?? false
+        }
+        #endif
+        return false
+    }
+
+    public func chat(messages: [ChatMessage]) async throws -> ChatResponse {
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, iOS 26.0, *) {
+            guard let provider = _provider as? OnDeviceProvider else {
+                throw CocoaError(.featureUnsupported)
+            }
+            let systemPrompt = messages.first(where: { $0.role == .system })?.content
+            let userMessage = messages.last(where: { $0.role == .user })?.content ?? ""
+            let response = try await provider.generate(prompt: userMessage, systemPrompt: systemPrompt)
+            return ChatResponse(content: response, isOnDevice: true)
+        }
+        #endif
+        throw CocoaError(.featureUnsupported)
+    }
+
     public func streamChat(
         messages: [ChatMessage],
         onChunk: @Sendable @escaping (String) -> Void
     ) async throws -> ChatResponse {
-        let systemPrompt = messages.first(where: { $0.role == .system })?.content
-        let userMessage = messages.last(where: { $0.role == .user })?.content ?? ""
-
-        let response = try await provider.stream(
-            prompt: userMessage,
-            systemPrompt: systemPrompt,
-            onChunk: onChunk
-        )
-
-        return ChatResponse(content: response, isOnDevice: true)
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, iOS 26.0, *) {
+            guard let provider = _provider as? OnDeviceProvider else {
+                throw CocoaError(.featureUnsupported)
+            }
+            let systemPrompt = messages.first(where: { $0.role == .system })?.content
+            let userMessage = messages.last(where: { $0.role == .user })?.content ?? ""
+            let response = try await provider.stream(prompt: userMessage, systemPrompt: systemPrompt, onChunk: onChunk)
+            return ChatResponse(content: response, isOnDevice: true)
+        }
+        #endif
+        throw CocoaError(.featureUnsupported)
     }
 
-    /// Estimate whether a message is within the on-device context window.
-    /// Uses a rough 4 characters per token heuristic.
     public func fitsInContext(_ text: String) -> Bool {
-        let estimatedTokens = text.count / 4
-        return estimatedTokens < (OnDeviceProvider.contextWindow / 2)
+        text.count / 4 < 2048
     }
 }

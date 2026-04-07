@@ -155,11 +155,15 @@ public final class ConnectionManager: ObservableObject {
     }
 
     public func registerPushToken(token: String) {
-        connection?.registerPushToken(token: token)
+        queue.async { [weak self] in
+            self?.connection?.registerPushToken(token: token)
+        }
     }
 
     public func unregisterPushToken(token: String) {
-        connection?.unregisterPushToken(token: token)
+        queue.async { [weak self] in
+            self?.connection?.unregisterPushToken(token: token)
+        }
     }
 
     public func setEventHandler(_ handler: @escaping (String, [String: AnyCodable]?) -> Void) {

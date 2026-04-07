@@ -1,9 +1,10 @@
 /*
- * Apple Intelligence provider — connects to an apfel server (OpenAI-compatible)
- * running on localhost for free, fully private on-device inference via Apple's
- * FoundationModels framework.
+ * Apple Intelligence provider — connects to an on-device inference server
+ * (human-ondevice or apfel, OpenAI-compatible) running on localhost for free,
+ * fully private inference via Apple's FoundationModels framework.
  *
- * The apfel server exposes /v1/chat/completions at http://127.0.0.1:11434/v1.
+ * Default endpoint: http://127.0.0.1:11435/v1 (human-ondevice).
+ * Fallback: http://127.0.0.1:11434/v1 (apfel, third-party).
  * This provider auto-discovers it and maps to the hu_provider_t vtable.
  *
  * Gated by HU_ENABLE_APPLE_INTELLIGENCE (default OFF on non-Apple).
@@ -15,6 +16,7 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/provider.h"
+#include "human/providers/sse.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -179,7 +181,7 @@ static hu_error_t apple_chat(void *ctx, hu_allocator_t *alloc, const hu_chat_req
         hu_json_array_push(alloc, msgs_arr, obj);
     }
 
-    /* Tool definitions — apfel supports OpenAI-style function calling */
+    /* Tool definitions — on-device server supports OpenAI-style function calling */
     if (request->tools && request->tools_count > 0) {
         hu_json_value_t *tools_arr = hu_json_array_new(alloc);
         if (tools_arr) {
@@ -341,7 +343,233 @@ static void apple_deinit(void *ctx, hu_allocator_t *alloc) {
 
 static bool apple_supports_streaming(void *ctx) {
     (void)ctx;
-    return false;
+    return true;
+}
+
+/* ── SSE streaming ── */
+#if !HU_IS_TEST
+typedef struct {
+    hu_allocator_t *alloc;
+    hu_stream_callback_t callback;
+    void *callback_ctx;
+    hu_sse_parser_t parser;
+    hu_error_t last_error;
+    char *content_buf;
+    size_t content_len;
+    size_t content_cap;
+} apple_stream_ctx_t;
+
+static void apple_sse_event_cb(const char *event_type, size_t event_type_len, const char *data,
+                                size_t data_len, void *userdata) {
+    apple_stream_ctx_t *sctx = (apple_stream_ctx_t *)userdata;
+    if (sctx->last_error != HU_OK)
+        return;
+    (void)event_type;
+    (void)event_type_len;
+
+    if (data_len == 6 && memcmp(data, "[DONE]", 6) == 0) {
+        if (sctx->callback) {
+            hu_stream_chunk_t c;
+            memset(&c, 0, sizeof(c));
+            c.type = HU_STREAM_CONTENT;
+            c.is_final = true;
+            sctx->callback(sctx->callback_ctx, &c);
+        }
+        return;
+    }
+
+    hu_json_value_t *parsed = NULL;
+    hu_error_t err = hu_json_parse(sctx->alloc, data, data_len, &parsed);
+    if (err != HU_OK || !parsed)
+        return;
+
+    hu_json_value_t *choices = hu_json_object_get(parsed, "choices");
+    if (choices && choices->type == HU_JSON_ARRAY && choices->data.array.len > 0) {
+        hu_json_value_t *choice0 = choices->data.array.items[0];
+        hu_json_value_t *delta = hu_json_object_get(choice0, "delta");
+        if (delta && delta->type == HU_JSON_OBJECT) {
+            const char *content = hu_json_get_string(delta, "content");
+            if (content && content[0]) {
+                size_t clen = strlen(content);
+                if (sctx->callback) {
+                    hu_stream_chunk_t c;
+                    memset(&c, 0, sizeof(c));
+                    c.type = HU_STREAM_CONTENT;
+                    c.delta = content;
+                    c.delta_len = clen;
+                    sctx->callback(sctx->callback_ctx, &c);
+                }
+                size_t needed = sctx->content_len + clen;
+                if (needed > sctx->content_cap) {
+                    size_t new_cap = needed * 2;
+                    if (new_cap < 256)
+                        new_cap = 256;
+                    char *nb = (char *)sctx->alloc->alloc(sctx->alloc->ctx, new_cap);
+                    if (nb) {
+                        if (sctx->content_buf) {
+                            memcpy(nb, sctx->content_buf, sctx->content_len);
+                            sctx->alloc->free(sctx->alloc->ctx, sctx->content_buf,
+                                              sctx->content_cap);
+                        }
+                        sctx->content_buf = nb;
+                        sctx->content_cap = new_cap;
+                    }
+                }
+                if (sctx->content_buf && sctx->content_len + clen <= sctx->content_cap) {
+                    memcpy(sctx->content_buf + sctx->content_len, content, clen);
+                    sctx->content_len += clen;
+                }
+            }
+        }
+    }
+    hu_json_free(sctx->alloc, parsed);
+}
+
+static size_t apple_stream_write_cb(const char *chunk, size_t chunk_len, void *userdata) {
+    apple_stream_ctx_t *sctx = (apple_stream_ctx_t *)userdata;
+    if (sctx->last_error != HU_OK)
+        return 0;
+    hu_error_t err =
+        hu_sse_parser_feed(&sctx->parser, chunk, chunk_len, apple_sse_event_cb, sctx);
+    if (err != HU_OK)
+        sctx->last_error = err;
+    return chunk_len;
+}
+#endif /* !HU_IS_TEST */
+
+static hu_error_t apple_stream_chat(void *ctx, hu_allocator_t *alloc,
+                                    const hu_chat_request_t *request, const char *model,
+                                    size_t model_len, double temperature,
+                                    hu_stream_callback_t callback, void *callback_ctx,
+                                    hu_stream_chat_result_t *out) {
+    apple_ctx_t *ac = (apple_ctx_t *)ctx;
+    if (!ac || !alloc || !request || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    memset(out, 0, sizeof(*out));
+
+#if HU_IS_TEST
+    (void)model;
+    (void)model_len;
+    (void)temperature;
+    hu_stream_chunk_t chunk;
+    memset(&chunk, 0, sizeof(chunk));
+    chunk.type = HU_STREAM_CONTENT;
+    chunk.delta = "Hello from ";
+    chunk.delta_len = 11;
+    if (callback)
+        callback(callback_ctx, &chunk);
+    memset(&chunk, 0, sizeof(chunk));
+    chunk.type = HU_STREAM_CONTENT;
+    chunk.delta = "Apple Intelligence";
+    chunk.delta_len = 18;
+    if (callback)
+        callback(callback_ctx, &chunk);
+    memset(&chunk, 0, sizeof(chunk));
+    chunk.type = HU_STREAM_CONTENT;
+    chunk.is_final = true;
+    if (callback)
+        callback(callback_ctx, &chunk);
+    out->content = hu_strndup(alloc, "Hello from Apple Intelligence", 29);
+    out->content_len = 29;
+    return HU_OK;
+#else
+    if (!callback)
+        return HU_ERR_INVALID_ARGUMENT;
+
+    hu_json_value_t *root = hu_json_object_new(alloc);
+    if (!root)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    const char *mdl = HU_APPLE_MODEL_NAME;
+    size_t mdl_len = sizeof(HU_APPLE_MODEL_NAME) - 1;
+    if (model && model_len > 0) {
+        mdl = model;
+        mdl_len = model_len;
+    }
+
+    hu_json_object_set(alloc, root, "model", hu_json_string_new(alloc, mdl, mdl_len));
+    hu_json_object_set(alloc, root, "stream", hu_json_bool_new(alloc, true));
+    if (temperature > 0.0)
+        hu_json_object_set(alloc, root, "temperature", hu_json_number_new(alloc, temperature));
+
+    hu_json_value_t *msgs_arr = hu_json_array_new(alloc);
+    if (!msgs_arr) {
+        hu_json_free(alloc, root);
+        return HU_ERR_OUT_OF_MEMORY;
+    }
+    hu_json_object_set(alloc, root, "messages", msgs_arr);
+
+    for (size_t i = 0; i < request->messages_count; i++) {
+        const hu_chat_message_t *m = &request->messages[i];
+        hu_json_value_t *obj = hu_json_object_new(alloc);
+        if (!obj) {
+            hu_json_free(alloc, root);
+            return HU_ERR_OUT_OF_MEMORY;
+        }
+        const char *rs = role_str(m->role);
+        hu_json_object_set(alloc, obj, "role", hu_json_string_new(alloc, rs, strlen(rs)));
+        if (m->content && m->content_len > 0)
+            hu_json_object_set(alloc, obj, "content",
+                               hu_json_string_new(alloc, m->content, m->content_len));
+        hu_json_array_push(alloc, msgs_arr, obj);
+    }
+
+    char *body = NULL;
+    size_t body_len = 0;
+    hu_error_t err = hu_json_stringify(alloc, root, &body, &body_len);
+    hu_json_free(alloc, root);
+    if (err != HU_OK)
+        return err;
+
+    const char *base = ac->base_url ? ac->base_url : HU_APPLE_DEFAULT_BASE_URL;
+    size_t base_len = ac->base_url_len ? ac->base_url_len : (sizeof(HU_APPLE_DEFAULT_BASE_URL) - 1);
+    while (base_len > 0 && base[base_len - 1] == '/')
+        base_len--;
+
+    char url_buf[512];
+    int n = snprintf(url_buf, sizeof(url_buf), "%.*s/chat/completions", (int)base_len, base);
+    if (n <= 0 || (size_t)n >= sizeof(url_buf)) {
+        alloc->free(alloc->ctx, body, body_len);
+        return HU_ERR_INVALID_ARGUMENT;
+    }
+
+    apple_stream_ctx_t sctx;
+    memset(&sctx, 0, sizeof(sctx));
+    sctx.alloc = alloc;
+    sctx.callback = callback;
+    sctx.callback_ctx = callback_ctx;
+    sctx.last_error = HU_OK;
+    err = hu_sse_parser_init(&sctx.parser, alloc);
+    if (err != HU_OK) {
+        alloc->free(alloc->ctx, body, body_len);
+        return err;
+    }
+
+    err = hu_http_post_json_stream(alloc, url_buf, NULL, NULL, body, body_len,
+                                   apple_stream_write_cb, &sctx);
+    hu_sse_parser_deinit(&sctx.parser);
+    alloc->free(alloc->ctx, body, body_len);
+
+    if (err != HU_OK) {
+        if (sctx.content_buf)
+            alloc->free(alloc->ctx, sctx.content_buf, sctx.content_cap);
+        return err;
+    }
+    if (sctx.last_error != HU_OK) {
+        if (sctx.content_buf)
+            alloc->free(alloc->ctx, sctx.content_buf, sctx.content_cap);
+        return sctx.last_error;
+    }
+
+    if (sctx.content_buf && sctx.content_len > 0) {
+        out->content = hu_strndup(alloc, sctx.content_buf, sctx.content_len);
+        out->content_len = sctx.content_len;
+        alloc->free(alloc->ctx, sctx.content_buf, sctx.content_cap);
+    }
+
+    return HU_OK;
+#endif
 }
 
 static const hu_provider_vtable_t apple_vtable = {
@@ -355,7 +583,7 @@ static const hu_provider_vtable_t apple_vtable = {
     .supports_streaming = apple_supports_streaming,
     .supports_vision = NULL,
     .supports_vision_for_model = NULL,
-    .stream_chat = NULL,
+    .stream_chat = apple_stream_chat,
 };
 
 hu_error_t hu_apple_provider_create(hu_allocator_t *alloc, const hu_apple_config_t *config,

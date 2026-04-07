@@ -259,6 +259,26 @@ flowchart LR
 | Growth Narrative | `agent/growth_narrative.c` | Track and surface relationship evolution |
 | Genuine Boundaries | `persona/genuine_boundaries.c` | Value-driven personal stances |
 
+## Humanness Context
+
+Per-turn humanness context (`src/agent/humanness.c`, `include/human/agent/humanness.h`) builds a voice/style snapshot for the current turn. Integrated in `hu_agent_turn` — built fresh each turn, freed on next turn or agent deinit. Includes voice profile adaptation based on conversation history.
+
+## Apple Intelligence Provider
+
+`src/providers/apple.c` integrates Apple Foundation Models via the on-device inference API. Tool call parsing, streaming support, and graceful fallback when not running on Apple Silicon. Registered in `src/providers/factory.c`.
+
+## On-Device Server
+
+`apps/shared/HumanKit/Sources/HumanOnDeviceServer/` provides a localhost-only HTTP server exposing an OpenAI-compatible `/v1/chat/completions` endpoint for on-device inference. Bearer token authentication required. Loopback-only binding. Request size capped at 10MB.
+
+## Music Teasers
+
+`src/music.c` and `src/context/conversation.c` implement proactive music sharing. The daemon detects music-related conversation context, prompts the LLM for song suggestions, validates Apple Music/Spotify URLs, and sends them through the channel. Subject to moderation checks.
+
+## Paperclip Integration
+
+`src/paperclip/` provides a client for the Paperclip task management API. Includes checkout, update, comment, and list operations with JSON-escaped payloads and authenticated requests.
+
 ## Evaluation
 
 **Turing-style scoring** (`turing_score.c`) implements an **18-dimension** heuristic (S2S taxonomy) for naturalness and conversational quality, complementing the broader eval harness in `src/eval.c` and adversarial suites.
@@ -280,8 +300,8 @@ src/
   core/        Allocator, arena, JSON, string, HTTP, error
 
 include/human/  Public C headers (vtable definitions)
-tests/          414 test files, 8,400+ tests
-fuzz/           31 libFuzzer harnesses
+tests/          425+ test files, 8,900+ tests
+fuzz/           33 libFuzzer harnesses
 ui/             LitElement web dashboard
 website/        Astro marketing site
 apps/           iOS, macOS, Android native apps + shared HumanKit
@@ -301,7 +321,7 @@ apps/           iOS, macOS, Android native apps + shared HumanKit
 
 | Metric                | Measured       |
 | --------------------- | -------------- |
-| Binary size (release) | ~1696 KB       |
+| Binary size (release) | ~2075 KB       |
 | Cold start            | 4-27 ms        |
 | Peak RSS              | ~5.7 MB        |
 | Test throughput       | 700+ tests/sec |

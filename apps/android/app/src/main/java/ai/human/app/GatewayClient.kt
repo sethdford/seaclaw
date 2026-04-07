@@ -73,6 +73,7 @@ class GatewayClient {
         .pingInterval(30, TimeUnit.SECONDS)
         .build()
 
+    private val webSocketLock = Any()
     private var webSocket: WebSocket? = null
     private var requestCounter = 0
 
@@ -122,7 +123,7 @@ class GatewayClient {
             .trimEnd('/') + "/ws"
 
         val request = Request.Builder().url(wsUrl).build()
-        webSocket = client.newWebSocket(request, object : WebSocketListener() {
+        val socket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 scope.launch {
                     _lastError.value = null
@@ -260,6 +261,9 @@ class GatewayClient {
                 scope.launch { _state.value = ConnectionState.DISCONNECTED }
             }
         })
+        synchronized(webSocketLock) {
+            webSocket = socket
+        }
     }
 
     fun send(method: String, params: Map<String, Any> = emptyMap()) {
@@ -270,12 +274,16 @@ class GatewayClient {
             put("method", method)
             put("params", JSONObject(params))
         }
-        webSocket?.send(json.toString())
+        synchronized(webSocketLock) {
+            webSocket?.send(json.toString())
+        }
     }
 
     fun disconnect() {
-        webSocket?.close(1000, "User disconnect")
-        webSocket = null
+        synchronized(webSocketLock) {
+            webSocket?.close(1000, "disconnect")
+            webSocket = null
+        }
         _state.value = ConnectionState.DISCONNECTED
     }
 

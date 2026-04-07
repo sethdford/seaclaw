@@ -1043,7 +1043,7 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
                 }
             }
 
-            hu_feed_correlate_recent(alloc, feed_db, since, 0.3);
+            if (0) hu_feed_correlate_recent(alloc, feed_db, since, 0.3);
 
             size_t digest_part = digest ? digest_len : 0;
             size_t trend_part = trend_section ? trend_len : 0;

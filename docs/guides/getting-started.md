@@ -44,7 +44,7 @@ human onboard
 ```
 
 **Mac users:** The wizard defaults to Apple Intelligence (on-device, no API key needed).
-Requires macOS 26+, Apple Silicon, and [apfel](https://github.com/Arthur-Ficial/apfel) installed.
+Requires macOS 26+, Apple Silicon, and Apple Intelligence enabled. The on-device server is built and installed automatically — no third-party dependencies needed.
 
 The wizard will:
 
