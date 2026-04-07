@@ -56,6 +56,7 @@ Use this to find the right files for a given task without searching the full cod
 | **SSE streaming**               | `src/providers/sse.c`, `src/sse/sse_client.c`       | `test_sse.c`, `test_streaming.c`         |
 | **HUML checkpoint (on-device)** | `src/providers/huml.c`, `include/human/providers/huml.h` | `test_ml.c`                          |
 | **Embedded / llama-cli**        | `src/providers/embedded.c`, `include/human/providers/embedded.h` | `test_ml.c`                    |
+| **Apple Intelligence / apfel**  | `src/providers/apple.c`, `include/human/providers/apple.h` | `test_apple_provider.c`              |
 
 ### Voice
 

@@ -34,7 +34,9 @@ struct OverviewView: View {
     }
 
     private var overviewStatusColor: Color {
-        if !connectionManager.isConnected { return tokens.error }
+        if !connectionManager.isConnected {
+            return connectionManager.onDeviceAvailable ? tokens.accent : tokens.error
+        }
         switch connectionManager.healthStatus {
         case .healthy, .unknown: return tokens.success
         case .degraded: return tokens.accent

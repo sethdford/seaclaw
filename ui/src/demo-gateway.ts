@@ -365,7 +365,7 @@ const CONFIG_SCHEMA = {
     default_provider: {
       type: "string",
       description: "Default AI model provider",
-      enum: ["openai", "anthropic", "gemini", "ollama", "openrouter"],
+      enum: ["openai", "anthropic", "gemini", "ollama", "openrouter", "apple"],
       default: "openrouter",
     },
     default_model: {
@@ -1465,6 +1465,14 @@ export class DemoGatewayClient extends EventTarget {
               base_url: "https://generativelanguage.googleapis.com",
               native_tools: true,
               is_default: (this.state.config.default_provider ?? "openrouter") === "gemini",
+            },
+            {
+              name: "apple",
+              has_key: false,
+              base_url: "http://127.0.0.1:11434/v1",
+              native_tools: true,
+              is_default: (this.state.config.default_provider ?? "openrouter") === "apple",
+              on_device: true,
             },
           ],
         };
