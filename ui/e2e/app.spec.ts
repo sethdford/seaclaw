@@ -17,10 +17,10 @@ test.describe("h-uman Control UI", () => {
     await expect(sidebar).toBeAttached({ timeout: 5000 });
   });
 
-  test("overview is the default view", async ({ page }) => {
+  test("chat is the default view", async ({ page }) => {
     await page.goto("/");
-    const overview = page.locator("hu-app >> hu-overview-view");
-    await expect(overview).toBeAttached({ timeout: 5000 });
+    const chatView = page.locator("hu-app >> hu-chat-view");
+    await expect(chatView).toBeAttached({ timeout: 5000 });
   });
 
   test("hash navigation loads chat view", async ({ page }) => {
@@ -121,11 +121,11 @@ test.describe("h-uman Control UI", () => {
     await expect(view).toBeAttached({ timeout: 5000 });
   });
 
-  test("invalid hash falls back to overview", async ({ page }) => {
+  test("invalid hash falls back to chat", async ({ page }) => {
     await page.goto("/#nonexistent");
     await page.waitForLoadState("domcontentloaded");
-    const overview = page.locator("hu-app >> hu-overview-view");
-    await expect(overview).toBeAttached({ timeout: 5000 });
+    const chatView = page.locator("hu-app >> hu-chat-view");
+    await expect(chatView).toBeAttached({ timeout: 5000 });
   });
 
   test("Ctrl+K opens command palette", async ({ page }) => {
@@ -177,20 +177,17 @@ test.describe("h-uman Control UI", () => {
     }
   });
 
-  test("auto-fallback populates overview without live gateway", async ({ page }) => {
+  test("auto-fallback populates chat without live gateway", async ({ page }) => {
     await page.goto("/");
-    // Wait for fallback timer (2.5s) + demo gateway connect (400ms) + view load
-    const overview = page.locator("hu-app >> hu-overview-view");
-    await expect(overview).toBeAttached({ timeout: 5000 });
-    // Verify actual content loaded (not just skeleton)
+    const chatView = page.locator("hu-app >> hu-chat-view");
+    await expect(chatView).toBeAttached({ timeout: 5000 });
     await expect(async () => {
       const text = await page.evaluate(() => {
         const app = document.querySelector("hu-app");
-        const view = app?.shadowRoot?.querySelector("hu-overview-view");
+        const view = app?.shadowRoot?.querySelector("hu-chat-view");
         return view?.shadowRoot?.textContent ?? "";
       });
-      // Overview should show capabilities data from demo gateway
-      expect(text.length).toBeGreaterThan(100);
+      expect(text.length).toBeGreaterThan(50);
     }).toPass({ timeout: 8000 });
   });
 });

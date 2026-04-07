@@ -11,7 +11,7 @@ test.describe("prefers-reduced-motion", () => {
   test.use({ reducedMotion: "reduce" });
 
   test("no running animations when reduced motion is preferred", async ({ page }) => {
-    await page.goto("/?demo");
+    await page.goto("/?demo#overview");
     await page.waitForLoadState("networkidle");
     await waitForViewReady(page, "hu-overview-view");
 
@@ -30,7 +30,7 @@ test.describe("prefers-reduced-motion", () => {
   });
 
   test("no elements have animation-duration > 0 when reduced motion", async ({ page }) => {
-    await page.goto("/?demo");
+    await page.goto("/?demo#overview");
     await page.waitForLoadState("networkidle");
     await waitForViewReady(page, "hu-overview-view");
 
@@ -53,7 +53,7 @@ test.describe("prefers-reduced-motion", () => {
   test("no transition-duration > 0 on opacity or transform when reduced motion", async ({
     page,
   }) => {
-    await page.goto("/?demo");
+    await page.goto("/?demo#overview");
     await page.waitForLoadState("networkidle");
     await waitForViewReady(page, "hu-overview-view");
 

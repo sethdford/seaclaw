@@ -108,7 +108,7 @@ test.describe("Secondary Views", () => {
   });
 
   test("overview view renders", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/#overview");
     await page.waitForLoadState("domcontentloaded");
     const app = page.locator("hu-app");
     await expect(app).toBeAttached({ timeout: 5000 });
