@@ -404,6 +404,35 @@ static void test_chatdb_max_rowid(void) {
     sqlite3_close(db);
 }
 
+static void test_chatdb_chat_id_by_message_id_for_react(void) {
+    sqlite3 *db = open_fixture();
+    HU_ASSERT_NOT_NULL(db);
+
+    const char *sql = "SELECT cmj.chat_id FROM chat_message_join cmj "
+                      "WHERE cmj.message_id = ? LIMIT 1";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    HU_ASSERT_EQ(rc, SQLITE_OK);
+
+    sqlite3_bind_int64(stmt, 1, 1);
+    HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    int64_t chat_id = sqlite3_column_int64(stmt, 0);
+    HU_ASSERT_EQ(chat_id, 1);
+    sqlite3_reset(stmt);
+
+    sqlite3_bind_int64(stmt, 1, 999);
+    HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_DONE);
+    sqlite3_reset(stmt);
+
+    sqlite3_bind_int64(stmt, 1, 4);
+    HU_ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    int64_t chat_id4 = sqlite3_column_int64(stmt, 0);
+    HU_ASSERT_EQ(chat_id4, 1);
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
+
 static void test_chatdb_participant_count_subquery(void) {
     sqlite3 *db = open_fixture();
     HU_ASSERT_NOT_NULL(db);
@@ -858,6 +887,7 @@ void run_imessage_chatdb_fixture_tests(void) {
     HU_RUN_TEST(test_chatdb_attachment_join_works);
     HU_RUN_TEST(test_chatdb_chat_guid_lookup);
     HU_RUN_TEST(test_chatdb_max_rowid);
+    HU_RUN_TEST(test_chatdb_chat_id_by_message_id_for_react);
     HU_RUN_TEST(test_chatdb_participant_count_subquery);
     HU_RUN_TEST(test_chatdb_balloon_bundle_id_detection);
     HU_RUN_TEST(test_chatdb_self_react_fallback_query);

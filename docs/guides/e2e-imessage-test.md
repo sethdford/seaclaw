@@ -9,6 +9,20 @@ Two `human` instances talking to each other over real iMessage, proving the full
 
 > **Note:** The `human channel e2e-test` subcommand is planned but not yet implemented in `cli_commands.c`. For now, use the manual two-machine E2E procedure described below, or the synthetic test harness at `tests/synthetic/channel_imessage_real.c`.
 
+## Quick Humanness E2E (Single Machine)
+
+For a fast single-machine proof of every iMessage capability (text, images, audio, video, tapbacks, typing indicators, read receipts, watch events):
+
+```bash
+./scripts/e2e-imessage-humanness.sh --to "+1234567890"          # all phases
+./scripts/e2e-imessage-humanness.sh --to "+1234567890" --phase=tapback  # one phase
+./scripts/e2e-imessage-humanness.sh --to "+1234567890" --verbose --pause=5  # slow + logs
+```
+
+Requires: macOS, Messages.app signed in, `imsg` CLI, Full Disk Access. Optional: `ffmpeg` (video), `CARTESIA_API_KEY` (voice messages).
+
+## Agent-to-Agent E2E (Two Machines)
+
 ## Prerequisites
 
 - **Two Macs** (or one Mac + one Mac VM), each with its own Apple ID
@@ -76,7 +90,7 @@ Mac A would use `human channel e2e-test` for automatic config overrides once tha
 }
 ```
 
-`use_imsg_cli` is implemented: when `true`, sends prefer the `imsg` CLI when available (with AppleScript fallback), as documented in the iMessage channel and investigation docs.
+`use_imsg_cli` is the recommended production config. When `true` and `imsg` is on `$PATH`, enables: faster text send (<1s via `imsg send`), attachment send via `imsg send --file`, tapback via `imsg react`, event-driven polling via `imsg watch` subprocess, and target validation via `imsg chats` at startup. All paths have graceful AppleScript/JXA fallback.
 
 ### Mac B (responder)
 
@@ -108,6 +122,46 @@ Mac B runs `human service-loop`, so it needs explicit daemon overrides in `~/.hu
 | `daemon.response_mode` | Any channel's daemon block | `"selective"` | `"eager"` responds to everything, recommended for E2E. |
 
 These fields work on **any channel**, not just iMessage — you could run the same test over Telegram, Discord, etc.
+
+### Humanness Config (Production)
+
+For natural, human-like behavior in real conversations (not E2E testing), use `response_mode: "normal"` and enable `llm_decides`. This activates the full intelligence pipeline: the daemon uses a fast classify LLM to decide text, tapback, or silence for each message — with natural delay.
+
+```json
+{
+  "channels": {
+    "imessage": {
+      "default_target": "+1XXXXXXXXXX",
+      "use_imsg_cli": true,
+      "daemon": {
+        "llm_decides": true,
+        "voice_enabled": true,
+        "response_mode": "normal"
+      }
+    }
+  }
+}
+```
+
+| Feature | What happens | Requires |
+|---------|-------------|----------|
+| **`llm_decides: true`** | Fast Flash model classifies each message: text, tapback, or silence + natural delay. Overrides heuristic gating. | Configured provider (Gemini Flash recommended) |
+| **`use_imsg_cli: true`** | Text via `imsg send`, attachments via `imsg send --file`, tapbacks via `imsg react`, event-driven polling via `imsg watch`, target validation via `imsg chats`. | `imsg` on `$PATH` |
+| **`voice_enabled: true`** | Agent occasionally sends voice notes via Cartesia TTS when context warrants it. | `CARTESIA_API_KEY`, persona with `voice.voice_id` |
+| **`response_mode: "normal"`** | Heuristic classifier output used as-is (selective downgrades without `?`, eager always responds). `llm_decides` overrides this per-message. | — |
+
+With this config, the full humanness pipeline activates:
+
+- **Emotional pacing** — heavier messages get longer read delays (+3s heavy, +6s grief)
+- **Typing indicators** — "..." bubble appears before responses, between choreography segments, and briefly before backchannels
+- **Tapback intelligence** — director chooses heart/like/haha contextually (not randomly)
+- **Leave on read** — occasionally skips response entirely for low-signal messages
+- **Backchannel** — sends "mhm" or "haha" instead of a full LLM response when appropriate
+- **Silence intuition** — detects when no response is the most human response
+- **Choreography** — splits long responses into natural multi-message segments with inter-segment typing
+- **Voice notes** — probabilistically sends TTS audio for emotional or casual contexts
+- **GIFs/stickers** — contextually sends media when conversation tone matches
+- **Late-night gating** — higher skip rates and briefer responses between 2-6 AM
 
 ## What Gets Tested
 

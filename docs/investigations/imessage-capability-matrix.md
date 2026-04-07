@@ -13,9 +13,9 @@ Canonical reference for every iMessage platform capability, our implementation s
 
 | Feature | User Behavior | Feasibility | Our Status | Priority | Notes |
 | --- | --- | --- | --- | --- | --- |
-| **Send text** | Core (100%) | Public API (AppleScript or imsg CLI) | Implemented | — | `imessage_send()` via osascript; opt-in `imsg send` path via `HU_IMESSAGE_SEND_IMSG` |
-| **Receive/poll text** | Core (100%) | chat.db SQLite | Implemented | — | `hu_imessage_poll()` via chat.db |
-| **Send attachment** | High (~40% of convos) | AppleScript attachment | Implemented | — | osascript + file path |
+| **Send text** | Core (100%) | Public API (imsg CLI or AppleScript) | Implemented | — | `imessage_send()` via `imsg send` (preferred) or osascript fallback; `use_imsg_cli` config key |
+| **Receive/poll text** | Core (100%) | chat.db SQLite + imsg watch | Implemented | — | `hu_imessage_poll()` via chat.db; event-driven `imsg watch` subprocess when `use_imsg_cli` enabled |
+| **Send attachment** | High (~40% of convos) | imsg CLI or AppleScript | Implemented | — | `imsg send --file` (preferred) with per-attachment AppleScript fallback |
 | **Receive attachment path** | High | chat.db + attachment table | Implemented | — | `hu_imessage_get_attachment_path()` |
 | **Classic tapback (send)** | Very high (70%+ of users) | JXA + AX automation | Implemented (fragile) | High | Requires AX permission, varies by macOS version. `HU_IMESSAGE_TAPBACK_ENABLED` opt-in. |
 | **Classic tapback (read)** | Very high | chat.db types 2000-2005 | Implemented | — | `hu_imessage_build_tapback_context()` |
@@ -49,7 +49,7 @@ Canonical reference for every iMessage platform capability, our implementation s
 
 | Tool | Tapback Send | Typing | Edit | Unsend | Inline Reply | Speed | API Type |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Our implementation** | JXA+AX (fragile) | Yes (AX) | No | No | No | ~2-5s send | AppleScript |
+| **Our implementation** | imsg react (preferred) or JXA+AX | Yes (AX) | No | No | No | <1s send (imsg) | imsg CLI + AppleScript fallback |
 | **imsg v0.5.0** | Yes (`react` cmd) | Broken (macOS 26) | No | No | No | <1s send | AppleScript + Swift |
 | **imsg-bridge** | Via imsg | Broken | No | No | No | ~1.2s avg | REST wrapper around imsg |
 | **BlueBubbles** | Yes | Yes | Yes (private API) | Yes (private API) | Yes | ~2s | Private IMCore |
@@ -88,21 +88,28 @@ Canonical reference for every iMessage platform capability, our implementation s
 | Implement AX-based typing indicators | System Events focus + keystroke triggers real "..." bubble; no private entitlements; same AX permission as tapback | 2026-04 |
 | Add sticker/Memoji read-side detection | balloon_bundle_id check in poll; zero risk read-only | 2026-04 |
 | Add message effects read-side detection | expressive_send_style_id check in poll; zero risk read-only | 2026-04 |
-| Wire HU_IMESSAGE_SEND_IMSG CMake flag | imsg CLI opt-in for faster send; graceful AppleScript fallback | 2026-04 |
+| imsg CLI as unified runtime control | `use_imsg_cli` config key is single control; removed `HU_IMESSAGE_SEND_IMSG` CMake flag | 2026-04 |
 | imsg CLI tapback even without JXA enabled | Auto-detect imsg on $PATH; try before returning NOT_SUPPORTED | 2026-04 |
+| imsg send --file for attachments | Per-attachment imsg CLI with AppleScript fallback; faster and better errors | 2026-04 |
+| imsg watch for event-driven polling | Spawns `imsg watch --json --since-rowid` subprocess; pipe-based notification; SQL skipped when no data | 2026-04 |
+| imsg chats for target validation | One-time startup check: `imsg chats --json`; warns if default_target not in active chats | 2026-04 |
+| Poll interval auto-reduction | Bootstrap sets 1s when `use_imsg_cli` enabled (vs 3s default); watch skips SQL when idle | 2026-04 |
 | Implement 30s music preview attachments | iTunes + Spotify dual-service: .m4a preview, album art, auto-detect Spotify/Apple preference from history, taste learning via tapback reactions. | 2026-04 |
 
 ## Architecture
 
-- **Outbound**: `imessage_send()` → osascript AppleScript → Messages.app
-- **Inbound**: `hu_imessage_poll()` → chat.db SQLite → parse text + attributedBody + attachments + reactions
+- **Outbound text**: `imessage_send()` → `imsg send --to --text` (preferred, <1s) → AppleScript fallback (2-5s)
+- **Outbound attachments**: `imsg send --to --file` (preferred, per-attachment) → AppleScript `POSIX file` fallback
+- **Inbound (event-driven)**: `imsg watch --json --since-rowid` subprocess → pipe notification → `hu_imessage_poll()` → chat.db SQLite (only when data available)
+- **Inbound (fallback)**: timer-based `hu_imessage_poll()` → chat.db SQLite → parse text + attributedBody + attachments + reactions
 - **Outbound typing**: `imessage_start_typing()` → osascript System Events → focus Messages.app input field + keystroke (triggers real "..." typing bubble)
 - **Sticker/effects detection**: `hu_imessage_poll()` reads `balloon_bundle_id` and `expressive_send_style_id` from chat.db
-- **Tapback send**: `imessage_react()` → JXA + System Events AX automation (opt-in)
+- **Tapback send**: `imessage_react()` → `imsg react --chat-id --reaction` (preferred) → JXA + System Events AX fallback (opt-in)
+- **Target validation**: `imsg chats --json` at channel start → warn if `default_target` not found
 - **Feed/persona**: `feeds/imessage.c` and `persona/sampler.c` → chat.db with attributedBody support
 - **Music preview**: taste prompt → LLM picks song → detect user preference (Spotify/Apple Music) → iTunes search (for .m4a) + optional Spotify search (for share link) → download preview + album art → send text + audio + artwork attachments → record for taste learning
 - **GIF**: Tenor API → download to temp file → send as attachment
 
 ## Last Updated
 
-2026-04-04
+2026-04-06

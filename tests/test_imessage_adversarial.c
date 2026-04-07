@@ -984,6 +984,30 @@ static void imessage_text_is_placeholder_false_cases(void) {
     HU_ASSERT_FALSE(hu_imessage_text_is_placeholder("photo"));
 }
 
+static void imessage_balloon_override_only_on_placeholder(void) {
+    const char *sticker_bundle = "com.apple.Stickers.UserGenerated.StickerPack";
+    const char *label = hu_imessage_balloon_label(sticker_bundle);
+    HU_ASSERT_NOT_NULL(label);
+
+    /* Real text with balloon → text preserved (balloon label NOT applied) */
+    HU_ASSERT_FALSE(hu_imessage_text_is_placeholder("Check out this sticker"));
+    HU_ASSERT_FALSE(hu_imessage_text_is_placeholder("Haha nice one"));
+
+    /* Placeholder text with balloon → label overrides */
+    HU_ASSERT_TRUE(hu_imessage_text_is_placeholder(NULL));
+    HU_ASSERT_TRUE(hu_imessage_text_is_placeholder(""));
+    HU_ASSERT_TRUE(hu_imessage_text_is_placeholder("[Photo]"));
+
+    /* Verify the complete decision: if placeholder, label wins; if real, text wins */
+    const char *real_text = "Check out this sticker";
+    const char *result_text = (hu_imessage_text_is_placeholder(real_text)) ? label : real_text;
+    HU_ASSERT_STR_EQ(result_text, "Check out this sticker");
+
+    const char *placeholder = "[Photo]";
+    result_text = (hu_imessage_text_is_placeholder(placeholder)) ? label : placeholder;
+    HU_ASSERT_STR_EQ(result_text, "[Sticker]");
+}
+
 static void imessage_copy_bounded_normal(void) {
     char dst[32];
     size_t n = hu_imessage_copy_bounded(dst, sizeof(dst), "hello", 5);
@@ -1045,6 +1069,114 @@ static void imessage_set_use_imsg_cli_wires_to_context(void) {
     hu_imessage_set_use_imsg_cli(&ch, true);
     hu_imessage_set_use_imsg_cli(&ch, false);
     hu_imessage_set_use_imsg_cli(NULL, true);
+    hu_imessage_destroy(&ch);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PART 14 — imsg CLI deep integration (watch, attachments, chats validation)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void imessage_watch_active_false_under_test(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    hu_imessage_set_use_imsg_cli(&ch, true);
+    HU_ASSERT_FALSE(hu_imessage_watch_active(&ch));
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_watch_active_null_channel_returns_false(void) {
+    HU_ASSERT_FALSE(hu_imessage_watch_active(NULL));
+    hu_channel_t ch = {0};
+    HU_ASSERT_FALSE(hu_imessage_watch_active(&ch));
+}
+
+static void imessage_watch_active_false_without_imsg_cli(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    hu_imessage_set_use_imsg_cli(&ch, false);
+    HU_ASSERT_FALSE(hu_imessage_watch_active(&ch));
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_start_stop_with_imsg_cli_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    hu_imessage_set_use_imsg_cli(&ch, true);
+    HU_ASSERT_EQ(ch.vtable->start(ch.ctx), HU_OK);
+    ch.vtable->stop(ch.ctx);
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_destroy_with_imsg_cli_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    hu_imessage_set_use_imsg_cli(&ch, true);
+    HU_ASSERT_EQ(ch.vtable->start(ch.ctx), HU_OK);
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_imsg_cli_text_send_test_mode_stores_message(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    hu_imessage_set_use_imsg_cli(&ch, true);
+    HU_ASSERT_EQ(ch.vtable->send(ch.ctx, "+15551234567", 12, "test msg", 8, NULL, 0), HU_OK);
+    size_t out_len = 0;
+    const char *msg = hu_imessage_test_get_last_message(&ch, &out_len);
+    HU_ASSERT_NOT_NULL(msg);
+    HU_ASSERT_EQ(out_len, 8);
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_imsg_cli_media_test_mode_stores_path(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    hu_imessage_set_use_imsg_cli(&ch, true);
+    const char *media[] = {"/tmp/test.jpg"};
+    HU_ASSERT_EQ(ch.vtable->send(ch.ctx, "+15551234567", 12, "", 0, media, 1), HU_OK);
+    HU_ASSERT_EQ(hu_imessage_test_get_last_media_count(&ch), 1);
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_poll_returns_ok_with_no_mocks_and_imsg_cli(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    hu_imessage_set_use_imsg_cli(&ch, true);
+    hu_channel_loop_msg_t msgs[4];
+    size_t count = 99;
+    HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 0);
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_start_stop_double_stop_no_crash(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    hu_imessage_set_use_imsg_cli(&ch, true);
+    HU_ASSERT_EQ(ch.vtable->start(ch.ctx), HU_OK);
+    ch.vtable->stop(ch.ctx);
+    ch.vtable->stop(ch.ctx);
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_start_stop_cycle_with_poll(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+    hu_imessage_set_use_imsg_cli(&ch, true);
+    HU_ASSERT_EQ(ch.vtable->start(ch.ctx), HU_OK);
+    hu_channel_loop_msg_t msgs[4];
+    size_t count = 99;
+    HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 0);
+    ch.vtable->stop(ch.ctx);
     hu_imessage_destroy(&ch);
 }
 
@@ -1195,6 +1327,7 @@ void run_imessage_adversarial_tests(void) {
     HU_RUN_TEST(imessage_balloon_label_null_and_empty);
     HU_RUN_TEST(imessage_text_is_placeholder_true_cases);
     HU_RUN_TEST(imessage_text_is_placeholder_false_cases);
+    HU_RUN_TEST(imessage_balloon_override_only_on_placeholder);
     HU_RUN_TEST(imessage_copy_bounded_normal);
     HU_RUN_TEST(imessage_copy_bounded_truncates);
     HU_RUN_TEST(imessage_copy_bounded_exact_fit);
@@ -1205,6 +1338,20 @@ void run_imessage_adversarial_tests(void) {
     HU_RUN_TEST(imessage_start_typing_returns_ok);
     HU_RUN_TEST(imessage_start_typing_null_ctx_safe);
     HU_RUN_TEST(imessage_set_use_imsg_cli_wires_to_context);
+#endif
+
+    /* Part 14: imsg CLI deep integration (watch, attachments, validation) */
+#if HU_IS_TEST
+    HU_RUN_TEST(imessage_watch_active_false_under_test);
+    HU_RUN_TEST(imessage_watch_active_null_channel_returns_false);
+    HU_RUN_TEST(imessage_watch_active_false_without_imsg_cli);
+    HU_RUN_TEST(imessage_start_stop_with_imsg_cli_no_crash);
+    HU_RUN_TEST(imessage_destroy_with_imsg_cli_no_crash);
+    HU_RUN_TEST(imessage_imsg_cli_text_send_test_mode_stores_message);
+    HU_RUN_TEST(imessage_imsg_cli_media_test_mode_stores_path);
+    HU_RUN_TEST(imessage_poll_returns_ok_with_no_mocks_and_imsg_cli);
+    HU_RUN_TEST(imessage_start_stop_double_stop_no_crash);
+    HU_RUN_TEST(imessage_start_stop_cycle_with_poll);
 #endif
 }
 #else  /* !HU_HAS_IMESSAGE */

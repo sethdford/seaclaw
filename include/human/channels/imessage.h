@@ -24,6 +24,11 @@ void hu_imessage_set_loopback_handle(hu_channel_t *ch, const char *handle);
 /** Returns true if default target (phone/email) is configured. */
 bool hu_imessage_is_configured(hu_channel_t *ch);
 
+/** Returns true if the imsg watch subprocess is actively monitoring for new messages.
+ * Event-driven monitoring provides sub-second message delivery latency.
+ * Returns false under HU_IS_TEST, on non-macOS, or when imsg CLI is unavailable. */
+bool hu_imessage_watch_active(hu_channel_t *ch);
+
 /** Poll ~/Library/Messages/chat.db for new inbound messages (macOS only). */
 hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_loop_msg_t *msgs,
                             size_t max_msgs, size_t *out_count);

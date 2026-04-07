@@ -36,7 +36,7 @@ Add to `~/.human/config.json` under `channels.imessage`:
 | `default_target`    | string   | —       | Phone number or Apple ID used when no explicit target is provided |
 | `allow_from`        | string[] | `[]`    | Restrict inbound to these handles only (`"*"` = allow all)        |
 | `poll_interval_sec` | number   | `30`    | How often (seconds) to poll chat.db for new messages              |
-| `use_imsg_cli`      | boolean  | `false` | Use `imsg` CLI for send/react (faster, better error reporting)    |
+| `use_imsg_cli`      | boolean  | `false` | Use `imsg` CLI for send, react, attachments, event-driven watch, and chat validation (recommended) |
 
 ### Target format
 
@@ -48,16 +48,22 @@ Add to `~/.human/config.json` under `channels.imessage`:
 
 ### Outbound (send)
 
-- Uses `osascript -e` to run AppleScript: `tell application "Messages" to send "MESSAGE" to buddy "TARGET"`
-- Escapes quotes and backslashes in the message text for AppleScript
+- **With `use_imsg_cli`**: Sends via `imsg send --to TARGET --text MESSAGE --service imessage` (<1s). Attachments via `imsg send --file`. Falls back to AppleScript on failure.
+- **Without `use_imsg_cli`**: Uses `osascript -e` to run AppleScript: `tell application "Messages" to send "MESSAGE" to buddy "TARGET"`
+- Escapes quotes and backslashes in the message text for AppleScript fallback
 - If a message provides an explicit target, that is used; otherwise `default_target` is used
 
 ### Inbound (receive)
 
-- Polls `~/Library/Messages/chat.db` every 30 seconds (configurable via `poll_interval_sec`)
-- Queries: `SELECT m.ROWID, m.text, h.id FROM message m JOIN handle h ON m.handle_id = h.ROWID WHERE m.is_from_me = 0 AND m.text IS NOT NULL AND m.ROWID > ?`
+- **With `use_imsg_cli`**: Spawns `imsg watch --json --since-rowid` as a background subprocess for event-driven notifications. Poll interval auto-reduces to 1s. SQL query is skipped when the watch pipe reports no new data.
+- **Without `use_imsg_cli`**: Timer-based polling every 3 seconds (configurable via `poll_interval_sec`)
+- Queries `~/Library/Messages/chat.db` for new messages with rich metadata (text, attributedBody, attachments, tapbacks, effects, stickers)
 - Uses handle ID (phone/email) as session key; message text as content
 - Tracks `last_rowid` to avoid reprocessing
+
+### Startup validation
+
+- **With `use_imsg_cli`**: Runs `imsg chats --json` once at startup to verify the configured `default_target` exists in active conversations. Logs a warning if not found.
 
 ## Platform limitations
 

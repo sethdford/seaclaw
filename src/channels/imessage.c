@@ -17,6 +17,10 @@
 #include <unistd.h>
 
 #if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/wait.h>
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
 #endif
@@ -117,6 +121,12 @@ typedef struct hu_imessage_ctx {
     bool imsg_cli_checked;
     bool has_imsg_cli;
     const char *loopback_handle;
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+    pid_t imsg_watch_pid;
+    int imsg_watch_fd;
+    bool imsg_watch_running;
+    bool imsg_target_validated;
+#endif
 #if HU_IS_TEST
     char last_message[4096];
     size_t last_message_len;
@@ -251,6 +261,183 @@ static bool imsg_cli_available(hu_imessage_ctx_t *c) {
         hu_log_info("imessage", NULL, "imsg CLI detected on $PATH");
     return c->has_imsg_cli;
 }
+/* ── imsg watch subprocess (event-driven poll trigger) ─────────────── */
+
+static void imsg_watch_start(hu_imessage_ctx_t *c) {
+    if (!c || c->imsg_watch_running || !c->use_imsg_cli || !imsg_cli_available(c))
+        return;
+
+    int pipefd[2];
+    if (pipe(pipefd) < 0)
+        return;
+
+    char rowid_str[32];
+    snprintf(rowid_str, sizeof(rowid_str), "%lld", (long long)c->last_rowid);
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return;
+    }
+    if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
+        int devnull = open("/dev/null", O_WRONLY);
+        if (devnull >= 0) {
+            dup2(devnull, STDERR_FILENO);
+            close(devnull);
+        }
+        execlp("imsg", "imsg", "watch", "--json", "--since-rowid", rowid_str, NULL);
+        _exit(127);
+    }
+    close(pipefd[1]);
+    fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
+    c->imsg_watch_pid = pid;
+    c->imsg_watch_fd = pipefd[0];
+    c->imsg_watch_running = true;
+    hu_log_info("imessage", NULL, "started imsg watch (pid=%d, since-rowid=%s)",
+                (int)pid, rowid_str);
+}
+
+static bool imsg_watch_has_data(hu_imessage_ctx_t *c) {
+    if (!c->imsg_watch_running || c->imsg_watch_fd < 0)
+        return false;
+
+    char drain[4096];
+    bool got_data = false;
+    for (;;) {
+        ssize_t n = read(c->imsg_watch_fd, drain, sizeof(drain));
+        if (n > 0) {
+            got_data = true;
+            continue;
+        }
+        if (n == 0) {
+            c->imsg_watch_running = false;
+            close(c->imsg_watch_fd);
+            c->imsg_watch_fd = -1;
+            waitpid(c->imsg_watch_pid, NULL, WNOHANG);
+            hu_log_info("imessage", NULL,
+                        "imsg watch exited, falling back to timer-based polling");
+            return got_data;
+        }
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return got_data;
+        return got_data;
+    }
+}
+
+static void imsg_watch_stop(hu_imessage_ctx_t *c) {
+    if (!c || !c->imsg_watch_running)
+        return;
+    kill(c->imsg_watch_pid, SIGTERM);
+    waitpid(c->imsg_watch_pid, NULL, 0);
+    if (c->imsg_watch_fd >= 0) {
+        close(c->imsg_watch_fd);
+        c->imsg_watch_fd = -1;
+    }
+    c->imsg_watch_running = false;
+    hu_log_info("imessage", NULL, "stopped imsg watch");
+}
+
+/* ── imsg chats target validation ─────────────────────────────────── */
+
+static bool imsg_validate_target(hu_imessage_ctx_t *c) {
+    if (!c || !c->default_target || c->default_target_len == 0)
+        return false;
+    if (c->imsg_target_validated)
+        return true;
+    c->imsg_target_validated = true;
+
+    const char *argv[] = {"imsg", "chats", "--json", "--limit", "100", NULL};
+    hu_run_result_t result = {0};
+    hu_error_t err = hu_process_run(c->alloc, argv, NULL, 262144, &result);
+    if (err != HU_OK || !result.success || result.exit_code != 0) {
+        hu_run_result_free(c->alloc, &result);
+        return true;
+    }
+
+    bool found = false;
+    if (result.stdout_buf && result.stdout_len >= c->default_target_len) {
+        for (size_t i = 0; i <= result.stdout_len - c->default_target_len; i++) {
+            if (memcmp(result.stdout_buf + i, c->default_target,
+                       c->default_target_len) == 0) {
+                found = true;
+                break;
+            }
+        }
+    }
+    hu_run_result_free(c->alloc, &result);
+
+    if (!found)
+        hu_log_info("imessage", NULL,
+                    "target '%.*s' not found in active chats (imsg chats); "
+                    "first message may create a new conversation",
+                    (int)c->default_target_len, c->default_target);
+    else if (getenv("HU_DEBUG"))
+        hu_log_info("imessage", NULL, "target '%.*s' validated via imsg chats",
+                    (int)c->default_target_len, c->default_target);
+    return found;
+}
+
+/* ── imsg react helper (shared by both tapback-enabled and tapback-disabled paths) ── */
+
+static bool imsg_try_react(hu_imessage_ctx_t *c, int64_t message_id,
+                           hu_reaction_type_t reaction) {
+    if (!c || !c->alloc || message_id <= 0)
+        return false;
+    const char *tapback_name = hu_imessage_reaction_to_tapback_name(reaction);
+    if (!tapback_name)
+        return false;
+
+    char chat_rowid_str[32] = {0};
+#if defined(HU_ENABLE_SQLITE)
+    const char *home_env = getenv("HOME");
+    if (home_env) {
+        char db_p[512];
+        int dp = snprintf(db_p, sizeof(db_p), "%s/Library/Messages/chat.db", home_env);
+        if (dp > 0 && (size_t)dp < sizeof(db_p)) {
+            sqlite3 *db = NULL;
+            if (sqlite3_open_v2(db_p, &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK) {
+                sqlite3_stmt *cs = NULL;
+                if (sqlite3_prepare_v2(db,
+                                       "SELECT cmj.chat_id FROM chat_message_join cmj "
+                                       "WHERE cmj.message_id = ? LIMIT 1",
+                                       -1, &cs, NULL) == SQLITE_OK) {
+                    sqlite3_bind_int64(cs, 1, message_id);
+                    if (sqlite3_step(cs) == SQLITE_ROW) {
+                        int64_t rowid = sqlite3_column_int64(cs, 0);
+                        snprintf(chat_rowid_str, sizeof(chat_rowid_str), "%lld",
+                                 (long long)rowid);
+                    }
+                    sqlite3_finalize(cs);
+                }
+                sqlite3_close(db);
+            }
+        }
+    }
+#endif
+    if (!chat_rowid_str[0])
+        return false;
+
+    const char *react_argv[] = {"imsg",       "react",    "--chat-id",
+                                chat_rowid_str, "--reaction", tapback_name, NULL};
+    hu_run_result_t rr = {0};
+    hu_error_t re = hu_process_run(c->alloc, react_argv, NULL, 65536, &rr);
+    bool rok = (re == HU_OK && rr.success && rr.exit_code == 0);
+    if (!rok)
+        hu_log_info("imessage", NULL,
+                    "imsg react failed (exit=%d stdout=%.*s stderr=%.*s)",
+                    rr.exit_code,
+                    (int)(rr.stdout_len < 200 ? rr.stdout_len : 200),
+                    rr.stdout_buf ? rr.stdout_buf : "",
+                    (int)(rr.stderr_len < 200 ? rr.stderr_len : 200),
+                    rr.stderr_buf ? rr.stderr_buf : "");
+    hu_run_result_free(c->alloc, &rr);
+    return rok;
+}
+
 #endif /* __APPLE__ && __MACH__ && !HU_IS_TEST */
 
 static hu_error_t imessage_start(void *ctx) {
@@ -258,6 +445,12 @@ static hu_error_t imessage_start(void *ctx) {
     if (!c)
         return HU_ERR_INVALID_ARGUMENT;
     c->running = true;
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+    if (c->use_imsg_cli && imsg_cli_available(c)) {
+        imsg_validate_target(c);
+        imsg_watch_start(c);
+    }
+#endif
     return HU_OK;
 }
 
@@ -266,6 +459,9 @@ static void imessage_stop(void *ctx) {
     if (c) {
         c->running = false;
         atomic_store(&c->typing_active, false);
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+        imsg_watch_stop(c);
+#endif
     }
 }
 
@@ -801,11 +997,7 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
         imessage_simulate_typing(c, tgt, tgt_len, message_len);
 
         {
-            bool try_imsg = c->use_imsg_cli;
-#ifdef HU_IMESSAGE_SEND_IMSG
-            try_imsg = true;
-#endif
-            if (try_imsg && imsg_cli_available(c)) {
+            if (c->use_imsg_cli && imsg_cli_available(c)) {
                 char tgt_buf[256];
                 size_t tb = tgt_len < sizeof(tgt_buf) - 1 ? tgt_len : sizeof(tgt_buf) - 1;
                 memcpy(tgt_buf, tgt, tb);
@@ -891,50 +1083,83 @@ static hu_error_t imessage_send(void *ctx, const char *target, size_t target_len
 
 #if !HU_IS_TEST
 imsg_media:
-    /* Send media attachments (local file paths only) after text succeeds */
+    /* Send media attachments (local file paths only) after text succeeds.
+     * Prefer imsg send --file when available (faster, better error reporting);
+     * fall back to AppleScript per-attachment on failure. */
     if (send_err == HU_OK && media && media_count > 0) {
+        bool try_imsg_file = c->use_imsg_cli && imsg_cli_available(c);
+        char imsg_tgt_buf[256];
+        if (try_imsg_file) {
+            size_t tb = tgt_len < sizeof(imsg_tgt_buf) - 1 ? tgt_len : sizeof(imsg_tgt_buf) - 1;
+            memcpy(imsg_tgt_buf, tgt, tb);
+            imsg_tgt_buf[tb] = '\0';
+        }
+
         size_t m_tgt_cap = tgt_len * 2 + 1;
+        char *m_tgt_esc = NULL;
         if (m_tgt_cap <= 4096) {
-            char *m_tgt_esc = (char *)c->alloc->alloc(c->alloc->ctx, m_tgt_cap);
-            if (m_tgt_esc) {
+            m_tgt_esc = (char *)c->alloc->alloc(c->alloc->ctx, m_tgt_cap);
+            if (m_tgt_esc)
                 escape_for_applescript(m_tgt_esc, m_tgt_cap, tgt, tgt_len);
-                for (size_t i = 0; i < media_count && send_err == HU_OK; i++) {
-                    const char *url = media[i];
-                    if (!url || url[0] != '/')
-                        continue; /* Skip URLs and non-file media */
-                    if (access(url, R_OK) != 0)
-                        continue; /* Skip if file does not exist or is not readable */
-                    size_t path_len = strlen(url);
-                    size_t path_esc_cap = path_len * 2 + 1;
-                    if (path_esc_cap > 8192)
-                        continue;
-                    char *path_esc = (char *)c->alloc->alloc(c->alloc->ctx, path_esc_cap);
-                    if (!path_esc)
-                        continue;
-                    escape_for_applescript(path_esc, path_esc_cap, url, path_len);
-                    size_t m_script_cap = 256 + strlen(m_tgt_esc) + strlen(path_esc);
-                    char *m_script = (char *)c->alloc->alloc(c->alloc->ctx, m_script_cap);
-                    if (m_script) {
-                        size_t m_n = imessage_build_attach_script(
-                            m_script, m_script_cap, m_tgt_esc, path_esc);
-                        c->alloc->free(c->alloc->ctx, path_esc, path_esc_cap);
-                        if (m_n > 0) {
-                            const char *argv[] = {"osascript", "-e", m_script, NULL};
-                            hu_run_result_t result = {0};
-                            hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
-                            bool ok = (err == HU_OK && result.success && result.exit_code == 0);
-                            hu_run_result_free(c->alloc, &result);
-                            if (!ok)
-                                send_err = HU_ERR_CHANNEL_SEND;
-                        }
-                        c->alloc->free(c->alloc->ctx, m_script, m_script_cap);
-                    } else {
-                        c->alloc->free(c->alloc->ctx, path_esc, path_esc_cap);
-                    }
+        }
+
+        for (size_t i = 0; i < media_count && send_err == HU_OK; i++) {
+            const char *url = media[i];
+            if (!url || url[0] != '/')
+                continue;
+            if (access(url, R_OK) != 0)
+                continue;
+
+            if (try_imsg_file) {
+                const char *fa[] = {"imsg",      "send",    "--to",      imsg_tgt_buf,
+                                    "--file",    url,       "--service", "imessage",
+                                    NULL};
+                hu_run_result_t ir = {0};
+                hu_error_t ie = hu_process_run(c->alloc, fa, NULL, 65536, &ir);
+                bool fok = (ie == HU_OK && ir.success && ir.exit_code == 0);
+                hu_run_result_free(c->alloc, &ir);
+                if (fok)
+                    continue;
+                if (getenv("HU_DEBUG"))
+                    hu_log_info("imessage", NULL,
+                                "imsg send --file failed, falling back to AppleScript");
+            }
+
+            if (!m_tgt_esc) {
+                send_err = HU_ERR_CHANNEL_SEND;
+                break;
+            }
+            size_t path_len = strlen(url);
+            size_t path_esc_cap = path_len * 2 + 1;
+            if (path_esc_cap > 8192)
+                continue;
+            char *path_esc = (char *)c->alloc->alloc(c->alloc->ctx, path_esc_cap);
+            if (!path_esc)
+                continue;
+            escape_for_applescript(path_esc, path_esc_cap, url, path_len);
+            size_t m_script_cap = 256 + strlen(m_tgt_esc) + strlen(path_esc);
+            char *m_script = (char *)c->alloc->alloc(c->alloc->ctx, m_script_cap);
+            if (m_script) {
+                size_t m_n = imessage_build_attach_script(
+                    m_script, m_script_cap, m_tgt_esc, path_esc);
+                c->alloc->free(c->alloc->ctx, path_esc, path_esc_cap);
+                if (m_n > 0) {
+                    const char *argv[] = {"osascript", "-e", m_script, NULL};
+                    hu_run_result_t result = {0};
+                    hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
+                    bool ok = (err == HU_OK && result.success && result.exit_code == 0);
+                    hu_run_result_free(c->alloc, &result);
+                    if (!ok)
+                        send_err = HU_ERR_CHANNEL_SEND;
                 }
-                c->alloc->free(c->alloc->ctx, m_tgt_esc, m_tgt_cap);
+                c->alloc->free(c->alloc->ctx, m_script, m_script_cap);
+            } else {
+                c->alloc->free(c->alloc->ctx, path_esc, path_esc_cap);
             }
         }
+
+        if (m_tgt_esc)
+            c->alloc->free(c->alloc->ctx, m_tgt_esc, m_tgt_cap);
     }
 #endif
 
@@ -1534,59 +1759,10 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
     return HU_ERR_NOT_SUPPORTED;
 #elif !defined(HU_IMESSAGE_TAPBACK_ENABLED)
     {
-        /* Without JXA tapback, imsg CLI is the only option; respect use_imsg_cli */
         hu_imessage_ctx_t *c_try = (hu_imessage_ctx_t *)ctx;
-        if (c_try && c_try->alloc && c_try->use_imsg_cli &&
-            imsg_cli_available(c_try) && message_id > 0) {
-            const char *tapback_name = hu_imessage_reaction_to_tapback_name(reaction);
-            if (tapback_name) {
-                char chat_rowid_str[32] = {0};
-#if defined(HU_ENABLE_SQLITE)
-                const char *home_env = getenv("HOME");
-                if (home_env) {
-                    char db_p[512];
-                    int dp = snprintf(db_p, sizeof(db_p), "%s/Library/Messages/chat.db",
-                                      home_env);
-                    if (dp > 0 && (size_t)dp < sizeof(db_p)) {
-                        sqlite3 *db = NULL;
-                        if (sqlite3_open_v2(db_p, &db, SQLITE_OPEN_READONLY, NULL) ==
-                            SQLITE_OK) {
-                            sqlite3_stmt *cs = NULL;
-                            if (sqlite3_prepare_v2(
-                                    db,
-                                    "SELECT cmj.chat_id FROM chat_message_join cmj "
-                                    "WHERE cmj.message_id = ? LIMIT 1",
-                                    -1, &cs, NULL) == SQLITE_OK) {
-                                sqlite3_bind_int64(cs, 1, message_id);
-                                if (sqlite3_step(cs) == SQLITE_ROW) {
-                                    int64_t rowid = sqlite3_column_int64(cs, 0);
-                                    snprintf(chat_rowid_str, sizeof(chat_rowid_str),
-                                             "%lld", (long long)rowid);
-                                }
-                                sqlite3_finalize(cs);
-                            }
-                            sqlite3_close(db);
-                        }
-                    }
-                }
-#endif
-                if (chat_rowid_str[0]) {
-                    const char *react_argv[] = {"imsg",       "react",
-                                                "--chat-id",  chat_rowid_str,
-                                                "--reaction", tapback_name,
-                                                NULL};
-                    hu_run_result_t rr = {0};
-                    hu_error_t re =
-                        hu_process_run(c_try->alloc, react_argv, NULL, 65536, &rr);
-                    bool rok = (re == HU_OK && rr.success && rr.exit_code == 0);
-                    hu_run_result_free(c_try->alloc, &rr);
-                    if (rok)
-                        return HU_OK;
-                    hu_log_info("imessage", NULL,
-                                "imsg react failed (exit=%d)", rr.exit_code);
-                }
-            }
-        }
+        if (c_try && c_try->use_imsg_cli && imsg_cli_available(c_try) &&
+            imsg_try_react(c_try, message_id, reaction))
+            return HU_OK;
         (void)target;
         (void)target_len;
         if (getenv("HU_DEBUG"))
@@ -1605,63 +1781,9 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
     if (!target || target_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
 
-    /* Prefer imsg CLI when enabled — faster and more reliable than JXA/AX.
-     * imsg v0.5 react takes --chat-id (numeric ROWID) and --reaction;
-     * it reacts to the most recent incoming message in that chat. */
-    if (c->use_imsg_cli && imsg_cli_available(c) && message_id > 0) {
-        const char *tapback_name = hu_imessage_reaction_to_tapback_name(reaction);
-        if (tapback_name) {
-            char chat_rowid_str[32] = {0};
-#if defined(HU_ENABLE_SQLITE)
-            const char *home_env = getenv("HOME");
-            if (home_env) {
-                char db_p[512];
-                int dp = snprintf(db_p, sizeof(db_p), "%s/Library/Messages/chat.db", home_env);
-                if (dp > 0 && (size_t)dp < sizeof(db_p)) {
-                    sqlite3 *db = NULL;
-                    if (sqlite3_open_v2(db_p, &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK) {
-                        sqlite3_stmt *cs = NULL;
-                        if (sqlite3_prepare_v2(
-                                db,
-                                "SELECT cmj.chat_id FROM chat_message_join cmj "
-                                "WHERE cmj.message_id = ? LIMIT 1",
-                                -1, &cs, NULL) == SQLITE_OK) {
-                            sqlite3_bind_int64(cs, 1, message_id);
-                            if (sqlite3_step(cs) == SQLITE_ROW) {
-                                int64_t rowid = sqlite3_column_int64(cs, 0);
-                                snprintf(chat_rowid_str, sizeof(chat_rowid_str), "%lld",
-                                         (long long)rowid);
-                            }
-                            sqlite3_finalize(cs);
-                        }
-                        sqlite3_close(db);
-                    }
-                }
-            }
-#endif
-            if (chat_rowid_str[0]) {
-                const char *react_argv[] = {"imsg",       "react",
-                                            "--chat-id",  chat_rowid_str,
-                                            "--reaction", tapback_name,
-                                            NULL};
-                hu_run_result_t rr = {0};
-                hu_error_t re = hu_process_run(c->alloc, react_argv, NULL, 65536, &rr);
-                bool rok = (re == HU_OK && rr.success && rr.exit_code == 0);
-                if (!rok)
-                    hu_log_info("imessage", NULL,
-                                "imsg react failed (exit=%d stdout=%.*s stderr=%.*s), "
-                                "falling back to JXA",
-                                rr.exit_code,
-                                (int)(rr.stdout_len < 200 ? rr.stdout_len : 200),
-                                rr.stdout_buf ? rr.stdout_buf : "",
-                                (int)(rr.stderr_len < 200 ? rr.stderr_len : 200),
-                                rr.stderr_buf ? rr.stderr_buf : "");
-                hu_run_result_free(c->alloc, &rr);
-                if (rok)
-                    return HU_OK;
-            }
-        }
-    }
+    if (c->use_imsg_cli && imsg_cli_available(c) &&
+        imsg_try_react(c, message_id, reaction))
+        return HU_OK;
 
     /* Fetch raw message text for AX menu-item matching. Intentionally does NOT
      * apply balloon_label or effect_name — tapback needs the original text that
@@ -2221,9 +2343,23 @@ void hu_imessage_set_loopback_handle(hu_channel_t *ch, const char *handle) {
     c->loopback_handle = handle;
 }
 
+bool hu_imessage_watch_active(hu_channel_t *ch) {
+    if (!ch || !ch->ctx)
+        return false;
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+    hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ch->ctx;
+    return c->imsg_watch_running;
+#else
+    return false;
+#endif
+}
+
 void hu_imessage_destroy(hu_channel_t *ch) {
     if (ch && ch->ctx) {
         hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ch->ctx;
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+        imsg_watch_stop(c);
+#endif
         hu_allocator_t *a = c->alloc;
         if (c->default_target)
             a->free(a->ctx, c->default_target, c->default_target_len + 1);
@@ -2437,6 +2573,16 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
     return HU_ERR_NOT_SUPPORTED;
 #else
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)channel_ctx;
+
+    /* When imsg watch is active, skip the SQL query if no new data arrived.
+     * This avoids redundant queries while maintaining sub-second latency.
+     * If the watch process died, attempt restart before falling back to SQL. */
+    if (c->imsg_watch_running) {
+        if (!imsg_watch_has_data(c))
+            return HU_OK;
+    } else if (c->use_imsg_cli && imsg_cli_available(c)) {
+        imsg_watch_start(c);
+    }
 
     const char *home = getenv("HOME");
     if (!home)

@@ -75,9 +75,9 @@ send_imessage() {
     local to="$1" text="$2" file="${3:-}"
     if $HAS_IMSG; then
         if [[ -n "$file" && -f "$file" ]]; then
-            imsg send --to "$to" --text "$text" --file "$file"
+            imsg send --to "$to" --text "$text" --file "$file" --service imessage
         else
-            imsg send --to "$to" --text "$text"
+            imsg send --to "$to" --text "$text" --service imessage
         fi
     else
         if [[ -n "$file" && -f "$file" ]]; then

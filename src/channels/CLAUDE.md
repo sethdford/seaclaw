@@ -71,7 +71,10 @@ Generated from designated initializers in each `src/channels/*.c` vtable. **hist
  *   - Sticker/Memoji detection: read-side via balloon_bundle_id in chat.db (poll shows [Sticker], [Memoji], or [iMessage App])
  *   - Message effects detection: read-side via expressive_send_style_id (poll shows [Sent with Slam], [Sent with Confetti], etc.)
  *   - Tapback send: JXA+AX (opt-in HU_IMESSAGE_TAPBACK_ENABLED) OR imsg CLI (auto-detected on $PATH, no AX needed)
- *   - imsg CLI send: opt-in via HU_IMESSAGE_SEND_IMSG, faster (<1s vs 2-5s AppleScript), graceful fallback
+ *   - imsg CLI send: `use_imsg_cli` config (runtime), faster (<1s vs 2-5s AppleScript), graceful fallback
+ *   - imsg CLI attachments: `imsg send --file` per-attachment with AppleScript fallback
+ *   - imsg watch: event-driven polling via `imsg watch --json` subprocess; skips SQL when no new data
+ *   - imsg chats: target validation at startup via `imsg chats --json`
  *   - Inline replies: no AppleScript verb for threaded reply-to-specific-message (read-side works via thread_originator_guid)
  *   - Message editing: no public API (IMCore only; uses *correction pattern instead)
  *   - Unsend: AX/UI automation only, fragile, 2-min window (not recommended)

@@ -93,9 +93,9 @@ Not supported by imsg. Confirmed dead end — same as our finding.
 - Attachment support via `--file` flag
 - Named argument syntax: `imsg send --to <recipient> --text "msg" [--file /path] --service imessage`
 
-Our current AppleScript send path is stable and well-tested. The imsg send path is now implemented as an **opt-in alternative** via `HU_IMESSAGE_SEND_IMSG` CMake flag, not a replacement.
+Our current AppleScript send path is stable and well-tested. The imsg send path was initially an opt-in alternative via a CMake flag; it has since been promoted to the preferred path controlled by the `use_imsg_cli` runtime config key (the CMake flag was removed 2026-04-06).
 
-**Implementation (2026-04-03):** `HU_IMESSAGE_SEND_IMSG` CMake option added. When enabled:
+**Implementation (2026-04-03):** `use_imsg_cli` config key added. When enabled:
 - Text sends try `imsg send --to <target> --text <message> --service imessage` first
 - Attachment sends use `imsg send --to <target> --file <path> --service imessage`
 - Graceful fallback: if imsg fails, falls through to existing AppleScript path
@@ -103,15 +103,24 @@ Our current AppleScript send path is stable and well-tested. The imsg send path 
 
 **Update (2026-04-04):** Both the send and react paths are now implemented in C:
 
-- `HU_IMESSAGE_SEND_IMSG` CMake option added; compile definitions wired for all targets
 - Text send via `imsg send --to <target> --text <message> --service imessage` with AppleScript fallback
 - imsg CLI tapback works even without `HU_IMESSAGE_TAPBACK_ENABLED` — auto-detects `imsg` on `$PATH` and tries `imsg react --chat-id <chat-guid> --message-guid <msg-guid> --reaction <type>` before returning `HU_ERR_NOT_SUPPORTED`
 - Chat GUID and message GUID are looked up from chat.db at react time
 - `use_imsg_cli` config key now parsed in `config_parse_channels.c`
+
+**Update (2026-04-06):** Full imsg CLI deep integration — all available imsg features now leveraged:
+
+- **Removed `HU_IMESSAGE_SEND_IMSG` CMake flag.** The `use_imsg_cli` runtime config key is now the single control point. When `true` and `imsg` is on `$PATH`, all imsg features are active.
+- **Attachment send via `imsg send --file`**: Each attachment tries `imsg send --to <target> --file <path> --service imessage` first, with per-attachment AppleScript fallback on failure. Faster (<1s) and better error reporting than raw AppleScript.
+- **Event-driven polling via `imsg watch`**: On `imessage_start()`, spawns `imsg watch --json --since-rowid <N>` as a background subprocess with pipe. `hu_imessage_poll()` checks the pipe (non-blocking read); skips the SQL query entirely when no new data has arrived. Auto-restarts on process exit. Reduces message delivery latency from up to 3s to sub-second.
+- **Target validation via `imsg chats`**: On channel start, runs `imsg chats --json --limit 100` and checks if the configured `default_target` appears. Logs a warning if not found (e.g., typo in phone number). One-time check at startup.
+- **Poll interval reduction**: Bootstrap auto-reduces poll interval from 3s to 1s when `use_imsg_cli` is enabled. Combined with watch pipe check, SQL queries only run when there's actually new data.
+- **10 new adversarial tests** (Part 14) covering watch lifecycle, null safety, start/stop cycles, send/poll with imsg CLI enabled.
+- `hu_imessage_watch_active()` public API for runtime status checking.
 
 ### React Path Command Syntax
 Corrected to named arguments: `imsg react --chat-id <chat-guid> --message-guid <msg-guid> --reaction <type>`
 
 ## Conclusion
 
-**Positive evaluation.** imsg v0.5.0 is a viable, lower-risk alternative for both tapback sending and message sending. It eliminates the Accessibility permission requirement for tapbacks, works headless, and supports custom emoji reactions. Both the react and send paths are implemented as opt-in with graceful fallback to existing methods. Typing indicators are broken and should not be pursued.
+**Full integration complete.** All viable imsg v0.5.0 features are now leveraged: text send, attachment send (`--file`), react, event-driven watch, and chat validation. `use_imsg_cli: true` is the recommended production config. The only imsg feature NOT used is `typing` (broken on macOS 26). Every path has graceful fallback to the existing AppleScript/JXA methods when imsg fails or is unavailable.
