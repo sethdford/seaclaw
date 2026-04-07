@@ -481,7 +481,10 @@ export class ScMemoryView extends GatewayAwareLitElement {
   override render() {
     return html`
       <hu-page-hero>
-        <hu-section-header heading="Memory" description="Browse, search, and manage stored memories and auto-generated insights.">
+        <hu-section-header
+          heading="Memory"
+          description="Browse, search, and manage stored memories and auto-generated insights."
+        >
         </hu-section-header>
       </hu-page-hero>
 

@@ -52,6 +52,9 @@ hu_error_t hu_imessage_build_read_receipt_context(hu_allocator_t *alloc, const c
  * Returns 0 on non-macOS or when SQLite unavailable. */
 int hu_imessage_count_recent_gif_tapbacks(const char *contact_id, size_t contact_id_len);
 
+/** Count positive tapbacks on our music messages (.m4a attachments) to this contact (24h). */
+int hu_imessage_count_recent_music_tapbacks(const char *contact_id, size_t contact_id_len);
+
 /** Look up the ROWID of the most recent is_from_me=1 message to the given handle.
  * Used for self-reaction targeting instead of fragile ROWID+1 guessing.
  * Returns -1 on failure or when SQLite/macOS unavailable. */

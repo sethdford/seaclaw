@@ -2687,11 +2687,13 @@ const tools = [
 
       // Show all elements immediately for reduced motion
       if (prefersReducedMotion) {
-        document.querySelectorAll("[data-reveal], .hu-chapter-reveal").forEach((el) => {
-          (el as HTMLElement).style.opacity = "1";
-          (el as HTMLElement).style.transform = "none";
-          (el as HTMLElement).style.transitionDuration = "0s";
-        });
+        document
+          .querySelectorAll("[data-reveal], .hu-chapter-reveal")
+          .forEach((el) => {
+            (el as HTMLElement).style.opacity = "1";
+            (el as HTMLElement).style.transform = "none";
+            (el as HTMLElement).style.transitionDuration = "0s";
+          });
         document.querySelectorAll(".opacity-0").forEach((el) => {
           (el as HTMLElement).style.opacity = "1";
         });

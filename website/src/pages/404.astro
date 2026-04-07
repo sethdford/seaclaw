@@ -153,7 +153,8 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
     <style>
       .error-cta-primary:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 16px color-mix(in srgb, var(--hu-accent) 30%, transparent);
+        box-shadow: 0 4px 16px
+          color-mix(in srgb, var(--hu-accent) 30%, transparent);
       }
       .error-cta-secondary:hover {
         transform: translateY(-2px);
@@ -164,8 +165,13 @@ const base = rawBase.endsWith("/") ? rawBase : rawBase + "/";
         animation: error-float 6s ease-in-out infinite;
       }
       @keyframes error-float {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-8px); }
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-8px);
+        }
       }
       @media (prefers-reduced-motion: reduce) {
         .error-logo {

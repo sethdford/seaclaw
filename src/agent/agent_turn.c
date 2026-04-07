@@ -854,7 +854,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
     char *humor_dir = NULL;
     size_t humor_dir_len = 0;
     bool had_humor_dir = false;
-    int humor_theory_saved = 0;
+    int humor_theory_saved = 0; (void)humor_theory_saved;
     char *syc_friction_ctx = NULL;
     size_t syc_friction_ctx_len = 0;
     char *conv_goals_ctx = NULL;

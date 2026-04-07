@@ -31,11 +31,11 @@ Add to `~/.human/config.json` under `channels.imessage`:
 
 ### Fields
 
-| Field               | Type     | Default | Description                                                       |
-| ------------------- | -------- | ------- | ----------------------------------------------------------------- |
-| `default_target`    | string   | —       | Phone number or Apple ID used when no explicit target is provided |
-| `allow_from`        | string[] | `[]`    | Restrict inbound to these handles only (`"*"` = allow all)        |
-| `poll_interval_sec` | number   | `30`    | How often (seconds) to poll chat.db for new messages              |
+| Field               | Type     | Default | Description                                                                                        |
+| ------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------- |
+| `default_target`    | string   | —       | Phone number or Apple ID used when no explicit target is provided                                  |
+| `allow_from`        | string[] | `[]`    | Restrict inbound to these handles only (`"*"` = allow all)                                         |
+| `poll_interval_sec` | number   | `30`    | How often (seconds) to poll chat.db for new messages                                               |
 | `use_imsg_cli`      | boolean  | `false` | Use `imsg` CLI for send, react, attachments, event-driven watch, and chat validation (recommended) |
 
 ### Target format

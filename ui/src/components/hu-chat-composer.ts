@@ -347,8 +347,7 @@ export class ScChatComposer extends LitElement {
     }
     .send-btn:hover:not(:disabled) {
       filter: brightness(1.1);
-      box-shadow: 0 0 var(--hu-space-sm) 1px
-        color-mix(in srgb, var(--hu-accent) 20%, transparent);
+      box-shadow: 0 0 var(--hu-space-sm) 1px color-mix(in srgb, var(--hu-accent) 20%, transparent);
       transform: scale(1.04);
     }
     .send-btn:active:not(:disabled) {

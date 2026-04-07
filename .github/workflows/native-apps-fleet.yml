@@ -149,9 +149,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: "Debug + release build (award-tier: ships clean on both configs)"
-        run: |
-          cd apps/macos && swift build
-          cd apps/macos && swift build -c release
+        run: cd apps/macos && swift build && swift build -c release
 
   fleet-sota-gate:
     name: Fleet SOTA gate (award-tier)

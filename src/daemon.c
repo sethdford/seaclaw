@@ -8347,7 +8347,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     bool needs_thinking = hu_conversation_classify_thinking(
                         combined, combined_len, history_entries, history_count, &thinking,
                         (uint32_t)time(NULL));
-                    if (needs_thinking && thinking.filler_len > 0) {
+                    if (needs_thinking && thinking.filler_len > 0 &&
+                        ch->channel->vtable->send) {
                         ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
                                                   thinking.filler, thinking.filler_len, NULL, 0);
 #ifndef HU_IS_TEST
@@ -8611,7 +8612,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         s_resp == HU_SILENCE_BRIEF_ACKNOWLEDGE) {
                         size_t ack_len = 0;
                         char *ack = hu_silence_build_acknowledgment(alloc, s_resp, &ack_len);
-                        if (ack && ack_len > 0) {
+                        if (ack && ack_len > 0 && ch->channel->vtable->send) {
                             hu_log_info("human", agent ? agent->observer : NULL,
                                         "silence intuition: \"%.*s\" for %.*s", (int)ack_len, ack,
                                         (int)(key_len > 20 ? 20 : key_len), batch_key);
@@ -9703,12 +9704,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                if (history_entries)
-                    alloc->free(alloc->ctx, history_entries,
-                                history_count * sizeof(hu_channel_history_entry_t));
-                history_entries = NULL;
-                history_count = 0;
-
                 /* Episodic: summarize this interaction (LLM when provider available, else
                  * rule-based). Skip in llm_decides mode — extra LLM call is too slow. */
                 if (err == HU_OK && response && response_len > 0 && agent->memory &&
@@ -9762,6 +9757,18 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         hu_log_info("human", agent ? agent->observer : NULL,
                                     "AI disclosure detected in response (allowed)");
                     }
+                }
+#endif
+
+#ifndef HU_IS_TEST
+                /* Free history before post-send block when that block will not run (it also
+                 * uses history for inline reply, double-text, GIF, music). */
+                if (history_entries &&
+                    !(err == HU_OK && response && response_len > 0)) {
+                    alloc->free(alloc->ctx, history_entries,
+                                history_count * sizeof(hu_channel_history_entry_t));
+                    history_entries = NULL;
+                    history_count = 0;
                 }
 #endif
 
@@ -10323,11 +10330,22 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             memset(&mod_r, 0, sizeof(mod_r));
                             if (hu_moderation_check(alloc, send_ptr, send_len, &mod_r) == HU_OK &&
                                 mod_r.flagged) {
-                                hu_log_info("human", agent ? agent->observer : NULL,
-                                            "outbound moderation flagged: v=%.2f sh=%.2f "
-                                            "h=%.2f",
-                                            mod_r.violence_score, mod_r.self_harm_score,
-                                            mod_r.hate_score);
+                                hu_log_warn("human", agent ? agent->observer : NULL,
+                                            "moderation flagged output (categories: %s%s%s%s), "
+                                            "blocking send",
+                                            mod_r.violence ? "violence " : "",
+                                            mod_r.hate ? "hate " : "",
+                                            mod_r.sexual ? "sexual " : "",
+                                            mod_r.self_harm ? "self-harm " : "");
+                                static const char mod_safe_reply[] =
+                                    "I need to rethink my response. Let me try again with "
+                                    "something more appropriate.";
+                                if (send_buf_ack) {
+                                    alloc->free(alloc->ctx, send_buf_ack, send_len + 1);
+                                    send_buf_ack = NULL;
+                                }
+                                send_ptr = mod_safe_reply;
+                                send_len = sizeof(mod_safe_reply) - 1;
                                 if (mod_r.self_harm) {
                                     char *crisis = NULL;
                                     size_t crisis_len = 0;
@@ -10343,10 +10361,6 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                             merged[send_len + 1] = '\n';
                                             memcpy(merged + send_len + 2, crisis, crisis_len);
                                             merged[new_len] = '\0';
-                                            if (send_buf_ack) {
-                                                alloc->free(alloc->ctx, send_buf_ack, send_len + 1);
-                                                send_buf_ack = NULL;
-                                            }
                                             send_buf_ack = merged;
                                             send_ptr = send_buf_ack;
                                             send_len = new_len;
@@ -10362,10 +10376,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             if (hu_companion_safety_check(alloc, send_ptr, send_len, NULL, 0,
                                                           &cs_r) == HU_OK &&
                                 cs_r.flagged) {
-                                hu_log_info("human", agent ? agent->observer : NULL,
-                                            "companion safety flagged: risk=%.2f "
-                                            "farewell=%d",
-                                            cs_r.total_risk, cs_r.farewell_unsafe);
+                                hu_log_warn("human", agent ? agent->observer : NULL,
+                                            "companion safety flagged output, replacing");
+                                static const char cs_safe_reply[] =
+                                    "Let me reconsider what I was about to say.";
+                                if (send_buf_ack) {
+                                    alloc->free(alloc->ctx, send_buf_ack, send_len + 1);
+                                    send_buf_ack = NULL;
+                                }
+                                send_ptr = cs_safe_reply;
+                                send_len = sizeof(cs_safe_reply) - 1;
                             }
                         }
                         /* MEM-002: Memory claim verification gate + TRUST-006 updates */
@@ -10888,6 +10908,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         }
                     }
                 }
+
+                /* Music taste: detect positive tapbacks on our music messages via SQL */
+                {
+                    int music_taps = hu_imessage_count_recent_music_tapbacks(batch_key, key_len);
+                    if (music_taps > 0) {
+                        for (int mt = 0; mt < music_taps; mt++)
+                            hu_music_taste_record_reaction(batch_key, key_len);
+                    }
+                }
 #endif
 
                 /* Load calibration data on first pass */
@@ -11144,9 +11173,24 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     /* Detect user's streaming preference from history */
                                     hu_music_source_t pref = HU_MUSIC_SOURCE_ITUNES;
                                     if (history_entries && history_count > 0) {
-                                        const char (*texts)[512] =
-                                            (const char (*)[512])history_entries[0].text;
-                                        pref = hu_music_detect_preference(texts, history_count);
+                                        enum { MUSIC_HIST_CAP = 20 };
+                                        char music_texts[MUSIC_HIST_CAP][512];
+                                        size_t music_lens[MUSIC_HIST_CAP];
+                                        const char *music_pref_ptrs[MUSIC_HIST_CAP];
+                                        size_t music_n = history_count < (size_t)MUSIC_HIST_CAP
+                                                             ? history_count
+                                                             : (size_t)MUSIC_HIST_CAP;
+                                        for (size_t mi = 0; mi < music_n; mi++) {
+                                            size_t tlen =
+                                                strnlen(history_entries[mi].text, 511);
+                                            memcpy(music_texts[mi], history_entries[mi].text,
+                                                    tlen);
+                                            music_texts[mi][tlen] = '\0';
+                                            music_lens[mi] = tlen;
+                                            music_pref_ptrs[mi] = music_texts[mi];
+                                        }
+                                        pref = hu_music_detect_preference(music_pref_ptrs,
+                                                                          music_lens, music_n);
                                     }
 
                                     /* Always search iTunes (for the .m4a preview) */
@@ -11364,6 +11408,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 
                     agent->alloc->free(agent->alloc->ctx, response, response_alloc_len + 1);
                 }
+#ifndef HU_IS_TEST
+                if (history_entries) {
+                    alloc->free(alloc->ctx, history_entries,
+                                history_count * sizeof(hu_channel_history_entry_t));
+                    history_entries = NULL;
+                    history_count = 0;
+                }
+#endif
             }
         }
 

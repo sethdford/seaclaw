@@ -82,7 +82,8 @@ bool hu_music_parse_suggestion(const char *suggestion, size_t suggestion_len, ch
 /** Scan conversation history for Spotify vs Apple Music URLs.
  *  Returns HU_MUSIC_SOURCE_SPOTIFY if user has shared more Spotify links,
  *  HU_MUSIC_SOURCE_ITUNES otherwise (default). */
-hu_music_source_t hu_music_detect_preference(const char (*texts)[512], size_t count);
+hu_music_source_t hu_music_detect_preference(const char *const *texts, const size_t *lens,
+                                              size_t count);
 
 /* ── Taste learning ──────────────────────────────────────────────────── */
 

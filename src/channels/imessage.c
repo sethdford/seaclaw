@@ -1536,6 +1536,63 @@ int hu_imessage_count_recent_gif_tapbacks(const char *contact_id, size_t contact
     return result;
 }
 
+int hu_imessage_count_recent_music_tapbacks(const char *contact_id, size_t contact_id_len) {
+    if (!contact_id || contact_id_len == 0)
+        return 0;
+
+    const char *home = getenv("HOME");
+    if (!home)
+        return 0;
+
+    char db_path[512];
+    int dp = snprintf(db_path, sizeof(db_path), "%s/Library/Messages/chat.db", home);
+    if (dp < 0 || (size_t)dp >= sizeof(db_path))
+        return 0;
+
+    sqlite3 *db = NULL;
+    if (sqlite3_open_v2(db_path, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+        if (db)
+            sqlite3_close(db);
+        return 0;
+    }
+
+    const char *sql =
+        "SELECT COUNT(*) FROM message m "
+        "WHERE m.is_from_me = 0 "
+        "  AND (m.associated_message_type BETWEEN 2000 AND 2004 "
+        "       OR m.associated_message_type = 2006) "
+        "  AND m.handle_id = (SELECT ROWID FROM handle WHERE id = ?1) "
+        "  AND m.date > (strftime('%s', 'now') - 86400) * 1000000000 - 978307200000000000 "
+        "  AND m.associated_message_guid IN ("
+        "    SELECT m2.guid FROM message m2 "
+        "    JOIN message_attachment_join maj ON maj.message_id = m2.ROWID "
+        "    JOIN attachment a ON maj.attachment_id = a.ROWID "
+        "    WHERE m2.is_from_me = 1 "
+        "      AND LOWER(a.filename) LIKE '%.m4a' "
+        "      AND m2.date > (strftime('%s', 'now') - 86400) * 1000000000 - 978307200000000000"
+        "  )";
+
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        sqlite3_close(db);
+        return 0;
+    }
+
+    char contact_buf[128];
+    size_t clen =
+        contact_id_len < sizeof(contact_buf) - 1 ? contact_id_len : sizeof(contact_buf) - 1;
+    memcpy(contact_buf, contact_id, clen);
+    contact_buf[clen] = '\0';
+    sqlite3_bind_text(stmt, 1, contact_buf, (int)clen, SQLITE_STATIC);
+
+    int cnt = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+        cnt = sqlite3_column_int(stmt, 0);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    return cnt;
+}
+
 int64_t hu_imessage_get_latest_sent_rowid(const char *handle, size_t handle_len) {
     if (!handle || handle_len == 0)
         return -1;
@@ -1704,6 +1761,12 @@ hu_error_t hu_imessage_build_tapback_context(hu_allocator_t *alloc, const char *
 }
 
 int hu_imessage_count_recent_gif_tapbacks(const char *contact_id, size_t contact_id_len) {
+    (void)contact_id;
+    (void)contact_id_len;
+    return 0;
+}
+
+int hu_imessage_count_recent_music_tapbacks(const char *contact_id, size_t contact_id_len) {
     (void)contact_id;
     (void)contact_id_len;
     return 0;
@@ -2875,6 +2938,7 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
 
 /* ── Tenor JSON fallback + GIF download (v2) ─────────────────────────── */
 
+#if HU_IS_TEST || defined(HU_HTTP_CURL)
 /* Simple JSON string extractor: find "key":"value" and return value.
  * Writes into out (up to cap). Returns length or 0 on failure. */
 static size_t gif_json_extract(const char *json, size_t json_len, const char *key, char *out,
@@ -2903,6 +2967,7 @@ static size_t gif_json_extract(const char *json, size_t json_len, const char *ke
     }
     return 0;
 }
+#endif /* HU_IS_TEST || HU_HTTP_CURL */
 
 #if HU_IS_TEST
 size_t hu_imessage_test_gif_json_extract(const char *json, size_t json_len, const char *key,

@@ -46,6 +46,16 @@ struct HTTPRequestParsingTests {
         #expect(req?.headers["content-type"] == "application/json")
         #expect(req?.headers["x-custom"] == "value")
     }
+
+    @Test("Request with no body")
+    func noBody() {
+        let raw = "DELETE /v1/models/abc HTTP/1.1\r\nHost: localhost\r\n\r\n"
+        let req = HTTPRequest.parse(Data(raw.utf8))
+        #expect(req != nil)
+        #expect(req?.method == "DELETE")
+        #expect(req?.path == "/v1/models/abc")
+        #expect(req?.body == nil || req?.body?.isEmpty == true)
+    }
 }
 
 @Suite("HTTPResponse")
@@ -74,22 +84,37 @@ struct HTTPResponseTests {
         #expect(header.contains("Content-Length:"))
         #expect(header.contains("HTTP/1.1 200 OK"))
     }
+
+    @Test("Not found response")
+    func notFound() {
+        let resp = HTTPResponse.notFound()
+        #expect(resp.statusCode == 404)
+    }
+
+    @Test("Method not allowed response")
+    func methodNotAllowed() {
+        let resp = HTTPResponse.methodNotAllowed()
+        #expect(resp.statusCode == 405)
+    }
 }
 
-@available(macOS 14.0, iOS 17.0, *)
 @Suite("OnDeviceServer")
 struct OnDeviceServerTests {
     @Test("Server initializes with default port")
     func defaultPort() {
-        let server = OnDeviceServer()
-        #expect(server.port == 11435)
-        #expect(server.baseURL == "http://127.0.0.1:11435/v1")
+        if #available(macOS 26.0, iOS 26.0, *) {
+            let server = OnDeviceServer()
+            #expect(server.port == 11435)
+            #expect(server.baseURL == "http://127.0.0.1:11435/v1")
+        }
     }
 
     @Test("Server initializes with custom port")
     func customPort() {
-        let server = OnDeviceServer(port: 9999)
-        #expect(server.port == 9999)
-        #expect(server.baseURL == "http://127.0.0.1:9999/v1")
+        if #available(macOS 26.0, iOS 26.0, *) {
+            let server = OnDeviceServer(port: 9999)
+            #expect(server.port == 9999)
+            #expect(server.baseURL == "http://127.0.0.1:9999/v1")
+        }
     }
 }

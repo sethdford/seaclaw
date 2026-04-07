@@ -555,7 +555,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
 
     /* Build frontier context for the streaming prompt (matching batch path) */
     bool had_humor_dir = false;
-    int humor_theory_saved = 0;
+    int humor_theory_saved = 0; (void)humor_theory_saved;
     char *somatic_ctx = NULL, *trust_ctx = NULL, *humor_dir = NULL;
     size_t somatic_ctx_len = 0, trust_ctx_len = 0, humor_dir_len = 0;
     char *syc_friction_ctx = NULL;

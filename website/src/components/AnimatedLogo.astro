@@ -58,10 +58,8 @@ const { size = 180, interactive = true } = Astro.props;
     inset: -60%;
     background: radial-gradient(
       circle,
-      var(
-        --hu-orb-glow,
-        color-mix(in srgb, var(--hu-accent) 25%, transparent)
-      ) 0%,
+      var(--hu-orb-glow, color-mix(in srgb, var(--hu-accent) 25%, transparent))
+        0%,
       transparent 70%
     );
     border-radius: 50%;

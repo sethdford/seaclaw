@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #if !defined(HU_IS_TEST)
 #include <time.h>
@@ -293,15 +294,18 @@ static bool ci_contains(const char *haystack, size_t hlen, const char *needle) {
     return false;
 }
 
-hu_music_source_t hu_music_detect_preference(const char (*texts)[512], size_t count) {
-    if (!texts || count == 0)
+hu_music_source_t hu_music_detect_preference(const char *const *texts, const size_t *lens,
+                                              size_t count) {
+    if (!texts || !lens || count == 0)
         return HU_MUSIC_SOURCE_ITUNES;
 
     int spotify_count = 0;
     int apple_count = 0;
 
     for (size_t i = 0; i < count; i++) {
-        size_t tlen = strlen(texts[i]);
+        if (!texts[i])
+            continue;
+        size_t tlen = lens[i];
         if (ci_contains(texts[i], tlen, "open.spotify.com") ||
             ci_contains(texts[i], tlen, "spotify.link"))
             spotify_count++;
@@ -318,7 +322,6 @@ typedef struct {
     char contact_id[128];
     char artists[HU_MUSIC_TASTE_HISTORY][64];
     char titles[HU_MUSIC_TASTE_HISTORY][128];
-    char genres[HU_MUSIC_TASTE_HISTORY][32];
     int sends;
     int reactions;
     int head; /* circular index */
@@ -464,6 +467,19 @@ size_t hu_music_taste_build_prompt(const char *contact_id, size_t cid_len, char 
 
 /* ── Taste persistence (JSON file) ────────────────────────────────────── */
 
+static void taste_write_escaped(FILE *f, const char *s) {
+    for (; *s; s++) {
+        if (*s == '"')
+            fputs("\\\"", f);
+        else if (*s == '\\')
+            fputs("\\\\", f);
+        else if ((unsigned char)*s < 0x20)
+            fprintf(f, "\\u%04x", (unsigned)*s);
+        else
+            fputc(*s, f);
+    }
+}
+
 hu_error_t hu_music_taste_save(const char *path, size_t path_len) {
     if (!path || path_len == 0 || s_taste_count == 0)
         return HU_ERR_INVALID_ARGUMENT;
@@ -475,19 +491,36 @@ hu_error_t hu_music_taste_save(const char *path, size_t path_len) {
     path_buf[path_len] = '\0';
 
     FILE *f = fopen(path_buf, "w");
-    if (!f)
-        return HU_ERR_IO;
+    if (!f) {
+        /* Try creating parent directory (e.g. ~/.human/) */
+        char *last_slash = strrchr(path_buf, '/');
+        if (last_slash && last_slash != path_buf) {
+            *last_slash = '\0';
+            (void)mkdir(path_buf, 0700);
+            *last_slash = '/';
+            f = fopen(path_buf, "w");
+        }
+        if (!f)
+            return HU_ERR_IO;
+    }
 
     fprintf(f, "[\n");
     for (int i = 0; i < s_taste_count; i++) {
         music_taste_entry_t *e = &s_taste[i];
-        fprintf(f, "  {\"contact\":\"%s\",\"sends\":%d,\"reactions\":%d,\"artists\":[",
-                e->contact_id, e->sends, e->reactions);
+        fprintf(f, "  {\"contact\":\"");
+        taste_write_escaped(f, e->contact_id);
+        fprintf(f, "\",\"sends\":%d,\"reactions\":%d,\"head\":%d,\"artists\":[",
+                e->sends, e->reactions, e->head);
         int total = e->head < HU_MUSIC_TASTE_HISTORY ? e->head : HU_MUSIC_TASTE_HISTORY;
+        bool first = true;
         for (int j = 0; j < total; j++) {
             int idx = (e->head - 1 - j + HU_MUSIC_TASTE_HISTORY * 2) % HU_MUSIC_TASTE_HISTORY;
-            if (e->artists[idx][0])
-                fprintf(f, "%s\"%s\"", j > 0 ? "," : "", e->artists[idx]);
+            if (e->artists[idx][0]) {
+                fprintf(f, "%s\"", first ? "" : ",");
+                taste_write_escaped(f, e->artists[idx]);
+                fputc('"', f);
+                first = false;
+            }
         }
         fprintf(f, "]}%s\n", i + 1 < s_taste_count ? "," : "");
     }
@@ -517,30 +550,67 @@ hu_error_t hu_music_taste_load(const char *path, size_t path_len) {
         return HU_ERR_NOT_FOUND;
     buf[n] = '\0';
 
-    /* Minimal JSON array parse: extract contact, sends, reactions */
     s_taste_count = 0;
     const char *p = buf;
     while ((p = strstr(p, "\"contact\":\"")) != NULL && s_taste_count < HU_MUSIC_TASTE_MAX_CONTACTS) {
-        p += 11; /* skip "contact":" */
+        p += 11;
         const char *end = strchr(p, '"');
         if (!end)
             break;
         music_taste_entry_t *e = &s_taste[s_taste_count];
         memset(e, 0, sizeof(*e));
         size_t cl = (size_t)(end - p);
-        if (cl >= 127)
-            cl = 127;
+        if (cl >= sizeof(e->contact_id) - 1)
+            cl = sizeof(e->contact_id) - 1;
         memcpy(e->contact_id, p, cl);
         e->contact_id[cl] = '\0';
         p = end + 1;
 
+        /* Find the closing brace for this entry to limit search scope */
+        const char *entry_end = strchr(p, '}');
+        if (!entry_end)
+            entry_end = buf + n;
+        size_t scope = (size_t)(entry_end - p);
+
         const char *sends = strstr(p, "\"sends\":");
-        if (sends && sends < p + 200)
+        if (sends && (size_t)(sends - p) < scope)
             e->sends = atoi(sends + 8);
         const char *reacts = strstr(p, "\"reactions\":");
-        if (reacts && reacts < p + 200)
+        if (reacts && (size_t)(reacts - p) < scope)
             e->reactions = atoi(reacts + 12);
+        const char *head_s = strstr(p, "\"head\":");
+        if (head_s && (size_t)(head_s - p) < scope)
+            e->head = atoi(head_s + 7);
 
+        /* Parse artists array */
+        const char *artists = strstr(p, "\"artists\":[");
+        if (artists && (size_t)(artists - p) < scope) {
+            const char *ap = artists + 11;
+            const char *arr_end = strchr(ap, ']');
+            if (!arr_end || arr_end > entry_end)
+                arr_end = entry_end;
+            int ai = 0;
+            while (ap < arr_end && ai < HU_MUSIC_TASTE_HISTORY) {
+                const char *q1 = strchr(ap, '"');
+                if (!q1 || q1 >= arr_end)
+                    break;
+                q1++;
+                const char *q2 = strchr(q1, '"');
+                if (!q2 || q2 >= arr_end)
+                    break;
+                size_t al = (size_t)(q2 - q1);
+                if (al >= sizeof(e->artists[0]) - 1)
+                    al = sizeof(e->artists[0]) - 1;
+                /* Save in reverse order (newest first in file) */
+                int slot = (e->head - 1 - ai + HU_MUSIC_TASTE_HISTORY * 2) % HU_MUSIC_TASTE_HISTORY;
+                memcpy(e->artists[slot], q1, al);
+                e->artists[slot][al] = '\0';
+                ai++;
+                ap = q2 + 1;
+            }
+        }
+
+        p = entry_end;
         s_taste_count++;
     }
 

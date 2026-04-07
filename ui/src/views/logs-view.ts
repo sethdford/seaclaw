@@ -623,7 +623,9 @@ export class ScLogsView extends GatewayAwareLitElement {
             @click=${this.togglePause}
             aria-label=${this._paused ? "Resume" : "Pause"}
           >
-            ${this._paused ? icons.play : icons.pause}<span class="btn-label"> ${this._paused ? "Resume" : "Pause"}</span>
+            ${this._paused ? icons.play : icons.pause}<span class="btn-label">
+              ${this._paused ? "Resume" : "Pause"}</span
+            >
           </hu-button>
           <hu-button variant="ghost" size="sm" @click=${this.clearLogs} aria-label="Clear all logs">
             ${icons.trash}<span class="btn-label"> Clear</span>

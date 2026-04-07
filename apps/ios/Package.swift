@@ -21,6 +21,7 @@ let package = Package(
                 .product(name: "HumanClient", package: "HumanKit"),
                 .product(name: "HumanChatUI", package: "HumanKit"),
                 .product(name: "HumanProtocol", package: "HumanKit"),
+                .product(name: "HumanOnDevice", package: "HumanKit"),
             ],
             path: "Sources/HumaniOS",
             exclude: ["Resources/Info.plist"],

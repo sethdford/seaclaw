@@ -298,40 +298,37 @@ static void test_music_parse_suggestion_only_whitespace(void) {
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 static void test_music_preference_default_itunes(void) {
-    HU_ASSERT_EQ(hu_music_detect_preference(NULL, 0),
+    HU_ASSERT_EQ(hu_music_detect_preference(NULL, NULL, 0),
                   (hu_music_source_t)HU_MUSIC_SOURCE_ITUNES);
 }
 
 static void test_music_preference_spotify_wins(void) {
-    char texts[4][512];
-    memset(texts, 0, sizeof(texts));
-    snprintf(texts[0], 512, "check this out https://open.spotify.com/track/abc");
-    snprintf(texts[1], 512, "nice");
-    snprintf(texts[2], 512, "https://open.spotify.com/track/def");
-    snprintf(texts[3], 512, "love it https://music.apple.com/us/album/xyz");
-
-    HU_ASSERT_EQ(hu_music_detect_preference(texts, 4),
+    const char *t[] = {
+        "check this out https://open.spotify.com/track/abc",
+        "nice",
+        "https://open.spotify.com/track/def",
+        "love it https://music.apple.com/us/album/xyz",
+    };
+    size_t l[] = {49, 4, 38, 45};
+    HU_ASSERT_EQ(hu_music_detect_preference(t, l, 4),
                   (hu_music_source_t)HU_MUSIC_SOURCE_SPOTIFY);
 }
 
 static void test_music_preference_apple_wins(void) {
-    char texts[3][512];
-    memset(texts, 0, sizeof(texts));
-    snprintf(texts[0], 512, "https://music.apple.com/us/album/one");
-    snprintf(texts[1], 512, "https://music.apple.com/us/album/two");
-    snprintf(texts[2], 512, "https://open.spotify.com/track/abc");
-
-    HU_ASSERT_EQ(hu_music_detect_preference(texts, 3),
+    const char *t[] = {
+        "https://music.apple.com/us/album/one",
+        "https://music.apple.com/us/album/two",
+        "https://open.spotify.com/track/abc",
+    };
+    size_t l[] = {36, 36, 34};
+    HU_ASSERT_EQ(hu_music_detect_preference(t, l, 3),
                   (hu_music_source_t)HU_MUSIC_SOURCE_ITUNES);
 }
 
 static void test_music_preference_no_urls(void) {
-    char texts[2][512];
-    memset(texts, 0, sizeof(texts));
-    snprintf(texts[0], 512, "hey whats up");
-    snprintf(texts[1], 512, "not much");
-
-    HU_ASSERT_EQ(hu_music_detect_preference(texts, 2),
+    const char *t[] = {"hey whats up", "not much"};
+    size_t l[] = {12, 8};
+    HU_ASSERT_EQ(hu_music_detect_preference(t, l, 2),
                   (hu_music_source_t)HU_MUSIC_SOURCE_ITUNES);
 }
 
@@ -388,9 +385,34 @@ static void test_music_taste_save_and_load(void) {
     size_t path_len = strlen(path);
     HU_ASSERT_EQ(hu_music_taste_save(path, path_len), HU_OK);
 
-    /* Verify file exists by loading into a separate state */
-    hu_music_taste_record_send("+15559999999", 12, "Other", "Song");
+    /* Load replaces in-memory state; verify artists roundtrip */
     HU_ASSERT_EQ(hu_music_taste_load(path, path_len), HU_OK);
+
+    /* After load, the prompt should still contain the saved artists */
+    char prompt[256];
+    size_t pl = hu_music_taste_build_prompt("+15551234567", 12, prompt, sizeof(prompt));
+    HU_ASSERT(pl > 0);
+    HU_ASSERT(strstr(prompt, "Radiohead") != NULL || strstr(prompt, "Nirvana") != NULL);
+
+    /* Hit rate should survive: 1 reaction / 2 sends = 0.5 */
+    float rate = hu_music_taste_hit_rate("+15551234567", 12);
+    HU_ASSERT(rate > 0.4f && rate < 0.6f);
+
+    (void)unlink(path);
+}
+
+static void test_music_taste_save_escaped_json(void) {
+    hu_music_taste_record_send("+15559876543", 12, "Guns N' Roses", "Sweet Child O' Mine");
+    hu_music_taste_record_send("+15559876543", 12, "AC/DC", "Back In \"Black\"");
+
+    const char *path = "/tmp/hu_test_taste_esc.json";
+    size_t path_len = strlen(path);
+    HU_ASSERT_EQ(hu_music_taste_save(path, path_len), HU_OK);
+    HU_ASSERT_EQ(hu_music_taste_load(path, path_len), HU_OK);
+
+    char prompt[256];
+    size_t pl = hu_music_taste_build_prompt("+15559876543", 12, prompt, sizeof(prompt));
+    HU_ASSERT(pl > 0);
 
     (void)unlink(path);
 }
@@ -505,6 +527,7 @@ void run_music_tests(void) {
 
     /* Taste persistence */
     HU_RUN_TEST(test_music_taste_save_and_load);
+    HU_RUN_TEST(test_music_taste_save_escaped_json);
     HU_RUN_TEST(test_music_taste_save_null_args);
     HU_RUN_TEST(test_music_taste_load_missing_file);
 

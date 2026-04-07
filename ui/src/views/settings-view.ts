@@ -358,7 +358,10 @@ export class ScSettingsView extends LitElement {
     return html`
       <div class="header-area">
         <hu-page-hero>
-          <hu-section-header heading="Settings" description="Configure your h-uman instance"></hu-section-header>
+          <hu-section-header
+            heading="Settings"
+            description="Configure your h-uman instance"
+          ></hu-section-header>
         </hu-page-hero>
       </div>
 
