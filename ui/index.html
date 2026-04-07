@@ -6,19 +6,13 @@
     <meta name="description" content="h-uman Control — not quite human. AI assistant dashboard." />
     <meta name="theme-color" content="#0c0c0c" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
-    <link rel="preload" href="https://fonts.gstatic.com/s/inter/v18/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2JL7SUc.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="prefetch" href="https://fonts.gstatic.com/s/inter/v18/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2JL7SUc.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="icon" type="image/svg+xml" href="/src/assets/logo.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>h-uman Control</title>
   </head>
   <body class="hu-film-grain">
     <a href="#main-content" class="skip-link">Skip to main content</a>
-    <div
-      id="main-content"
-      tabindex="-1"
-      style="position: absolute; left: -9999px; width: 1px; height: 1px"
-      aria-hidden="true"
-    ></div>
     <svg class="hu-glass-refraction-svg" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <filter id="hu-refract" x="-10%" y="-10%" width="120%" height="120%"
@@ -40,7 +34,7 @@
         </filter>
       </defs>
     </svg>
-    <hu-app></hu-app>
+    <hu-app id="main-content" tabindex="-1"></hu-app>
     <script type="module" src="/src/main.ts"></script>
     <script>
       if ("serviceWorker" in navigator) {

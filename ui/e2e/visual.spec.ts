@@ -19,7 +19,7 @@ function snapshotExists(testInfo: { snapshotDir: string }, name: string): boolea
 }
 
 const ALL_VIEWS = [
-  { name: "overview", hash: "" },
+  { name: "overview", hash: "#overview" },
   { name: "chat", hash: "#chat" },
   { name: "agents", hash: "#agents" },
   { name: "models", hash: "#models" },

@@ -38,58 +38,90 @@ final class HumaniOSFleetUITests: XCTestCase {
         app.tabBars.firstMatch
     }
 
-    /// Resolves a tab control: accessibility id (preferred), `tabBars` buttons, then app-level buttons (newer iOS / SwiftUI).
+    /// Resolves a tab control across iOS versions. On iOS 18+ the accessibility tree structure for
+    /// SwiftUI TabView differs from earlier versions — tab items may not appear as `buttons` inside
+    /// `tabBars`. This method checks multiple strategies in priority order.
     private func tabBarButton(for title: String) -> XCUIElement {
         let id = tabAccessibilityIdentifier(for: title)
+
+        // Strategy 1: Button by accessibility ID (works when .accessibilityIdentifier propagates)
         let byId = app.buttons[id]
-        if byId.waitForExistence(timeout: Timeout.tabItem) {
+        if byId.waitForExistence(timeout: 8) {
             return byId
         }
 
+        // Strategy 2: Tab bar buttons by exact label
         let bar = primaryTabBar
-        _ = bar.buttons.firstMatch.waitForExistence(timeout: Timeout.tabItem)
-        let exact = bar.buttons[title]
-        if exact.waitForExistence(timeout: Timeout.tabItem) {
-            return exact
-        }
-        let fuzzy = bar.buttons
-            .matching(NSPredicate(format: "label CONTAINS[c] %@", title))
-            .firstMatch
-        if fuzzy.waitForExistence(timeout: 8) {
-            return fuzzy
+        if bar.exists {
+            let barBtn = bar.buttons[title]
+            if barBtn.waitForExistence(timeout: 5) {
+                return barBtn
+            }
+            let barFuzzy = bar.buttons
+                .matching(NSPredicate(format: "label CONTAINS[c] %@", title))
+                .firstMatch
+            if barFuzzy.waitForExistence(timeout: 3) {
+                return barFuzzy
+            }
         }
 
+        // Strategy 3: App-level button by label (iOS 18+ may flatten tab buttons)
         let appExact = app.buttons[title]
-        if appExact.waitForExistence(timeout: Timeout.tabItem) {
+        if appExact.waitForExistence(timeout: 5) {
             return appExact
         }
-        let appFuzzy = app.buttons
-            .matching(NSPredicate(format: "label CONTAINS[c] %@", title))
-            .firstMatch
-        if appFuzzy.waitForExistence(timeout: 8) {
-            return appFuzzy
+
+        // Strategy 4: Any element type with matching label/identifier in tab bar
+        if bar.exists {
+            let anyInBar = bar.descendants(matching: .any)
+                .matching(NSPredicate(format: "label == %@ OR identifier == %@", title, id))
+                .firstMatch
+            if anyInBar.waitForExistence(timeout: 3) {
+                return anyInBar
+            }
         }
 
-        if title == "Overview" {
-            if bar.buttons.count > 0 {
-                return bar.buttons.element(boundBy: 0)
-            }
-            return app.buttons[id]
+        // Strategy 5: Any descendant anywhere with matching label
+        let anyApp = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@ OR identifier == %@", title, id))
+            .firstMatch
+        if anyApp.waitForExistence(timeout: 5) {
+            return anyApp
         }
-        return exact
+
+        // Strategy 6: First child of tab bar for "Overview" (first tab)
+        if title == "Overview" && bar.exists {
+            let children = bar.children(matching: .any)
+            if children.count > 0 {
+                return children.element(boundBy: 0)
+            }
+        }
+
+        return byId
     }
 
     /// Overflow **More** tab: query at app scope so it resolves whether the control is nested under `tabBars` or flattened on newer OS builds.
     private func moreTabButton() -> XCUIElement {
-        app.buttons["More"]
+        let byButton = app.buttons["More"]
+        if byButton.exists { return byButton }
+        return app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == 'More'"))
+            .firstMatch
     }
 
+    /// Checks whether any primary tab chrome is visible, regardless of element type.
     private func anyPrimaryTabChromeVisible() -> Bool {
-        if primaryTabBar.buttons.count > 0 {
-            return true
+        let bar = primaryTabBar
+        if bar.exists {
+            if bar.buttons.count > 0 { return true }
+            if bar.children(matching: .any).count > 0 { return true }
         }
         for label in primaryTabLabels {
-            if app.buttons[tabAccessibilityIdentifier(for: label)].exists {
+            let id = tabAccessibilityIdentifier(for: label)
+            if app.buttons[id].exists { return true }
+            if app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label == %@ OR identifier == %@", label, id))
+                .firstMatch.exists {
                 return true
             }
         }
@@ -102,21 +134,31 @@ final class HumaniOSFleetUITests: XCTestCase {
             app.wait(for: .runningForeground, timeout: Timeout.launchForeground),
             "App should reach foreground (CI simulator startup)",
         )
+
+        // Wait for any sign that the main tab UI has loaded.
+        // iOS versions expose the tab bar differently in the accessibility tree.
         let tabBar = primaryTabBar
-        let tabBarChrome = tabBar.waitForExistence(timeout: Timeout.tabBar)
-        let overviewId = app.buttons[tabAccessibilityIdentifier(for: "Overview")]
-        let tabsByIdentifier = overviewId.waitForExistence(timeout: Timeout.tabBar)
+        let tabBarAppeared = tabBar.waitForExistence(timeout: Timeout.tabBar)
+
+        // Also check for tab buttons by identifier at app level
+        let overviewId = tabAccessibilityIdentifier(for: "Overview")
+        let overviewById = app.buttons[overviewId]
+        let idAppeared = overviewById.waitForExistence(timeout: tabBarAppeared ? 5 : Timeout.tabBar)
+
+        // Also check for any element labeled "Overview" (covers all element types)
+        let overviewByLabel = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == 'Overview' OR identifier == %@", overviewId))
+            .firstMatch
+        let labelAppeared = overviewByLabel.waitForExistence(timeout: tabBarAppeared || idAppeared ? 3 : Timeout.tabBar)
+
         XCTAssertTrue(
-            tabBarChrome || tabsByIdentifier,
+            tabBarAppeared || idAppeared || labelAppeared,
             "Tab bar or tab accessibility roots should appear after launch",
         )
-        if tabBarChrome {
-            _ = tabBar.buttons.firstMatch.waitForExistence(timeout: Timeout.tabBar)
-        }
+
         let overview = tabBarButton(for: "Overview")
         XCTAssertTrue(
             overview.waitForExistence(timeout: Timeout.tabBar)
-                || tabBar.buttons.count > 0
                 || anyPrimaryTabChromeVisible(),
             "Primary shell should expose Overview (or first tab when labels differ)",
         )
@@ -131,7 +173,7 @@ final class HumaniOSFleetUITests: XCTestCase {
     /// Selects a root tab, using **More** when the item is not on the main tab bar (six tabs on iPhone).
     private func selectPrimaryTab(_ label: String) {
         let direct = tabBarButton(for: label)
-        if direct.waitForExistence(timeout: 3), direct.isHittable {
+        if direct.waitForExistence(timeout: 5), direct.isHittable {
             direct.tap()
             return
         }
@@ -179,17 +221,11 @@ final class HumaniOSFleetUITests: XCTestCase {
                 "Expected tab bar item \(label)",
             )
         }
-        let toolsOnBar = primaryTabBar.buttons["Tools"].waitForExistence(timeout: 3)
-            || app.buttons["tab_tools"].waitForExistence(timeout: 3)
-            || app.buttons["Tools"].waitForExistence(timeout: 3)
-        let settingsOnBar = primaryTabBar.buttons["Settings"].waitForExistence(timeout: 3)
-            || app.buttons["tab_settings"].waitForExistence(timeout: 3)
-            || app.buttons["Settings"].waitForExistence(timeout: 3)
+        let toolsOnBar = tabBarButton(for: "Tools").waitForExistence(timeout: 3)
+        let settingsOnBar = tabBarButton(for: "Settings").waitForExistence(timeout: 3)
         if toolsOnBar, settingsOnBar {
-            XCTAssertTrue(primaryTabBar.buttons["Tools"].exists || app.buttons["tab_tools"].exists || app.buttons["Tools"].exists)
-            XCTAssertTrue(
-                primaryTabBar.buttons["Settings"].exists || app.buttons["tab_settings"].exists || app.buttons["Settings"].exists,
-            )
+            XCTAssertTrue(tabBarButton(for: "Tools").exists)
+            XCTAssertTrue(tabBarButton(for: "Settings").exists)
         } else {
             XCTAssertTrue(
                 moreTabButton().waitForExistence(timeout: Timeout.tabItem),

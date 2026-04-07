@@ -26,6 +26,7 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     expect: { timeout: 10000 },
+    serviceWorkers: "block",
   },
   projects: [
     {

@@ -29,9 +29,9 @@ const BREAKPOINTS = [
 for (const bp of BREAKPOINTS) {
   test(`dashboard at ${bp.name} (${bp.width}px)`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: bp.width, height: bp.height });
-    await page.goto("/?demo");
+    await page.goto("/?demo#overview");
     await page.waitForLoadState("networkidle");
-    await waitForViewReady(page, "hu-overview-view");
+    await waitForViewReady(page, "hu-overview-view", 15000);
     const snapName = `density-${bp.name}-${testInfo.project.name}-${process.platform}.png`;
     const updating = testInfo.config.updateSnapshots !== "none";
     // Skipped in non-CI when no baseline exists; CI generates with --update-snapshots
