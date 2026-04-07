@@ -2460,7 +2460,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             }
         }
         hu_physical_state_t f1_physical = HU_PHYSICAL_NORMAL;
-#ifndef HU_IS_TEST
+#if !defined(HU_IS_TEST) && defined(HU_ENABLE_PERSONA) && HU_ENABLE_PERSONA
         {
             time_t f1_now = time(NULL);
             struct tm f1_lt;

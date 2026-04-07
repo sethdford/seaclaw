@@ -48,7 +48,7 @@ Add to `~/.human/config.json` under `channels.imessage`:
 
 ### Outbound (send)
 
-- **With `use_imsg_cli`**: Sends via `imsg send --to TARGET --text MESSAGE --service imessage` (<1s). Attachments via `imsg send --file`. Falls back to AppleScript on failure.
+- **With `use_imsg_cli`**: Sends via `imsg send --to TARGET --text MESSAGE --service imessage` (&lt;1s). Attachments via `imsg send --file`. Falls back to AppleScript on failure.
 - **Without `use_imsg_cli`**: Uses `osascript -e` to run AppleScript: `tell application "Messages" to send "MESSAGE" to buddy "TARGET"`
 - Escapes quotes and backslashes in the message text for AppleScript fallback
 - If a message provides an explicit target, that is used; otherwise `default_target` is used

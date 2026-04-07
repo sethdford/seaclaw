@@ -82,7 +82,7 @@ struct MemoryView: View {
         if let err = viewModel.errorMessage {
             VStack(spacing: HUTokens.spaceMd) {
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: HUTokens.text3xl))
+                    .font(.system(size: HUTokens.textXl * 1.5))
                     .foregroundStyle(tokens.textMuted)
                 Text("Could not load memories")
                     .font(.custom("Avenir-Medium", size: HUTokens.textLg, relativeTo: .body))
