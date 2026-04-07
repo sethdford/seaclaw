@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "HumanProtocol", targets: ["HumanProtocol"]),
         .library(name: "HumanClient", targets: ["HumanClient"]),
         .library(name: "HumanChatUI", targets: ["HumanChatUI"]),
+        .library(name: "HumanOnDevice", targets: ["HumanOnDevice"]),
     ],
     targets: [
         .target(
@@ -27,6 +28,10 @@ let package = Package(
             dependencies: ["HumanProtocol"],
             path: "Sources/HumanChatUI"
         ),
+        .target(
+            name: "HumanOnDevice",
+            path: "Sources/HumanOnDevice"
+        ),
         .testTarget(
             name: "HumanProtocolTests",
             dependencies: ["HumanProtocol"],
@@ -41,6 +46,11 @@ let package = Package(
             name: "HumanChatUITests",
             dependencies: ["HumanChatUI"],
             path: "Tests/HumanChatUITests"
+        ),
+        .testTarget(
+            name: "HumanOnDeviceTests",
+            dependencies: ["HumanOnDevice"],
+            path: "Tests/HumanOnDeviceTests"
         ),
     ]
 )

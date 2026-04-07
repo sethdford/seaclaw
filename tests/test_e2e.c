@@ -1,4 +1,5 @@
 #include "human/agent.h"
+#include "human/agent/model_router.h"
 #include "human/config.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
@@ -532,6 +533,10 @@ static void test_agent_turn_stream_v2_with_tools(void) {
         hu_agent_from_config(&agent, &alloc, prov, &tool, 1, NULL, NULL, NULL, NULL, "gpt-4", 5,
                              "openai", 6, 0.7, ".", 1, 25, 50, false, 0, NULL, 0, NULL, 0, NULL);
     HU_ASSERT_EQ(err, HU_OK);
+    /* Force turn_model and tier so the model router is bypassed and tools are included */
+    agent.turn_model = "gpt-4";
+    agent.turn_model_len = 5;
+    agent.turn_tier = HU_TIER_ANALYTICAL;
 
     stream_v2_event_collector_t coll;
     memset(&coll, 0, sizeof(coll));
@@ -831,7 +836,11 @@ static void test_config_defaults(void) {
 
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(cfg.default_provider);
+#if defined(__APPLE__) && defined(HU_ENABLE_APPLE_INTELLIGENCE)
+    HU_ASSERT_STR_EQ(cfg.default_provider, "apple");
+#else
     HU_ASSERT_STR_EQ(cfg.default_provider, "gemini");
+#endif
     HU_ASSERT_FLOAT_EQ(cfg.default_temperature, 0.7, 0.001);
     HU_ASSERT_NOT_NULL(cfg.gateway_host);
     HU_ASSERT_EQ(cfg.gateway_port, 3000);

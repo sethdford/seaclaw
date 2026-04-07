@@ -67,29 +67,26 @@ static hu_error_t paperclip_execute(void *raw_ctx, hu_allocator_t *alloc,
             return HU_OK;
         }
 
-        char *buf = (char *)alloc->alloc(alloc->ctx, 4096);
-        if (!buf) {
-            hu_paperclip_task_list_free(alloc, &list);
-            return HU_ERR_OUT_OF_MEMORY;
-        }
+        char tmp[4096];
         size_t pos = 0;
-        const size_t cap = 4096;
-        pos = hu_buf_appendf(buf, cap, pos, "Found %zu task(s):\n", list.count);
+        const size_t cap = sizeof(tmp);
+        pos = hu_buf_appendf(tmp, cap, pos, "Found %zu task(s):\n", list.count);
         if (pos >= cap)
             pos = cap - 1;
         for (size_t i = 0; i < list.count && pos < 3900; i++) {
-            pos = hu_buf_appendf(buf, cap, pos, "- [%s] %s (status: %s)\n",
+            pos = hu_buf_appendf(tmp, cap, pos, "- [%s] %s (status: %s)\n",
                                  list.tasks[i].id ? list.tasks[i].id : "?",
                                  list.tasks[i].title ? list.tasks[i].title : "(untitled)",
                                  list.tasks[i].status ? list.tasks[i].status : "?");
             if (pos >= cap)
                 pos = cap - 1;
         }
+        tmp[pos] = '\0';
         out->success = true;
-        out->output = buf;
-        out->output_len = pos;
+        out->output = hu_strdup(alloc, tmp);
+        out->output_len = out->output ? pos : 0;
         hu_paperclip_task_list_free(alloc, &list);
-        return HU_OK;
+        return out->output ? HU_OK : HU_ERR_OUT_OF_MEMORY;
     }
 
     if (strcmp(action, "update_status") == 0) {
@@ -154,36 +151,33 @@ static hu_error_t paperclip_execute(void *raw_ctx, hu_allocator_t *alloc,
             out->output_len = out->output ? strlen(out->output) : 0;
             return HU_OK;
         }
-        char *buf = (char *)alloc->alloc(alloc->ctx, 2048);
-        if (!buf) {
-            hu_paperclip_task_free(alloc, &t);
-            return HU_ERR_OUT_OF_MEMORY;
-        }
+        char tmp[2048];
         size_t pos = 0;
-        const size_t cap = 2048;
-        pos = hu_buf_appendf(buf, cap, pos, "Task: %s\n", t.title ? t.title : "?");
+        const size_t cap = sizeof(tmp);
+        pos = hu_buf_appendf(tmp, cap, pos, "Task: %s\n", t.title ? t.title : "?");
         if (pos >= cap)
             pos = cap - 1;
         if (t.status) {
-            pos = hu_buf_appendf(buf, cap, pos, "Status: %s\n", t.status);
+            pos = hu_buf_appendf(tmp, cap, pos, "Status: %s\n", t.status);
             if (pos >= cap)
                 pos = cap - 1;
         }
         if (t.priority) {
-            pos = hu_buf_appendf(buf, cap, pos, "Priority: %s\n", t.priority);
+            pos = hu_buf_appendf(tmp, cap, pos, "Priority: %s\n", t.priority);
             if (pos >= cap)
                 pos = cap - 1;
         }
         if (t.description) {
-            pos = hu_buf_appendf(buf, cap, pos, "Description:\n%s\n", t.description);
+            pos = hu_buf_appendf(tmp, cap, pos, "Description:\n%s\n", t.description);
             if (pos >= cap)
                 pos = cap - 1;
         }
+        tmp[pos] = '\0';
         out->success = true;
-        out->output = buf;
-        out->output_len = pos;
+        out->output = hu_strdup(alloc, tmp);
+        out->output_len = out->output ? pos : 0;
         hu_paperclip_task_free(alloc, &t);
-        return HU_OK;
+        return out->output ? HU_OK : HU_ERR_OUT_OF_MEMORY;
     }
 
     return HU_OK;

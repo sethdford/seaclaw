@@ -560,6 +560,8 @@ hu_error_t cp_admin_models_list(hu_allocator_t *alloc, hu_app_context_t *app, hu
         for (size_t i = 0; i < app->config->providers_len; i++) {
             hu_provider_entry_t *pe = &app->config->providers[i];
             hu_json_value_t *p = hu_json_object_new(alloc);
+            if (!p)
+                continue;
             cp_json_set_str(alloc, p, "name", pe->name);
             hu_json_object_set(alloc, p, "has_key",
                                hu_json_bool_new(alloc, pe->api_key && pe->api_key[0]));

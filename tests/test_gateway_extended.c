@@ -1220,10 +1220,24 @@ static void test_rpc_models_decisions_returns_valid_json(void) {
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(out_len > 0);
-    HU_ASSERT_TRUE(strstr(out, "\"decisions\"") != NULL);
-    HU_ASSERT_TRUE(strstr(out, "\"total\"") != NULL);
-    HU_ASSERT_TRUE(strstr(out, "\"tier_distribution\"") != NULL);
-    HU_ASSERT_TRUE(strstr(out, "\"conversational\"") != NULL);
+
+    /* Structural: top-level keys */
+    HU_ASSERT_STR_CONTAINS(out, "\"decisions\"");
+    HU_ASSERT_STR_CONTAINS(out, "\"total\"");
+    HU_ASSERT_STR_CONTAINS(out, "\"tier_distribution\"");
+
+    /* Seeded entry fields: tier, source, model from the seed above */
+    HU_ASSERT_STR_CONTAINS(out, "\"conversational\"");
+    HU_ASSERT_STR_CONTAINS(out, "\"heuristic\"");
+    HU_ASSERT_STR_CONTAINS(out, "\"gemini-3-flash-preview\"");
+    HU_ASSERT_STR_CONTAINS(out, "\"heuristic_score\"");
+    HU_ASSERT_STR_CONTAINS(out, "\"timestamp\"");
+
+    /* All four tier_distribution keys present */
+    HU_ASSERT_STR_CONTAINS(out, "\"reflexive\"");
+    HU_ASSERT_STR_CONTAINS(out, "\"analytical\"");
+    HU_ASSERT_STR_CONTAINS(out, "\"deep\"");
+
     alloc.free(alloc.ctx, out, out_len + 1);
 }
 

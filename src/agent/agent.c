@@ -1,5 +1,6 @@
 #include "human/core/log.h"
 #include "human/agent.h"
+#include "human/agent/humanness.h"
 #include "human/config.h"
 #include "human/agent/awareness.h"
 #include "human/agent/commitment_store.h"
@@ -829,6 +830,7 @@ void hu_agent_set_voice_config(hu_agent_t *agent, hu_voice_config_t *voice_cfg) 
 void hu_agent_deinit(hu_agent_t *agent) {
     if (!agent)
         return;
+    hu_agent_free_turn_context(agent);
     if (agent->mailbox) {
         uint64_t id = agent->agent_id ? agent->agent_id : (uint64_t)(uintptr_t)agent;
         (void)hu_mailbox_unregister(agent->mailbox, id);

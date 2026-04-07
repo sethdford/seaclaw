@@ -25,6 +25,8 @@ targets:
         product: HumanChatUI
       - package: HumanKit
         product: HumanProtocol
+      - package: HumanKit
+        product: HumanOnDevice
       - target: HumanWidgetExtension
         embed: true
     settings:

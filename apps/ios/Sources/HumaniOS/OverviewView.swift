@@ -43,7 +43,9 @@ struct OverviewView: View {
     }
 
     private var overviewStatusText: String {
-        if !connectionManager.isConnected { return "Disconnected" }
+        if !connectionManager.isConnected {
+            return connectionManager.onDeviceAvailable ? "On-Device" : "Disconnected"
+        }
         switch connectionManager.healthStatus {
         case .healthy: return "Connected"
         case .degraded: return "Degraded"

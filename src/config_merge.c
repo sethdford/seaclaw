@@ -94,7 +94,7 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     cfg->default_temperature = 0.7;
     cfg->temperature = 0.7;
     cfg->max_tokens = 0;
-    cfg->memory_backend = hu_strdup(a, "markdown");
+    cfg->memory_backend = hu_strdup(a, "sqlite");
     if (!cfg->memory_backend) {
         set_defaults_rollback(cfg, a);
         return;
@@ -229,7 +229,7 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
         set_defaults_rollback(cfg, a);
         return;
     }
-    cfg->memory.backend = hu_strdup(a, "markdown");
+    cfg->memory.backend = hu_strdup(a, "sqlite");
     if (!cfg->memory.backend) {
         set_defaults_rollback(cfg, a);
         return;
@@ -671,6 +671,10 @@ void hu_config_apply_env_overrides(hu_config_t *cfg) {
             cfg->security.autonomy_level = (uint8_t)al;
         sync_autonomy_string_from_level(cfg, a);
     }
+
+    v = getenv("HUMAN_PERSONA");
+    if (v)
+        hu_config_apply_env_str(a, &cfg->agent.persona, v);
 
     v = getenv("HUMAN_METACOGNITION");
     if (v) {

@@ -58,6 +58,9 @@ static void nostr_stop(void *ctx) {
         c->running = false;
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((unused))
+#endif
 static bool nostr_is_shell_safe(const char *s) {
     if (!s)
         return false;

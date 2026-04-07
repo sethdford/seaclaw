@@ -1,5 +1,6 @@
 import Foundation
 import HumanClient
+import HumanOnDevice
 import HumanProtocol
 
 // MARK: - RPC Data Types
@@ -69,6 +70,12 @@ public final class ConnectionManager: ObservableObject {
     private var connection: HumanConnection?
     private var eventHandlerStorage: ((String, [String: AnyCodable]?) -> Void)?
     private let queue = DispatchQueue(label: "com.human.connectionManager")
+
+    /// On-device Apple Intelligence adapter for offline/fallback inference.
+    public let onDevice = OnDeviceChatAdapter()
+
+    /// Whether on-device Apple Intelligence inference is available on this device.
+    public var onDeviceAvailable: Bool { onDevice.isAvailable }
 
     public init() {
         self.gatewayURL = UserDefaults.standard.string(forKey: "Human.gatewayURL")
@@ -165,6 +172,28 @@ public final class ConnectionManager: ObservableObject {
                 handler(event, payload)
             }
             self.connection?.eventHandler = self.eventHandlerStorage
+        }
+    }
+
+    // MARK: - On-Device Fallback
+
+    /// Send a message using on-device Apple Intelligence when the gateway is disconnected.
+    /// Returns nil if on-device inference is not available.
+    public func chatOnDevice(message: String, systemPrompt: String? = nil) async -> String? {
+        guard onDeviceAvailable else { return nil }
+        guard onDevice.fitsInContext(message) else { return nil }
+
+        var messages: [OnDeviceChatAdapter.ChatMessage] = []
+        if let systemPrompt {
+            messages.append(.init(role: .system, content: systemPrompt))
+        }
+        messages.append(.init(role: .user, content: message))
+
+        do {
+            let response = try await onDevice.chat(messages: messages)
+            return response.content
+        } catch {
+            return nil
         }
     }
 

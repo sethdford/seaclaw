@@ -19,6 +19,7 @@
         "HU_ENABLE_UPDATE": "ON",
         "HU_ENABLE_ML": "ON",
         "HU_ENABLE_EMBEDDED_MODEL": "ON",
+        "HU_ENABLE_APPLE_INTELLIGENCE": "ON",
         "HU_ENABLE_CARTESIA": "ON",
         "HU_ENABLE_CRON": "ON",
         "HU_ENABLE_TOOLS_ADVANCED": "ON"

@@ -1,5 +1,6 @@
 /* Core turn execution: hu_agent_turn and turn-local helpers */
 #include "agent_internal.h"
+#include "human/agent/humanness.h"
 #include "human/config.h"
 #include "human/core/string.h"
 #include "human/data/loader.h"
@@ -577,6 +578,10 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         hu_log_info("agent_turn", NULL, "ENTER agent_turn msg_len=%zu", msg_len);
 
     hu_agent_set_current_for_tools(agent);
+
+    /* Free any previously-built humanness context, then build fresh for this turn */
+    hu_agent_free_turn_context(agent);
+    hu_agent_build_turn_context(agent);
 
     /* Speculative cache: check for pre-computed response */
     if (agent->infra.speculative_cache) {
@@ -3975,6 +3980,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
         } else {
             /* Inline routing: emotional/vulnerable messages get better models */
             hu_model_router_config_t mr_cfg = hu_model_router_default_config();
+            mr_cfg.on_device_available = agent->on_device_available;
             const char *rel = NULL;
             size_t rel_len = 0;
 #ifdef HU_HAS_PERSONA
@@ -4943,6 +4949,7 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
             hu_agent_clear_current_for_tools();
 #ifdef HU_HAS_PERSONA
             hu_relationship_update(&agent->relationship, 1);
+            hu_agent_update_voice_profile(agent, msg, msg_len);
 #endif
             if (acp_context)
                 agent->alloc->free(agent->alloc->ctx, acp_context, acp_context_len + 1);

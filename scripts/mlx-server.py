@@ -46,17 +46,39 @@ prompt_cache_state = None
 STOP_STRINGS = ("<end_of_turn>", "<eos>")
 
 
-def load_model(model_name):
-    global model, processor, config, model_id
+adapter_path_global = None
+
+def load_model(model_name, adapter_path=None):
+    global model, processor, config, model_id, adapter_path_global
     from mlx_vlm import load as vlm_load
     from mlx_vlm.utils import load_config as vlm_load_config
 
-    print(f"Loading {model_name}...", flush=True)
+    adapter_path_global = adapter_path
+    label = model_name
+    if adapter_path:
+        label += f" + LoRA adapter ({adapter_path})"
+    print(f"Loading {label}...", flush=True)
     t0 = time.time()
-    model, processor = vlm_load(model_name)
+
+    if adapter_path:
+        # Load base model without adapter first, then apply mlx_lm-trained adapter
+        model, processor = vlm_load(model_name)
+        import mlx.core as mx
+        from pathlib import Path
+        adapter_file = Path(adapter_path) / "adapters.safetensors"
+        if adapter_file.exists():
+            import mlx.nn as nn
+            adapters = list(mx.load(str(adapter_file)).items())
+            model.load_weights(adapters, strict=False)
+            print(f"  Applied {len(adapters)} LoRA weight tensors from {adapter_file}", flush=True)
+    else:
+        model, processor = vlm_load(model_name)
+
     config = vlm_load_config(model_name)
     model_id = model_name.split("/")[-1] if "/" in model_name else model_name
-    print(f"Model loaded in {time.time() - t0:.1f}s — ready to serve", flush=True)
+    elapsed = time.time() - t0
+    adapter_tag = " (with LoRA adapter)" if adapter_path else ""
+    print(f"Model loaded in {elapsed:.1f}s{adapter_tag} — ready to serve", flush=True)
 
 
 def _extract_content(content):
@@ -216,6 +238,8 @@ class ChatHandler(BaseHTTPRequestHandler):
                 cache_info["kv_quant_scheme"] = kv_quant_scheme
             if prompt_cache_state is not None and prompt_cache_state.token_ids is not None:
                 cache_info["cached_tokens"] = len(prompt_cache_state.token_ids)
+            if adapter_path_global:
+                cache_info["adapter"] = adapter_path_global
             self._send_json(200, {"status": "ok", "model": model_id, **cache_info})
             return
 
@@ -358,6 +382,11 @@ def main():
     parser.add_argument("--port", type=int, default=int(os.environ.get("MLX_PORT", DEFAULT_PORT)))
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument(
+        "--adapter-path", default=os.environ.get("MLX_ADAPTER_PATH", None),
+        help="Path to LoRA adapter directory (e.g. from finetune-gemma.py). "
+             "Also settable via MLX_ADAPTER_PATH env var.",
+    )
+    parser.add_argument(
         "--kv-bits", type=float, default=None,
         help="KV cache quantization bits. Use 3 for TurboQuant 3-bit (4.6x compression). "
              "Omit to use full FP16 KV cache.",
@@ -383,7 +412,7 @@ def main():
         prompt_cache_state = PromptCacheState()
         print("Prompt cache enabled: system prompt KV will be reused across turns", flush=True)
 
-    load_model(args.model)
+    load_model(args.model, adapter_path=args.adapter_path)
 
     class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         allow_reuse_address = True
@@ -393,8 +422,9 @@ def main():
     server = ThreadedHTTPServer((args.host, args.port), ChatHandler)
     kv_info = f", KV={kv_bits}b TurboQuant" if kv_bits else ""
     cache_info = ", prompt-cache=on" if prompt_cache_state else ""
+    adapter_info = f", adapter={args.adapter_path}" if args.adapter_path else ""
     print(f"\nServing on http://{args.host}:{args.port}/v1/chat/completions")
-    print(f"Model: {args.model} ({model_id}{kv_info}{cache_info})")
+    print(f"Model: {args.model} ({model_id}{kv_info}{cache_info}{adapter_info})")
     print(f"Health: http://{args.host}:{args.port}/health\n", flush=True)
 
     try:

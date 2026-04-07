@@ -26,6 +26,9 @@ typedef struct {
     char *default_db_path;
 } db_introspect_ctx_t;
 
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((unused))
+#endif
 static bool is_safe_sql_identifier(const char *s) {
     if (!s || !s[0])
         return false;

@@ -769,7 +769,7 @@ static void test_persona_build_prompt_core(void) {
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(out_len > 0);
-    HU_ASSERT_NOT_NULL(strstr(out, "You are acting as"));
+    HU_ASSERT_NOT_NULL(strstr(out, "You ARE"));
     HU_ASSERT_NOT_NULL(strstr(out, "testuser"));
     HU_ASSERT_NOT_NULL(strstr(out, "direct"));
     HU_ASSERT_NOT_NULL(strstr(out, "Keep it short"));

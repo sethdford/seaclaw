@@ -1,5 +1,6 @@
 /* Streaming infrastructure: token callback wiring, hu_agent_turn_stream, hu_agent_turn_stream_v2 */
 #include "agent_internal.h"
+#include "human/agent/humanness.h"
 #include "human/agent/awareness.h"
 #include "human/agent/commands.h"
 #include "human/agent/memory_loader.h"
@@ -257,6 +258,10 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
     hu_agent_set_current_for_tools(agent);
     hu_agent_internal_process_mailbox_messages(agent);
 
+    /* Free any previously-built humanness context, then build fresh for this turn */
+    hu_agent_free_turn_context(agent);
+    hu_agent_build_turn_context(agent);
+
     char *slash_resp = hu_agent_handle_slash_command(agent, msg, msg_len);
     if (slash_resp) {
         hu_agent_clear_current_for_tools();
@@ -333,19 +338,34 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
 #ifdef HU_HAS_PERSONA
     if (agent->persona) {
         if (agent->lean_prompt) {
-            /* Lean persona: hard output constraint + core_anchor + reinforcement
+            /* Lean persona: identity + output constraint + core_anchor + reinforcement
              * + anti_patterns + style_rules + channel overlay. ~3-5KB. */
             char lp[8192];
             size_t lpo = 0;
             {
-                static const char preamble[] =
-                    "You ARE Seth, 45, tech entrepreneur. You live alone with your cat. "
-                    "Your kids do NOT live with you. Output ONLY what Seth would type in "
-                    "iMessage — nothing else. No reasoning, no parentheses, no "
-                    "meta-commentary, no analysis. Just the raw text message, exactly as "
-                    "it would appear on screen. No emoji unless you'd actually use one. "
-                    "Keep it short, casual, lowercase-leaning. ASCII text only.\n\n";
-                int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s", preamble);
+                const hu_persona_t *pp = agent->persona;
+                if (pp->identity) {
+                    int n = snprintf(lp + lpo, sizeof(lp) - lpo,
+                        "You ARE this person: %s\n", pp->identity);
+                    if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                }
+                if (pp->biography) {
+                    int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s\n", pp->biography);
+                    if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                }
+                static const char constraint[] =
+                    "Output ONLY what this person would actually type — nothing else. "
+                    "No reasoning, no parentheses, no meta-commentary, no analysis. "
+                    "Just the raw text message, exactly as it would appear on screen.\n";
+                int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s", constraint);
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                for (size_t ri = 0; ri < pp->communication_rules_count && ri < 8; ri++) {
+                    if (pp->communication_rules[ri]) {
+                        n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n", pp->communication_rules[ri]);
+                        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                    }
+                }
+                n = snprintf(lp + lpo, sizeof(lp) - lpo, "\n");
                 if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
             }
             const hu_persona_t *p = agent->persona;
@@ -377,6 +397,26 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     if (p->style_rules[i]) {
                         n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n", p->style_rules[i]);
                         if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                    }
+                }
+            }
+            /* Add examples to prime the model on correct tone */
+            {
+                const hu_persona_example_t *exs = NULL;
+                size_t ex_count = 0;
+                hu_persona_select_examples(p, agent->active_channel,
+                    agent->active_channel_len, NULL, 0, &exs, &ex_count, 3);
+                if (exs && ex_count > 0) {
+                    int n = snprintf(lp + lpo, sizeof(lp) - lpo,
+                                     "\nExamples of how you text:\n");
+                    if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                    for (size_t ei = 0; ei < ex_count; ei++) {
+                        if (exs[ei].incoming && exs[ei].response) {
+                            n = snprintf(lp + lpo, sizeof(lp) - lpo,
+                                "them: %s\nyou: %s\n\n",
+                                exs[ei].incoming, exs[ei].response);
+                            if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                        }
                     }
                 }
             }
@@ -489,6 +529,30 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         }
     }
 #endif
+    /* Use the pre-computed tier from the caller (CLI/daemon) to gate tools.
+     * Casual conversation (REFLEXIVE/CONVERSATIONAL) doesn't need 80 tool
+     * descriptions competing for model attention.  -1 = unset → include tools. */
+    hu_cognitive_tier_t early_tier = HU_TIER_ANALYTICAL;
+    if (agent->turn_tier >= 0)
+        early_tier = (hu_cognitive_tier_t)agent->turn_tier;
+    else if (!agent->turn_model || agent->turn_model_len == 0) {
+        hu_model_router_config_t mr_cfg = hu_model_router_default_config();
+        const char *rel_early = NULL;
+        size_t rel_early_len = 0;
+#ifdef HU_HAS_PERSONA
+        if (agent->relationship.stage >= HU_REL_TRUSTED) {
+            rel_early = "trusted"; rel_early_len = 7;
+        } else if (agent->relationship.stage >= HU_REL_FAMILIAR) {
+            rel_early = "friend"; rel_early_len = 6;
+        }
+#endif
+        hu_model_selection_t early_sel = hu_model_route(&mr_cfg, msg, msg_len,
+                                                         rel_early, rel_early_len, -1,
+                                                         agent->history_count);
+        early_tier = early_sel.tier;
+    }
+    bool turn_needs_tools = (early_tier >= HU_TIER_ANALYTICAL);
+
     /* Build frontier context for the streaming prompt (matching batch path) */
     bool had_humor_dir = false;
     int humor_theory_saved = 0;
@@ -604,6 +668,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             return err;
         }
     } else {
+        bool has_native_tools = (agent->provider.vtable->supports_native_tools &&
+                                 agent->provider.vtable->supports_native_tools(agent->provider.ctx));
         hu_prompt_config_t cfg = {
             .provider_name = agent->provider.vtable->get_name(agent->provider.ctx),
             .provider_name_len = 0,
@@ -611,8 +677,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             .model_name_len = agent->model_name_len,
             .workspace_dir = agent->lean_prompt ? NULL : agent->workspace_dir,
             .workspace_dir_len = agent->lean_prompt ? 0 : agent->workspace_dir_len,
-            .tools = agent->tools,
-            .tools_count = agent->tools_count,
+            .tools = turn_needs_tools ? agent->tools : NULL,
+            .tools_count = turn_needs_tools ? agent->tools_count : 0,
             .memory_context = memory_ctx,
             .memory_context_len = memory_ctx_len,
             .autonomy_level = agent->autonomy_level,
@@ -625,6 +691,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
             .outcome_context = outcome_ctx,
             .outcome_context_len = outcome_ctx_len,
             .persona_immersive = (persona_prompt && persona_prompt_len > 0),
+            .native_tools = has_native_tools,
             .persona = agent->lean_prompt ? NULL :
 #ifdef HU_HAS_PERSONA
                 agent->persona
@@ -724,14 +791,14 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         req.messages = all_msgs;
         req.messages_count = total_msgs;
 
-        /* Emotional model routing (matching batch path) */
+        /* Model selection: reuse the early tier computation, apply model override */
         const char *turn_model = agent->model_name;
         size_t turn_model_len = agent->model_name_len;
         double turn_temp = agent->temperature;
         if (agent->turn_model && agent->turn_model_len > 0) {
             turn_model = agent->turn_model;
             turn_model_len = agent->turn_model_len;
-        } else {
+        } else if (early_tier >= HU_TIER_ANALYTICAL) {
             hu_model_router_config_t mr_cfg = hu_model_router_default_config();
             const char *rel = NULL;
             size_t rel_len = 0;
@@ -768,8 +835,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
         req.model = turn_model;
         req.model_len = turn_model_len;
         req.temperature = turn_temp;
-        req.tools = (agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
-        req.tools_count = agent->tool_specs_count;
+        req.tools = (turn_needs_tools && agent->tool_specs_count > 0) ? agent->tool_specs : NULL;
+        req.tools_count = turn_needs_tools ? agent->tool_specs_count : 0;
 
         /* Stream from the provider (with emotional pacing on first chunk).
          * When quality systems (GVR/Constitutional) are enabled, suppress streaming
@@ -1075,11 +1142,13 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
     }
 #endif /* !HU_IS_TEST */
 
-    /* If quality systems buffered the response (suppressed streaming), emit now */
+    /* If quality systems buffered the response (suppressed streaming), emit now.
+     * Must match the suppression check: lean_prompt disables buffering. */
     {
         bool was_buffered = false;
 #ifndef HU_IS_TEST
-        was_buffered = agent->sota.gvr_config.enabled || agent->constitutional_enabled;
+        if (!agent->lean_prompt)
+            was_buffered = agent->sota.gvr_config.enabled || agent->constitutional_enabled;
 #endif
         if (was_buffered && final_content && on_event) {
             hu_agent_stream_event_t final_ev;

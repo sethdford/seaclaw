@@ -136,9 +136,9 @@ static void curl_pool_release(CURL *h) {
 }
 
 static void curl_setup_common(CURL *curl) {
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600L);
     curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
-    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 120L);
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 300L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
     curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);

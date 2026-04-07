@@ -8,9 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-static size_t build_task_context(char *buf, size_t cap, const hu_paperclip_task_t *task,
-                                 const hu_paperclip_comment_list_t *comments,
-                                 const hu_paperclip_client_t *client) {
+size_t hu_paperclip_build_task_context(char *buf, size_t cap,
+                                       const hu_paperclip_task_t *task,
+                                       const hu_paperclip_comment_list_t *comments,
+                                       const hu_paperclip_client_t *client) {
     size_t pos = 0;
     int w;
 
@@ -125,7 +126,7 @@ hu_error_t hu_paperclip_heartbeat(hu_allocator_t *alloc, int argc, char **argv) 
     hu_paperclip_get_comments(&client, target_task_id, &comments);
 
     char context[4096];
-    size_t ctx_len = build_task_context(context, sizeof(context), &task, &comments, &client);
+    size_t ctx_len = hu_paperclip_build_task_context(context, sizeof(context), &task, &comments, &client);
 
     hu_log_info("paperclip", NULL, "Context built (%zu chars). Bootstrapping agent...", ctx_len);
 

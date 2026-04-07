@@ -86,12 +86,22 @@ struct DashboardView: View {
                     Circle()
                         .fill(status.isGatewayConnected ? tokens.success : tokens.error)
                         .frame(width: HUTokens.spaceSm, height: HUTokens.spaceSm)
-                    Text(status.isGatewayConnected ? "Connected" : "Disconnected")
-                        .font(.custom("Avenir-Book", size: HUTokens.textXs))
-                        .foregroundStyle(tokens.textMuted)
+                    if status.isGatewayConnected {
+                        Text("Connected")
+                            .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                            .foregroundStyle(tokens.textMuted)
+                    } else if status.gatewayClient.onDeviceAvailable {
+                        Text("On-Device")
+                            .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                            .foregroundStyle(tokens.textMuted)
+                    } else {
+                        Text("Disconnected")
+                            .font(.custom("Avenir-Book", size: HUTokens.textXs))
+                            .foregroundStyle(tokens.textMuted)
+                    }
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Gateway \(status.isGatewayConnected ? "connected" : "disconnected")")
+                .accessibilityLabel("Gateway \(status.isGatewayConnected ? "connected" : status.gatewayClient.onDeviceAvailable ? "on-device" : "disconnected")")
             }
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: HUTokens.spaceXs) {
@@ -487,19 +497,36 @@ struct MacChatPane: View {
                 messages.append(MacChatMessage(id: UUID(), text: trimmed, role: .user))
             }
         }
-        status.gatewayClient.request(method: Methods.chatSend, params: ["message": trimmed]) { result in
-            Task { @MainActor in
-                if case let .failure(err) = result {
-                    isSending = false
-                    let line = "Failed to send: \(err.localizedDescription)"
-                    if reduceMotion {
-                        messages.append(MacChatMessage(id: UUID(), text: line, role: .assistant))
-                    } else {
-                        withAnimation(HUTokens.springInteractive) {
-                            messages.append(MacChatMessage(id: UUID(), text: line, role: .assistant))
+
+        Task {
+            if status.isGatewayConnected {
+                status.gatewayClient.request(method: Methods.chatSend, params: ["message": trimmed]) { result in
+                    Task { @MainActor in
+                        if case let .failure(err) = result {
+                            Task { await self.tryOnDeviceFallback(trimmed, gatewayError: err) }
                         }
                     }
                 }
+            } else {
+                await tryOnDeviceFallback(trimmed, gatewayError: nil)
+            }
+        }
+    }
+
+    private func tryOnDeviceFallback(_ message: String, gatewayError: Error?) async {
+        if let reply = await status.gatewayClient.chatOnDevice(message: message) {
+            await MainActor.run {
+                isSending = false
+                let append = { self.messages.append(MacChatMessage(id: UUID(), text: reply, role: .assistant)) }
+                if reduceMotion { append() } else { withAnimation(HUTokens.springInteractive) { append() } }
+            }
+        } else {
+            let desc = gatewayError?.localizedDescription ?? "Gateway disconnected and on-device AI unavailable"
+            await MainActor.run {
+                isSending = false
+                let line = "Failed to send: \(desc)"
+                let append = { self.messages.append(MacChatMessage(id: UUID(), text: line, role: .assistant)) }
+                if reduceMotion { append() } else { withAnimation(HUTokens.springInteractive) { append() } }
             }
         }
     }

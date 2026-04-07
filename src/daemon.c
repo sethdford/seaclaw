@@ -8309,8 +8309,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     agent->memory->current_session_id_len = key_len;
                 }
 
-                /* F29: Backchannel — send brief cue and skip LLM when narrative detected */
+                /* F29: Backchannel — send brief cue and skip LLM when narrative detected.
+                 * Flash typing briefly so the recipient sees "..." before the short
+                 * reply appears, matching how a human types "mhm" or "haha". */
                 if (use_backchannel && backchannel_len > 0 && ch->channel->vtable->send) {
+                    if (ch->channel->vtable->start_typing) {
+                        ch->channel->vtable->start_typing(ch->channel->ctx, batch_key, key_len);
+                        unsigned int bc_delay_ms = 300 + (unsigned int)(rand() % 501);
+                        struct timespec bc_ts = {
+                            .tv_sec = 0,
+                            .tv_nsec = (long)bc_delay_ms * 1000000L};
+                        nanosleep(&bc_ts, NULL);
+                        turn_out_state.typing_started = true;
+                    }
                     ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, backchannel_buf,
                                               backchannel_len, NULL, 0);
                     hu_log_info("human", agent ? agent->observer : NULL, "backchannel: %.*s",
@@ -9568,6 +9579,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 #endif
 
             skip_llm_this_batch:
+                if (turn_out_state.typing_started &&
+                    ch->channel->vtable->stop_typing)
+                    ch->channel->vtable->stop_typing(ch->channel->ctx,
+                                                     batch_key, key_len);
                 /* Clear per-turn context and free */
 #ifndef HU_IS_TEST
                 agent->contact_context = NULL;

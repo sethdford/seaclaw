@@ -2,6 +2,7 @@
 #include "human/core/json.h"
 #include "human/core/log.h"
 #include "human/core/string.h"
+#include "human/data/loader.h"
 #include "human/persona/persona_fuse.h"
 #include "human/persona/relationship.h"
 #include <stdio.h>
@@ -2365,40 +2366,63 @@ hu_error_t hu_persona_load(hu_allocator_t *alloc, const char *name, size_t name_
                            hu_persona_t *out) {
     if (!alloc || !name || !out)
         return HU_ERR_INVALID_ARGUMENT;
+
+    char *buf = NULL;
+    size_t read_len = 0;
+    size_t alloc_sz = 0;
+
+    /* Try filesystem first: ~/.human/personas/<name>.json */
     char base[HU_PERSONA_PATH_MAX];
-    if (!hu_persona_base_dir(base, sizeof(base)))
-        return HU_ERR_NOT_FOUND;
-    char path[HU_PERSONA_PATH_MAX];
-    int n = snprintf(path, sizeof(path), "%s/%.*s.json", base, (int)name_len, name);
-    if (n <= 0 || (size_t)n >= sizeof(path))
-        return HU_ERR_INVALID_ARGUMENT;
-    FILE *f = fopen(path, "rb");
-    if (!f)
-        return HU_ERR_NOT_FOUND;
-    if (fseek(f, 0, SEEK_END) != 0) {
-        fclose(f);
-        return HU_ERR_IO;
+    bool found_file = false;
+    if (hu_persona_base_dir(base, sizeof(base))) {
+        char path[HU_PERSONA_PATH_MAX];
+        int n = snprintf(path, sizeof(path), "%s/%.*s.json", base, (int)name_len, name);
+        if (n > 0 && (size_t)n < sizeof(path)) {
+            FILE *f = fopen(path, "rb");
+            if (f) {
+                if (fseek(f, 0, SEEK_END) != 0) {
+                    fclose(f);
+                    return HU_ERR_IO;
+                }
+                long sz = ftell(f);
+                if (sz < 0 || sz > (long)(1024 * 1024)) {
+                    fclose(f);
+                    return sz < 0 ? HU_ERR_IO : HU_ERR_INVALID_ARGUMENT;
+                }
+                rewind(f);
+                alloc_sz = (size_t)sz + 1;
+                buf = (char *)alloc->alloc(alloc->ctx, alloc_sz);
+                if (!buf) {
+                    fclose(f);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                read_len = fread(buf, 1, (size_t)sz, f);
+                fclose(f);
+                if (read_len != (size_t)sz) {
+                    alloc->free(alloc->ctx, buf, alloc_sz);
+                    return HU_ERR_IO;
+                }
+                buf[read_len] = '\0';
+                found_file = true;
+            }
+        }
     }
-    long sz = ftell(f);
-    if (sz < 0 || sz > (long)(1024 * 1024)) {
-        fclose(f);
-        return sz < 0 ? HU_ERR_IO : HU_ERR_INVALID_ARGUMENT;
+
+    /* Fallback: try embedded data (personas/<name>.json) */
+    if (!found_file) {
+        char embed_path[HU_PERSONA_PATH_MAX];
+        int en = snprintf(embed_path, sizeof(embed_path), "personas/%.*s.json",
+                          (int)name_len, name);
+        if (en <= 0 || (size_t)en >= sizeof(embed_path))
+            return HU_ERR_NOT_FOUND;
+        hu_error_t lerr = hu_data_load_embedded(alloc, embed_path, &buf, &read_len);
+        if (lerr != HU_OK)
+            return HU_ERR_NOT_FOUND;
+        alloc_sz = read_len + 1;
     }
-    rewind(f);
-    char *buf = (char *)alloc->alloc(alloc->ctx, (size_t)sz + 1);
-    if (!buf) {
-        fclose(f);
-        return HU_ERR_OUT_OF_MEMORY;
-    }
-    size_t read_len = fread(buf, 1, (size_t)sz, f);
-    fclose(f);
-    if (read_len != (size_t)sz) {
-        alloc->free(alloc->ctx, buf, (size_t)sz + 1);
-        return HU_ERR_IO;
-    }
-    buf[read_len] = '\0';
+
     hu_error_t err = hu_persona_load_json(alloc, buf, read_len, out);
-    alloc->free(alloc->ctx, buf, (size_t)sz + 1);
+    alloc->free(alloc->ctx, buf, alloc_sz);
     if (err != HU_OK)
         return err;
 
@@ -2523,7 +2547,7 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
     const char *name = persona->name ? persona->name : "persona";
     size_t name_len = persona->name_len ? persona->name_len : strlen(name);
     char header[256];
-    int n = snprintf(header, sizeof(header), "You are acting as %.*s.", (int)name_len, name);
+    int n = snprintf(header, sizeof(header), "You ARE %.*s.", (int)name_len, name);
     if (n > 0) {
         hu_error_t err = append_prompt(alloc, &buf, &len, &cap, header, (size_t)n);
         if (err != HU_OK) {

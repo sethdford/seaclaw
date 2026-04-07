@@ -229,6 +229,18 @@ hu_error_t hu_daemon_logs(void) {
 #define HU_LAUNCHD_DIR   "Library/LaunchAgents"
 
 static int get_binary_path(char *buf, size_t buf_size) {
+    /* Check $HOME/bin/human first (common user-local install path) */
+    const char *home = getenv("HOME");
+    if (home && home[0] == '/') {
+        char user_bin[HU_MAX_PATH];
+        int n = snprintf(user_bin, sizeof(user_bin), "%s/bin/human", home);
+        if (n > 0 && (size_t)n < sizeof(user_bin) && access(user_bin, X_OK) == 0) {
+            if ((size_t)n < buf_size) {
+                memcpy(buf, user_bin, (size_t)n + 1);
+                return n;
+            }
+        }
+    }
     const char *paths[] = {"/usr/local/bin/human", "/opt/homebrew/bin/human", NULL};
     for (int i = 0; paths[i]; i++) {
         if (access(paths[i], X_OK) == 0) {
@@ -302,6 +314,15 @@ hu_error_t hu_daemon_install(hu_allocator_t *alloc) {
             "</plist>\n",
             HU_LAUNCHD_LABEL, bin, log_path, log_path, home);
     fclose(f);
+
+#ifndef HU_IS_TEST
+    /* Ad-hoc sign the binary so macOS code signing enforcement doesn't
+     * SIGKILL it on launch.  This is a no-op if already validly signed. */
+    char sign_cmd[HU_MAX_PATH + 32];
+    n = snprintf(sign_cmd, sizeof(sign_cmd), "codesign -s - -f \"%s\" 2>/dev/null", bin);
+    if (n > 0 && (size_t)n < sizeof(sign_cmd))
+        (void)system(sign_cmd);
+#endif
 
     char cmd[HU_MAX_PATH * 2];
     n = snprintf(cmd, sizeof(cmd), "launchctl load -w \"%s\"", plist);

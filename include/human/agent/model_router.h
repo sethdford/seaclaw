@@ -37,6 +37,12 @@ typedef struct hu_model_router_config {
     size_t analytical_model_len;
     const char *deep_model;         /* most capable: complex reasoning */
     size_t deep_model_len;
+    const char *on_device_model;    /* on-device fallback (e.g. apple-foundationmodel) */
+    size_t on_device_model_len;
+    bool on_device_available;       /* set true when an on-device provider is probed;
+                                     * defaults to false — callers must set explicitly */
+    hu_cognitive_tier_t conversation_floor; /* minimum tier for conversational channels;
+                                            * 0 (HU_TIER_REFLEXIVE) = no floor (default) */
 } hu_model_router_config_t;
 
 /* Analyze message content and context to select the optimal model + thinking budget.
@@ -49,6 +55,11 @@ hu_model_selection_t hu_model_route(const hu_model_router_config_t *cfg,
 
 /* Initialize config with sensible Gemini defaults */
 hu_model_router_config_t hu_model_router_default_config(void);
+
+/* Check whether the on-device model is sufficient for a given tier.
+ * Currently returns true only for REFLEXIVE (short acks, simple greetings).
+ * On-device context window (~4096 tokens) limits complex interactions. */
+bool hu_model_router_on_device_suitable(hu_cognitive_tier_t tier);
 
 /* Forward declarations for judge call */
 struct hu_provider;

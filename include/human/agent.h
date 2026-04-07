@@ -64,6 +64,7 @@
 #include "human/persona.h"
 #include "human/persona/circadian.h"
 #include "human/persona/relationship.h"
+#include "human/persona/voice_maturity.h"
 #endif
 #include "human/agent/reflection.h"
 #include "human/cognition/dual_process.h"
@@ -229,11 +230,12 @@ struct hu_agent {
     size_t conversation_context_len;
     uint32_t max_response_chars;
 
-    /* Per-turn model override (set by daemon, not owned; NULL = use default) */
+    /* Per-turn model override (set by daemon/CLI, not owned; NULL = use default) */
     const char *turn_model;
     size_t turn_model_len;
     double turn_temperature;  /* 0.0 = use agent default */
     int turn_thinking_budget; /* 0 = no thinking config */
+    int turn_tier;            /* hu_cognitive_tier_t from model router, -1 = unset */
     hu_timing_model_t *timing_model;
 
     /* Per-turn A/B evaluation: channel history for quality scoring (set by daemon, not owned) */
@@ -298,7 +300,8 @@ struct hu_agent {
     hu_reflection_config_t reflection;
     struct hu_outcome_tracker *outcomes; /* optional; tracks tool results and user corrections */
 
-    bool chain_of_thought; /* inject reasoning instructions into prompt */
+    bool chain_of_thought;      /* inject reasoning instructions into prompt */
+    bool on_device_available;    /* true if on-device provider (e.g. apfel) was detected at startup */
     char *persona_prompt;  /* custom identity override; owned */
     size_t persona_prompt_len;
 
@@ -345,7 +348,10 @@ struct hu_agent {
 
 #ifdef HU_HAS_PERSONA
     hu_persona_t *persona; /* loaded from config; owned */
+    hu_voice_profile_t voice_profile;
+    bool voice_profile_initialized;
 #endif
+    bool humanness_ctx_owned; /* true when conversation_context was built by humanness module */
     char *persona_name;
     size_t persona_name_len;
 

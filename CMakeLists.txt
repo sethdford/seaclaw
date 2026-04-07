@@ -65,7 +65,6 @@ else()
     option(HU_ENABLE_IMESSAGE "Build iMessage channel" OFF)
 endif()
 option(HU_IMESSAGE_TAPBACK_ENABLED "Enable iMessage tapback reactions via JXA (requires accessibility)" OFF)
-option(HU_IMESSAGE_SEND_IMSG "Enable imsg CLI send path (steipete/imsg, faster alternative to AppleScript)" OFF)
 if(APPLE)
     option(HU_ENABLE_PWA "Build PWA channel (browser tab polling)" ON)
 else()
@@ -441,6 +440,7 @@ set(HU_CORE_SOURCES
     src/agent/agent_plan.c
     src/agent/agent_stream.c
     src/agent/agent_turn.c
+    src/agent/humanness.c
     src/agent/context.c
     src/agent/prompt.c
     src/agent/memory_loader.c
@@ -1135,6 +1135,7 @@ list(APPEND HU_CORE_SOURCES
     src/data/data_conversation_vulnerability_keywords_json.c
     src/data/data_persona_circadian_phases_json.c
     src/data/data_persona_relationship_stages_json.c
+    src/data/data_personas_default_json.c
     src/data/data_security_command_lists_json.c
     src/data/data_agent_commitment_patterns_json.c
     src/data/data_agent_conversation_plan_words_json.c
@@ -1310,9 +1311,6 @@ if(HU_ENABLE_IMESSAGE)
     target_compile_definitions(human_core PRIVATE HU_HAS_IMESSAGE=1)
     if(HU_IMESSAGE_TAPBACK_ENABLED)
         target_compile_definitions(human_core PRIVATE HU_IMESSAGE_TAPBACK_ENABLED=1)
-    endif()
-    if(HU_IMESSAGE_SEND_IMSG)
-        target_compile_definitions(human_core PRIVATE HU_IMESSAGE_SEND_IMSG=1)
     endif()
 endif()
 if(HU_ENABLE_PWA)
@@ -1604,9 +1602,6 @@ if(HU_ENABLE_IMESSAGE)
     target_compile_definitions(human PRIVATE HU_HAS_IMESSAGE=1)
     if(HU_IMESSAGE_TAPBACK_ENABLED)
         target_compile_definitions(human PRIVATE HU_IMESSAGE_TAPBACK_ENABLED=1)
-    endif()
-    if(HU_IMESSAGE_SEND_IMSG)
-        target_compile_definitions(human PRIVATE HU_IMESSAGE_SEND_IMSG=1)
     endif()
 endif()
 if(HU_ENABLE_PWA)
@@ -2304,6 +2299,7 @@ set(HU_TEST_SOURCES
     tests/test_sota_humanness.c
     tests/test_distiller.c
     tests/test_model_router.c
+    tests/test_humanness_context.c
     tests/test_plan_executor.c
     tests/test_planner_mcts_wiring.c
     tests/test_cdp.c
@@ -2521,9 +2517,6 @@ if(HU_ENABLE_IMESSAGE)
     if(HU_IMESSAGE_TAPBACK_ENABLED)
         target_compile_definitions(human_tests PRIVATE HU_IMESSAGE_TAPBACK_ENABLED=1)
     endif()
-    if(HU_IMESSAGE_SEND_IMSG)
-        target_compile_definitions(human_tests PRIVATE HU_IMESSAGE_SEND_IMSG=1)
-    endif()
 endif()
 if(HU_ENABLE_PWA)
     target_compile_definitions(human_tests PRIVATE HU_HAS_PWA=1)
@@ -2624,9 +2617,6 @@ if(HU_ENABLE_INTEGRATION_TESTS)
         target_compile_definitions(human_integration_tests PRIVATE HU_HAS_IMESSAGE=1)
         if(HU_IMESSAGE_TAPBACK_ENABLED)
             target_compile_definitions(human_integration_tests PRIVATE HU_IMESSAGE_TAPBACK_ENABLED=1)
-        endif()
-        if(HU_IMESSAGE_SEND_IMSG)
-            target_compile_definitions(human_integration_tests PRIVATE HU_IMESSAGE_SEND_IMSG=1)
         endif()
     endif()
     if(HU_ENABLE_IMAP)

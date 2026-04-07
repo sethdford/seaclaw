@@ -143,7 +143,11 @@ hu_error_t hu_session_persist_save(hu_allocator_t *alloc, const hu_agent_t *agen
         return HU_ERR_IO;
 
     char sid[HU_SESSION_ID_MAX];
-    hu_session_generate_id(sid, sizeof(sid));
+    if (agent->session_id[0] != '\0') {
+        memcpy(sid, agent->session_id, HU_SESSION_ID_MAX);
+    } else {
+        hu_session_generate_id(sid, sizeof(sid));
+    }
     if (session_id_out)
         memcpy(session_id_out, sid, HU_SESSION_ID_MAX);
 

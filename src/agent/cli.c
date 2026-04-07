@@ -314,6 +314,14 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
         cfg.memory_backend = "none";
     }
 
+    /* Auto-load default persona when none configured (activates personality layer) */
+    if (!cfg.agent.persona || !cfg.agent.persona[0]) {
+        hu_allocator_t *ca = &cfg.allocator;
+        if (cfg.agent.persona)
+            ca->free(ca->ctx, cfg.agent.persona, strlen(cfg.agent.persona) + 1);
+        cfg.agent.persona = hu_strdup(ca, "default");
+    }
+
     const char *prov_name = cfg.default_provider ? cfg.default_provider : "openai";
     size_t prov_name_len = strlen(prov_name);
     const char *api_key = hu_config_default_provider_key(&cfg);
@@ -656,6 +664,9 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     hu_outcome_tracker_init(&cli_outcomes, true);
     hu_agent_set_outcomes(&agent, &cli_outcomes);
     agent.scheduler = (struct hu_cron_scheduler *)cron;
+
+    if (parsed_args.message && parsed_args.message[0])
+        agent.lean_prompt = true;
 
     /* Session persistence: load prior conversation if --session was given,
      * or generate a session ID so auto_save works for new sessions. */
@@ -1020,6 +1031,7 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
 #ifndef HU_IS_TEST
         if (cli_provider_uses_gemini_slot_models(prov_name, prov_name_len)) {
             hu_model_router_config_t mr_cfg = hu_model_router_default_config();
+            mr_cfg.conversation_floor = HU_TIER_CONVERSATIONAL;
             if (cfg.agent.mr_reflexive_model) {
                 mr_cfg.reflexive_model = cfg.agent.mr_reflexive_model;
                 mr_cfg.reflexive_model_len = strlen(cfg.agent.mr_reflexive_model);
@@ -1074,11 +1086,17 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
             agent.turn_model_len = sel.model_len;
             agent.turn_temperature = sel.temperature;
             agent.turn_thinking_budget = sel.thinking_budget;
+            agent.turn_tier = (int)sel.tier;
         } else {
             agent.turn_model = agent.model_name;
             agent.turn_model_len = agent.model_name_len;
             agent.turn_temperature = agent.temperature;
             agent.turn_thinking_budget = 0;
+            /* Still compute tier for tool gating even with non-Gemini providers */
+            hu_model_router_config_t mr_cfg_nongem = hu_model_router_default_config();
+            hu_model_selection_t sel_nongem = hu_model_route(&mr_cfg_nongem, line, line_len,
+                                                              NULL, 0, -1, agent.history_count);
+            agent.turn_tier = (int)sel_nongem.tier;
         }
 #endif
 

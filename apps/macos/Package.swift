@@ -13,6 +13,7 @@ let package = Package(
             dependencies: [
                 .product(name: "HumanClient", package: "HumanKit"),
                 .product(name: "HumanChatUI", package: "HumanKit"),
+                .product(name: "HumanOnDevice", package: "HumanKit"),
             ],
             path: "Sources/HumanApp"
         ),

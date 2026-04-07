@@ -170,8 +170,40 @@ hu_error_t hu_paperclip_list_tasks(hu_paperclip_client_t *client,
     }
 
 #ifdef HU_IS_TEST
-    (void)url;
-    return HU_OK;
+    {
+        static const char *mock_json =
+            "{\"items\":["
+            "{\"id\":\"task-001\",\"title\":\"Fix login bug\","
+            "\"description\":\"Users cannot log in with SSO\","
+            "\"status\":\"todo\",\"priority\":\"high\","
+            "\"project\":{\"name\":\"Auth\"},\"goal\":{\"title\":\"Q2 stability\"}},"
+            "{\"id\":\"task-002\",\"title\":\"Add rate limiting\","
+            "\"description\":\"API needs request throttling\","
+            "\"status\":\"in_progress\",\"priority\":\"medium\","
+            "\"project\":{\"name\":\"Platform\"},\"goal\":{\"title\":\"Scale\"}}"
+            "]}";
+        hu_json_value_t *root = NULL;
+        hu_error_t parse_err =
+            hu_json_parse(client->alloc, mock_json, strlen(mock_json), &root);
+        if (parse_err != HU_OK)
+            return parse_err;
+        hu_json_value_t *items = hu_json_object_get(root, "items");
+        if (items && items->type == HU_JSON_ARRAY && items->data.array.len > 0) {
+            size_t n = items->data.array.len;
+            out->tasks = (hu_paperclip_task_t *)client->alloc->alloc(
+                client->alloc->ctx, n * sizeof(hu_paperclip_task_t));
+            if (!out->tasks) {
+                hu_json_free(client->alloc, root);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            memset(out->tasks, 0, n * sizeof(hu_paperclip_task_t));
+            for (size_t i = 0; i < n; i++)
+                out->tasks[i] = parse_task(client->alloc, items->data.array.items[i]);
+            out->count = n;
+        }
+        hu_json_free(client->alloc, root);
+        return HU_OK;
+    }
 #endif
 
     char *auth = build_auth_header(client->alloc, client);
@@ -222,8 +254,24 @@ hu_error_t hu_paperclip_get_task(hu_paperclip_client_t *client, const char *task
     snprintf(url, sizeof(url), "%s/issues/%s", client->api_url, task_id);
 
 #ifdef HU_IS_TEST
-    (void)url;
-    return HU_OK;
+    {
+        char mock_json[512];
+        snprintf(mock_json, sizeof(mock_json),
+                 "{\"id\":\"%s\",\"title\":\"Fix login bug\","
+                 "\"description\":\"Users cannot log in with SSO\","
+                 "\"status\":\"todo\",\"priority\":\"high\","
+                 "\"project\":{\"name\":\"Auth\"},"
+                 "\"goal\":{\"title\":\"Q2 stability\"}}",
+                 task_id);
+        hu_json_value_t *root = NULL;
+        hu_error_t parse_err =
+            hu_json_parse(client->alloc, mock_json, strlen(mock_json), &root);
+        if (parse_err != HU_OK)
+            return parse_err;
+        *out = parse_task(client->alloc, root);
+        hu_json_free(client->alloc, root);
+        return HU_OK;
+    }
 #endif
 
     char *auth = build_auth_header(client->alloc, client);
@@ -373,8 +421,50 @@ hu_error_t hu_paperclip_get_comments(hu_paperclip_client_t *client, const char *
     snprintf(url, sizeof(url), "%s/issues/%s/comments", client->api_url, task_id);
 
 #ifdef HU_IS_TEST
-    (void)url;
-    return HU_OK;
+    {
+        static const char *mock_json =
+            "{\"items\":["
+            "{\"id\":\"c-001\",\"body\":\"Started investigating\","
+            "\"authorName\":\"agent-1\",\"createdAt\":\"2026-04-06T10:00:00Z\"},"
+            "{\"id\":\"c-002\",\"body\":\"Found root cause in auth module\","
+            "\"authorName\":\"agent-1\",\"createdAt\":\"2026-04-06T10:05:00Z\"}"
+            "]}";
+        hu_json_value_t *root = NULL;
+        hu_error_t parse_err =
+            hu_json_parse(client->alloc, mock_json, strlen(mock_json), &root);
+        if (parse_err != HU_OK)
+            return parse_err;
+        hu_json_value_t *items = hu_json_object_get(root, "items");
+        if (items && items->type == HU_JSON_ARRAY && items->data.array.len > 0) {
+            size_t n = items->data.array.len;
+            out->comments = (hu_paperclip_comment_t *)client->alloc->alloc(
+                client->alloc->ctx, n * sizeof(hu_paperclip_comment_t));
+            if (!out->comments) {
+                hu_json_free(client->alloc, root);
+                return HU_ERR_OUT_OF_MEMORY;
+            }
+            memset(out->comments, 0, n * sizeof(hu_paperclip_comment_t));
+            for (size_t i = 0; i < n; i++) {
+                hu_json_value_t *c = items->data.array.items[i];
+                if (!c || c->type != HU_JSON_OBJECT)
+                    continue;
+                const char *s;
+                s = hu_json_get_string(c, "id");
+                if (s) out->comments[i].id = hu_strdup(client->alloc, s);
+                s = hu_json_get_string(c, "body");
+                if (s) out->comments[i].body = hu_strdup(client->alloc, s);
+                s = hu_json_get_string(c, "authorName");
+                if (!s) s = hu_json_get_string(c, "author_name");
+                if (s) out->comments[i].author_name = hu_strdup(client->alloc, s);
+                s = hu_json_get_string(c, "createdAt");
+                if (!s) s = hu_json_get_string(c, "created_at");
+                if (s) out->comments[i].created_at = hu_strdup(client->alloc, s);
+            }
+            out->count = n;
+        }
+        hu_json_free(client->alloc, root);
+        return HU_OK;
+    }
 #endif
 
     char *auth = build_auth_header(client->alloc, client);

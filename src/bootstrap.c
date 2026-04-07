@@ -26,6 +26,9 @@
 #include "human/plugin_discovery.h"
 #include "human/plugin_loader.h"
 #include "human/providers/factory.h"
+#ifdef HU_ENABLE_APPLE_INTELLIGENCE
+#include "human/providers/apple.h"
+#endif
 #include "human/runtime.h"
 #include "human/security/audit.h"
 #include "human/security/sandbox.h"
@@ -798,6 +801,9 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
 
         const char *model = bi->cfg.default_model ? bi->cfg.default_model : "";
         double temp = bi->cfg.temperature > 0.0 ? bi->cfg.temperature : 0.7;
+
+
+
         uint32_t max_iters =
             bi->cfg.agent.max_tool_iterations > 0 ? bi->cfg.agent.max_tool_iterations : 25;
         uint32_t max_hist =
@@ -828,6 +834,13 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
         if (err != HU_OK)
             goto fail;
         hu_metacognition_apply_config(&bi->agent.infra.metacognition, &bi->cfg.agent.metacognition);
+#ifdef HU_ENABLE_APPLE_INTELLIGENCE
+        if (bi->cfg.agent.mr_on_device_enabled) {
+            bi->agent.on_device_available = hu_apple_probe(alloc, NULL, 0);
+            if (bi->agent.on_device_available)
+                HU_LOG_INFO("Apple Intelligence on-device provider detected (apfel at 127.0.0.1:11434)");
+        }
+#endif
         memset(&bi->voice_cfg, 0, sizeof(bi->voice_cfg));
         (void)hu_voice_config_from_settings(&bi->cfg, &bi->voice_cfg);
         if (bi->voice_cfg.tts_provider || bi->voice_cfg.local_tts_endpoint ||
@@ -1028,6 +1041,12 @@ hu_error_t hu_app_bootstrap(hu_app_ctx_t *ctx, hu_allocator_t *alloc, const char
                         poll_sec = cfg->channels.imessage.poll_interval_sec;
                     if (poll_sec <= 0)
                         poll_sec = 3;
+                    /* When imsg CLI is enabled, imsg watch provides event-driven
+                     * notifications via a pipe. Use a fast 500ms poll interval so
+                     * the pipe is checked frequently; the SQL query is skipped
+                     * when the watch reports no new data. */
+                    if (cfg->channels.imessage.use_imsg_cli && poll_sec > 1)
+                        poll_sec = 1;
                     bi->channels[ch_count].interval_ms = (uint32_t)(poll_sec * 1000);
                 }
                 bi->channels[ch_count].last_poll_ms = 0;

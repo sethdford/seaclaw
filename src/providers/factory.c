@@ -6,6 +6,9 @@
 #include "human/providers/claude_cli.h"
 #include "human/providers/codex_cli.h"
 #include "human/providers/compatible.h"
+#ifdef HU_ENABLE_APPLE_INTELLIGENCE
+#include "human/providers/apple.h"
+#endif
 #ifdef HU_ENABLE_COREML
 #include "human/providers/coreml.h"
 #endif
@@ -173,6 +176,25 @@ hu_error_t hu_provider_create(hu_allocator_t *alloc, const char *name, size_t na
     if (name_len == 12 && memcmp(name, "openai-codex", 12) == 0) {
         return hu_openai_codex_create(alloc, api_key, api_key_len, base_url, base_url_len, out);
     }
+
+#ifdef HU_ENABLE_APPLE_INTELLIGENCE
+    if (name_len == 5 && memcmp(name, "apple", 5) == 0) {
+        hu_apple_config_t ac = {.base_url = base_url, .base_url_len = base_url_len};
+        return hu_apple_provider_create(alloc, &ac, out);
+    }
+    if (name_len == 5 && memcmp(name, "apfel", 5) == 0) {
+        hu_apple_config_t ac = {.base_url = base_url, .base_url_len = base_url_len};
+        return hu_apple_provider_create(alloc, &ac, out);
+    }
+    if (name_len == 18 && memcmp(name, "apple-intelligence", 18) == 0) {
+        hu_apple_config_t ac = {.base_url = base_url, .base_url_len = base_url_len};
+        return hu_apple_provider_create(alloc, &ac, out);
+    }
+    if (name_len == 16 && memcmp(name, "foundationmodels", 16) == 0) {
+        hu_apple_config_t ac = {.base_url = base_url, .base_url_len = base_url_len};
+        return hu_apple_provider_create(alloc, &ac, out);
+    }
+#endif
 
 #ifdef HU_ENABLE_COREML
     if (name_len == 7 && memcmp(name, "coreml", 7) == 0) {

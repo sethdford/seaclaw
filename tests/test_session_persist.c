@@ -465,6 +465,89 @@ static void test_save_preserves_all_roles(void) {
     teardown();
 }
 
+static void test_save_reuses_agent_session_id(void) {
+    setup();
+    hu_agent_t agent;
+    init_agent(&agent);
+    add_message(&agent, HU_ROLE_USER, "Hello");
+    add_message(&agent, HU_ROLE_ASSISTANT, "Hi there!");
+
+    /* Set a stable session ID on the agent */
+    const char *stable_id = "my-stable-session";
+    size_t sid_len = strlen(stable_id);
+    memcpy(agent.session_id, stable_id, sid_len);
+    agent.session_id[sid_len] = '\0';
+
+    char sid_out[HU_SESSION_ID_MAX];
+    hu_error_t err = hu_session_persist_save(&g_alloc, &agent, g_tmpdir, sid_out);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_STR_EQ(sid_out, "my-stable-session");
+
+    /* Verify file is named with the stable ID, not a generated timestamp */
+    char path[512];
+    snprintf(path, sizeof(path), "%s/my-stable-session.json", g_tmpdir);
+    struct stat st;
+    HU_ASSERT_EQ(stat(path, &st), 0);
+
+    /* Round-trip: load with same ID, verify history */
+    hu_agent_t agent2;
+    init_agent(&agent2);
+    err = hu_session_persist_load(&g_alloc, &agent2, g_tmpdir, "my-stable-session");
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(agent2.history_count, 2);
+    HU_ASSERT_STR_EQ(agent2.history[0].content, "Hello");
+    HU_ASSERT_STR_EQ(agent2.history[1].content, "Hi there!");
+    HU_ASSERT_STR_EQ(agent2.session_id, "my-stable-session");
+
+    free_agent(&agent);
+    free_agent(&agent2);
+    teardown();
+}
+
+static void test_save_overwrites_same_session_id(void) {
+    setup();
+    hu_agent_t agent;
+    init_agent(&agent);
+    add_message(&agent, HU_ROLE_USER, "Turn 1");
+    add_message(&agent, HU_ROLE_ASSISTANT, "Reply 1");
+
+    const char *stable_id = "accumulate-test";
+    size_t sid_len = strlen(stable_id);
+    memcpy(agent.session_id, stable_id, sid_len);
+    agent.session_id[sid_len] = '\0';
+
+    hu_error_t err = hu_session_persist_save(&g_alloc, &agent, g_tmpdir, NULL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Simulate second invocation: load, add turn, save again */
+    hu_agent_t agent2;
+    init_agent(&agent2);
+    err = hu_session_persist_load(&g_alloc, &agent2, g_tmpdir, stable_id);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(agent2.history_count, 2);
+
+    add_message(&agent2, HU_ROLE_USER, "Turn 2");
+    add_message(&agent2, HU_ROLE_ASSISTANT, "Reply 2");
+    err = hu_session_persist_save(&g_alloc, &agent2, g_tmpdir, NULL);
+    HU_ASSERT_EQ(err, HU_OK);
+
+    /* Third invocation: load and verify all 4 messages accumulated */
+    hu_agent_t agent3;
+    init_agent(&agent3);
+    err = hu_session_persist_load(&g_alloc, &agent3, g_tmpdir, stable_id);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(agent3.history_count, 4);
+    HU_ASSERT_STR_EQ(agent3.history[0].content, "Turn 1");
+    HU_ASSERT_STR_EQ(agent3.history[1].content, "Reply 1");
+    HU_ASSERT_STR_EQ(agent3.history[2].content, "Turn 2");
+    HU_ASSERT_STR_EQ(agent3.history[3].content, "Reply 2");
+
+    free_agent(&agent);
+    free_agent(&agent2);
+    free_agent(&agent3);
+    teardown();
+}
+
 static void test_default_dir(void) {
     setup();
     char *dir = hu_session_default_dir(&g_alloc);
@@ -495,5 +578,7 @@ void test_session_persist(void) {
     HU_RUN_TEST(test_save_empty_history);
     HU_RUN_TEST(test_null_args_rejected);
     HU_RUN_TEST(test_save_preserves_all_roles);
+    HU_RUN_TEST(test_save_reuses_agent_session_id);
+    HU_RUN_TEST(test_save_overwrites_same_session_id);
     HU_RUN_TEST(test_default_dir);
 }

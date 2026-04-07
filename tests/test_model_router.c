@@ -488,6 +488,39 @@ static void judge_cached_reflexive_uses_on_device(void) {
     HU_ASSERT_STR_EQ(sel.model, c.on_device_model);
 }
 
+static void conversation_floor_prevents_reflexive(void) {
+    cfg = hu_model_router_default_config();
+    cfg.conversation_floor = HU_TIER_CONVERSATIONAL;
+    hu_model_selection_t sel = hu_model_route(&cfg, "hey", 3, NULL, 0, 14, 0);
+    HU_ASSERT(sel.tier >= HU_TIER_CONVERSATIONAL);
+    HU_ASSERT_STR_EQ(sel.model, cfg.conversational_model);
+}
+
+static void conversation_floor_zero_allows_reflexive(void) {
+    cfg = hu_model_router_default_config();
+    cfg.conversation_floor = HU_TIER_REFLEXIVE;
+    hu_model_selection_t sel = hu_model_route(&cfg, "lol", 3, NULL, 0, 14, 0);
+    HU_ASSERT(sel.tier == HU_TIER_REFLEXIVE);
+}
+
+static void conversation_floor_does_not_downgrade_higher(void) {
+    cfg = hu_model_router_default_config();
+    cfg.conversation_floor = HU_TIER_CONVERSATIONAL;
+    const char *msg = "I'm really struggling with depression and feel so alone right now";
+    hu_model_selection_t sel = hu_model_route(&cfg, msg, strlen(msg), NULL, 0, 2, 0);
+    HU_ASSERT(sel.tier >= HU_TIER_CONVERSATIONAL);
+}
+
+static void conversation_floor_applies_to_judge_fallback(void) {
+    hu_model_router_config_t c = hu_model_router_default_config();
+    c.conversation_floor = HU_TIER_CONVERSATIONAL;
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_provider_t dummy = { .vtable = NULL, .ctx = NULL };
+    hu_model_selection_t sel = hu_model_route_with_judge(
+        &c, "ok", 2, NULL, 0, 10, 0, &dummy, "test", 4, &alloc, NULL);
+    HU_ASSERT(sel.tier >= HU_TIER_CONVERSATIONAL);
+}
+
 void run_model_router_tests(void) {
     HU_TEST_SUITE("Model Router");
 
@@ -562,4 +595,10 @@ void run_model_router_tests(void) {
     HU_RUN_TEST(reflexive_uses_custom_on_device_model);
     HU_RUN_TEST(conversational_never_uses_on_device);
     HU_RUN_TEST(judge_cached_reflexive_uses_on_device);
+
+    /* Conversation floor */
+    HU_RUN_TEST(conversation_floor_prevents_reflexive);
+    HU_RUN_TEST(conversation_floor_zero_allows_reflexive);
+    HU_RUN_TEST(conversation_floor_does_not_downgrade_higher);
+    HU_RUN_TEST(conversation_floor_applies_to_judge_fallback);
 }

@@ -121,7 +121,14 @@ hu_model_router_config_t hu_model_router_default_config(void) {
     cfg.analytical_model_len = 22;
     cfg.deep_model = "gemini-3.1-pro-preview";
     cfg.deep_model_len = 22;
+    cfg.on_device_model = "apple-foundationmodel";
+    cfg.on_device_model_len = 21;
+    cfg.on_device_available = false;
     return cfg;
+}
+
+bool hu_model_router_on_device_suitable(hu_cognitive_tier_t tier) {
+    return tier == HU_TIER_REFLEXIVE;
 }
 
 /* Internal heuristic scoring — returns the raw score for use by both
@@ -171,8 +178,13 @@ static void apply_tier_to_selection(hu_model_selection_t *sel, const hu_model_ro
                                     int score) {
     if (score <= 0) {
         sel->tier = HU_TIER_REFLEXIVE;
-        sel->model = cfg->reflexive_model;
-        sel->model_len = cfg->reflexive_model_len;
+        if (cfg->on_device_available && cfg->on_device_model && cfg->on_device_model_len > 0) {
+            sel->model = cfg->on_device_model;
+            sel->model_len = cfg->on_device_model_len;
+        } else {
+            sel->model = cfg->reflexive_model;
+            sel->model_len = cfg->reflexive_model_len;
+        }
         sel->thinking_budget = 0;
         sel->temperature = 0.9;
     } else if (score <= 3) {
@@ -201,8 +213,13 @@ static void apply_tier_override(hu_model_selection_t *sel, const hu_model_router
     switch (tier) {
     case HU_TIER_REFLEXIVE:
         sel->tier = HU_TIER_REFLEXIVE;
-        sel->model = cfg->reflexive_model;
-        sel->model_len = cfg->reflexive_model_len;
+        if (cfg->on_device_available && cfg->on_device_model && cfg->on_device_model_len > 0) {
+            sel->model = cfg->on_device_model;
+            sel->model_len = cfg->on_device_model_len;
+        } else {
+            sel->model = cfg->reflexive_model;
+            sel->model_len = cfg->reflexive_model_len;
+        }
         sel->thinking_budget = 0;
         sel->temperature = 0.9;
         break;
@@ -249,6 +266,9 @@ hu_model_selection_t hu_model_route(const hu_model_router_config_t *cfg,
                                         history_count);
     apply_tier_to_selection(&sel, cfg, score);
 
+    if (cfg->conversation_floor > sel.tier)
+        apply_tier_override(&sel, cfg, cfg->conversation_floor);
+
     /* Record to global decision log for dashboard visibility */
     hu_route_log_record(hu_route_global_log(), &sel, score, (int64_t)time(NULL));
 
@@ -281,6 +301,8 @@ hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *c
     if (cache && hu_route_cache_get(cache, msg, msg_len, now, &cached_tier)) {
         sel.source = HU_ROUTE_JUDGE_CACHED;
         apply_tier_override(&sel, cfg, cached_tier);
+        if (cfg->conversation_floor > sel.tier)
+            apply_tier_override(&sel, cfg, cfg->conversation_floor);
         hu_route_log_record(hu_route_global_log(), &sel, score, now);
         return sel;
     }
@@ -292,12 +314,16 @@ hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *c
     /* In test mode, skip the actual LLM call and fall through to heuristics */
     sel.source = HU_ROUTE_JUDGE_FALLBACK;
     apply_tier_to_selection(&sel, cfg, score);
+    if (cfg->conversation_floor > sel.tier)
+        apply_tier_override(&sel, cfg, cfg->conversation_floor);
     hu_route_log_record(hu_route_global_log(), &sel, score, now);
     return sel;
 #else
     if (!judge_provider->vtable || !judge_provider->vtable->chat_with_system) {
         sel.source = HU_ROUTE_JUDGE_FALLBACK;
         apply_tier_to_selection(&sel, cfg, score);
+        if (cfg->conversation_floor > sel.tier)
+            apply_tier_override(&sel, cfg, cfg->conversation_floor);
         hu_route_log_record(hu_route_global_log(), &sel, score, now);
         return sel;
     }
@@ -314,6 +340,8 @@ hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *c
             alloc->free(alloc->ctx, response, response_len + 1);
         sel.source = HU_ROUTE_JUDGE_FALLBACK;
         apply_tier_to_selection(&sel, cfg, score);
+        if (cfg->conversation_floor > sel.tier)
+            apply_tier_override(&sel, cfg, cfg->conversation_floor);
         hu_route_log_record(hu_route_global_log(), &sel, score, now);
         return sel;
     }
@@ -328,6 +356,9 @@ hu_model_selection_t hu_model_route_with_judge(const hu_model_router_config_t *c
         sel.source = HU_ROUTE_JUDGE_FALLBACK;
         apply_tier_to_selection(&sel, cfg, score);
     }
+
+    if (cfg->conversation_floor > sel.tier)
+        apply_tier_override(&sel, cfg, cfg->conversation_floor);
 
     alloc->free(alloc->ctx, response, response_len + 1);
     hu_route_log_record(hu_route_global_log(), &sel, score, now);
