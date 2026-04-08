@@ -12,7 +12,7 @@ export class ScCard extends LitElement {
   @property({ type: Boolean }) accent = false;
   @property({ type: Boolean }) elevated = false;
   @property({ type: Boolean }) glass = false;
-  @property({ type: Boolean }) solid = false;
+  @property({ type: String, attribute: "aria-label" }) ariaLabelAttr = "";
   /** Opt-in 3D perspective tilt following pointer (overview-style cards). */
   @property({ type: Boolean, reflect: true }) tilt = false;
   /** Enable mesh gradient background overlay. */
@@ -544,6 +544,7 @@ export class ScCard extends LitElement {
         style="--hu-card-surface: ${surfaceToken}"
         role=${this.clickable ? "button" : undefined}
         tabindex=${this.clickable ? 0 : undefined}
+        aria-label=${this.clickable && this.ariaLabelAttr ? this.ariaLabelAttr : undefined}
         @keydown=${this._onKeyDown}
         @pointerenter=${onTiltEnter}
         @pointermove=${onTiltMove}

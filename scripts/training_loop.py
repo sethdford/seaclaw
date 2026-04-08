@@ -32,6 +32,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -124,14 +125,15 @@ def phase_merge():
 
 
 def phase_prepare():
-    """Phase 3: Prepare fine-tuning data."""
+    """Phase 3: Generate targeted synthetic data + prepare fine-tuning data."""
     print(f"\n{'='*60}")
     print(f"  Phase 3: PREPARE FINE-TUNE DATA")
     print(f"{'='*60}")
 
+    run_script("generate_targeted_synthetic.py", check=False)
+
     run_script("prepare-finetune.py", [
         "--persona", "seth",
-        "--include-chatdb",
         "--output", str(FINETUNE_DIR),
     ])
 
@@ -146,6 +148,7 @@ def phase_train(args) -> int:
         "--data", str(FINETUNE_DIR),
         "--adapter-path", str(ADAPTER_PATH),
         "--iters", str(args.iters),
+        "--rank", "16",
         "--max-seq-length", "2048",
         "--no-restart-server",
     ]
@@ -204,7 +207,7 @@ def phase_eval(args) -> dict:
 
     # Blinded A/B
     print(f"\n  --- Blinded A/B ---")
-    run_script("eval_blinded_ab.py", ["--synthetic"], check=False)
+    run_script("eval_blinded_ab.py", ["--mlx", "--synthetic", "--max-trials=50"], check=False)
     ab_path = DATA_DIR / "eval_blinded_ab.json"
     scores["blinded_ab"] = read_eval_score(ab_path)
     print(f"  Blinded A/B fool rate: {scores['blinded_ab']:.1f}%")
@@ -302,16 +305,26 @@ def run_cycle(args, cycle_num: int, history: dict) -> dict:
         print(f"\n  Starting MLX server for evaluation...")
         server_cmd = [
             sys.executable, str(SCRIPTS / "mlx-server.py"),
+            "--model", "mlx-community/gemma-4-31b-it-4bit",
             "--port", str(args.port),
         ]
         adapter_safetensors = ADAPTER_PATH / "adapters.safetensors"
         if adapter_safetensors.exists():
             server_cmd.extend(["--adapter-path", str(ADAPTER_PATH)])
         server = subprocess.Popen(
-            server_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            start_new_session=True,
+            server_cmd, start_new_session=True,
         )
-        time.sleep(15)
+        # Wait for server to load model and start serving
+        for _ in range(30):
+            time.sleep(2)
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{args.port}/health", timeout=3)
+                print(f"  MLX server ready on port {args.port}")
+                break
+            except Exception:
+                pass
+        else:
+            print(f"  WARNING: MLX server may not be ready (timeout after 60s)")
 
     # Generate training data
     if not args.eval_only and not args.skip_convo:
@@ -364,7 +377,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--cycles", type=int, default=1, help="Number of improvement cycles (default: 1)")
-    parser.add_argument("--iters", type=int, default=200, help="SFT training iterations per cycle")
+    parser.add_argument("--iters", type=int, default=800, help="SFT training iterations per cycle")
     parser.add_argument("--convo-turns", type=int, default=15, help="Conversation turns per convo-trainer session")
     parser.add_argument("--port", type=int, default=8741, help="MLX server port for eval")
     parser.add_argument("--skip-extract", action="store_true", help="Skip data extraction phase")

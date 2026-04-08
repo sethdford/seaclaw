@@ -10,6 +10,7 @@ Reads ~/Library/Messages/chat.db and produces:
 
 import json
 import os
+import re
 import sqlite3
 import sys
 from datetime import datetime
@@ -51,12 +52,38 @@ def should_skip(text):
     return False
 
 
+def extract_text_from_attributed_body(blob):
+    """Decode text from an NSAttributedString (NSKeyedArchiver) blob.
+
+    Modern macOS stores iMessage text only in the attributedBody column as a
+    serialised NSAttributedString.  The text payload sits between the
+    ``NSString`` marker and a ``\\x86`` terminator.
+    """
+    idx = blob.find(b"NSString")
+    if idx < 0:
+        return None
+    start = blob.find(b"+", idx)
+    if start < 0:
+        return None
+    start += 1
+    end = blob.find(b"\x86", start)
+    if end < 0:
+        end = start + 2000
+    raw = blob[start:end]
+    try:
+        text = raw.decode("utf-8", errors="ignore").strip()
+    except Exception:
+        return None
+    text = re.sub(r"^[\x00-\x1f]+", "", text)
+    return text if len(text) > 1 else None
+
+
 def extract_messages(db_path):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT 
+        SELECT
             m.ROWID,
             m.is_from_me,
             m.text,
@@ -64,28 +91,40 @@ def extract_messages(db_path):
             COALESCE(h.id, '') as contact,
             COALESCE(c.chat_identifier, '') as chat_id,
             m.date_delivered,
-            m.date_read
+            m.date_read,
+            m.attributedBody
         FROM message m
         LEFT JOIN handle h ON m.handle_id = h.ROWID
         LEFT JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
         LEFT JOIN chat c ON cmj.chat_id = c.ROWID
-        WHERE m.text IS NOT NULL 
-          AND m.text != ''
-          AND m.item_type = 0
+        WHERE m.item_type = 0
           AND m.associated_message_type = 0
+          AND (m.text IS NOT NULL OR m.attributedBody IS NOT NULL)
         ORDER BY c.chat_identifier, m.date
     """)
 
     messages = []
+    ab_recovered = 0
     for row in cursor.fetchall():
-        rowid, is_from_me, text, date_ns, contact, chat_id, delivered, read = row
-        if should_skip(text):
+        rowid, is_from_me, text, date_ns, contact, chat_id, delivered, read, attr_body = row
+
+        if text and text.strip():
+            final_text = text.strip()
+        elif attr_body:
+            final_text = extract_text_from_attributed_body(attr_body)
+            if final_text:
+                ab_recovered += 1
+        else:
             continue
+
+        if not final_text or should_skip(final_text):
+            continue
+
         unix_ts = apple_date_to_unix(date_ns)
         messages.append({
             "rowid": rowid,
             "is_from_me": bool(is_from_me),
-            "text": text.strip(),
+            "text": final_text,
             "timestamp": unix_ts,
             "contact": contact,
             "chat_id": chat_id,
@@ -95,6 +134,8 @@ def extract_messages(db_path):
         })
 
     conn.close()
+    if ab_recovered:
+        print(f"  ({ab_recovered} messages recovered from attributedBody)")
     return messages
 
 
@@ -197,6 +238,56 @@ def extract_timing_data(windows):
     return timing
 
 
+def extract_voice_training_pairs(windows):
+    """
+    Extract training pairs optimized for real-time voice (E4B/E2B models).
+
+    Voice-optimized differences from standard training:
+      - Shorter context windows (3 messages max — voice is more immediate)
+      - Prefer shorter Seth replies (voice needs concise responses)
+      - Add conversational timing metadata for pacing
+      - Filter to conversational-style messages (not links, not long-form)
+    """
+    MAX_VOICE_REPLY_LENGTH = 280
+    MAX_VOICE_CONTEXT = 3
+    pairs = []
+    for window in windows:
+        for i, msg in enumerate(window):
+            if not msg["is_from_me"] or len(msg["text"]) < MIN_REPLY_LENGTH:
+                continue
+            if len(msg["text"]) > MAX_VOICE_REPLY_LENGTH:
+                continue
+            if msg["text"].startswith("http") or "\n\n" in msg["text"]:
+                continue
+
+            context_start = max(0, i - MAX_VOICE_CONTEXT)
+            context = window[context_start:i]
+            if not context:
+                continue
+
+            messages = []
+            for ctx in context:
+                role = "assistant" if ctx["is_from_me"] else "user"
+                messages.append({"role": role, "content": ctx["text"]})
+            messages.append({"role": "assistant", "content": msg["text"]})
+
+            delay_from_prev = 0
+            if i > 0:
+                delay_from_prev = msg["timestamp"] - window[i - 1]["timestamp"]
+
+            pairs.append({
+                "messages": messages,
+                "metadata": {
+                    "chat_id": msg["chat_id"],
+                    "timestamp": msg["datetime"],
+                    "reply_length": len(msg["text"]),
+                    "response_delay_s": round(delay_from_prev, 1),
+                    "format": "voice",
+                }
+            })
+    return pairs
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -213,13 +304,21 @@ def main():
         all_windows.extend(windows)
     print(f"  {len(all_windows)} conversation windows")
 
-    # Training pairs
+    # Training pairs (standard — for 31B fine-tuning)
     training = extract_training_pairs(all_windows)
     train_path = os.path.join(OUT_DIR, "training_pairs.jsonl")
     with open(train_path, "w") as f:
         for pair in training:
             f.write(json.dumps(pair) + "\n")
     print(f"\n  Training pairs: {len(training)} -> {train_path}")
+
+    # Voice-optimized training pairs (for E4B/E2B fine-tuning)
+    voice_training = extract_voice_training_pairs(all_windows)
+    voice_path = os.path.join(OUT_DIR, "voice_training_pairs.jsonl")
+    with open(voice_path, "w") as f:
+        for pair in voice_training:
+            f.write(json.dumps(pair) + "\n")
+    print(f"  Voice training pairs: {len(voice_training)} -> {voice_path}")
 
     # Ground truth
     gt = extract_ground_truth(all_windows)
@@ -252,10 +351,21 @@ def main():
         print(f"  Avg reply delay: {sum(delays)/len(delays):.0f}s")
         print(f"  Median reply delay: {sorted(delays)[len(delays)//2]:.0f}s")
 
+    # Voice-specific stats
+    voice_lengths = [len(p["messages"][-1]["content"]) for p in voice_training]
+    if voice_lengths:
+        print(f"\n--- Voice Training Stats ---")
+        print(f"  Voice pairs: {len(voice_training)} ({len(voice_training)/len(training)*100:.0f}% of total)")
+        print(f"  Avg voice reply length: {sum(voice_lengths)/len(voice_lengths):.0f} chars")
+        print(f"  Median voice reply length: {sorted(voice_lengths)[len(voice_lengths)//2]} chars")
+
     # Sample for inspection
     print(f"\n--- Sample training pair ---")
     if training:
         print(json.dumps(training[0], indent=2))
+    print(f"\n--- Sample voice training pair ---")
+    if voice_training:
+        print(json.dumps(voice_training[0], indent=2))
     print(f"\n--- Sample ground truth ---")
     if gt:
         print(json.dumps(gt[0], indent=2))

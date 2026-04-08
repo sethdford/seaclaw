@@ -4,6 +4,7 @@
  */
 #include "human/config.h"
 #include "human/voice/gemini_live.h"
+#include "human/voice/mlx_local.h"
 #include "human/voice/provider.h"
 #include <string.h>
 
@@ -95,6 +96,23 @@ hu_error_t hu_voice_provider_create_from_config(hu_allocator_t *alloc, const hu_
         return hu_voice_provider_openai_create(alloc, &rtc, out);
     }
 
+    if (strcmp(mode, "mlx_local") == 0) {
+        hu_mlx_local_config_t mlc = {
+            .endpoint = "http://127.0.0.1:8741",
+            .model = rt_model,
+            .voice_id = rt_voice,
+            .sample_rate = (extras && extras->sample_rate > 0) ? extras->sample_rate : 24000,
+        };
+        if (extras) {
+            mlc.system_prompt = extras->system_instruction;
+            if (extras->model_id && extras->model_id[0])
+                mlc.model = extras->model_id;
+            if (extras->voice_id && extras->voice_id[0])
+                mlc.voice_id = extras->voice_id;
+        }
+        return hu_voice_provider_mlx_local_create(alloc, &mlc, out);
+    }
+
     return HU_ERR_NOT_SUPPORTED;
 }
 
@@ -149,6 +167,17 @@ hu_error_t hu_voice_provider_create_from_extras(hu_allocator_t *alloc, const cha
             .vad_enabled = true,
         };
         return hu_voice_provider_openai_create(alloc, &rtc, out);
+    }
+
+    if (strcmp(mode, "mlx_local") == 0) {
+        hu_mlx_local_config_t mlc = {
+            .endpoint = "http://127.0.0.1:8741",
+            .model = model,
+            .system_prompt = extras->system_instruction,
+            .voice_id = voice,
+            .sample_rate = extras->sample_rate > 0 ? extras->sample_rate : 24000,
+        };
+        return hu_voice_provider_mlx_local_create(alloc, &mlc, out);
     }
 
     return HU_ERR_NOT_SUPPORTED;

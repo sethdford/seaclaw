@@ -58,12 +58,29 @@ def _gemini_url():
             f"publishers/google/models/{EVAL_MODEL}:generateContent")
 
 GATEWAY_URL = os.environ.get("HU_GATEWAY_URL", "http://127.0.0.1:3002")
+MLX_URL = os.environ.get("MLX_URL", "http://127.0.0.1:8741/v1/chat/completions")
 USE_GATEWAY = "--gateway" in sys.argv
 USE_SYNTHETIC = "--synthetic" in sys.argv
+USE_MLX = "--mlx" in sys.argv
+MAX_TRIALS = 50
+
+for arg in sys.argv:
+    if arg.startswith("--max-trials="):
+        MAX_TRIALS = int(arg.split("=")[1])
 
 HU_BIN = "hu"
 GT_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "imessage", "ground_truth.jsonl")
 RESULTS_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "eval_blinded_ab.json")
+
+SETH_SYSTEM_PROMPT = (
+    "You are Seth Ford, 45, texting on iMessage. Chief Architect at Vanguard. "
+    "Live alone with your cat in King of Prussia, PA. From Afton, Wyoming. "
+    "Three kids (Annette, Emerson, Edison) who don't live with you. "
+    "Speak Japanese, lived in Japan (lost home in 2011 tsunami). "
+    "23 years at Fidelity before this. Build AI runtimes as side projects.\n\n"
+    "Style: casual, warm, direct. Short messages. Lowercase. "
+    "Abbreviate (gonna, tbh, idk, hru). Emoji rare. Strong opinions. Dry humor."
+)
 
 SYNTHETIC_SCENARIOS = [
     {"incoming": "hey whats up", "seth_reply": "not much just chilling. you?"},
@@ -99,7 +116,34 @@ def call_gemini(prompt, temperature=0.3):
 def get_ai_response(message):
     if USE_GATEWAY:
         return get_ai_response_gateway(message)
+    if USE_MLX:
+        return get_ai_response_mlx(message)
     return get_ai_response_cli(message)
+
+
+def get_ai_response_mlx(message):
+    """Get AI response from the local MLX server with Seth persona."""
+    try:
+        payload = json.dumps({
+            "messages": [
+                {"role": "system", "content": SETH_SYSTEM_PROMPT},
+                {"role": "user", "content": message},
+            ],
+            "max_tokens": 200,
+            "temperature": 0.7,
+        }).encode()
+        req = urllib.request.Request(
+            MLX_URL, data=payload,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        resp = urllib.request.urlopen(req, timeout=30)
+        data = json.loads(resp.read())
+        choices = data.get("choices", [])
+        if choices:
+            return choices[0].get("message", {}).get("content", "(empty)")
+        return "(no choices)"
+    except Exception as e:
+        return f"(error: {e})"
 
 
 def get_ai_response_cli(message):
@@ -202,13 +246,18 @@ def main():
         print("  Or use: --synthetic flag for synthetic scenarios")
         sys.exit(1)
 
-    mode = "GATEWAY (live daemon)" if USE_GATEWAY else "CLI (hu agent -m)"
+    total_available = len(pairs)
+    if len(pairs) > MAX_TRIALS:
+        random.shuffle(pairs)
+        pairs = pairs[:MAX_TRIALS]
+
+    mode = "MLX server" if USE_MLX else ("GATEWAY (live daemon)" if USE_GATEWAY else "CLI (hu agent -m)")
     print("=" * 70)
     print("  BLINDED A/B EVALUATION — AI vs Real Seth")
     print("=" * 70)
     print(f"  Mode: {mode}")
-    print(f"  Pairs: {len(pairs)} ({len(load_ground_truth())} ground truth"
-          f"{f', {len(SYNTHETIC_SCENARIOS)} synthetic' if USE_SYNTHETIC else ''})")
+    print(f"  Pairs: {len(pairs)} (sampled from {total_available}"
+          f"{f', +{len(SYNTHETIC_SCENARIOS)} synthetic' if USE_SYNTHETIC else ''})")
     print(f"  Judge: Gemini 3.1 Pro (independent, blinded)")
     print("=" * 70)
 

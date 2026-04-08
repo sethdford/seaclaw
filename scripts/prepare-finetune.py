@@ -146,63 +146,48 @@ def examples_from_persona(persona: dict) -> list[dict]:
     return examples
 
 
-def examples_from_chatdb(persona: dict, max_per_contact: int = 500) -> list[dict]:
-    """Extract training examples from iMessage chat.db."""
-    chatdb_path = Path.home() / "Library" / "Messages" / "chat.db"
-    if not chatdb_path.exists():
-        print(f"  chat.db not found at {chatdb_path}, skipping", file=sys.stderr)
+def examples_from_merged_pairs(persona: dict) -> list[dict]:
+    """Load training examples from the merged extraction pipeline output.
+
+    Reads data/merged/training_pairs.jsonl which is produced by
+    extract_imessage_pairs.py + extract_apple_photos.py -> merge_training_sources.py.
+    This is the primary source of real conversation data.
+    """
+    merged_path = REPO_ROOT / "data" / "merged" / "training_pairs.jsonl"
+    if not merged_path.exists():
         return []
 
     contacts = persona.get("contacts", {})
     examples = []
 
-    try:
-        conn = sqlite3.connect(str(chatdb_path))
-        conn.row_factory = sqlite3.Row
-    except Exception as e:
-        print(f"  Could not open chat.db: {e}", file=sys.stderr)
-        return []
-
-    for contact_id, contact in contacts.items():
-        if contact.get("relationship") == "test":
-            continue
-
-        contact_ctx = build_contact_context(contact)
-        rows = conn.execute("""
-            SELECT m.text, m.is_from_me, m.date
-            FROM message m
-            JOIN handle h ON m.handle_id = h.ROWID
-            WHERE h.id = ?
-              AND m.text IS NOT NULL AND m.text != ''
-            ORDER BY m.date ASC
-            LIMIT ?
-        """, (contact_id, max_per_contact * 3)).fetchall()
-
-        if len(rows) < 2:
-            continue
-
-        context_window: list[dict] = []
-        for row in rows:
-            text = row["text"].strip()
-            is_from_me = row["is_from_me"]
-            if not text:
+    with open(merged_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                pair = json.loads(line)
+            except json.JSONDecodeError:
                 continue
 
-            if is_from_me and len(context_window) > 0 and len(text) >= MIN_RESPONSE_CHARS:
-                last_role = context_window[-1]["role"] if context_window else None
-                if last_role == "user":
-                    messages = [{"role": "system", "content": build_system_prompt(contact_ctx)}]
-                    for ctx_msg in context_window[-6:]:
-                        messages.append(ctx_msg)
-                    messages.append({"role": "assistant", "content": text})
-                    examples.append({"messages": clean_messages(messages)})
+            msgs = pair.get("messages", [])
+            if not msgs:
+                continue
 
-            role = "assistant" if is_from_me else "user"
-            context_window.append({"role": role, "content": text})
-            if len(context_window) > 20:
-                context_window = context_window[-20:]
+            last_assistant = [m for m in msgs if m.get("role") == "assistant"]
+            if not last_assistant:
+                continue
+            if len(last_assistant[-1].get("content", "")) < MIN_RESPONSE_CHARS:
+                continue
 
-    conn.close()
+            chat_id = pair.get("metadata", {}).get("chat_id", "")
+            contact = contacts.get(chat_id, {})
+            contact_ctx = build_contact_context(contact) if contact else ""
+
+            final_msgs = [{"role": "system", "content": build_system_prompt(contact_ctx)}]
+            final_msgs.extend(msgs)
+            examples.append({"messages": clean_messages(final_msgs)})
+
     return examples
 
 
@@ -535,16 +520,15 @@ def main():
 
     all_examples = []
 
-    # Source 1: Persona example banks (highest quality, 3x weight)
+    # Source 1: Merged extraction pipeline (real conversations — primary source)
+    merged_examples = examples_from_merged_pairs(persona)
+    print(f"  Merged pipeline examples: {len(merged_examples)}")
+    all_examples.extend(merged_examples)
+
+    # Source 2: Persona example banks (highest quality, 3x weight)
     persona_examples = examples_from_persona(persona)
     print(f"  Persona examples: {len(persona_examples)}")
     all_examples.extend(persona_examples * 3)
-
-    # Source 2: chat.db history
-    if args.include_chatdb:
-        chatdb_examples = examples_from_chatdb(persona, args.max_per_contact)
-        print(f"  Chat.db examples: {len(chatdb_examples)}")
-        all_examples.extend(chatdb_examples)
 
     # Source 3: DPO pairs (chosen responses, 2x weight)
     dpo_paths = []
@@ -565,7 +549,28 @@ def main():
     print(f"  Backstory examples: {len(backstory_exs)}")
     all_examples.extend(backstory_exs * 2)
 
-    # Source 5: Style-augmented copies (1x weight — teaches texting patterns)
+    # Source 5: Targeted synthetic data (fills coverage gaps, 3x weight)
+    synthetic_path = REPO_ROOT / "data" / "synthetic" / "targeted.jsonl"
+    if synthetic_path.exists():
+        synthetic_examples = []
+        with open(synthetic_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ex = json.loads(line)
+                    msgs = ex.get("messages", [])
+                    if msgs:
+                        synthetic_examples.append({"messages": msgs})
+                except json.JSONDecodeError:
+                    continue
+        print(f"  Targeted synthetic: {len(synthetic_examples)}")
+        all_examples.extend(synthetic_examples * 3)
+    else:
+        print(f"  Targeted synthetic: 0 (run generate_targeted_synthetic.py)")
+
+    # Source 6: Style-augmented copies (1x weight — teaches texting patterns)
     style_augmented = augment_with_style(all_examples)
     print(f"  Style-augmented: {len(style_augmented)}")
     all_examples.extend(style_augmented)

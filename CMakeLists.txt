@@ -876,6 +876,7 @@ list(APPEND HU_CORE_SOURCES
     src/voice/realtime.c
     src/voice/gemini_live.c
     src/voice/provider_factory.c
+    src/voice/mlx_local.c
     src/voice/duplex.c
     src/voice/session.c
     src/voice/opus.c
@@ -2118,6 +2119,7 @@ set(HU_TEST_SOURCES
     tests/test_gemini_live.c
     tests/test_voice_factory_e2e.c
     tests/test_voice_streaming_e2e.c
+    tests/test_mlx_local_voice.c
     tests/test_autonomy.c
     tests/test_retrieval.c
     tests/test_prompt.c

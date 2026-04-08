@@ -513,13 +513,24 @@ def run_conversation(args: argparse.Namespace) -> dict[str, Any]:
             try:
                 raw_score = call_gemini(scorer_prompt, temperature=0.2)
                 scores = json.loads(_strip_json_fence(raw_score))
+                if isinstance(scores, list):
+                    scores = scores[0] if scores and isinstance(scores[0], dict) else {}
+                if not isinstance(scores, dict):
+                    scores = {}
             except Exception as e:
                 print(f"         [scorer error: {e}]")
+                scores = {}
+
+            if "overall" not in scores:
                 scores = {
-                    "naturalness": 50, "persona_consistency": 50,
-                    "engagement": 50, "emotional_intelligence": 50,
-                    "substance": 50, "overall": 50,
-                    "correction": None, "notes": f"scorer error: {e}",
+                    "naturalness": scores.get("naturalness", 50),
+                    "persona_consistency": scores.get("persona_consistency", 50),
+                    "engagement": scores.get("engagement", 50),
+                    "emotional_intelligence": scores.get("emotional_intelligence", 50),
+                    "substance": scores.get("substance", 50),
+                    "overall": scores.get("overall", 50),
+                    "correction": scores.get("correction"),
+                    "notes": scores.get("notes", ""),
                 }
 
         overall = scores.get("overall", 50)

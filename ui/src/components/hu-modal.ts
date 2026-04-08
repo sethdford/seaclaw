@@ -113,6 +113,8 @@ export class ScModal extends LitElement {
   @property({ type: String }) heading = "";
   @state() private _closing = false;
   private _closeTimeout: ReturnType<typeof setTimeout> | null = null;
+  private _previouslyFocused: HTMLElement | null = null;
+  private _scrollY = 0;
 
   override updated(changedProperties: Map<string, unknown>): void {
     if (changedProperties.has("open")) {
@@ -122,13 +124,18 @@ export class ScModal extends LitElement {
           clearTimeout(this._closeTimeout);
           this._closeTimeout = null;
         }
+        this._previouslyFocused = document.activeElement as HTMLElement | null;
+        this._lockScroll();
         requestAnimationFrame(() => this._focusFirst());
       } else if (changedProperties.get("open") === true) {
         this._closing = true;
+        this._unlockScroll();
         this._closeTimeout = setTimeout(() => {
           this._closing = false;
           this._closeTimeout = null;
         }, 100);
+        this._previouslyFocused?.focus();
+        this._previouslyFocused = null;
       }
     }
   }
@@ -136,6 +143,26 @@ export class ScModal extends LitElement {
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     if (this._closeTimeout) clearTimeout(this._closeTimeout);
+    this._unlockScroll();
+  }
+
+  private _lockScroll(): void {
+    this._scrollY = window.scrollY;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${this._scrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+  }
+
+  private _unlockScroll(): void {
+    if (document.body.style.position !== "fixed") return;
+    document.body.style.overflow = "";
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
+    window.scrollTo(0, this._scrollY);
   }
 
   /** Includes `position: fixed` targets; avoids dropping focusables when `offsetParent` is null. */

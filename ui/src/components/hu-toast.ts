@@ -225,8 +225,8 @@ export class ScToast extends LitElement {
         (item) => html`
           <div
             class="toast hu-entry-slide-up variant-${item.variant} ${item.visible ? "" : "exiting"}"
-            role="status"
-            aria-live="polite"
+            role=${item.variant === "error" ? "alert" : "status"}
+            aria-live=${item.variant === "error" ? "assertive" : "polite"}
             aria-atomic="true"
           >
             <span class="message">${item.message}</span>

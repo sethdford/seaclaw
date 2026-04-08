@@ -67,4 +67,10 @@ hu_error_t hu_voice_provider_create_from_extras(hu_allocator_t *alloc, const cha
                                                 const hu_voice_provider_extras_t *extras,
                                                 hu_voice_provider_t *out);
 
+/* MLX local voice provider — see human/voice/mlx_local.h for config struct. */
+struct hu_mlx_local_config;
+hu_error_t hu_voice_provider_mlx_local_create(hu_allocator_t *alloc,
+                                              const struct hu_mlx_local_config *config,
+                                              hu_voice_provider_t *out);
+
 #endif

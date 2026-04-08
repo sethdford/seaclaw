@@ -208,11 +208,24 @@ def call_judge(prompt: str) -> dict:
     return json.loads(raw)
 
 
+SETH_SYSTEM_PROMPT = (
+    "You are Seth Ford, 45, texting on iMessage. Chief Architect at Vanguard. "
+    "Live alone with your cat in King of Prussia, PA. From Afton, Wyoming. "
+    "Three kids (Annette, Emerson, Edison) who don't live with you. "
+    "Speak Japanese, lived in Japan (lost home in 2011 tsunami). "
+    "23 years at Fidelity before this. Build AI runtimes as side projects.\n\n"
+    "Style: casual, warm, direct. Short messages. Lowercase. "
+    "Abbreviate (gonna, tbh, idk, hru). Emoji rare. Strong opinions. Dry humor."
+)
+
+
 def get_model_response(probe: str, model_url: str) -> str:
     payload = json.dumps({
-        "model": "default",
-        "messages": [{"role": "user", "content": probe}],
-        "max_tokens": 256,
+        "messages": [
+            {"role": "system", "content": SETH_SYSTEM_PROMPT},
+            {"role": "user", "content": probe},
+        ],
+        "max_tokens": 200,
         "temperature": 0.7,
     }).encode()
     try:
@@ -220,7 +233,7 @@ def get_model_response(probe: str, model_url: str) -> str:
             model_url, data=payload,
             headers={"Content-Type": "application/json"},
         )
-        resp = urllib.request.urlopen(req, timeout=30)
+        resp = urllib.request.urlopen(req, timeout=120)
         data = json.loads(resp.read())
         return data["choices"][0]["message"]["content"].strip()
     except Exception as e:

@@ -138,7 +138,7 @@ export class ScInput extends LitElement {
   }
 
   override render() {
-    const errorId = this.error ? "hu-input-error" : undefined;
+    const errorId = this.error ? `${this._inputId}-error` : undefined;
     return html`
       <div class="wrapper">
         ${this.label ? html`<label class="label" for=${this._inputId}>${this.label}</label>` : null}
@@ -163,7 +163,7 @@ export class ScInput extends LitElement {
         ${this.error
           ? html`<span
               class="error-msg"
-              id=${`${this._inputId}-error`}
+              id=${errorId}
               role="alert"
               aria-live="polite"
               >${this.error}</span

@@ -528,7 +528,7 @@ export class ScSidebar extends LitElement {
           </div>
         </header>
 
-        <nav class="nav" aria-label="Main navigation">
+        <nav class="nav" aria-label="Main navigation" @keydown=${this._onNavKeyDown}>
           ${PRIMARY_NAV.map(
             (item) => html`
               <div
@@ -541,6 +541,7 @@ export class ScSidebar extends LitElement {
                   data-nav-id=${item.id}
                   ?aria-current=${this.activeTab === item.id}
                   aria-label=${item.label}
+                  aria-describedby=${this._showShortcutTooltip && this._hoveredItemId === item.id ? `shortcut-${item.id}` : undefined}
                   title=${this.collapsed ? item.label : undefined}
                   @click=${() => this._dispatchTabChange(item.id)}
                   @mouseenter=${() => this._dispatchNavHover(item.id)}
@@ -549,7 +550,7 @@ export class ScSidebar extends LitElement {
                   <span class="label">${item.label}</span>
                 </button>
                 ${this._showShortcutTooltip && this._hoveredItemId === item.id
-                  ? html`<span class="shortcut-tooltip" role="tooltip"
+                  ? html`<span class="shortcut-tooltip" id=${`shortcut-${item.id}`} role="tooltip"
                       >${NAV_SHORTCUT_MAP[item.id] ?? ""}</span
                     >`
                   : nothing}
@@ -798,6 +799,18 @@ export class ScSidebar extends LitElement {
     this._teardownMagneticNavListeners();
     this._onNavItemLeave();
     super.disconnectedCallback();
+  }
+
+  private _onNavKeyDown(e: KeyboardEvent): void {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    const nav = this.renderRoot.querySelector<HTMLElement>(".nav");
+    if (!nav) return;
+    const buttons = Array.from(nav.querySelectorAll<HTMLElement>(".nav-item"));
+    const idx = buttons.indexOf(e.target as HTMLElement);
+    if (idx === -1) return;
+    const next = e.key === "ArrowDown" ? (idx + 1) % buttons.length : (idx - 1 + buttons.length) % buttons.length;
+    buttons[next].focus();
   }
 
   private _dispatchTabChange(tabId: string): void {

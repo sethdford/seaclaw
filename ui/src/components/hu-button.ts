@@ -222,6 +222,11 @@ export class ScButton extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.addEventListener("pointerdown", this._onPointerDown);
+    if (this.iconOnly && !this.ariaLabelAttr) {
+      console.warn(
+        `<hu-button icon-only> missing aria-label — screen readers cannot name this control`,
+      );
+    }
   }
 
   override disconnectedCallback(): void {
@@ -241,9 +246,9 @@ export class ScButton extends LitElement {
     return html`
       <button
         class=${classes}
-        ?disabled=${this.disabled}
+        ?disabled=${this.disabled || this.loading}
         aria-busy=${this.loading}
-        aria-disabled=${this.disabled}
+        aria-disabled=${this.disabled || this.loading}
         aria-label=${this.ariaLabelAttr || nothing}
       >
         ${this.loading ? html`<span class="spinner" aria-hidden="true"></span>` : null}
