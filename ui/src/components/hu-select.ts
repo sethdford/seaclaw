@@ -111,8 +111,8 @@ export class ScSelect extends LitElement {
     }
 
     .chevron svg {
-      width: 1rem;
-      height: 1rem;
+      width: var(--hu-icon-sm);
+      height: var(--hu-icon-sm);
     }
 
     .error-msg {

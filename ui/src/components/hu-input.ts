@@ -76,7 +76,7 @@ export class ScInput extends LitElement {
       border-color: var(--hu-accent);
       outline: var(--hu-focus-ring-width) solid var(--hu-focus-ring);
       outline-offset: var(--hu-focus-ring-offset);
-      box-shadow: 0 0 12px var(--hu-focus-glow);
+      box-shadow: var(--hu-focus-glow-shadow);
     }
 
     input.error {

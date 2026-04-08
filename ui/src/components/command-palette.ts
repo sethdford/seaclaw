@@ -162,7 +162,7 @@ export class ScCommandPalette extends LitElement {
     .input:focus-visible {
       outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
       outline-offset: var(--hu-focus-ring-offset, 2px);
-      box-shadow: 0 0 12px var(--hu-focus-glow);
+      box-shadow: var(--hu-focus-glow-shadow);
     }
 
     .results {
@@ -188,7 +188,7 @@ export class ScCommandPalette extends LitElement {
       &:focus-visible {
         outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
         outline-offset: var(--hu-focus-ring-offset, 2px);
-        box-shadow: 0 0 12px var(--hu-focus-glow);
+        box-shadow: var(--hu-focus-glow-shadow);
       }
       &.selected {
         background: var(--hu-hover-overlay);

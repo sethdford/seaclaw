@@ -55,6 +55,7 @@
   --hu-surface: var(--hu-bg-surface);
   --hu-overlay: var(--hu-color-overlay, rgb(0 0 0 / 0.6));
   --hu-focus-glow: color-mix(in srgb, var(--hu-accent) 15%, transparent);
+  --hu-focus-glow-shadow: 0 0 12px var(--hu-focus-glow);
   --hu-glass-text-shadow-color: rgb(0 0 0 / 0.5);
   --hu-glass-hover-border: rgb(255 255 255 / 0.08);
   --hu-accent-glow: color-mix(in srgb, var(--hu-accent) 35%, transparent);
@@ -212,7 +213,7 @@ body {
 :focus-visible {
   outline: var(--hu-focus-ring-width, 2px) solid var(--hu-focus-ring);
   outline-offset: var(--hu-focus-ring-offset, 2px);
-  box-shadow: 0 0 12px var(--hu-focus-glow);
+  box-shadow: var(--hu-focus-glow-shadow);
 }
 
 /* ─── Selection ───────────────────────────────────────────────────── */
