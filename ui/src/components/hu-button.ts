@@ -46,7 +46,7 @@ export class ScButton extends LitElement {
     }
 
     button.icon-only {
-      min-width: 2.75rem;
+      min-width: var(--hu-button-min-height);
     }
 
     button:focus-visible {

@@ -228,7 +228,7 @@ export class ScSidebar extends LitElement {
       align-items: center;
       gap: var(--hu-space-md);
       width: 100%;
-      min-height: 3rem;
+      min-height: var(--hu-button-min-height);
       padding: var(--hu-space-sm) var(--hu-space-md);
       background: transparent;
       border: none;
@@ -325,7 +325,7 @@ export class ScSidebar extends LitElement {
       align-items: center;
       gap: var(--hu-space-sm);
       width: 100%;
-      min-height: 2.75rem;
+      min-height: var(--hu-button-min-height);
       padding: var(--hu-space-sm);
       background: transparent;
       border: none;
@@ -369,7 +369,7 @@ export class ScSidebar extends LitElement {
       align-items: center;
       justify-content: center;
       width: 100%;
-      min-height: 2.75rem;
+      min-height: var(--hu-button-min-height);
       padding: var(--hu-space-sm);
       background: transparent;
       border: none;

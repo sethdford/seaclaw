@@ -14,6 +14,10 @@
   --text-xl: var(--hu-text-xl);
   --text-2xl: var(--hu-text-2xl);
   --text-3xl: var(--hu-text-3xl);
+  --breakpoint-sm: 600px;
+  --breakpoint-md: 905px;
+  --breakpoint-lg: 1240px;
+  --breakpoint-xl: 1440px;
 }
 
 @font-face {
@@ -170,6 +174,12 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  @supports (min-height: 100dvh) {
+    .min-h-screen {
+      min-height: 100dvh;
+    }
   }
 
   body {
@@ -619,7 +629,7 @@
     color: var(--hu-on-accent);
     transition:
       --hu-gradient-angle var(--hu-duration-normal) var(--hu-ease-out),
-      transform 200ms var(--hu-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+      transform var(--hu-duration-fast) var(--hu-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
       box-shadow var(--hu-duration-normal) var(--hu-ease-out);
     box-shadow:
       0 1px 2px color-mix(in srgb, var(--hu-text) 10%, transparent),
@@ -661,7 +671,7 @@
     transition:
       color var(--hu-duration-normal) var(--hu-ease-out),
       border-color var(--hu-duration-normal) var(--hu-ease-out),
-      transform 200ms var(--hu-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+      transform var(--hu-duration-fast) var(--hu-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
   }
 
   .btn-outline:hover {
@@ -698,7 +708,7 @@
     animation-delay: calc(var(--line-delay, 0) * 0.8s + 1s);
   }
   .terminal-line.response {
-    padding-left: var(--hu-space-md);
+    padding-inline-start: var(--hu-space-md);
     color: var(--hu-text-secondary);
   }
   @keyframes hu-terminal-type {
@@ -1290,7 +1300,7 @@ body.hu-ambient-ready {
   container-type: inline-size;
 }
 
-@container (max-width: 600px) {
+@container (max-width: 37.5rem) /* cq-compact */ {
   .eco-card {
     padding: var(--hu-space-lg);
   }
@@ -1299,14 +1309,13 @@ body.hu-ambient-ready {
   }
 }
 
-@media (max-width: 600px) {
-  /* custom — dash-stats compact layout */
+@media (max-width: 599px) /* --hu-breakpoint-compact */ {
   .dash-stats-grid {
     gap: var(--hu-space-sm);
   }
 }
 
-@container (max-width: 480px) {
+@container (max-width: 30rem) /* cq-sm */ {
   .number-item {
     padding-block: var(--hu-space-md, 1rem);
   }
@@ -1615,13 +1624,13 @@ h3 {
 }
 
 /* ── Ecosystem Categorized Cards (density 9) ── */
-.eco-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--hu-space-lg);
-  max-width: 960px;
-  margin: 0 auto;
-}
+  .eco-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--hu-grid-track-md, 16rem), 1fr));
+    gap: var(--hu-space-adaptive-content-gap, var(--hu-space-lg));
+    max-width: 960px;
+    margin: 0 auto;
+  }
 
 .eco-card {
   background: color-mix(
@@ -1676,21 +1685,20 @@ h3 {
   margin-top: auto;
 }
 
-@media (max-width: 768px) {
-  /* --hu-breakpoint-lg */
-  .eco-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 599px) /* --hu-breakpoint-compact */ {
+    .eco-grid {
+      grid-template-columns: 1fr;
+    }
   }
-}
 
 /* ── Quality Ring Gauges (density 9) ── */
-.quality-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--hu-space-lg);
-  max-width: 960px;
-  margin: 0 auto;
-}
+  .quality-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--hu-grid-track-md, 16rem), 1fr));
+    gap: var(--hu-space-adaptive-content-gap, var(--hu-space-lg));
+    max-width: 960px;
+    margin: 0 auto;
+  }
 
 .q-card {
   background: color-mix(
@@ -1769,12 +1777,11 @@ h3 {
   stroke-dashoffset: 2.51;
 }
 
-@media (max-width: 768px) {
-  /* --hu-breakpoint-lg */
-  .quality-cards {
-    grid-template-columns: 1fr;
+  @media (max-width: 599px) /* --hu-breakpoint-compact */ {
+    .quality-cards {
+      grid-template-columns: 1fr;
+    }
   }
-}
 
 /* ─── Quiet Mastery: Scroll Narrative ──────────────────────────── */
 
@@ -1798,79 +1805,11 @@ h3 {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   RESPONSIVE: Mobile-first breakpoints for homepage sections
+   RESPONSIVE: Canonical 4-tier breakpoints for homepage sections
+   compact: 600px | medium: 905px | expanded: 1240px | wide: 1440px
    ═══════════════════════════════════════════════════════════════ */
 
-@media (max-width: 480px) {
-  /* --hu-breakpoint-sm */
-
-  .numbers-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0;
-    padding-inline: var(--hu-space-sm);
-  }
-
-  .numbers-grid .number-item {
-    padding-block: var(--hu-space-md);
-  }
-
-  .crystal-grid {
-    grid-template-columns: repeat(4, 1fr);
-    max-width: 320px;
-  }
-
-  .crystal-cell {
-    font-size: 7px;
-    padding: 3px 2px;
-  }
-
-  .comparison-bar-label {
-    width: 56px !important;
-    font-size: 10px !important;
-  }
-
-  .eco-pills {
-    gap: 4px;
-  }
-
-  .eco-num {
-    font-size: clamp(1.5rem, 5vw, 2rem);
-  }
-}
-
-@media (max-width: 640px) {
-  /* --hu-breakpoint-md */
-
-  .device-spectrum-line {
-    max-width: 280px;
-  }
-
-  .spectrum-dot {
-    width: 8px;
-    height: 8px;
-  }
-
-  .crystal-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
-  .q-card {
-    padding: var(--hu-space-lg);
-  }
-
-  .ring-svg {
-    width: 48px;
-    height: 48px;
-  }
-
-  .dash-stats-grid {
-    gap: var(--hu-space-sm);
-  }
-}
-
-@media (max-width: 768px) {
-  /* --hu-breakpoint-lg: tablet + large phone */
-
+@media (max-width: 904px) /* --hu-breakpoint-medium */ {
   .numbers-grid {
     grid-template-columns: repeat(3, 1fr) !important;
     padding-inline: var(--hu-space-md);
@@ -1897,6 +1836,57 @@ h3 {
 
   .device-spectrum-line {
     max-width: 320px;
+  }
+}
+
+@media (max-width: 599px) /* --hu-breakpoint-compact */ {
+  .device-spectrum-line {
+    max-width: 280px;
+  }
+
+  .spectrum-dot {
+    width: 8px;
+    height: 8px;
+  }
+
+  .crystal-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .q-card {
+    padding: var(--hu-space-lg);
+  }
+
+  .numbers-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0;
+    padding-inline: var(--hu-space-sm);
+  }
+
+  .numbers-grid .number-item {
+    padding-block: var(--hu-space-md);
+  }
+
+  .crystal-grid {
+    max-width: 320px;
+  }
+
+  .crystal-cell {
+    font-size: 7px;
+    padding: 3px 2px;
+  }
+
+  .comparison-bar-label {
+    width: 56px !important;
+    font-size: 10px !important;
+  }
+
+  .eco-pills {
+    gap: 4px;
+  }
+
+  .eco-num {
+    font-size: clamp(1.5rem, 5vw, 2rem);
   }
 }
 
