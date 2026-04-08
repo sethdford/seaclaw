@@ -1,6 +1,7 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/provider.h"
 #include "human/providers/helpers.h"
@@ -689,6 +690,8 @@ static size_t compatible_stream_write_cb(const char *data, size_t len, void *use
     compatible_stream_ctx_t *s = (compatible_stream_ctx_t *)userdata;
     hu_error_t err = hu_sse_parser_feed(&s->parser, data, len, compatible_sse_event_cb, s);
     if (err != HU_OK) {
+        hu_log_error("compatible", NULL, "SSE parser feed error: %s (data_len=%zu)",
+                     hu_error_string(err), len);
         s->last_error = err;
         return 0;
     }
@@ -856,6 +859,8 @@ static hu_error_t compatible_stream_chat(void *ctx, hu_allocator_t *alloc,
         alloc->free(alloc->ctx, body, body_len);
         return err;
     }
+    hu_log_info("compatible", NULL, "stream_chat: url=%s model=%.*s body_len=%zu",
+                url_buf, (int)model_len, model, body_len);
     err = hu_http_post_json_stream(alloc, url_buf, auth, NULL, body, body_len,
                                    compatible_stream_write_cb, &sctx);
     hu_sse_parser_deinit(&sctx.parser);

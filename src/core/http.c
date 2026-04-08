@@ -344,8 +344,10 @@ static hu_error_t hu_http_post_json_impl(hu_allocator_t *alloc, const char *url,
         curl_pool_release(curl);
         return HU_ERR_INVALID_ARGUMENT;
     }
+    const char *url_query = strchr(url, '?');
+    int url_display_len = url_query ? (int)(url_query - url) : (int)strlen(url);
     if (getenv("HU_DEBUG"))
-        hu_log_info("http", NULL, "POST %s (body_len=%zu)", url, json_body_len);
+        hu_log_info("http", NULL, "POST %.*s (body_len=%zu)", url_display_len, url, json_body_len);
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_body);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)json_body_len);
@@ -362,8 +364,8 @@ static hu_error_t hu_http_post_json_impl(hu_allocator_t *alloc, const char *url,
     curl_pool_release(curl);
 
     if (res != CURLE_OK) {
-        hu_log_error("http", NULL, "curl POST failed: %s (code=%d) url=%s body_len=%zu",
-                     curl_easy_strerror(res), (int)res, url, json_body_len);
+        hu_log_error("http", NULL, "curl POST failed: %s (code=%d) %.*s (body_len=%zu)",
+                     curl_easy_strerror(res), (int)res, url_display_len, url, json_body_len);
         alloc->free(alloc->ctx, w.buf, w.cap);
         if (res == CURLE_OPERATION_TIMEDOUT)
             return HU_ERR_TIMEOUT;
@@ -448,6 +450,11 @@ static hu_error_t hu_http_post_json_stream_impl(hu_allocator_t *alloc, const cha
     curl_pool_release(curl);
 
     if (res != CURLE_OK) {
+        long http_code = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+        hu_log_error("http", NULL,
+                     "curl stream POST failed: %s (code=%d, http=%ld) url=%s body_len=%zu",
+                     curl_easy_strerror(res), (int)res, http_code, url, json_body_len);
         if (res == CURLE_OPERATION_TIMEDOUT)
             return HU_ERR_TIMEOUT;
         return HU_ERR_IO;

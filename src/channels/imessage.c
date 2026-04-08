@@ -21,6 +21,11 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <ApplicationServices/ApplicationServices.h>
+#include <dlfcn.h>
+#include <libproc.h>
+#include <objc/message.h>
+#include <objc/runtime.h>
 #ifdef HU_ENABLE_SQLITE
 #include <sqlite3.h>
 #endif
@@ -126,6 +131,9 @@ typedef struct hu_imessage_ctx {
     int imsg_watch_fd;
     bool imsg_watch_running;
     bool imsg_target_validated;
+    void *imcore_handle;
+    bool imcore_tried;
+    bool imcore_connected;
 #endif
 #if HU_IS_TEST
     char last_message[4096];
@@ -145,6 +153,19 @@ typedef struct hu_imessage_ctx {
 } hu_imessage_ctx_t;
 
 #if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+
+/* Forward declarations for the native Messages.app bridge (defined later). */
+static void ax_open_conversation(const char *recipient, size_t recipient_len);
+static bool ax_start_typing(const char *target, size_t target_len);
+static bool ax_stop_typing(void);
+static bool ax_tapback(const char *content_prefix, int row_offset,
+                       const char *tapback_label);
+static bool imcore_init(hu_imessage_ctx_t *c);
+static bool imcore_start_typing(hu_imessage_ctx_t *c, const char *recipient,
+                                size_t recipient_len);
+static bool imcore_stop_typing(hu_imessage_ctx_t *c, const char *recipient,
+                               size_t recipient_len);
+
 static uint32_t imessage_hash(const char *s, size_t len) {
     uint32_t h = 2166136261u;
     for (size_t i = 0; i < len; i++)
@@ -461,6 +482,11 @@ static void imessage_stop(void *ctx) {
         atomic_store(&c->typing_active, false);
 #if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
         imsg_watch_stop(c);
+        if (c->imcore_handle) {
+            dlclose(c->imcore_handle);
+            c->imcore_handle = NULL;
+            c->imcore_connected = false;
+        }
 #endif
     }
 }
@@ -644,22 +670,24 @@ size_t hu_imessage_copy_bounded(char *dst, size_t dst_cap, const char *src, size
  * Sending uses JXA + System Events AXShowMenu; AppleScript has no native tapback API.
  * Requires accessibility permissions; UI hierarchy may vary by macOS version.
  */
-static const char *imessage_reaction_to_ax_menu_name(hu_reaction_type_t reaction) {
+static const char *imessage_reaction_to_ax_action_prefix(hu_reaction_type_t reaction) {
+    /* macOS 26 SwiftUI Messages: tapbacks are AX actions on the message
+     * element named "Name:Heart", "Name:Thumbs up", etc. */
     switch (reaction) {
     case HU_REACTION_HEART:
-        return "Love";
+        return "Name:Heart";
     case HU_REACTION_THUMBS_UP:
-        return "Like";
+        return "Name:Thumbs up";
     case HU_REACTION_THUMBS_DOWN:
-        return "Dislike";
+        return "Name:Thumbs down";
     case HU_REACTION_HAHA:
-        return "Ha Ha";
+        return "Name:Ha ha!";
     case HU_REACTION_EMPHASIS:
-        return "!!";
+        return "Name:Exclamation mark";
     case HU_REACTION_QUESTION:
-        return "?";
+        return "Name:Question mark";
     case HU_REACTION_CUSTOM_EMOJI:
-        return "Love"; /* AX has no emoji tapback menu; fall back to Love */
+        return "Name:Heart";
     default:
         return NULL;
     }
@@ -706,6 +734,17 @@ size_t imessage_build_attach_script(char *out, size_t out_cap,
     return 0;
 }
 
+unsigned int hu_imessage_typing_duration(size_t msg_len, uint32_t seed) {
+    uint32_t s = seed * 1103515245u + 12345u;
+    int32_t jitter = (int32_t)((s >> 16u) % 801u) - 300;
+    unsigned int base = 400u + (unsigned int)(msg_len * 45u) + (unsigned int)jitter;
+    if (base < 800u)
+        base = 800u;
+    if (base > 6000u)
+        base = 6000u;
+    return base;
+}
+
 #if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
 /*
  * Typing indicator with chat ID caching and group chat support.
@@ -717,11 +756,8 @@ static void imessage_simulate_typing(hu_imessage_ctx_t *c, const char *tgt, size
     if (!c || atomic_load(&c->typing_active))
         return;
 
-    unsigned int delay_ms = (unsigned int)(message_len * 25);
-    if (delay_ms < 800)
-        delay_ms = 800;
-    if (delay_ms > 4000)
-        delay_ms = 4000;
+    unsigned int delay_ms =
+        hu_imessage_typing_duration(message_len, (uint32_t)time(NULL) ^ (uint32_t)message_len);
 
     size_t tgt_esc_cap = tgt_len * 2 + 1;
     if (tgt_esc_cap > 4096)
@@ -1838,7 +1874,7 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
     if (!c || !c->alloc)
         return HU_ERR_INVALID_ARGUMENT;
-    const char *tapback_ax = imessage_reaction_to_ax_menu_name(reaction);
+    const char *tapback_ax = imessage_reaction_to_ax_action_prefix(reaction);
     if (!tapback_ax)
         return HU_ERR_INVALID_ARGUMENT;
     if (!target || target_len == 0)
@@ -1848,6 +1884,8 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
         imsg_try_react(c, message_id, reaction))
         return HU_OK;
 
+    /* Tier 2: Native AX tapback — uses our process's Accessibility permission
+     * directly, bypasses System Events keystroke restriction. */
     /* Fetch raw message text for AX menu-item matching. Intentionally does NOT
      * apply balloon_label or effect_name — tapback needs the original text that
      * the Messages UI displays, not decorated agent-facing labels. */
@@ -1912,6 +1950,16 @@ static hu_error_t imessage_react(void *ctx, const char *target, size_t target_le
 #endif
     (void)message_id;
 
+    /* Try native AX tapback first (no subprocess, no keystroke restriction).
+     * Must open the conversation in Messages so it's in the AX tree. */
+    if (target && target_len > 0)
+        ax_open_conversation(target, target_len);
+    if (ax_tapback(content_len > 0 ? content_buf : NULL, row_offset, tapback_ax)) {
+        hu_log_info("imessage", NULL, "tapback sent via native AX");
+        return HU_OK;
+    }
+
+    /* Fall back to JXA subprocess (legacy, may fail on Sequoia+). */
     /* Escape content_prefix and tapback_ax for JavaScript string literals. */
     size_t esc_cap = (content_len + strlen(tapback_ax)) * 2 + 64;
     if (esc_cap > 2048)
@@ -2170,12 +2218,591 @@ static hu_error_t imessage_mark_read(void *ctx, const char *contact_id,
 #endif
 }
 
-/* ── AX-based typing indicators ──────────────────────────────────────
- * Trigger the real iMessage "..." typing bubble by focusing Messages.app's
- * input field via System Events and typing a character. This works because
- * Messages.app itself has the entitlements to signal typing state to
- * imagent — we just trigger it via UI automation.
- * Requires Accessibility permission (same as tapback). */
+/* ══════════════════════════════════════════════════════════════════════
+ * Native Messages.app bridge — AX + IMCore
+ *
+ * Three-tier fallback for typing indicators and tapback reactions:
+ *   Tier 1: IMCore private framework (dlopen, macOS 14-15, fast, no UI)
+ *   Tier 2: Accessibility API (AXUIElement, macOS 14+, bypasses keystroke block)
+ *   Tier 3: AppleScript/JXA subprocess (existing, last resort)
+ *
+ * Tier 2 is the primary innovation: AXUIElementSetAttributeValue and
+ * AXUIElementPerformAction use the calling process's Accessibility permission
+ * directly — they don't route through System Events and don't need the
+ * "send keystrokes" entitlement that macOS Sequoia/Tahoe blocks.
+ * ══════════════════════════════════════════════════════════════════════ */
+
+#if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
+
+/* ── Messages.app PID lookup ────────────────────────────────────────── */
+static pid_t ax_messages_pid(void) {
+    int count = proc_listallpids(NULL, 0);
+    if (count <= 0)
+        return 0;
+    size_t buf_size = (size_t)(count + 64) * sizeof(pid_t);
+    pid_t *pids = (pid_t *)malloc(buf_size);
+    if (!pids)
+        return 0;
+    count = proc_listallpids(pids, (int)buf_size);
+    pid_t found = 0;
+    for (int i = 0; i < count; i++) {
+        char name[64] = {0};
+        proc_name(pids[i], name, sizeof(name));
+        if (strcmp(name, "Messages") == 0) {
+            found = pids[i];
+            break;
+        }
+    }
+    free(pids);
+    return found;
+}
+
+/* ── AX tree walker: find compose text field ────────────────────────── */
+#define AX_MAX_DEPTH 25
+
+static AXUIElementRef ax_find_compose_field_recurse(AXUIElementRef elem, int depth) {
+    if (depth > AX_MAX_DEPTH)
+        return NULL;
+    CFArrayRef children = NULL;
+    if (AXUIElementCopyAttributeValue(elem, kAXChildrenAttribute, (CFTypeRef *)&children) !=
+            kAXErrorSuccess ||
+        !children)
+        return NULL;
+    AXUIElementRef result = NULL;
+    CFIndex count = CFArrayGetCount(children);
+    for (CFIndex i = count - 1; i >= 0 && !result; i--) {
+        AXUIElementRef child = (AXUIElementRef)CFArrayGetValueAtIndex(children, i);
+        CFStringRef role = NULL;
+        if (AXUIElementCopyAttributeValue(child, kAXRoleAttribute, (CFTypeRef *)&role) ==
+                kAXErrorSuccess &&
+            role) {
+            bool is_text = (CFStringCompare(role, CFSTR("AXTextArea"), 0) == kCFCompareEqualTo ||
+                            CFStringCompare(role, CFSTR("AXTextField"), 0) == kCFCompareEqualTo);
+            CFRelease(role);
+            if (is_text) {
+                /* macOS 26 Messages (SwiftUI): the compose field has
+                 * desc="Message"; message bubbles are AXTextArea desc="text
+                 * entry area". Only accept fields with desc="Message" or
+                 * AXTextField role (which is never a message bubble). */
+                CFStringRef desc = NULL;
+                AXUIElementCopyAttributeValue(child, kAXDescriptionAttribute,
+                                              (CFTypeRef *)&desc);
+                bool is_compose = false;
+                if (desc) {
+                    is_compose = (CFStringCompare(desc, CFSTR("Message"), 0) ==
+                                  kCFCompareEqualTo);
+                    CFRelease(desc);
+                }
+                if (!is_compose) {
+                    CFStringRef child_role = NULL;
+                    AXUIElementCopyAttributeValue(child, kAXRoleAttribute,
+                                                  (CFTypeRef *)&child_role);
+                    if (child_role) {
+                        is_compose = (CFStringCompare(child_role, CFSTR("AXTextField"), 0) ==
+                                      kCFCompareEqualTo);
+                        CFRelease(child_role);
+                    }
+                }
+                if (is_compose) {
+                    Boolean settable = false;
+                    AXUIElementIsAttributeSettable(child, kAXValueAttribute, &settable);
+                    if (settable) {
+                        CFRetain(child);
+                        result = child;
+                    }
+                }
+            }
+        } else if (role) {
+            CFRelease(role);
+        }
+        if (!result)
+            result = ax_find_compose_field_recurse(child, depth + 1);
+    }
+    CFRelease(children);
+    return result;
+}
+
+/* ── Activate Messages.app via NSRunningApplication ──────────────────
+ * Stronger than AXFrontmost alone — uses AppKit to force-activate even
+ * when the calling process is a background daemon. */
+static void ax_activate_messages(pid_t pid) {
+    Class ns_running_app = objc_getClass("NSRunningApplication");
+    if (!ns_running_app)
+        return;
+    SEL sel_pid = sel_registerName("runningApplicationWithProcessIdentifier:");
+    id app_obj = ((id (*)(id, SEL, pid_t))objc_msgSend)((id)ns_running_app, sel_pid, pid);
+    if (!app_obj)
+        return;
+    /* activateWithOptions: NSApplicationActivateIgnoringOtherApps (1 << 1 = 2) */
+    SEL sel_activate = sel_registerName("activateWithOptions:");
+    ((BOOL (*)(id, SEL, unsigned long))objc_msgSend)(app_obj, sel_activate, 2UL);
+}
+
+/* ── Open Messages conversation reliably ─────────────────────────────
+ * Uses imessage:// URL scheme + NSRunningApplication activation + AXFrontmost
+ * + AXRaise. Robust against the daemon running in background. */
+static void ax_open_conversation(const char *recipient, size_t recipient_len) {
+    char url[320];
+    int n = snprintf(url, sizeof(url), "imessage://%.*s", (int)recipient_len, recipient);
+    if (n <= 0 || (size_t)n >= sizeof(url))
+        return;
+    pid_t child = fork();
+    if (child == 0) {
+        int devnull = open("/dev/null", O_WRONLY);
+        if (devnull >= 0) {
+            dup2(devnull, STDOUT_FILENO);
+            dup2(devnull, STDERR_FILENO);
+            close(devnull);
+        }
+        execlp("open", "open", url, NULL);
+        _exit(127);
+    } else if (child > 0) {
+        int status = 0;
+        waitpid(child, &status, 0);
+    }
+    usleep(300000); /* 300ms for URL handling */
+
+    pid_t pid = ax_messages_pid();
+    if (pid <= 0)
+        return;
+
+    /* NSRunningApplication activation — strongest method for background daemons */
+    ax_activate_messages(pid);
+
+    /* Also set AXFrontmost as a belt-and-suspenders approach */
+    AXUIElementRef app = AXUIElementCreateApplication(pid);
+    if (app) {
+        AXError aerr = AXUIElementSetAttributeValue(app, CFSTR("AXFrontmost"),
+                                                    kCFBooleanTrue);
+        if (aerr != kAXErrorSuccess)
+            hu_log_info("imessage", NULL, "AX setFrontmost: error %d", (int)aerr);
+
+        /* AXRaise on the first window for extra robustness */
+        CFArrayRef windows = NULL;
+        AXUIElementCopyAttributeValue(app, kAXWindowsAttribute, (CFTypeRef *)&windows);
+        if (windows && CFArrayGetCount(windows) > 0) {
+            AXUIElementRef win = (AXUIElementRef)CFArrayGetValueAtIndex(windows, 0);
+            AXUIElementPerformAction(win, CFSTR("AXRaise"));
+        }
+        if (windows)
+            CFRelease(windows);
+        CFRelease(app);
+    }
+    usleep(500000); /* 500ms for window to appear after activation */
+}
+
+/* ── AX window helper ───────────────────────────────────────────────
+ * macOS 26 Messages: windows may not exist when running in the background.
+ * Try focused window first, then any AXWindow, then the first top-level
+ * child element (SwiftUI apps sometimes expose the main view as a non-window). */
+static AXUIElementRef ax_get_messages_window(void) {
+    pid_t pid = ax_messages_pid();
+    if (pid == 0)
+        return NULL;
+    AXUIElementRef app = AXUIElementCreateApplication(pid);
+    if (!app)
+        return NULL;
+    AXUIElementRef window = NULL;
+    AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute, (CFTypeRef *)&window);
+    if (!window) {
+        CFArrayRef windows = NULL;
+        AXUIElementCopyAttributeValue(app, kAXWindowsAttribute, (CFTypeRef *)&windows);
+        if (windows && CFArrayGetCount(windows) > 0) {
+            window = (AXUIElementRef)CFArrayGetValueAtIndex(windows, 0);
+            CFRetain(window);
+        }
+        if (windows)
+            CFRelease(windows);
+    }
+    if (!window) {
+        /* macOS 26 fallback: check top-level children for any element with children
+         * (the SwiftUI main view appears as a role-less child of the application). */
+        CFArrayRef children = NULL;
+        AXUIElementCopyAttributeValue(app, kAXChildrenAttribute, (CFTypeRef *)&children);
+        if (children) {
+            CFIndex count = CFArrayGetCount(children);
+            for (CFIndex i = 0; i < count; i++) {
+                AXUIElementRef child = (AXUIElementRef)CFArrayGetValueAtIndex(children, i);
+                CFStringRef role = NULL;
+                AXUIElementCopyAttributeValue(child, kAXRoleAttribute, (CFTypeRef *)&role);
+                bool is_menu = (role && CFStringCompare(role, CFSTR("AXMenuBar"), 0) ==
+                                            kCFCompareEqualTo);
+                if (role)
+                    CFRelease(role);
+                if (!is_menu) {
+                    CFArrayRef sub = NULL;
+                    AXUIElementCopyAttributeValue(child, kAXChildrenAttribute,
+                                                  (CFTypeRef *)&sub);
+                    if (sub) {
+                        CFIndex sub_count = CFArrayGetCount(sub);
+                        CFRelease(sub);
+                        if (sub_count > 0) {
+                            CFRetain(child);
+                            window = child;
+                            break;
+                        }
+                    }
+                }
+            }
+            CFRelease(children);
+        }
+    }
+    CFRelease(app);
+    return window;
+}
+
+/* ── AX: start typing via compose field value injection ─────────────── */
+static bool ax_start_typing(const char *target, size_t target_len) {
+    ax_open_conversation(target, target_len);
+
+    /* Retry loop: Messages.app may need time to fully activate and populate
+     * its AX tree, especially when the daemon runs in the background.
+     * Try up to 8 times with 200ms intervals (~1.6s max additional wait). */
+    AXUIElementRef field = NULL;
+    for (int attempt = 0; attempt < 8 && !field; attempt++) {
+        if (attempt > 0) {
+            usleep(200000); /* 200ms between retries */
+            /* Re-activate on retries 2 and 5 in case focus was stolen */
+            if (attempt == 2 || attempt == 5) {
+                pid_t pid = ax_messages_pid();
+                if (pid > 0)
+                    ax_activate_messages(pid);
+            }
+        }
+        AXUIElementRef window = ax_get_messages_window();
+        if (!window)
+            continue;
+        field = ax_find_compose_field_recurse(window, 0);
+        CFRelease(window);
+    }
+    if (!field) {
+        hu_log_info("imessage", NULL, "AX typing: compose field not found after retries");
+        return false;
+    }
+
+    AXUIElementSetAttributeValue(field, kAXFocusedAttribute, kCFBooleanTrue);
+
+    /* Inject a zero-width space — Messages sends the typing indicator when
+     * the compose field has content. Invisible if the user glances at screen. */
+    CFStringRef marker = CFSTR("\xE2\x80\x8B"); /* U+200B ZERO WIDTH SPACE */
+    AXError set_err = AXUIElementSetAttributeValue(field, kAXValueAttribute, marker);
+    CFRelease(field);
+    if (set_err != kAXErrorSuccess)
+        hu_log_info("imessage", NULL, "AX typing: set value failed (%d)", (int)set_err);
+    return (set_err == kAXErrorSuccess);
+}
+
+/* ── AX: stop typing by clearing compose field ──────────────────────── */
+static bool ax_stop_typing(void) {
+    AXUIElementRef window = ax_get_messages_window();
+    if (!window)
+        return false;
+    AXUIElementRef field = ax_find_compose_field_recurse(window, 0);
+    CFRelease(window);
+    if (!field)
+        return false;
+    CFStringRef empty = CFSTR("");
+    AXError err = AXUIElementSetAttributeValue(field, kAXValueAttribute, empty);
+    CFRelease(field);
+    /* Send Return key to dismiss any pending text (just clears the field). */
+    return (err == kAXErrorSuccess);
+}
+
+/* ── AX tree: find message element for tapback ──────────────────────
+ * macOS 26 (Tahoe): Messages uses SwiftUI; transcript is nested AXGroups.
+ * Each message bubble is an AXGroup whose description contains the message
+ * text (e.g. "Your iMessage, hello world, 3:54 PM"). Children contain
+ * AXTextArea elements with desc="text entry area" holding the actual text.
+ * We match by walking AXGroup descriptions or child AXTextArea values. */
+static AXUIElementRef ax_find_message_group(AXUIElementRef elem, const char *content_prefix,
+                                            int depth) {
+    if (depth > AX_MAX_DEPTH || !content_prefix || !content_prefix[0])
+        return NULL;
+    CFArrayRef children = NULL;
+    if (AXUIElementCopyAttributeValue(elem, kAXChildrenAttribute, (CFTypeRef *)&children) !=
+            kAXErrorSuccess ||
+        !children)
+        return NULL;
+
+    AXUIElementRef found = NULL;
+    CFIndex count = CFArrayGetCount(children);
+    /* Walk from bottom (most recent messages last). */
+    for (CFIndex i = count - 1; i >= 0 && !found; i--) {
+        AXUIElementRef child = (AXUIElementRef)CFArrayGetValueAtIndex(children, i);
+
+        /* Check this element's description for message text. */
+        CFStringRef desc = NULL;
+        if (AXUIElementCopyAttributeValue(child, kAXDescriptionAttribute,
+                                          (CFTypeRef *)&desc) == kAXErrorSuccess &&
+            desc) {
+            char dbuf[512] = {0};
+            CFStringGetCString(desc, dbuf, (CFIndex)sizeof(dbuf), kCFStringEncodingUTF8);
+            CFRelease(desc);
+            if (strstr(dbuf, content_prefix)) {
+                /* Check this element supports AXShowMenu (for context menu). */
+                CFArrayRef actions = NULL;
+                if (AXUIElementCopyActionNames(child, &actions) == kAXErrorSuccess && actions) {
+                    CFIndex ac = CFArrayGetCount(actions);
+                    for (CFIndex a = 0; a < ac; a++) {
+                        CFStringRef act = (CFStringRef)CFArrayGetValueAtIndex(actions, a);
+                        if (CFStringCompare(act, CFSTR("AXShowMenu"), 0) == kCFCompareEqualTo) {
+                            CFRetain(child);
+                            found = child;
+                            break;
+                        }
+                    }
+                    CFRelease(actions);
+                }
+            }
+        }
+
+        /* Also check child AXTextArea values. */
+        if (!found) {
+            CFStringRef role = NULL;
+            AXUIElementCopyAttributeValue(child, kAXRoleAttribute, (CFTypeRef *)&role);
+            bool is_textarea = (role &&
+                CFStringCompare(role, CFSTR("AXTextArea"), 0) == kCFCompareEqualTo);
+            if (role)
+                CFRelease(role);
+            if (is_textarea) {
+                CFStringRef val = NULL;
+                if (AXUIElementCopyAttributeValue(child, kAXValueAttribute,
+                                                  (CFTypeRef *)&val) == kAXErrorSuccess &&
+                    val) {
+                    char vbuf[512] = {0};
+                    CFStringGetCString(val, vbuf, (CFIndex)sizeof(vbuf), kCFStringEncodingUTF8);
+                    CFRelease(val);
+                    if (strstr(vbuf, content_prefix)) {
+                        /* Return the PARENT (which has AXShowMenu), not the text area. */
+                        CFRetain(elem);
+                        found = elem;
+                    }
+                }
+            }
+        }
+
+        if (!found)
+            found = ax_find_message_group(child, content_prefix, depth + 1);
+    }
+    CFRelease(children);
+    return found;
+}
+
+/* ── AX: perform tapback reaction ───────────────────────────────────
+ * macOS 26 (Tahoe): SwiftUI Messages exposes tapbacks as custom AX actions
+ * on the message element (e.g. "Name:Heart\nTarget:0x0\nSelector:(null)").
+ * We enumerate actions on the message and its inner child, then perform
+ * the one matching our desired tapback prefix. Pure AX — no CGEvent. */
+static bool ax_perform_tapback_on_row(AXUIElementRef row, const char *tapback_label) {
+    /* Check both the row and its first child (SwiftUI nests the actions
+     * on the inner group, not the outer description group). */
+    AXUIElementRef targets[2] = {row, NULL};
+    int target_count = 1;
+    CFArrayRef children = NULL;
+    if (AXUIElementCopyAttributeValue(row, kAXChildrenAttribute,
+                                      (CFTypeRef *)&children) == kAXErrorSuccess &&
+        children) {
+        if (CFArrayGetCount(children) > 0) {
+            targets[1] = (AXUIElementRef)CFArrayGetValueAtIndex(children, 0);
+            target_count = 2;
+        }
+    }
+
+    bool success = false;
+    size_t label_len = strlen(tapback_label);
+    for (int t = 0; t < target_count && !success; t++) {
+        CFArrayRef actions = NULL;
+        if (AXUIElementCopyActionNames(targets[t], &actions) != kAXErrorSuccess || !actions)
+            continue;
+        CFIndex ac = CFArrayGetCount(actions);
+        for (CFIndex a = 0; a < ac && !success; a++) {
+            CFStringRef act_name = (CFStringRef)CFArrayGetValueAtIndex(actions, a);
+            char abuf[256] = {0};
+            CFStringGetCString(act_name, abuf, (CFIndex)sizeof(abuf), kCFStringEncodingUTF8);
+            if (strncmp(abuf, tapback_label, label_len) == 0) {
+                AXError err = AXUIElementPerformAction(targets[t], act_name);
+                success = (err == kAXErrorSuccess);
+            }
+        }
+        CFRelease(actions);
+    }
+
+    if (children)
+        CFRelease(children);
+    return success;
+}
+
+static bool ax_tapback(const char *content_prefix, int row_offset,
+                       const char *tapback_label) {
+    (void)row_offset;
+
+    /* Retry loop: window or message may not be in AX tree immediately */
+    AXUIElementRef msg_group = NULL;
+    for (int attempt = 0; attempt < 6 && !msg_group; attempt++) {
+        if (attempt > 0) {
+            usleep(250000); /* 250ms between retries */
+            if (attempt == 3) {
+                pid_t pid = ax_messages_pid();
+                if (pid > 0)
+                    ax_activate_messages(pid);
+            }
+        }
+        AXUIElementRef window = ax_get_messages_window();
+        if (!window)
+            continue;
+        msg_group = ax_find_message_group(window, content_prefix, 0);
+        CFRelease(window);
+    }
+    if (!msg_group) {
+        hu_log_info("imessage", NULL, "AX tapback: message not found after retries");
+        return false;
+    }
+
+    bool ok = ax_perform_tapback_on_row(msg_group, tapback_label);
+    CFRelease(msg_group);
+    hu_log_info("imessage", NULL, "AX tapback: %s (action=%s)",
+                ok ? "sent" : "action not found", tapback_label);
+    return ok;
+}
+
+/* ── IMCore private framework bridge ────────────────────────────────── */
+static bool imcore_init(hu_imessage_ctx_t *c) {
+    if (!c || c->imcore_tried)
+        return c ? c->imcore_connected : false;
+    c->imcore_tried = true;
+
+    c->imcore_handle =
+        dlopen("/System/Library/PrivateFrameworks/IMCore.framework/IMCore", RTLD_LAZY);
+    if (!c->imcore_handle)
+        return false;
+
+    Class daemon_cls = (Class)objc_getClass("IMDaemonController");
+    if (!daemon_cls) {
+        dlclose(c->imcore_handle);
+        c->imcore_handle = NULL;
+        return false;
+    }
+
+    typedef id (*id_msg)(id, SEL);
+    id controller = ((id_msg)objc_msgSend)((id)daemon_cls,
+                                           sel_registerName("sharedInstance"));
+    if (!controller) {
+        dlclose(c->imcore_handle);
+        c->imcore_handle = NULL;
+        return false;
+    }
+
+    /* Try connecting to the imagent daemon. Fails on macOS 26+ due to
+     * private entitlement lockdown (com.apple.imagent.desktop.auth). */
+    typedef void (*void_msg)(id, SEL);
+    ((void_msg)objc_msgSend)(controller, sel_registerName("connectToDaemon"));
+
+    typedef BOOL (*bool_msg)(id, SEL);
+    BOOL connected = ((bool_msg)objc_msgSend)(controller,
+                                              sel_registerName("isConnected"));
+    c->imcore_connected = (connected != 0);
+    if (!c->imcore_connected) {
+        hu_log_info("imessage", NULL,
+                    "IMCore loaded but daemon connection failed "
+                    "(expected on macOS 26+, falling back to AX)");
+    }
+    return c->imcore_connected;
+}
+
+static bool imcore_start_typing(hu_imessage_ctx_t *c, const char *recipient,
+                                size_t recipient_len) {
+    if (!c || !c->imcore_connected || !recipient || recipient_len == 0)
+        return false;
+
+    Class registry_cls = (Class)objc_getClass("IMChatRegistry");
+    if (!registry_cls)
+        return false;
+
+    typedef id (*id_msg)(id, SEL, ...);
+    id registry = ((id_msg)objc_msgSend)((id)registry_cls,
+                                         sel_registerName("sharedInstance"));
+    if (!registry)
+        return false;
+
+    Class ns_string = (Class)objc_getClass("NSString");
+    if (!ns_string)
+        return false;
+
+    /* macOS 26 uses "any;-;" prefix; older versions use "iMessage;-;" / "SMS;-;". */
+    static const char *prefixes[] = {"iMessage;-;", "SMS;-;", "any;-;"};
+    char chat_id[320];
+    id chat = NULL;
+    for (int px = 0; px < 3 && !chat; px++) {
+        int n = snprintf(chat_id, sizeof(chat_id), "%s%.*s",
+                         prefixes[px], (int)recipient_len, recipient);
+        if (n < 0 || (size_t)n >= sizeof(chat_id))
+            continue;
+        id chat_id_str = ((id_msg)objc_msgSend)((id)ns_string,
+                                                sel_registerName("stringWithUTF8String:"),
+                                                chat_id);
+        if (chat_id_str)
+            chat = ((id_msg)objc_msgSend)(
+                registry, sel_registerName("existingChatWithChatIdentifier:"), chat_id_str);
+    }
+    if (!chat)
+        return false;
+
+    typedef void (*bool_set_msg)(id, SEL, BOOL);
+    ((bool_set_msg)objc_msgSend)(chat, sel_registerName("setLocalUserIsTyping:"),
+                                 (BOOL)1);
+    return true;
+}
+
+static bool imcore_stop_typing(hu_imessage_ctx_t *c, const char *recipient,
+                               size_t recipient_len) {
+    if (!c || !c->imcore_connected || !recipient || recipient_len == 0)
+        return false;
+
+    Class registry_cls = (Class)objc_getClass("IMChatRegistry");
+    if (!registry_cls)
+        return false;
+
+    typedef id (*id_msg)(id, SEL, ...);
+    id registry = ((id_msg)objc_msgSend)((id)registry_cls,
+                                         sel_registerName("sharedInstance"));
+    if (!registry)
+        return false;
+
+    Class ns_string = (Class)objc_getClass("NSString");
+    if (!ns_string)
+        return false;
+
+    static const char *prefixes[] = {"iMessage;-;", "SMS;-;", "any;-;"};
+    char chat_id[320];
+    id chat = NULL;
+    for (int px = 0; px < 3 && !chat; px++) {
+        int n = snprintf(chat_id, sizeof(chat_id), "%s%.*s",
+                         prefixes[px], (int)recipient_len, recipient);
+        if (n < 0 || (size_t)n >= sizeof(chat_id))
+            continue;
+        id chat_id_str = ((id_msg)objc_msgSend)((id)ns_string,
+                                                sel_registerName("stringWithUTF8String:"),
+                                                chat_id);
+        if (chat_id_str)
+            chat = ((id_msg)objc_msgSend)(
+                registry, sel_registerName("existingChatWithChatIdentifier:"), chat_id_str);
+    }
+    if (!chat)
+        return false;
+
+    typedef void (*bool_set_msg)(id, SEL, BOOL);
+    ((bool_set_msg)objc_msgSend)(chat, sel_registerName("setLocalUserIsTyping:"),
+                                 (BOOL)0);
+    return true;
+}
+
+#endif /* !HU_IS_TEST && __APPLE__ */
+
+/* ── Typing indicators: three-tier fallback ──────────────────────────
+ * Tier 1: IMCore private framework (direct API, no UI, macOS 14-15)
+ * Tier 2: AX compose field injection (bypasses keystroke block, macOS 14+)
+ * Tier 3: AppleScript keystroke via System Events (last resort)
+ * Requires Accessibility permission for tiers 2+3. */
 static hu_error_t imessage_start_typing(void *ctx, const char *recipient,
                                         size_t recipient_len) {
 #if HU_IS_TEST
@@ -2193,69 +2820,49 @@ static hu_error_t imessage_start_typing(void *ctx, const char *recipient,
     if (!c || !c->alloc || !recipient || recipient_len == 0)
         return HU_ERR_INVALID_ARGUMENT;
 
-    size_t tgt_esc_cap = recipient_len * 2 + 1;
-    if (tgt_esc_cap > 4096)
-        return HU_ERR_INVALID_ARGUMENT;
-    char *tgt_esc = (char *)c->alloc->alloc(c->alloc->ctx, tgt_esc_cap);
-    if (!tgt_esc)
-        return HU_ERR_OUT_OF_MEMORY;
-    escape_for_applescript(tgt_esc, tgt_esc_cap, recipient, recipient_len);
-
-    bool same_target = (c->typing_last_target_len == recipient_len && recipient_len > 0 &&
-                        memcmp(c->typing_last_target, recipient, recipient_len) == 0);
     if (recipient_len > 0 && recipient_len < sizeof(c->typing_last_target)) {
         memcpy(c->typing_last_target, recipient, recipient_len);
         c->typing_last_target[recipient_len] = '\0';
         c->typing_last_target_len = recipient_len;
     }
 
-    char script[1024];
-    int n;
-    if (same_target) {
-        n = snprintf(script, sizeof(script),
-                     "tell application \"Messages\" to activate\n"
-                     "delay 0.2\n"
-                     "tell application \"System Events\" to tell process \"Messages\"\n"
-                     "  keystroke \".\"\n"
-                     "end tell");
-    } else {
-        n = snprintf(script, sizeof(script),
-                     "tell application \"Messages\"\n"
-                     "  activate\n"
-                     "  set targetHandle to \"%s\"\n"
-                     "  set targetChat to missing value\n"
-                     "  repeat with c in every chat\n"
-                     "    try\n"
-                     "      repeat with p in participants of c\n"
-                     "        if handle of p is targetHandle then\n"
-                     "          set targetChat to c\n"
-                     "          exit repeat\n"
-                     "        end if\n"
-                     "      end repeat\n"
-                     "    end try\n"
-                     "    if targetChat is not missing value then exit repeat\n"
-                     "  end repeat\n"
-                     "end tell\n"
-                     "delay 0.3\n"
-                     "tell application \"System Events\" to tell process \"Messages\"\n"
-                     "  keystroke \".\"\n"
-                     "end tell",
-                     tgt_esc);
-    }
-    c->alloc->free(c->alloc->ctx, tgt_esc, tgt_esc_cap);
-    if (n < 0 || (size_t)n >= sizeof(script))
-        return HU_ERR_INTERNAL;
-
-    const char *argv[] = {"osascript", "-e", script, NULL};
-    hu_run_result_t result = {0};
-    hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
-    bool ok = (err == HU_OK && result.exit_code == 0);
-    hu_run_result_free(c->alloc, &result);
-    if (!ok && getenv("HU_DEBUG"))
-        hu_log_error("imessage", NULL, "start_typing failed (accessibility?)");
-    if (ok)
+    /* Tier 1: IMCore — direct API, no UI activation needed. */
+    imcore_init(c);
+    if (imcore_start_typing(c, recipient, recipient_len)) {
+        hu_log_info("imessage", NULL, "typing started via IMCore");
         atomic_store(&c->typing_active, true);
-    return ok ? HU_OK : (err != HU_OK ? err : HU_ERR_INTERNAL);
+        return HU_OK;
+    }
+
+    /* Tier 2: AX compose field injection — no keystrokes, uses our process's
+     * Accessibility permission directly. ax_start_typing opens the conversation
+     * via imessage:// URL scheme before manipulating the compose field. */
+    if (ax_start_typing(recipient, recipient_len)) {
+        hu_log_info("imessage", NULL, "typing started via AX compose field");
+        atomic_store(&c->typing_active, true);
+        return HU_OK;
+    }
+
+    /* Tier 3: imsg typing CLI or AppleScript keystroke (legacy). */
+    if (c->use_imsg_cli && imsg_cli_available(c)) {
+        char tgt_buf[256];
+        size_t tb = recipient_len < sizeof(tgt_buf) - 1 ? recipient_len : sizeof(tgt_buf) - 1;
+        memcpy(tgt_buf, recipient, tb);
+        tgt_buf[tb] = '\0';
+        const char *argv[] = {"imsg", "typing", "--to", tgt_buf, "--duration", "5s", NULL};
+        hu_run_result_t result = {0};
+        hu_error_t err = hu_process_run(c->alloc, argv, NULL, 4096, &result);
+        bool ok = (err == HU_OK && result.exit_code == 0);
+        hu_run_result_free(c->alloc, &result);
+        if (ok) {
+            hu_log_info("imessage", NULL, "typing started via imsg CLI");
+            atomic_store(&c->typing_active, true);
+            return HU_OK;
+        }
+    }
+
+    hu_log_info("imessage", NULL, "all typing tiers failed (IMCore/AX/imsg)");
+    return HU_ERR_NOT_SUPPORTED;
 #endif
 }
 
@@ -2275,22 +2882,38 @@ static hu_error_t imessage_stop_typing(void *ctx, const char *recipient,
     hu_imessage_ctx_t *c = (hu_imessage_ctx_t *)ctx;
     if (!c || !c->alloc)
         return HU_ERR_INVALID_ARGUMENT;
-    (void)recipient;
-    (void)recipient_len;
 
-    const char *script =
-        "tell application \"System Events\" to tell process \"Messages\"\n"
-        "  keystroke \"a\" using command down\n"
-        "  key code 51\n"
-        "end tell";
+    /* Tier 1: IMCore */
+    if (imcore_stop_typing(c, recipient, recipient_len)) {
+        atomic_store(&c->typing_active, false);
+        return HU_OK;
+    }
 
-    const char *argv[] = {"osascript", "-e", script, NULL};
-    hu_run_result_t result = {0};
-    hu_error_t err = hu_process_run(c->alloc, argv, NULL, 65536, &result);
-    bool ok = (err == HU_OK && result.exit_code == 0);
-    hu_run_result_free(c->alloc, &result);
+    /* Tier 2: AX — clear compose field */
+    if (ax_stop_typing()) {
+        atomic_store(&c->typing_active, false);
+        return HU_OK;
+    }
+
+    /* Tier 3: imsg CLI or AppleScript (legacy) */
+    if (c->use_imsg_cli && imsg_cli_available(c) && recipient && recipient_len > 0) {
+        char tgt_buf[256];
+        size_t tb = recipient_len < sizeof(tgt_buf) - 1 ? recipient_len : sizeof(tgt_buf) - 1;
+        memcpy(tgt_buf, recipient, tb);
+        tgt_buf[tb] = '\0';
+        const char *argv[] = {"imsg", "typing", "--to", tgt_buf, "--stop", "true", NULL};
+        hu_run_result_t result = {0};
+        hu_error_t err = hu_process_run(c->alloc, argv, NULL, 4096, &result);
+        bool ok = (err == HU_OK && result.exit_code == 0);
+        hu_run_result_free(c->alloc, &result);
+        if (ok) {
+            atomic_store(&c->typing_active, false);
+            return HU_OK;
+        }
+    }
+
     atomic_store(&c->typing_active, false);
-    return ok ? HU_OK : (err != HU_OK ? err : HU_ERR_INTERNAL);
+    return HU_OK;
 #endif
 }
 
@@ -2803,10 +3426,11 @@ hu_error_t hu_imessage_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         int was_edited = sqlite3_column_int(stmt, 8);
         const char *reply_to = (const char *)sqlite3_column_text(stmt, 9);
 
-        /* macOS 15+: text column may be NULL while attributedBody has the content.
-         * Extract plain text from NSAttributedString (NSKeyedArchiver) blob. */
+        /* macOS 15+: text column is often NULL while attributedBody has the
+         * actual content. The COALESCE in the query substitutes '[Photo]' for
+         * NULL text, so also try attributedBody when text is a placeholder. */
         char attr_text_buf[4096];
-        if (!text || text[0] == '\0') {
+        if (!text || text[0] == '\0' || hu_imessage_text_is_placeholder(text)) {
             const unsigned char *attr_blob = sqlite3_column_blob(stmt, 10);
             int attr_len = sqlite3_column_bytes(stmt, 10);
             if (attr_blob && attr_len > 0) {
