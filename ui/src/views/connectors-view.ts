@@ -73,6 +73,11 @@ export class ConnectorsView extends GatewayAwareLitElement {
       color: var(--hu-text);
     }
 
+    .tab-btn:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: -2px;
+    }
+
     .tab-btn[aria-selected="true"] {
       color: var(--hu-accent);
       border-bottom-color: var(--hu-accent);

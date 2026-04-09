@@ -54,7 +54,7 @@ export class ScDropdown extends LitElement {
       transform: translateY(calc(-1 * var(--hu-space-xs)));
       transition:
         opacity var(--hu-duration-fast) var(--hu-ease-out),
-        visibility var(--hu-duration-fast),
+        visibility var(--hu-duration-fast) var(--hu-ease-out),
         transform var(--hu-duration-normal) var(--hu-spring-out);
     }
 
@@ -129,8 +129,8 @@ export class ScDropdown extends LitElement {
     }
 
     .item-icon svg {
-      width: 1rem;
-      height: 1rem;
+      width: var(--hu-icon-sm);
+      height: var(--hu-icon-sm);
     }
 
     .divider {

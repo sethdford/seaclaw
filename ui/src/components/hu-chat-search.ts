@@ -108,8 +108,8 @@ export class ScChatSearch extends LitElement {
     }
 
     .clear-btn svg {
-      width: 1rem;
-      height: 1rem;
+      width: var(--hu-icon-sm);
+      height: var(--hu-icon-sm);
     }
 
     .nav-btn {
@@ -146,8 +146,8 @@ export class ScChatSearch extends LitElement {
     }
 
     .nav-btn svg {
-      width: 1rem;
-      height: 1rem;
+      width: var(--hu-icon-sm);
+      height: var(--hu-icon-sm);
     }
 
     .match-count {
@@ -183,8 +183,8 @@ export class ScChatSearch extends LitElement {
     }
 
     .close-btn svg {
-      width: 1rem;
-      height: 1rem;
+      width: var(--hu-icon-sm);
+      height: var(--hu-icon-sm);
     }
 
     @media (prefers-reduced-motion: reduce) {

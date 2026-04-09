@@ -30,8 +30,8 @@ export class ScModelSelector extends LitElement {
       color: var(--hu-text-secondary);
       cursor: pointer;
       transition:
-        color var(--hu-duration-fast),
-        background var(--hu-duration-fast);
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .trigger:hover {
@@ -85,7 +85,7 @@ export class ScModelSelector extends LitElement {
       font-family: var(--hu-font);
       color: var(--hu-text);
       cursor: pointer;
-      transition: background var(--hu-duration-fast);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
       border: none;
       background: transparent;
       width: 100%;

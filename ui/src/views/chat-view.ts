@@ -101,7 +101,7 @@ export class ScChatView extends GatewayAwareLitElement {
         color: var(--hu-text-muted);
         background: transparent;
         border-bottom: none;
-        transition: color var(--hu-duration-fast);
+        transition: color var(--hu-duration-fast) var(--hu-ease-out);
       }
       .status-bar:hover {
         color: var(--hu-text);
@@ -146,10 +146,19 @@ export class ScChatView extends GatewayAwareLitElement {
         display: flex;
         align-items: center;
         padding: var(--hu-space-2xs) var(--hu-space-xs);
+        border-radius: var(--hu-radius-sm);
+        transition: background var(--hu-duration-fast) var(--hu-ease-out);
+      }
+      .error-banner button:hover {
+        background: var(--hu-hover-overlay);
+      }
+      .error-banner button:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
       }
       .error-banner button svg {
-        width: 1rem;
-        height: 1rem;
+        width: var(--hu-icon-sm);
+        height: var(--hu-icon-sm);
         line-height: 1;
       }
       .sessions-toggle {
@@ -165,16 +174,23 @@ export class ScChatView extends GatewayAwareLitElement {
         color: var(--hu-text-muted);
         cursor: pointer;
         transition:
-          color var(--hu-duration-fast),
-          background var(--hu-duration-fast);
+          color var(--hu-duration-fast) var(--hu-ease-out),
+          background var(--hu-duration-fast) var(--hu-ease-out);
       }
       .sessions-toggle:hover {
         color: var(--hu-text);
         background: var(--hu-hover-overlay);
       }
+      .sessions-toggle:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
+      }
+      .sessions-toggle:active {
+        transform: scale(0.92);
+      }
       .sessions-toggle svg {
-        width: 1rem;
-        height: 1rem;
+        width: var(--hu-icon-sm);
+        height: var(--hu-icon-sm);
       }
       .skeleton-wrap {
         flex: 1;

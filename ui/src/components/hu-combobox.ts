@@ -122,7 +122,7 @@ export class ScCombobox extends LitElement {
       font-family: var(--hu-font);
       color: var(--hu-text);
       cursor: pointer;
-      transition: background var(--hu-duration-fast);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
       border: none;
       background: transparent;
       width: 100%;

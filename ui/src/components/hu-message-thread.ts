@@ -269,6 +269,10 @@ export class ScMessageThread extends LitElement {
       z-index: 5;
       animation: hu-pill-bounce var(--hu-duration-slow)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+      transition:
+        background var(--hu-duration-fast) var(--hu-ease-out),
+        border-color var(--hu-duration-fast) var(--hu-ease-out),
+        color var(--hu-duration-fast) var(--hu-ease-out);
     }
     @media (prefers-reduced-motion: reduce) {
       .scroll-bottom-pill {
@@ -279,6 +283,13 @@ export class ScMessageThread extends LitElement {
       background: var(--hu-bg-surface);
       border-color: var(--hu-border);
       color: var(--hu-text);
+    }
+    .scroll-bottom-pill:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
+    .scroll-bottom-pill:active {
+      transform: scale(0.95);
     }
     .pill-icon svg {
       width: var(--hu-icon-xs);
@@ -300,10 +311,21 @@ export class ScMessageThread extends LitElement {
       cursor: pointer;
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font);
+      transition:
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        border-color var(--hu-duration-fast) var(--hu-ease-out),
+        transform var(--hu-duration-fast) var(--hu-ease-out);
     }
     .abort-btn:hover {
       color: var(--hu-error);
       border-color: var(--hu-error);
+    }
+    .abort-btn:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
+    .abort-btn:active {
+      transform: scale(0.97);
     }
     .history-skeleton {
       display: flex;
@@ -332,10 +354,21 @@ export class ScMessageThread extends LitElement {
       border-radius: var(--hu-radius-full);
       color: var(--hu-text-secondary);
       cursor: pointer;
+      transition:
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        border-color var(--hu-duration-fast) var(--hu-ease-out),
+        transform var(--hu-duration-fast) var(--hu-ease-out);
     }
     .branch-btn:hover {
       color: var(--hu-accent);
       border-color: var(--hu-accent);
+    }
+    .branch-btn:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
+    .branch-btn:active {
+      transform: scale(0.9);
     }
     .branch-btn svg {
       width: var(--hu-icon-xs);
@@ -363,8 +396,13 @@ export class ScMessageThread extends LitElement {
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font);
       cursor: pointer;
+      transition: border-color var(--hu-duration-fast) var(--hu-ease-out);
       &:hover {
         border-color: var(--hu-accent);
+      }
+      &:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
       }
       &.mine {
         border-color: var(--hu-accent);
@@ -439,6 +477,9 @@ export class ScMessageThread extends LitElement {
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font);
       cursor: pointer;
+      transition:
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        border-color var(--hu-duration-fast) var(--hu-ease-out);
     }
     .load-earlier-btn:hover {
       color: var(--hu-accent);

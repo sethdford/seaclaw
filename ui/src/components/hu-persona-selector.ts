@@ -35,8 +35,8 @@ export class HuPersonaSelector extends LitElement {
       color: var(--hu-text-faint);
       cursor: pointer;
       transition:
-        color var(--hu-duration-fast),
-        background var(--hu-duration-fast);
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .trigger:hover {
@@ -57,7 +57,7 @@ export class HuPersonaSelector extends LitElement {
     .trigger .chevron {
       width: 0.625rem;
       height: 0.625rem;
-      transition: transform var(--hu-duration-fast);
+      transition: transform var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     :host([open]) .trigger .chevron {
@@ -99,7 +99,7 @@ export class HuPersonaSelector extends LitElement {
       color: var(--hu-text);
       cursor: pointer;
       text-align: left;
-      transition: background var(--hu-duration-fast);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .option:hover,

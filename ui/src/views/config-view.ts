@@ -119,10 +119,15 @@ export class ScConfigView extends GatewayAwareLitElement {
         align-items: center;
         justify-content: space-between;
         user-select: none;
-        transition: background var(--hu-duration-fast);
+        transition: background var(--hu-duration-fast) var(--hu-ease-out);
 
         &:hover {
           background: var(--hu-bg-overlay);
+        }
+
+        &:focus-visible {
+          outline: 2px solid var(--hu-accent);
+          outline-offset: -2px;
         }
 
         & .chevron {
@@ -149,8 +154,8 @@ export class ScConfigView extends GatewayAwareLitElement {
         overflow: hidden;
         transition:
           max-height var(--hu-duration-slow) var(--hu-ease-out),
-          padding var(--hu-duration-normal),
-          opacity var(--hu-duration-normal);
+          padding var(--hu-duration-normal) var(--hu-ease-out),
+          opacity var(--hu-duration-normal) var(--hu-ease-out);
       }
       .section.collapsed .section-content {
         max-height: 0;
@@ -196,7 +201,7 @@ export class ScConfigView extends GatewayAwareLitElement {
         padding: var(--hu-space-md) var(--hu-space-lg);
         background: var(--hu-bg-surface);
         border-top: 1px solid var(--hu-border);
-        box-shadow: 0 calc(-1 * var(--hu-space-xs)) var(--hu-space-md) var(--hu-shadow-lg);
+        box-shadow: 0 -4px 16px color-mix(in srgb, var(--hu-shadow-color, #000) 12%, transparent);
         z-index: 10;
       }
       .unsaved-banner-actions {

@@ -181,6 +181,7 @@ export class ScCommandPalette extends LitElement {
       color: var(--hu-text);
       cursor: pointer;
       border-radius: var(--hu-radius);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
 
       &:hover {
         background: var(--hu-hover-overlay);

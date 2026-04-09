@@ -214,6 +214,7 @@ export class ScDataTableV2 extends LitElement {
     th.sortable {
       cursor: pointer;
       user-select: none;
+      transition: color var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     th.sortable:hover {
@@ -237,6 +238,7 @@ export class ScDataTableV2 extends LitElement {
       padding: var(--hu-space-sm) var(--hu-space-md);
       border-bottom: 1px solid var(--hu-border-subtle);
       font-variant-numeric: tabular-nums;
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     td[data-align="center"] {

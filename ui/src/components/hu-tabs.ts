@@ -36,7 +36,7 @@ export class ScTabs extends LitElement {
       font-weight: var(--hu-weight-medium);
       color: var(--hu-text-muted);
       cursor: pointer;
-      transition: color var(--hu-duration-fast);
+      transition: color var(--hu-duration-fast) var(--hu-ease-out);
       outline: none;
     }
 

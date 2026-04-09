@@ -35,7 +35,7 @@ export class ScFloatingMic extends LitElement {
       align-items: center;
       justify-content: center;
       padding: 0;
-      transition: background var(--hu-duration-normal);
+      transition: background var(--hu-duration-normal) var(--hu-ease-out);
     }
     .btn:hover {
       background: var(--hu-accent-hover);

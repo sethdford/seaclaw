@@ -107,11 +107,19 @@ export class ScMessageActions extends LitElement {
       min-width: auto;
       min-height: auto;
       animation: hu-undo-fade 5s var(--hu-ease-out) forwards; /* hu-lint-ok: functional timeout */
+      transition:
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .undo-btn:hover {
       color: var(--hu-text);
       background: color-mix(in srgb, var(--hu-warning) 20%, transparent);
+    }
+
+    .undo-btn:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
     }
 
     @media (prefers-reduced-motion: reduce) {

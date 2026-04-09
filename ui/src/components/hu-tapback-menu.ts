@@ -74,7 +74,7 @@ export class ScTapbackMenu extends LitElement {
       cursor: pointer;
       color: var(--hu-text);
       font-size: var(--hu-text-lg);
-      transition: background var(--hu-duration-fast);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .reaction-btn:hover {
       background: var(--hu-hover-overlay);

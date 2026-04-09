@@ -346,9 +346,9 @@ export class ScChatComposer extends LitElement {
       cursor: pointer;
       font-family: var(--hu-font);
       transition:
-        background var(--hu-duration-fast),
+        background var(--hu-duration-fast) var(--hu-ease-out),
         transform var(--hu-duration-normal) var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
-        box-shadow var(--hu-duration-fast);
+        box-shadow var(--hu-duration-fast) var(--hu-ease-out);
     }
     .send-btn.send {
       background: var(--hu-accent);
@@ -593,6 +593,7 @@ export class ScChatComposer extends LitElement {
       background: transparent;
       border: none;
       border-radius: var(--hu-radius);
+      transition: color var(--hu-duration-fast) var(--hu-ease-out);
     }
     .context-more:hover {
       color: var(--hu-accent);

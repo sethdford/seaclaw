@@ -279,6 +279,11 @@ export class ScSettingsView extends LitElement {
         text-transform: uppercase;
         letter-spacing: 0.04em;
         cursor: pointer;
+        transition: color var(--hu-duration-fast) var(--hu-ease-out);
+      }
+
+      .accordion-trigger:hover {
+        color: var(--hu-text);
       }
 
       .accordion-trigger:focus-visible {
@@ -324,8 +329,8 @@ export class ScSettingsView extends LitElement {
       cursor: pointer;
       white-space: nowrap;
       transition:
-        background var(--hu-duration-fast),
-        color var(--hu-duration-fast);
+        background var(--hu-duration-fast) var(--hu-ease-out),
+        color var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .tab-btn:hover {
@@ -365,11 +370,10 @@ export class ScSettingsView extends LitElement {
 
     .loading {
       display: flex;
-      align-items: center;
-      justify-content: center;
+      flex-direction: column;
+      gap: var(--hu-space-md);
+      padding: var(--hu-space-lg) 0;
       min-height: 20rem;
-      color: var(--hu-text-muted);
-      font-size: var(--hu-text-sm);
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -466,7 +470,14 @@ export class ScSettingsView extends LitElement {
       </nav>
 
       <div class="content" role="tabpanel" aria-label=${active.label}>
-        ${this._loading ? html`<div class="loading">Loading...</div>` : this._renderSection(active)}
+        ${this._loading
+          ? html`<div class="loading">
+              <hu-skeleton variant="line" width="40%" height="1rem"></hu-skeleton>
+              <hu-skeleton variant="line" width="100%" height="2.5rem"></hu-skeleton>
+              <hu-skeleton variant="line" width="100%" height="2.5rem"></hu-skeleton>
+              <hu-skeleton variant="line" width="60%" height="2.5rem"></hu-skeleton>
+            </div>`
+          : this._renderSection(active)}
       </div>
     `;
   }

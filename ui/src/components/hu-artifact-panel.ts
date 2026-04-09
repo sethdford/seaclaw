@@ -106,6 +106,9 @@ export class ScArtifactPanel extends LitElement {
       border-radius: var(--hu-radius-sm);
       color: var(--hu-text-muted);
       cursor: pointer;
+      transition:
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        border-color var(--hu-duration-fast) var(--hu-ease-out);
     }
     .version-btn:hover:not(:disabled) {
       color: var(--hu-accent);
@@ -131,6 +134,9 @@ export class ScArtifactPanel extends LitElement {
       border-radius: var(--hu-radius-sm);
       color: var(--hu-text-muted);
       cursor: pointer;
+      transition:
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .close-btn:hover {
       color: var(--hu-text);
@@ -141,8 +147,8 @@ export class ScArtifactPanel extends LitElement {
       outline-offset: 2px;
     }
     .close-btn svg {
-      width: 1rem;
-      height: 1rem;
+      width: var(--hu-icon-sm);
+      height: var(--hu-icon-sm);
     }
     .body {
       flex: 1;

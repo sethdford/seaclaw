@@ -117,7 +117,7 @@ export class ScToast extends LitElement {
       font-size: var(--hu-text-xs);
       font-weight: var(--hu-weight-medium);
       cursor: pointer;
-      transition: color var(--hu-duration-fast);
+      transition: color var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .action-btn:hover {
@@ -140,7 +140,7 @@ export class ScToast extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: color var(--hu-duration-fast);
+      transition: color var(--hu-duration-fast) var(--hu-ease-out);
       line-height: 1;
     }
 

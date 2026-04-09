@@ -184,8 +184,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
         color: var(--hu-text);
         cursor: pointer;
         transition:
-          color var(--hu-duration-fast),
-          border-color var(--hu-duration-fast);
+          color var(--hu-duration-fast) var(--hu-ease-out),
+          border-color var(--hu-duration-fast) var(--hu-ease-out);
       }
 
       .sessions-toggle:hover {

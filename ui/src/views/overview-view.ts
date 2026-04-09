@@ -113,6 +113,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
           text-decoration: none;
           text-decoration-color: var(--hu-accent-tertiary-subtle);
           font-weight: var(--hu-weight-medium);
+          transition: color var(--hu-duration-fast) var(--hu-ease-out);
 
           &:hover {
             color: var(--hu-accent-tertiary-hover);

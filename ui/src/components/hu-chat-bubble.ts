@@ -443,6 +443,13 @@ export class ScChatBubble extends LitElement {
       color: var(--hu-accent);
       border-color: var(--hu-accent);
     }
+    .outline-toggle:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
+    .outline-toggle:active {
+      transform: scale(0.97);
+    }
     .outline-toggle svg {
       width: var(--hu-icon-xs);
       height: var(--hu-icon-xs);
@@ -475,6 +482,10 @@ export class ScChatBubble extends LitElement {
       color: var(--hu-accent);
       background: color-mix(in srgb, var(--hu-accent) 6%, transparent);
     }
+    .outline-item:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: -2px;
+    }
     .outline-item[data-level="2"] {
       padding-inline-start: var(--hu-space-md);
     }
@@ -493,9 +504,14 @@ export class ScChatBubble extends LitElement {
       cursor: pointer;
       font-family: var(--hu-font);
       max-width: 100%;
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .reply-quote:hover {
       background: color-mix(in srgb, var(--hu-accent) 12%, transparent);
+    }
+    .reply-quote:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
     }
     .reply-role {
       display: block;

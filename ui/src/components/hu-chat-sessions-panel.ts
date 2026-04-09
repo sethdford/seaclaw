@@ -108,8 +108,8 @@ export class ScChatSessionsPanel extends LitElement {
       color: var(--hu-text-muted);
       cursor: pointer;
       transition:
-        color var(--hu-duration-fast),
-        background var(--hu-duration-fast);
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .panel-close:hover {
       color: var(--hu-text);
@@ -175,7 +175,7 @@ export class ScChatSessionsPanel extends LitElement {
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
       outline: none;
-      transition: border-color var(--hu-duration-fast);
+      transition: border-color var(--hu-duration-fast) var(--hu-ease-out);
       &:focus {
         border-color: var(--hu-accent);
       }
@@ -332,9 +332,9 @@ export class ScChatSessionsPanel extends LitElement {
       color: var(--hu-text-muted);
       cursor: pointer;
       transition:
-        color var(--hu-duration-fast),
-        border-color var(--hu-duration-fast),
-        background var(--hu-duration-fast);
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        border-color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .project-chip:hover {
       color: var(--hu-text);
@@ -417,14 +417,27 @@ export class ScChatSessionsPanel extends LitElement {
       border: none;
       border-radius: var(--hu-radius);
       cursor: pointer;
+      transition:
+        background var(--hu-duration-fast) var(--hu-ease-out),
+        transform var(--hu-duration-fast) var(--hu-ease-out);
+    }
+    .new-project-confirm:hover:not(:disabled) {
+      background: var(--hu-accent-hover);
+    }
+    .new-project-confirm:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
+    .new-project-confirm:active:not(:disabled) {
+      transform: scale(0.92);
     }
     .new-project-confirm:disabled {
       opacity: 0.4;
       cursor: not-allowed;
     }
     .new-project-confirm svg {
-      width: 0.75rem;
-      height: 0.75rem;
+      width: var(--hu-icon-xs);
+      height: var(--hu-icon-xs);
     }
     .session-project-indicator {
       display: inline-flex;

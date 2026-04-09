@@ -198,6 +198,7 @@ export class ScToolResult extends LitElement {
 
     .header--interactive {
       cursor: pointer;
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .header--interactive:hover {
@@ -312,6 +313,7 @@ export class ScToolResult extends LitElement {
       background: transparent;
       border: none;
       cursor: pointer;
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .section-toggle:hover {

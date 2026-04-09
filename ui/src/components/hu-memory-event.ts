@@ -32,8 +32,8 @@ export class ScMemoryEvent extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 1rem;
-      height: 1rem;
+      width: var(--hu-icon-sm);
+      height: var(--hu-icon-sm);
       flex-shrink: 0;
       margin-top: 0.125rem;
       color: var(--hu-accent-tertiary, var(--hu-accent));
@@ -52,6 +52,7 @@ export class ScMemoryEvent extends LitElement {
       gap: var(--hu-space-xs);
       cursor: pointer;
       user-select: none;
+      transition: color var(--hu-duration-fast) var(--hu-ease-out);
     }
     .summary:hover .label {
       color: var(--hu-text);

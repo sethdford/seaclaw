@@ -204,7 +204,7 @@ export class ScApp extends LitElement {
       transform-origin: left;
       flex-shrink: 0;
       opacity: 0;
-      transition: opacity var(--hu-duration-normal, 200ms);
+      transition: opacity var(--hu-duration-normal, 200ms) var(--hu-ease-out);
     }
     main:has(:is([data-scrollable="true"])) .scroll-progress {
       opacity: 1;
@@ -323,7 +323,7 @@ export class ScApp extends LitElement {
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font);
       cursor: pointer;
-      transition: background var(--hu-duration-fast);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
       line-height: 1;
     }
     .disconnect-banner button:hover,
@@ -399,7 +399,7 @@ export class ScApp extends LitElement {
         min-width: 44px;
         min-height: 44px;
         border-radius: var(--hu-radius-sm);
-        transition: color var(--hu-duration-fast);
+        transition: color var(--hu-duration-fast) var(--hu-ease-out);
       }
       .mobile-tab:hover,
       .mobile-tab.active {
@@ -502,7 +502,7 @@ export class ScApp extends LitElement {
       font-family: var(--hu-font);
       font-size: var(--hu-text-xs);
       cursor: pointer;
-      transition: background var(--hu-duration-fast);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .more-item:hover {
       background: var(--hu-hover-overlay);

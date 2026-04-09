@@ -178,6 +178,15 @@ export class CanvasView extends GatewayAwareLitElement {
         background: var(--hu-surface-container-high);
       }
 
+      .row:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: -2px;
+      }
+
+      .row:active {
+        transform: scale(0.99);
+      }
+
       .row.selected {
         border-color: var(--hu-accent);
         box-shadow: 0 0 0 1px color-mix(in srgb, var(--hu-accent) 35%, transparent);
@@ -313,6 +322,7 @@ export class CanvasView extends GatewayAwareLitElement {
         align-items: center;
         gap: var(--hu-space-2xs);
         cursor: pointer;
+        transition: color var(--hu-duration-fast) var(--hu-ease-out);
       }
 
       .version-btn:hover {
@@ -354,11 +364,19 @@ export class CanvasView extends GatewayAwareLitElement {
         cursor: pointer;
         padding: var(--hu-space-2xs);
         border-radius: var(--hu-radius-sm);
+        transition:
+          color var(--hu-duration-fast) var(--hu-ease-out),
+          background var(--hu-duration-fast) var(--hu-ease-out);
       }
 
       .version-panel-close:hover {
         background: var(--hu-hover-overlay);
         color: var(--hu-text);
+      }
+
+      .version-panel-close:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: 2px;
       }
 
       .version-item {
@@ -374,11 +392,16 @@ export class CanvasView extends GatewayAwareLitElement {
         cursor: pointer;
         font-family: var(--hu-font);
         color: var(--hu-text);
-        transition: background var(--hu-duration-fast);
+        transition: background var(--hu-duration-fast) var(--hu-ease-out);
       }
 
       .version-item:hover {
         background: var(--hu-hover-overlay);
+      }
+
+      .version-item:focus-visible {
+        outline: 2px solid var(--hu-accent);
+        outline-offset: -2px;
       }
 
       .version-item.active {

@@ -345,6 +345,7 @@ export class ScJsonViewer extends LitElement {
       min-height: 1.5em;
       cursor: default;
       position: relative;
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .row:hover {
@@ -386,6 +387,7 @@ export class ScJsonViewer extends LitElement {
       border: none;
       cursor: pointer;
       color: var(--hu-text-muted);
+      transition: color var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .toggle:hover {
@@ -434,6 +436,7 @@ export class ScJsonViewer extends LitElement {
       cursor: pointer;
       color: var(--hu-text-muted);
       border-radius: var(--hu-radius-sm);
+      transition: color var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .copy-btn:hover {

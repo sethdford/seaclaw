@@ -120,6 +120,9 @@ export class ScBranchTree extends LitElement {
       color: var(--hu-text-muted);
       padding: 0;
       border-radius: var(--hu-radius-sm);
+      transition:
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .branch-toggle:hover {
       color: var(--hu-accent);

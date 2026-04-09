@@ -183,8 +183,8 @@ export class ScPagination extends LitElement {
     }
 
     .icon svg {
-      width: 1rem;
-      height: 1rem;
+      width: var(--hu-icon-sm);
+      height: var(--hu-icon-sm);
     }
   `;
 

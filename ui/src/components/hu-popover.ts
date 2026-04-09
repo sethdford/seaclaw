@@ -40,7 +40,7 @@ export class ScPopover extends LitElement {
       transform: scale(0.96);
       transition:
         opacity var(--hu-duration-fast) var(--hu-ease-out),
-        visibility var(--hu-duration-fast),
+        visibility var(--hu-duration-fast) var(--hu-ease-out),
         transform var(--hu-duration-normal) var(--hu-spring-out);
     }
 
