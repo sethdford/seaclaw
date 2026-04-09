@@ -9,7 +9,8 @@
 #   human-serve.sh ensure   # Start only if not already running (for auto-start)
 #
 # Reads config from ~/.human/config.json for model/adapter/port.
-# Falls back to sensible defaults if config is missing.
+# Prefers gemma-realtime mlx-server.py (TurboQuant+, speculative decode, PLE-safe).
+# Falls back to turbo-serve.py → mlx_lm.server if gemma-realtime not found.
 
 set -euo pipefail
 
@@ -21,39 +22,58 @@ DEFAULT_MODEL="mlx-community/gemma-4-26b-a4b-it-4bit"
 DEFAULT_ADAPTER="$HOME/.human/adapters/persona"
 DEFAULT_PORT=8741
 
+GEMMA_RT_PATHS=(
+    "$HOME/Documents/gemma-realtime-1/scripts/mlx-server.py"
+    "$HOME/Documents/gemma-realtime/scripts/mlx-server.py"
+    "$HOME/gemma-realtime/scripts/mlx-server.py"
+)
+
 read_config() {
     if [[ -f "$CONFIG" ]] && command -v python3 &>/dev/null; then
-        MODEL=$(python3 -c "
+        eval "$(python3 -c "
 import json, os
 try:
     with open('$CONFIG') as f:
         c = json.load(f)
     mlx = c.get('mlx_local', {})
-    print(mlx.get('model', c.get('default_model', '$DEFAULT_MODEL')))
-except: print('$DEFAULT_MODEL')
-" 2>/dev/null)
-        ADAPTER=$(python3 -c "
-import json, os
-try:
-    with open('$CONFIG') as f:
-        c = json.load(f)
-    p = c.get('mlx_local', {}).get('adapter_path', '$DEFAULT_ADAPTER')
-    print(os.path.expanduser(p))
-except: print('$DEFAULT_ADAPTER')
-" 2>/dev/null)
-        PORT=$(python3 -c "
-import json
-try:
-    with open('$CONFIG') as f:
-        c = json.load(f)
-    print(c.get('mlx_local', {}).get('port', $DEFAULT_PORT))
-except: print($DEFAULT_PORT)
-" 2>/dev/null)
+    print(f'MODEL={mlx.get(\"model\", c.get(\"default_model\", \"$DEFAULT_MODEL\"))}')
+    print(f'ADAPTER={os.path.expanduser(mlx.get(\"adapter_path\", \"$DEFAULT_ADAPTER\"))}')
+    print(f'PORT={mlx.get(\"port\", $DEFAULT_PORT)}')
+    print(f'REALTIME={\"true\" if mlx.get(\"realtime\", False) else \"false\"}')
+    print(f'KV_BITS={mlx.get(\"kv_bits\", \"\")}')
+    print(f'KV_ASYMMETRIC={\"true\" if mlx.get(\"kv_asymmetric\", False) else \"false\"}')
+    print(f'SPECULATIVE_DRAFT={mlx.get(\"speculative_draft\", \"\")}')
+    print(f'SPECULATIVE_DRAFT_ADAPTER={os.path.expanduser(mlx.get(\"speculative_draft_adapter\", \"\"))}')
+except Exception:
+    print(f'MODEL=$DEFAULT_MODEL')
+    print(f'ADAPTER=$DEFAULT_ADAPTER')
+    print(f'PORT=$DEFAULT_PORT')
+    print('REALTIME=false')
+    print('KV_BITS=')
+    print('KV_ASYMMETRIC=false')
+    print('SPECULATIVE_DRAFT=')
+    print('SPECULATIVE_DRAFT_ADAPTER=')
+" 2>/dev/null)"
     else
         MODEL="$DEFAULT_MODEL"
         ADAPTER="$DEFAULT_ADAPTER"
         PORT="$DEFAULT_PORT"
+        REALTIME="false"
+        KV_BITS=""
+        KV_ASYMMETRIC="false"
+        SPECULATIVE_DRAFT=""
+        SPECULATIVE_DRAFT_ADAPTER=""
     fi
+}
+
+find_server_script() {
+    for p in "${GEMMA_RT_PATHS[@]}"; do
+        if [[ -f "$p" ]]; then
+            echo "$p"
+            return 0
+        fi
+    done
+    return 1
 }
 
 is_running() {
@@ -64,7 +84,6 @@ is_running() {
             return 0
         fi
     fi
-    # Also check by port
     if lsof -ti:"$PORT" &>/dev/null; then
         return 0
     fi
@@ -84,16 +103,36 @@ do_start() {
     echo "  Port:    $PORT"
     echo "  Log:     $LOGFILE"
 
-    local turbo_script
-    turbo_script="$(cd "$(dirname "$0")" && pwd)/turbo-serve.py"
+    local cmd=""
+    local server_script
+    if server_script=$(find_server_script); then
+        cmd="python3 $server_script --model $MODEL --port $PORT"
+        echo "  Engine:  gemma-realtime mlx-server.py"
 
-    local cmd
-    if [[ -f "$turbo_script" ]]; then
-        cmd="python3 $turbo_script --model $MODEL --port $PORT"
-        echo "  Turbo:   KV cache compression enabled"
+        if [[ "$REALTIME" == "true" ]]; then
+            cmd="$cmd --realtime"
+            echo "  Mode:    real-time voice (TurboQuant+ KV compression)"
+        fi
+        if [[ -n "$KV_BITS" ]]; then
+            cmd="$cmd --kv-bits $KV_BITS"
+            echo "  KV bits: $KV_BITS"
+        fi
+        if [[ "$KV_ASYMMETRIC" == "true" ]]; then
+            cmd="$cmd --kv-asymmetric"
+            echo "  KV mode: asymmetric (K=FP16, V=turbo)"
+        fi
+        if [[ -n "$SPECULATIVE_DRAFT" ]]; then
+            cmd="$cmd --speculative-draft $SPECULATIVE_DRAFT"
+            echo "  Draft:   $SPECULATIVE_DRAFT"
+        fi
+        if [[ -n "$SPECULATIVE_DRAFT_ADAPTER" ]] && [[ -d "$SPECULATIVE_DRAFT_ADAPTER" ]]; then
+            cmd="$cmd --speculative-draft-adapter $SPECULATIVE_DRAFT_ADAPTER"
+        fi
     else
         cmd="python3 -m mlx_lm.server --model $MODEL --port $PORT"
+        echo "  Engine:  mlx_lm.server (fallback — install gemma-realtime for TurboQuant+)"
     fi
+
     if [[ -d "$ADAPTER" ]] && [[ -f "$ADAPTER/adapters.safetensors" ]]; then
         cmd="$cmd --adapter-path $ADAPTER"
         echo "  LoRA:    persona adapter loaded"
@@ -103,13 +142,28 @@ do_start() {
     local pid=$!
     echo "$pid" > "$PIDFILE"
 
-    # Wait for server to be ready
     echo -n "  Waiting for server"
-    for i in $(seq 1 30); do
+    for i in $(seq 1 60); do
         if curl -sf "http://127.0.0.1:$PORT/v1/models" &>/dev/null; then
             echo " ready!"
             echo "  PID:     $pid"
             echo "  URL:     http://127.0.0.1:$PORT"
+            # Show TurboQuant+ status if using gemma-realtime
+            if [[ -n "$server_script" ]]; then
+                local tq
+                tq=$(curl -sf "http://127.0.0.1:$PORT/health" 2>/dev/null | python3 -c "
+import sys, json
+try:
+    h = json.loads(sys.stdin.read())
+    tq = h.get('turboquant_plus', False)
+    kv = h.get('kv_bits')
+    tps = h.get('avg_tok_per_sec', 0)
+    if tq: print(f'  TQ+:     {kv}b KV cache compression active')
+    if tps > 0: print(f'  Speed:   {tps:.1f} tok/s')
+except: pass
+" 2>/dev/null)
+                [[ -n "$tq" ]] && echo "$tq"
+            fi
             return 0
         fi
         echo -n "."
@@ -132,7 +186,6 @@ do_stop() {
             return 0
         fi
     fi
-    # Try by port
     local pids
     pids=$(lsof -ti:"$PORT" 2>/dev/null || true)
     if [[ -n "$pids" ]]; then
@@ -155,6 +208,24 @@ do_status() {
         if [[ -d "$ADAPTER" ]]; then
             echo "  Adapter: $ADAPTER"
         fi
+        curl -sf "http://127.0.0.1:$PORT/health" 2>/dev/null | python3 -c "
+import sys, json
+try:
+    h = json.loads(sys.stdin.read())
+    e = h.get('engine', 'unknown')
+    tq = h.get('turboquant_plus', False)
+    kv = h.get('kv_bits')
+    tps = h.get('avg_tok_per_sec', 0)
+    reqs = h.get('total_requests', 0)
+    print(f'  Engine:  {e}')
+    if tq: print(f'  TQ+:     {kv}b KV cache compression')
+    if tps > 0: print(f'  Speed:   {tps:.1f} tok/s ({reqs} requests)')
+    hw = h.get('hardware', {})
+    chip = hw.get('chip', '')
+    mem = hw.get('unified_memory_gb', 0)
+    if chip: print(f'  HW:      {chip}, {mem} GB unified')
+except: pass
+" 2>/dev/null
     else
         echo "MLX server not running"
         return 1
