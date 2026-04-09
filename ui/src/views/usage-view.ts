@@ -174,7 +174,10 @@ export class ScUsageView extends GatewayAwareLitElement {
 
   private async loadSummary(): Promise<void> {
     const gw = this.gateway;
-    if (!gw) return;
+    if (!gw) {
+      this.error = "Not connected to gateway";
+      return;
+    }
     this.loading = true;
     this.error = "";
     try {

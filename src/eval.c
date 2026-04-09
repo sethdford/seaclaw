@@ -679,8 +679,10 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
         (out->results_count > 0) ? (double)out->passed / (double)out->results_count : 1.0;
 
     out->suite_name = suite->name ? hu_strdup(alloc, suite->name) : hu_strndup(alloc, "eval", 4);
-    if (!out->suite_name)
+    if (!out->suite_name) {
+        hu_eval_run_free(alloc, out);
         return HU_ERR_OUT_OF_MEMORY;
+    }
 #if defined(HU_IS_TEST) && HU_IS_TEST
     out->provider = hu_strndup(alloc, "test", 4);
 #else
@@ -689,8 +691,10 @@ hu_error_t hu_eval_run_suite(hu_allocator_t *alloc, hu_provider_t *provider, con
         out->provider = pname ? hu_strdup(alloc, pname) : hu_strndup(alloc, "unknown", 7);
     }
 #endif
-    if (!out->provider)
+    if (!out->provider) {
+        hu_eval_run_free(alloc, out);
         return HU_ERR_OUT_OF_MEMORY;
+    }
     out->model = (model && model_len > 0) ? hu_strndup(alloc, model, model_len) : NULL;
 
     return HU_OK;

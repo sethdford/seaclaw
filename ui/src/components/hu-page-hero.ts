@@ -22,7 +22,7 @@ export class ScPageHero extends LitElement {
     }
     .hero {
       position: relative;
-      padding: var(--hu-space-2xl) var(--hu-space-lg) var(--hu-space-xl);
+      padding: var(--hu-space-lg) var(--hu-space-lg) var(--hu-space-md);
       animation: hu-fade-in var(--hu-duration-normal) var(--hu-ease-out) both;
     }
     .hero::after {

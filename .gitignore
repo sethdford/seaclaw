@@ -131,3 +131,4 @@ src/data/data_eval_golden_set_jsonl.c
 src/data/data_eval_results_json.c
 .lighthouseci/
 debug
+convo-training/

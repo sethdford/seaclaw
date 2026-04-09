@@ -18,8 +18,8 @@ export interface WorkflowViewConfig {
   }>;
 }
 
-@customElement("hu-workflow-view")
-export class HuWorkflowView extends LitElement {
+@customElement("hu-workflow-detail")
+export class HuWorkflowDetail extends LitElement {
   @property() workflowId = "";
   @property() status: "running" | "paused" | "completed" | "failed" = "running";
   @property({ type: Array }) events: WorkflowEvent[] = [];
@@ -33,6 +33,7 @@ export class HuWorkflowView extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      width: 100%;
       font-family: var(--hu-font);
       container-type: inline-size;
       background: var(--hu-bg);
@@ -393,6 +394,6 @@ export class HuWorkflowView extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "hu-workflow-view": HuWorkflowView;
+    "hu-workflow-detail": HuWorkflowDetail;
   }
 }

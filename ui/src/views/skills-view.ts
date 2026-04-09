@@ -65,14 +65,25 @@ export class ScSkillsView extends GatewayAwareLitElement {
       .toolbar-right {
         display: flex;
         align-items: center;
-        gap: var(--hu-space-sm);
+        gap: var(--hu-space-xs);
+        flex-wrap: nowrap;
+      }
+      .install-row {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-xs);
+        margin-bottom: var(--hu-space-md);
+      }
+      .install-row hu-input {
+        flex: 1;
+        max-width: 22rem;
       }
       .staleness {
         font-size: var(--hu-text-xs);
         color: var(--hu-text-secondary);
       }
       .section {
-        margin-bottom: var(--hu-space-2xl);
+        margin-bottom: var(--hu-space-lg);
       }
       .section-head {
         display: flex;
@@ -92,23 +103,35 @@ export class ScSkillsView extends GatewayAwareLitElement {
       }
       .tag-chips {
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: var(--hu-space-xs);
-        margin-bottom: var(--hu-space-lg);
+        margin-bottom: var(--hu-space-md);
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding-bottom: var(--hu-space-2xs);
+      }
+      .tag-chips::-webkit-scrollbar {
+        display: none;
       }
       .tag-chip {
         display: inline-flex;
         align-items: center;
-        padding: var(--hu-space-2xs) var(--hu-space-sm);
+        padding: 0.25rem 0.625rem;
         border-radius: var(--hu-radius-full);
-        font-size: var(--hu-text-xs);
+        font-size: var(--hu-text-sm);
         font-weight: var(--hu-weight-medium);
         cursor: pointer;
         border: 1px solid var(--hu-border);
         background: transparent;
         color: var(--hu-text-secondary);
         font-family: var(--hu-font);
-        transition: all var(--hu-duration-fast) var(--hu-ease-out);
+        flex-shrink: 0;
+        white-space: nowrap;
+        transition:
+          color var(--hu-duration-fast) var(--hu-ease-out),
+          border-color var(--hu-duration-fast) var(--hu-ease-out),
+          background var(--hu-duration-fast) var(--hu-ease-out);
       }
       .tag-chip:hover {
         color: var(--hu-text);
@@ -256,7 +279,10 @@ export class ScSkillsView extends GatewayAwareLitElement {
   }
 
   protected override async load(): Promise<void> {
-    if (!this.gateway) return;
+    if (!this.gateway) {
+      this.error = "Not connected to gateway";
+      return;
+    }
     if (this.gateway.features && this.gateway.features.skills === false) {
       this.error = "Skills not available on this build";
       return;
@@ -402,26 +428,6 @@ export class ScSkillsView extends GatewayAwareLitElement {
         heading="Skills"
         description="Extend your agent with installable skill packages"
       >
-        <div class="toolbar-right">
-          <hu-input
-            type="url"
-            placeholder="Install from URL..."
-            aria-label="Skill URL to install"
-            .value=${this.installUrl}
-            .error=${this.installUrlError}
-            @hu-input=${(e: CustomEvent<{ value: string }>) => {
-              this.installUrl = e.detail.value;
-              this.installUrlError = this._validateInstallUrl(e.detail.value);
-            }}
-          ></hu-input>
-          <hu-button
-            variant="primary"
-            ?disabled=${!this.installUrl.trim() || !!this.installUrlError || this.actionLoading}
-            @click=${this._installFromUrl}
-            aria-label="Install skill from URL"
-            >Install</hu-button
-          >
-        </div>
       </hu-section-header>
     </hu-page-hero>`;
   }
@@ -495,7 +501,7 @@ export class ScSkillsView extends GatewayAwareLitElement {
       <div class="toolbar">
         <div class="toolbar-left">
           <hu-input
-            placeholder="Filter installed skills..."
+            placeholder="Filter skills..."
             aria-label="Search installed skills"
             .value=${this.localSearch}
             @hu-input=${(e: CustomEvent<{ value: string }>) => (this.localSearch = e.detail.value)}
@@ -503,10 +509,31 @@ export class ScSkillsView extends GatewayAwareLitElement {
         </div>
         <div class="toolbar-right">
           <span class="staleness">${this.stalenessLabel}</span>
-          <hu-button variant="ghost" @click=${() => this.load()} aria-label="Refresh skills list"
-            >${icons.refresh} Refresh</hu-button
+          <hu-button variant="ghost" size="sm" @click=${() => this.load()} aria-label="Refresh skills list"
+            >${icons.refresh}</hu-button
           >
         </div>
+      </div>
+      <div class="install-row">
+        <hu-input
+          type="url"
+          placeholder="Install from URL..."
+          aria-label="Skill URL to install"
+          .value=${this.installUrl}
+          .error=${this.installUrlError}
+          @hu-input=${(e: CustomEvent<{ value: string }>) => {
+            this.installUrl = e.detail.value;
+            this.installUrlError = this._validateInstallUrl(e.detail.value);
+          }}
+        ></hu-input>
+        <hu-button
+          variant="primary"
+          size="sm"
+          ?disabled=${!this.installUrl.trim() || !!this.installUrlError || this.actionLoading}
+          @click=${this._installFromUrl}
+          aria-label="Install skill from URL"
+          >Install</hu-button
+        >
       </div>
       ${filtered.length === 0 && this.skills.length > 0
         ? html`<hu-empty-state

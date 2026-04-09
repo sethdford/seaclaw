@@ -190,8 +190,11 @@ static hu_error_t task_list_load(hu_task_list_t *list) {
     hu_json_value_t *root = NULL;
     hu_error_t err = hu_json_parse(list->alloc, content, nr, &root);
     list->alloc->free(list->alloc->ctx, content, (size_t)sz + 1);
-    if (err != HU_OK || !root || root->type != HU_JSON_ARRAY)
-        return (root ? (void)hu_json_free(list->alloc, root), HU_OK : HU_OK);
+    if (err != HU_OK || !root || root->type != HU_JSON_ARRAY) {
+        if (root)
+            hu_json_free(list->alloc, root);
+        return HU_OK;
+    }
 
     for (size_t i = 0; i < root->data.array.len && list->count < list->max_tasks; i++) {
         hu_json_value_t *item = root->data.array.items[i];

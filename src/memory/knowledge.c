@@ -353,7 +353,7 @@ hu_error_t hu_knowledge_summary_to_prompt(hu_allocator_t *alloc,
     }
     if (summary->known_count == 0) {
         n = snprintf(buf + pos, cap - pos, "(none)");
-        if (n > 0)
+        if (n > 0 && pos + (size_t)n < cap)
             pos += (size_t)n;
     }
     buf[pos++] = '\n';
@@ -376,7 +376,7 @@ hu_error_t hu_knowledge_summary_to_prompt(hu_allocator_t *alloc,
     }
     if (summary->unknown_count == 0) {
         n = snprintf(buf + pos, cap - pos, "(none)");
-        if (n > 0)
+        if (n > 0 && pos + (size_t)n < cap)
             pos += (size_t)n;
     }
     buf[pos++] = '\n';

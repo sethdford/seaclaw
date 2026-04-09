@@ -51,7 +51,7 @@ export class ScFloatingMic extends LitElement {
     }
     .btn.listening {
       background: var(--hu-error);
-      animation: hu-pulse-red var(--hu-duration-slow) ease-in-out infinite;
+      animation: hu-pulse-red var(--hu-duration-slow) var(--hu-ease-in-out, ease-in-out) infinite;
     }
     .btn.transcribing {
       background: var(--hu-accent-secondary);

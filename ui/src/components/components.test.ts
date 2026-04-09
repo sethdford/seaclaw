@@ -300,15 +300,15 @@ describe("hu-agent-graph", () => {
   });
 });
 
-describe("hu-workflow-view", () => {
+describe("hu-workflow-detail", () => {
   it("should be defined as a custom element", async () => {
     await import("./hu-workflow-view.js");
-    expect(customElements.get("hu-workflow-view")).toBeDefined();
+    expect(customElements.get("hu-workflow-detail")).toBeDefined();
   });
 
   it("should render without errors", async () => {
-    const { HuWorkflowView } = await import("./hu-workflow-view.js");
-    const el = new HuWorkflowView();
+    const { HuWorkflowDetail } = await import("./hu-workflow-view.js");
+    const el = new HuWorkflowDetail();
     el.workflowId = "workflow-1";
     el.status = "running";
     el.events = [];

@@ -23,16 +23,26 @@ const NAV_SHORTCUT_MAP: Record<string, string> = {
   settings: "g s",
 };
 
-/** Primary nav items — the 5 top-level destinations. */
 const PRIMARY_NAV: NavItem[] = [
   { id: "chat", label: "Chat", icon: icons["message-square"] },
   { id: "voice", label: "Voice", icon: icons.mic },
-  { id: "canvas", label: "Canvas", icon: icons.monitor },
-  { id: "memory", label: "Memory", icon: icons.brain },
-  { id: "agents", label: "Agents", icon: icons.zap },
 ];
 
-/** Settings item — pinned to the sidebar footer. */
+const SECONDARY_NAV: NavItem[] = [
+  { id: "agents", label: "Agents", icon: icons.zap },
+  { id: "memory", label: "Memory", icon: icons.brain },
+  { id: "skills", label: "Skills", icon: icons.grid },
+];
+
+const SYSTEM_NAV: NavItem[] = [
+  { id: "canvas", label: "Canvas", icon: icons.monitor },
+  { id: "nodes", label: "Nodes", icon: icons.cpu },
+  { id: "metrics", label: "Metrics", icon: icons.activity },
+  { id: "logs", label: "Logs", icon: icons["file-text"] },
+  { id: "security", label: "Security", icon: icons.lock },
+  { id: "automations", label: "Automations", icon: icons.clock },
+];
+
 const SETTINGS_NAV: NavItem = {
   id: "settings",
   label: "Settings",
@@ -218,6 +228,77 @@ export class ScSidebar extends LitElement {
       padding: var(--hu-space-md);
     }
 
+    .nav-section {
+      margin-bottom: var(--hu-space-sm);
+    }
+
+    .nav-divider {
+      height: 1px;
+      background: color-mix(in srgb, var(--hu-border) 50%, transparent);
+      margin: var(--hu-space-sm) var(--hu-space-sm);
+    }
+
+    .nav-group-label {
+      display: flex;
+      align-items: center;
+      gap: var(--hu-space-sm);
+      width: 100%;
+      padding: var(--hu-space-xs) var(--hu-space-md);
+      background: none;
+      border: none;
+      font-size: var(--hu-text-xs);
+      font-family: var(--hu-font);
+      font-weight: var(--hu-weight-semibold);
+      color: var(--hu-text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: color var(--hu-duration-fast) var(--hu-ease-out);
+    }
+
+    .nav-group-label:hover {
+      color: var(--hu-text-secondary);
+    }
+
+    .nav-group-label .chevron {
+      width: var(--hu-icon-xs, 0.75rem);
+      height: var(--hu-icon-xs, 0.75rem);
+      transition: transform var(--hu-duration-fast) var(--hu-ease-out);
+    }
+
+    .nav-group-label .chevron.open {
+      transform: rotate(90deg);
+    }
+
+    :host([collapsed]) .nav-group-label {
+      justify-content: center;
+    }
+
+    :host([collapsed]) .nav-group-label span:not(.chevron) {
+      display: none;
+    }
+
+    .system-items {
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        max-height var(--hu-duration-normal) var(--hu-ease-out),
+        opacity var(--hu-duration-fast) var(--hu-ease-out),
+        visibility 0s var(--hu-duration-normal);
+    }
+
+    .system-items.open {
+      max-height: 25rem;
+      opacity: 1;
+      visibility: visible;
+      transition:
+        max-height var(--hu-duration-normal) var(--hu-ease-out),
+        opacity var(--hu-duration-fast) var(--hu-ease-out),
+        visibility 0s;
+    }
+
     .settings-item {
       border-left: 1px solid transparent;
       margin-bottom: var(--hu-space-xs);
@@ -246,7 +327,23 @@ export class ScSidebar extends LitElement {
       text-align: left;
       font-family: var(--hu-font);
       font-weight: var(--hu-weight-medium);
+      animation: hu-nav-enter var(--hu-duration-normal, 300ms) var(--hu-ease-out) both;
     }
+    @keyframes hu-nav-enter {
+      from {
+        opacity: 0;
+        transform: translateX(calc(-1 * var(--hu-space-sm)));
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    .nav-section .nav-item:nth-child(1) { animation-delay: 50ms; }
+    .nav-section .nav-item:nth-child(2) { animation-delay: 100ms; }
+    .nav-section .nav-item:nth-child(3) { animation-delay: 150ms; }
+    .nav-section .nav-item:nth-child(4) { animation-delay: 200ms; }
+    .nav-section .nav-item:nth-child(5) { animation-delay: 250ms; }
 
     .nav-item {
       &:active {
@@ -335,8 +432,8 @@ export class ScSidebar extends LitElement {
       font-size: var(--hu-text-xs);
       font-family: var(--hu-font);
       transition:
-        background var(--hu-duration-fast),
-        color var(--hu-duration-fast);
+        background var(--hu-duration-fast) var(--hu-ease-out),
+        color var(--hu-duration-fast) var(--hu-ease-out);
     }
 
     .theme-toggle:hover {
@@ -377,8 +474,8 @@ export class ScSidebar extends LitElement {
       color: var(--hu-text);
       cursor: pointer;
       transition:
-        background var(--hu-duration-fast),
-        color var(--hu-duration-fast),
+        background var(--hu-duration-fast) var(--hu-ease-out),
+        color var(--hu-duration-fast) var(--hu-ease-out),
         transform var(--hu-duration-normal) var(--hu-ease-out);
     }
 
@@ -477,6 +574,7 @@ export class ScSidebar extends LitElement {
 
   @state() private _hoveredItemId: string | null = null;
   @state() private _showShortcutTooltip = false;
+  @state() private _systemOpen = false;
   private _hoverTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _mqlHoverNone: MediaQueryList | null = null;
@@ -511,6 +609,35 @@ export class ScSidebar extends LitElement {
     }
   };
 
+  private _renderNavItem(item: NavItem) {
+    return html`
+      <div
+        class="nav-item-wrap"
+        @mouseenter=${() => this._onNavItemEnter(item.id)}
+        @mouseleave=${() => this._onNavItemLeave()}
+      >
+        <button
+          class="nav-item"
+          data-nav-id=${item.id}
+          ?aria-current=${this.activeTab === item.id}
+          aria-label=${item.label}
+          aria-describedby=${this._showShortcutTooltip && this._hoveredItemId === item.id ? `shortcut-${item.id}` : undefined}
+          title=${this.collapsed ? item.label : undefined}
+          @click=${() => this._dispatchTabChange(item.id)}
+          @mouseenter=${() => this._dispatchNavHover(item.id)}
+        >
+          <span class="icon">${item.icon}</span>
+          <span class="label">${item.label}</span>
+        </button>
+        ${this._showShortcutTooltip && this._hoveredItemId === item.id
+          ? html`<span class="shortcut-tooltip" id=${`shortcut-${item.id}`} role="tooltip"
+              >${NAV_SHORTCUT_MAP[item.id] ?? ""}</span
+            >`
+          : nothing}
+      </div>
+    `;
+  }
+
   override render() {
     return html`
       <aside class="sidebar">
@@ -529,34 +656,27 @@ export class ScSidebar extends LitElement {
         </header>
 
         <nav class="nav" aria-label="Main navigation" @keydown=${this._onNavKeyDown}>
-          ${PRIMARY_NAV.map(
-            (item) => html`
-              <div
-                class="nav-item-wrap"
-                @mouseenter=${() => this._onNavItemEnter(item.id)}
-                @mouseleave=${() => this._onNavItemLeave()}
-              >
-                <button
-                  class="nav-item"
-                  data-nav-id=${item.id}
-                  ?aria-current=${this.activeTab === item.id}
-                  aria-label=${item.label}
-                  aria-describedby=${this._showShortcutTooltip && this._hoveredItemId === item.id ? `shortcut-${item.id}` : undefined}
-                  title=${this.collapsed ? item.label : undefined}
-                  @click=${() => this._dispatchTabChange(item.id)}
-                  @mouseenter=${() => this._dispatchNavHover(item.id)}
-                >
-                  <span class="icon">${item.icon}</span>
-                  <span class="label">${item.label}</span>
-                </button>
-                ${this._showShortcutTooltip && this._hoveredItemId === item.id
-                  ? html`<span class="shortcut-tooltip" id=${`shortcut-${item.id}`} role="tooltip"
-                      >${NAV_SHORTCUT_MAP[item.id] ?? ""}</span
-                    >`
-                  : nothing}
-              </div>
-            `,
-          )}
+          <div class="nav-section">
+            ${PRIMARY_NAV.map((item) => this._renderNavItem(item))}
+          </div>
+          <div class="nav-divider"></div>
+          <div class="nav-section">
+            ${SECONDARY_NAV.map((item) => this._renderNavItem(item))}
+          </div>
+          <div class="nav-divider"></div>
+          <div class="nav-section">
+            <button
+              class="nav-group-label"
+              @click=${() => { this._systemOpen = !this._systemOpen; }}
+              aria-expanded=${this._systemOpen}
+            >
+              <span class="chevron ${this._systemOpen ? "open" : ""}">${icons.chevron}</span>
+              <span>System</span>
+            </button>
+            <div class="system-items ${this._systemOpen ? "open" : ""}">
+              ${SYSTEM_NAV.map((item) => this._renderNavItem(item))}
+            </div>
+          </div>
         </nav>
 
         <footer class="footer">
@@ -670,6 +790,12 @@ export class ScSidebar extends LitElement {
     super.updated(changed);
     if (changed.has("collapsed")) {
       this._syncMagneticNavListeners();
+    }
+    if (changed.has("activeTab")) {
+      const systemIds = SYSTEM_NAV.map((n) => n.id);
+      if (systemIds.includes(this.activeTab)) {
+        this._systemOpen = true;
+      }
     }
   }
 

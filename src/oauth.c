@@ -226,20 +226,24 @@ hu_error_t hu_mcp_oauth_exchange_code(hu_allocator_t *alloc, const hu_oauth_conf
     const char *access_token = "test_access_token_from_mock";
     const char *token_type = "Bearer";
 
-    out_token->access_token = (char *)alloc->alloc(alloc->ctx, strlen(access_token) + 1);
+    size_t mock_access_len = strlen(access_token);
+    out_token->access_token = (char *)alloc->alloc(alloc->ctx, mock_access_len + 1);
     if (!out_token->access_token)
         return HU_ERR_OUT_OF_MEMORY;
-    strcpy(out_token->access_token, access_token);
-    out_token->access_token_len = strlen(access_token);
+    memcpy(out_token->access_token, access_token, mock_access_len);
+    out_token->access_token[mock_access_len] = '\0';
+    out_token->access_token_len = mock_access_len;
 
-    out_token->token_type = (char *)alloc->alloc(alloc->ctx, strlen(token_type) + 1);
+    size_t mock_tt_len = strlen(token_type);
+    out_token->token_type = (char *)alloc->alloc(alloc->ctx, mock_tt_len + 1);
     if (!out_token->token_type) {
         alloc->free(alloc->ctx, out_token->access_token, out_token->access_token_len + 1);
         out_token->access_token = NULL;
         return HU_ERR_OUT_OF_MEMORY;
     }
-    strcpy(out_token->token_type, token_type);
-    out_token->token_type_len = strlen(token_type);
+    memcpy(out_token->token_type, token_type, mock_tt_len);
+    out_token->token_type[mock_tt_len] = '\0';
+    out_token->token_type_len = mock_tt_len;
     out_token->expires_at = (int64_t)time(NULL) + 3600;  /* 1 hour from now */
     return HU_OK;
 #else
@@ -311,7 +315,8 @@ hu_error_t hu_mcp_oauth_exchange_code(hu_allocator_t *alloc, const hu_oauth_conf
         hu_json_free(alloc, resp_obj);
         return HU_ERR_OUT_OF_MEMORY;
     }
-    strcpy(out_token->access_token, access_token);
+    memcpy(out_token->access_token, access_token, access_len);
+    out_token->access_token[access_len] = '\0';
     out_token->access_token_len = access_len;
 
     /* Allocate and copy refresh_token if present */
@@ -319,7 +324,8 @@ hu_error_t hu_mcp_oauth_exchange_code(hu_allocator_t *alloc, const hu_oauth_conf
         size_t refresh_len = strlen(refresh_token);
         out_token->refresh_token = (char *)alloc->alloc(alloc->ctx, refresh_len + 1);
         if (out_token->refresh_token) {
-            strcpy(out_token->refresh_token, refresh_token);
+            memcpy(out_token->refresh_token, refresh_token, refresh_len);
+            out_token->refresh_token[refresh_len] = '\0';
             out_token->refresh_token_len = refresh_len;
         }
     }
@@ -329,7 +335,8 @@ hu_error_t hu_mcp_oauth_exchange_code(hu_allocator_t *alloc, const hu_oauth_conf
     size_t tt_len = strlen(tt);
     out_token->token_type = (char *)alloc->alloc(alloc->ctx, tt_len + 1);
     if (out_token->token_type) {
-        strcpy(out_token->token_type, tt);
+        memcpy(out_token->token_type, tt, tt_len);
+        out_token->token_type[tt_len] = '\0';
         out_token->token_type_len = tt_len;
     }
 
@@ -509,7 +516,8 @@ hu_error_t hu_mcp_oauth_token_load(hu_allocator_t *alloc, const char *path,
         size_t len = strlen(access_token);
         out_token->access_token = (char *)alloc->alloc(alloc->ctx, len + 1);
         if (out_token->access_token) {
-            strcpy(out_token->access_token, access_token);
+            memcpy(out_token->access_token, access_token, len);
+            out_token->access_token[len] = '\0';
             out_token->access_token_len = len;
         }
     }
@@ -519,7 +527,8 @@ hu_error_t hu_mcp_oauth_token_load(hu_allocator_t *alloc, const char *path,
         size_t len = strlen(refresh_token);
         out_token->refresh_token = (char *)alloc->alloc(alloc->ctx, len + 1);
         if (out_token->refresh_token) {
-            strcpy(out_token->refresh_token, refresh_token);
+            memcpy(out_token->refresh_token, refresh_token, len);
+            out_token->refresh_token[len] = '\0';
             out_token->refresh_token_len = len;
         }
     }
@@ -529,7 +538,8 @@ hu_error_t hu_mcp_oauth_token_load(hu_allocator_t *alloc, const char *path,
         size_t len = strlen(token_type);
         out_token->token_type = (char *)alloc->alloc(alloc->ctx, len + 1);
         if (out_token->token_type) {
-            strcpy(out_token->token_type, token_type);
+            memcpy(out_token->token_type, token_type, len);
+            out_token->token_type[len] = '\0';
             out_token->token_type_len = len;
         }
     }

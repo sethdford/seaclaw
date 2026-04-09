@@ -132,7 +132,7 @@ export class ScCommandPalette extends LitElement {
       box-shadow: var(--hu-shadow-xl);
       border: 1px solid var(--hu-glass-border-color);
       border-radius: var(--hu-radius-xl);
-      max-width: 560px;
+      max-width: 35rem;
       width: 100%;
       margin: 0 var(--hu-space-md);
       box-sizing: border-box;

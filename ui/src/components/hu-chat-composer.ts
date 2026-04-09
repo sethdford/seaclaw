@@ -3,6 +3,7 @@ import { customElement, property, state, query } from "lit/decorators.js";
 import { icons } from "../icons.js";
 import "./hu-file-preview.js";
 import "./hu-model-selector.js";
+import "./hu-persona-selector.js";
 import type { FilePreviewItem } from "./hu-file-preview.js";
 import { playAudioCue } from "../utils/audio-cue.js";
 
@@ -59,8 +60,11 @@ export class ScChatComposer extends LitElement {
   @property({ type: Boolean, attribute: "voice-active" }) voiceActive = false;
   @property({ type: Boolean, attribute: "voice-supported" }) voiceSupported = true;
   @property({ type: Boolean, attribute: "thinking-enabled" }) thinkingEnabled = false;
+  @property({ type: Boolean, attribute: "research-enabled" }) researchEnabled = false;
   @property({ type: Number, attribute: "active-memories" }) activeMemories = 0;
   @property({ type: Array }) models: Array<{ id: string; name: string; provider?: string }> = [];
+  @property({ type: String }) persona = "";
+  @property({ type: Array }) personas: Array<{ id: string; name: string; description?: string }> = [];
 
   @state() private _dragOver = false;
   @state() private _attachedFiles: FilePreviewItem[] = [];
@@ -85,25 +89,27 @@ export class ScChatComposer extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      width: 100%;
       contain: layout style;
       container-type: inline-size;
     }
     .composer {
       display: flex;
       flex-direction: column;
-      gap: var(--hu-space-sm);
-      padding: var(--hu-space-xs) var(--hu-space-md);
-      background: color-mix(in srgb, var(--hu-surface-container) 20%, transparent);
-      backdrop-filter: blur(var(--hu-blur-sm));
-      -webkit-backdrop-filter: blur(var(--hu-blur-sm));
-      border: 1px solid color-mix(in srgb, var(--hu-border-subtle) 50%, transparent);
-      border-radius: var(--hu-radius-lg);
+      gap: 0;
+      padding: var(--hu-space-sm) var(--hu-space-md);
+      background: var(--hu-surface-container);
+      border: 1px solid color-mix(in srgb, var(--hu-border-subtle) 60%, transparent);
+      border-radius: var(--hu-radius-xl, 1.25rem);
+      box-shadow: 0 1px 2px 0 color-mix(in srgb, var(--hu-shadow-color, #000) 4%, transparent);
       transition:
-        border-color var(--hu-duration-fast),
-        box-shadow var(--hu-duration-fast);
+        border-color var(--hu-duration-fast) var(--hu-ease-out),
+        box-shadow var(--hu-duration-fast) var(--hu-ease-out);
       &:focus-within {
-        border-color: var(--hu-accent);
-        box-shadow: 0 0 0 2px var(--hu-accent-subtle);
+        border-color: color-mix(in srgb, var(--hu-accent) 50%, transparent);
+        box-shadow:
+          0 1px 2px 0 color-mix(in srgb, var(--hu-shadow-color, #000) 4%, transparent),
+          0 0 0 3px color-mix(in srgb, var(--hu-accent) 8%, transparent);
       }
       &.drag-over {
         outline: 2px dashed var(--hu-accent);
@@ -134,8 +140,8 @@ export class ScChatComposer extends LitElement {
       cursor: pointer;
       white-space: nowrap;
       transition:
-        border-color var(--hu-duration-fast),
-        background var(--hu-duration-fast);
+        border-color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
       &:hover {
         border-color: var(--hu-accent);
         background: var(--hu-accent-subtle);
@@ -147,37 +153,45 @@ export class ScChatComposer extends LitElement {
     }
     .input-row {
       display: flex;
-      align-items: center;
-      gap: var(--hu-space-sm);
+      flex-direction: column;
     }
-    hu-model-selector {
+    .toolbar-row {
+      display: flex;
+      align-items: center;
+      gap: var(--hu-space-2xs);
+      flex-wrap: wrap;
+    }
+    .toolbar-row .spacer {
+      flex: 1;
+      min-width: var(--hu-space-md);
+    }
+    hu-model-selector,
+    hu-persona-selector {
       flex-shrink: 0;
     }
     .thinking-toggle {
       flex-shrink: 0;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: var(--hu-space-2xs);
-      padding: var(--hu-space-2xs) var(--hu-space-sm);
-      background: var(--hu-bg-elevated);
-      border: 1px solid var(--hu-border-subtle);
-      border-radius: var(--hu-radius-full);
-      font-size: var(--hu-text-xs);
+      gap: 0.25rem;
+      padding: 0.25rem 0.5rem;
+      background: transparent;
+      border: none;
+      border-radius: var(--hu-radius);
+      font-size: var(--hu-text-sm);
       font-family: var(--hu-font);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-faint);
       cursor: pointer;
       transition:
-        color var(--hu-duration-fast),
-        border-color var(--hu-duration-fast),
-        background var(--hu-duration-fast);
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .thinking-toggle:hover {
-      color: var(--hu-text);
-      border-color: var(--hu-border);
+      color: var(--hu-text-secondary);
+      background: var(--hu-hover-overlay);
     }
     .thinking-toggle.active {
       color: var(--hu-accent-text, var(--hu-accent));
-      border-color: color-mix(in srgb, var(--hu-accent) 40%, transparent);
       background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
     }
     .thinking-toggle .toggle-icon {
@@ -196,24 +210,24 @@ export class ScChatComposer extends LitElement {
     }
     .memory-chip {
       flex-shrink: 0;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: var(--hu-space-2xs);
-      padding: var(--hu-space-2xs) var(--hu-space-sm);
-      background: color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 8%, transparent);
-      border: 1px solid
-        color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 30%, transparent);
-      border-radius: var(--hu-radius-full);
-      font-size: var(--hu-text-xs);
+      gap: 0.25rem;
+      padding: 0.25rem 0.5rem;
+      background: transparent;
+      border: none;
+      border-radius: var(--hu-radius);
+      font-size: var(--hu-text-sm);
       font-family: var(--hu-font);
-      color: var(--hu-accent-tertiary, var(--hu-accent));
+      color: var(--hu-text-faint);
       cursor: pointer;
       transition:
-        background var(--hu-duration-fast),
-        border-color var(--hu-duration-fast);
+        background var(--hu-duration-fast) var(--hu-ease-out),
+        color var(--hu-duration-fast) var(--hu-ease-out);
     }
     .memory-chip:hover {
-      background: color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 14%, transparent);
+      background: var(--hu-hover-overlay);
+      color: var(--hu-text-secondary);
     }
     .memory-chip:focus-visible {
       outline: 2px solid var(--hu-accent);
@@ -230,48 +244,51 @@ export class ScChatComposer extends LitElement {
       height: 100%;
     }
     textarea {
-      flex: 1;
-      min-height: 2.75rem;
+      width: 100%;
+      min-height: 1.5rem;
       max-height: ${(LINE_HEIGHT * MAX_LINES) / 16}rem;
-      padding: var(--hu-space-sm) 0;
+      padding: var(--hu-space-xs) 0 var(--hu-space-2xs);
       background: transparent;
       border: none;
       color: var(--hu-text);
       font-family: var(--hu-font);
       font-size: var(--hu-text-base);
+      font-weight: var(--hu-weight-normal, 400);
       resize: none;
       line-height: ${LINE_HEIGHT / 16}rem;
+      letter-spacing: -0.01em;
     }
     textarea:focus {
       outline: none;
     }
     textarea::placeholder {
-      color: var(--hu-text-muted);
+      color: var(--hu-text-faint);
+      font-weight: var(--hu-weight-normal, 400);
     }
     .actions {
       display: flex;
       align-items: center;
-      gap: var(--hu-space-sm);
+      gap: var(--hu-space-xs);
     }
     .icon-btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: var(--hu-icon-2xl);
-      height: var(--hu-icon-2xl);
+      width: 2rem;
+      height: 2rem;
       padding: 0;
       background: transparent;
       border: none;
       border-radius: var(--hu-radius);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-faint);
       cursor: pointer;
       transition:
-        color var(--hu-duration-fast),
-        background var(--hu-duration-fast);
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .icon-btn:hover:not(:disabled) {
       background: var(--hu-hover-overlay);
-      color: var(--hu-accent);
+      color: var(--hu-text-secondary);
     }
     .icon-btn:focus-visible {
       outline: 2px solid var(--hu-accent);
@@ -282,8 +299,8 @@ export class ScChatComposer extends LitElement {
       cursor: not-allowed;
     }
     .icon-btn svg {
-      width: 1.25rem;
-      height: 1.25rem;
+      width: 1.125rem;
+      height: 1.125rem;
     }
     .mic-btn.active {
       background: var(--hu-accent-subtle);
@@ -320,9 +337,9 @@ export class ScChatComposer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 2.25rem;
-      height: 2.25rem;
-      min-width: 2.25rem;
+      width: 2rem;
+      height: 2rem;
+      min-width: 2rem;
       padding: 0;
       border: none;
       border-radius: var(--hu-radius-full);
@@ -395,7 +412,7 @@ export class ScChatComposer extends LitElement {
       background: transparent;
       width: 100%;
       text-align: left;
-      transition: background var(--hu-duration-fast);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .slash-item:hover,
     .slash-item.focused {
@@ -436,7 +453,7 @@ export class ScChatComposer extends LitElement {
       background: transparent;
       border: none;
       cursor: pointer;
-      transition: background var(--hu-duration-fast);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
       &:hover,
       &.active {
         background: var(--hu-hover-overlay);
@@ -472,7 +489,7 @@ export class ScChatComposer extends LitElement {
       background: transparent;
       border: none;
       cursor: pointer;
-      transition: background var(--hu-duration-fast);
+      transition: background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .command-item:hover,
     .command-item.active {
@@ -556,8 +573,8 @@ export class ScChatComposer extends LitElement {
       color: var(--hu-text-muted);
       cursor: pointer;
       transition:
-        color var(--hu-duration-fast),
-        background var(--hu-duration-fast);
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .context-chip .chip-close:hover {
       color: var(--hu-text);
@@ -582,8 +599,6 @@ export class ScChatComposer extends LitElement {
     }
     @media (prefers-reduced-transparency: reduce) {
       .composer {
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
         background: var(--hu-surface-container);
       }
     }
@@ -783,6 +798,17 @@ export class ScChatComposer extends LitElement {
     );
   }
 
+  private _toggleResearch(): void {
+    this.researchEnabled = !this.researchEnabled;
+    this.dispatchEvent(
+      new CustomEvent("hu-research-toggle", {
+        bubbles: true,
+        composed: true,
+        detail: { enabled: this.researchEnabled },
+      }),
+    );
+  }
+
   private _emitSend(): void {
     const msg = this.value.trim();
     if (!msg || this.waiting || this.disabled) return;
@@ -796,7 +822,7 @@ export class ScChatComposer extends LitElement {
       new CustomEvent("hu-send", {
         bubbles: true,
         composed: true,
-        detail: { message: msg, files, mentionedFiles, thinkingEnabled: this.thinkingEnabled },
+        detail: { message: msg, files, mentionedFiles, thinkingEnabled: this.thinkingEnabled, researchEnabled: this.researchEnabled },
       }),
     );
   }
@@ -1061,11 +1087,30 @@ export class ScChatComposer extends LitElement {
               `
             : nothing}
           <div class="input-row">
+            <textarea
+              id="composer-textarea"
+              aria-label="Message input"
+              .value=${this.value}
+              .placeholder=${this.placeholder}
+              ?disabled=${this.disabled}
+              @input=${this._handleInput}
+              @keydown=${this._handleKeyDown}
+              @paste=${this._handlePaste}
+            ></textarea>
+            <input id="file-input" type="file" multiple hidden @change=${this._handleFileChange} />
+          </div>
+          <div class="toolbar-row">
             ${this.model
               ? html`<hu-model-selector
                   .value=${this.model}
                   .models=${this.models}
                 ></hu-model-selector>`
+              : nothing}
+            ${this.personas.length > 0
+              ? html`<hu-persona-selector
+                  .value=${this.persona}
+                  .personas=${this.personas}
+                ></hu-persona-selector>`
               : nothing}
             <button
               class="thinking-toggle ${this.thinkingEnabled ? "active" : ""}"
@@ -1079,6 +1124,19 @@ export class ScChatComposer extends LitElement {
             >
               <span class="toggle-icon">${icons.brain}</span>
               <span>Think</span>
+            </button>
+            <button
+              class="thinking-toggle ${this.researchEnabled ? "active" : ""}"
+              type="button"
+              @click=${this._toggleResearch}
+              aria-label=${this.researchEnabled
+                ? "Disable research mode"
+                : "Enable research mode"}
+              aria-pressed=${this.researchEnabled}
+              title="Research mode (${this.researchEnabled ? "on" : "off"})"
+            >
+              <span class="toggle-icon">${icons.magnifyingGlass}</span>
+              <span>Research</span>
             </button>
             ${this.activeMemories > 0
               ? html`<button
@@ -1095,17 +1153,7 @@ export class ScChatComposer extends LitElement {
                   <span>${this.activeMemories}</span>
                 </button>`
               : nothing}
-            <textarea
-              id="composer-textarea"
-              aria-label="Message input"
-              .value=${this.value}
-              .placeholder=${this.placeholder}
-              ?disabled=${this.disabled}
-              @input=${this._handleInput}
-              @keydown=${this._handleKeyDown}
-              @paste=${this._handlePaste}
-            ></textarea>
-            <input id="file-input" type="file" multiple hidden @change=${this._handleFileChange} />
+            <div class="spacer"></div>
             <div class="actions">
               <button
                 class="icon-btn"

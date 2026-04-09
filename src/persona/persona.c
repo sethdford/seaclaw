@@ -183,6 +183,10 @@ void hu_persona_deinit(hu_allocator_t *alloc, hu_persona_t *persona) {
     if (persona->biography) {
         alloc->free(alloc->ctx, persona->biography, strlen(persona->biography) + 1);
     }
+    if (persona->recent_activity) {
+        alloc->free(alloc->ctx, persona->recent_activity,
+                    strlen(persona->recent_activity) + 1);
+    }
     free_string_array(alloc, persona->directors_notes, persona->directors_notes_count);
     free_string_array(alloc, persona->mood_states, persona->mood_states_count);
     free_string_array(alloc, persona->inner_world.contradictions,
@@ -960,9 +964,11 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         out->name_len = strlen(out->name);
     }
 
+    /* Support both nested "core" format and flat top-level format */
     hu_json_value_t *core = hu_json_object_get(root, "core");
-    if (core && core->type == HU_JSON_OBJECT) {
-        const char *s = hu_json_get_string(core, "identity");
+    hu_json_value_t *core_src = (core && core->type == HU_JSON_OBJECT) ? core : root;
+    {
+        const char *s = hu_json_get_string(core_src, "identity");
         if (s) {
             out->identity = hu_strdup(alloc, s);
             if (!out->identity) {
@@ -971,7 +977,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 return HU_ERR_OUT_OF_MEMORY;
             }
         }
-        hu_json_value_t *traits = hu_json_object_get(core, "traits");
+        hu_json_value_t *traits = hu_json_object_get(core_src, "traits");
         if (traits) {
             err = parse_string_array(alloc, traits, &out->traits, &out->traits_count);
             if (err != HU_OK) {
@@ -980,7 +986,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 return err;
             }
         }
-        hu_json_value_t *principles = hu_json_object_get(core, "principles");
+        hu_json_value_t *principles = hu_json_object_get(core_src, "principles");
         if (principles) {
             err = parse_string_array(alloc, principles, &out->principles, &out->principles_count);
             if (err != HU_OK) {
@@ -989,7 +995,8 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 return err;
             }
         }
-        hu_json_value_t *vocab = hu_json_object_get(core, "vocabulary");
+        /* Nested vocabulary object (core.vocabulary.preferred/avoided) */
+        hu_json_value_t *vocab = hu_json_object_get(core_src, "vocabulary");
         if (vocab && vocab->type == HU_JSON_OBJECT) {
             hu_json_value_t *pref = hu_json_object_get(vocab, "preferred");
             if (pref) {
@@ -1021,7 +1028,18 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 }
             }
         }
-        hu_json_value_t *rules = hu_json_object_get(core, "communication_rules");
+        /* Flat vocab arrays (preferred_vocab, avoided_vocab at top level) */
+        if (!out->preferred_vocab) {
+            hu_json_value_t *pv = hu_json_object_get(core_src, "preferred_vocab");
+            if (pv)
+                parse_string_array(alloc, pv, &out->preferred_vocab, &out->preferred_vocab_count);
+        }
+        if (!out->avoided_vocab) {
+            hu_json_value_t *av = hu_json_object_get(core_src, "avoided_vocab");
+            if (av)
+                parse_string_array(alloc, av, &out->avoided_vocab, &out->avoided_vocab_count);
+        }
+        hu_json_value_t *rules = hu_json_object_get(core_src, "communication_rules");
         if (rules) {
             err = parse_string_array(alloc, rules, &out->communication_rules,
                                      &out->communication_rules_count);
@@ -1031,7 +1049,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 return err;
             }
         }
-        hu_json_value_t *vals = hu_json_object_get(core, "values");
+        hu_json_value_t *vals = hu_json_object_get(core_src, "values");
         if (vals) {
             err = parse_string_array(alloc, vals, &out->values, &out->values_count);
             if (err != HU_OK) {
@@ -1040,7 +1058,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 return err;
             }
         }
-        s = hu_json_get_string(core, "decision_style");
+        s = hu_json_get_string(core_src, "decision_style");
         if (s) {
             out->decision_style = hu_strdup(alloc, s);
             if (!out->decision_style) {
@@ -1049,15 +1067,15 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
                 return HU_ERR_OUT_OF_MEMORY;
             }
         }
-        s = hu_json_get_string(core, "biography");
+        s = hu_json_get_string(core_src, "biography");
         if (s)
             PERSONA_STRDUP_OPT(out->biography, s);
 
-        hu_json_value_t *dn = hu_json_object_get(core, "directors_notes");
+        hu_json_value_t *dn = hu_json_object_get(core_src, "directors_notes");
         if (dn)
             parse_string_array(alloc, dn, &out->directors_notes, &out->directors_notes_count);
 
-        hu_json_value_t *ms = hu_json_object_get(core, "mood_states");
+        hu_json_value_t *ms = hu_json_object_get(core_src, "mood_states");
         if (ms)
             parse_string_array(alloc, ms, &out->mood_states, &out->mood_states_count);
     }
@@ -2451,6 +2469,83 @@ hu_error_t hu_persona_load(hu_allocator_t *alloc, const char *name, size_t name_
         return err;
 
 #if !(defined(HU_IS_TEST) && HU_IS_TEST) && (defined(__unix__) || defined(__APPLE__))
+    /* Load recent activity context from ~/.human/photos/recent_activity.json.
+     * This gives the persona runtime awareness of where the user has been lately,
+     * so it can say "I was in Boston last week" instead of making things up. */
+    {
+        const char *home = getenv("HOME");
+        if (home) {
+            char ra_path[HU_PERSONA_PATH_MAX];
+            int rn = snprintf(ra_path, sizeof(ra_path), "%s/.human/photos/recent_activity.json",
+                              home);
+            if (rn > 0 && (size_t)rn < sizeof(ra_path)) {
+                FILE *rf = fopen(ra_path, "rb");
+                if (rf) {
+                    if (fseek(rf, 0, SEEK_END) == 0) {
+                        long rsz = ftell(rf);
+                        if (rsz > 0 && rsz < (long)(32 * 1024)) {
+                            rewind(rf);
+                            char *rbuf = (char *)alloc->alloc(alloc->ctx, (size_t)rsz + 1);
+                            if (rbuf) {
+                                size_t rrd = fread(rbuf, 1, (size_t)rsz, rf);
+                                rbuf[rrd] = '\0';
+                                /* Parse the JSON to build a concise summary string */
+                                hu_json_value_t *ra_root = NULL;
+                                hu_error_t jerr =
+                                    hu_json_parse(alloc, rbuf, rrd, &ra_root);
+                                if (jerr == HU_OK && ra_root &&
+                                    ra_root->type == HU_JSON_OBJECT) {
+                                    hu_json_value_t *locs =
+                                        hu_json_object_get(ra_root, "locations");
+                                    int window =
+                                        (int)hu_json_get_number(ra_root, "window_days", 30);
+                                    int photo_count =
+                                        (int)hu_json_get_number(ra_root, "photo_count", 0);
+                                    if (locs && locs->type == HU_JSON_ARRAY &&
+                                        locs->data.array.len > 0 && photo_count > 0) {
+                                        char summary[1024];
+                                        int sn = snprintf(summary, sizeof(summary),
+                                                          "Recent activity (last %d days, %d "
+                                                          "photos): ",
+                                                          window, photo_count);
+                                        size_t loc_count = locs->data.array.len;
+                                        for (size_t li = 0;
+                                             li < loc_count && li < 5 &&
+                                             (size_t)sn < sizeof(summary) - 60;
+                                             li++) {
+                                            const hu_json_value_t *loc =
+                                                locs->data.array.items[li];
+                                            if (!loc || loc->type != HU_JSON_OBJECT)
+                                                continue;
+                                            const char *place =
+                                                hu_json_get_string(loc, "place");
+                                            int pc = (int)hu_json_get_number(
+                                                loc, "photo_count", 0);
+                                            if (place && pc > 0) {
+                                                sn += snprintf(summary + sn,
+                                                               sizeof(summary) - (size_t)sn,
+                                                               "%s%s (%d)",
+                                                               li > 0 ? ", " : "", place,
+                                                               pc);
+                                            }
+                                        }
+                                        if ((size_t)sn < sizeof(summary))
+                                            out->recent_activity =
+                                                hu_strndup(alloc, summary, (size_t)sn);
+                                    }
+                                }
+                                if (ra_root)
+                                    hu_json_free(alloc, ra_root);
+                                alloc->free(alloc->ctx, rbuf, (size_t)rsz + 1);
+                            }
+                        }
+                    }
+                    fclose(rf);
+                }
+            }
+        }
+    }
+
     /* Load example banks from <base>/examples/<name>/<channel>/examples.json */
     {
         char base_dir[HU_PERSONA_PATH_MAX];
@@ -2573,7 +2668,8 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
     char header[256];
     int n = snprintf(header, sizeof(header), "You ARE %.*s.", (int)name_len, name);
     if (n > 0) {
-        hu_error_t err = append_prompt(alloc, &buf, &len, &cap, header, (size_t)n);
+        size_t hlen = ((size_t)n < sizeof(header)) ? (size_t)n : sizeof(header) - 1;
+        hu_error_t err = append_prompt(alloc, &buf, &len, &cap, header, hlen);
         if (err != HU_OK) {
             alloc->free(alloc->ctx, buf, cap);
             return err;
@@ -2848,6 +2944,19 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
         if (err == HU_OK)
             err = append_prompt(alloc, &buf, &len, &cap, persona->biography,
                                 strlen(persona->biography));
+        if (err == HU_OK)
+            err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
+        if (err != HU_OK)
+            goto fail;
+    }
+
+    /* Recent activity — grounded in real photo location data */
+    if (persona->recent_activity && persona->recent_activity[0]) {
+        static const char ra_hdr[] = "\n--- Recent Activity (real, grounded) ---\n";
+        err = append_prompt(alloc, &buf, &len, &cap, ra_hdr, sizeof(ra_hdr) - 1);
+        if (err == HU_OK)
+            err = append_prompt(alloc, &buf, &len, &cap, persona->recent_activity,
+                                strlen(persona->recent_activity));
         if (err == HU_OK)
             err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
         if (err != HU_OK)

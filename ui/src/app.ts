@@ -93,12 +93,12 @@ const loadedViews = new Set<TabId>();
 const MOBILE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] = [
   { id: "chat", label: "Chat", icon: icons["message-square"] },
   { id: "voice", label: "Voice", icon: icons.mic },
-  { id: "canvas", label: "Canvas", icon: icons.monitor },
   { id: "agents", label: "Agents", icon: icons.zap },
+  { id: "memory", label: "Memory", icon: icons.brain },
 ];
 
 const MORE_TABS: { id: TabId; label: string; icon: ReturnType<typeof html> }[] = [
-  { id: "memory", label: "Memory", icon: icons.brain },
+  { id: "skills", label: "Skills", icon: icons.grid },
   { id: "settings", label: "Settings", icon: icons.settings },
 ];
 
@@ -173,6 +173,9 @@ export class ScApp extends LitElement {
       position: relative;
       outline: none;
     }
+    main.no-pad {
+      padding: 0;
+    }
 
     /* Keyboard-accessible scrollport (axe scrollable-region-focusable; nested views use shadow DOM). */
     .main-scroll {
@@ -184,7 +187,13 @@ export class ScApp extends LitElement {
       overflow: auto;
       position: relative;
       outline: none;
+      scrollbar-width: thin;
+      scrollbar-color: var(--hu-border-subtle) transparent;
     }
+    .main-scroll::-webkit-scrollbar { width: 6px; }
+    .main-scroll::-webkit-scrollbar-track { background: transparent; }
+    .main-scroll::-webkit-scrollbar-thumb { background: var(--hu-border-subtle); border-radius: 3px; }
+    .main-scroll::-webkit-scrollbar-thumb:hover { background: var(--hu-border); }
 
     .scroll-progress {
       position: sticky;
@@ -609,10 +618,15 @@ export class ScApp extends LitElement {
     return this.sidebarCollapsed || this._isMediumViewport;
   }
 
+  private get _isConversationalView(): boolean {
+    return this.tab === "chat" || this.tab === "voice";
+  }
+
   override connectedCallback(): void {
     super.connectedCallback();
 
-    this.sidebarCollapsed = localStorage.getItem(SIDEBAR_KEY) === "true";
+    const storedSidebar = localStorage.getItem(SIDEBAR_KEY);
+    this.sidebarCollapsed = storedSidebar === null ? true : storedSidebar === "true";
     this._bannerDismissed = sessionStorage.getItem("hu-banner-dismissed") === "true";
     this._updateViewportBreakpoint();
     window.addEventListener("resize", this._resizeHandler);
@@ -1110,7 +1124,8 @@ export class ScApp extends LitElement {
           @toggle-collapse=${() => this._toggleSidebar()}
         ></hu-sidebar>
 
-        <main id="main-content" tabindex="-1" role="main">
+        <main id="main-content" tabindex="-1" role="main" class="${this._isConversationalView ? "no-pad" : ""}"
+        >
           <div
             id="main-scroll"
             class="main-scroll view-content"
@@ -1201,7 +1216,7 @@ export class ScApp extends LitElement {
         }}
       ></hu-shortcut-overlay>
 
-      ${this.tab === "chat" ? html`<hu-floating-mic></hu-floating-mic>` : nothing}
+      ${nothing}
     `;
   }
 

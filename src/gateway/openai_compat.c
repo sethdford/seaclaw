@@ -644,7 +644,8 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
                     }
                 }
                 if (has_tell) {
-                    hu_log_info("openai-compat", NULL, "ai-tell retry for: %.60s", response);
+                    hu_log_info("openai-compat", NULL, "ai-tell retry (response_len=%zu)",
+                                response_len);
                     app_ctx->agent->alloc->free(app_ctx->agent->alloc->ctx, response,
                                                 response_len + 1);
                     response = NULL;

@@ -1199,6 +1199,365 @@ static void imessage_mark_read_null_ctx_no_crash(void) {
 #endif
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * PART 15 — Typing duration model (red team: anti-linearity)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void imessage_typing_duration_short_msg_above_floor(void) {
+    unsigned int d = hu_imessage_typing_duration(5, 42);
+    HU_ASSERT_TRUE(d >= 800);
+    HU_ASSERT_TRUE(d <= 6000);
+}
+
+static void imessage_typing_duration_medium_msg(void) {
+    unsigned int d = hu_imessage_typing_duration(50, 42);
+    HU_ASSERT_TRUE(d >= 800);
+    HU_ASSERT_TRUE(d <= 6000);
+    HU_ASSERT_TRUE(d >= 1500);
+}
+
+static void imessage_typing_duration_long_msg_capped(void) {
+    unsigned int d = hu_imessage_typing_duration(300, 42);
+    HU_ASSERT_EQ(d, 6000);
+}
+
+static void imessage_typing_duration_zero_len(void) {
+    unsigned int d = hu_imessage_typing_duration(0, 0);
+    HU_ASSERT_TRUE(d >= 800);
+}
+
+static void imessage_typing_duration_varies_by_seed(void) {
+    unsigned int d1 = hu_imessage_typing_duration(60, 100);
+    unsigned int d2 = hu_imessage_typing_duration(60, 999);
+    HU_ASSERT_TRUE(d1 != d2 || d1 == 6000);
+}
+
+static void imessage_typing_duration_jitter_bounded(void) {
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        unsigned int d = hu_imessage_typing_duration(40, seed);
+        HU_ASSERT_TRUE(d >= 800);
+        HU_ASSERT_TRUE(d <= 6000);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PART 16 — Tapback decision exhaustive branch coverage
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void imessage_tapback_decision_question_prefers_text(void) {
+    hu_tapback_decision_t d =
+        hu_conversation_classify_tapback_decision(S("hey where are you?"), NULL, 0, NULL, 0);
+    HU_ASSERT_EQ((int)d, (int)HU_TEXT_ONLY);
+}
+
+static void imessage_tapback_decision_emotional_heavy_prefers_text(void) {
+    hu_tapback_decision_t d =
+        hu_conversation_classify_tapback_decision(S("my grandma passed away"), NULL, 0, NULL, 0);
+    HU_ASSERT_EQ((int)d, (int)HU_TEXT_ONLY);
+}
+
+static void imessage_tapback_decision_got_fired_prefers_text(void) {
+    hu_tapback_decision_t d =
+        hu_conversation_classify_tapback_decision(S("i just got fired today"), NULL, 0, NULL, 0);
+    HU_ASSERT_EQ((int)d, (int)HU_TEXT_ONLY);
+}
+
+static void imessage_tapback_decision_lol_tapback_dominant(void) {
+    int tapback_count = 0;
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_tapback_decision_t d =
+            hu_conversation_classify_tapback_decision(S("lol"), NULL, 0, NULL, seed);
+        if (d == HU_TAPBACK_ONLY || d == HU_TAPBACK_AND_TEXT)
+            tapback_count++;
+    }
+    HU_ASSERT_TRUE(tapback_count > 100);
+}
+
+static void imessage_tapback_decision_ok_often_no_response(void) {
+    int no_resp = 0;
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_tapback_decision_t d =
+            hu_conversation_classify_tapback_decision(S("ok"), NULL, 0, NULL, seed);
+        if (d == HU_NO_RESPONSE)
+            no_resp++;
+    }
+    HU_ASSERT_TRUE(no_resp > 80);
+}
+
+static void imessage_tapback_decision_nice_cool_tapback_likely(void) {
+    int tapback_count = 0;
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_tapback_decision_t d =
+            hu_conversation_classify_tapback_decision(S("nice"), NULL, 0, NULL, seed);
+        if (d == HU_TAPBACK_ONLY || d == HU_TAPBACK_AND_TEXT)
+            tapback_count++;
+    }
+    HU_ASSERT_TRUE(tapback_count > 80);
+}
+
+static void imessage_tapback_decision_short_msg_no_question(void) {
+    int tapback_count = 0;
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_tapback_decision_t d =
+            hu_conversation_classify_tapback_decision(S("yep"), NULL, 0, NULL, seed);
+        if (d == HU_TAPBACK_ONLY || d == HU_TAPBACK_AND_TEXT)
+            tapback_count++;
+    }
+    HU_ASSERT_TRUE(tapback_count > 50);
+}
+
+static void imessage_tapback_decision_substantive_prefers_text(void) {
+    hu_tapback_decision_t d = hu_conversation_classify_tapback_decision(
+        S("I was thinking we could go to that new restaurant downtown for dinner tonight"),
+        NULL, 0, NULL, 42);
+    HU_ASSERT_EQ((int)d, (int)HU_TEXT_ONLY);
+}
+
+static void imessage_tapback_decision_null_returns_no_response(void) {
+    hu_tapback_decision_t d =
+        hu_conversation_classify_tapback_decision(NULL, 0, NULL, 0, NULL, 0);
+    HU_ASSERT_EQ((int)d, (int)HU_NO_RESPONSE);
+}
+
+static void imessage_tapback_decision_empty_returns_no_response(void) {
+    hu_tapback_decision_t d =
+        hu_conversation_classify_tapback_decision("", 0, NULL, 0, NULL, 0);
+    HU_ASSERT_EQ((int)d, (int)HU_NO_RESPONSE);
+}
+
+static void imessage_tapback_decision_anti_spam_recent_tapbacks(void) {
+    hu_channel_history_entry_t entries[4] = {
+        {.from_me = true, .text = "Loved an image", .timestamp = "10:00"},
+        {.from_me = true, .text = "Laughed at a message", .timestamp = "10:01"},
+        {.from_me = false, .text = "cool", .timestamp = "10:02"},
+        {.from_me = true, .text = "hey!", .timestamp = "10:03"},
+    };
+    int text_only = 0;
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_tapback_decision_t d = hu_conversation_classify_tapback_decision(
+            S("sweet"), entries, 4, NULL, seed);
+        if (d == HU_TEXT_ONLY)
+            text_only++;
+    }
+    HU_ASSERT_TRUE(text_only > 50);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PART 17 — Seen-behavior classification
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void imessage_seen_behavior_non_busy_always_now(void) {
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        uint32_t delay = 0;
+        hu_seen_action_t a =
+            hu_conversation_classify_seen_behavior(S("hey"), 20, seed, &delay);
+        HU_ASSERT_EQ((int)a, (int)HU_SEEN_RESPOND_NOW);
+    }
+}
+
+static void imessage_seen_behavior_urgent_bypasses_delay(void) {
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        uint32_t delay = 0;
+        hu_seen_action_t a =
+            hu_conversation_classify_seen_behavior(S("urgent please call now"), 14, seed, &delay);
+        HU_ASSERT_EQ((int)a, (int)HU_SEEN_RESPOND_NOW);
+    }
+}
+
+static void imessage_seen_behavior_busy_low_priority_sometimes_delays(void) {
+    int delayed = 0;
+    for (uint32_t seed = 0; seed < 1000; seed++) {
+        uint32_t delay = 0;
+        hu_seen_action_t a =
+            hu_conversation_classify_seen_behavior(S("ok"), 14, seed, &delay);
+        if (a == HU_SEEN_DELAY_THEN_RESPOND) {
+            delayed++;
+            HU_ASSERT_TRUE(delay >= 300000);
+        }
+    }
+    HU_ASSERT_TRUE(delayed > 50);
+    HU_ASSERT_TRUE(delayed < 300);
+}
+
+static void imessage_seen_behavior_question_during_busy_responds_now(void) {
+    uint32_t delay = 0;
+    hu_seen_action_t a =
+        hu_conversation_classify_seen_behavior(S("can you pick up groceries?"), 14, 42, &delay);
+    HU_ASSERT_EQ((int)a, (int)HU_SEEN_RESPOND_NOW);
+}
+
+static void imessage_seen_behavior_null_msg_responds_now(void) {
+    uint32_t delay = 0;
+    hu_seen_action_t a =
+        hu_conversation_classify_seen_behavior(NULL, 0, 14, 42, &delay);
+    HU_ASSERT_EQ((int)a, (int)HU_SEEN_RESPOND_NOW);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PART 18 — Double-text decision
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void imessage_double_text_farewell_suppressed(void) {
+    HU_ASSERT_FALSE(hu_conversation_should_double_text(S("goodnight!"), NULL, 0, 12, 42, 1.0f));
+    HU_ASSERT_FALSE(hu_conversation_should_double_text(S("ttyl bro"), NULL, 0, 12, 42, 1.0f));
+    HU_ASSERT_FALSE(hu_conversation_should_double_text(S("gotta go bye"), NULL, 0, 12, 42, 1.0f));
+}
+
+static void imessage_double_text_late_night_suppressed(void) {
+    HU_ASSERT_FALSE(
+        hu_conversation_should_double_text(S("that was fun"), NULL, 0, 23, 42, 1.0f));
+    HU_ASSERT_FALSE(
+        hu_conversation_should_double_text(S("that was fun"), NULL, 0, 3, 42, 1.0f));
+}
+
+static void imessage_double_text_zero_probability_never(void) {
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        HU_ASSERT_FALSE(
+            hu_conversation_should_double_text(S("that was awesome"), NULL, 0, 14, seed, 0.0f));
+    }
+}
+
+static void imessage_double_text_null_response_never(void) {
+    HU_ASSERT_FALSE(hu_conversation_should_double_text(NULL, 0, NULL, 0, 14, 42, 1.0f));
+}
+
+static void imessage_double_text_sometimes_true_with_high_prob(void) {
+    int yes = 0;
+    for (uint32_t seed = 0; seed < 500; seed++) {
+        if (hu_conversation_should_double_text(S("omg that was amazing!"), NULL, 0, 14, seed,
+                                               0.5f))
+            yes++;
+    }
+    HU_ASSERT_TRUE(yes > 50);
+    HU_ASSERT_TRUE(yes < 450);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PART 19 — Reaction classifier exhaustive branch coverage
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void imessage_reaction_heart_on_love_you(void) {
+    int hearts = 0;
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_reaction_type_t r =
+            hu_conversation_classify_reaction(S("love you so much"), false, NULL, 0, seed);
+        if (r == HU_REACTION_HEART)
+            hearts++;
+    }
+    HU_ASSERT_TRUE(hearts > 30);
+}
+
+static void imessage_reaction_heart_on_miss_you(void) {
+    int hearts = 0;
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_reaction_type_t r =
+            hu_conversation_classify_reaction(S("miss you buddy"), false, NULL, 0, seed);
+        if (r == HU_REACTION_HEART)
+            hearts++;
+    }
+    HU_ASSERT_TRUE(hearts > 30);
+}
+
+static void imessage_reaction_thumbs_up_on_absolutely(void) {
+    int thumbs = 0;
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_reaction_type_t r =
+            hu_conversation_classify_reaction(S("absolutely, let's do it"), false, NULL, 0, seed);
+        if (r == HU_REACTION_THUMBS_UP)
+            thumbs++;
+    }
+    HU_ASSERT_TRUE(thumbs > 30);
+}
+
+static void imessage_reaction_emphasis_on_got_the_job(void) {
+    int emphasis = 0;
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_reaction_type_t r =
+            hu_conversation_classify_reaction(S("i got the job!"), false, NULL, 0, seed);
+        if (r == HU_REACTION_EMPHASIS)
+            emphasis++;
+    }
+    HU_ASSERT_TRUE(emphasis > 30);
+}
+
+static void imessage_reaction_none_on_question(void) {
+    hu_reaction_type_t r =
+        hu_conversation_classify_reaction(S("what time should we meet?"), false, NULL, 0, 42);
+    HU_ASSERT_EQ((int)r, (int)HU_REACTION_NONE);
+}
+
+static void imessage_reaction_gif_haha_or_heart(void) {
+    int haha = 0, heart = 0;
+    for (uint32_t seed = 0; seed < 500; seed++) {
+        hu_reaction_type_t r =
+            hu_conversation_classify_reaction(S("[GIF]"), false, NULL, 0, seed);
+        if (r == HU_REACTION_HAHA)
+            haha++;
+        else if (r == HU_REACTION_HEART)
+            heart++;
+    }
+    HU_ASSERT_TRUE(haha > 100);
+    HU_ASSERT_TRUE(heart > 30);
+}
+
+static void imessage_reaction_never_reacts_to_own(void) {
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_reaction_type_t r =
+            hu_conversation_classify_reaction(S("lol this is hilarious"), true, NULL, 0, seed);
+        HU_ASSERT_EQ((int)r, (int)HU_REACTION_NONE);
+    }
+}
+
+static void imessage_reaction_photo_sometimes_heart(void) {
+    int heart = 0;
+    for (uint32_t seed = 0; seed < 200; seed++) {
+        hu_reaction_type_t r =
+            hu_conversation_classify_reaction(S("[image attached]"), false, NULL, 0, seed);
+        if (r == HU_REACTION_HEART)
+            heart++;
+    }
+    HU_ASSERT_TRUE(heart > 50);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PART 20 — Self-reaction trigger verification
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void imessage_self_reaction_oops_yields_haha(void) {
+    int haha = 0;
+    for (uint32_t seed = 0; seed < 5000; seed++) {
+        hu_reaction_type_t r =
+            hu_conversation_classify_self_reaction(S("oops my bad lol"), seed);
+        if (r == HU_REACTION_HAHA)
+            haha++;
+    }
+    HU_ASSERT_TRUE(haha > 0);
+}
+
+static void imessage_self_reaction_exclaim_yields_emphasis(void) {
+    int emphasis = 0;
+    for (uint32_t seed = 0; seed < 5000; seed++) {
+        hu_reaction_type_t r =
+            hu_conversation_classify_self_reaction(S("no way!!!"), seed);
+        if (r == HU_REACTION_EMPHASIS)
+            emphasis++;
+    }
+    HU_ASSERT_TRUE(emphasis > 0);
+}
+
+static void imessage_self_reaction_normal_text_always_none_at_high_seed(void) {
+    for (uint32_t seed = 100; seed < 200; seed++) {
+        hu_reaction_type_t r =
+            hu_conversation_classify_self_reaction(S("i think we should go"), seed);
+        HU_ASSERT_EQ((int)r, (int)HU_REACTION_NONE);
+    }
+}
+
+static void imessage_self_reaction_null_safe(void) {
+    hu_reaction_type_t r = hu_conversation_classify_self_reaction(NULL, 0, 0);
+    HU_ASSERT_EQ((int)r, (int)HU_REACTION_NONE);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * Suite registration
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1353,6 +1712,57 @@ void run_imessage_adversarial_tests(void) {
     HU_RUN_TEST(imessage_start_stop_double_stop_no_crash);
     HU_RUN_TEST(imessage_start_stop_cycle_with_poll);
 #endif
+
+    /* Part 15: Typing duration model (red team) */
+    HU_RUN_TEST(imessage_typing_duration_short_msg_above_floor);
+    HU_RUN_TEST(imessage_typing_duration_medium_msg);
+    HU_RUN_TEST(imessage_typing_duration_long_msg_capped);
+    HU_RUN_TEST(imessage_typing_duration_zero_len);
+    HU_RUN_TEST(imessage_typing_duration_varies_by_seed);
+    HU_RUN_TEST(imessage_typing_duration_jitter_bounded);
+
+    /* Part 16: Tapback decision exhaustive (red team) */
+    HU_RUN_TEST(imessage_tapback_decision_question_prefers_text);
+    HU_RUN_TEST(imessage_tapback_decision_emotional_heavy_prefers_text);
+    HU_RUN_TEST(imessage_tapback_decision_got_fired_prefers_text);
+    HU_RUN_TEST(imessage_tapback_decision_lol_tapback_dominant);
+    HU_RUN_TEST(imessage_tapback_decision_ok_often_no_response);
+    HU_RUN_TEST(imessage_tapback_decision_nice_cool_tapback_likely);
+    HU_RUN_TEST(imessage_tapback_decision_short_msg_no_question);
+    HU_RUN_TEST(imessage_tapback_decision_substantive_prefers_text);
+    HU_RUN_TEST(imessage_tapback_decision_null_returns_no_response);
+    HU_RUN_TEST(imessage_tapback_decision_empty_returns_no_response);
+    HU_RUN_TEST(imessage_tapback_decision_anti_spam_recent_tapbacks);
+
+    /* Part 17: Seen-behavior classification (red team) */
+    HU_RUN_TEST(imessage_seen_behavior_non_busy_always_now);
+    HU_RUN_TEST(imessage_seen_behavior_urgent_bypasses_delay);
+    HU_RUN_TEST(imessage_seen_behavior_busy_low_priority_sometimes_delays);
+    HU_RUN_TEST(imessage_seen_behavior_question_during_busy_responds_now);
+    HU_RUN_TEST(imessage_seen_behavior_null_msg_responds_now);
+
+    /* Part 18: Double-text decision (red team) */
+    HU_RUN_TEST(imessage_double_text_farewell_suppressed);
+    HU_RUN_TEST(imessage_double_text_late_night_suppressed);
+    HU_RUN_TEST(imessage_double_text_zero_probability_never);
+    HU_RUN_TEST(imessage_double_text_null_response_never);
+    HU_RUN_TEST(imessage_double_text_sometimes_true_with_high_prob);
+
+    /* Part 19: Reaction classifier exhaustive (red team) */
+    HU_RUN_TEST(imessage_reaction_heart_on_love_you);
+    HU_RUN_TEST(imessage_reaction_heart_on_miss_you);
+    HU_RUN_TEST(imessage_reaction_thumbs_up_on_absolutely);
+    HU_RUN_TEST(imessage_reaction_emphasis_on_got_the_job);
+    HU_RUN_TEST(imessage_reaction_none_on_question);
+    HU_RUN_TEST(imessage_reaction_gif_haha_or_heart);
+    HU_RUN_TEST(imessage_reaction_never_reacts_to_own);
+    HU_RUN_TEST(imessage_reaction_photo_sometimes_heart);
+
+    /* Part 20: Self-reaction trigger verification (red team) */
+    HU_RUN_TEST(imessage_self_reaction_oops_yields_haha);
+    HU_RUN_TEST(imessage_self_reaction_exclaim_yields_emphasis);
+    HU_RUN_TEST(imessage_self_reaction_normal_text_always_none_at_high_seed);
+    HU_RUN_TEST(imessage_self_reaction_null_safe);
 }
 #else  /* !HU_HAS_IMESSAGE */
 void run_imessage_adversarial_tests(void) {

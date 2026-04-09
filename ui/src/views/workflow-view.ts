@@ -73,7 +73,10 @@ export class HuWorkflowView extends GatewayAwareLitElement {
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
-    if (!gw) return;
+    if (!gw) {
+      this.error = "Not connected to gateway";
+      return;
+    }
     this.loading = true;
     this.error = "";
     try {
@@ -132,7 +135,9 @@ export class HuWorkflowView extends GatewayAwareLitElement {
           .icon=${icons.warning}
           heading="Error"
           description=${this.error}
-        ></hu-empty-state>`;
+        >
+          <hu-button variant="primary" @click=${() => this.load()}>Retry</hu-button>
+        </hu-empty-state>`;
     }
 
     if (this.tasks.length === 0) {

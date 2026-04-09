@@ -19,23 +19,24 @@ export class ScModelSelector extends LitElement {
     .trigger {
       display: inline-flex;
       align-items: center;
-      gap: var(--hu-space-2xs);
-      padding: var(--hu-space-2xs) var(--hu-space-sm);
-      background: var(--hu-bg-elevated);
-      border: 1px solid var(--hu-border-subtle);
-      border-radius: var(--hu-radius-full);
-      font-size: var(--hu-text-xs);
+      gap: 0.25rem;
+      padding: 0.25rem 0.5rem;
+      background: transparent;
+      border: none;
+      border-radius: var(--hu-radius);
+      font-size: var(--hu-text-sm);
       font-family: var(--hu-font);
-      color: var(--hu-text-muted);
+      font-weight: var(--hu-weight-medium, 500);
+      color: var(--hu-text-secondary);
       cursor: pointer;
       transition:
         color var(--hu-duration-fast),
-        border-color var(--hu-duration-fast);
+        background var(--hu-duration-fast);
     }
 
     .trigger:hover {
       color: var(--hu-text);
-      border-color: var(--hu-border);
+      background: var(--hu-hover-overlay);
     }
 
     .trigger:focus-visible {

@@ -475,7 +475,7 @@ hu_error_t hu_training_collector_export_json(hu_allocator_t *alloc,
                          (int)(t->prompt_len < 64 ? t->prompt_len : 64), t->prompt,
                          (int)(t->response_len < 64 ? t->response_len : 64), t->response,
                          t->reward);
-        if (n > 0)
+        if (n > 0 && (size_t)pos + (size_t)n < buf_size)
             pos += n;
     }
 

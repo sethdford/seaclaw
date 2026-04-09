@@ -549,6 +549,8 @@ hu_error_t cmd_models(hu_allocator_t *alloc, int argc, char **argv) {
         printf("Known providers and default models:\n");
         printf("  %-16s %s\n", "Provider", "Default Model");
         printf("  %-16s %s\n", "--------", "-------------");
+        printf("  %-16s %s\n", "mlx_local", "gemma-4-26b (fine-tuned, local)");
+        printf("  %-16s %s\n", "apple", "Apple Intelligence (on-device)");
         printf("  %-16s %s\n", "openai", "gpt-4o");
         printf("  %-16s %s\n", "anthropic", "claude-sonnet-4-20250514");
         printf("  %-16s %s\n", "google", "gemini-3.1-flash-lite-preview");

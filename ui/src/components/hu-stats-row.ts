@@ -10,15 +10,16 @@ export class ScStatsRow extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      width: 100%;
       contain: layout style;
       container-type: inline-size;
     }
 
     .stats-row {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(11.25rem, 1fr));
-      gap: var(--hu-space-md);
-      margin-bottom: var(--hu-space-2xl);
+      grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
+      gap: var(--hu-space-sm);
+      margin-bottom: var(--hu-space-md);
     }
 
     @container (max-width: 40rem) /* cq-compact */ {

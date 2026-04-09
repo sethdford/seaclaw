@@ -1680,6 +1680,19 @@ if(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" AND UNIX AND NOT CMAKE_CROSSCOMPILING)
     endif()
 endif()
 
+# --- macOS: codesign with stable "Human Local Dev" cert so TCC survives rebuilds ---
+if(APPLE AND NOT CMAKE_CROSSCOMPILING)
+    execute_process(
+        COMMAND security find-identity -v -p codesigning
+        OUTPUT_VARIABLE _signing_identities
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(_signing_identities MATCHES "Human Local Dev")
+        add_custom_command(TARGET human POST_BUILD
+            COMMAND codesign --force --sign "Human Local Dev" $<TARGET_FILE:human>
+            COMMENT "Signing human binary with Human Local Dev certificate")
+    endif()
+endif()
+
 # --- Test-mode core library (same sources, compiled with HU_IS_TEST=1) ---
 # When HU_ENABLE_ALL_CHANNELS=OFF, prod binary omits signal/nostr/qq/maixcam/dispatch,
 # but tests need them — add to test lib only.

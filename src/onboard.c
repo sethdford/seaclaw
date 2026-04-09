@@ -137,9 +137,12 @@ hu_error_t hu_onboard_run_with_args(hu_allocator_t *alloc, const char *cli_provi
     }
 
     if (!provider) {
-#if defined(__APPLE__) && defined(HU_ENABLE_APPLE_INTELLIGENCE)
+#if defined(__APPLE__)
         static const hu_choice_t provider_choices[] = {
-            {"Apple Intelligence (on-device, no API key)", "apple", true},
+            {"MLX Local (fine-tuned Gemma, on-device)", "mlx_local", true},
+#ifdef HU_ENABLE_APPLE_INTELLIGENCE
+            {"Apple Intelligence (on-device, no API key)", "apple", false},
+#endif
             {"Gemini (cloud)", "gemini", false},
             {"OpenAI (GPT-4, etc.)", "openai", false},
             {"Anthropic (Claude)", "anthropic", false},
@@ -169,6 +172,12 @@ hu_error_t hu_onboard_run_with_args(hu_allocator_t *alloc, const char *cli_provi
         printf("\nApple Intelligence selected — no API key needed.\n");
         printf("Requires: macOS 26+, Apple Silicon, Apple Intelligence enabled.\n");
         printf("The human-ondevice server handles on-device inference automatically.\n\n");
+    } else if (strcmp(provider, "mlx_local") == 0 || strcmp(provider, "mlx-local") == 0) {
+        if (!model)
+            model = "mlx-community/gemma-4-26b-a4b-it-4bit";
+        printf("\nMLX Local selected — no API key needed.\n");
+        printf("Fine-tuned Gemma model runs entirely on your Mac (Apple Silicon).\n");
+        printf("The model server starts automatically when you run 'human agent'.\n\n");
     } else {
         if (cli_api_key) {
             api_key = cli_api_key;
@@ -193,6 +202,8 @@ hu_error_t hu_onboard_run_with_args(hu_allocator_t *alloc, const char *cli_provi
                 default_model = "gemini-3.1-flash-lite-preview";
             else if (strcmp(provider, "ollama") == 0)
                 default_model = "llama3";
+            else if (strcmp(provider, "mlx_local") == 0 || strcmp(provider, "mlx-local") == 0)
+                default_model = "mlx-community/gemma-4-26b-a4b-it-4bit";
 
             printf("Model (default: %s): ", default_model);
             fflush(stdout);

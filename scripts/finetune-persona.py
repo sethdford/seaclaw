@@ -44,7 +44,7 @@ def load_persona(path: Path) -> dict:
 
 
 def build_system_prompt(persona: dict) -> str:
-    """Build a compact system prompt from persona for training examples."""
+    """Build system prompt matching h-uman's lean_prompt format exactly."""
     parts = []
     if persona.get("identity"):
         parts.append(f"You ARE this person: {persona['identity']}")
@@ -52,10 +52,51 @@ def build_system_prompt(persona: dict) -> str:
         parts.append(persona["biography"])
     parts.append(
         "Output ONLY what this person would actually type — nothing else. "
-        "No reasoning, no parentheses, no meta-commentary."
+        "No reasoning, no parentheses, no meta-commentary, no analysis. "
+        "Just the raw text message, exactly as it would appear on screen."
     )
-    for rule in persona.get("communication_rules", []):
+    for rule in persona.get("communication_rules", [])[:8]:
         parts.append(f"- {rule}")
+    parts.append("")
+    if persona.get("core_anchor"):
+        parts.append(persona["core_anchor"])
+        parts.append("")
+    for item in persona.get("immersive_reinforcement", [])[:10]:
+        parts.append(f"- {item}")
+    if persona.get("anti_patterns"):
+        parts.append("\nNEVER do:")
+        for ap in persona["anti_patterns"]:
+            parts.append(f"- {ap}")
+    if persona.get("style_rules"):
+        parts.append("\nStyle:")
+        for sr in persona["style_rules"]:
+            parts.append(f"- {sr}")
+    banks = persona.get("example_banks", [])
+    cli_bank = next((b for b in banks if b.get("channel") == "cli"), None)
+    if cli_bank:
+        parts.append("\nExamples of how you text:")
+        for ex in cli_bank.get("examples", [])[:3]:
+            if ex.get("incoming") and ex.get("response"):
+                parts.append(f"them: {ex['incoming']}")
+                parts.append(f"you: {ex['response']}")
+                parts.append("")
+    cli_overlay = next(
+        (o for o in persona.get("overlays", []) if o.get("channel") == "cli"), None
+    )
+    if cli_overlay:
+        style_str = "\nChannel style:"
+        if cli_overlay.get("formality"):
+            style_str += f" {cli_overlay['formality']}."
+        if cli_overlay.get("avg_length"):
+            style_str += f" Length: {cli_overlay['avg_length']}."
+        if cli_overlay.get("emoji_usage"):
+            style_str += f" Emoji: {cli_overlay['emoji_usage']}."
+        if isinstance(cli_overlay.get("style_notes"), str):
+            style_str += f" {cli_overlay['style_notes']}."
+        elif isinstance(cli_overlay.get("style_notes"), list):
+            for sn in cli_overlay["style_notes"]:
+                style_str += f" {sn}."
+        parts.append(style_str)
     return "\n".join(parts)
 
 

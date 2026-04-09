@@ -68,6 +68,7 @@ export class ScChatSessionsPanel extends LitElement {
       flex-direction: column;
       background: var(--hu-surface-container);
       border-right: 1px solid var(--hu-border-subtle);
+      overflow: hidden;
     }
 
     @media (max-width: 904px) /* --hu-breakpoint-medium */ {
@@ -81,12 +82,55 @@ export class ScChatSessionsPanel extends LitElement {
       }
     }
 
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--hu-space-sm) var(--hu-space-sm) 0;
+    }
+    .panel-title {
+      font-family: var(--hu-font);
+      font-size: var(--hu-text-sm);
+      font-weight: var(--hu-weight-semibold, 600);
+      color: var(--hu-text);
+      padding-inline-start: var(--hu-space-sm);
+    }
+    .panel-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.75rem;
+      height: 1.75rem;
+      padding: 0;
+      background: transparent;
+      border: none;
+      border-radius: var(--hu-radius);
+      color: var(--hu-text-muted);
+      cursor: pointer;
+      transition:
+        color var(--hu-duration-fast),
+        background var(--hu-duration-fast);
+    }
+    .panel-close:hover {
+      color: var(--hu-text);
+      background: var(--hu-hover-overlay);
+    }
+    .panel-close:focus-visible {
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
+    }
+    .panel-close svg {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+
     .new-chat-btn {
       display: flex;
       align-items: center;
       gap: var(--hu-space-sm);
-      width: 100%;
-      padding: var(--hu-space-md);
+      box-sizing: border-box;
+      width: calc(100% - 2 * var(--hu-space-sm));
+      padding: var(--hu-space-sm) var(--hu-space-md);
       margin: var(--hu-space-sm);
       background: transparent;
       border: 1px solid var(--hu-border);
@@ -405,6 +449,15 @@ export class ScChatSessionsPanel extends LitElement {
     }
   `;
 
+  private _onClose(): void {
+    this.dispatchEvent(
+      new CustomEvent("hu-sessions-close", {
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   private _onNewChat(): void {
     this.dispatchEvent(
       new CustomEvent("hu-session-new", {
@@ -579,6 +632,17 @@ export class ScChatSessionsPanel extends LitElement {
 
     return html`
       <div class="panel" role="navigation" aria-label="Chat sessions">
+        <div class="panel-header">
+          <span class="panel-title">Chats</span>
+          <button
+            type="button"
+            class="panel-close"
+            @click=${this._onClose}
+            aria-label="Close sessions panel"
+          >
+            ${icons.x}
+          </button>
+        </div>
         <button type="button" class="new-chat-btn" @click=${this._onNewChat} aria-label="New chat">
           ${icons["file-text"]} New Chat
         </button>

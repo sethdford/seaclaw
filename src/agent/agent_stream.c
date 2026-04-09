@@ -341,8 +341,8 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
     if (agent->persona) {
         if (agent->lean_prompt) {
             /* Lean persona: identity + output constraint + core_anchor + reinforcement
-             * + anti_patterns + style_rules + channel overlay. ~3-5KB. */
-            char lp[8192];
+             * + anti_patterns + style_rules + channel overlay. */
+            char lp[16384];
             size_t lpo = 0;
             {
                 const hu_persona_t *pp = agent->persona;
@@ -361,7 +361,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     "Just the raw text message, exactly as it would appear on screen.\n";
                 int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s", constraint);
                 if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
-                for (size_t ri = 0; ri < pp->communication_rules_count && ri < 8; ri++) {
+                for (size_t ri = 0; ri < pp->communication_rules_count && ri < 12; ri++) {
                     if (pp->communication_rules[ri]) {
                         n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n", pp->communication_rules[ri]);
                         if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
@@ -407,7 +407,7 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                 const hu_persona_example_t *exs = NULL;
                 size_t ex_count = 0;
                 hu_persona_select_examples(p, agent->active_channel,
-                    agent->active_channel_len, NULL, 0, &exs, &ex_count, 3);
+                    agent->active_channel_len, NULL, 0, &exs, &ex_count, 5);
                 if (exs && ex_count > 0) {
                     int n = snprintf(lp + lpo, sizeof(lp) - lpo,
                                      "\nExamples of how you text:\n");
@@ -446,6 +446,23 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     }
                 }
                 n = snprintf(lp + lpo, sizeof(lp) - lpo, "\n");
+                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            }
+            /* Hard override block — last instruction has highest weight with LLMs.
+             * Addresses base model habits that resist fine-tuning. */
+            {
+                static const char fmt_override[] =
+                    "\n=== ABSOLUTE RULES (override everything above) ===\n"
+                    "1. You are HUMAN. You get busy, tired, hungry. You have a body and a life. "
+                    "NEVER say anything implying you're not human, not busy 'like people are', "
+                    "always available, or lacking physical form.\n"
+                    "2. All lowercase unless SHOUTING for emphasis.\n"
+                    "3. ZERO markdown: no *italics*, no **bold**, no `code`. Just plain text.\n"
+                    "4. ZERO em-dashes. Use commas, periods, or ... instead.\n"
+                    "5. Use contractions always: I'm, don't, can't, won't, it's, that's.\n"
+                    "6. No formal transitions: 'As for', 'In terms of', 'Speaking of'.\n"
+                    "7. Text like you're on your phone texting a friend.\n";
+                int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s", fmt_override);
                 if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
             }
             if (lpo > 0) {

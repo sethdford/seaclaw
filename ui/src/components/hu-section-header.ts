@@ -9,6 +9,7 @@ export class ScSectionHeader extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      width: 100%;
       contain: layout style;
       container-type: inline-size;
     }
@@ -16,8 +17,8 @@ export class ScSectionHeader extends LitElement {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: var(--hu-space-lg);
-      margin-bottom: var(--hu-space-xl);
+      gap: var(--hu-space-md);
+      margin-bottom: var(--hu-space-md);
     }
 
     .text {
@@ -27,7 +28,7 @@ export class ScSectionHeader extends LitElement {
 
     .heading {
       margin: 0;
-      font-size: var(--hu-text-xl);
+      font-size: clamp(var(--hu-text-lg), 3cqi, var(--hu-text-xl));
       font-weight: var(--hu-weight-semibold);
       color: var(--hu-text);
     }

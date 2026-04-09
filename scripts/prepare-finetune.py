@@ -26,7 +26,39 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-MIN_RESPONSE_CHARS = 12
+MIN_RESPONSE_CHARS = 20
+
+# Patterns that indicate corrupted or dangerous training data
+import re as _re
+_GARBAGE_PREFIX = _re.compile(r'^[0-9QTgi%$!;][A-Z]')
+_GRAPH_IDS = _re.compile(r'pggraph|singlemoment|ZASSET|ZGENERICASSET')
+_MODEL_LABELS = _re.compile(r'\[Gemini|\[Imagen|\[Claude|\[GPT')
+_SECRETS = _re.compile(
+    r'pk_live_|sk_live_|pk_test_|sk_test_|'
+    r'api[_-]?key\s*[=:]\s*["\']?[A-Za-z0-9]{20}|'
+    r'Bearer\s+[A-Za-z0-9._-]{20,}|'
+    r'ghp_[A-Za-z0-9]{36}|'
+    r'AKIA[A-Z0-9]{16}'
+)
+_TEST_ARTIFACTS = _re.compile(r'Seth Ford \(test\)|ASan test|Testing the full pipeline')
+
+
+def is_toxic_example(messages: list[dict]) -> str | None:
+    """Return a reason string if this example should be dropped, None if OK."""
+    for m in messages:
+        content = m.get("content", "")
+        if _SECRETS.search(content):
+            return "secret"
+        if _GRAPH_IDS.search(content):
+            return "graph_id"
+        if _MODEL_LABELS.search(content):
+            return "model_label"
+        if _TEST_ARTIFACTS.search(content):
+            return "test_artifact"
+        if m["role"] in ("user", "assistant") and _GARBAGE_PREFIX.match(content):
+            return "garbage_prefix"
+    return None
+
 
 SYSTEM_PROMPT_TEMPLATE = """You are Seth Ford, 45, texting on iMessage. Chief Architect at Vanguard. Live alone with your cat in King of Prussia, PA. From Afton, Wyoming. Three kids (Annette, Emerson, Edison) who don't live with you. Speak Japanese, lived in Japan (lost home in 2011 tsunami). 23 years at Fidelity before this. Build AI runtimes as side projects.
 
@@ -489,19 +521,19 @@ def photo_grounded_examples(persona: dict) -> list[dict]:
         print("    (no photo data — run mine-photos.py first)")
         return []
 
-    timeline = json.load(open(timeline_path))
-    recent = json.load(open(recent_path)) if recent_path.exists() else {}
+    try:
+        with open(timeline_path) as f:
+            timeline = json.load(f)
+        with open(recent_path) as f:
+            recent = json.load(f) if recent_path.exists() else {}
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"    (photo data load failed: {e})")
+        return []
 
     contacts = persona.get("contacts", {})
     all_examples = []
 
-    # Helper: build a generic system prompt with travel awareness baked in
-    photo_ctx = persona.get("photo_context", {})
-    places_lived = photo_ctx.get("places_lived", [])
-    freq_dests = photo_ctx.get("frequent_destinations", [])
-
     trips = timeline.get("trips", [])
-    clusters = timeline.get("location_clusters", [])
     recent_locs = recent.get("locations", [])
     recent_days = recent.get("days_active", [])
 
@@ -710,7 +742,7 @@ def photo_grounded_examples(persona: dict) -> list[dict]:
         {"role": "user", "content": "you seem well traveled"},
         {"role": "assistant", "content": "ha yeah i dont sit still very well. grew up in tiny wyoming so once i discovered the world existed i just kept going"},
         {"role": "user", "content": "where was your last trip"},
-        {"role": "assistant", "content": f"boston area, revere and quincy. just a quick thing tho. before that was {"vegas" if any("Vegas" in t["place"] for t in trip_refs[:5]) else "somewhere fun"}"},
+        {"role": "assistant", "content": "boston area, revere and quincy. just a quick thing tho. before that was " + ("vegas" if any("Vegas" in t["place"] for t in trip_refs[:5]) else "somewhere fun")},
         {"role": "user", "content": "nice! any trips planned"},
         {"role": "assistant", "content": "always thinking about the next one. wanna get back to japan this year. and i need to see annie in seattle, its been a minute"},
     ]})
@@ -828,6 +860,23 @@ def main():
         sys.exit(1)
 
     print(f"\n  Total examples (with weighting): {len(all_examples)}")
+
+    # Scrub toxic examples (secrets, garbage, test artifacts, etc.)
+    pre_scrub = len(all_examples)
+    scrub_reasons: dict[str, int] = {}
+    clean_examples = []
+    for ex in all_examples:
+        reason = is_toxic_example(ex.get("messages", []))
+        if reason:
+            scrub_reasons[reason] = scrub_reasons.get(reason, 0) + 1
+        else:
+            clean_examples.append(ex)
+    all_examples = clean_examples
+    scrubbed = pre_scrub - len(all_examples)
+    if scrubbed:
+        print(f"  Scrubbed {scrubbed} toxic examples:")
+        for reason, count in sorted(scrub_reasons.items(), key=lambda x: -x[1]):
+            print(f"    {reason}: {count}")
 
     train, valid, test = split_data(all_examples)
     print(f"  Train: {len(train)}  Valid: {len(valid)}  Test: {len(test)}")

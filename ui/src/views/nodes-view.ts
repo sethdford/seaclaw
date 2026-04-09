@@ -114,7 +114,10 @@ export class ScNodesView extends GatewayAwareLitElement {
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
-    if (!gw) return;
+    if (!gw) {
+      this.error = "Not connected to gateway";
+      return;
+    }
     this.loading = true;
     this.error = "";
     try {
@@ -242,7 +245,9 @@ export class ScNodesView extends GatewayAwareLitElement {
             .icon=${icons.warning}
             heading="Error"
             .description=${this.error}
-          ></hu-empty-state>`
+          >
+            <hu-button variant="primary" @click=${() => this.load()}>Retry</hu-button>
+          </hu-empty-state>`
         : nothing}
       <div class="table-section hu-stagger-motion9" role="region" aria-label="Nodes table">
         ${this.nodes.length === 0 && !this.loading

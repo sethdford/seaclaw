@@ -173,7 +173,7 @@ export class ScScheduleBuilder extends LitElement {
 
     .preset-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
       gap: var(--hu-space-sm);
     }
 

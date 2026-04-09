@@ -35,7 +35,7 @@ export class ScCard extends LitElement {
       background-image: var(--hu-surface-gradient);
       border: 1px solid var(--hu-card-border-color, var(--hu-border-subtle));
       border-radius: var(--hu-radius-xl);
-      padding: var(--hu-space-xl);
+      padding: var(--hu-space-lg);
       box-shadow:
         var(--hu-shadow-card),
         inset 0 1px 0 color-mix(in srgb, var(--hu-color-white) 90%, transparent),

@@ -44,6 +44,9 @@ export class CanvasView extends GatewayAwareLitElement {
   @state() private selectedId: string | null = null;
   @state() private _viewMode: "preview" | "code" | "split" = "preview";
   @state() private _loading = false;
+  @state() private _error = "";
+  @state() private _versionsOpen = false;
+  @state() private _versions: Array<{ seq: number; created_at: number; summary: string }> = [];
   private _editTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _onGateway = ((e: Event) => {
@@ -135,7 +138,7 @@ export class CanvasView extends GatewayAwareLitElement {
       @media (min-width: 1240px) /* --hu-breakpoint-wide */ {
         .layout.has-detail {
           display: grid;
-          grid-template-columns: minmax(14rem, 1fr) minmax(0, 3fr);
+          grid-template-columns: minmax(min(14rem, 100%), 1fr) minmax(0, 3fr);
           gap: var(--hu-space-lg);
           align-items: start;
         }
@@ -305,6 +308,94 @@ export class CanvasView extends GatewayAwareLitElement {
         padding: 0 var(--hu-space-xs);
       }
 
+      .version-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--hu-space-2xs);
+        cursor: pointer;
+      }
+
+      .version-btn:hover {
+        color: var(--hu-accent);
+      }
+
+      .version-panel {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 14rem;
+        background: var(--hu-surface-container-high);
+        border-left: 1px solid var(--hu-border);
+        overflow-y: auto;
+        z-index: 10;
+        animation: hu-slide-in-right var(--hu-duration-normal) var(--hu-ease-out);
+      }
+
+      @keyframes hu-slide-in-right {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+      }
+
+      .version-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--hu-space-sm) var(--hu-space-md);
+        border-bottom: 1px solid var(--hu-border-subtle);
+        font-weight: var(--hu-weight-semibold);
+        font-size: var(--hu-text-sm);
+      }
+
+      .version-panel-close {
+        background: none;
+        border: none;
+        color: var(--hu-text-secondary);
+        cursor: pointer;
+        padding: var(--hu-space-2xs);
+        border-radius: var(--hu-radius-sm);
+      }
+
+      .version-panel-close:hover {
+        background: var(--hu-hover-overlay);
+        color: var(--hu-text);
+      }
+
+      .version-item {
+        display: flex;
+        flex-direction: column;
+        gap: var(--hu-space-3xs);
+        padding: var(--hu-space-sm) var(--hu-space-md);
+        width: 100%;
+        background: none;
+        border: none;
+        border-bottom: 1px solid var(--hu-border-subtle);
+        text-align: left;
+        cursor: pointer;
+        font-family: var(--hu-font);
+        color: var(--hu-text);
+        transition: background var(--hu-duration-fast);
+      }
+
+      .version-item:hover {
+        background: var(--hu-hover-overlay);
+      }
+
+      .version-item.active {
+        background: color-mix(in srgb, var(--hu-accent) 10%, transparent);
+        border-left: 2px solid var(--hu-accent);
+      }
+
+      .version-item .v-label {
+        font-size: var(--hu-text-sm);
+        font-weight: var(--hu-weight-medium);
+      }
+
+      .version-item .v-meta {
+        font-size: var(--hu-text-xs);
+        color: var(--hu-text-tertiary);
+      }
+
       .detail-body {
         flex: 1;
         min-height: 0;
@@ -371,9 +462,14 @@ export class CanvasView extends GatewayAwareLitElement {
   }
 
   protected override async load(): Promise<void> {
+    if (!this.gateway) {
+      this._error = "Not connected to gateway";
+      return;
+    }
     this._loading = true;
+    this._error = "";
     try {
-      const res = await this.gateway?.request<{
+      const res = await this.gateway.request<{
         canvases?: Array<{
           canvas_id: string;
           title: string;
@@ -391,7 +487,8 @@ export class CanvasView extends GatewayAwareLitElement {
           title: c.title || c.canvas_id,
           format: resolveFormat(c.format),
           content: c.content || "",
-          imports: c.imports || {},
+          imports:
+            c.imports && typeof c.imports === "object" ? c.imports : {},
           language: c.language || "",
           versionSeq: c.version_seq ?? 0,
           status: "active" as const,
@@ -400,8 +497,8 @@ export class CanvasView extends GatewayAwareLitElement {
           this.selectedId = this.canvases[0].id;
         }
       }
-    } catch {
-      /* canvas.list not available yet — rely on push events */
+    } catch (err) {
+      this._error = err instanceof Error ? err.message : "Failed to load canvases";
     }
     this._loading = false;
     this.lastLoadedAt = Date.now();
@@ -471,7 +568,93 @@ export class CanvasView extends GatewayAwareLitElement {
     }
   }
 
+  private async _loadVersions(): Promise<void> {
+    if (!this.selectedId || !this.gateway) return;
+    try {
+      const res = await this.gateway.request<{
+        canvas_id: string;
+        versions: Array<{ seq: number; created_at: number; summary: string }>;
+      }>("canvas.versions", { canvas_id: this.selectedId });
+      this._versions = res?.versions ?? [];
+      this._versionsOpen = true;
+    } catch {
+      this._versions = [];
+    }
+  }
+
+  private async _jumpToVersion(seq: number): Promise<void> {
+    if (!this.selectedId || !this.gateway) return;
+    try {
+      const res = await this.gateway.request<{
+        ok: boolean;
+        content?: string;
+        version_seq?: number;
+      }>("canvas.get", { canvas_id: this.selectedId, version_seq: seq });
+      if (res?.content !== undefined) {
+        const sid = this.selectedId;
+        this.canvases = this.canvases.map((c) =>
+          c.id === sid
+            ? { ...c, content: res.content!, versionSeq: res.version_seq ?? seq }
+            : c,
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private _renderVersionPanel(currentSeq: number) {
+    if (!this._versionsOpen) return nothing;
+    return html`
+      <div class="version-panel">
+        <div class="version-panel-header">
+          <span>Versions</span>
+          <button
+            class="version-panel-close"
+            aria-label="Close versions"
+            @click=${() => { this._versionsOpen = false; }}
+          >${icons.x}</button>
+        </div>
+        ${this._versions.map(
+          (v) => html`
+            <button
+              class="version-item ${v.seq === currentSeq ? "active" : ""}"
+              @click=${() => this._jumpToVersion(v.seq)}
+            >
+              <span class="v-label">v${v.seq}</span>
+              <span class="v-meta">${v.summary}</span>
+              <span class="v-meta">${new Date(v.created_at).toLocaleTimeString()}</span>
+            </button>
+          `,
+        )}
+      </div>
+    `;
+  }
+
   override render() {
+    if (this._error) {
+      return html`
+        <h1>Live Canvas</h1>
+        <hu-empty-state
+          .icon=${icons.warning}
+          heading="Connection Error"
+          description=${this._error}
+        >
+          <hu-button variant="primary" @click=${() => this.load()}>Retry</hu-button>
+        </hu-empty-state>
+      `;
+    }
+
+    if (this._loading && this.canvases.length === 0) {
+      return html`
+        <h1>Live Canvas</h1>
+        <div class="list" style="gap: var(--hu-space-md)">
+          <hu-skeleton height="3.5rem"></hu-skeleton>
+          <hu-skeleton height="3.5rem"></hu-skeleton>
+        </div>
+      `;
+    }
+
     const selected = this.canvases.find((c) => c.id === this.selectedId) ?? null;
     const hasList = this.canvases.length > 0;
 
@@ -617,7 +800,13 @@ export class CanvasView extends GatewayAwareLitElement {
             </div>
             ${c.versionSeq > 0
               ? html`
-                  <span class="version-info">v${c.versionSeq}</span>
+                  <button
+                    class="version-info version-btn"
+                    @click=${() => this._loadVersions()}
+                    title="View version history"
+                  >
+                    v${c.versionSeq} ${icons.clock}
+                  </button>
                   <hu-button variant="tonal" size="sm" @click=${() => this._onUndo()}>
                     Undo
                   </hu-button>
@@ -628,7 +817,7 @@ export class CanvasView extends GatewayAwareLitElement {
               : nothing}
           </div>
         </div>
-        <div class="detail-body">
+        <div class="detail-body" style="position: relative;">
           ${this._viewMode === "preview"
             ? this._renderPreview(c)
             : this._viewMode === "code"
@@ -636,6 +825,7 @@ export class CanvasView extends GatewayAwareLitElement {
               : html`
                   <div class="split-body">${this._renderEditor(c)} ${this._renderPreview(c)}</div>
                 `}
+          ${this._renderVersionPanel(c.versionSeq)}
         </div>
       </div>
     `;
@@ -644,6 +834,6 @@ export class CanvasView extends GatewayAwareLitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "canvas-view": CanvasView;
+    "hu-canvas-view": CanvasView;
   }
 }

@@ -23,6 +23,7 @@ export class ScInput extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      width: 100%;
       container-type: inline-size;
     }
 

@@ -77,6 +77,7 @@ export class ScCodeBlock extends LitElement {
   @state() private _highlighted = "";
   @state() private _copied = false;
   @state() private _shikiReady = false;
+  @state() private _shikiFailed = false;
   @state() private _darkScheme = true;
   @state() private _expanded = false;
   private _copyTimeout = 0;
@@ -156,6 +157,22 @@ export class ScCodeBlock extends LitElement {
     .copy-btn.copied {
       color: var(--hu-success);
       border-color: var(--hu-success);
+    }
+
+    .content {
+      transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
+    }
+
+    .content.loading {
+      opacity: 0.5;
+    }
+
+    .shiki-error {
+      font-family: var(--hu-font);
+      font-size: var(--hu-text-xs);
+      color: var(--hu-text-muted);
+      padding: var(--hu-space-2xs) var(--hu-space-md);
+      border-top: 1px solid var(--hu-border-subtle);
     }
 
     .code-wrapper {
@@ -311,6 +328,7 @@ export class ScCodeBlock extends LitElement {
       if (gen !== this._highlightGeneration) return;
       this._highlighted = "";
       this._shikiReady = true;
+      this._shikiFailed = false;
       return;
     }
     try {
@@ -320,9 +338,11 @@ export class ScCodeBlock extends LitElement {
       const result = highlighter.codeToHtml(this.code, { lang, theme });
       if (gen !== this._highlightGeneration) return;
       this._highlighted = result;
+      this._shikiFailed = false;
     } catch {
       if (gen !== this._highlightGeneration) return;
       this._highlighted = "";
+      this._shikiFailed = true;
     }
     if (gen !== this._highlightGeneration) return;
     this._shikiReady = true;
@@ -387,13 +407,16 @@ export class ScCodeBlock extends LitElement {
               (_, i) => html`<div class="line-number">${i + 1}</div>`,
             )}
           </div>
-          <div class="content">
+          <div class="content ${!this._shikiReady && this.language ? "loading" : ""}">
             ${showHighlighted
               ? html`${unsafeHTML(DOMPurify.sanitize(this._highlighted))}`
               : html`<pre><code>${this.code}</code></pre>`}
           </div>
           ${shouldTruncate ? html`<div class="truncated-fade"></div>` : ""}
         </div>
+        ${this._shikiFailed
+          ? html`<div class="shiki-error">Syntax highlighting unavailable</div>`
+          : ""}
         ${canTruncate
           ? html`
               <button

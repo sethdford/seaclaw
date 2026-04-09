@@ -18,7 +18,7 @@ export class HuCanvasSandbox extends LitElement {
   @state() private _height = 200;
 
   private _iframe: HTMLIFrameElement | null = null;
-  private _harnessSrc = "";
+  @state() private _harnessSrc = "";
   private _messageHandler = this._onMessage.bind(this);
   private _pendingRender = false;
 
@@ -119,8 +119,9 @@ export class HuCanvasSandbox extends LitElement {
     }
   }
 
-  override firstUpdated(): void {
+  override async firstUpdated(): Promise<void> {
     this._harnessSrc = buildHarness();
+    await this.updateComplete;
     this._iframe = this.renderRoot.querySelector("iframe");
     if (this._pendingRender) {
       this._sendRender();

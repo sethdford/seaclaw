@@ -109,7 +109,7 @@ export class ScAutomationsView extends GatewayAwareLitElement {
 
       .templates-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(var(--hu-grid-track-sm), 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-sm), 100%), 1fr));
         gap: var(--hu-space-md);
       }
 
@@ -173,7 +173,10 @@ export class ScAutomationsView extends GatewayAwareLitElement {
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
-    if (!gw) return;
+    if (!gw) {
+      this.error = "Not connected to gateway";
+      return;
+    }
     if (gw.features && gw.features.cron === false) {
       this.error = "Automations not available on this build";
       return;

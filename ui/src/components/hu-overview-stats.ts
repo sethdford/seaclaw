@@ -30,7 +30,7 @@ export class ScOverviewStats extends LitElement {
     }
 
     .metrics-block {
-      margin-bottom: var(--hu-space-2xl);
+      margin-bottom: var(--hu-space-md);
     }
   `;
 
@@ -45,7 +45,7 @@ export class ScOverviewStats extends LitElement {
                 .valueStr=${m.valueStr ?? ""}
                 .label=${m.label}
                 .sparklineData=${m.sparklineData ?? []}
-                .sparklineColor=${"var(--hu-accent-tertiary)"}
+                .sparklineColor=${"var(--hu-accent)"}
                 .countUp=${this.countUp}
                 style="--hu-stagger-delay: ${i * 50}ms"
               ></hu-stat-card>

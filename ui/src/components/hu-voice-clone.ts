@@ -114,20 +114,26 @@ export class HuVoiceClone extends LitElement {
     }
 
     .recording-dot {
-      width: 10px;
-      height: 10px;
+      width: var(--hu-space-sm);
+      height: var(--hu-space-sm);
       background: var(--hu-error);
       border-radius: var(--hu-radius-full);
-      animation: pulse var(--hu-duration-slow) ease-in-out infinite;
+      animation: hu-recording-pulse var(--hu-duration-slow) var(--hu-ease-in-out, ease-in-out) infinite;
     }
 
-    @keyframes pulse {
+    @keyframes hu-recording-pulse {
       0%,
       100% {
         opacity: 1;
       }
       50% {
         opacity: 0.3;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .recording-dot {
+        animation: none;
       }
     }
 

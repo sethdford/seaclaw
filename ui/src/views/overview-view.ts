@@ -169,11 +169,9 @@ export class ScOverviewView extends GatewayAwareLitElement {
       }
 
       .section-label {
-        font-size: var(--hu-text-xs);
+        font-size: var(--hu-text-sm);
         font-weight: var(--hu-weight-semibold);
-        letter-spacing: var(--hu-tracking-xs);
-        text-transform: uppercase;
-        color: var(--hu-accent-tertiary-text);
+        color: var(--hu-text);
         margin-bottom: var(--hu-space-sm);
       }
 
@@ -189,7 +187,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
 
       .channels-inner {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(var(--hu-sidebar-width), 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-sidebar-width), 100%), 1fr));
         gap: var(--hu-space-sm);
         flex: 1;
         min-width: 0;
@@ -619,12 +617,11 @@ export class ScOverviewView extends GatewayAwareLitElement {
     if (this.loading) return this._renderSkeleton();
     return html`
       ${this.error
-        ? html`<hu-empty-state .icon=${icons.warning} heading="Error" description=${this.error}>
+        ? html`<hu-empty-state .icon=${icons.warning} heading="Connection Error" description=${this.error}>
             <hu-button variant="primary" @click=${() => this.load()}> Retry </hu-button>
           </hu-empty-state>`
-        : nothing}
-      ${this._renderHero()} ${this._renderMetrics()} ${this._renderQuickActions()}
-      ${this._renderDetails()}
+        : html`${this._renderHero()} ${this._renderMetrics()} ${this._renderQuickActions()}
+      ${this._renderDetails()}`}
     `;
   }
 
@@ -649,11 +646,9 @@ export class ScOverviewView extends GatewayAwareLitElement {
           <div class="hero-actions">
             <hu-connection-pulse status=${this.connectionStatus}></hu-connection-pulse>
             ${this.lastLoadedAt
-              ? html`<span class="staleness">Updated ${this.stalenessLabel}</span>`
+              ? html`<span class="staleness">${this.stalenessLabel}</span>`
               : nothing}
-            <hu-tooltip text="Reload all dashboard data" position="bottom">
-              <hu-button variant="secondary" @click=${() => this.load()}>Refresh</hu-button>
-            </hu-tooltip>
+            <hu-button variant="ghost" size="sm" @click=${() => this.load()} aria-label="Refresh dashboard">${icons.refresh}</hu-button>
           </div>
         </hu-section-header>
         <div class="hero-inner">
@@ -663,7 +658,7 @@ export class ScOverviewView extends GatewayAwareLitElement {
             </hu-tooltip>
             <div class="hero-status">
               <div class="hero-meta">
-                <span>${cap.version ?? "h-uman"}</span>
+                <span>v${cap.version ?? "h-uman"}</span>
                 ${this.updateInfo.available
                   ? html`<span>&middot;</span>
                       <a
@@ -736,11 +731,6 @@ export class ScOverviewView extends GatewayAwareLitElement {
         label: "Memory",
         valueStr: memoryStr,
         sparklineData: this._mockTrendData(memoryMb, 0.8),
-      },
-      {
-        label: "HuLa Programs",
-        value: this.hulaAnalytics?.summary?.file_count ?? 0,
-        sparklineData: this._mockTrendData(this.hulaAnalytics?.summary?.file_count || 12, 2),
       },
     ];
     const metricRowItems = [

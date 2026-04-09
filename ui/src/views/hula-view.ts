@@ -161,7 +161,7 @@ export class ScHulaView extends GatewayAwareLitElement {
       }
       .stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
         gap: var(--hu-space-md);
         margin-bottom: var(--hu-space-xl);
       }
@@ -192,6 +192,7 @@ export class ScHulaView extends GatewayAwareLitElement {
   protected override async load(): Promise<void> {
     const gw = this.gateway;
     if (!gw) {
+      this.listError = "Not connected to gateway";
       this.loading = false;
       return;
     }
@@ -337,7 +338,7 @@ export class ScHulaView extends GatewayAwareLitElement {
           <hu-section-header heading="Saved traces"></hu-section-header>
           ${!this.loading && !this.traces.length
             ? html`<hu-empty-state
-                headline="No traces yet"
+                heading="No traces yet"
                 description="Run a HuLa program with HU_HULA_TRACE_DIR set (or use the default ~/.human/hula_traces on POSIX). The gateway lists traces on POSIX builds only."
               ></hu-empty-state>`
             : nothing}
@@ -423,11 +424,11 @@ export class ScHulaView extends GatewayAwareLitElement {
                 `
               : this.selected?.id
                 ? html`<hu-empty-state
-                    headline="Could not load trace"
+                    heading="Could not load trace"
                     description="The list entry is selected but no record was returned. Try another file or refresh."
                   ></hu-empty-state>`
                 : html`<hu-empty-state
-                    headline="Select a trace"
+                    heading="Select a trace"
                     description="Choose a file on the left to inspect its execution tree."
                   ></hu-empty-state>`}
         </hu-card>

@@ -1067,6 +1067,11 @@ export class DemoGatewayClient extends EventTarget {
     cronRuns: [...DEMO_CRON_RUNS],
     skills: makeSkills(),
     nodes: [...DEMO_NODES],
+    projects: [
+      { id: "proj-1", name: "h-uman Core", instructions: "", pinned: true, color: "var(--hu-brand-primary)" },
+      { id: "proj-2", name: "UI Dashboard", instructions: "", pinned: false, color: "var(--hu-brand-secondary)" },
+      { id: "proj-3", name: "Research", instructions: "", pinned: false, color: "var(--hu-brand-tertiary)" },
+    ] as Array<{ id: string; name: string; instructions: string; pinned: boolean; color: string }>,
   };
 
   static readonly EVENT_STATUS = "status";
@@ -1370,6 +1375,33 @@ export class DemoGatewayClient extends EventTarget {
       case "sessions.delete": {
         const key = params?.key as string;
         this.state.sessions = this.state.sessions.filter((x) => x.key !== key);
+        return { ok: true };
+      }
+
+      // --- Projects ---
+      case "projects.list":
+        return { projects: this.state.projects };
+      case "projects.create": {
+        const name = (params?.name as string) ?? "Untitled";
+        const id = `proj-${Date.now()}`;
+        const proj = { id, name, instructions: "", pinned: false, color: "var(--hu-text-tertiary)" };
+        this.state.projects.push(proj);
+        return { project: proj };
+      }
+      case "projects.update": {
+        const pid = params?.id as string;
+        const p = this.state.projects.find((x) => x.id === pid);
+        if (p) {
+          if (params?.name != null) p.name = params.name as string;
+          if (params?.instructions != null) p.instructions = params.instructions as string;
+          if (params?.pinned != null) p.pinned = params.pinned as boolean;
+          if (params?.color != null) p.color = params.color as string;
+        }
+        return { ok: true };
+      }
+      case "projects.delete": {
+        const pid = params?.id as string;
+        this.state.projects = this.state.projects.filter((x) => x.id !== pid);
         return { ok: true };
       }
 
@@ -1861,6 +1893,17 @@ export class DemoGatewayClient extends EventTarget {
         return { ok: true, mode };
       }
 
+      case "persona.list":
+        return {
+          personas: [
+            { id: "default", name: "Default", description: "Balanced, natural conversation" },
+            { id: "concise", name: "Concise", description: "Brief, to-the-point responses" },
+            { id: "formal", name: "Formal", description: "Professional, structured tone" },
+            { id: "creative", name: "Creative", description: "Expressive, imaginative language" },
+            { id: "technical", name: "Technical", description: "Precise, detail-oriented" },
+          ],
+          active: "default",
+        };
       case "persona.set":
         return { ok: true };
 
@@ -2080,7 +2123,7 @@ export class DemoGatewayClient extends EventTarget {
               content: // prettier-ignore
                 '<div style="padding:20px;font-family:sans-serif"><h2>Sales Dashboard</h2><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#7ab648">$42,150</div><div style="font-size:12px;opacity:0.6">Revenue today</div></div><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#e8b931">1,234</div><div style="font-size:12px;opacity:0.6">Active users</div></div><div style="background:#1a2332;padding:16px;border-radius:8px"><div style="font-size:24px;font-weight:bold;color:#5b8def">98.7%</div><div style="font-size:12px;opacity:0.6">Uptime</div></div></div></div>' /* hu-lint-ok */,
               language: "",
-              imports: "",
+              imports: {},
               version_seq: 3,
               version_count: 3,
             },
@@ -2160,6 +2203,20 @@ export class DemoGatewayClient extends EventTarget {
           content: "<h2>Next version</h2>",
           format: "html",
         };
+
+      case "canvas.versions": {
+        const cid =
+          params && typeof (params as { canvas_id?: string }).canvas_id === "string"
+            ? (params as { canvas_id: string }).canvas_id
+            : "cv_0";
+        const count = cid === "cv_0" ? 3 : 1;
+        const versions = Array.from({ length: count }, (_, i) => ({
+          seq: i + 1,
+          created_at: Date.now() - (count - i) * 60_000,
+          summary: i === 0 ? "Initial version" : `Edit ${i + 1}`,
+        }));
+        return { canvas_id: cid, versions };
+      }
 
       case "hula.traces.list":
         return {
@@ -2469,7 +2526,33 @@ export class DemoGatewayClient extends EventTarget {
 
       // --- MCP Resources + Prompts ---
       case "mcp.resources.list":
-        return { resources: [], templates: [] };
+        return {
+          resources: [
+            { uri: "file:///project/README.md", name: "Project README", description: "Main project documentation", mimeType: "text/markdown" },
+            { uri: "db://main/users", name: "Users table", description: "User database table schema", mimeType: "application/json" },
+          ],
+          templates: [
+            { uriTemplate: "file:///project/{path}", name: "Project files", description: "Access project files by path" },
+          ],
+        };
+      case "mcp.tools.list":
+        return {
+          tools: [
+            { name: "read_file", description: "Read a file from the filesystem", server: "filesystem" },
+            { name: "write_file", description: "Write content to a file", server: "filesystem" },
+            { name: "search_code", description: "Search codebase using ripgrep", server: "filesystem" },
+            { name: "run_query", description: "Execute a SQL query against the database", server: "database" },
+            { name: "web_fetch", description: "Fetch content from a URL", server: "browser" },
+          ],
+        };
+      case "mcp.servers.list":
+        return {
+          servers: [
+            { name: "filesystem", status: "connected", tools_count: 3, resources_count: 1 },
+            { name: "database", status: "connected", tools_count: 1, resources_count: 1 },
+            { name: "browser", status: "disconnected", tools_count: 1, resources_count: 0 },
+          ],
+        };
       case "mcp.prompts.list":
         return { prompts: [] };
 

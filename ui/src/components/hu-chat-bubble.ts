@@ -123,12 +123,12 @@ export class ScChatBubble extends LitElement {
       font-family: var(--hu-font);
       font-size: var(--hu-text-base);
       line-height: var(--hu-leading-relaxed);
-      padding: var(--hu-space-md) var(--hu-space-lg);
+      padding: var(--hu-space-sm) var(--hu-space-md);
     }
 
     .bubble.role-user {
       margin-inline-start: auto;
-      max-width: 75%;
+      max-width: 80%;
       background: var(--hu-surface-container-high);
       color: var(--hu-text);
       border-radius: var(--hu-radius-xl) var(--hu-radius-xl) var(--hu-radius-sm) var(--hu-radius-xl);
@@ -140,11 +140,12 @@ export class ScChatBubble extends LitElement {
 
     .bubble.role-assistant {
       margin-inline-end: auto;
-      max-width: 90%;
-      background: var(--hu-surface-container);
+      max-width: 100%;
+      background: transparent;
       color: var(--hu-text);
-      border: 1px solid var(--hu-border-subtle);
-      border-radius: var(--hu-radius-xl) var(--hu-radius-xl) var(--hu-radius-xl) var(--hu-radius-sm);
+      border: none;
+      border-radius: 0;
+      padding: var(--hu-space-2xs) var(--hu-space-xs);
       animation: hu-bubble-receive var(--hu-duration-normal)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
     }
@@ -435,8 +436,8 @@ export class ScChatBubble extends LitElement {
       color: var(--hu-text-secondary);
       cursor: pointer;
       transition:
-        color var(--hu-duration-fast),
-        border-color var(--hu-duration-fast);
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        border-color var(--hu-duration-fast) var(--hu-ease-out);
     }
     .outline-toggle:hover {
       color: var(--hu-accent);
@@ -467,8 +468,8 @@ export class ScChatBubble extends LitElement {
       border: none;
       text-align: left;
       transition:
-        color var(--hu-duration-fast),
-        background var(--hu-duration-fast);
+        color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out);
     }
     .outline-item:hover {
       color: var(--hu-accent);

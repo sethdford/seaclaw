@@ -188,8 +188,7 @@ export class ScToolResult extends LitElement {
       display: flex;
       flex-direction: column;
       gap: var(--hu-space-2xs);
-      padding: var(--hu-space-sm) var(--hu-space-md);
-      padding-bottom: var(--hu-space-sm);
+      padding: var(--hu-space-xs) var(--hu-space-sm);
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
       font-weight: var(--hu-weight-medium);
@@ -303,7 +302,7 @@ export class ScToolResult extends LitElement {
       align-items: center;
       justify-content: space-between;
       width: 100%;
-      padding: var(--hu-space-sm) var(--hu-space-md);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
       margin: 0;
       font-family: var(--hu-font);
       font-size: var(--hu-text-xs);

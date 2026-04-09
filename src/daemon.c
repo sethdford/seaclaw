@@ -8329,8 +8329,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                     ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, backchannel_buf,
                                               backchannel_len, NULL, 0);
-                    hu_log_info("human", agent ? agent->observer : NULL, "backchannel: %.*s",
-                                (int)backchannel_len, backchannel_buf);
+                    hu_log_info("daemon", NULL, "backchannel sent (len=%zu)", backchannel_len);
                     goto skip_llm_this_batch;
                 }
 
@@ -8403,10 +8402,14 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 msg_id, director_result.reaction);
                             hu_log_info("human", agent ? agent->observer : NULL,
                                         "tapback result: %s", hu_error_string(react_err));
-                            if (agent->bth_metrics)
-                                agent->bth_metrics->reactions_sent++;
+                            if (react_err == HU_OK) {
+                                if (agent->bth_metrics)
+                                    agent->bth_metrics->reactions_sent++;
+                                goto skip_llm_this_batch;
+                            }
+                            hu_log_info("human", agent ? agent->observer : NULL,
+                                        "tapback failed, falling back to text response");
                         }
-                        goto skip_llm_this_batch;
                     }
                     hu_log_info("human", agent ? agent->observer : NULL,
                                 "director: text response, sending to LLM");

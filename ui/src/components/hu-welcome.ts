@@ -54,7 +54,7 @@ export class ScWelcome extends LitElement {
     }
     .steps {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
       gap: var(--hu-space-lg, 1.5rem);
       margin-bottom: var(--hu-space-2xl, 2rem);
     }

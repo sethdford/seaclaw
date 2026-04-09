@@ -87,6 +87,7 @@ export class ScAutomationCard extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      width: 100%;
       contain: layout style;
       container-type: inline-size;
     }

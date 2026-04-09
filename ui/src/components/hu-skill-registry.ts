@@ -142,6 +142,7 @@ export class ScSkillRegistry extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      width: 100%;
       contain: layout style;
       container-type: inline-size;
     }
@@ -211,7 +212,7 @@ export class ScSkillRegistry extends LitElement {
 
     .skills-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(17.5rem, 100%), 1fr));
       gap: var(--hu-space-lg);
     }
 

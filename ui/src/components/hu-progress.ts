@@ -64,7 +64,7 @@ export class ScProgress extends LitElement {
 
     .fill.indeterminate {
       width: 30% !important;
-      animation: hu-progress-indeterminate var(--hu-duration-slow) ease-in-out infinite;
+      animation: hu-progress-indeterminate var(--hu-duration-slow) var(--hu-ease-in-out) infinite;
     }
 
     @keyframes hu-progress-indeterminate {

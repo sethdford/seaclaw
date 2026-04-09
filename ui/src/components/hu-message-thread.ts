@@ -108,6 +108,7 @@ export class ScMessageThread extends LitElement {
   static override styles = css`
     :host {
       display: flex;
+      width: 100%;
       min-width: 0;
       flex-direction: column;
       flex: 1;
@@ -123,11 +124,17 @@ export class ScMessageThread extends LitElement {
       padding-bottom: var(--hu-messages-padding-bottom, var(--hu-space-3xl));
       display: flex;
       flex-direction: column;
-      gap: var(--hu-space-lg);
+      gap: var(--hu-space-sm);
       scroll-behavior: smooth;
       overscroll-behavior: contain;
       scroll-padding-top: var(--hu-space-xl);
+      scrollbar-width: thin;
+      scrollbar-color: var(--hu-border-subtle) transparent;
     }
+    .messages::-webkit-scrollbar { width: 6px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--hu-border-subtle); border-radius: 3px; }
+    .messages::-webkit-scrollbar-thumb:hover { background: var(--hu-border); }
     .message-wrapper {
       position: relative;
       overflow: hidden;
@@ -182,6 +189,7 @@ export class ScMessageThread extends LitElement {
     }
     .bubble-wrapper.assistant {
       margin-inline-end: auto;
+      max-width: 100%;
     }
     .bubble-wrapper:hover hu-message-actions {
       opacity: 1;
@@ -209,7 +217,7 @@ export class ScMessageThread extends LitElement {
       align-items: center;
       justify-content: center;
       gap: var(--hu-space-sm);
-      margin: var(--hu-space-md) 0;
+      margin: var(--hu-space-xs) 0;
     }
     .time-divider::before,
     .time-divider::after {
@@ -246,16 +254,14 @@ export class ScMessageThread extends LitElement {
       left: 50%;
       transform: translateX(-50%);
       background: var(--hu-bg-surface);
-      border: 1px solid var(--hu-accent);
-      box-shadow:
-        var(--hu-shadow-md),
-        0 0 12px 2px color-mix(in srgb, var(--hu-accent) 20%, transparent);
+      border: 1px solid color-mix(in srgb, var(--hu-border-subtle) 80%, transparent);
+      box-shadow: var(--hu-shadow-sm);
       padding: var(--hu-space-xs) var(--hu-space-md);
       border-radius: var(--hu-radius-full);
       font-size: var(--hu-text-xs);
       font-weight: var(--hu-weight-medium);
       font-family: var(--hu-font);
-      color: var(--hu-accent);
+      color: var(--hu-text-secondary);
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -270,7 +276,9 @@ export class ScMessageThread extends LitElement {
       }
     }
     .scroll-bottom-pill:hover {
-      background: color-mix(in srgb, var(--hu-accent) 8%, var(--hu-bg-surface));
+      background: var(--hu-bg-surface);
+      border-color: var(--hu-border);
+      color: var(--hu-text);
     }
     .pill-icon svg {
       width: var(--hu-icon-xs);
@@ -385,6 +393,19 @@ export class ScMessageThread extends LitElement {
       .messages {
         padding: var(--hu-space-sm);
       }
+      .hero-suggestions {
+        grid-template-columns: 1fr;
+        gap: var(--hu-space-xs);
+      }
+      .hero-chip {
+        justify-content: center;
+      }
+      .hero {
+        padding: var(--hu-space-xl, 1.5rem);
+      }
+      .hero-greeting {
+        font-size: clamp(1.5rem, 5cqi, var(--hu-text-4xl, 2.5rem));
+      }
     }
     .pull-to-load {
       position: sticky;
@@ -482,8 +503,8 @@ export class ScMessageThread extends LitElement {
       align-items: center;
       justify-content: center;
       gap: var(--hu-space-lg);
-      padding: var(--hu-space-2xl) var(--hu-space-lg);
-      padding-bottom: var(--hu-hero-padding-bottom, var(--hu-space-2xl));
+      padding: var(--hu-space-2xl, 2rem) var(--hu-space-lg);
+      padding-bottom: var(--hu-hero-padding-bottom, var(--hu-space-2xl, 2rem));
       text-align: center;
       animation: hu-hero-enter var(--hu-duration-slow) var(--hu-ease-out) both;
     }
@@ -499,41 +520,48 @@ export class ScMessageThread extends LitElement {
     }
     .hero-greeting {
       font-family: var(--hu-font);
-      font-size: var(--hu-text-3xl);
-      font-weight: var(--hu-weight-bold, 700);
+      font-size: clamp(1.75rem, 4vw, var(--hu-text-4xl, 2.5rem));
+      font-weight: var(--hu-weight-semibold, 600);
       letter-spacing: var(--hu-tracking-2xl, -0.02em);
       color: var(--hu-text);
       line-height: var(--hu-leading-tight, 1.25);
     }
     .hero-sub {
       font-size: var(--hu-text-lg);
-      color: var(--hu-text-muted);
-      margin-top: var(--hu-space-sm);
+      color: var(--hu-text-faint);
+      margin-top: var(--hu-space-xs);
+      letter-spacing: 0.01em;
     }
     .hero-suggestions {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(2, auto);
       justify-content: center;
       gap: var(--hu-space-sm);
+      margin-top: var(--hu-space-lg);
     }
     .hero-chip {
       display: inline-flex;
       align-items: center;
       gap: var(--hu-space-xs);
       padding: var(--hu-space-sm) var(--hu-space-lg);
-      background: color-mix(in srgb, var(--hu-surface-container) 50%, transparent);
+      background: color-mix(in srgb, var(--hu-surface-container-high) 50%, transparent);
       backdrop-filter: blur(var(--hu-blur-sm, 8px));
       -webkit-backdrop-filter: blur(var(--hu-blur-sm, 8px));
-      border: 1px solid var(--hu-border-subtle);
+      border: 1px solid color-mix(in srgb, var(--hu-border-subtle) 60%, transparent);
       border-radius: var(--hu-radius-full);
       font-family: var(--hu-font);
       font-size: var(--hu-text-sm);
       color: var(--hu-text);
       cursor: pointer;
+      animation: hu-chip-enter var(--hu-duration-normal, 300ms) var(--hu-ease-out) both;
       transition:
-        border-color var(--hu-duration-fast),
-        background var(--hu-duration-fast),
-        transform var(--hu-duration-fast);
+        border-color var(--hu-duration-fast) var(--hu-ease-out),
+        background var(--hu-duration-fast) var(--hu-ease-out),
+        transform var(--hu-duration-fast) var(--hu-ease-out);
+      &:nth-child(1) { animation-delay: 200ms; }
+      &:nth-child(2) { animation-delay: 260ms; }
+      &:nth-child(3) { animation-delay: 320ms; }
+      &:nth-child(4) { animation-delay: 380ms; }
       &:hover {
         border-color: var(--hu-accent);
         background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
@@ -550,6 +578,16 @@ export class ScMessageThread extends LitElement {
         width: var(--hu-icon-sm);
         height: var(--hu-icon-sm);
         color: var(--hu-accent);
+      }
+    }
+    @keyframes hu-chip-enter {
+      from {
+        opacity: 0;
+        transform: translateY(0.5rem) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
       }
     }
     @media (prefers-reduced-transparency: reduce) {
@@ -580,8 +618,8 @@ export class ScMessageThread extends LitElement {
       color: var(--hu-text-secondary);
       cursor: pointer;
       transition:
-        border-color var(--hu-duration-fast),
-        color var(--hu-duration-fast);
+        border-color var(--hu-duration-fast) var(--hu-ease-out),
+        color var(--hu-duration-fast) var(--hu-ease-out);
       animation: hu-suggestion-enter var(--hu-duration-normal)
         var(--hu-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
       &:hover {
@@ -1332,13 +1370,10 @@ export class ScMessageThread extends LitElement {
                 })}
                 ${!this.isWaiting &&
                 this._findLastAssistantIdx() >= 0 &&
-                (this.suggestions.length > 0 || DEMO_FOLLOWUP_SUGGESTIONS.length > 0)
+                this.suggestions.length > 0
                   ? html`
                       <div class="suggestions">
-                        ${(this.suggestions.length > 0
-                          ? this.suggestions
-                          : DEMO_FOLLOWUP_SUGGESTIONS
-                        ).map(
+                        ${this.suggestions.map(
                           (s, i) => html`
                             <button
                               class="suggestion-chip"

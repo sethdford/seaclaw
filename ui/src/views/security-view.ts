@@ -250,7 +250,10 @@ export class ScSecurityView extends GatewayAwareLitElement {
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
-    if (!gw) return;
+    if (!gw) {
+      this.error = "Not connected to gateway";
+      return;
+    }
     this.loading = true;
     this.error = "";
     try {

@@ -137,6 +137,7 @@ export class ScDataTableV2 extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      width: 100%;
       overflow-x: auto;
       font-family: var(--hu-font);
       contain: layout style;
@@ -280,7 +281,7 @@ export class ScDataTableV2 extends LitElement {
     }
 
     .compact th {
-      font-size: 0.625rem;
+      font-size: var(--hu-text-2xs);
     }
 
     .compact td {

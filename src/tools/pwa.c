@@ -103,6 +103,7 @@ static hu_error_t action_list_tabs(hu_allocator_t *alloc, hu_pwa_tool_ctx_t *ctx
     }
 
     if (count == 0) {
+        hu_pwa_tabs_free(alloc, tabs, count);
         *out = hu_tool_result_ok("No matching tabs found", 22);
         return HU_OK;
     }

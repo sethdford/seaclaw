@@ -446,19 +446,19 @@ size_t hu_music_taste_build_prompt(const char *contact_id, size_t cid_len, char 
 
     size_t w = 0;
     int n = snprintf(buf + w, cap - w, "Previously shared artists they liked: ");
-    if (n > 0)
+    if (n > 0 && w + (size_t)n < cap)
         w += (size_t)n;
 
     for (int i = 0; i < seen_count && w + 1 < cap; i++) {
         n = snprintf(buf + w, cap - w, "%s%s", i > 0 ? ", " : "", seen[i]);
-        if (n > 0)
+        if (n > 0 && w + (size_t)n < cap)
             w += (size_t)n;
     }
 
     float rate = (e->sends > 0) ? (float)e->reactions / (float)e->sends : 0.0f;
     if (rate > 0.0f && w + 1 < cap) {
         n = snprintf(buf + w, cap - w, " (%.0f%% positive reaction rate)", rate * 100.0f);
-        if (n > 0)
+        if (n > 0 && w + (size_t)n < cap)
             w += (size_t)n;
     }
 

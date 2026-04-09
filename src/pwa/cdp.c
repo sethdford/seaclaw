@@ -144,28 +144,50 @@ hu_error_t hu_cdp_connect(hu_allocator_t *alloc, const char *host, uint16_t port
     memset(&resp, 0, sizeof(resp));
     hu_error_t err = hu_http_get(alloc, url, NULL, &resp);
     if (err != HU_OK)
-        return err;
+        goto fail;
     if (!resp.body || resp.body_len == 0) {
         hu_http_response_free(alloc, &resp);
-        return HU_ERR_NOT_FOUND;
+        err = HU_ERR_NOT_FOUND;
+        goto fail;
     }
 
     hu_json_value_t *json = NULL;
     err = hu_json_parse(alloc, resp.body, resp.body_len, &json);
     hu_http_response_free(alloc, &resp);
     if (err != HU_OK)
-        return err;
+        goto fail;
 
     const char *ws = hu_json_get_string(json, "webSocketDebuggerUrl");
     if (ws) {
         out->ws_url = hu_strdup(alloc, ws);
+        if (!out->ws_url) {
+            hu_json_free(alloc, json);
+            err = HU_ERR_OUT_OF_MEMORY;
+            goto fail;
+        }
         out->ws_url_len = strlen(ws);
         err = hu_ws_connect(alloc, ws, &out->ws);
         out->connected = (err == HU_OK && out->ws != NULL);
     }
     hu_json_free(alloc, json);
 
-    return out->connected ? HU_OK : HU_ERR_NOT_FOUND;
+    if (out->connected)
+        return HU_OK;
+    err = HU_ERR_NOT_FOUND;
+fail:
+    hu_ws_client_free(out->ws, alloc);
+    out->ws = NULL;
+    if (out->ws_url) {
+        alloc->free(alloc->ctx, out->ws_url, out->ws_url_len + 1);
+        out->ws_url = NULL;
+        out->ws_url_len = 0;
+    }
+    if (out->debug_url) {
+        alloc->free(alloc->ctx, out->debug_url, out->debug_url_len + 1);
+        out->debug_url = NULL;
+        out->debug_url_len = 0;
+    }
+    return err;
 }
 
 static hu_error_t cdp_send_and_recv(hu_cdp_session_t *s, const char *method, const char *params,

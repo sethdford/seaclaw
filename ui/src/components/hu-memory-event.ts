@@ -17,15 +17,15 @@ export class ScMemoryEvent extends LitElement {
     }
     .memory-event {
       display: flex;
-      align-items: flex-start;
-      gap: var(--hu-space-sm);
-      padding: var(--hu-space-sm) var(--hu-space-md);
-      background: color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 6%, transparent);
-      border-left: 0.125rem solid
-        color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 30%, transparent);
-      border-radius: var(--hu-radius-md);
+      align-items: center;
+      gap: var(--hu-space-xs);
+      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      background: color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 5%, transparent);
+      border-left: 2px solid
+        color-mix(in srgb, var(--hu-accent-tertiary, var(--hu-accent)) 25%, transparent);
+      border-radius: var(--hu-radius-sm);
       font-family: var(--hu-font);
-      font-size: var(--hu-text-sm);
+      font-size: var(--hu-text-xs);
       color: var(--hu-text-muted);
     }
     .icon {

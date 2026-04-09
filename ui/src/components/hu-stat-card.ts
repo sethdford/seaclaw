@@ -12,8 +12,7 @@ export class ScStatCard extends LitElement {
   @property({ type: String }) valueStr = "";
   @property({ type: String }) label = "";
   @property({ type: Array }) sparklineData: number[] = [];
-  /** Sparkline stroke/fill; use tertiary for informational dashboard metrics. */
-  @property({ type: String }) sparklineColor = "var(--hu-accent-tertiary)";
+  @property({ type: String }) sparklineColor = "var(--hu-accent)";
   @property({ type: String }) trend = "";
   @property({ type: String }) trendDirection: "up" | "down" | "flat" = "flat";
   @property({ type: Number }) progress = -1;
@@ -38,8 +37,8 @@ export class ScStatCard extends LitElement {
 
     .stat-card {
       position: relative;
-      padding: var(--hu-space-lg);
-      min-width: 8.75rem;
+      padding: var(--hu-space-sm) var(--hu-space-md);
+      min-width: 7rem;
     }
 
     .trend {
@@ -69,17 +68,16 @@ export class ScStatCard extends LitElement {
     }
 
     .value {
-      font-size: var(--hu-text-2xl);
+      font-size: var(--hu-text-xl);
       font-weight: var(--hu-weight-semibold);
       color: var(--hu-text);
     }
 
     .label {
       font-size: var(--hu-text-xs);
-      color: var(--hu-text-muted);
-      margin-top: var(--hu-space-xs);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      color: var(--hu-text-secondary);
+      margin-top: var(--hu-space-2xs);
+      letter-spacing: 0.01em;
     }
 
     .sparkline-wrap {

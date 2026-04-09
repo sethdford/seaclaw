@@ -63,9 +63,12 @@ static const char *DEFAULT_SENTIMENT_POS[] = {
 static const char **s_multistep_needles = DEFAULT_MULTISTEP_NEEDLES;
 static const char **s_sentiment_neg = DEFAULT_SENTIMENT_NEG;
 static const char **s_sentiment_pos = DEFAULT_SENTIMENT_POS;
+static size_t s_multistep_needles_slots = 0;
+static size_t s_sentiment_neg_slots = 0;
+static size_t s_sentiment_pos_slots = 0;
 
 static void at_load_patterns(hu_allocator_t *alloc, hu_json_value_t *root, const char *key,
-                             const char ***dest) {
+                             const char ***dest, size_t *out_slot_count) {
     if (!root || !dest)
         return;
     hu_json_value_t *arr = hu_json_object_get(root, key);
@@ -93,22 +96,20 @@ static void at_load_patterns(hu_allocator_t *alloc, hu_json_value_t *root, const
     }
     patterns[filled] = NULL;
     *dest = patterns;
+    if (out_slot_count)
+        *out_slot_count = count + 1;
 }
 
-static void at_free_patterns(hu_allocator_t *alloc, const char **arr, const char **default_arr) {
+static void at_free_patterns(hu_allocator_t *alloc, const char **arr, const char **default_arr,
+                             size_t slot_count) {
     if (arr == default_arr || !arr)
         return;
-    /* at_load_patterns allocates (json_array_len + 1) slots with a NULL sentinel at the end.
-     * Intermediate slots may be NULL if hu_strndup failed. We must walk until we find
-     * a slot that is the sentinel (the slot after the last valid index). Since we can't
-     * distinguish a failed-strndup NULL from the sentinel, bail out on first NULL. This
-     * means some entries after a gap leak — but at_load_patterns should abort on failure. */
     size_t i = 0;
     while (arr[i]) {
         alloc->free(alloc->ctx, (char *)arr[i], strlen(arr[i]) + 1);
         i++;
     }
-    alloc->free(alloc->ctx, (void *)arr, (i + 1) * sizeof(const char *));
+    alloc->free(alloc->ctx, (void *)arr, slot_count * sizeof(const char *));
 }
 
 hu_error_t hu_agent_turn_data_init(hu_allocator_t *alloc) {
@@ -125,7 +126,8 @@ hu_error_t hu_agent_turn_data_init(hu_allocator_t *alloc) {
             err = hu_json_parse(alloc, json_data, json_len, &root);
             alloc->free(alloc->ctx, json_data, json_len);
             if (err == HU_OK && root) {
-                at_load_patterns(alloc, root, "needles", &s_multistep_needles);
+                at_load_patterns(alloc, root, "needles", &s_multistep_needles,
+                                 &s_multistep_needles_slots);
                 hu_json_free(alloc, root);
             }
         }
@@ -141,8 +143,8 @@ hu_error_t hu_agent_turn_data_init(hu_allocator_t *alloc) {
             err = hu_json_parse(alloc, json_data, json_len, &root);
             alloc->free(alloc->ctx, json_data, json_len);
             if (err == HU_OK && root) {
-                at_load_patterns(alloc, root, "negative", &s_sentiment_neg);
-                at_load_patterns(alloc, root, "positive", &s_sentiment_pos);
+                at_load_patterns(alloc, root, "negative", &s_sentiment_neg, &s_sentiment_neg_slots);
+                at_load_patterns(alloc, root, "positive", &s_sentiment_pos, &s_sentiment_pos_slots);
                 hu_json_free(alloc, root);
             }
         }
@@ -155,13 +157,16 @@ void hu_agent_turn_data_cleanup(hu_allocator_t *alloc) {
     if (!alloc)
         return;
 
-    at_free_patterns(alloc, s_multistep_needles, DEFAULT_MULTISTEP_NEEDLES);
-    at_free_patterns(alloc, s_sentiment_neg, DEFAULT_SENTIMENT_NEG);
-    at_free_patterns(alloc, s_sentiment_pos, DEFAULT_SENTIMENT_POS);
+    at_free_patterns(alloc, s_multistep_needles, DEFAULT_MULTISTEP_NEEDLES, s_multistep_needles_slots);
+    at_free_patterns(alloc, s_sentiment_neg, DEFAULT_SENTIMENT_NEG, s_sentiment_neg_slots);
+    at_free_patterns(alloc, s_sentiment_pos, DEFAULT_SENTIMENT_POS, s_sentiment_pos_slots);
 
     s_multistep_needles = DEFAULT_MULTISTEP_NEEDLES;
     s_sentiment_neg = DEFAULT_SENTIMENT_NEG;
     s_sentiment_pos = DEFAULT_SENTIMENT_POS;
+    s_multistep_needles_slots = 0;
+    s_sentiment_neg_slots = 0;
+    s_sentiment_pos_slots = 0;
 }
 
 #ifdef HU_HAS_SKILLS

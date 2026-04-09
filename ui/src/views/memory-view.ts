@@ -53,7 +53,7 @@ const CATEGORY_OPTIONS = [
   { value: "all", label: "All" },
   { value: "core", label: "Core" },
   { value: "daily", label: "Daily" },
-  { value: "conversation", label: "Conversation" },
+  { value: "conversation", label: "Chat" },
   { value: "insight", label: "Insights" },
 ];
 
@@ -120,7 +120,18 @@ export class ScMemoryView extends GatewayAwareLitElement {
       .layout {
         display: flex;
         flex-direction: column;
-        gap: var(--hu-space-lg);
+        gap: var(--hu-space-md);
+      }
+      .controls-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--hu-space-sm);
+      }
+      .controls-count {
+        font-size: var(--hu-text-sm);
+        font-weight: var(--hu-weight-medium);
+        color: var(--hu-text-secondary);
       }
       .controls {
         display: flex;
@@ -134,22 +145,20 @@ export class ScMemoryView extends GatewayAwareLitElement {
       }
       .controls hu-segmented-control {
         flex-shrink: 0;
-        overflow-x: auto;
-        max-width: 100%;
       }
       .memory-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-lg), 100%), 1fr));
-        gap: var(--hu-space-md);
+        grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+        gap: var(--hu-space-sm);
       }
       .memory-card {
         display: flex;
         flex-direction: column;
-        gap: var(--hu-space-xs);
+        gap: var(--hu-space-2xs);
       }
       .memory-card .entry-header {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         gap: var(--hu-space-xs);
       }
@@ -158,28 +167,29 @@ export class ScMemoryView extends GatewayAwareLitElement {
         opacity: 0;
         transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
       }
-      .memory-card:hover .entry-header hu-button {
+      .memory-card:hover .entry-header hu-button,
+      .memory-card:focus-within .entry-header hu-button {
         opacity: 1;
-      }
-      .memory-card .key {
-        font-family: var(--hu-font-mono);
-        font-size: var(--hu-text-xs);
-        color: var(--hu-text-muted);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
       }
       .memory-card .content {
         font-size: var(--hu-text-sm);
         line-height: var(--hu-leading-relaxed);
         color: var(--hu-text);
       }
+      .memory-card .key {
+        font-family: var(--hu-font-mono);
+        font-size: var(--hu-text-2xs);
+        color: var(--hu-text-faint);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin-top: var(--hu-space-2xs);
+      }
       .memory-card .meta {
         display: flex;
         align-items: center;
         gap: var(--hu-space-xs);
         flex-wrap: wrap;
-        margin-top: var(--hu-space-xs);
       }
       .memory-card .source {
         font-size: var(--hu-text-xs);
@@ -211,8 +221,8 @@ export class ScMemoryView extends GatewayAwareLitElement {
       }
       .skeleton-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-lg), 100%), 1fr));
-        gap: var(--hu-space-md);
+        grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+        gap: var(--hu-space-sm);
       }
 
       @container (max-width: 48rem) /* cq-medium */ {
@@ -297,7 +307,10 @@ export class ScMemoryView extends GatewayAwareLitElement {
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
-    if (!gw) return;
+    if (!gw) {
+      this.error = "Not connected to gateway";
+      return;
+    }
     this.loading = true;
     this.error = "";
     this.actionError = "";
@@ -544,28 +557,27 @@ export class ScMemoryView extends GatewayAwareLitElement {
           value=${String(cats.insight ?? 0)}
           .icon=${icons.zap}
         ></hu-stat-card>
-        <hu-stat-card label="Engine" valueStr=${s?.engine ?? "—"} .icon=${icons.cpu}></hu-stat-card>
+        <hu-stat-card
+          label="Daily"
+          value=${String(cats.daily ?? 0)}
+          .icon=${icons.cpu}
+        ></hu-stat-card>
       </hu-stats-row>
-
-      <hu-section-header
-        heading="Memories"
-        description="${filtered.length} ${filtered.length === 1 ? "entry" : "entries"}"
-      >
-        <div slot="actions" class="consolidate-row">
-          <hu-button
-            size="sm"
-            variant="ghost"
-            ?disabled=${this.consolidating}
-            @click=${() => this._consolidate()}
-            >${this.consolidating ? "Running…" : "Consolidate"}</hu-button
-          >
-        </div>
-      </hu-section-header>
 
       ${this.actionError
         ? html`<div class="error-banner" role="alert">${this.actionError}</div>`
         : nothing}
 
+      <div class="controls-header">
+        <span class="controls-count">${filtered.length} ${filtered.length === 1 ? "memory" : "memories"}</span>
+        <hu-button
+          size="sm"
+          variant="ghost"
+          ?disabled=${this.consolidating}
+          @click=${() => this._consolidate()}
+          >${this.consolidating ? "Running…" : "Consolidate"}</hu-button
+        >
+      </div>
       <div class="controls">
         <hu-input
           placeholder="Search memories…"
@@ -676,7 +688,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
       <hu-card hoverable class=${isInsight ? "insight-card" : ""} role="listitem">
         <div class="memory-card">
           <div class="entry-header">
-            <div class="key">${entry.key}</div>
+            <div class="content">${entry.content}</div>
             <hu-button
               size="xs"
               variant="ghost"
@@ -685,7 +697,6 @@ export class ScMemoryView extends GatewayAwareLitElement {
               >${icons.trash}</hu-button
             >
           </div>
-          <div class="content">${entry.content}</div>
           <div class="meta">
             <hu-badge variant=${categoryVariant(entry.category)} label=${entry.category}></hu-badge>
             ${entry.source
@@ -695,6 +706,7 @@ export class ScMemoryView extends GatewayAwareLitElement {
               ? html`<span class="timestamp">${formatTimestamp(entry.timestamp)}</span>`
               : nothing}
           </div>
+          <div class="key">${entry.key}</div>
         </div>
       </hu-card>
     `;

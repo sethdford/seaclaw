@@ -246,7 +246,7 @@ export class ScTuringView extends GatewayAwareLitElement {
 
       .trajectory-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(var(--hu-grid-track-sm), 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(var(--hu-grid-track-sm), 100%), 1fr));
         gap: var(--hu-space-adaptive-content-gap);
         margin-bottom: var(--hu-space-2xl);
       }

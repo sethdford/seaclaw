@@ -56,6 +56,7 @@ static const char *const hu_config_top_keys[] = {
     "data_dir",
     "temp_dir",
     "behavior",
+    "mlx_local",
 };
 static const size_t hu_config_top_keys_len =
     sizeof(hu_config_top_keys) / sizeof(hu_config_top_keys[0]);
@@ -108,7 +109,8 @@ static const size_t hu_security_keys_len = sizeof(hu_security_keys) / sizeof(hu_
 static const char *const hu_known_providers[] = {
     "openai",       "anthropic",  "gemini",     "google",     "google-gemini",
     "ollama",       "openrouter", "compatible", "claude_cli", "codex_cli",
-    "openai-codex", "router",     "reliable",   "ensemble",
+    "openai-codex", "router",     "reliable",   "ensemble",   "mlx_local",
+    "mlx-local",    "apple",
 };
 static const size_t hu_known_providers_len =
     sizeof(hu_known_providers) / sizeof(hu_known_providers[0]);

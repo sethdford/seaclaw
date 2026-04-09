@@ -233,7 +233,8 @@ export class ScVoiceView extends GatewayAwareLitElement {
       .status-bar {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: var(--hu-space-xs);
         padding: var(--hu-space-xs) var(--hu-space-md);
         font-size: var(--hu-text-xs);
         color: var(--hu-text-secondary);
@@ -246,11 +247,19 @@ export class ScVoiceView extends GatewayAwareLitElement {
         flex-shrink: 0;
       }
 
-      .status-left,
-      .status-right {
+      .status-left {
         display: flex;
         align-items: center;
         gap: var(--hu-space-sm);
+        min-width: 0;
+      }
+
+      .status-right {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-2xs);
+        flex-wrap: wrap;
+        margin-left: auto;
       }
 
       .status-title {
@@ -330,13 +339,60 @@ export class ScVoiceView extends GatewayAwareLitElement {
       .setup-banner {
         background: var(--hu-surface-container);
         border-radius: var(--hu-radius-lg);
-        padding: var(--hu-space-lg);
-        margin: var(--hu-space-md);
+        padding: var(--hu-space-md);
+        margin: var(--hu-space-sm) var(--hu-space-md);
         flex-shrink: 0;
       }
 
       .setup-banner fieldset {
         gap: var(--hu-space-sm);
+      }
+
+      .provider-option {
+        display: flex;
+        align-items: center;
+        gap: var(--hu-space-2xs);
+        cursor: pointer;
+        font-size: var(--hu-text-sm);
+        font-family: var(--hu-font);
+        padding: var(--hu-space-2xs) var(--hu-space-sm);
+        border-radius: var(--hu-radius-md);
+        border: 1px solid transparent;
+        transition: border-color var(--hu-duration-fast) var(--hu-ease-out),
+                    background var(--hu-duration-fast) var(--hu-ease-out);
+      }
+      .provider-option:hover {
+        background: var(--hu-hover-overlay);
+      }
+      .provider-option[data-selected] {
+        border-color: var(--hu-accent);
+        background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
+      }
+      .provider-option input[type="radio"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid var(--hu-border);
+        border-radius: 50%;
+        margin: 0;
+        flex-shrink: 0;
+        position: relative;
+        transition: border-color var(--hu-duration-fast) var(--hu-ease-out);
+      }
+      .provider-option input[type="radio"]:checked {
+        border-color: var(--hu-accent);
+      }
+      .provider-option input[type="radio"]:checked::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background: var(--hu-accent);
       }
 
       /* ── Skeleton ────────────────────────────────────── */
@@ -1225,41 +1281,43 @@ export class ScVoiceView extends GatewayAwareLitElement {
   }
 
   private _renderSetupBanner() {
-    const providers = [
+    const providers: { id: string; label: string; help: string; url: string }[] = [
       {
         id: "gemini_live",
         label: "Gemini Live (Google)",
-        help: "Get a key at aistudio.google.com/apikey",
+        help: "Get a key at",
+        url: "https://aistudio.google.com/apikey",
       },
       {
         id: "openai_realtime",
         label: "OpenAI Realtime",
-        help: "Get a key at platform.openai.com/api-keys",
+        help: "Get a key at",
+        url: "https://platform.openai.com/api-keys",
       },
       {
         id: "standard",
         label: "Standard (Cartesia TTS)",
-        help: "Get a key at play.cartesia.ai",
+        help: "Get a key at",
+        url: "https://play.cartesia.ai",
       },
     ];
     const selected = providers.find((p) => p.id === this._setupMode) ?? providers[0];
     return html`
       <div class="setup-banner" role="region" aria-label="Voice setup">
-        <h3 style="margin:0 0 var(--hu-space-sm) 0;font:var(--hu-font-heading-sm)">Voice Setup</h3>
-        <p
-          style="margin:0 0 var(--hu-space-md) 0;color:var(--hu-text-secondary);font:var(--hu-font-body-sm)"
-        >
-          Choose a voice provider and enter your API key to start talking.
-        </p>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:var(--hu-space-sm);margin-bottom:var(--hu-space-xs)">
+          <h3 style="margin:0;font:var(--hu-font-heading-sm)">Voice Setup</h3>
+          <span style="font-size:var(--hu-text-xs);color:var(--hu-text-faint)">Choose a provider and enter your API key</span>
+        </div>
         <fieldset
-          style="border:none;padding:0;margin:0 0 var(--hu-space-md) 0;display:flex;flex-direction:column;gap:var(--hu-space-sm)"
+          style="border:none;padding:0;margin:0 0 var(--hu-space-sm) 0;display:flex;flex-direction:row;gap:var(--hu-space-xs);flex-wrap:wrap"
           role="radiogroup"
           aria-label="Voice provider"
         >
           ${providers.map(
             (p) => html`
               <label
-                style="display:flex;align-items:center;gap:var(--hu-space-xs);cursor:pointer;font:var(--hu-font-body-sm)"
+                class="provider-option"
+                ?data-selected=${this._setupMode === p.id}
               >
                 <input
                   type="radio"
@@ -1271,21 +1329,13 @@ export class ScVoiceView extends GatewayAwareLitElement {
                     this._setupError = "";
                     this._setupSuccess = false;
                   }}
-                  style="accent-color:var(--hu-accent)"
                 />
                 ${p.label}
               </label>
             `,
           )}
         </fieldset>
-        <p
-          style="margin:0 0 var(--hu-space-sm) 0;color:var(--hu-text-tertiary);font:var(--hu-font-body-xs)"
-        >
-          ${selected.help}
-        </p>
-        <div
-          style="display:flex;gap:var(--hu-space-xs);align-items:center;margin-bottom:var(--hu-space-sm)"
-        >
+        <div style="display:flex;gap:var(--hu-space-xs);align-items:center">
           <input
             type="password"
             placeholder="Paste API key"
@@ -1295,16 +1345,22 @@ export class ScVoiceView extends GatewayAwareLitElement {
               this._setupKey = (e.target as HTMLInputElement).value;
               this._setupError = "";
             }}
-            style="flex:1;padding:var(--hu-space-xs) var(--hu-space-sm);border-radius:var(--hu-radius-sm);border:1px solid var(--hu-border);background:var(--hu-bg-surface);color:var(--hu-text-primary);font:var(--hu-font-body-sm)"
+            style="flex:1;padding:0.4375rem var(--hu-space-sm);border-radius:var(--hu-radius-md);border:1px solid var(--hu-border-subtle);background:var(--hu-bg-surface);color:var(--hu-text);font-size:var(--hu-text-sm);font-family:var(--hu-font);outline:none;transition:border-color var(--hu-duration-fast) var(--hu-ease-out)"
           />
           <button
             aria-label="Test connection"
             ?disabled=${this._setupValidating || !this._setupKey.trim()}
             @click=${() => void this._testVoiceConnection()}
-            style="padding:var(--hu-space-xs) var(--hu-space-md);border-radius:var(--hu-radius-sm);border:1px solid var(--hu-border);background:var(--hu-accent);color:var(--hu-on-accent);font:var(--hu-font-body-sm);cursor:pointer"
+            style="padding:0.4375rem var(--hu-space-md);border-radius:var(--hu-radius-md);border:none;background:var(--hu-accent);color:var(--hu-on-accent);font-size:var(--hu-text-sm);font-family:var(--hu-font);cursor:pointer;font-weight:var(--hu-weight-medium)"
           >
             ${this._setupValidating ? "Testing\u2026" : "Test"}
           </button>
+          <a
+            href=${selected.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style="font-size:var(--hu-text-xs);color:var(--hu-text-faint);white-space:nowrap;text-decoration:underline;text-underline-offset:2px"
+          >Get key &rarr;</a>
         </div>
         ${this._setupError
           ? html`<p

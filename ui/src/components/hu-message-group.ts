@@ -47,13 +47,11 @@ export class ScMessageGroup extends LitElement {
     }
 
     .avatar.assistant {
-      background: var(--hu-accent);
-      color: var(--hu-on-accent);
+      display: none;
     }
 
     .avatar.user {
-      background: var(--hu-accent-subtle);
-      color: var(--hu-accent);
+      display: none;
     }
 
     .avatar svg {
@@ -73,27 +71,25 @@ export class ScMessageGroup extends LitElement {
       align-items: center;
       gap: var(--hu-space-xs);
       margin-top: var(--hu-space-2xs);
-      opacity: 0.4;
+      opacity: 0;
       transition: opacity var(--hu-duration-fast) var(--hu-ease-out);
       font-size: var(--hu-text-2xs, 0.625rem);
       color: var(--hu-text-faint);
     }
 
-    @media (hover: hover) {
-      .group-footer {
-        opacity: 0.3;
-      }
-      .group:hover .group-footer {
-        opacity: 0.8;
-      }
+    .group:hover .group-footer,
+    .group:focus-within .group-footer {
+      opacity: 0.6;
     }
 
     .group.user .group-footer {
       justify-content: flex-end;
+      padding-inline-end: 0;
     }
 
     .group.assistant .group-footer {
       justify-content: flex-start;
+      padding-inline-start: 0;
     }
 
     @media (prefers-reduced-motion: reduce) {

@@ -290,7 +290,10 @@ export class ScConfigView extends GatewayAwareLitElement {
   }
 
   private async loadConfig(): Promise<void> {
-    if (!this.gateway) return;
+    if (!this.gateway) {
+      this.loadError = "Not connected to gateway";
+      return;
+    }
     try {
       const cfg = await this.gateway.request<Partial<ConfigData>>("config.get", {});
       this.config = {

@@ -88,11 +88,11 @@ export class ScAgentsView extends GatewayAwareLitElement {
       }
 
       .card-spacer {
-        margin-bottom: var(--hu-space-2xl);
+        margin-bottom: var(--hu-space-md);
       }
 
       .chart-section {
-        margin-bottom: var(--hu-space-2xl);
+        margin-bottom: var(--hu-space-md);
       }
 
       .profile-header {
@@ -110,7 +110,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
 
       .profile-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(8.75rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(8.75rem, 100%), 1fr));
         gap: var(--hu-space-sm);
         font-size: var(--hu-text-sm);
       }
@@ -124,7 +124,7 @@ export class ScAgentsView extends GatewayAwareLitElement {
       }
 
       .skeleton-sessions {
-        margin-bottom: var(--hu-space-2xl);
+        margin-bottom: var(--hu-space-md);
       }
 
       @container (max-width: 48rem) /* cq-medium */ {
@@ -167,7 +167,10 @@ export class ScAgentsView extends GatewayAwareLitElement {
 
   protected override async load(): Promise<void> {
     const gw = this.gateway;
-    if (!gw) return;
+    if (!gw) {
+      this.error = "Not connected to gateway";
+      return;
+    }
     this.loading = true;
     this.error = "";
     try {
@@ -264,7 +267,6 @@ export class ScAgentsView extends GatewayAwareLitElement {
         {
           label: "Sessions",
           data: sorted.map(([, v]) => v),
-          backgroundColor: "var(--hu-chart-brand, var(--hu-accent))",
         },
       ],
     };
@@ -287,10 +289,11 @@ export class ScAgentsView extends GatewayAwareLitElement {
             .icon=${icons.warning}
             heading="Error"
             description=${this.error}
-          ></hu-empty-state>`
-        : nothing}
-      ${this._renderHero()} ${this._renderMetrics()} ${this._renderChart()}
-      ${this._renderSessions()} ${this._renderConfig()}
+          >
+            <hu-button variant="primary" @click=${() => this.load()}>Retry</hu-button>
+          </hu-empty-state>`
+        : html`${this._renderHero()} ${this._renderMetrics()} ${this._renderChart()}
+      ${this._renderSessions()} ${this._renderConfig()}`}
     `;
   }
 
@@ -299,8 +302,8 @@ export class ScAgentsView extends GatewayAwareLitElement {
       <hu-page-hero role="region" aria-label="h-uman Agent overview">
         <hu-section-header heading="h-uman Agent" description="Monitor autonomous agent instances">
           <span class="staleness">${this.stalenessLabel}</span>
-          <hu-button size="sm" @click=${() => this.load()} aria-label="Refresh data"
-            >Refresh</hu-button
+          <hu-button size="sm" variant="ghost" @click=${() => this.load()} aria-label="Refresh data"
+            >${icons.refresh}</hu-button
           >
         </hu-section-header>
       </hu-page-hero>

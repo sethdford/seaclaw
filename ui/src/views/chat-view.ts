@@ -34,6 +34,7 @@ export class ScChatView extends GatewayAwareLitElement {
         flex: 1;
         min-height: 0;
         --hu-artifacts-width: 25rem;
+        --hu-content-width: 48rem;
       }
       .main-wrap {
         display: grid;
@@ -76,8 +77,10 @@ export class ScChatView extends GatewayAwareLitElement {
         min-height: 0;
         max-width: var(--hu-content-width);
         margin: 0 auto;
+        padding: 0 var(--hu-space-lg);
         position: relative;
         width: 100%;
+        box-sizing: border-box;
         container-type: inline-size;
       }
       .thread-column {
@@ -93,20 +96,15 @@ export class ScChatView extends GatewayAwareLitElement {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: var(--hu-space-2xs) var(--hu-space-md);
-        font-size: var(--hu-text-xs);
-        color: var(--hu-text);
-        background: color-mix(in srgb, var(--hu-surface-container) 60%, transparent);
-        backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
-          saturate(var(--hu-glass-subtle-saturate, 120%));
-        -webkit-backdrop-filter: blur(var(--hu-glass-subtle-blur, 12px))
-          saturate(var(--hu-glass-subtle-saturate, 120%));
-        border-bottom: 1px solid var(--hu-border-subtle);
-        opacity: 0.7;
-        transition: opacity var(--hu-duration-fast);
+        padding: var(--hu-space-3xs, 2px) var(--hu-space-md);
+        font-size: var(--hu-text-2xs, 0.6875rem);
+        color: var(--hu-text-muted);
+        background: transparent;
+        border-bottom: none;
+        transition: color var(--hu-duration-fast);
       }
       .status-bar:hover {
-        opacity: 1;
+        color: var(--hu-text);
       }
       .status-left,
       .status-right {
@@ -116,20 +114,9 @@ export class ScChatView extends GatewayAwareLitElement {
       }
       .status-title {
         font-weight: var(--hu-weight-medium);
-        color: var(--hu-text);
-        font-size: var(--hu-text-sm);
-      }
-      .kbd-hint {
-        display: inline-flex;
-        align-items: center;
-        padding: var(--hu-space-2xs) var(--hu-space-xs);
-        font-size: var(--hu-text-2xs);
-        font-family: var(--hu-font);
-        background: var(--hu-bg-elevated);
-        border: 1px solid var(--hu-border);
-        border-radius: var(--hu-radius-sm);
-        color: var(--hu-text);
-        line-height: 1;
+        color: var(--hu-text-muted);
+        font-size: var(--hu-text-xs);
+        letter-spacing: 0.01em;
       }
       .retry-btn-wrap {
         display: flex;
@@ -169,25 +156,25 @@ export class ScChatView extends GatewayAwareLitElement {
         display: flex;
         align-items: center;
         justify-content: center;
-        min-width: 2.75rem;
-        min-height: 2.75rem;
-        padding: var(--hu-space-2xs) var(--hu-space-sm);
+        min-width: 2rem;
+        min-height: 2rem;
+        padding: var(--hu-space-2xs);
         background: transparent;
-        border: 1px solid var(--hu-border);
+        border: none;
         border-radius: var(--hu-radius-sm);
-        color: var(--hu-text);
+        color: var(--hu-text-muted);
         cursor: pointer;
         transition:
           color var(--hu-duration-fast),
-          border-color var(--hu-duration-fast);
+          background var(--hu-duration-fast);
       }
       .sessions-toggle:hover {
         color: var(--hu-text);
-        border-color: var(--hu-text-muted);
+        background: var(--hu-hover-overlay);
       }
       .sessions-toggle svg {
-        width: 1.125rem;
-        height: 1.125rem;
+        width: 1rem;
+        height: 1rem;
       }
       .skeleton-wrap {
         flex: 1;
@@ -196,7 +183,7 @@ export class ScChatView extends GatewayAwareLitElement {
         min-height: 0;
       }
       .skeleton-toolbar {
-        width: 200px;
+        width: min(12.5rem, 100%);
       }
       .skeleton-bubbles {
         display: flex;
@@ -224,7 +211,19 @@ export class ScChatView extends GatewayAwareLitElement {
         position: sticky;
         bottom: 0;
         z-index: 10;
-        background: var(--hu-bg-surface);
+        padding: var(--hu-space-sm) 0 var(--hu-space-md);
+        background: var(--hu-bg);
+        animation: hu-composer-enter var(--hu-duration-normal, 300ms) var(--hu-ease-out, ease-out) 100ms both;
+      }
+      @keyframes hu-composer-enter {
+        from {
+          opacity: 0;
+          transform: translateY(0.75rem);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
       /* Empty state: center composer vertically like Claude.ai / ChatGPT */
       .container.empty {
@@ -253,8 +252,7 @@ export class ScChatView extends GatewayAwareLitElement {
         }
       }
       @container (max-width: 30rem) /* cq-sm */ {
-        .status-left span:not(.status-title),
-        .status-right .kbd-hint {
+        .status-left span:not(.status-title) {
           display: none;
         }
         .status-bar {
@@ -287,31 +285,14 @@ export class ScChatView extends GatewayAwareLitElement {
   @state() private _sessionsPanelOpen = false;
   @state() private _artifactsPanelOpen = false;
   @state() private _sessions: ChatSession[] = [];
-  private _demoProjects: ChatProject[] = [
-    {
-      id: "proj-1",
-      name: "h-uman Core",
-      instructions: "",
-      pinned: true,
-      color: "var(--hu-brand-primary)",
-    },
-    {
-      id: "proj-2",
-      name: "UI Dashboard",
-      instructions: "",
-      pinned: false,
-      color: "var(--hu-brand-secondary)",
-    },
-    {
-      id: "proj-3",
-      name: "Research",
-      instructions: "",
-      pinned: false,
-      color: "var(--hu-brand-tertiary)",
-    },
-  ];
+  @state() private _projects: ChatProject[] = [];
   @state() private _tapback = { open: false, x: 0, y: 0, index: -1, content: "" };
   @state() private _sessionsLoading = false;
+  @state() private _selectedModel = "";
+  @state() private _modelList: Array<{ id: string; name: string; provider?: string }> = [];
+  @state() private _suggestions: string[] = [];
+  @state() private _activePersona = "";
+  @state() private _personaList: Array<{ id: string; name: string; description?: string }> = [];
   private _artifactHighlightTimer: ReturnType<typeof setTimeout> | null = null;
   private _artifactHighlightCleanupTimer: ReturnType<typeof setTimeout> | null = null;
   private _artifactHighlightRaf = 0;
@@ -429,7 +410,128 @@ export class ScChatView extends GatewayAwareLitElement {
 
   protected override async load(): Promise<void> {
     await this.chat.loadHistory(this.sessionKey);
-    await this._loadSessions();
+    await Promise.all([this._loadSessions(), this._loadModels(), this._loadProjects(), this._loadPersonas()]);
+  }
+
+  private async _loadModels(): Promise<void> {
+    const gw = this.gateway;
+    if (!gw) return;
+    try {
+      const [cfg, modelsRes] = await Promise.all([
+        gw.request<{ model?: string; default_model?: string }>("config.get"),
+        gw.request<{
+          default_model?: string;
+          providers?: Array<{ name: string; has_key?: boolean }>;
+        }>("models.list"),
+      ]);
+      const modelId = cfg?.model ?? cfg?.default_model ?? modelsRes?.default_model ?? "";
+      this._selectedModel = modelId;
+      const models: Array<{ id: string; name: string; provider?: string }> = [];
+      if (modelId) {
+        models.push({ id: modelId, name: this._friendlyModelName(modelId) });
+      }
+      if (modelsRes?.providers) {
+        for (const p of modelsRes.providers) {
+          if (p.has_key !== false && !models.some((m) => m.provider === p.name)) {
+            models.push({ id: p.name, name: p.name, provider: p.name });
+          }
+        }
+      }
+      this._modelList = models;
+    } catch {
+      /* models not available */
+    }
+  }
+
+  private _friendlyModelName(id: string): string {
+    const map: Record<string, string> = {
+      "claude-sonnet-4-20250514": "Claude Sonnet 4",
+      "claude-opus-4-20250514": "Claude Opus 4",
+      "gpt-4o": "GPT-4o",
+      "gpt-4o-mini": "GPT-4o Mini",
+      "gemini-3.1-pro-preview": "Gemini 3.1 Pro",
+      "gemini-3-flash-preview": "Gemini 3 Flash",
+      "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite",
+    };
+    return map[id] ?? id.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  private async _loadProjects(): Promise<void> {
+    const gw = this.gateway;
+    if (!gw) return;
+    try {
+      const res = await gw.request<{
+        projects?: Array<{
+          id: string;
+          name: string;
+          instructions?: string;
+          pinned?: boolean;
+          color?: string;
+        }>;
+      }>("projects.list");
+      if (res?.projects) {
+        this._projects = res.projects.map((p) => ({
+          id: p.id,
+          name: p.name,
+          instructions: p.instructions ?? "",
+          pinned: p.pinned ?? false,
+          color: p.color,
+        }));
+      }
+    } catch {
+      /* projects not available */
+    }
+  }
+
+  private async _onProjectCreate(e: CustomEvent<{ name: string }>): Promise<void> {
+    const gw = this.gateway;
+    if (!gw) return;
+    try {
+      const res = await gw.request<{
+        project?: { id: string; name: string; instructions?: string; pinned?: boolean; color?: string };
+      }>("projects.create", { name: e.detail.name });
+      if (res?.project) {
+        this._projects = [...this._projects, {
+          id: res.project.id,
+          name: res.project.name,
+          instructions: res.project.instructions ?? "",
+          pinned: res.project.pinned ?? false,
+          color: res.project.color,
+        }];
+      }
+    } catch {
+      ScToast.show({ message: "Failed to create project", variant: "error" });
+    }
+  }
+
+  private async _loadPersonas(): Promise<void> {
+    const gw = this.gateway;
+    if (!gw) return;
+    try {
+      const res = await gw.request<{
+        personas?: Array<{ id: string; name: string; description?: string }>;
+        active?: string;
+      }>("persona.list");
+      if (res?.personas) {
+        this._personaList = res.personas;
+        this._activePersona = res.active ?? "";
+      }
+    } catch {
+      /* personas not available */
+    }
+  }
+
+  private async _onPersonaChange(e: CustomEvent<{ persona: string }>): Promise<void> {
+    const gw = this.gateway;
+    if (!gw) return;
+    const prev = this._activePersona;
+    this._activePersona = e.detail.persona;
+    try {
+      await gw.request("persona.set", { persona: e.detail.persona });
+    } catch {
+      this._activePersona = prev;
+      ScToast.show({ message: "Failed to set persona", variant: "error" });
+    }
   }
 
   private async _loadSessions(): Promise<void> {
@@ -648,7 +750,7 @@ export class ScChatView extends GatewayAwareLitElement {
     message: string,
     files?: Array<{ name: string; size: number; type: string; dataUrl?: string }>,
     mentionedFiles?: string[],
-    options?: { thinkingEnabled?: boolean },
+    options?: { thinkingEnabled?: boolean; researchEnabled?: boolean },
   ): Promise<void> {
     if (!message || !this.gateway) return;
     this.inputValue = "";
@@ -729,6 +831,22 @@ export class ScChatView extends GatewayAwareLitElement {
     else if (command === "/clear") {
       this.chat.items = [];
       this.chat.cacheMessages(this.sessionKey);
+    } else if (command === "/model") {
+      const selector = this.renderRoot.querySelector("hu-model-selector") as HTMLElement | null;
+      selector?.click();
+    } else if (command === "/persona") {
+      this.dispatchEvent(
+        new CustomEvent("navigate", { bubbles: true, composed: true, detail: "settings" }),
+      );
+    } else if (command === "/memory") {
+      this.dispatchEvent(
+        new CustomEvent("navigate", { bubbles: true, composed: true, detail: "memory" }),
+      );
+    } else if (command === "/help") {
+      ScToast.show({
+        message: "Available: /model, /persona, /memory, /attach, /export, /clear",
+        variant: "info",
+      });
     }
   }
 
@@ -763,15 +881,17 @@ export class ScChatView extends GatewayAwareLitElement {
       <div class="${wrapClasses}">
         <hu-chat-sessions-panel
           .sessions=${sessionsWithActive}
-          .projects=${this._demoProjects}
+          .projects=${this._projects}
           ?open=${this._sessionsPanelOpen}
           @hu-session-select=${this._onSessionSelect}
           @hu-session-new=${this._onSessionNew}
           @hu-session-delete=${this._onSessionDelete}
           @hu-session-rename=${this._onSessionRename}
+          @hu-sessions-close=${this._onToggleSessions}
+          @hu-project-create=${this._onProjectCreate}
         ></hu-chat-sessions-panel>
         <div class="container ${isEmpty ? "empty" : ""}">
-          ${this.chat.items.length > 0 ? this._renderStatusBar() : nothing}
+          ${this._renderStatusBar()}
           ${this._renderErrorBanner()} ${this._renderHistoryErrorBanner()} ${this._renderSearch()}
           ${this.chat.historyLoading
             ? this._renderSkeleton()
@@ -889,6 +1009,7 @@ export class ScChatView extends GatewayAwareLitElement {
                       this._highlightArtifactSource(e.detail.id);
                     }}
                     .artifacts=${Array.from(this.chat.artifacts.values())}
+                    .suggestions=${this._suggestions}
                   ></hu-message-thread>
                 </div>
               `}
@@ -899,19 +1020,25 @@ export class ScChatView extends GatewayAwareLitElement {
             .disabled=${this.connectionStatus === "disconnected"}
             .showSuggestions=${false}
             .streamElapsed=${this.chat.streamElapsed}
+            .model=${this._selectedModel}
+            .models=${this._modelList}
+            .persona=${this._activePersona}
+            .personas=${this._personaList}
             .placeholder=${this.connectionStatus === "disconnected"
               ? "Disconnected \u2014 reconnect to send messages"
-              : "Type a message... (Enter to send, Shift+Enter for newline)"}
+              : "Message h-uman\u2026"}
             @hu-send=${(
               e: CustomEvent<{
                 message: string;
                 files?: Array<{ name: string; size: number; type: string; dataUrl?: string }>;
                 mentionedFiles?: string[];
                 thinkingEnabled?: boolean;
+                researchEnabled?: boolean;
               }>,
             ) =>
               this._handleSend(e.detail.message, e.detail.files, e.detail.mentionedFiles, {
                 thinkingEnabled: e.detail.thinkingEnabled,
+                researchEnabled: e.detail.researchEnabled,
               })}
             @hu-use-suggestion=${(e: CustomEvent<{ text: string }>) =>
               this._handleSend(e.detail.text)}
@@ -921,6 +1048,10 @@ export class ScChatView extends GatewayAwareLitElement {
             @hu-abort=${() => this.handleAbort()}
             @hu-slash-command=${(e: CustomEvent<{ command: string }>) =>
               this._handleSlashCommand(e.detail.command)}
+            @hu-model-change=${(e: CustomEvent<{ model: string }>) => {
+              this._selectedModel = e.detail.model;
+            }}
+            @hu-persona-change=${this._onPersonaChange}
           ></hu-chat-composer>
           ${this._contextMenu.open
             ? html` <hu-context-menu
@@ -961,12 +1092,6 @@ export class ScChatView extends GatewayAwareLitElement {
   }
 
   private _renderStatusBar() {
-    const label =
-      this.connectionStatus === "connected"
-        ? "Connected"
-        : this.connectionStatus === "connecting"
-          ? "Reconnecting\u2026"
-          : "Disconnected";
     return html`
       <div class="status-bar">
         <div class="status-left">
@@ -978,8 +1103,10 @@ export class ScChatView extends GatewayAwareLitElement {
           >
             ${icons["sidebar-toggle"]}
           </button>
-          <hu-status-dot status=${this.connectionStatus}></hu-status-dot>
-          <span>${label}</span>
+          ${this.connectionStatus !== "connected"
+            ? html`<hu-status-dot status=${this.connectionStatus}></hu-status-dot>
+                <span>${this.connectionStatus === "connecting" ? "Reconnecting\u2026" : "Disconnected"}</span>`
+            : nothing}
         </div>
         <span class="status-title"
           >${this.sessionKey === "default" ? "New Chat" : this.sessionKey}</span
@@ -993,7 +1120,6 @@ export class ScChatView extends GatewayAwareLitElement {
           >
             ${icons.export}
           </button>
-          <kbd class="kbd-hint">⌘F</kbd>
         </div>
       </div>
     `;
@@ -1085,7 +1211,7 @@ export class ScChatView extends GatewayAwareLitElement {
     return html`
       <div class="skeleton-wrap">
         <div class="skeleton-toolbar">
-          <hu-skeleton variant="line" width="200px" height="var(--hu-space-md)"></hu-skeleton>
+          <hu-skeleton variant="line" width="12.5rem" height="var(--hu-space-md)"></hu-skeleton>
         </div>
         <div class="skeleton-bubbles">
           <hu-skeleton

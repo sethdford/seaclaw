@@ -110,6 +110,12 @@ size_t hu_imessage_copy_bounded(char *dst, size_t dst_cap, const char *src, size
 size_t hu_imessage_extract_attributed_body(const unsigned char *blob, size_t blob_len, char *out,
                                            size_t out_cap);
 
+/** Compute a human-realistic typing duration for a message of the given length.
+ * Models real mobile typing: ~45ms/char base rate, 400ms read/compose overhead,
+ * seed-driven jitter to prevent statistical detection of linear timing.
+ * Returns milliseconds, clamped to [800, 6000]. */
+unsigned int hu_imessage_typing_duration(size_t msg_len, uint32_t seed);
+
 /** Search Tenor for a GIF matching the query and download to a temp file.
  * Returns the local path to the downloaded GIF (caller owns, free with alloc).
  * Returns NULL on failure (no API key, network error, no results).

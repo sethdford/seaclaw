@@ -21,6 +21,7 @@ type SectionId =
   | "overview"
   | "turing"
   | "hula"
+  | "connectors"
   | "design-system";
 
 type SettingsGroup = "system" | "capabilities" | "observability" | "developer";
@@ -116,6 +117,14 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     load: () => import("./hula-view.js"),
     render: () => html`<hu-hula-view></hu-hula-view>`,
   },
+  {
+    id: "connectors",
+    label: "Connectors",
+    icon: icons.compass,
+    group: "capabilities",
+    load: () => import("./connectors-view.js"),
+    render: () => html`<hu-connectors-view></hu-connectors-view>`,
+  },
   /* OBSERVABILITY */
   {
     id: "overview",
@@ -182,33 +191,41 @@ export class ScSettingsView extends LitElement {
     :host {
       view-transition-name: view-settings;
       display: block;
+      container-type: inline-size;
     }
 
     .header-area {
-      padding: var(--hu-space-lg) var(--hu-space-lg) 0;
+      padding: var(--hu-space-md) var(--hu-space-lg) 0;
       max-width: var(--hu-content-width-wide);
       margin: 0 auto;
     }
 
     .tabs {
       display: flex;
-      gap: var(--hu-space-2xs);
-      flex-wrap: wrap;
+      gap: var(--hu-space-xs);
+      flex-wrap: nowrap;
       align-items: center;
       padding: 0 var(--hu-space-lg);
       max-width: var(--hu-content-width-wide);
-      margin: 0 auto var(--hu-space-md);
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      margin: 0 auto var(--hu-space-lg);
       border-bottom: 1px solid var(--hu-border-subtle);
       padding-bottom: var(--hu-space-sm);
     }
 
+    .tabs::-webkit-scrollbar {
+      display: none;
+    }
+
     .tab-group-label {
-      font-size: var(--hu-text-2xs, 0.625rem);
+      font-size: var(--hu-text-xs);
       font-weight: var(--hu-weight-semibold);
       font-family: var(--hu-font);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-faint);
       text-transform: uppercase;
-      letter-spacing: var(--hu-tracking-xs, 0.05em);
+      letter-spacing: 0.04em;
       padding: var(--hu-space-2xs) var(--hu-space-xs);
       white-space: nowrap;
       user-select: none;
@@ -216,9 +233,10 @@ export class ScSettingsView extends LitElement {
 
     .tab-group-divider {
       width: 1px;
-      height: var(--hu-space-lg);
+      height: 1.25rem;
       background: var(--hu-border-subtle);
-      margin: 0 var(--hu-space-2xs);
+      flex-shrink: 0;
+      margin: 0 var(--hu-space-xs);
     }
 
     /* Mobile accordion */
@@ -254,12 +272,12 @@ export class ScSettingsView extends LitElement {
         padding: var(--hu-space-sm) 0;
         background: transparent;
         border: none;
-        font-size: var(--hu-text-xs);
+        font-size: var(--hu-text-sm);
         font-weight: var(--hu-weight-semibold);
         font-family: var(--hu-font);
-        color: var(--hu-text-muted);
+        color: var(--hu-text-secondary);
         text-transform: uppercase;
-        letter-spacing: var(--hu-tracking-xs, 0.05em);
+        letter-spacing: 0.04em;
         cursor: pointer;
       }
 
@@ -293,14 +311,16 @@ export class ScSettingsView extends LitElement {
     .tab-btn {
       display: flex;
       align-items: center;
-      gap: var(--hu-space-2xs);
-      padding: var(--hu-space-2xs) var(--hu-space-sm);
+      gap: 0.25rem;
+      padding: 0.375rem 0.625rem;
       background: transparent;
+      flex-shrink: 0;
+      white-space: nowrap;
       border: none;
-      border-radius: var(--hu-radius-sm);
-      font-size: var(--hu-text-xs);
+      border-radius: var(--hu-radius);
+      font-size: var(--hu-text-sm);
       font-family: var(--hu-font);
-      color: var(--hu-text-muted);
+      color: var(--hu-text-secondary);
       cursor: pointer;
       white-space: nowrap;
       transition:
@@ -314,18 +334,19 @@ export class ScSettingsView extends LitElement {
     }
 
     .tab-btn:focus-visible {
-      outline: var(--hu-focus-ring-width) solid var(--hu-accent);
-      outline-offset: calc(-1 * var(--hu-focus-ring-width));
+      outline: 2px solid var(--hu-accent);
+      outline-offset: 2px;
     }
 
     .tab-btn[aria-selected="true"] {
       color: var(--hu-accent-text, var(--hu-accent));
-      background: var(--hu-surface-container-high);
+      background: color-mix(in srgb, var(--hu-accent) 8%, transparent);
+      font-weight: var(--hu-weight-medium, 500);
     }
 
     .tab-btn .icon {
-      width: var(--hu-icon-xs);
-      height: var(--hu-icon-xs);
+      width: 0.875rem;
+      height: 0.875rem;
     }
 
     .tab-btn .icon svg {
@@ -335,6 +356,11 @@ export class ScSettingsView extends LitElement {
 
     .content {
       min-height: 20rem;
+      animation: hu-settings-fade var(--hu-duration-fast, 150ms) var(--hu-ease-out) both;
+    }
+    @keyframes hu-settings-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     .loading {
@@ -344,6 +370,12 @@ export class ScSettingsView extends LitElement {
       min-height: 20rem;
       color: var(--hu-text-muted);
       font-size: var(--hu-text-sm);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .content {
+        animation: none;
+      }
     }
   `;
 
@@ -461,9 +493,14 @@ export class ScSettingsView extends LitElement {
     if (!section) return;
     if (!this._loadedSections.has(id)) {
       this._loading = true;
-      await section.load();
-      this._loadedSections.add(id);
-      this._loading = false;
+      try {
+        await section.load();
+        this._loadedSections.add(id);
+      } catch {
+        /* dynamic import failed — section stays unloaded, user can retry */
+      } finally {
+        this._loading = false;
+      }
     }
   }
 

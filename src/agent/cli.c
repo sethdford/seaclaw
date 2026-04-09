@@ -64,6 +64,12 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#if !defined(HU_IS_TEST) && defined(__APPLE__)
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#endif
 
 #if defined(HU_GATEWAY_POSIX) && !defined(HU_IS_TEST)
 #include <poll.h>
@@ -106,6 +112,82 @@ static const char *spinner_frames[] = {
     "\xe2\xa0\xb4", "\xe2\xa0\xa6", "\xe2\xa0\xa7", "\xe2\xa0\x87", "\xe2\xa0\x8f"};
 #define SPINNER_FRAME_COUNT 10
 #endif
+
+/* ── MLX local server auto-start (macOS only) ────────────────────────── */
+#if !defined(HU_IS_TEST) && defined(__APPLE__)
+static bool mlx_port_is_open(uint16_t port) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0)
+        return false;
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    struct timeval tv = {.tv_sec = 1, .tv_usec = 0};
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    bool ok = connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0;
+    close(fd);
+    return ok;
+}
+
+static bool mlx_auto_serve(const char *prov_name) {
+    if (!prov_name)
+        return true;
+    if (strcmp(prov_name, "mlx_local") != 0 && strcmp(prov_name, "mlx-local") != 0)
+        return true;
+    if (mlx_port_is_open(8741))
+        return true;
+
+    hu_log_info("human", NULL, "MLX server not running — auto-starting...");
+    fprintf(stderr, "\033[90mStarting MLX model server (this may take a moment on first run)...\033[0m\n");
+
+    const char *home = getenv("HOME");
+    if (!home)
+        home = "/tmp";
+
+    char candidates[3][HU_CLI_MAX_PATH];
+    size_t ncand = 0;
+    snprintf(candidates[ncand++], HU_CLI_MAX_PATH, "%s/.human/bin/human-serve.sh", home);
+    snprintf(candidates[ncand++], HU_CLI_MAX_PATH, "%s/Documents/h-uman/scripts/human-serve.sh",
+             home);
+    snprintf(candidates[ncand++], HU_CLI_MAX_PATH, "%s/h-uman/scripts/human-serve.sh", home);
+
+    const char *found = NULL;
+    for (size_t i = 0; i < ncand; i++) {
+        if (access(candidates[i], X_OK) == 0) {
+            found = candidates[i];
+            break;
+        }
+    }
+
+    if (!found) {
+        hu_log_error("human", NULL,
+                     "Cannot find human-serve.sh. Start the server manually:\n"
+                     "  scripts/human-serve.sh start");
+        return false;
+    }
+
+    char cmd[HU_CLI_MAX_PATH + 16];
+    snprintf(cmd, sizeof(cmd), "%s ensure", found);
+    int rc = system(cmd);
+
+    if (rc != 0) {
+        hu_log_error("human", NULL,
+                     "MLX server failed to start. Run manually:\n  scripts/human-serve.sh start");
+        return false;
+    }
+
+    /* Verify the port is now open */
+    for (int i = 0; i < 5; i++) {
+        if (mlx_port_is_open(8741))
+            return true;
+        usleep(500000);
+    }
+    hu_log_error("human", NULL, "MLX server started but port 8741 not responding");
+    return false;
+}
+#endif /* !HU_IS_TEST && __APPLE__ */
 
 /* ── Global cancel flag (set by SIGINT handler) ──────────────────────── */
 static volatile sig_atomic_t g_cancel = 0;
@@ -323,6 +405,14 @@ hu_error_t hu_agent_cli_run(hu_allocator_t *alloc, const char *const *argv, size
     }
 
     const char *prov_name = cfg.default_provider ? cfg.default_provider : "openai";
+
+#if !defined(HU_IS_TEST) && defined(__APPLE__)
+    if (!mlx_auto_serve(prov_name)) {
+        hu_config_deinit(&cfg);
+        return HU_ERR_PROVIDER_UNAVAILABLE;
+    }
+#endif
+
     size_t prov_name_len = strlen(prov_name);
     const char *api_key = hu_config_default_provider_key(&cfg);
     size_t api_key_len = api_key ? strlen(api_key) : 0;

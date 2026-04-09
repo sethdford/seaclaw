@@ -417,6 +417,9 @@ typedef struct hu_persona {
     hu_relationship_t relationships[16];
     size_t relationships_count;
 
+    /* Recent activity context (loaded from ~/.human/photos/recent_activity.json) */
+    char *recent_activity;
+
     /* Behavioral calibration data (from behavioral_calibration JSON or hu_behavioral_clone) */
     double avg_message_length; /* 0 = not set */
     double emoji_frequency;    /* 0.0–1.0, fraction of messages with emoji */

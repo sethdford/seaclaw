@@ -19,6 +19,11 @@ export class ScTabs extends LitElement {
       position: relative;
       gap: var(--hu-space-md);
       border-bottom: 1px solid var(--hu-border);
+      overflow-x: auto;
+      scrollbar-width: none;
+      &::-webkit-scrollbar {
+        display: none;
+      }
     }
 
     .tab {
