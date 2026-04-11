@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define DISCORD_API_BASE        "https://discord.com/api/v10/channels"
 #define DISCORD_MAX_CHANNELS    16
@@ -50,6 +51,14 @@ typedef struct hu_discord_ctx {
     struct {
         char session_key[128];
         char content[4096];
+        char chat_id[128];
+        char guid[96];
+        char reply_to_guid[96];
+        bool is_group;
+        bool has_attachment;
+        bool has_video;
+        int64_t message_id;
+        int64_t timestamp_sec;
     } mock_msgs[8];
     size_t mock_count;
 #endif
@@ -287,9 +296,10 @@ static hu_error_t discord_send_event(void *ctx, const char *target, size_t targe
             err = hu_http_patch_json(c->alloc, url_buf, auth_buf, body, body_len, &resp);
             if (body)
                 c->alloc->free(c->alloc->ctx, body, body_len + 1);
+            int patch_status = resp.status_code;
             if (resp.owned && resp.body)
                 hu_http_response_free(c->alloc, &resp);
-            if (err != HU_OK)
+            if (err != HU_OK || patch_status != 200)
                 return HU_ERR_CHANNEL_SEND;
         }
     } else {
@@ -807,6 +817,15 @@ hu_error_t hu_discord_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_
         for (size_t i = 0; i < n; i++) {
             memcpy(msgs[i].session_key, ctx->mock_msgs[i].session_key, 128);
             memcpy(msgs[i].content, ctx->mock_msgs[i].content, 4096);
+            memcpy(msgs[i].chat_id, ctx->mock_msgs[i].chat_id, sizeof(msgs[i].chat_id));
+            memcpy(msgs[i].guid, ctx->mock_msgs[i].guid, sizeof(msgs[i].guid));
+            memcpy(msgs[i].reply_to_guid, ctx->mock_msgs[i].reply_to_guid,
+                   sizeof(msgs[i].reply_to_guid));
+            msgs[i].is_group = ctx->mock_msgs[i].is_group;
+            msgs[i].has_attachment = ctx->mock_msgs[i].has_attachment;
+            msgs[i].has_video = ctx->mock_msgs[i].has_video;
+            msgs[i].message_id = ctx->mock_msgs[i].message_id;
+            msgs[i].timestamp_sec = ctx->mock_msgs[i].timestamp_sec;
         }
         *out_count = n;
         ctx->mock_count = 0;
@@ -946,6 +965,59 @@ hu_error_t hu_discord_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_
             size_t ct_len = content_len < DISCORD_CONTENT_MAX ? content_len : DISCORD_CONTENT_MAX;
             memcpy(msgs[cnt].content, content, ct_len);
             msgs[cnt].content[ct_len] = '\0';
+
+            /* Message ID (Discord snowflake → int64) */
+            if (msg_id)
+                msgs[cnt].message_id = strtoll(msg_id, NULL, 10);
+
+            /* Timestamp from Discord ISO 8601 (extract Unix epoch) */
+            const char *ts = hu_json_get_string(msg, "timestamp");
+            if (ts) {
+                struct tm tm_val;
+                memset(&tm_val, 0, sizeof(tm_val));
+                if (sscanf(ts, "%d-%d-%dT%d:%d:%d", &tm_val.tm_year, &tm_val.tm_mon,
+                           &tm_val.tm_mday, &tm_val.tm_hour, &tm_val.tm_min,
+                           &tm_val.tm_sec) >= 6) {
+                    tm_val.tm_year -= 1900;
+                    tm_val.tm_mon -= 1;
+                    msgs[cnt].timestamp_sec = (int64_t)timegm(&tm_val);
+                }
+            }
+
+            /* Guild channels are always group contexts */
+            msgs[cnt].is_group = true;
+            memcpy(msgs[cnt].chat_id, ch_id, sk_len);
+            msgs[cnt].chat_id[sk_len] = '\0';
+
+            /* Attachments */
+            hu_json_value_t *attachments = hu_json_object_get(msg, "attachments");
+            if (attachments && attachments->type == HU_JSON_ARRAY &&
+                attachments->data.array.len > 0) {
+                msgs[cnt].has_attachment = true;
+                for (size_t ai = 0; ai < attachments->data.array.len; ai++) {
+                    hu_json_value_t *att = attachments->data.array.items[ai];
+                    if (!att || att->type != HU_JSON_OBJECT)
+                        continue;
+                    const char *ct_type = hu_json_get_string(att, "content_type");
+                    if (ct_type && (strstr(ct_type, "video/") == ct_type)) {
+                        msgs[cnt].has_video = true;
+                        break;
+                    }
+                }
+            }
+
+            /* Inline reply context */
+            hu_json_value_t *ref = hu_json_object_get(msg, "message_reference");
+            if (ref && ref->type == HU_JSON_OBJECT) {
+                const char *ref_id = hu_json_get_string(ref, "message_id");
+                if (ref_id) {
+                    size_t rl = strlen(ref_id);
+                    if (rl > 95) rl = 95;
+                    memcpy(msgs[cnt].reply_to_guid, ref_id, rl);
+                    msgs[cnt].reply_to_guid[rl] = '\0';
+                }
+            }
+
             cnt++;
         }
         hu_json_free(alloc, parsed);
@@ -1069,6 +1141,55 @@ const char *hu_discord_test_get_last_message(hu_channel_t *ch, size_t *out_len) 
     if (out_len)
         *out_len = c->last_message_len;
     return c->last_message;
+}
+
+hu_error_t hu_discord_test_inject_mock_full(hu_channel_t *ch, const char *session_key,
+                                             size_t session_key_len, const char *content,
+                                             size_t content_len,
+                                             const hu_discord_test_msg_opts_t *opts) {
+    if (!ch || !ch->ctx || !opts)
+        return HU_ERR_INVALID_ARGUMENT;
+    hu_discord_ctx_t *c = (hu_discord_ctx_t *)ch->ctx;
+    if (c->mock_count >= 8)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t i = c->mock_count++;
+    memset(&c->mock_msgs[i], 0, sizeof(c->mock_msgs[i]));
+
+    size_t sk = session_key_len > 127 ? 127 : session_key_len;
+    if (session_key && sk > 0)
+        memcpy(c->mock_msgs[i].session_key, session_key, sk);
+    c->mock_msgs[i].session_key[sk] = '\0';
+
+    size_t ct = content_len > 4095 ? 4095 : content_len;
+    if (content && ct > 0)
+        memcpy(c->mock_msgs[i].content, content, ct);
+    c->mock_msgs[i].content[ct] = '\0';
+
+    c->mock_msgs[i].is_group = opts->is_group;
+    c->mock_msgs[i].has_attachment = opts->has_attachment;
+    c->mock_msgs[i].has_video = opts->has_video;
+    c->mock_msgs[i].message_id = opts->message_id;
+    c->mock_msgs[i].timestamp_sec = opts->timestamp_sec;
+
+    if (opts->chat_id) {
+        size_t cl = strlen(opts->chat_id);
+        if (cl > 127) cl = 127;
+        memcpy(c->mock_msgs[i].chat_id, opts->chat_id, cl);
+        c->mock_msgs[i].chat_id[cl] = '\0';
+    }
+    if (opts->guid) {
+        size_t gl = strlen(opts->guid);
+        if (gl > 95) gl = 95;
+        memcpy(c->mock_msgs[i].guid, opts->guid, gl);
+        c->mock_msgs[i].guid[gl] = '\0';
+    }
+    if (opts->reply_to_guid) {
+        size_t rl = strlen(opts->reply_to_guid);
+        if (rl > 95) rl = 95;
+        memcpy(c->mock_msgs[i].reply_to_guid, opts->reply_to_guid, rl);
+        c->mock_msgs[i].reply_to_guid[rl] = '\0';
+    }
+    return HU_OK;
 }
 #endif
 
