@@ -5,6 +5,70 @@ Zero dependencies beyond libc (optional SQLite and libcurl).
 
 Read `AGENTS.md` for the full engineering protocol. This file is the quick reference.
 
+## Product Thesis
+
+**The assistant that's actually yours.**
+
+Every other AI assistant in 2026 is someone else's product renting you access. Gemini is Google's agent that happens to know your Gmail. Siri is Apple's voice layer that outsources its brain to Google. Claude Cowork is Anthropic's operator working in your folder. OpenClaw is a framework — powerful, but personality-free.
+
+human is different: **a private, personal AI that runs on your hardware, learns who you are locally, and never sends your identity to a cloud.** The "every device" story is how we get there. The "actually yours" story is why someone chooses us.
+
+### Red-Teamed Reality Check (April 2026)
+
+This thesis was stress-tested. Here's what survived and what didn't.
+
+**The privacy paradox is real but solvable.** 81% of consumers say they care about AI privacy; only 8-12% will configure privacy settings (Pew/Cisco/McKinsey 2025-2026). Stated willingness to pay a privacy premium: 10-30%. Actual behavior lags far behind. **Implication:** privacy-by-architecture (the default is private, no settings needed) beats privacy-as-feature (toggle in settings). Our thesis survives only if privacy is structural, not optional.
+
+**AI app retention is brutal.** AI apps retain 21.1% of annual subscribers vs 30.7% for non-AI apps — 30% faster churn (RevenueCat 2026). Novelty exhaustion is the #1 killer. **But:** companion/personal AI shows 41% DAU/MAU vs 14% for utility AI. Personalization drives retention; task execution doesn't. This supports the persona thesis.
+
+**Gemini already personalizes.** Google launched "Personal Intelligence" — connecting Gmail, Photos, Search, YouTube for personalized responses. They even have an "Import Memory" feature to poach users from other AIs. **Our "knows you" claim must be about WHERE data lives and WHO controls it, not WHETHER personalization exists.**
+
+**OpenClaw already has persona plugins.** Multiple Personas (SOUL.md, PERSONALITY.md, MEMORY.md), personality-dynamics (mode switching, weekly auto-evolution), open-persona (meta-skill for persona packs). 6.2K stars. **Our persona depth is real (27 C modules vs markdown templates), but the moat is narrower than we claimed.**
+
+### What We're Not Competing On (Table Stakes)
+
+- **Task execution.** Commodity. Every framework does this.
+- **Channel count.** 31 channels is breadth, not a moat. OpenClaw has ClawHub.
+- **Chat interfaces.** Google has 2B+ devices. We can't out-distribute.
+- **Benchmark scores.** We call the same frontier models. Can't beat them at their layer.
+- **Binary size / startup time.** Developers appreciate it; users don't feel it.
+- **Dashboard aesthetics.** Hygiene, not differentiation.
+- **"We have persona."** OpenClaw has SOUL.md persona plugins. Existence of persona is no longer unique.
+
+### What Actually Makes Us Better (Honest Moats)
+
+1. **Persona as compiled architecture, not markdown templates.** 27 C modules with runtime integration (circadian timing, somatic markers, emotional cognition, humor bridging) vs OpenClaw's SOUL.md text files. The difference: our persona *changes how the agent behaves at the code level* — timing, tool selection, tone adaptation, proactive messaging. Theirs is a system prompt wrapper.
+2. **Privacy by architecture, not by settings.** Data never leaves the device as a structural property. No "opt-in to privacy" toggle. Gemini's Personal Intelligence processes your data in Google's cloud (their privacy doc confirms this). We can't match their data breadth (Gmail/Photos/YouTube), but we own the trust story.
+3. **On-device personalization pipeline (partial — see honest status below).** MLX LoRA fine-tuning on Apple Silicon is proven at 1B-7B models. Our ML subsystem has the training loop. **Gap:** our LoRA path currently trains a reference GPT, not the frontier model users chat with. Bridging this gap (via ggml/MLX integration) is the real technical challenge.
+4. **HuLa IR.** Typed tool-orchestration with compiler and emergence. Genuinely novel. **Gap:** tightly coupled to internal agent; not yet a platform.
+5. **Runs anywhere, owned by you.** Same binary from $5 board to data center. No subscription lock-in.
+
+### Strategic Missions (Red-Teamed)
+
+Every mission below includes an honest difficulty assessment from code-level red teaming.
+
+| # | Mission | Honest Difficulty | Success Metric |
+|---|---------|------------------|----------------|
+| **M1** | **Persona-First** — Make persona always-on | **Done (Phase 1).** 100+ `#ifdef` guards removed. Persona fields unconditional in `hu_agent_t`. `human init` creates starter persona with channel overlays. 9,063 tests passing. Remaining: onboarding wizard, A/B validation. | Persona context in every agent turn ✅; starter persona on first run ✅ |
+| **M2** | **Personal Model** — Unified model-of-the-person from memory | **Very Hard.** No unified artifact exists. Fact extraction is brittle pattern matching ("i like", "i never"). Many parallel memory mechanisms, no single learned representation. | Measurable adaptation in tone/timing after 50 conversations |
+| **M3** | **Private Learning** — On-device ML personalization | **Hardest. Narrative doesn't match code.** `lora-persona` trains a reference GPT on example banks, not the frontier chat model. `--checkpoint` is accepted but `(void)checkpoint_path`. CPU-only. ggml "planned." | LoRA adapter that measurably improves persona fidelity on inference |
+| **M4** | **Ship to Users** — 100 DAU | **Medium.** First-run drops to defaults with a log line. No onboarding wizard. Persona defaults are NULL. Config assumes cloud provider credentials. | 100 DAU with 30% day-7 retention |
+| **M5** | **HuLa as Platform** — Developer-facing SDK | **Hard.** HuLa is internal C IR coupled to agent/policy/spawn. No semver, no bindings, no hosted docs. | External devs write and run HuLa programs |
+| **M6** | **Channel Focus** — Prioritize 4 Tier-1 (Telegram, Discord, iMessage, Slack) across 31 messaging channels | **Easy (strategy), Medium (execution).** 43 channel `.c` files. This is prioritization, not a code change. | Tier 1 score 8/10+ on naturalness eval |
+
+### Competitive Position (April 2026 — Honest)
+
+| Dimension | human | Gemini Agent | Claude Cowork | OpenClaw |
+|-----------|-------|-------------|---------------|----------|
+| Persona depth | **Deep** (27 compiled modules) | Basic (Personal Intelligence) | None | **Growing** (SOUL.md plugins, personality-dynamics) |
+| Personalization | Memory stack (heuristic) | **Google apps data** (Gmail, Photos, YouTube) | Chat memory | SOUL.md + MEMORY.md |
+| On-device learning | Reference only (CPU, toy GPT) | No | No | No |
+| Privacy architecture | **Structural** (local-first) | Cloud (Google infra) | Cloud (Anthropic) | Self-hosted (Node.js) |
+| Tool orchestration | **HuLa IR** (compiled) | Prompt-chained | Prompt-chained | Prompt-chained |
+| Distribution | **None** (0 users) | **2B+ devices** | **Desktop + API** | **100K+ GitHub stars** |
+| Ecosystem | Small | **Google apps** | **Mac + tools** | **ClawHub** |
+| Runtime footprint | **~1750 KB / 6 MB** | Cloud | Cloud | ~180 MB / 120 MB |
+
 ## Build & Test
 
 ```bash

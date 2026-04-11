@@ -12,12 +12,13 @@ Canonical terms used across the human project (code, docs, UI, CLI). Single sour
 
 ## Brand Identity
 
-| Element       | Canonical Form                     | Usage                                                                                       |
-| ------------- | ---------------------------------- | ------------------------------------------------------------------------------------------- |
-| Product name  | human                              | Lowercase in running text. Title case ("Human") only at sentence start or in `<title>` tags |
-| Stylized name | h-uman                             | Domain, logos, hero branding, social cards, footer lockups                                  |
-| Tagline       | not quite human.                   | Always lowercase, always ends with a period. Used in subtitles, meta descriptions, footers  |
-| Mission       | Bring AI to every device on Earth. | Hero headlines, OG titles, README header                                                    |
+| Element       | Canonical Form                                        | Usage                                                                                       |
+| ------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Product name  | human                                                 | Lowercase in running text. Title case ("Human") only at sentence start or in `<title>` tags |
+| Stylized name | h-uman                                                | Domain, logos, hero branding, social cards, footer lockups                                  |
+| Tagline       | not quite human.                                      | Always lowercase, always ends with a period. Used in subtitles, meta descriptions, footers  |
+| Thesis        | The assistant that's actually yours.                   | Strategic docs, CLAUDE.md, internal planning. The *why* behind the product.                 |
+| Mission       | Bring AI to every device on Earth.                     | Hero headlines, OG titles, README header. The *how* we deliver the thesis.                  |
 
 ### Tagline Usage Rules
 
