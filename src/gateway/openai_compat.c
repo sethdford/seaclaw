@@ -3,6 +3,7 @@
 #include "../agent/agent_internal.h"
 #include "human/agent.h"
 #include "human/config.h"
+#include "human/context/conversation.h"
 #include "human/core/error.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
@@ -613,6 +614,13 @@ void hu_openai_compat_handle_chat_completions(const char *body, size_t body_len,
             size_t response_len = 0;
             hu_error_t agent_err = hu_agent_turn(app_ctx->agent, last_user_msg, last_user_msg_len,
                                                  &response, &response_len);
+
+            /* Strip model artifacts before further processing */
+            if (agent_err == HU_OK && response && response_len > 0) {
+                response_len = hu_conversation_strip_channel_tags(response, response_len);
+                response_len = hu_conversation_strip_ai_phrases(response, response_len);
+                response_len = hu_conversation_strip_formal_structure(response, response_len);
+            }
 
             /* AI-tell filter: retry once if known robotic phrases detected */
             if (agent_err == HU_OK && response && response_len > 0) {

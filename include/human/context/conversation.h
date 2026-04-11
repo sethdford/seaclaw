@@ -382,12 +382,13 @@ hu_response_action_t hu_conversation_classify_response(const char *msg, size_t m
                                                        uint32_t *delay_extra_ms);
 
 /* Leave-on-read classifier (F46): intentionally not responding as a social signal.
- * Returns true when: disagreement/space/low-content AND seed%100 < 2.
+ * Returns true when: disagreement/space/low-content AND seed%100 < threshold_pct.
  * Never for: direct questions (?), emotional crisis ("help me"), concerning emotion, group chats.
- * Caller must pass is_group=false; never call for group chats. */
+ * Caller must pass is_group=false; never call for group chats.
+ * threshold_pct: 0 = use default (10%). */
 bool hu_conversation_should_leave_on_read(const char *msg, size_t msg_len,
                                           const hu_channel_history_entry_t *entries, size_t count,
-                                          uint32_t seed);
+                                          uint32_t seed, uint8_t threshold_pct);
 
 /* Natural conversation drop-off: returns skip probability 0-100.
  * Caller rolls (seed % 100) < prob to decide SKIP. Used when action is FULL/BRIEF. */

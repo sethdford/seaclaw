@@ -38,11 +38,27 @@ MLX_URL = "http://127.0.0.1:8741/v1/chat/completions"
 
 _adc_token_cache: dict = {"token": None, "expires": 0}
 
+SYSTEM_PROMPT_BASE = (
+    "You are Seth Ford, 45, texting on iMessage. Chief Architect at Vanguard. "
+    "Live alone with your cat in King of Prussia, PA. From Afton, Wyoming. "
+    "Three kids (Annette, Emerson, Edison) who don't live with you. "
+    "Speak Japanese, lived in Japan (lost home in 2011 tsunami). "
+    "23 years at Fidelity before this. Build AI runtimes as side projects.\n\n"
+    "Style: casual, warm, direct. Short messages. Lowercase. "
+    "Abbreviate (gonna, tbh, idk, hru). Emoji rare. Strong opinions. Dry humor. "
+    "Match their energy. When they hurt, be real and brief."
+)
+
 CONTACT_SCENARIOS = {
     "mom": {
         "name": "Mom (Kathy)",
         "relationship": "mother",
         "expected_traits": "warm, respectful, patient, reassuring, not too much slang",
+        "contact_context": (
+            "You are texting Mom (Kathy) (mother). "
+            "Dynamic: Warm, respectful, patient. She worries about you living alone. "
+            "You grew up in Afton, Wyoming together. She lives in Utah."
+        ),
         "probes": [
             "How's work going sweetheart",
             "Are you eating enough?",
@@ -56,6 +72,12 @@ CONTACT_SCENARIOS = {
         "name": "Annie (sister)",
         "relationship": "sister",
         "expected_traits": "casual sibling banter, inside jokes, protective, honest",
+        "contact_context": (
+            "You are texting Annie (sister). "
+            "Dynamic: Casual sibling banter, inside jokes, honest. "
+            "She lives in Seattle. You grew up together in Afton, Wyoming. "
+            "You go fishing, share family memories, and support each other."
+        ),
         "probes": [
             "Hey bro you up?",
             "Mom is being crazy again",
@@ -69,6 +91,12 @@ CONTACT_SCENARIOS = {
         "name": "Dermot (friend)",
         "relationship": "close friend, tech collaborator",
         "expected_traits": "casual, technical, enthusiastic about projects, British slang awareness",
+        "contact_context": (
+            "You are texting Dermot (close friend, tech collaborator). "
+            "He is British. Dynamic: Casual, technical, enthusiastic about projects. "
+            "He knows about your AI runtime project (human). "
+            "You discuss architecture, vtables, binary size. You've planned road trips together."
+        ),
         "probes": [
             "How's the AI project going mate",
             "I'm thinking about building something similar",
@@ -82,6 +110,12 @@ CONTACT_SCENARIOS = {
         "name": "Someone Seth is dating",
         "relationship": "romantic interest",
         "expected_traits": "flirty but not cringe, warm, vulnerable, playful, genuine",
+        "contact_context": (
+            "You are texting someone you're dating (romantic interest). "
+            "Dynamic: Flirty but genuine, warm, vulnerable, playful. "
+            "She is younger, a teacher. You like her a lot. "
+            "You suggest Longwood Gardens, dinner, hanging out on weekends."
+        ),
         "probes": [
             "Good morning!! What are you up to today",
             "I had the worst day at school",
@@ -95,6 +129,11 @@ CONTACT_SCENARIOS = {
         "name": "Random person",
         "relationship": "stranger/acquaintance",
         "expected_traits": "friendly but guarded, less personal, still casual, no deep vulnerability",
+        "contact_context": (
+            "You are texting someone you just met (stranger/acquaintance). "
+            "Dynamic: Friendly but guarded. Keep it casual, don't overshare. "
+            "Still be yourself but hold back on deep personal stuff."
+        ),
         "probes": [
             "What do you do for work?",
             "Where are you from originally?",
@@ -187,11 +226,20 @@ def call_judge(prompt: str) -> dict:
     return json.loads(raw)
 
 
-def get_model_response(probe: str, model_url: str) -> str:
+def build_system_prompt(contact_context: str = "") -> str:
+    if contact_context:
+        return SYSTEM_PROMPT_BASE + "\n\n" + contact_context
+    return SYSTEM_PROMPT_BASE
+
+
+def get_model_response(probe: str, model_url: str, system_prompt: str = "") -> str:
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": probe})
     payload = json.dumps({
-        "model": "default",
-        "messages": [{"role": "user", "content": probe}],
-        "max_tokens": 256,
+        "messages": messages,
+        "max_tokens": 200,
         "temperature": 0.7,
     }).encode()
     try:
@@ -199,7 +247,7 @@ def get_model_response(probe: str, model_url: str) -> str:
             model_url, data=payload,
             headers={"Content-Type": "application/json"},
         )
-        resp = urllib.request.urlopen(req, timeout=30)
+        resp = urllib.request.urlopen(req, timeout=120)
         data = json.loads(resp.read())
         return data["choices"][0]["message"]["content"].strip()
     except Exception as e:
@@ -238,9 +286,10 @@ def main():
         print(f"  Testing: {scenario['name']} ({scenario['relationship']})")
         print(f"{'─'*70}")
 
+        sys_prompt = build_system_prompt(scenario.get("contact_context", ""))
         contact_scores = []
         for probe in scenario["probes"]:
-            response = get_model_response(probe, args.model_url)
+            response = get_model_response(probe, args.model_url, sys_prompt)
             if response.startswith("(error"):
                 print(f"  SKIP: {probe[:30]}... -> {response}")
                 continue

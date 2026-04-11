@@ -1028,6 +1028,7 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
             if (sched_len > 0) {
                 sched_len = hu_conversation_strip_channel_tags(sched_msg, sched_len);
                 sched_len = hu_conversation_strip_ai_phrases(sched_msg, sched_len);
+                sched_len = hu_conversation_strip_formal_structure(sched_msg, sched_len);
                 sched_len =
                     hu_conversation_vary_complexity(sched_msg, sched_len, (uint32_t)time(NULL));
                 if (sched_len > 1 && sched_msg[0] >= 'A' && sched_msg[0] <= 'Z' &&
@@ -1660,6 +1661,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                             hu_conversation_strip_channel_tags(response, response_len);
                         response_len = hu_conversation_strip_ai_phrases(response, response_len);
                         response_len =
+                            hu_conversation_strip_formal_structure(response, response_len);
+                        response_len =
                             hu_conversation_vary_complexity(response, response_len, (uint32_t)now);
                         if (response_len > 1 && response[0] >= 'A' && response[0] <= 'Z' &&
                             response[1] >= 'a' && response[1] <= 'z' && response[0] != 'I') {
@@ -1982,6 +1985,13 @@ static void daemon_stream_event_cb(const hu_agent_stream_event_t *event, void *c
             return;
         ev.type = HU_BUS_MESSAGE_CHUNK;
         daemon_bus_set_message(&ev, event->data, event->data_len);
+        {
+            size_t slen = strnlen(ev.message, HU_BUS_MSG_LEN);
+            slen = hu_conversation_strip_channel_tags(ev.message, slen);
+            ev.message[slen] = '\0';
+            if (slen == 0)
+                return;
+        }
         break;
     case HU_AGENT_STREAM_THINKING:
         if (!event->data || event->data_len == 0)
@@ -3769,9 +3779,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     if (!leave_on_read_skip && action != HU_RESPONSE_SKIP && !tapback_skip) {
                         uint32_t lor_seed =
                             (uint32_t)now_ts * 1103515245u + 12345u + (uint32_t)(uintptr_t)combined;
+                        uint8_t lor_pct = 0;
+                        if (agent->persona && agent->active_channel) {
+                            const hu_persona_overlay_t *lor_ov = hu_persona_find_overlay(
+                                agent->persona, agent->active_channel, agent->active_channel_len);
+                            if (lor_ov)
+                                lor_pct = lor_ov->leave_on_read_pct;
+                        }
                         if (hu_conversation_should_leave_on_read(combined, combined_len,
                                                                  early_history, early_history_count,
-                                                                 lor_seed)) {
+                                                                 lor_seed, lor_pct)) {
                             leave_on_read_skip = true;
                             /* Store leave_on_read_until: now + random 2–24 hours */
                             uint32_t hrs = 7200u + ((lor_seed >> 16u) % (86400u - 7200u + 1u));
@@ -8529,6 +8546,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         burst_msgs[bi], bm_len);
                                     bm_len =
                                         hu_conversation_strip_ai_phrases(burst_msgs[bi], bm_len);
+                                    bm_len = hu_conversation_strip_formal_structure(
+                                        burst_msgs[bi], bm_len);
                                     bm_len = hu_conversation_vary_complexity(
                                         burst_msgs[bi], bm_len, burst_seed + (uint32_t)bi);
                                     if (bm_len > 1 && burst_msgs[bi][0] >= 'A' &&
@@ -10842,6 +10861,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         hu_conversation_strip_channel_tags(dt_resp, dt_resp_len);
                                     dt_resp_len =
                                         hu_conversation_strip_ai_phrases(dt_resp, dt_resp_len);
+                                    dt_resp_len =
+                                        hu_conversation_strip_formal_structure(dt_resp, dt_resp_len);
                                     dt_resp_len = hu_conversation_vary_complexity(
                                         dt_resp, dt_resp_len, dt_seed);
                                     if (dt_resp_len > 1 && dt_resp[0] >= 'A' && dt_resp[0] <= 'Z' &&

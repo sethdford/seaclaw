@@ -885,9 +885,18 @@ typedef struct svc_gw_thread_ctx {
 
 static void *svc_gateway_thread(void *arg) {
     svc_gw_thread_ctx_t *ctx = (svc_gw_thread_ctx_t *)arg;
-    hu_error_t err = hu_gateway_run(ctx->alloc, ctx->host, ctx->port, &ctx->config);
-    if (err != HU_OK)
-        hu_log_error("gateway", NULL, "gateway thread error: %s", hu_error_string(err));
+    for (int attempt = 0; attempt < 5; attempt++) {
+        hu_error_t err = hu_gateway_run(ctx->alloc, ctx->host, ctx->port, &ctx->config);
+        if (err == HU_OK)
+            break;
+        hu_log_error("gateway", NULL, "gateway thread error: %s (attempt %d/5)",
+                     hu_error_string(err), attempt + 1);
+        if (attempt < 4) {
+            unsigned int backoff = (unsigned int)(2u << (unsigned)attempt);
+            hu_log_info("gateway", NULL, "retrying in %us...", backoff);
+            sleep(backoff);
+        }
+    }
     return NULL;
 }
 

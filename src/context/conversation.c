@@ -4681,7 +4681,7 @@ int hu_conversation_classify_dropoff(const char *message, size_t message_len,
 
 bool hu_conversation_should_leave_on_read(const char *msg, size_t msg_len,
                                           const hu_channel_history_entry_t *entries, size_t count,
-                                          uint32_t seed) {
+                                          uint32_t seed, uint8_t threshold_pct) {
     if (!msg || msg_len == 0)
         return false;
 
@@ -4735,8 +4735,8 @@ bool hu_conversation_should_leave_on_read(const char *msg, size_t msg_len,
     if (!trigger)
         return false;
 
-    /* 10% probability for low-signal messages (real humans ~15-20%) */
-    return (seed % 100u) < 10u;
+    uint8_t pct = threshold_pct > 0 ? threshold_pct : 10;
+    return (seed % 100u) < pct;
 }
 
 /* ── URL extraction ──────────────────────────────────────────────────── */
@@ -6542,12 +6542,35 @@ size_t hu_conversation_strip_formal_structure(char *buf, size_t len) {
     size_t w = 0;
     size_t i = 0;
     while (i < len) {
+        bool at_line_start = (w == 0 || buf[w - 1] == '\n');
+
         /* Strip numbered list markers at line start: "1. ", "2) ", etc. */
-        if ((i == 0 || buf[i - 1] == '\n') && i + 2 < len && buf[i] >= '1' && buf[i] <= '9') {
+        if (at_line_start && i + 2 < len && buf[i] >= '1' && buf[i] <= '9') {
             size_t j = i + 1;
             while (j < len && buf[j] >= '0' && buf[j] <= '9')
                 j++;
             if (j < len && (buf[j] == '.' || buf[j] == ')') && j + 1 < len && buf[j + 1] == ' ') {
+                i = j + 2;
+                continue;
+            }
+        }
+
+        /* Strip bullet markers at line start: "- ", "* " */
+        if (at_line_start && i + 1 < len && (buf[i] == '-' || buf[i] == '*') &&
+            buf[i + 1] == ' ') {
+            i += 2;
+            continue;
+        }
+
+        /* Strip "Topic: " colon-phrase at line start (capitalized word followed by colon+space).
+         * Keeps the text after the colon. */
+        if (at_line_start && buf[i] >= 'A' && buf[i] <= 'Z') {
+            size_t j = i + 1;
+            while (j < len && ((buf[j] >= 'a' && buf[j] <= 'z') ||
+                               (buf[j] >= 'A' && buf[j] <= 'Z')))
+                j++;
+            if (j < len && buf[j] == ':' && j + 1 < len && buf[j + 1] == ' ' && j - i >= 2 &&
+                j - i <= 20) {
                 i = j + 2;
                 continue;
             }

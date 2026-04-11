@@ -921,6 +921,18 @@ static hu_error_t parse_overlay(hu_allocator_t *a, const char *channel_name,
         if (!ov->vulnerability_tier)
             goto ov_oom;
     }
+    {
+        hu_json_value_t *amc = hu_json_object_get(obj, "affect_mirror_ceiling");
+        if (amc && amc->type == HU_JSON_NUMBER)
+            ov->affect_mirror_ceiling = (float)amc->data.number;
+    }
+    {
+        hu_json_value_t *lor = hu_json_object_get(obj, "leave_on_read_pct");
+        if (lor && lor->type == HU_JSON_NUMBER) {
+            int v = (int)lor->data.number;
+            ov->leave_on_read_pct = (uint8_t)(v > 100 ? 100 : (v < 0 ? 0 : v));
+        }
+    }
     return HU_OK;
 
 ov_oom:
@@ -4541,6 +4553,32 @@ hu_error_t hu_persona_build_prompt(hu_allocator_t *alloc, const hu_persona_t *pe
         err = append_prompt(alloc, &buf, &len, &cap, "\n", 1);
         if (err != HU_OK)
             goto fail;
+    }
+
+    /* Anti-structure directives for casual messaging channels.
+     * Skip for email/web where formal structure is appropriate. */
+    {
+        bool formal_channel = false;
+        if (channel && channel_len > 0) {
+            if ((channel_len == 5 && memcmp(channel, "email", 5) == 0) ||
+                (channel_len == 3 && memcmp(channel, "web", 3) == 0))
+                formal_channel = true;
+        }
+        if (!formal_channel) {
+            static const char anti_struct[] =
+                "\n=== Output Format Rules (CRITICAL) ===\n"
+                "NEVER use numbered or bulleted lists.\n"
+                "NEVER use Topic: value patterns.\n"
+                "NEVER use First/Second/Third enumeration.\n"
+                "No concluding summaries or offers of further help.\n"
+                "No em-dashes. Use commas, periods, or ... instead.\n"
+                "No markdown formatting: no bold, italic, code, or headers.\n"
+                "All lowercase unless SHOUTING for emphasis.\n"
+                "Text like you're on your phone.\n";
+            err = append_prompt(alloc, &buf, &len, &cap, anti_struct, sizeof(anti_struct) - 1);
+            if (err != HU_OK)
+                goto fail;
+        }
     }
 
     if (len > HU_PERSONA_PROMPT_MAX_BYTES) {

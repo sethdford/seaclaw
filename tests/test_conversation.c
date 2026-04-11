@@ -2941,6 +2941,170 @@ static void strip_channel_tag_empty_input(void) {
     HU_ASSERT_EQ(buf[0], 'a');
 }
 
+static void strip_channel_tag_eos_token(void) {
+    char buf[64];
+    strcpy(buf, "hello there</s>");
+    size_t len = hu_conversation_strip_channel_tags(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "hello there");
+    (void)len;
+}
+
+static void strip_channel_tag_inst_markers(void) {
+    char buf[64];
+    strcpy(buf, "[INST]say hi[/INST]hello!");
+    size_t len = hu_conversation_strip_channel_tags(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "say hihello!");
+    (void)len;
+}
+
+static void strip_channel_tag_thinking_block(void) {
+    char buf[128];
+    strcpy(buf, "<thinking>let me reason about this</thinking>the answer is 42");
+    size_t len = hu_conversation_strip_channel_tags(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "the answer is 42");
+    (void)len;
+}
+
+static void strip_channel_tag_analysis_block(void) {
+    char buf[128];
+    strcpy(buf, "here is <analysis>deep stuff</analysis>the point");
+    size_t len = hu_conversation_strip_channel_tags(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "here is the point");
+    (void)len;
+}
+
+static void strip_channel_tag_bos_token(void) {
+    char buf[64];
+    strcpy(buf, "<s>hello world");
+    size_t len = hu_conversation_strip_channel_tags(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "hello world");
+    (void)len;
+}
+
+static void strip_channel_tag_sys_markers(void) {
+    char buf[64];
+    strcpy(buf, "<<SYS>>system msg<</SYS>>hi");
+    size_t len = hu_conversation_strip_channel_tags(buf, strlen(buf));
+    HU_ASSERT_STR_EQ(buf, "system msghi");
+    (void)len;
+}
+
+/* ── Formal structure stripping tests ─────────────────────────────── */
+
+static void strip_formal_numbered_list(void) {
+    char buf[128];
+    strcpy(buf, "1. First thing\n2. Second thing\n3. Third thing");
+    size_t len = hu_conversation_strip_formal_structure(buf, strlen(buf));
+    HU_ASSERT(strstr(buf, "1.") == NULL);
+    HU_ASSERT(strstr(buf, "2.") == NULL);
+    HU_ASSERT(strstr(buf, "First thing") != NULL);
+    (void)len;
+}
+
+static void strip_formal_em_dash(void) {
+    char buf[128];
+    /* em-dash is UTF-8 E2 80 94 */
+    const char *input = "hello \xe2\x80\x94 world";
+    strcpy(buf, input);
+    size_t len = hu_conversation_strip_formal_structure(buf, strlen(buf));
+    HU_ASSERT(strstr(buf, ",") != NULL);
+    HU_ASSERT(len < strlen(input));
+    (void)len;
+}
+
+static void strip_formal_no_change(void) {
+    char buf[64];
+    strcpy(buf, "just a normal text message haha");
+    size_t orig = strlen(buf);
+    size_t len = hu_conversation_strip_formal_structure(buf, orig);
+    HU_ASSERT_EQ(len, orig);
+    HU_ASSERT_STR_EQ(buf, "just a normal text message haha");
+}
+
+static void strip_formal_en_dash(void) {
+    char buf[128];
+    /* en-dash is UTF-8 E2 80 93 */
+    strcpy(buf, "pages 1\xe2\x80\x93" "10");
+    size_t len = hu_conversation_strip_formal_structure(buf, strlen(buf));
+    HU_ASSERT(strstr(buf, "-") != NULL);
+    (void)len;
+}
+
+static void strip_formal_empty_safe(void) {
+    char buf[4] = "hi";
+    size_t len = hu_conversation_strip_formal_structure(buf, 2);
+    HU_ASSERT_EQ(len, (size_t)2);
+}
+
+static void strip_formal_colon_phrase(void) {
+    char buf[128];
+    strcpy(buf, "Weather: it's nice outside\nFood: pizza sounds good");
+    size_t len = hu_conversation_strip_formal_structure(buf, strlen(buf));
+    HU_ASSERT(strstr(buf, "Weather:") == NULL);
+    HU_ASSERT(strstr(buf, "Food:") == NULL);
+    HU_ASSERT(strstr(buf, "it's nice outside") != NULL);
+    HU_ASSERT(strstr(buf, "pizza sounds good") != NULL);
+    (void)len;
+}
+
+static void strip_formal_bullet_list(void) {
+    char buf[128];
+    strcpy(buf, "- first item\n- second item\n* third item");
+    size_t len = hu_conversation_strip_formal_structure(buf, strlen(buf));
+    HU_ASSERT(strstr(buf, "- ") == NULL);
+    HU_ASSERT(strstr(buf, "* ") == NULL);
+    HU_ASSERT(strstr(buf, "first item") != NULL);
+    (void)len;
+}
+
+static void strip_formal_colon_preserves_inline(void) {
+    char buf[64];
+    strcpy(buf, "meeting at 3:00 pm");
+    size_t orig = strlen(buf);
+    size_t len = hu_conversation_strip_formal_structure(buf, orig);
+    HU_ASSERT_EQ(len, orig);
+    HU_ASSERT_STR_EQ(buf, "meeting at 3:00 pm");
+}
+
+/* ── Full outbound strip pipeline integration test ──────────────────── */
+
+static void strip_pipeline_full_integration(void) {
+    char buf[512];
+    const char *dirty =
+        "<thinking>internal reasoning</thinking>"
+        "1. Weather: It's pretty nice\n"
+        "2. Food \xe2\x80\x94 pizza sounds good\n"
+        "- Also check out **bold text**\n"
+        "<|endoftext|>"
+        "As an AI, I hope this helps!";
+    size_t len = strlen(dirty);
+    HU_ASSERT(len < sizeof(buf));
+    memcpy(buf, dirty, len + 1);
+
+    /* Stage 1: strip channel/model tags */
+    len = hu_conversation_strip_channel_tags(buf, len);
+    HU_ASSERT(strstr(buf, "<thinking>") == NULL);
+    HU_ASSERT(strstr(buf, "<|endoftext|>") == NULL);
+
+    /* Stage 2: strip AI phrases */
+    len = hu_conversation_strip_ai_phrases(buf, len);
+    HU_ASSERT(strstr(buf, "As an AI") == NULL);
+
+    /* Stage 3: strip formal structure */
+    len = hu_conversation_strip_formal_structure(buf, len);
+    HU_ASSERT(strstr(buf, "1.") == NULL);
+    HU_ASSERT(strstr(buf, "2.") == NULL);
+    HU_ASSERT(strstr(buf, "- Also") == NULL);
+    HU_ASSERT(strstr(buf, "Weather:") == NULL);
+    HU_ASSERT(strstr(buf, "\xe2\x80\x94") == NULL);
+
+    /* Content survives */
+    HU_ASSERT(strstr(buf, "nice") != NULL);
+    HU_ASSERT(strstr(buf, "pizza") != NULL);
+    HU_ASSERT(len > 10);
+    HU_ASSERT(len < 300);
+}
+
 /* ── Example bank format compatibility test ─────────────────────────── */
 
 static void examples_load_input_output_format(void) {
@@ -3152,7 +3316,7 @@ static void leave_on_read_agree_to_disagree_seed_under_2_returns_true(void) {
     hu_channel_history_entry_t entries[1] = {
         make_entry(false, "agree to disagree", "12:00"),
     };
-    bool r = hu_conversation_should_leave_on_read("agree to disagree", 17, entries, 1, 0u);
+    bool r = hu_conversation_should_leave_on_read("agree to disagree", 17, entries, 1, 0u, 0);
     HU_ASSERT_TRUE(r);
 }
 
@@ -3160,7 +3324,7 @@ static void leave_on_read_question_never_true(void) {
     hu_channel_history_entry_t entries[1] = {
         make_entry(false, "what do you think?", "12:00"),
     };
-    bool r = hu_conversation_should_leave_on_read("what do you think?", 18, entries, 1, 0u);
+    bool r = hu_conversation_should_leave_on_read("what do you think?", 18, entries, 1, 0u, 0);
     HU_ASSERT_FALSE(r);
 }
 
@@ -3168,7 +3332,7 @@ static void leave_on_read_help_me_never_true(void) {
     hu_channel_history_entry_t entries[1] = {
         make_entry(false, "help me", "12:00"),
     };
-    bool r = hu_conversation_should_leave_on_read("help me", 7, entries, 1, 0u);
+    bool r = hu_conversation_should_leave_on_read("help me", 7, entries, 1, 0u, 0);
     HU_ASSERT_FALSE(r);
 }
 
@@ -3177,8 +3341,8 @@ static void leave_on_read_normal_message_seed_over_2_returns_false(void) {
     hu_channel_history_entry_t entries[1] = {
         make_entry(false, msg, "12:00"),
     };
-    /* seed 50: 50 % 100 = 50 >= 2; normal message has no trigger; so false */
-    bool r = hu_conversation_should_leave_on_read(msg, strlen(msg), entries, 1, 50u);
+    /* seed 50: 50 % 100 = 50 >= 10; normal message has no trigger; so false */
+    bool r = hu_conversation_should_leave_on_read(msg, strlen(msg), entries, 1, 50u, 0);
     HU_ASSERT_FALSE(r);
 }
 
@@ -3186,7 +3350,7 @@ static void leave_on_read_short_ok_seed_under_2_returns_true(void) {
     hu_channel_history_entry_t entries[1] = {
         make_entry(false, "ok", "12:00"),
     };
-    bool r = hu_conversation_should_leave_on_read("ok", 2, entries, 1, 1u);
+    bool r = hu_conversation_should_leave_on_read("ok", 2, entries, 1, 1u, 0);
     HU_ASSERT_TRUE(r);
 }
 
@@ -3194,7 +3358,7 @@ static void leave_on_read_whatever_seed_under_2_returns_true(void) {
     hu_channel_history_entry_t entries[1] = {
         make_entry(false, "whatever", "12:00"),
     };
-    bool r = hu_conversation_should_leave_on_read("whatever", 8, entries, 1, 0u);
+    bool r = hu_conversation_should_leave_on_read("whatever", 8, entries, 1, 0u, 0);
     HU_ASSERT_TRUE(r);
 }
 
@@ -3202,8 +3366,20 @@ static void leave_on_read_ok_seed_over_2_returns_false(void) {
     hu_channel_history_entry_t entries[1] = {
         make_entry(false, "ok", "12:00"),
     };
-    bool r = hu_conversation_should_leave_on_read("ok", 2, entries, 1, 42u);
+    bool r = hu_conversation_should_leave_on_read("ok", 2, entries, 1, 42u, 0);
     HU_ASSERT_FALSE(r);
+}
+
+static void leave_on_read_custom_threshold(void) {
+    hu_channel_history_entry_t entries[1] = {
+        make_entry(false, "ok", "12:00"),
+    };
+    /* seed 42: 42 % 100 = 42; with threshold 50%, should trigger */
+    bool r = hu_conversation_should_leave_on_read("ok", 2, entries, 1, 42u, 50);
+    HU_ASSERT_TRUE(r);
+    /* with threshold 30%, should not trigger (42 >= 30) */
+    bool r2 = hu_conversation_should_leave_on_read("ok", 2, entries, 1, 42u, 30);
+    HU_ASSERT_FALSE(r2);
 }
 
 /* ── Call escalation (F49) ────────────────────────────────────────────────── */
@@ -3935,6 +4111,25 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(strip_channel_tag_no_tags);
     HU_RUN_TEST(strip_channel_tag_multiple);
     HU_RUN_TEST(strip_channel_tag_empty_input);
+    HU_RUN_TEST(strip_channel_tag_eos_token);
+    HU_RUN_TEST(strip_channel_tag_inst_markers);
+    HU_RUN_TEST(strip_channel_tag_thinking_block);
+    HU_RUN_TEST(strip_channel_tag_analysis_block);
+    HU_RUN_TEST(strip_channel_tag_bos_token);
+    HU_RUN_TEST(strip_channel_tag_sys_markers);
+
+    /* Formal structure stripping */
+    HU_RUN_TEST(strip_formal_numbered_list);
+    HU_RUN_TEST(strip_formal_em_dash);
+    HU_RUN_TEST(strip_formal_no_change);
+    HU_RUN_TEST(strip_formal_en_dash);
+    HU_RUN_TEST(strip_formal_empty_safe);
+    HU_RUN_TEST(strip_formal_colon_phrase);
+    HU_RUN_TEST(strip_formal_bullet_list);
+    HU_RUN_TEST(strip_formal_colon_preserves_inline);
+
+    /* Full outbound strip pipeline integration */
+    HU_RUN_TEST(strip_pipeline_full_integration);
 
     /* Example bank format compatibility */
     HU_RUN_TEST(examples_load_input_output_format);
@@ -3973,6 +4168,7 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(leave_on_read_short_ok_seed_under_2_returns_true);
     HU_RUN_TEST(leave_on_read_whatever_seed_under_2_returns_true);
     HU_RUN_TEST(leave_on_read_ok_seed_over_2_returns_false);
+    HU_RUN_TEST(leave_on_read_custom_threshold);
 
     /* Call escalation (F49) */
     HU_RUN_TEST(call_escalation_crisis_keywords_returns_true);

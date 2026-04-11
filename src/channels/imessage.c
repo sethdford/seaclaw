@@ -127,6 +127,7 @@ typedef struct hu_imessage_ctx {
     bool imsg_cli_checked;
     bool has_imsg_cli;
     const char *loopback_handle;
+    int64_t last_ai_send_epoch;
 #if !HU_IS_TEST && defined(__APPLE__) && defined(__MACH__)
     pid_t imsg_watch_pid;
     int imsg_watch_fd;
@@ -186,6 +187,7 @@ static uint32_t imessage_hash(const char *s, size_t len) {
 }
 
 static void imessage_record_sent(hu_imessage_ctx_t *c, const char *msg, size_t msg_len) {
+    c->last_ai_send_epoch = (int64_t)time(NULL);
     size_t slot = c->sent_ring_idx % HU_IMESSAGE_SENT_RING_SIZE;
     size_t copy_len =
         msg_len < HU_IMESSAGE_SENT_PREFIX_LEN - 1 ? msg_len : HU_IMESSAGE_SENT_PREFIX_LEN - 1;
@@ -267,10 +269,18 @@ bool hu_imessage_user_responded_recently(void *channel_ctx, const char *handle, 
         memcmp(c->loopback_handle, handle, handle_len) == 0)
         return false;
 
+    /* Exclude messages sent by the AI: only count is_from_me=1 rows whose
+     * timestamp is after the last known AI send (+3s grace for clock skew).
+     * If the AI never sent, last_ai_send_epoch is 0 and the filter is a no-op. */
+    int64_t ai_cutoff = 0;
+    if (c && c->last_ai_send_epoch > 0)
+        ai_cutoff = c->last_ai_send_epoch + 3;
+
     const char *sql = "SELECT COUNT(*) FROM message m "
                       "JOIN handle h ON m.handle_id = h.ROWID "
                       "WHERE h.id = ?1 AND m.is_from_me = 1 "
-                      "AND m.date > ((?2 - 978307200) * 1000000000)";
+                      "AND m.date > ((?2 - 978307200) * 1000000000) "
+                      "AND m.date > ((?3 - 978307200) * 1000000000)";
 
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
@@ -282,6 +292,7 @@ bool hu_imessage_user_responded_recently(void *channel_ctx, const char *handle, 
 
     time_t cutoff = time(NULL) - within_seconds;
     sqlite3_bind_int64(stmt, 2, (int64_t)cutoff);
+    sqlite3_bind_int64(stmt, 3, ai_cutoff);
 
     bool found = false;
     if (sqlite3_step(stmt) == SQLITE_ROW) {

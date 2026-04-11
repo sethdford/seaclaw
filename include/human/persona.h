@@ -27,6 +27,7 @@ typedef struct hu_persona_overlay {
     size_t typing_quirks_count;
     char *vulnerability_tier;
     float affect_mirror_ceiling; /* 0.0-1.0; caps emotional intensity mirroring. 0 = use default */
+    uint8_t leave_on_read_pct;   /* 0-100; probability of leave-on-read. 0 = use default (10%) */
 } hu_persona_overlay_t;
 
 typedef struct hu_persona_example {
