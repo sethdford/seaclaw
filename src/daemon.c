@@ -3337,6 +3337,15 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 const char *batch_key = msgs[m].session_key;
                 size_t key_len = strlen(batch_key);
 
+                /* For group chats, route sends to the chat_id (thread)
+                 * rather than the sender's handle to avoid accidental DMs. */
+                const char *send_target = batch_key;
+                size_t send_target_len = key_len;
+                if (msgs[m].is_group && msgs[m].chat_id[0]) {
+                    send_target = msgs[m].chat_id;
+                    send_target_len = strlen(send_target);
+                }
+
                 /* Gather consecutive messages from the same sender */
                 char combined[4096];
                 size_t combined_len = 0;
@@ -6260,7 +6269,9 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 if (style_ctx)
                     alloc->free(alloc->ctx, style_ctx, style_ctx_len + 1);
 
-                /* Tapback / reaction awareness via channel vtable. */
+                /* Tapback / reaction awareness via channel vtable.
+                 * For groups, batch_key is still the sender handle, so
+                 * per-handle SQL returns that person's reactions (partial but valid). */
 #ifndef HU_IS_TEST
                 {
                     if (ch->channel->vtable->build_reaction_context) {
@@ -6292,12 +6303,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 alloc->free(alloc->ctx, tapback_ctx, tapback_len + 1);
                         }
                     }
-                }
-#endif
 
-                /* Read receipt awareness via channel vtable. */
-#ifndef HU_IS_TEST
-                {
+                    /* Read receipt awareness via channel vtable. */
                     if (ch->channel->vtable->build_read_receipt_context) {
                         char *rr_ctx = NULL;
                         size_t rr_len = 0;
@@ -8327,7 +8334,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         nanosleep(&bc_ts, NULL);
                         turn_out_state.typing_started = true;
                     }
-                    ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, backchannel_buf,
+                    ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len, backchannel_buf,
                                               backchannel_len, NULL, 0);
                     hu_log_info("daemon", NULL, "backchannel sent (len=%zu)", backchannel_len);
                     goto skip_llm_this_batch;
@@ -8348,7 +8355,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         (uint32_t)time(NULL));
                     if (needs_thinking && thinking.filler_len > 0 &&
                         ch->channel->vtable->send) {
-                        ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                        ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len,
                                                   thinking.filler, thinking.filler_len, NULL, 0);
 #ifndef HU_IS_TEST
                         if (agent && agent->bth_metrics)
@@ -8454,19 +8461,29 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 combined, combined_len, false, history_entries, history_count,
                                 (uint32_t)time(NULL));
                         }
+                        bool tapback_sent = false;
                         if (reaction != HU_REACTION_NONE) {
                             int64_t msg_id = msgs[batch_end].message_id;
                             if (msg_id > 0) {
-                                ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len,
-                                                           msg_id, reaction);
-                                if (agent->bth_metrics)
-                                    agent->bth_metrics->reactions_sent++;
+                                hu_error_t react_err = ch->channel->vtable->react(
+                                    ch->channel->ctx, batch_key, key_len, msg_id, reaction);
+                                if (react_err == HU_OK) {
+                                    tapback_sent = true;
+                                    if (agent->bth_metrics)
+                                        agent->bth_metrics->reactions_sent++;
+                                } else {
+                                    hu_log_info("human", agent ? agent->observer : NULL,
+                                                "tapback-only react failed (%s), falling back to LLM",
+                                                hu_error_string(react_err));
+                                }
                             }
                         }
-                        hu_log_info("human", agent ? agent->observer : NULL,
-                                    "tapback only (no text) for %.*s",
-                                    (int)(combined_len > 40 ? 40 : combined_len), combined);
-                        goto skip_llm_this_batch;
+                        if (tapback_sent) {
+                            hu_log_info("human", agent ? agent->observer : NULL,
+                                        "tapback only (no text) for %.*s",
+                                        (int)(combined_len > 40 ? 40 : combined_len), combined);
+                            goto skip_llm_this_batch;
+                        }
                     }
 
                     if (tapback_decision == HU_TAPBACK_AND_TEXT && ch->channel->vtable->react) {
@@ -8493,10 +8510,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         if (reaction != HU_REACTION_NONE) {
                             int64_t msg_id = msgs[batch_end].message_id;
                             if (msg_id > 0) {
-                                ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len,
-                                                           msg_id, reaction);
-                                if (agent->bth_metrics)
-                                    agent->bth_metrics->reactions_sent++;
+                                hu_error_t react_err = ch->channel->vtable->react(
+                                    ch->channel->ctx, batch_key, key_len, msg_id, reaction);
+                                if (react_err == HU_OK) {
+                                    if (agent->bth_metrics)
+                                        agent->bth_metrics->reactions_sent++;
+                                }
                             }
                         }
                     }
@@ -8563,7 +8582,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                         burst_msgs[bi][bm_len - 1] = '\0';
                                         bm_len--;
                                     }
-                                    ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                    ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len,
                                                               burst_msgs[bi], bm_len, NULL, 0);
                                     if (bi < n - 1) {
                                         unsigned int delay_ms =
@@ -8619,7 +8638,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             hu_log_info("human", agent ? agent->observer : NULL,
                                         "silence intuition: \"%.*s\" for %.*s", (int)ack_len, ack,
                                         (int)(key_len > 20 ? 20 : key_len), batch_key);
-                            ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len, ack,
+                            ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len, ack,
                                                       ack_len, NULL, 0);
                             alloc->free(alloc->ctx, ack, ack_len + 1);
                             goto skip_llm_this_batch;
@@ -10302,9 +10321,12 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         char *send_buf_ack = NULL;
                         {
                             time_t now_ts = time(NULL);
-                            int64_t delay_secs = (int64_t)(now_ts - poll_receive_time);
+                            time_t msg_ts = (msgs[batch_start].timestamp_sec > 0)
+                                                ? (time_t)msgs[batch_start].timestamp_sec
+                                                : poll_receive_time;
+                            int64_t delay_secs = (int64_t)(now_ts - msg_ts);
                             struct tm tm_recv, tm_now;
-                            struct tm *pr = localtime_r(&poll_receive_time, &tm_recv);
+                            struct tm *pr = localtime_r(&msg_ts, &tm_recv);
                             struct tm *pn = localtime_r(&now_ts, &tm_now);
                             int recv_hr = pr ? pr->tm_hour : 0;
                             int curr_hr = pn ? pn->tm_hour : 0;
@@ -10493,7 +10515,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                     (seg == 0 && all_send_media_cnt > 0) ? all_send_media_ptr : NULL;
                                 size_t pv_cnt =
                                     (seg == 0 && all_send_media_cnt > 0) ? all_send_media_cnt : 0;
-                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len,
                                     choreo_plan.segments[seg].text,
                                     choreo_plan.segments[seg].text_len, pv_ptr, pv_cnt);
                             }
@@ -10624,7 +10646,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 const char *const *pv_ptr =
                                     all_send_media_cnt > 0 ? all_send_media_ptr : NULL;
                                 size_t pv_cnt = all_send_media_cnt;
-                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len,
                                                           send_text, send_text_len, pv_ptr, pv_cnt);
                                 if (fmt_text)
                                     alloc->free(alloc->ctx, fmt_text, fmt_len + 1);
@@ -10648,7 +10670,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 if (corr_len > 0) {
                                     unsigned int delay_ms = 2500 + (unsigned int)(typo_seed % 2500);
                                     usleep((useconds_t)(delay_ms * 1000));
-                                    ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                    ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len,
                                                               correction, corr_len, NULL, 0);
                                     if (agent->bth_metrics)
                                         agent->bth_metrics->corrections_sent++;
@@ -10686,7 +10708,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             const char *const *pv_ptr =
                                 all_send_media_cnt > 0 ? all_send_media_ptr : NULL;
                             size_t pv_cnt = all_send_media_cnt;
-                            ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                            ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len,
                                                       send_text, send_text_len, pv_ptr, pv_cnt);
                             if (fmt_text)
                                 alloc->free(alloc->ctx, fmt_text, fmt_len + 1);
@@ -10855,7 +10877,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 }
                                 unsigned int dt_delay = 10000u + (dt_seed % 35000u);
                                 usleep((useconds_t)(dt_delay * 1000u));
-                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len,
                                                           dt_resp, dt_resp_len, NULL, 0);
                                 if (agent->bth_metrics)
                                     agent->bth_metrics->double_texts++;
@@ -10868,8 +10890,10 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 } /* end dt_vtable scope */
 #endif /* HU_HAS_PERSONA */
 
-                /* Self-reaction: occasionally haha/emphasize own message (~2%) */
-                if (response && response_len > 0 && ch->channel->vtable->react) {
+                /* Self-reaction: occasionally haha/emphasize own message (~2%).
+                 * Skip for groups: get_latest_sent_rowid uses handle.id SQL. */
+                if (response && response_len > 0 && ch->channel->vtable->react &&
+                    !msgs[batch_start].is_group) {
                     hu_reaction_type_t self_r = hu_conversation_classify_self_reaction(
                         response, response_len, (uint32_t)time(NULL));
                     if (self_r != HU_REACTION_NONE) {
@@ -10881,7 +10905,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                         int64_t sent_id = msgs[batch_end].message_id + 1;
 #endif
                         if (sent_id > 0) {
-                            ch->channel->vtable->react(ch->channel->ctx, batch_key, key_len,
+                            ch->channel->vtable->react(ch->channel->ctx, send_target, send_target_len,
                                                        sent_id, self_r);
                             hu_log_info("human", agent ? agent->observer : NULL,
                                         "self-reaction on own message: %d", (int)self_r);
@@ -10889,8 +10913,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     }
                 }
 
-                /* GIF calibration: detect positive tapbacks on our GIF messages via SQL */
+                /* GIF/music calibration: skip for group chats where batch_key
+                 * is a chat identifier rather than a handle.id — SQL queries
+                 * would return wrong results. */
 #ifdef HU_HAS_IMESSAGE
+                if (!msgs[batch_start].is_group) {
                 {
                     int gif_taps = hu_imessage_count_recent_gif_tapbacks(batch_key, key_len);
                     if (gif_taps > 0) {
@@ -10920,6 +10947,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             hu_music_taste_record_reaction(batch_key, key_len);
                     }
                 }
+                } /* !is_group guard for GIF/music calibration */
 #endif
 
                 /* Load calibration data on first pass */
@@ -11089,7 +11117,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 if (sp_len > 0 && access(stk_path, R_OK) == 0) {
                                     usleep(1500000 + (stk_seed % 2000000));
                                     const char *media[] = {stk_path};
-                                    ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                    ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len,
                                                               "", 0, media, 1);
                                     hu_log_info("human", agent ? agent->observer : NULL,
                                                 "sent sticker: %s", stk_path);
@@ -11362,7 +11390,7 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 alloc, img_suggest, img_suggest_len, img_path, sizeof(img_path));
                             if (ierr == HU_OK) {
                                 const char *img_media[] = {img_path};
-                                ch->channel->vtable->send(ch->channel->ctx, batch_key, key_len,
+                                ch->channel->vtable->send(ch->channel->ctx, send_target, send_target_len,
                                                           NULL, 0, img_media, 1);
                                 hu_log_info("human", agent ? agent->observer : NULL,
                                             "proactive image sent: %.*s",

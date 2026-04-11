@@ -50,6 +50,8 @@ typedef struct hu_channel_loop_msg {
     bool was_edited;        /* message was edited after initial send (iMessage) */
     char reply_to_guid[96]; /* thread_originator_guid: message this is a reply to */
     bool was_unsent;        /* message was retracted/unsent (iMessage, date_retracted > 0) */
+    int64_t timestamp_sec;  /* message origin time (Unix epoch); 0 = use poll time */
+    char chat_id[128];      /* thread/chat identifier (e.g. iMessage chat.guid for groups) */
 } hu_channel_loop_msg_t;
 
 typedef hu_error_t (*hu_channel_loop_poll_fn)(void *channel_ctx, hu_allocator_t *alloc,

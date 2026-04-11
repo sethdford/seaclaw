@@ -10,6 +10,7 @@
 #ifdef HU_GATEWAY_POSIX
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
@@ -190,6 +191,30 @@ hu_error_t hu_process_run(hu_allocator_t *alloc, const char *const *argv, const 
     return hu_process_run_sandboxed(alloc, argv, cwd, max_output_bytes, NULL, NULL, out);
 }
 
+hu_error_t hu_process_run_with_timeout(hu_allocator_t *alloc, const char *const *argv,
+                                       const char *cwd, size_t max_output_bytes,
+                                       unsigned int timeout_sec, hu_run_result_t *out) {
+    if (timeout_sec == 0)
+        return hu_process_run(alloc, argv, cwd, max_output_bytes, out);
+
+    /* Build wrapper: perl -e 'alarm N; exec @ARGV' <original argv...> */
+    size_t argc = 0;
+    while (argv[argc])
+        argc++;
+    if (argc + 4 > 64)
+        return hu_process_run(alloc, argv, cwd, max_output_bytes, out);
+
+    const char *wrapped[68];
+    char alarm_expr[48];
+    snprintf(alarm_expr, sizeof(alarm_expr), "alarm %u; exec @ARGV", timeout_sec);
+    wrapped[0] = "perl";
+    wrapped[1] = "-e";
+    wrapped[2] = alarm_expr;
+    for (size_t i = 0; i <= argc; i++)
+        wrapped[3 + i] = argv[i];
+    return hu_process_run(alloc, wrapped, cwd, max_output_bytes, out);
+}
+
 typedef struct hu_policy_child_ctx {
     hu_security_policy_t *policy;
     const char *const *argv;
@@ -311,6 +336,13 @@ hu_error_t hu_process_run_sandboxed(hu_allocator_t *alloc, const char *const *ar
 hu_error_t hu_process_run(hu_allocator_t *alloc, const char *const *argv, const char *cwd,
                           size_t max_output_bytes, hu_run_result_t *out) {
     return hu_process_run_sandboxed(alloc, argv, cwd, max_output_bytes, NULL, NULL, out);
+}
+
+hu_error_t hu_process_run_with_timeout(hu_allocator_t *alloc, const char *const *argv,
+                                       const char *cwd, size_t max_output_bytes,
+                                       unsigned int timeout_sec, hu_run_result_t *out) {
+    (void)timeout_sec;
+    return hu_process_run(alloc, argv, cwd, max_output_bytes, out);
 }
 
 hu_error_t hu_process_run_with_policy(hu_allocator_t *alloc, const char *const *argv,

@@ -134,6 +134,35 @@ hu_error_t hu_imessage_test_inject_mock_ex2(hu_channel_t *ch, const char *sessio
                                             size_t session_key_len, const char *content,
                                             size_t content_len, bool has_attachment,
                                             bool has_video);
+
+/** Full-featured mock injection with all message fields. */
+typedef struct hu_imessage_test_msg_opts {
+    const char *guid;
+    const char *reply_to_guid;
+    const char *chat_id;
+    bool has_attachment;
+    bool has_video;
+    bool is_group;
+    bool was_edited;
+    bool was_unsent;
+    int64_t timestamp_sec;
+} hu_imessage_test_msg_opts_t;
+
+hu_error_t hu_imessage_test_inject_mock_full(hu_channel_t *ch, const char *session_key,
+                                             size_t session_key_len, const char *content,
+                                             size_t content_len,
+                                             const hu_imessage_test_msg_opts_t *opts);
+
+/** Store a GUID→text mapping for lookup_message_by_guid in test builds (per-channel). */
+void hu_imessage_test_store_guid_text(hu_channel_t *ch, const char *guid, const char *text);
+
+/** Register a GUID→text entry in the global lookup store.
+ * Makes hu_imessage_lookup_message_by_guid return the text for this GUID. */
+void hu_imessage_test_set_guid_lookup(const char *guid, const char *text);
+
+/** Clear all registered GUID→text lookup entries. */
+void hu_imessage_test_clear_guid_lookups(void);
+
 const char *hu_imessage_test_get_last_message(hu_channel_t *ch, size_t *out_len);
 void hu_imessage_test_get_last_reaction(hu_channel_t *ch, hu_reaction_type_t *out_reaction,
                                         int64_t *out_message_id);

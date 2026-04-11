@@ -60,6 +60,16 @@ hu_error_t hu_process_run_with_policy(hu_allocator_t *alloc, const char *const *
                                       hu_security_policy_t *policy, hu_run_result_t *out);
 
 /**
+ * Run a child process with a hard timeout (seconds). If the child does not
+ * exit within timeout_sec, it is killed with SIGKILL. timeout_sec == 0 means
+ * no timeout (identical to hu_process_run). On timeout, exit_code is set to
+ * -1 and success to false.
+ */
+hu_error_t hu_process_run_with_timeout(hu_allocator_t *alloc, const char *const *argv,
+                                       const char *cwd, size_t max_output_bytes,
+                                       unsigned int timeout_sec, hu_run_result_t *out);
+
+/**
  * True if `name` is an executable found on PATH, or an absolute/relative path with execute bit.
  * On Windows always returns false (not implemented).
  */

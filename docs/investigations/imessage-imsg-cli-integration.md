@@ -38,11 +38,12 @@ imsg is a Swift binary distributed via Homebrew (`brew install steipete/tap/imsg
 
 ### 2. API Surface for Tapbacks
 We have the data needed for `imsg react`:
-- Chat GUID: available from poll (chat.db `chat.guid`)
-- Message GUID: available from poll (chat.db `message.guid`)
+- Chat ROWID: looked up from `chat_message_join` via the message ROWID
 - Reaction type: maps directly to imsg's supported types
 
-Command: `imsg react <chat-guid> <message-guid> <reaction-type>`
+Command: `imsg react --chat-id <chat-rowid> --reaction <type>`
+
+**Limitation:** `imsg react` targets the most recent incoming message in the chat — no per-message GUID targeting is supported. In fast-paced conversations, this may react to the wrong message.
 
 This is more reliable than our JXA+AX approach because:
 - No Accessibility permission needed
@@ -104,8 +105,8 @@ Our current AppleScript send path is stable and well-tested. The imsg send path 
 **Update (2026-04-04):** Both the send and react paths are now implemented in C:
 
 - Text send via `imsg send --to <target> --text <message> --service imessage` with AppleScript fallback
-- imsg CLI tapback works even without `HU_IMESSAGE_TAPBACK_ENABLED` — auto-detects `imsg` on `$PATH` and tries `imsg react --chat-id <chat-guid> --message-guid <msg-guid> --reaction <type>` before returning `HU_ERR_NOT_SUPPORTED`
-- Chat GUID and message GUID are looked up from chat.db at react time
+- imsg CLI tapback works even without `HU_IMESSAGE_TAPBACK_ENABLED` — auto-detects `imsg` on `$PATH` and tries `imsg react --chat-id <chat-rowid> --reaction <type>` before returning `HU_ERR_NOT_SUPPORTED`. Note: `imsg react` only targets the most recent incoming message in the chat (no per-message GUID targeting).
+- Chat ROWID is looked up from `chat_message_join` in chat.db at react time
 - `use_imsg_cli` config key now parsed in `config_parse_channels.c`
 
 **Update (2026-04-06):** Full imsg CLI deep integration — all available imsg features now leveraged:
