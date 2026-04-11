@@ -167,8 +167,10 @@ typedef struct hu_imessage_ctx {
 static void ax_open_conversation(const char *recipient, size_t recipient_len);
 static bool ax_start_typing(const char *target, size_t target_len);
 static bool ax_stop_typing(void);
+#ifdef HU_IMESSAGE_TAPBACK_ENABLED
 static bool ax_tapback(const char *content_prefix, int row_offset,
                        const char *tapback_label);
+#endif
 static bool imcore_init(hu_imessage_ctx_t *c);
 static bool imcore_start_typing(hu_imessage_ctx_t *c, const char *recipient,
                                 size_t recipient_len);
@@ -2540,6 +2542,7 @@ static bool ax_stop_typing(void) {
     return (err == kAXErrorSuccess);
 }
 
+#ifdef HU_IMESSAGE_TAPBACK_ENABLED
 /* ── AX tree: find message element for tapback ──────────────────────
  * macOS 26 (Tahoe): Messages uses SwiftUI; transcript is nested AXGroups.
  * Each message bubble is an AXGroup whose description contains the message
@@ -2696,6 +2699,7 @@ static bool ax_tapback(const char *content_prefix, int row_offset,
                 ok ? "sent" : "action not found", tapback_label);
     return ok;
 }
+#endif /* HU_IMESSAGE_TAPBACK_ENABLED */
 
 /* ── IMCore private framework bridge ────────────────────────────────── */
 static bool imcore_init(hu_imessage_ctx_t *c) {
