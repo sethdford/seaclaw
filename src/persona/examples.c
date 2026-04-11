@@ -6,49 +6,27 @@
 
 #define HU_PERSONA_EXAMPLES_MAX 256
 
-/* Parse example bank from JSON. Format: {"examples":[{context,incoming,response},...]} */
-hu_error_t hu_persona_examples_load_json(hu_allocator_t *alloc, const char *channel,
-                                         size_t channel_len, const char *json, size_t json_len,
-                                         hu_persona_example_bank_t *out) {
-    if (!alloc || !channel || !json || !out)
-        return HU_ERR_INVALID_ARGUMENT;
-    memset(out, 0, sizeof(*out));
-
-    out->channel = hu_strndup(alloc, channel, channel_len);
-    if (!out->channel)
-        return HU_ERR_OUT_OF_MEMORY;
-
-    hu_json_value_t *root = NULL;
-    hu_error_t err = hu_json_parse(alloc, json, json_len, &root);
-    if (err != HU_OK || !root || root->type != HU_JSON_OBJECT) {
-        alloc->free(alloc->ctx, out->channel, channel_len + 1);
-        out->channel = NULL;
-        return err != HU_OK ? err : HU_ERR_JSON_PARSE;
-    }
-
-    hu_json_value_t *arr = hu_json_object_get(root, "examples");
-    if (!arr || arr->type != HU_JSON_ARRAY || !arr->data.array.items) {
-        alloc->free(alloc->ctx, out->channel, channel_len + 1);
-        out->channel = NULL;
-        hu_json_free(alloc, root);
+/* Parse examples array items into a heap block; on zero valid rows frees the block. */
+static hu_error_t persona_examples_fill_from_array(hu_allocator_t *alloc,
+                                                   const hu_json_value_t *arr,
+                                                   hu_persona_example_t **out_examples,
+                                                   size_t *out_count) {
+    *out_examples = NULL;
+    *out_count = 0;
+    if (!arr || arr->type != HU_JSON_ARRAY)
         return HU_OK;
-    }
-
     size_t n = arr->data.array.len;
-    if (n > 10000 || n > SIZE_MAX / sizeof(hu_persona_example_t)) {
-        hu_json_free(alloc, root);
-        alloc->free(alloc->ctx, out->channel, channel_len + 1);
-        out->channel = NULL;
+    if (n == 0)
+        return HU_OK;
+    if (!arr->data.array.items)
+        return HU_ERR_JSON_PARSE;
+    if (n > 10000 || n > SIZE_MAX / sizeof(hu_persona_example_t))
         return HU_ERR_INVALID_ARGUMENT;
-    }
+
     hu_persona_example_t *examples =
         (hu_persona_example_t *)alloc->alloc(alloc->ctx, n * sizeof(hu_persona_example_t));
-    if (!examples) {
-        hu_json_free(alloc, root);
-        alloc->free(alloc->ctx, out->channel, channel_len + 1);
-        out->channel = NULL;
+    if (!examples)
         return HU_ERR_OUT_OF_MEMORY;
-    }
     memset(examples, 0, n * sizeof(hu_persona_example_t));
     size_t count = 0;
 
@@ -90,17 +68,79 @@ hu_error_t hu_persona_examples_load_json(hu_allocator_t *alloc, const char *chan
                     alloc->free(alloc->ctx, examples[j].response, strlen(examples[j].response) + 1);
             }
             alloc->free(alloc->ctx, examples, n * sizeof(hu_persona_example_t));
-            hu_json_free(alloc, root);
-            alloc->free(alloc->ctx, out->channel, channel_len + 1);
-            out->channel = NULL;
             return HU_ERR_OUT_OF_MEMORY;
         }
         count++;
     }
 
-    out->examples = examples;
-    out->examples_count = count;
+    if (count == 0) {
+        alloc->free(alloc->ctx, examples, n * sizeof(hu_persona_example_t));
+        return HU_OK;
+    }
+    *out_examples = examples;
+    *out_count = count;
+    return HU_OK;
+}
+
+/* Parse example bank from JSON. Format: {"examples":[{context,incoming,response},...]} */
+hu_error_t hu_persona_examples_load_json(hu_allocator_t *alloc, const char *channel,
+                                         size_t channel_len, const char *json, size_t json_len,
+                                         hu_persona_example_bank_t *out) {
+    if (!alloc || !channel || !json || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+
+    out->channel = hu_strndup(alloc, channel, channel_len);
+    if (!out->channel)
+        return HU_ERR_OUT_OF_MEMORY;
+
+    hu_json_value_t *root = NULL;
+    hu_error_t err = hu_json_parse(alloc, json, json_len, &root);
+    if (err != HU_OK || !root || root->type != HU_JSON_OBJECT) {
+        alloc->free(alloc->ctx, out->channel, channel_len + 1);
+        out->channel = NULL;
+        return err != HU_OK ? err : HU_ERR_JSON_PARSE;
+    }
+
+    hu_json_value_t *arr = hu_json_object_get(root, "examples");
+    if (!arr || arr->type != HU_JSON_ARRAY || !arr->data.array.items) {
+        alloc->free(alloc->ctx, out->channel, channel_len + 1);
+        out->channel = NULL;
+        hu_json_free(alloc, root);
+        return HU_OK;
+    }
+
+    err = persona_examples_fill_from_array(alloc, arr, &out->examples, &out->examples_count);
     hu_json_free(alloc, root);
+    if (err != HU_OK) {
+        alloc->free(alloc->ctx, out->channel, channel_len + 1);
+        out->channel = NULL;
+        return err;
+    }
+    return HU_OK;
+}
+
+hu_error_t hu_persona_examples_bank_from_array(hu_allocator_t *alloc, const char *channel,
+                                               size_t channel_len,
+                                               const hu_json_value_t *examples_arr,
+                                               hu_persona_example_bank_t *out) {
+    if (!alloc || !channel || !out)
+        return HU_ERR_INVALID_ARGUMENT;
+    memset(out, 0, sizeof(*out));
+    out->channel = hu_strndup(alloc, channel, channel_len);
+    if (!out->channel)
+        return HU_ERR_OUT_OF_MEMORY;
+    hu_error_t err =
+        persona_examples_fill_from_array(alloc, examples_arr, &out->examples, &out->examples_count);
+    if (err != HU_OK) {
+        alloc->free(alloc->ctx, out->channel, strlen(out->channel) + 1);
+        out->channel = NULL;
+        return err;
+    }
+    if (out->examples_count == 0) {
+        alloc->free(alloc->ctx, out->channel, strlen(out->channel) + 1);
+        out->channel = NULL;
+    }
     return HU_OK;
 }
 

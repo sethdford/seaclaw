@@ -1273,6 +1273,31 @@ static void test_persona_load_json_missing_core(void) {
     }
 }
 
+static void test_persona_load_json_example_banks_inline_parsed(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_persona_t p;
+    memset(&p, 0, sizeof(p));
+    const char *json = "{\"version\":1,\"name\":\"eb\",\"core\":{\"identity\":\"id\","
+                       "\"traits\":[\"a\"],\"communication_rules\":[]},\"example_banks\":["
+                       "{\"channel\":\"cli\",\"examples\":[{\"context\":\"ctx\",\"incoming\":"
+                       "\"hi\",\"response\":\"hello\"}]}]}";
+    hu_error_t e = hu_persona_load_json(&alloc, json, strlen(json), &p);
+    HU_ASSERT_EQ(e, HU_OK);
+    HU_ASSERT_EQ(p.example_banks_count, (size_t)1);
+    HU_ASSERT_NOT_NULL(p.example_banks);
+    HU_ASSERT_STR_EQ(p.example_banks[0].channel, "cli");
+    HU_ASSERT_EQ(p.example_banks[0].examples_count, (size_t)1);
+    HU_ASSERT_STR_EQ(p.example_banks[0].examples[0].incoming, "hi");
+    char *prompt = NULL;
+    size_t plen = 0;
+    e = hu_persona_build_prompt(&alloc, &p, "cli", 3, NULL, 0, &prompt, &plen);
+    HU_ASSERT_EQ(e, HU_OK);
+    HU_ASSERT_NOT_NULL(strstr(prompt, "Example conversations showing your style:"));
+    HU_ASSERT_NOT_NULL(strstr(prompt, "Them: hi"));
+    alloc.free(alloc.ctx, prompt, plen + 1);
+    hu_persona_deinit(&alloc, &p);
+}
+
 /* hu_persona_load */
 static void test_persona_load_empty_name(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -3803,66 +3828,76 @@ static const char lean_test_persona_json[] =
     "\"style_notes\":[\"1-10 word messages\",\"rapid-fire short messages\"]}}}";
 
 /* Helper: build lean persona prompt the same way agent_stream.c does */
-static char *build_lean_persona(hu_allocator_t *alloc, const hu_persona_t *p,
-                                const char *channel, size_t channel_len,
-                                size_t *out_len) {
+static char *build_lean_persona(hu_allocator_t *alloc, const hu_persona_t *p, const char *channel,
+                                size_t channel_len, size_t *out_len) {
     char lp[8192];
     size_t lpo = 0;
     if (p->core_anchor) {
         int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s\n\n", p->core_anchor);
-        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        if (n > 0 && lpo + (size_t)n < sizeof(lp))
+            lpo += (size_t)n;
     }
     for (size_t i = 0; i < p->immersive_reinforcement_count && i < 10; i++) {
         if (p->immersive_reinforcement[i]) {
-            int n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n",
-                             p->immersive_reinforcement[i]);
-            if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            int n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n", p->immersive_reinforcement[i]);
+            if (n > 0 && lpo + (size_t)n < sizeof(lp))
+                lpo += (size_t)n;
         }
     }
     if (p->anti_patterns_count > 0) {
         int n = snprintf(lp + lpo, sizeof(lp) - lpo, "\nNEVER do:\n");
-        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        if (n > 0 && lpo + (size_t)n < sizeof(lp))
+            lpo += (size_t)n;
         for (size_t i = 0; i < p->anti_patterns_count; i++) {
             if (p->anti_patterns[i]) {
                 n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n", p->anti_patterns[i]);
-                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                if (n > 0 && lpo + (size_t)n < sizeof(lp))
+                    lpo += (size_t)n;
             }
         }
     }
     if (p->style_rules_count > 0) {
         int n = snprintf(lp + lpo, sizeof(lp) - lpo, "\nStyle:\n");
-        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        if (n > 0 && lpo + (size_t)n < sizeof(lp))
+            lpo += (size_t)n;
         for (size_t i = 0; i < p->style_rules_count; i++) {
             if (p->style_rules[i]) {
                 n = snprintf(lp + lpo, sizeof(lp) - lpo, "- %s\n", p->style_rules[i]);
-                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                if (n > 0 && lpo + (size_t)n < sizeof(lp))
+                    lpo += (size_t)n;
             }
         }
     }
     const hu_persona_overlay_t *ov = hu_persona_find_overlay(p, channel, channel_len);
     if (ov) {
         int n = snprintf(lp + lpo, sizeof(lp) - lpo, "\nChannel style:");
-        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        if (n > 0 && lpo + (size_t)n < sizeof(lp))
+            lpo += (size_t)n;
         if (ov->formality) {
             n = snprintf(lp + lpo, sizeof(lp) - lpo, " %s.", ov->formality);
-            if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            if (n > 0 && lpo + (size_t)n < sizeof(lp))
+                lpo += (size_t)n;
         }
         if (ov->avg_length) {
             n = snprintf(lp + lpo, sizeof(lp) - lpo, " Length: %s.", ov->avg_length);
-            if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            if (n > 0 && lpo + (size_t)n < sizeof(lp))
+                lpo += (size_t)n;
         }
         if (ov->emoji_usage) {
             n = snprintf(lp + lpo, sizeof(lp) - lpo, " Emoji: %s.", ov->emoji_usage);
-            if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+            if (n > 0 && lpo + (size_t)n < sizeof(lp))
+                lpo += (size_t)n;
         }
         for (size_t i = 0; i < ov->style_notes_count; i++) {
             if (ov->style_notes[i]) {
                 n = snprintf(lp + lpo, sizeof(lp) - lpo, " %s.", ov->style_notes[i]);
-                if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+                if (n > 0 && lpo + (size_t)n < sizeof(lp))
+                    lpo += (size_t)n;
             }
         }
         n = snprintf(lp + lpo, sizeof(lp) - lpo, "\n");
-        if (n > 0 && lpo + (size_t)n < sizeof(lp)) lpo += (size_t)n;
+        if (n > 0 && lpo + (size_t)n < sizeof(lp))
+            lpo += (size_t)n;
     }
     if (lpo > 0) {
         *out_len = lpo;
@@ -3876,14 +3911,14 @@ static void test_lean_prompt_size_under_5kb(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_persona_t p;
     memset(&p, 0, sizeof(p));
-    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
-                                          strlen(lean_test_persona_json), &p);
+    hu_error_t err =
+        hu_persona_load_json(&alloc, lean_test_persona_json, strlen(lean_test_persona_json), &p);
     HU_ASSERT_EQ(err, HU_OK);
 
     size_t lean_len = 0;
     char *lean = build_lean_persona(&alloc, &p, "imessage", 8, &lean_len);
     HU_ASSERT_NOT_NULL(lean);
-    HU_ASSERT_TRUE(lean_len > 100); /* not trivially empty */
+    HU_ASSERT_TRUE(lean_len > 100);  /* not trivially empty */
     HU_ASSERT_TRUE(lean_len < 5120); /* under 5KB */
 
     /* Build full system prompt through prompt.c immersive path */
@@ -3909,8 +3944,8 @@ static void test_lean_prompt_size_under_5kb(void) {
 static void test_lean_prompt_includes_core_anchor(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_persona_t p = {0};
-    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
-                                          strlen(lean_test_persona_json), &p);
+    hu_error_t err =
+        hu_persona_load_json(&alloc, lean_test_persona_json, strlen(lean_test_persona_json), &p);
     HU_ASSERT_EQ(err, HU_OK);
 
     size_t lean_len = 0;
@@ -3927,8 +3962,8 @@ static void test_lean_prompt_includes_core_anchor(void) {
 static void test_lean_prompt_includes_reinforcement(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_persona_t p = {0};
-    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
-                                          strlen(lean_test_persona_json), &p);
+    hu_error_t err =
+        hu_persona_load_json(&alloc, lean_test_persona_json, strlen(lean_test_persona_json), &p);
     HU_ASSERT_EQ(err, HU_OK);
 
     size_t lean_len = 0;
@@ -3945,8 +3980,8 @@ static void test_lean_prompt_includes_reinforcement(void) {
 static void test_lean_prompt_includes_anti_patterns(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_persona_t p = {0};
-    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
-                                          strlen(lean_test_persona_json), &p);
+    hu_error_t err =
+        hu_persona_load_json(&alloc, lean_test_persona_json, strlen(lean_test_persona_json), &p);
     HU_ASSERT_EQ(err, HU_OK);
 
     size_t lean_len = 0;
@@ -3963,8 +3998,8 @@ static void test_lean_prompt_includes_anti_patterns(void) {
 static void test_lean_prompt_excludes_biography(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_persona_t p = {0};
-    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
-                                          strlen(lean_test_persona_json), &p);
+    hu_error_t err =
+        hu_persona_load_json(&alloc, lean_test_persona_json, strlen(lean_test_persona_json), &p);
     HU_ASSERT_EQ(err, HU_OK);
 
     size_t lean_len = 0;
@@ -3990,8 +4025,8 @@ static void test_lean_prompt_excludes_biography(void) {
 static void test_lean_prompt_excludes_heavy_contexts(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_persona_t p = {0};
-    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
-                                          strlen(lean_test_persona_json), &p);
+    hu_error_t err =
+        hu_persona_load_json(&alloc, lean_test_persona_json, strlen(lean_test_persona_json), &p);
     HU_ASSERT_EQ(err, HU_OK);
 
     size_t lean_len = 0;
@@ -4048,8 +4083,8 @@ static void test_lean_prompt_excludes_heavy_contexts(void) {
 static void test_lean_prompt_full_pipeline_sp_len(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_persona_t p = {0};
-    hu_error_t err = hu_persona_load_json(&alloc, lean_test_persona_json,
-                                          strlen(lean_test_persona_json), &p);
+    hu_error_t err =
+        hu_persona_load_json(&alloc, lean_test_persona_json, strlen(lean_test_persona_json), &p);
     HU_ASSERT_EQ(err, HU_OK);
 
     /* Build lean persona prompt */
@@ -4060,8 +4095,8 @@ static void test_lean_prompt_full_pipeline_sp_len(void) {
     /* Now build full prompt the FULL way for comparison */
     char *full_prompt = NULL;
     size_t full_prompt_len = 0;
-    err = hu_persona_build_prompt(&alloc, &p, "imessage", 8, NULL, 0,
-                                  &full_prompt, &full_prompt_len);
+    err =
+        hu_persona_build_prompt(&alloc, &p, "imessage", 8, NULL, 0, &full_prompt, &full_prompt_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(full_prompt);
 
@@ -4188,6 +4223,7 @@ void run_persona_tests(void) {
     /* Error-path and edge-case tests */
     HU_RUN_TEST(test_persona_load_json_malformed_returns_error);
     HU_RUN_TEST(test_persona_load_json_missing_core);
+    HU_RUN_TEST(test_persona_load_json_example_banks_inline_parsed);
     HU_RUN_TEST(test_persona_load_empty_name);
     HU_RUN_TEST(test_persona_build_prompt_empty_persona);
     HU_RUN_TEST(test_persona_examples_load_json_empty_bank);

@@ -33,12 +33,12 @@ static void set_defaults_rollback(hu_config_t *cfg, hu_allocator_t *a) {
         cfg->autonomy.allowed_commands = NULL;
         cfg->autonomy.allowed_commands_len = 0;
     }
-#define HU_SET_DEF_FREE_STR(field)                                                                 \
-    do {                                                                                           \
-        if ((field)) {                                                                             \
-            a->free(a->ctx, (field), strlen((field)) + 1);                                         \
-            (field) = NULL;                                                                        \
-        }                                                                                          \
+#define HU_SET_DEF_FREE_STR(field)                         \
+    do {                                                   \
+        if ((field)) {                                     \
+            a->free(a->ctx, (field), strlen((field)) + 1); \
+            (field) = NULL;                                \
+        }                                                  \
     } while (0)
     HU_SET_DEF_FREE_STR(cfg->nodes[0].status);
     HU_SET_DEF_FREE_STR(cfg->nodes[0].name);
@@ -61,6 +61,34 @@ static void set_defaults_rollback(hu_config_t *cfg, hu_allocator_t *a) {
     HU_SET_DEF_FREE_STR(cfg->default_provider);
 #undef HU_SET_DEF_FREE_STR
     memset(cfg, 0, sizeof(*cfg));
+}
+
+/* Auto-detect best available provider from environment.
+ * Priority: explicit HUMAN_PROVIDER > Apple Intelligence (compile-time default) > Gemini >
+ * OpenAI > Anthropic > Ollama.
+ * Returns NULL if no env signals found (use compile-time default). */
+#if defined(__GNUC__) || defined(__clang__)
+static __attribute__((unused)) const char *detect_best_provider(void)
+#else
+static const char *detect_best_provider(void)
+#endif
+{
+    /* Explicit override always wins */
+    const char *explicit_prov = getenv("HUMAN_PROVIDER");
+    if (explicit_prov && explicit_prov[0])
+        return NULL; /* let env override handle it later */
+
+    /* Check for API keys that indicate a configured provider */
+    if (getenv("GEMINI_API_KEY") || getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+        return "gemini";
+    if (getenv("OPENAI_API_KEY"))
+        return "openai";
+    if (getenv("ANTHROPIC_API_KEY"))
+        return "anthropic";
+    if (getenv("OLLAMA_HOST"))
+        return "ollama";
+
+    return NULL; /* no env signal, use compile-time default */
 }
 
 static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
@@ -89,6 +117,33 @@ static void set_defaults(hu_config_t *cfg, hu_allocator_t *a) {
     if (!cfg->default_model) {
         set_defaults_rollback(cfg, a);
         return;
+    }
+#endif
+#if !(defined(__APPLE__) && defined(HU_ENABLE_APPLE_INTELLIGENCE))
+    /* Override defaults if environment suggests a specific provider */
+    const char *detected = detect_best_provider();
+    if (detected) {
+        if (cfg->default_provider)
+            a->free(a->ctx, cfg->default_provider, strlen(cfg->default_provider) + 1);
+        cfg->default_provider = hu_strdup(a, detected);
+        if (!cfg->default_provider) {
+            set_defaults_rollback(cfg, a);
+            return;
+        }
+        if (cfg->default_model)
+            a->free(a->ctx, cfg->default_model, strlen(cfg->default_model) + 1);
+        const char *model = "gemini-3.1-flash-lite-preview";
+        if (strcmp(detected, "openai") == 0)
+            model = "gpt-4o";
+        else if (strcmp(detected, "anthropic") == 0)
+            model = "claude-sonnet-4-20250514";
+        else if (strcmp(detected, "ollama") == 0)
+            model = "llama3";
+        cfg->default_model = hu_strdup(a, model);
+        if (!cfg->default_model) {
+            set_defaults_rollback(cfg, a);
+            return;
+        }
     }
 #endif
     cfg->default_temperature = 0.7;

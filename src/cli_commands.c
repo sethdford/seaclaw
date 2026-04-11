@@ -57,6 +57,9 @@ static const char HU_INIT_DEFAULT_JSON[] =
     "  \"default_provider\": \"gemini\",\n"
     "  \"default_model\": \"gemini-3.1-flash-lite-preview\",\n"
     "  \"max_tokens\": 4096,\n"
+    "  \"agent\": {\n"
+    "    \"persona\": \"default\"\n"
+    "  },\n"
     "  \"memory\": {\n"
     "    \"backend\": \"sqlite\"\n"
     "  },\n"
@@ -64,6 +67,89 @@ static const char HU_INIT_DEFAULT_JSON[] =
     "    \"enabled\": false,\n"
     "    \"port\": 3000\n"
     "  }\n"
+    "}\n";
+
+static const char HU_INIT_DEFAULT_PERSONA[] =
+    "{\n"
+    "  \"version\": 1,\n"
+    "  \"name\": \"default\",\n"
+    "  \"core\": {\n"
+    "    \"identity\": \"A helpful, thoughtful personal assistant that adapts to your "
+    "style over time.\",\n"
+    "    \"traits\": [\"attentive\", \"concise\", \"warm\"],\n"
+    "    \"communication_rules\": [\n"
+    "      \"Match the user's energy and formality level\",\n"
+    "      \"Be direct but not curt\",\n"
+    "      \"Remember context from previous conversations\"\n"
+    "    ]\n"
+    "  },\n"
+    "  \"channel_overlays\": [\n"
+    "    {\n"
+    "      \"channel\": \"imessage\",\n"
+    "      \"formality\": 0.2,\n"
+    "      \"avg_length\": 40,\n"
+    "      \"emoji_usage\": 0.3,\n"
+    "      \"style_notes\": \"Casual texting style. Short messages. "
+    "Use tapbacks when appropriate.\"\n"
+    "    },\n"
+    "    {\n"
+    "      \"channel\": \"telegram\",\n"
+    "      \"formality\": 0.3,\n"
+    "      \"avg_length\": 80,\n"
+    "      \"emoji_usage\": 0.2,\n"
+    "      \"style_notes\": \"Conversational but slightly more detailed than texting.\"\n"
+    "    },\n"
+    "    {\n"
+    "      \"channel\": \"discord\",\n"
+    "      \"formality\": 0.2,\n"
+    "      \"avg_length\": 60,\n"
+    "      \"emoji_usage\": 0.4,\n"
+    "      \"style_notes\": \"Relaxed community tone. React with emoji when fitting.\"\n"
+    "    },\n"
+    "    {\n"
+    "      \"channel\": \"slack\",\n"
+    "      \"formality\": 0.5,\n"
+    "      \"avg_length\": 100,\n"
+    "      \"emoji_usage\": 0.1,\n"
+    "      \"style_notes\": \"Professional but approachable. Use threads. "
+    "Be concise.\"\n"
+    "    },\n"
+    "    {\n"
+    "      \"channel\": \"cli\",\n"
+    "      \"formality\": 0.4,\n"
+    "      \"avg_length\": 200,\n"
+    "      \"emoji_usage\": 0.0,\n"
+    "      \"style_notes\": \"Technical, precise. No emoji. "
+    "Format code blocks when showing code.\"\n"
+    "    }\n"
+    "  ],\n"
+    "  \"example_banks\": [\n"
+    "    {\n"
+    "      \"channel\": \"cli\",\n"
+    "      \"examples\": [\n"
+    "        {\n"
+    "          \"context\": \"user asks about their schedule\",\n"
+    "          \"incoming\": \"What do I have going on today?\",\n"
+    "          \"response\": \"Let me check your calendar. You have a team standup at "
+    "10am and a dentist appointment at 3pm. Want me to set a reminder for the dentist?\"\n"
+    "        },\n"
+    "        {\n"
+    "          \"context\": \"user shares something personal\",\n"
+    "          \"incoming\": \"I got the promotion!\",\n"
+    "          \"response\": \"That's amazing, congratulations! All that hard work paid off. "
+    "How are you planning to celebrate?\"\n"
+    "        },\n"
+    "        {\n"
+    "          \"context\": \"user needs help with a task\",\n"
+    "          \"incoming\": \"Can you help me draft an email to my team about the new "
+    "project timeline?\",\n"
+    "          \"response\": \"Of course. What's the key message — are timelines moving "
+    "up or getting pushed back? And what tone do you want — casual update or more formal "
+    "announcement?\"\n"
+    "        }\n"
+    "      ]\n"
+    "    }\n"
+    "  ]\n"
     "}\n";
 #endif
 
@@ -107,6 +193,7 @@ hu_error_t cmd_init(hu_allocator_t *alloc, int argc, char **argv) {
     if (mkdir(dir_path, 0700) != 0 && errno != EEXIST)
         return HU_ERR_IO;
 
+    /* Write config.json */
     FILE *f = fopen(config_path, "w");
     if (!f)
         return HU_ERR_IO;
@@ -118,9 +205,34 @@ hu_error_t cmd_init(hu_allocator_t *alloc, int argc, char **argv) {
     }
     fclose(f);
 
+    /* Create personas directory and starter persona */
+    char persona_dir[HU_INIT_MAX_PATH];
+    n = snprintf(persona_dir, sizeof(persona_dir), "%s/%s/personas", home, HU_INIT_CONFIG_DIR);
+    if (n > 0 && (size_t)n < sizeof(persona_dir)) {
+        if (mkdir(persona_dir, 0700) == 0 || errno == EEXIST) {
+            char persona_path[HU_INIT_MAX_PATH];
+            n = snprintf(persona_path, sizeof(persona_path), "%s/default.json", persona_dir);
+            if (n > 0 && (size_t)n < sizeof(persona_path) && access(persona_path, F_OK) != 0) {
+                FILE *pf = fopen(persona_path, "w");
+                if (pf) {
+                    size_t plen = sizeof(HU_INIT_DEFAULT_PERSONA) - 1;
+                    (void)fwrite(HU_INIT_DEFAULT_PERSONA, 1, plen, pf);
+                    fclose(pf);
+                }
+            }
+        }
+    }
+
     printf("Created ~/.human/config.json\n");
-    printf("Set your API key: export OPENAI_API_KEY=sk-...\n");
+    printf("Created ~/.human/personas/default.json (starter persona)\n");
+    printf("\n");
+    printf("Set up your provider (pick one):\n");
+    printf("  Gemini:  export GEMINI_API_KEY=your-key\n");
+    printf("  OpenAI:  export OPENAI_API_KEY=sk-...\n");
+    printf("  Ollama:  ollama serve  (no API key needed)\n");
+    printf("\n");
     printf("Start chatting: human agent\n");
+    printf("Customize your persona: human persona update default\n");
     return HU_OK;
 #endif /* !HU_IS_TEST */
 }
@@ -2300,9 +2412,7 @@ static hu_error_t hula_demo_execute(void *ctx, hu_allocator_t *alloc, const hu_j
     char buf[256];
     int n = snprintf(buf, sizeof(buf), "[%s] %s", t->name, text);
     out->success = true;
-    size_t len = (n > 0 && (size_t)n < sizeof(buf)) ? (size_t)n
-                 : (n > 0) ? (sizeof(buf) - 1U)
-                           : 0U;
+    size_t len = (n > 0 && (size_t)n < sizeof(buf)) ? (size_t)n : (n > 0) ? (sizeof(buf) - 1U) : 0U;
     out->output = hu_strndup(alloc, buf, len);
     out->output_len = len;
     out->output_owned = true;

@@ -7,6 +7,7 @@
 #include <string.h>
 #ifdef _WIN32
 #include <direct.h>
+#include <io.h>
 #else
 #include <sys/stat.h>
 #include <unistd.h>
@@ -74,6 +75,90 @@ static const char *const HU_IDENTITY_TEMPLATE =
     "name: Human\n"
     "description: Autonomous AI assistant running locally\n"
     "personality: Helpful, concise, security-conscious\n";
+
+/* Same starter persona as cmd_init (HU_INIT_DEFAULT_PERSONA in cli_commands.c). */
+static const char HU_ONBOARD_DEFAULT_PERSONA[] =
+    "{\n"
+    "  \"version\": 1,\n"
+    "  \"name\": \"default\",\n"
+    "  \"core\": {\n"
+    "    \"identity\": \"A helpful, thoughtful personal assistant that adapts to your "
+    "style over time.\",\n"
+    "    \"traits\": [\"attentive\", \"concise\", \"warm\"],\n"
+    "    \"communication_rules\": [\n"
+    "      \"Match the user's energy and formality level\",\n"
+    "      \"Be direct but not curt\",\n"
+    "      \"Remember context from previous conversations\"\n"
+    "    ]\n"
+    "  },\n"
+    "  \"channel_overlays\": [\n"
+    "    {\n"
+    "      \"channel\": \"imessage\",\n"
+    "      \"formality\": 0.2,\n"
+    "      \"avg_length\": 40,\n"
+    "      \"emoji_usage\": 0.3,\n"
+    "      \"style_notes\": \"Casual texting style. Short messages. "
+    "Use tapbacks when appropriate.\"\n"
+    "    },\n"
+    "    {\n"
+    "      \"channel\": \"telegram\",\n"
+    "      \"formality\": 0.3,\n"
+    "      \"avg_length\": 80,\n"
+    "      \"emoji_usage\": 0.2,\n"
+    "      \"style_notes\": \"Conversational but slightly more detailed than texting.\"\n"
+    "    },\n"
+    "    {\n"
+    "      \"channel\": \"discord\",\n"
+    "      \"formality\": 0.2,\n"
+    "      \"avg_length\": 60,\n"
+    "      \"emoji_usage\": 0.4,\n"
+    "      \"style_notes\": \"Relaxed community tone. React with emoji when fitting.\"\n"
+    "    },\n"
+    "    {\n"
+    "      \"channel\": \"slack\",\n"
+    "      \"formality\": 0.5,\n"
+    "      \"avg_length\": 100,\n"
+    "      \"emoji_usage\": 0.1,\n"
+    "      \"style_notes\": \"Professional but approachable. Use threads. "
+    "Be concise.\"\n"
+    "    },\n"
+    "    {\n"
+    "      \"channel\": \"cli\",\n"
+    "      \"formality\": 0.4,\n"
+    "      \"avg_length\": 200,\n"
+    "      \"emoji_usage\": 0.0,\n"
+    "      \"style_notes\": \"Technical, precise. No emoji. "
+    "Format code blocks when showing code.\"\n"
+    "    }\n"
+    "  ],\n"
+    "  \"example_banks\": [\n"
+    "    {\n"
+    "      \"channel\": \"cli\",\n"
+    "      \"examples\": [\n"
+    "        {\n"
+    "          \"context\": \"user asks about their schedule\",\n"
+    "          \"incoming\": \"What do I have going on today?\",\n"
+    "          \"response\": \"Let me check your calendar. You have a team standup at "
+    "10am and a dentist appointment at 3pm. Want me to set a reminder for the dentist?\"\n"
+    "        },\n"
+    "        {\n"
+    "          \"context\": \"user shares something personal\",\n"
+    "          \"incoming\": \"I got the promotion!\",\n"
+    "          \"response\": \"That's amazing, congratulations! All that hard work paid off. "
+    "How are you planning to celebrate?\"\n"
+    "        },\n"
+    "        {\n"
+    "          \"context\": \"user needs help with a task\",\n"
+    "          \"incoming\": \"Can you help me draft an email to my team about the new "
+    "project timeline?\",\n"
+    "          \"response\": \"Of course. What's the key message — are timelines moving "
+    "up or getting pushed back? And what tone do you want — casual update or more formal "
+    "announcement?\"\n"
+    "        }\n"
+    "      ]\n"
+    "    }\n"
+    "  ]\n"
+    "}\n";
 
 static bool write_template_if_missing(const char *path, const char *content) {
     FILE *check = fopen(path, "rb");
@@ -151,20 +236,17 @@ hu_error_t hu_onboard_run_with_args(hu_allocator_t *alloc, const char *cli_provi
         };
 #else
         static const hu_choice_t provider_choices[] = {
-            {"Gemini (cloud)", "gemini", true},
-            {"OpenAI (GPT-4, etc.)", "openai", false},
-            {"Anthropic (Claude)", "anthropic", false},
-            {"Ollama (local)", "ollama", false},
+            {"Gemini (cloud)", "gemini", true},         {"OpenAI (GPT-4, etc.)", "openai", false},
+            {"Anthropic (Claude)", "anthropic", false}, {"Ollama (local)", "ollama", false},
             {"OpenRouter", "openrouter", false},
         };
 #endif
         hu_choice_result_t provider_result;
-        hu_error_t err = hu_choices_prompt(
-            "Choose your default provider:", provider_choices,
-            sizeof(provider_choices) / sizeof(provider_choices[0]), &provider_result);
-        provider = (err == HU_OK && provider_result.selected_value)
-                       ? provider_result.selected_value
-                       : provider_choices[0].value;
+        hu_error_t err = hu_choices_prompt("Choose your default provider:", provider_choices,
+                                           sizeof(provider_choices) / sizeof(provider_choices[0]),
+                                           &provider_result);
+        provider = (err == HU_OK && provider_result.selected_value) ? provider_result.selected_value
+                                                                    : provider_choices[0].value;
     }
 
     if (is_apple_provider(provider)) {
@@ -273,10 +355,44 @@ hu_error_t hu_onboard_run_with_args(hu_allocator_t *alloc, const char *cli_provi
                 api_key);
     else
         fprintf(f, "  \"providers\": [],\n");
+    fprintf(f, "  \"agent\": {\"persona\": \"default\"},\n");
     fprintf(f, "  \"memory\": {\"backend\": \"sqlite\", \"auto_save\": true},\n");
     fprintf(f, "  \"gateway\": {\"port\": 3000, \"host\": \"127.0.0.1\"}\n");
     fprintf(f, "}\n");
     fclose(f);
+
+#ifndef HU_IS_TEST
+    {
+        char persona_dir[HU_MAX_PATH];
+        int pn = snprintf(persona_dir, sizeof(persona_dir), "%s/%s/personas", home, HU_CONFIG_DIR);
+        if (pn > 0 && (size_t)pn < sizeof(persona_dir)) {
+#ifdef _WIN32
+            (void)_mkdir(persona_dir);
+#else
+            (void)mkdir(persona_dir, 0700);
+#endif
+            char persona_path[HU_MAX_PATH];
+            pn = snprintf(persona_path, sizeof(persona_path), "%s/default.json", persona_dir);
+            if (pn > 0 && (size_t)pn < sizeof(persona_path)) {
+#ifdef _WIN32
+                if (_access(persona_path, 0) != 0)
+#else
+                if (access(persona_path, F_OK) != 0)
+#endif
+                {
+                    FILE *pf = fopen(persona_path, "w");
+                    if (pf) {
+                        size_t plen = sizeof(HU_ONBOARD_DEFAULT_PERSONA) - 1;
+                        if (fwrite(HU_ONBOARD_DEFAULT_PERSONA, 1, plen, pf) == plen)
+                            printf("Starter persona created at %s\n", persona_path);
+                        fclose(pf);
+                    }
+                }
+            }
+        }
+    }
+#endif /* !HU_IS_TEST */
+
     alloc->free(alloc->ctx, ws_dir, strlen(ws_dir) + 1);
 
     printf("\nConfig written to %s\n", config_path);

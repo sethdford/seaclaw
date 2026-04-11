@@ -184,8 +184,7 @@ void hu_persona_deinit(hu_allocator_t *alloc, hu_persona_t *persona) {
         alloc->free(alloc->ctx, persona->biography, strlen(persona->biography) + 1);
     }
     if (persona->recent_activity) {
-        alloc->free(alloc->ctx, persona->recent_activity,
-                    strlen(persona->recent_activity) + 1);
+        alloc->free(alloc->ctx, persona->recent_activity, strlen(persona->recent_activity) + 1);
     }
     free_string_array(alloc, persona->directors_notes, persona->directors_notes_count);
     free_string_array(alloc, persona->mood_states, persona->mood_states_count);
@@ -492,10 +491,11 @@ hu_error_t hu_contact_profile_build_context(hu_allocator_t *alloc, const hu_cont
     if (cp->relationship_stage) {
         const char *stage = cp->relationship_stage;
         if (strcmp(stage, "stranger") == 0) {
-            pos = hu_buf_appendf(buf, cap, pos,
-                                 "\nSTAGE RULES: This is a new contact. Be polite, warm but boundaried. "
-                                 "Ask permission before probing questions. No tough love. "
-                                 "No deep vulnerability. Keep it surface-level friendly.\n");
+            pos = hu_buf_appendf(
+                buf, cap, pos,
+                "\nSTAGE RULES: This is a new contact. Be polite, warm but boundaried. "
+                "Ask permission before probing questions. No tough love. "
+                "No deep vulnerability. Keep it surface-level friendly.\n");
         } else if (strcmp(stage, "acquaintance") == 0) {
             pos = hu_buf_appendf(buf, cap, pos,
                                  "\nSTAGE RULES: You know this person casually. "
@@ -509,11 +509,12 @@ hu_error_t hu_contact_profile_build_context(hu_allocator_t *alloc, const hu_cont
                 "Warmth level: warm.\n");
         } else if (strcmp(stage, "trusted_confidant") == 0 || strcmp(stage, "inner_circle") == 0 ||
                    strcmp(stage, "close_family") == 0) {
-            pos = hu_buf_appendf(buf, cap, pos,
-                                 "\nSTAGE RULES: This is inner circle. No filters needed. "
-                                 "You can disagree strongly, express disappointment, share deepest fears, "
-                                 "give tough love, challenge their beliefs. Full vulnerability. "
-                                 "Warmth level: family/loving.\n");
+            pos = hu_buf_appendf(
+                buf, cap, pos,
+                "\nSTAGE RULES: This is inner circle. No filters needed. "
+                "You can disagree strongly, express disappointment, share deepest fears, "
+                "give tough love, challenge their beliefs. Full vulnerability. "
+                "Warmth level: family/loving.\n");
         }
     }
 
@@ -722,14 +723,14 @@ char *hu_persona_build_inner_world_graduated(hu_allocator_t *alloc, const hu_per
     int w;
 
     /* Safe advance: snprintf return value can exceed cap - pos on truncation. */
-#define ADVANCE(_w)                                                                                \
-    do {                                                                                           \
-        if ((_w) > 0) {                                                                            \
-            size_t _inc = (size_t)(_w);                                                           \
-            if (_inc >= cap - pos)                                                                 \
-                _inc = (cap > pos) ? cap - pos - 1 : 0;                                            \
-            pos += _inc;                                                                           \
-        }                                                                                          \
+#define ADVANCE(_w)                                     \
+    do {                                                \
+        if ((_w) > 0) {                                 \
+            size_t _inc = (size_t)(_w);                 \
+            if (_inc >= cap - pos)                      \
+                _inc = (cap > pos) ? cap - pos - 1 : 0; \
+            pos += _inc;                                \
+        }                                               \
     } while (0)
 
     /* Use time as entropy for subset selection */
@@ -2036,8 +2037,8 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
             }
             arr = hu_json_object_get(cval, "sensitive_topics");
             if (arr) {
-                err =
-                    parse_string_array(alloc, arr, &cp->sensitive_topics, &cp->sensitive_topics_count);
+                err = parse_string_array(alloc, arr, &cp->sensitive_topics,
+                                         &cp->sensitive_topics_count);
                 if (err != HU_OK)
                     goto contacts_parse_fail;
             }
@@ -2081,7 +2082,7 @@ hu_error_t hu_persona_load_json(hu_allocator_t *alloc, const char *json, size_t 
         out->contacts_count = count;
         goto contacts_parse_done;
 
-contacts_parse_fail:
+    contacts_parse_fail:
         for (size_t j = 0; j <= count; j++)
             free_contact_profile(alloc, &contacts[j]);
         alloc->free(alloc->ctx, contacts, n * sizeof(hu_contact_profile_t));
@@ -2089,7 +2090,7 @@ contacts_parse_fail:
         hu_json_free(alloc, root);
         return err;
 
-contacts_parse_done:;
+    contacts_parse_done:;
     }
 
     hu_json_value_t *overlays_obj = hu_json_object_get(root, "channel_overlays");
@@ -2121,6 +2122,54 @@ contacts_parse_done:;
         }
         out->overlays = ovs;
         out->overlays_count = count;
+    }
+
+    /* Inline example_banks: [{"channel":"cli","examples":[...]}, ...] */
+    {
+        hu_json_value_t *eb_root = hu_json_object_get(root, "example_banks");
+        if (eb_root && eb_root->type == HU_JSON_ARRAY && eb_root->data.array.items) {
+            size_t n_eb = eb_root->data.array.len;
+            for (size_t bi = 0; bi < n_eb; bi++) {
+                hu_json_value_t *bitem = eb_root->data.array.items[bi];
+                if (!bitem || bitem->type != HU_JSON_OBJECT)
+                    continue;
+                const char *bank_ch = hu_json_get_string(bitem, "channel");
+                if (!bank_ch || !bank_ch[0])
+                    continue;
+                hu_json_value_t *exa = hu_json_object_get(bitem, "examples");
+                if (!exa || exa->type != HU_JSON_ARRAY)
+                    continue;
+
+                hu_persona_example_bank_t tmp;
+                memset(&tmp, 0, sizeof(tmp));
+                hu_error_t eeb =
+                    hu_persona_examples_bank_from_array(alloc, bank_ch, strlen(bank_ch), exa, &tmp);
+                if (eeb != HU_OK) {
+                    hu_persona_deinit(alloc, out);
+                    hu_json_free(alloc, root);
+                    return eeb;
+                }
+                if (!tmp.channel || tmp.examples_count == 0) {
+                    free_example_bank(alloc, &tmp);
+                    continue;
+                }
+
+                size_t bc = out->example_banks_count;
+                hu_persona_example_bank_t *banks = out->example_banks;
+                hu_persona_example_bank_t *new_banks = (hu_persona_example_bank_t *)alloc->realloc(
+                    alloc->ctx, banks, bc * sizeof(hu_persona_example_bank_t),
+                    (bc + 1) * sizeof(hu_persona_example_bank_t));
+                if (!new_banks) {
+                    free_example_bank(alloc, &tmp);
+                    hu_persona_deinit(alloc, out);
+                    hu_json_free(alloc, root);
+                    return HU_ERR_OUT_OF_MEMORY;
+                }
+                out->example_banks = new_banks;
+                new_banks[bc] = tmp;
+                out->example_banks_count = bc + 1;
+            }
+        }
     }
 
     if (oom_on_optional)
@@ -2453,8 +2502,8 @@ hu_error_t hu_persona_load(hu_allocator_t *alloc, const char *name, size_t name_
     /* Fallback: try embedded data (personas/<name>.json) */
     if (!found_file) {
         char embed_path[HU_PERSONA_PATH_MAX];
-        int en = snprintf(embed_path, sizeof(embed_path), "personas/%.*s.json",
-                          (int)name_len, name);
+        int en =
+            snprintf(embed_path, sizeof(embed_path), "personas/%.*s.json", (int)name_len, name);
         if (en <= 0 || (size_t)en >= sizeof(embed_path))
             return HU_ERR_NOT_FOUND;
         hu_error_t lerr = hu_data_load_embedded(alloc, embed_path, &buf, &read_len);
@@ -2476,8 +2525,8 @@ hu_error_t hu_persona_load(hu_allocator_t *alloc, const char *name, size_t name_
         const char *home = getenv("HOME");
         if (home) {
             char ra_path[HU_PERSONA_PATH_MAX];
-            int rn = snprintf(ra_path, sizeof(ra_path), "%s/.human/photos/recent_activity.json",
-                              home);
+            int rn =
+                snprintf(ra_path, sizeof(ra_path), "%s/.human/photos/recent_activity.json", home);
             if (rn > 0 && (size_t)rn < sizeof(ra_path)) {
                 FILE *rf = fopen(ra_path, "rb");
                 if (rf) {
@@ -2491,10 +2540,8 @@ hu_error_t hu_persona_load(hu_allocator_t *alloc, const char *name, size_t name_
                                 rbuf[rrd] = '\0';
                                 /* Parse the JSON to build a concise summary string */
                                 hu_json_value_t *ra_root = NULL;
-                                hu_error_t jerr =
-                                    hu_json_parse(alloc, rbuf, rrd, &ra_root);
-                                if (jerr == HU_OK && ra_root &&
-                                    ra_root->type == HU_JSON_OBJECT) {
+                                hu_error_t jerr = hu_json_parse(alloc, rbuf, rrd, &ra_root);
+                                if (jerr == HU_OK && ra_root && ra_root->type == HU_JSON_OBJECT) {
                                     hu_json_value_t *locs =
                                         hu_json_object_get(ra_root, "locations");
                                     int window =
@@ -2509,24 +2556,18 @@ hu_error_t hu_persona_load(hu_allocator_t *alloc, const char *name, size_t name_
                                                           "photos): ",
                                                           window, photo_count);
                                         size_t loc_count = locs->data.array.len;
-                                        for (size_t li = 0;
-                                             li < loc_count && li < 5 &&
-                                             (size_t)sn < sizeof(summary) - 60;
+                                        for (size_t li = 0; li < loc_count && li < 5 &&
+                                                            (size_t)sn < sizeof(summary) - 60;
                                              li++) {
-                                            const hu_json_value_t *loc =
-                                                locs->data.array.items[li];
+                                            const hu_json_value_t *loc = locs->data.array.items[li];
                                             if (!loc || loc->type != HU_JSON_OBJECT)
                                                 continue;
-                                            const char *place =
-                                                hu_json_get_string(loc, "place");
-                                            int pc = (int)hu_json_get_number(
-                                                loc, "photo_count", 0);
+                                            const char *place = hu_json_get_string(loc, "place");
+                                            int pc = (int)hu_json_get_number(loc, "photo_count", 0);
                                             if (place && pc > 0) {
-                                                sn += snprintf(summary + sn,
-                                                               sizeof(summary) - (size_t)sn,
-                                                               "%s%s (%d)",
-                                                               li > 0 ? ", " : "", place,
-                                                               pc);
+                                                sn += snprintf(
+                                                    summary + sn, sizeof(summary) - (size_t)sn,
+                                                    "%s%s (%d)", li > 0 ? ", " : "", place, pc);
                                             }
                                         }
                                         if ((size_t)sn < sizeof(summary))

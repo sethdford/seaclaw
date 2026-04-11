@@ -9,6 +9,8 @@
 #include "human/persona/relationship.h"
 
 #include <stdbool.h>
+
+struct hu_json_value;
 #include <stddef.h>
 #include <stdint.h>
 
@@ -297,12 +299,12 @@ typedef struct hu_voice_messages_config {
 
 /* Voice config — Cartesia TTS, cloned voice UUID, model, emotion */
 typedef struct hu_persona_voice_config {
-    char provider[32];        /* "cartesia" */
-    char voice_id[64];        /* UUID */
-    char model[64];           /* "sonic-3-2026-01-12" */
-    char default_emotion[32]; /* "content" */
-    float default_speed;      /* 0.95 */
-    bool nonverbals;          /* true */
+    char provider[32];         /* "cartesia" */
+    char voice_id[64];         /* UUID */
+    char model[64];            /* "sonic-3-2026-01-12" */
+    char default_emotion[32];  /* "content" */
+    float default_speed;       /* 0.95 */
+    bool nonverbals;           /* true */
     float vulnerability_level; /* 0.0–1.0, EMA-tracked from content */
 } hu_persona_voice_config_t;
 
@@ -445,6 +447,13 @@ hu_error_t hu_persona_validate_json(hu_allocator_t *alloc, const char *json, siz
 hu_error_t hu_persona_examples_load_json(hu_allocator_t *alloc, const char *channel,
                                          size_t channel_len, const char *json, size_t json_len,
                                          hu_persona_example_bank_t *out);
+
+/* Populate one example bank from an already-parsed JSON "examples" array (persona file
+ * "example_banks" entries). On success, out is filled; on failure, out is cleared. */
+hu_error_t hu_persona_examples_bank_from_array(hu_allocator_t *alloc, const char *channel,
+                                               size_t channel_len,
+                                               const struct hu_json_value *examples_arr,
+                                               hu_persona_example_bank_t *out);
 
 void hu_persona_deinit(hu_allocator_t *alloc, hu_persona_t *persona);
 
