@@ -2359,6 +2359,106 @@ static void test_discord_send_captures_last_message(void) {
     HU_ASSERT_STR_EQ(msg, "Test reply");
     hu_discord_destroy(&ch);
 }
+
+static void test_discord_mock_full_group_sets_is_group(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_discord_create(&alloc, "token", 5, &ch), HU_OK);
+
+    hu_discord_test_msg_opts_t opts = {
+        .is_group = true,
+        .chat_id = "1234567890",
+        .message_id = 9999,
+        .timestamp_sec = 1700000000,
+        .has_attachment = true,
+    };
+    HU_ASSERT_EQ(hu_discord_test_inject_mock_full(&ch, "ch1", 3, "hello", 5, &opts), HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_discord_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_TRUE(msgs[0].is_group);
+    HU_ASSERT_STR_EQ(msgs[0].chat_id, "1234567890");
+    HU_ASSERT_EQ(msgs[0].message_id, (int64_t)9999);
+    HU_ASSERT_EQ(msgs[0].timestamp_sec, (int64_t)1700000000);
+    HU_ASSERT_TRUE(msgs[0].has_attachment);
+
+    hu_discord_destroy(&ch);
+}
+
+static void test_discord_mock_full_reply_and_video(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_discord_create(&alloc, "token", 5, &ch), HU_OK);
+
+    hu_discord_test_msg_opts_t opts = {
+        .reply_to_guid = "88888",
+        .message_id = 99999,
+        .has_video = true,
+    };
+    HU_ASSERT_EQ(hu_discord_test_inject_mock_full(&ch, "ch1", 3, "reply", 5, &opts), HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_discord_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_STR_EQ(msgs[0].reply_to_guid, "88888");
+    HU_ASSERT_TRUE(msgs[0].has_video);
+    HU_ASSERT_EQ(msgs[0].message_id, (int64_t)99999);
+
+    hu_discord_destroy(&ch);
+}
+
+static void test_discord_mock_full_dm_no_group(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_discord_create(&alloc, "token", 5, &ch), HU_OK);
+
+    hu_discord_test_msg_opts_t opts = {.is_group = false};
+    HU_ASSERT_EQ(hu_discord_test_inject_mock_full(&ch, "ch1", 3, "dm", 2, &opts), HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_discord_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_TRUE(!msgs[0].is_group);
+    HU_ASSERT_STR_EQ(msgs[0].chat_id, "");
+
+    hu_discord_destroy(&ch);
+}
+
+static void test_discord_mock_full_null_opts_rejected(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_discord_create(&alloc, "token", 5, &ch), HU_OK);
+
+    hu_error_t err = hu_discord_test_inject_mock_full(&ch, "u", 1, "t", 1, NULL);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+
+    hu_discord_destroy(&ch);
+}
+
+static void test_discord_mock_full_timestamp_propagated(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_discord_create(&alloc, "token", 5, &ch), HU_OK);
+
+    hu_discord_test_msg_opts_t opts = {.timestamp_sec = 1680000000};
+    HU_ASSERT_EQ(hu_discord_test_inject_mock_full(&ch, "ch1", 3, "ts", 2, &opts), HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_discord_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_EQ(msgs[0].timestamp_sec, (int64_t)1680000000);
+
+    hu_discord_destroy(&ch);
+}
 #endif
 #endif
 
@@ -3016,6 +3116,11 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_discord_load_conversation_history_empty_in_test);
     HU_RUN_TEST(test_discord_inject_and_poll);
     HU_RUN_TEST(test_discord_send_captures_last_message);
+    HU_RUN_TEST(test_discord_mock_full_group_sets_is_group);
+    HU_RUN_TEST(test_discord_mock_full_reply_and_video);
+    HU_RUN_TEST(test_discord_mock_full_dm_no_group);
+    HU_RUN_TEST(test_discord_mock_full_null_opts_rejected);
+    HU_RUN_TEST(test_discord_mock_full_timestamp_propagated);
 #endif
 #endif
 #if HU_HAS_SLACK
