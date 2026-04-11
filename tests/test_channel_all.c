@@ -2081,6 +2081,120 @@ static void test_telegram_send_captures_last_message(void) {
     HU_ASSERT_STR_EQ(msg, "Test reply");
     hu_telegram_destroy(&ch);
 }
+
+static void test_telegram_mock_full_group_sets_is_group(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_telegram_create(&alloc, "123:tok", 7, &ch), HU_OK);
+
+    hu_telegram_test_msg_opts_t opts = {
+        .is_group = true,
+        .chat_id = "-100123456",
+        .message_id = 42,
+        .timestamp_sec = 1700000000,
+    };
+    HU_ASSERT_EQ(hu_telegram_test_inject_mock_full(&ch, "user1", 5, "hi group", 8, &opts), HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_telegram_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_TRUE(msgs[0].is_group);
+    HU_ASSERT_STR_EQ(msgs[0].chat_id, "-100123456");
+    HU_ASSERT_EQ(msgs[0].message_id, (int64_t)42);
+    HU_ASSERT_EQ(msgs[0].timestamp_sec, (int64_t)1700000000);
+
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_mock_full_dm_no_group(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_telegram_create(&alloc, "123:tok", 7, &ch), HU_OK);
+
+    hu_telegram_test_msg_opts_t opts = {.is_group = false};
+    HU_ASSERT_EQ(hu_telegram_test_inject_mock_full(&ch, "user1", 5, "dm msg", 6, &opts), HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_telegram_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_TRUE(!msgs[0].is_group);
+    HU_ASSERT_STR_EQ(msgs[0].chat_id, "");
+
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_mock_full_reply_to_guid(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_telegram_create(&alloc, "123:tok", 7, &ch), HU_OK);
+
+    hu_telegram_test_msg_opts_t opts = {
+        .reply_to_guid = "99",
+        .message_id = 100,
+    };
+    HU_ASSERT_EQ(hu_telegram_test_inject_mock_full(&ch, "user1", 5, "reply", 5, &opts), HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_telegram_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_STR_EQ(msgs[0].reply_to_guid, "99");
+    HU_ASSERT_EQ(msgs[0].message_id, (int64_t)100);
+
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_mock_full_attachment_flag(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_telegram_create(&alloc, "123:tok", 7, &ch), HU_OK);
+
+    hu_telegram_test_msg_opts_t opts = {.has_attachment = true};
+    HU_ASSERT_EQ(hu_telegram_test_inject_mock_full(&ch, "user1", 5, "[IMAGE:url]", 11, &opts), HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_telegram_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_TRUE(msgs[0].has_attachment);
+
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_mock_full_null_opts_rejected(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_telegram_create(&alloc, "123:tok", 7, &ch), HU_OK);
+
+    hu_error_t err = hu_telegram_test_inject_mock_full(&ch, "u", 1, "t", 1, NULL);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+
+    hu_telegram_destroy(&ch);
+}
+
+static void test_telegram_mock_full_timestamp_propagated(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_telegram_create(&alloc, "123:tok", 7, &ch), HU_OK);
+
+    hu_telegram_test_msg_opts_t opts = {.timestamp_sec = 1680000000};
+    HU_ASSERT_EQ(hu_telegram_test_inject_mock_full(&ch, "user1", 5, "ts", 2, &opts), HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_telegram_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_EQ(msgs[0].timestamp_sec, (int64_t)1680000000);
+
+    hu_telegram_destroy(&ch);
+}
 #endif
 #endif
 
@@ -2872,6 +2986,12 @@ void run_channel_all_tests(void) {
 #if HU_IS_TEST
     HU_RUN_TEST(test_telegram_inject_and_poll);
     HU_RUN_TEST(test_telegram_send_captures_last_message);
+    HU_RUN_TEST(test_telegram_mock_full_group_sets_is_group);
+    HU_RUN_TEST(test_telegram_mock_full_dm_no_group);
+    HU_RUN_TEST(test_telegram_mock_full_reply_to_guid);
+    HU_RUN_TEST(test_telegram_mock_full_attachment_flag);
+    HU_RUN_TEST(test_telegram_mock_full_null_opts_rejected);
+    HU_RUN_TEST(test_telegram_mock_full_timestamp_propagated);
 #endif
 #endif
 #if HU_HAS_DISCORD
