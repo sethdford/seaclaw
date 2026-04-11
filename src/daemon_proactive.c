@@ -23,17 +23,15 @@
 #include "human/agent/weather_awareness.h"
 #include "human/agent/weather_fetch.h"
 #include "human/config.h"
+#include "human/context/protective.h"
 #include "human/core/string.h"
 #include "human/feeds/awareness.h"
 #include "human/feeds/processor.h"
 #include "human/memory.h"
 #include "human/memory/compression.h"
+#include "human/memory/degradation.h"
 #include "human/persona.h"
 #include "human/platform.h"
-#ifdef HU_HAS_PERSONA
-#include "human/context/protective.h"
-#include "human/memory/degradation.h"
-#endif
 #ifdef HU_ENABLE_SQLITE
 #include "human/memory/superhuman.h"
 #endif
@@ -209,14 +207,8 @@ char *hu_daemon_build_callback_context(hu_allocator_t *alloc, hu_memory_t *memor
     struct tm *lt = hu_platform_localtime_r(&now, &tm_buf);
     int hour_local = lt ? lt->tm_hour : 12;
     float deg_rate = 0.10f;
-#ifdef HU_HAS_PERSONA
     if (agent && agent->persona && agent->persona->memory_degradation_rate > 0.f)
         deg_rate = agent->persona->memory_degradation_rate;
-#else
-    (void)agent;
-    (void)hour_local;
-    (void)deg_rate;
-#endif
 
     char buf[2048];
     size_t pos = 0;
@@ -228,17 +220,14 @@ char *hu_daemon_build_callback_context(hu_allocator_t *alloc, hu_memory_t *memor
     for (size_t i = 0; i < count && i < 3; i++) {
         if (!entries[i].content || entries[i].content_len == 0)
             continue;
-#ifdef HU_HAS_PERSONA
         if (agent &&
             !hu_protective_memory_ok(alloc, memory, session_id, session_id_len, entries[i].content,
                                      entries[i].content_len, 0.0f, hour_local))
             continue;
-#endif
         const char *content = entries[i].content;
         size_t content_len = entries[i].content_len;
         char *degraded = NULL;
         size_t degraded_len = 0;
-#ifdef HU_HAS_PERSONA
         uint32_t seed = (uint32_t)now * 1103515245u + 12345u + (uint32_t)i;
         degraded =
             hu_memory_degradation_apply(alloc, content, content_len, seed, deg_rate, &degraded_len);
@@ -246,7 +235,6 @@ char *hu_daemon_build_callback_context(hu_allocator_t *alloc, hu_memory_t *memor
             content = degraded;
             content_len = degraded_len;
         }
-#endif
         size_t show = content_len;
         if (show > 200)
             show = 200;
@@ -306,7 +294,6 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
     /* Calendar awareness: inject today's events when calendar_enabled */
     char *calendar_ctx = NULL;
     size_t calendar_ctx_len = 0;
-#ifdef HU_HAS_PERSONA
     if (agent && agent->persona && agent->persona->context_awareness.calendar_enabled) {
 #if defined(__APPLE__)
         char *events_json = NULL;
@@ -334,12 +321,10 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
         }
 #endif
     }
-#endif /* HU_HAS_PERSONA calendar */
 
     /* F51: Weather awareness — inject notable weather for proactive context */
     char *weather_ctx = NULL;
     size_t weather_ctx_len = 0;
-#ifdef HU_HAS_PERSONA
     if (agent && agent->persona && agent->persona->location[0]) {
         hu_weather_context_t wx = {0};
         (void)hu_weather_fetch(alloc, agent->persona->location, strlen(agent->persona->location),
@@ -361,13 +346,11 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
                 alloc->free(alloc->ctx, wx_dir, wx_len + 1);
         }
     }
-#endif /* HU_HAS_PERSONA weather */
 
 #ifdef HU_ENABLE_SQLITE
     /* Recent feeds → natural bring-up hooks for this contact (high relevance only). */
     char *feed_aware_ctx = NULL;
     size_t feed_aware_ctx_len = 0;
-#ifdef HU_HAS_PERSONA
     if (memory && agent && agent->persona) {
         sqlite3 *fdb = hu_sqlite_memory_get_db(memory);
         if (fdb) {
@@ -402,8 +385,7 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
                                 int n0 = snprintf(abuf, need,
                                                   "FEED AWARENESS — optional natural "
                                                   "bring-up (high relevance):\n");
-                                size_t ap =
-                                    (n0 > 0 && (size_t)n0 < need) ? (size_t)n0 : 0;
+                                size_t ap = (n0 > 0 && (size_t)n0 < need) ? (size_t)n0 : 0;
                                 for (size_t ti = 0; ti < tcount; ti++) {
                                     if (topics[ti].relevance < 0.65)
                                         continue;
@@ -430,7 +412,6 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
             }
         }
     }
-#endif /* HU_HAS_PERSONA feed awareness */
 #endif /* HU_ENABLE_SQLITE feed awareness */
 
     static const char HU_DEFAULT_PROACTIVE_RULES[] =
@@ -442,17 +423,12 @@ char *hu_daemon_proactive_prompt_for_contact(hu_allocator_t *alloc, hu_agent_t *
         "4. If you have nothing specific, share something you saw/did "
         "that made you think of them. "
         "5. Reply SKIP if you genuinely have nothing natural to say.";
-#ifdef HU_HAS_PERSONA
     const char *rules = (agent && agent->persona && agent->persona->proactive_rules)
                             ? agent->persona->proactive_rules
                             : HU_DEFAULT_PROACTIVE_RULES;
     size_t rules_len = (agent && agent->persona && agent->persona->proactive_rules)
                            ? strlen(rules)
                            : sizeof(HU_DEFAULT_PROACTIVE_RULES) - 1;
-#else
-    const char *rules = HU_DEFAULT_PROACTIVE_RULES;
-    size_t rules_len = sizeof(HU_DEFAULT_PROACTIVE_RULES) - 1;
-#endif
 
     char base_buf[256];
     int w = snprintf(base_buf, sizeof(base_buf), "You're initiating a casual check-in text to %s. ",

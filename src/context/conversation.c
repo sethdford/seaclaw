@@ -3,10 +3,8 @@
 #include "human/core/json.h"
 #include "human/core/string.h"
 #include "human/data/loader.h"
-#include "human/provider.h"
-#ifdef HU_HAS_PERSONA
 #include "human/persona.h"
-#endif
+#include "human/provider.h"
 #ifdef HU_ENABLE_SQLITE
 #include "human/memory.h"
 #include "human/memory/emotional_moments.h"
@@ -462,16 +460,16 @@ void hu_conversation_data_cleanup(void) {
 
 /* Safe pos advance: snprintf returns the would-be length even when truncated.
  * Clamp to remaining buffer capacity to prevent out-of-bounds writes. */
-#define POS_ADVANCE(w, pos, cap)           \
-    do {                                   \
-        if ((w) > 0) {                     \
-            size_t _add = (size_t)(w);     \
-            if ((pos) >= (cap) - 1)        \
-                break;                     \
-            if (_add > (cap) - 1 - (pos))  \
-                _add = (cap) - 1 - (pos);  \
-            (pos) += _add;                 \
-        }                                  \
+#define POS_ADVANCE(w, pos, cap)          \
+    do {                                  \
+        if ((w) > 0) {                    \
+            size_t _add = (size_t)(w);    \
+            if ((pos) >= (cap) - 1)       \
+                break;                    \
+            if (_add > (cap) - 1 - (pos)) \
+                _add = (cap) - 1 - (pos); \
+            (pos) += _add;                \
+        }                                 \
     } while (0)
 
 static bool str_contains_ci(const char *haystack, size_t hlen, const char *needle)
@@ -1109,9 +1107,6 @@ static const char *day_name(int wday) {
 char *hu_conversation_build_awareness(hu_allocator_t *alloc,
                                       const hu_channel_history_entry_t *entries, size_t count,
                                       const struct hu_persona *persona, size_t *out_len) {
-#ifndef HU_HAS_PERSONA
-    (void)persona;
-#endif
     if (!alloc || !out_len)
         return NULL;
     *out_len = 0;
@@ -1311,7 +1306,6 @@ char *hu_conversation_build_awareness(hu_allocator_t *alloc,
 
     /* Anti-AI style: prompt-level guidance so LLM produces natural output the first time.
      * Use persona style_rules when available; otherwise fallback to built-in rules. */
-#ifdef HU_HAS_PERSONA
     if (persona && persona->style_rules && persona->style_rules_count > 0) {
         w = snprintf(buf + pos, CTX_BUF_CAP - pos, "\n--- CRITICAL STYLE RULES ---\n");
         POS_ADVANCE(w, pos, CTX_BUF_CAP);
@@ -1321,9 +1315,7 @@ char *hu_conversation_build_awareness(hu_allocator_t *alloc,
                 POS_ADVANCE(w, pos, CTX_BUF_CAP);
             }
         }
-    } else
-#endif
-    {
+    } else {
         w = snprintf(
             buf + pos, CTX_BUF_CAP - pos,
             "\n--- CRITICAL STYLE RULES ---\n"
@@ -1355,8 +1347,7 @@ char *hu_conversation_build_awareness(hu_allocator_t *alloc,
     buf[pos] = '\0';
     *out_len = pos;
     if (pos + 1 < CTX_BUF_CAP && alloc->realloc) {
-        char *shrunk =
-            (char *)alloc->realloc(alloc->ctx, buf, CTX_BUF_CAP, pos + 1);
+        char *shrunk = (char *)alloc->realloc(alloc->ctx, buf, CTX_BUF_CAP, pos + 1);
         if (shrunk)
             buf = shrunk;
     }
@@ -1694,8 +1685,7 @@ char *hu_conversation_honesty_check(hu_allocator_t *alloc, const char *message,
     }
     size_t actual_len = (size_t)n;
     if (actual_len + 1 < 512 && alloc->realloc) {
-        char *shrunk =
-            (char *)alloc->realloc(alloc->ctx, buf, 512, actual_len + 1);
+        char *shrunk = (char *)alloc->realloc(alloc->ctx, buf, 512, actual_len + 1);
         if (shrunk)
             buf = shrunk;
     }
@@ -3056,8 +3046,6 @@ size_t hu_conversation_build_vulnerability_directive(const hu_vulnerability_stat
 
 /* ── Context modifiers (F16) ─────────────────────────────────────────── */
 
-#ifdef HU_HAS_PERSONA
-
 static bool detect_heavy_topic(const hu_channel_history_entry_t *entries, size_t count) {
     if (!entries || count == 0)
         return false;
@@ -3195,8 +3183,6 @@ size_t hu_conversation_build_context_modifiers(const hu_channel_history_entry_t 
     buf[pos] = '\0';
     return pos;
 }
-
-#endif /* HU_HAS_PERSONA */
 
 /* ── Typo correction fragment (*meant) ─────────────────────────────────── */
 
@@ -3568,9 +3554,6 @@ size_t hu_conversation_calibrate_length(const char *last_msg, size_t last_msg_le
 char *hu_conversation_analyze_style(hu_allocator_t *alloc,
                                     const hu_channel_history_entry_t *entries, size_t count,
                                     const struct hu_persona *persona, size_t *out_len) {
-#ifndef HU_HAS_PERSONA
-    (void)persona;
-#endif
     if (!alloc || !entries || count == 0 || !out_len)
         return NULL;
     *out_len = 0;
@@ -3710,7 +3693,6 @@ char *hu_conversation_analyze_style(hu_allocator_t *alloc,
     }
 
     /* Anti-AI warnings: use persona anti_patterns when available; otherwise fallback. */
-#ifdef HU_HAS_PERSONA
     if (persona && persona->anti_patterns && persona->anti_patterns_count > 0) {
         w = snprintf(buf + pos, STYLE_BUF_CAP - pos,
                      "\n--- Anti-patterns (NEVER do these in texts) ---\n");
@@ -3721,9 +3703,7 @@ char *hu_conversation_analyze_style(hu_allocator_t *alloc,
                 POS_ADVANCE(w, pos, STYLE_BUF_CAP);
             }
         }
-    } else
-#endif
-    {
+    } else {
         w = snprintf(
             buf + pos, STYLE_BUF_CAP - pos,
             "\n--- Anti-patterns (NEVER do these in texts) ---\n"
@@ -5607,7 +5587,6 @@ hu_reaction_type_t hu_conversation_classify_photo_reaction(const char *vision_de
 
 /* ── Text disfluency (F33) ──────────────────────────────────────────── */
 
-#ifdef HU_HAS_PERSONA
 static bool str_eq_ci(const char *a, size_t a_len, const char *b) {
     size_t b_len = strlen(b);
     if (a_len != b_len)
@@ -5624,12 +5603,10 @@ static bool str_eq_ci(const char *a, size_t a_len, const char *b) {
     }
     return true;
 }
-#endif
 
 size_t hu_conversation_apply_disfluency(char *buf, size_t len, size_t cap, uint32_t seed,
                                         float frequency, const struct hu_contact_profile *contact,
                                         const char *formality, size_t formality_len) {
-#ifdef HU_HAS_PERSONA
     if (!buf || len == 0 || cap <= len)
         return len;
 
@@ -5738,17 +5715,6 @@ size_t hu_conversation_apply_disfluency(char *buf, size_t len, size_t cap, uint3
     }
     buf[len] = '\0';
     return len;
-#else
-    (void)buf;
-    (void)len;
-    (void)cap;
-    (void)seed;
-    (void)frequency;
-    (void)contact;
-    (void)formality;
-    (void)formality_len;
-    return len;
-#endif
 }
 
 /* ── Filler word injection ────────────────────────────────────────────── */
@@ -7274,8 +7240,7 @@ static bool history_has_recent_music_url(const hu_channel_history_entry_t *entri
         const char *t = entries[i].text;
         size_t tl = strlen(t);
         if (str_contains_ci(t, tl, "music.apple.com") ||
-            str_contains_ci(t, tl, "open.spotify.com") ||
-            str_contains_ci(t, tl, "spotify.link"))
+            str_contains_ci(t, tl, "open.spotify.com") || str_contains_ci(t, tl, "spotify.link"))
             return true;
     }
     return false;
@@ -7299,29 +7264,28 @@ bool hu_conversation_should_send_music(const char *incoming, size_t incoming_len
     if (history_has_recent_music_url(history, history_count))
         return false;
 
-    bool keyword_hit =
-        str_contains_ci(incoming, incoming_len, "music") ||
-        str_contains_ci(incoming, incoming_len, "song") ||
-        str_contains_ci(incoming, incoming_len, "songs") ||
-        str_contains_ci(incoming, incoming_len, "listen") ||
-        str_contains_ci(incoming, incoming_len, "listening") ||
-        str_contains_ci(incoming, incoming_len, "playlist") ||
-        str_contains_ci(incoming, incoming_len, "album") ||
-        str_contains_ci(incoming, incoming_len, "artist") ||
-        str_contains_ci(incoming, incoming_len, "tune") ||
-        str_contains_ci(incoming, incoming_len, "jam") ||
-        str_contains_ci(incoming, incoming_len, "vibe") ||
-        str_contains_ci(incoming, incoming_len, "vibes") ||
-        str_contains_ci(incoming, incoming_len, "mood") ||
-        str_contains_ci(incoming, incoming_len, "spotify") ||
-        str_contains_ci(incoming, incoming_len, "apple music") ||
-        str_contains_ci(incoming, incoming_len, "track") ||
-        str_contains_ci(incoming, incoming_len, "lyrics") ||
-        str_contains_ci(incoming, incoming_len, "concert") ||
-        str_contains_ci(incoming, incoming_len, "band") ||
-        str_contains_ci(incoming, incoming_len, "sing") ||
-        str_contains_ci(incoming, incoming_len, "karaoke") ||
-        str_contains_ci(incoming, incoming_len, "what are you listening");
+    bool keyword_hit = str_contains_ci(incoming, incoming_len, "music") ||
+                       str_contains_ci(incoming, incoming_len, "song") ||
+                       str_contains_ci(incoming, incoming_len, "songs") ||
+                       str_contains_ci(incoming, incoming_len, "listen") ||
+                       str_contains_ci(incoming, incoming_len, "listening") ||
+                       str_contains_ci(incoming, incoming_len, "playlist") ||
+                       str_contains_ci(incoming, incoming_len, "album") ||
+                       str_contains_ci(incoming, incoming_len, "artist") ||
+                       str_contains_ci(incoming, incoming_len, "tune") ||
+                       str_contains_ci(incoming, incoming_len, "jam") ||
+                       str_contains_ci(incoming, incoming_len, "vibe") ||
+                       str_contains_ci(incoming, incoming_len, "vibes") ||
+                       str_contains_ci(incoming, incoming_len, "mood") ||
+                       str_contains_ci(incoming, incoming_len, "spotify") ||
+                       str_contains_ci(incoming, incoming_len, "apple music") ||
+                       str_contains_ci(incoming, incoming_len, "track") ||
+                       str_contains_ci(incoming, incoming_len, "lyrics") ||
+                       str_contains_ci(incoming, incoming_len, "concert") ||
+                       str_contains_ci(incoming, incoming_len, "band") ||
+                       str_contains_ci(incoming, incoming_len, "sing") ||
+                       str_contains_ci(incoming, incoming_len, "karaoke") ||
+                       str_contains_ci(incoming, incoming_len, "what are you listening");
 
     float effective = probability;
     if (keyword_hit && effective < 1.0f) {
@@ -7344,13 +7308,12 @@ size_t hu_conversation_build_music_prompt(const char *incoming, size_t incoming_
         return 0;
 
     size_t clip = incoming_len > 200 ? 200 : incoming_len;
-    int n = snprintf(
-        out, out_cap,
-        "Based on this conversation, suggest ONE song that fits the mood. "
-        "Return ONLY in this format: ARTIST - TITLE | brief casual message\n"
-        "The casual message should feel like a natural text — not a recommendation.\n"
-        "Recent message context: \"%.*s\"",
-        (int)clip, incoming);
+    int n = snprintf(out, out_cap,
+                     "Based on this conversation, suggest ONE song that fits the mood. "
+                     "Return ONLY in this format: ARTIST - TITLE | brief casual message\n"
+                     "The casual message should feel like a natural text — not a recommendation.\n"
+                     "Recent message context: \"%.*s\"",
+                     (int)clip, incoming);
     return (n > 0 && (size_t)n < out_cap) ? (size_t)n : 0;
 }
 

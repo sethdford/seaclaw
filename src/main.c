@@ -63,9 +63,7 @@
 #ifdef HU_HAS_SKILLS
 #include "human/skillforge.h"
 #endif
-#ifdef HU_HAS_PERSONA
 #include "human/persona.h"
-#endif
 #ifdef HU_ENABLE_CARTESIA
 #include "human/tts/voice_clone.h"
 #endif
@@ -190,9 +188,7 @@ static hu_error_t cmd_plugins(hu_allocator_t *alloc, int argc, char **argv);
 static hu_error_t cmd_agents(hu_allocator_t *alloc, int argc, char **argv);
 static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv);
 static hu_error_t cmd_migrate(hu_allocator_t *alloc, int argc, char **argv);
-#ifdef HU_HAS_PERSONA
 static hu_error_t cmd_persona(hu_allocator_t *alloc, int argc, char **argv);
-#endif
 #ifdef HU_ENABLE_CARTESIA
 static hu_error_t cmd_voice(hu_allocator_t *alloc, int argc, char **argv);
 #endif
@@ -457,9 +453,7 @@ static const hu_command_t commands[] = {
     {"sandbox", "Show sandbox status and backends", cmd_sandbox},
     {"migrate", "Migrate memory backends", cmd_migrate},
     {"memory", "Memory operations", cmd_memory},
-#ifdef HU_HAS_PERSONA
     {"persona", "Create and manage persona profiles", cmd_persona},
-#endif
 #ifdef HU_ENABLE_CARTESIA
     {"voice", "Voice cloning and TTS management", cmd_voice},
 #endif
@@ -973,7 +967,6 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
     hu_log_info("human", NULL, "%zu channel(s) active, cron enabled", app_ctx.channel_count);
 
     /* Register proactive engagement cron jobs from persona contacts */
-#ifdef HU_HAS_PERSONA
     if (app_ctx.agent && app_ctx.agent->persona && app_ctx.agent->scheduler) {
         const hu_persona_t *persona = app_ctx.agent->persona;
         for (size_t ci = 0; ci < persona->contacts_count; ci++) {
@@ -1012,7 +1005,6 @@ static hu_error_t cmd_service_loop(hu_allocator_t *alloc, int argc, char **argv)
             }
         }
     }
-#endif
 
 #ifdef HU_ENABLE_FEEDS
     if (app_ctx.agent && app_ctx.agent->scheduler) {
@@ -2063,8 +2055,8 @@ static hu_error_t cmd_pwa(hu_allocator_t *alloc, int argc, char **argv) {
     return HU_ERR_INVALID_ARGUMENT;
 }
 
-#ifdef HU_HAS_PERSONA
 static hu_error_t cmd_persona(hu_allocator_t *alloc, int argc, char **argv) {
+#ifdef HU_HAS_PERSONA
     hu_persona_cli_args_t args;
     hu_error_t err = hu_persona_cli_parse(argc, (const char **)argv, &args);
     if (err != HU_OK) {
@@ -2086,8 +2078,14 @@ static hu_error_t cmd_persona(hu_allocator_t *alloc, int argc, char **argv) {
         return err;
     }
     return hu_persona_cli_run(alloc, &args);
-}
+#else
+    (void)alloc;
+    (void)argc;
+    (void)argv;
+    fprintf(stderr, "Persona support not compiled in (HU_ENABLE_PERSONA=OFF)\n");
+    return HU_ERR_NOT_SUPPORTED;
 #endif
+}
 
 #ifdef HU_ENABLE_CARTESIA
 static hu_error_t cmd_voice(hu_allocator_t *alloc, int argc, char **argv) {
@@ -2726,9 +2724,9 @@ int main(int argc, char *argv[]) {
     }
 
 #ifndef HU_IS_TEST
-    if (hu_onboard_check_first_run() &&
-        strcmp(cmd_name, "onboard") != 0 && strcmp(cmd_name, "init") != 0 &&
-        strcmp(cmd_name, "help") != 0 && strcmp(cmd_name, "version") != 0) {
+    if (hu_onboard_check_first_run() && strcmp(cmd_name, "onboard") != 0 &&
+        strcmp(cmd_name, "init") != 0 && strcmp(cmd_name, "help") != 0 &&
+        strcmp(cmd_name, "version") != 0) {
         fprintf(stderr, "No config found. Run 'human onboard' to set up.\n\n");
     }
 #endif

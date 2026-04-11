@@ -1,7 +1,7 @@
-#include "test_framework.h"
-#include "human/agent/humanness.h"
 #include "human/agent.h"
+#include "human/agent/humanness.h"
 #include "human/core/allocator.h"
+#include "test_framework.h"
 #include <string.h>
 
 /* ── Build turn context: basic functionality ─────────────────────────── */
@@ -85,7 +85,6 @@ static void voice_update_null_agent_returns_error(void) {
     HU_ASSERT_EQ(hu_agent_update_voice_profile(NULL, "hello", 5), HU_ERR_INVALID_ARGUMENT);
 }
 
-#ifdef HU_HAS_PERSONA
 static void voice_update_uninitialized_returns_error(void) {
     hu_agent_t agent;
     memset(&agent, 0, sizeof(agent));
@@ -140,7 +139,6 @@ static void voice_profile_stages_evolve(void) {
         hu_agent_update_voice_profile(&agent, "I feel happy about this topic discussion", 40);
     HU_ASSERT(agent.voice_profile.stage > HU_VOICE_FORMAL);
 }
-#endif /* HU_HAS_PERSONA */
 
 /* ── Registration ─────────────────────────────────────────────────────── */
 
@@ -154,11 +152,9 @@ void run_humanness_context_tests(void) {
     HU_RUN_TEST(free_context_clears_owned);
     HU_RUN_TEST(free_context_does_not_free_external);
     HU_RUN_TEST(voice_update_null_agent_returns_error);
-#ifdef HU_HAS_PERSONA
     HU_RUN_TEST(voice_update_uninitialized_returns_error);
     HU_RUN_TEST(voice_update_increments_interaction);
     HU_RUN_TEST(voice_update_detects_emotion);
     HU_RUN_TEST(voice_update_detects_topic);
     HU_RUN_TEST(voice_profile_stages_evolve);
-#endif
 }

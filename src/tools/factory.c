@@ -17,10 +17,10 @@
 #endif
 #ifdef HU_HAS_TOOLS_ADVANCED
 #include "human/tools/canvas.h"
-#include "human/tools/declarative.h"
 #include "human/tools/claude_code.h"
 #include "human/tools/composio.h"
 #include "human/tools/database.h"
+#include "human/tools/declarative.h"
 #include "human/tools/notebook.h"
 #endif
 #ifdef HU_HAS_CRON
@@ -43,9 +43,9 @@
 #include "human/tools/git.h"
 #include "human/tools/gui_agent.h"
 #include "human/tools/image_gen.h"
+#include "human/tools/media_gif.h"
 #include "human/tools/media_image.h"
 #include "human/tools/media_video.h"
-#include "human/tools/media_gif.h"
 #ifdef HU_HAS_PERIPHERALS
 #include "human/tools/hardware_info.h"
 #include "human/tools/hardware_memory.h"
@@ -85,9 +85,7 @@
 #ifdef HU_HAS_CRON
 #include "human/tools/schedule.h"
 #endif
-#ifdef HU_HAS_PERSONA
 #include "human/tools/persona.h"
-#endif
 #ifdef HU_ENABLE_CURL
 #include "human/tools/paperclip.h"
 #endif
@@ -98,18 +96,18 @@
 #ifdef HU_HAS_SKILLS
 #include "human/tools/skill_run.h"
 #endif
+#include "human/tools/ask_user.h"
+#include "human/tools/db_introspect.h"
 #include "human/tools/lsp.h"
-#include "human/tools/tool_search.h"
+#include "human/tools/send_voice_message.h"
 #include "human/tools/skill_write.h"
 #include "human/tools/spawn.h"
-#include "human/tools/send_voice_message.h"
+#include "human/tools/task_tools.h"
+#include "human/tools/tool_search.h"
 #include "human/tools/voice_clone.h"
 #include "human/tools/web_fetch.h"
 #include "human/tools/web_search.h"
-#include "human/tools/ask_user.h"
-#include "human/tools/task_tools.h"
 #include "human/tools/webhook_tools.h"
-#include "human/tools/db_introspect.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -120,21 +118,19 @@
 #else
 #define HU_TOOLS_CRON_COUNT 0
 #endif
-#ifdef HU_HAS_PERSONA
 #define HU_TOOLS_PERSONA_COUNT 1
-#else
-#define HU_TOOLS_PERSONA_COUNT 0
-#endif
 #ifdef HU_ENABLE_CARTESIA
 #define HU_TOOLS_CARTESIA_COUNT 1
 #else
 #define HU_TOOLS_CARTESIA_COUNT 0
 #endif
-#define HU_TOOLS_WEBHOOK_COUNT 3  /* webhook_register, webhook_poll, webhook_list */
-#define HU_TOOLS_DB_INTROSPECT_COUNT 1  /* db_introspect */
-/* Base: 59 (core tools incl. lsp + tool_search + 3 media gen) + 5 (ask_user + 4 task tools) + 1 (db_introspect) + cron - 1 (skill_run conditional) + persona + cartesia + webhook */
-#define HU_TOOLS_COUNT_BASE \
-    (59 + 5 + HU_TOOLS_DB_INTROSPECT_COUNT + HU_TOOLS_CRON_COUNT - 1 + HU_TOOLS_PERSONA_COUNT + HU_TOOLS_CARTESIA_COUNT + HU_TOOLS_WEBHOOK_COUNT)
+#define HU_TOOLS_WEBHOOK_COUNT       3 /* webhook_register, webhook_poll, webhook_list */
+#define HU_TOOLS_DB_INTROSPECT_COUNT 1 /* db_introspect */
+/* Base: 59 (core tools incl. lsp + tool_search + 3 media gen) + 5 (ask_user + 4 task tools) + 1
+ * (db_introspect) + cron - 1 (skill_run conditional) + persona + cartesia + webhook */
+#define HU_TOOLS_COUNT_BASE                                                                     \
+    (59 + 5 + HU_TOOLS_DB_INTROSPECT_COUNT + HU_TOOLS_CRON_COUNT - 1 + HU_TOOLS_PERSONA_COUNT + \
+     HU_TOOLS_CARTESIA_COUNT + HU_TOOLS_WEBHOOK_COUNT)
 #ifdef HU_HAS_TOOLS_BROWSER
 #define HU_TOOLS_BROWSER_COUNT 3
 #else
@@ -488,12 +484,10 @@ hu_error_t hu_tools_create_default(hu_allocator_t *alloc, const char *workspace_
         goto fail;
     idx++;
 
-#ifdef HU_HAS_PERSONA
     err = hu_persona_tool_create(alloc, &tools[idx]);
     if (err != HU_OK)
         goto fail;
     idx++;
-#endif
 
     err = hu_send_message_create(alloc, mailbox, &tools[idx]);
     if (err != HU_OK)

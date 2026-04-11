@@ -12,6 +12,11 @@
 #include "human/observability/bth_metrics.h"
 #include "human/skillforge.h"
 #endif
+#include "human/agent/collab_planning.h"
+#include "human/context/authentic.h"
+#include "human/context/behavioral.h"
+#include "human/context/intelligence.h"
+#include "human/context/rel_dynamics.h"
 #include "human/observability/log_observer.h"
 #include "human/provider.h"
 #include "human/providers/openai.h"
@@ -22,13 +27,6 @@
 #include <string.h>
 #include <strings.h>
 #include <time.h>
-#ifdef HU_HAS_PERSONA
-#include "human/agent/collab_planning.h"
-#include "human/context/authentic.h"
-#include "human/context/behavioral.h"
-#include "human/context/intelligence.h"
-#include "human/context/rel_dynamics.h"
-#endif
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Mock provider — returns fixed "mock response" from chat()
@@ -1483,7 +1481,6 @@ static void test_agent_multi_turn_with_sqlite_memory(void) {
 }
 #endif
 
-#ifdef HU_HAS_PERSONA
 static void test_daemon_module_pipeline_no_crash(void) {
     hu_allocator_t alloc = hu_system_allocator();
 
@@ -1560,7 +1557,6 @@ static void test_daemon_module_pipeline_no_crash(void) {
     bool should = hu_collab_plan_should_propose("test", 4, 0, 3, 0.5);
     (void)should;
 }
-#endif
 
 void run_e2e_tests(void) {
     HU_TEST_SUITE("E2E");
@@ -1617,7 +1613,5 @@ void run_e2e_tests(void) {
 #ifdef HU_ENABLE_SQLITE
     HU_RUN_TEST(test_agent_multi_turn_with_sqlite_memory);
 #endif
-#ifdef HU_HAS_PERSONA
     HU_RUN_TEST(test_daemon_module_pipeline_no_crash);
-#endif
 }

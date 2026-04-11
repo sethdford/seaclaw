@@ -1,15 +1,13 @@
-#include "human/data/loader.h"
+#include "human/context/conversation.h"
 #include "human/core/allocator.h"
 #include "human/core/json.h"
-#include "human/context/conversation.h"
-#include "human/security.h"
-#ifdef HU_ENABLE_PERSONA
+#include "human/data/loader.h"
 #include "human/persona/circadian.h"
-#endif
+#include "human/security.h"
 #include "test_framework.h"
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void test_data_loader_loads_embedded_default(void) {
     hu_allocator_t alloc = hu_system_allocator();
@@ -122,7 +120,8 @@ static void test_data_loader_reasoning_instruction(void) {
     char *out = NULL;
     size_t out_len = 0;
 
-    hu_error_t err = hu_data_load_embedded(&alloc, "prompts/reasoning_instruction.txt", &out, &out_len);
+    hu_error_t err =
+        hu_data_load_embedded(&alloc, "prompts/reasoning_instruction.txt", &out, &out_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(out_len > 0);
@@ -150,7 +149,8 @@ static void test_data_loader_autonomy_supervised(void) {
     char *out = NULL;
     size_t out_len = 0;
 
-    hu_error_t err = hu_data_load_embedded(&alloc, "prompts/autonomy_supervised.txt", &out, &out_len);
+    hu_error_t err =
+        hu_data_load_embedded(&alloc, "prompts/autonomy_supervised.txt", &out, &out_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(out_len > 0);
@@ -178,7 +178,8 @@ static void test_data_loader_persona_reinforcement(void) {
     char *out = NULL;
     size_t out_len = 0;
 
-    hu_error_t err = hu_data_load_embedded(&alloc, "prompts/persona_reinforcement.txt", &out, &out_len);
+    hu_error_t err =
+        hu_data_load_embedded(&alloc, "prompts/persona_reinforcement.txt", &out, &out_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(out_len > 0);
@@ -279,8 +280,7 @@ static void integration_policy_data_init_succeeds(void) {
     hu_policy_data_cleanup(&alloc);
 }
 
-/* Test 5: Verify circadian data init succeeds (if persona enabled) */
-#ifdef HU_ENABLE_PERSONA
+/* Test 5: Verify circadian data init succeeds */
 static void integration_circadian_data_init_succeeds(void) {
     hu_allocator_t alloc = hu_system_allocator();
 
@@ -290,23 +290,17 @@ static void integration_circadian_data_init_succeeds(void) {
     /* Cleanup after test */
     hu_circadian_data_cleanup(&alloc);
 }
-#endif
 
 /* Test 6: Verify all conversation JSON data files are valid JSON */
 static void integration_conversation_json_files_valid(void) {
     hu_allocator_t alloc = hu_system_allocator();
 
     const char *json_paths[] = {
-        "conversation/ai_disclosure_patterns.json",
-        "conversation/filler_words.json",
-        "conversation/engage_words.json",
-        "conversation/backchannel_phrases.json",
-        "conversation/emotional_words.json",
-        "conversation/starters.json",
-        "conversation/personal_sharing.json",
-        "conversation/contractions.json",
-        "conversation/conversation_intros.json",
-        "conversation/time_gap_phrases.json",
+        "conversation/ai_disclosure_patterns.json", "conversation/filler_words.json",
+        "conversation/engage_words.json",           "conversation/backchannel_phrases.json",
+        "conversation/emotional_words.json",        "conversation/starters.json",
+        "conversation/personal_sharing.json",       "conversation/contractions.json",
+        "conversation/conversation_intros.json",    "conversation/time_gap_phrases.json",
         "conversation/crisis_keywords.json",
     };
 
@@ -335,10 +329,8 @@ static void integration_memory_json_files_valid(void) {
     hu_allocator_t alloc = hu_system_allocator();
 
     const char *json_paths[] = {
-        "memory/emotion_prefixes.json",
-        "memory/emotion_adjectives.json",
-        "memory/relationship_words.json",
-        "memory/topic_patterns.json",
+        "memory/emotion_prefixes.json",    "memory/emotion_adjectives.json",
+        "memory/relationship_words.json",  "memory/topic_patterns.json",
         "memory/commitment_prefixes.json",
     };
 
@@ -424,7 +416,8 @@ static void integration_json_files_have_expected_arrays(void) {
     /* Test that ai_disclosure_patterns has a "patterns" array */
     char *data = NULL;
     size_t data_len = 0;
-    hu_error_t err = hu_data_load_embedded(&alloc, "conversation/ai_disclosure_patterns.json", &data, &data_len);
+    hu_error_t err =
+        hu_data_load_embedded(&alloc, "conversation/ai_disclosure_patterns.json", &data, &data_len);
     HU_ASSERT_EQ(err, HU_OK);
 
     hu_json_value_t *root = NULL;
@@ -446,7 +439,8 @@ static void integration_filler_words_data_valid(void) {
 
     char *data = NULL;
     size_t data_len = 0;
-    hu_error_t err = hu_data_load_embedded(&alloc, "conversation/filler_words.json", &data, &data_len);
+    hu_error_t err =
+        hu_data_load_embedded(&alloc, "conversation/filler_words.json", &data, &data_len);
     HU_ASSERT_EQ(err, HU_OK);
 
     hu_json_value_t *root = NULL;
@@ -489,9 +483,7 @@ void run_data_loader_tests(void) {
     HU_RUN_TEST(integration_conversation_data_init_succeeds);
     HU_RUN_TEST(integration_ai_disclosure_detection_with_loaded_data);
     HU_RUN_TEST(integration_policy_data_init_succeeds);
-#ifdef HU_ENABLE_PERSONA
     HU_RUN_TEST(integration_circadian_data_init_succeeds);
-#endif
     HU_RUN_TEST(integration_conversation_json_files_valid);
     HU_RUN_TEST(integration_memory_json_files_valid);
     HU_RUN_TEST(integration_persona_json_files_valid);

@@ -418,7 +418,6 @@ hu_error_t cp_admin_persona_set(hu_allocator_t *alloc, hu_app_context_t *app, hu
         return err;
     }
 
-#ifdef HU_HAS_PERSONA
     hu_error_t err = hu_agent_set_persona(app->agent, name, name_len);
     if (err != HU_OK) {
         const char *emsg = hu_error_string(err);
@@ -427,14 +426,6 @@ hu_error_t cp_admin_persona_set(hu_allocator_t *alloc, hu_app_context_t *app, hu
         hu_json_free(alloc, obj);
         return serr;
     }
-#else
-    (void)name;
-    (void)name_len;
-    cp_json_set_str(alloc, obj, "error", "persona support not built (HU_ENABLE_PERSONA=OFF)");
-    hu_error_t err = hu_json_stringify(alloc, obj, out, out_len);
-    hu_json_free(alloc, obj);
-    return err;
-#endif
 
     hu_json_object_set(alloc, obj, "ok", hu_json_bool_new(alloc, true));
     hu_error_t serr = hu_json_stringify(alloc, obj, out, out_len);
@@ -1097,8 +1088,9 @@ hu_error_t cp_admin_metrics_snapshot(hu_allocator_t *alloc, hu_app_context_t *ap
                                hu_json_bool_new(alloc, app->agent->llm_compiler_enabled));
             hu_json_object_set(alloc, intel_obj, "mcts_planner",
                                hu_json_bool_new(alloc, app->agent->mcts_planner_enabled));
-            hu_json_object_set(alloc, intel_obj, "speculative_cache",
-                               hu_json_bool_new(alloc, app->agent->infra.speculative_cache != NULL));
+            hu_json_object_set(
+                alloc, intel_obj, "speculative_cache",
+                hu_json_bool_new(alloc, app->agent->infra.speculative_cache != NULL));
             hu_json_object_set(alloc, intel_obj, "multi_agent",
                                hu_json_bool_new(alloc, app->agent->multi_agent_enabled));
             hu_json_object_set(alloc, obj, "intelligence", intel_obj);

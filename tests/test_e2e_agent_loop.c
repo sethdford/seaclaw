@@ -14,9 +14,7 @@
 #ifdef HU_ENABLE_SQLITE
 #include "human/memory.h"
 #endif
-#ifdef HU_HAS_PERSONA
 #include "human/persona.h"
-#endif
 
 static hu_config_t *make_config_with_arena(void) {
     hu_allocator_t backing = hu_system_allocator();
@@ -90,7 +88,7 @@ static void e2e_bootstrap_minimal_no_agent(void) {
     hu_app_teardown(&ctx);
 }
 
-#if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_PERSONA)
+#if defined(HU_ENABLE_SQLITE)
 static void e2e_agent_turn_with_persona_and_contact(void) {
     hu_allocator_t alloc = hu_system_allocator();
 
@@ -136,15 +134,15 @@ static void e2e_agent_turn_with_persona_and_contact(void) {
 
     char *prompt = NULL;
     size_t prompt_len = 0;
-    err = hu_persona_build_prompt(&alloc, &persona, "imessage", 8, "coffee", 6,
-                                  &prompt, &prompt_len);
+    err =
+        hu_persona_build_prompt(&alloc, &persona, "imessage", 8, "coffee", 6, &prompt, &prompt_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(prompt);
     HU_ASSERT_TRUE(prompt_len > 0);
     HU_ASSERT_TRUE(strstr(prompt, "seth") != NULL);
-    HU_ASSERT_TRUE(strstr(prompt, "casual") != NULL || strstr(prompt, "warm") != NULL
-                   || strstr(prompt, "tech") != NULL || strstr(prompt, "dope") != NULL
-                   || strstr(prompt, "Keep") != NULL);
+    HU_ASSERT_TRUE(strstr(prompt, "casual") != NULL || strstr(prompt, "warm") != NULL ||
+                   strstr(prompt, "tech") != NULL || strstr(prompt, "dope") != NULL ||
+                   strstr(prompt, "Keep") != NULL);
     alloc.free(alloc.ctx, prompt, prompt_len + 1);
 
     char *contact_ctx = NULL;
@@ -157,8 +155,8 @@ static void e2e_agent_turn_with_persona_and_contact(void) {
 
     hu_memory_entry_t *entries = NULL;
     size_t count = 0;
-    err = hu_memory_recall_for_contact(&mem, &alloc, "mindy", 5, "coffee", 6,
-                                      5, "", 0, &entries, &count);
+    err = hu_memory_recall_for_contact(&mem, &alloc, "mindy", 5, "coffee", 6, 5, "", 0, &entries,
+                                       &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(count >= 1);
     bool found_coffee = false;
@@ -184,16 +182,16 @@ static void e2e_contact_scoped_memory_isolation(void) {
     size_t len_a = 5, len_b = 3;
 
     hu_error_t err = hu_memory_store_for_contact(&mem, contact_a, len_a, "pref", 4,
-                                      "Alice prefers espresso", 22, NULL, "", 0);
+                                                 "Alice prefers espresso", 22, NULL, "", 0);
     HU_ASSERT_EQ(err, HU_OK);
-    err = hu_memory_store_for_contact(&mem, contact_b, len_b, "pref", 4,
-                                      "Bob prefers matcha tea", 21, NULL, "", 0);
+    err = hu_memory_store_for_contact(&mem, contact_b, len_b, "pref", 4, "Bob prefers matcha tea",
+                                      21, NULL, "", 0);
     HU_ASSERT_EQ(err, HU_OK);
 
     hu_memory_entry_t *entries = NULL;
     size_t count = 0;
-    err = hu_memory_recall_for_contact(&mem, &alloc, contact_a, len_a,
-                                                   "espresso", 8, 5, "", 0, &entries, &count);
+    err = hu_memory_recall_for_contact(&mem, &alloc, contact_a, len_a, "espresso", 8, 5, "", 0,
+                                       &entries, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(count >= 1);
     HU_ASSERT_TRUE(entries[0].content && strstr(entries[0].content, "espresso") != NULL);
@@ -203,8 +201,8 @@ static void e2e_contact_scoped_memory_isolation(void) {
 
     entries = NULL;
     count = 0;
-    err = hu_memory_recall_for_contact(&mem, &alloc, contact_a, len_a, "matcha", 6,
-                                       5, "", 0, &entries, &count);
+    err = hu_memory_recall_for_contact(&mem, &alloc, contact_a, len_a, "matcha", 6, 5, "", 0,
+                                       &entries, &count);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_EQ(count, 0u);
     if (entries) {
@@ -217,16 +215,16 @@ static void e2e_contact_scoped_memory_isolation(void) {
 
 static void e2e_persona_prompt_includes_temporal_context(void) {
     hu_allocator_t alloc = hu_system_allocator();
-    const char *json =
-        "{"
-        "\"name\": \"seth\","
-        "\"identity\": \"test persona\","
-        "\"core_values\": [\"honesty\", \"curiosity\"],"
-        "\"relationships\": [{\"name\": \"Mom\", \"role\": \"mother\", \"notes\": \"weekly calls\"}],"
-        "\"style_rules\": [\"never use exclamation marks\"],"
-        "\"anti_patterns\": [\"don't say 'as an AI'\"],"
-        "\"identity_reinforcement\": \"You are Seth, always.\""
-        "}";
+    const char *json = "{"
+                       "\"name\": \"seth\","
+                       "\"identity\": \"test persona\","
+                       "\"core_values\": [\"honesty\", \"curiosity\"],"
+                       "\"relationships\": [{\"name\": \"Mom\", \"role\": \"mother\", \"notes\": "
+                       "\"weekly calls\"}],"
+                       "\"style_rules\": [\"never use exclamation marks\"],"
+                       "\"anti_patterns\": [\"don't say 'as an AI'\"],"
+                       "\"identity_reinforcement\": \"You are Seth, always.\""
+                       "}";
     hu_persona_t persona;
     memset(&persona, 0, sizeof(persona));
     hu_error_t err = hu_persona_load_json(&alloc, json, strlen(json), &persona);
@@ -234,8 +232,7 @@ static void e2e_persona_prompt_includes_temporal_context(void) {
 
     char *prompt = NULL;
     size_t prompt_len = 0;
-    err = hu_persona_build_prompt(&alloc, &persona, "imessage", 8, NULL, 0,
-                                  &prompt, &prompt_len);
+    err = hu_persona_build_prompt(&alloc, &persona, "imessage", 8, NULL, 0, &prompt, &prompt_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_NOT_NULL(prompt);
 
@@ -259,7 +256,7 @@ void run_e2e_agent_loop_tests(void) {
     HU_RUN_TEST(e2e_config_parse_empty_uses_defaults);
     HU_RUN_TEST(e2e_agent_loop_bootstrap_teardown_safe);
     HU_RUN_TEST(e2e_bootstrap_minimal_no_agent);
-#if defined(HU_ENABLE_SQLITE) && defined(HU_HAS_PERSONA)
+#if defined(HU_ENABLE_SQLITE)
     HU_RUN_TEST(e2e_agent_turn_with_persona_and_contact);
     HU_RUN_TEST(e2e_contact_scoped_memory_isolation);
     HU_RUN_TEST(e2e_persona_prompt_includes_temporal_context);

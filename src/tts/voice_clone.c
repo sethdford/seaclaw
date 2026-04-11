@@ -345,7 +345,7 @@ hu_error_t hu_persona_set_voice_id(hu_allocator_t *alloc, const char *persona_na
     (void)voice_id;
     (void)voice_id_len;
     return HU_OK;
-#elif defined(HU_HAS_PERSONA) && (defined(__unix__) || defined(__APPLE__))
+#elif defined(__unix__) || defined(__APPLE__)
     char base[512];
     if (!hu_persona_base_dir(base, sizeof(base)))
         return HU_ERR_IO;

@@ -60,12 +60,11 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
 hu_error_t hu_service_run_agent_cron(hu_allocator_t *alloc, struct hu_agent *agent,
                                      hu_service_channel_t *channels, size_t channel_count);
 
-#ifdef HU_HAS_PERSONA
 /* Proactive check-ins: iterate contacts with proactive_checkin=true,
- * check last interaction time, and initiate natural conversations. */
+ * check last interaction time, and initiate natural conversations.
+ * No-op when agent has no persona loaded. */
 void hu_service_run_proactive_checkins(hu_allocator_t *alloc, struct hu_agent *agent,
                                        hu_service_channel_t *channels, size_t channel_count);
-#endif
 
 hu_error_t hu_daemon_install(hu_allocator_t *alloc);
 hu_error_t hu_daemon_uninstall(void);
@@ -80,11 +79,12 @@ uint32_t hu_daemon_photo_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, siz
 uint32_t hu_daemon_video_viewing_delay_ms(const hu_channel_loop_msg_t *msgs, size_t batch_start,
                                           size_t batch_end, uint32_t seed);
 /* Test hook: per-channel daemon config lookup (see k_daemon_configs in daemon.c). */
-const struct hu_channel_daemon_config *hu_daemon_test_get_active_daemon_config(
-    const struct hu_config *config, const char *ch_name);
+const struct hu_channel_daemon_config *
+hu_daemon_test_get_active_daemon_config(const struct hu_config *config, const char *ch_name);
 #endif
 
-/* Set the missed-message acknowledgment threshold in seconds (minimum 60s). Default: 1800 (30min) */
+/* Set the missed-message acknowledgment threshold in seconds (minimum 60s). Default: 1800 (30min)
+ */
 void hu_daemon_set_missed_msg_threshold(uint32_t secs);
 
 /* Missed-message acknowledgment (F10): returns phrase or NULL if none needed. */

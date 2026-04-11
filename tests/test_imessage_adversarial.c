@@ -18,9 +18,7 @@
 #include "human/context/conversation.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
-#ifdef HU_HAS_PERSONA
 #include "human/persona.h"
-#endif
 #include "test_framework.h"
 #include <string.h>
 
@@ -228,9 +226,9 @@ static void imessage_load_history_returns_not_supported_under_test(void) {
     HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
     hu_channel_history_entry_t *entries = NULL;
     size_t n = 0;
-    HU_ASSERT_EQ(ch.vtable->load_conversation_history(ch.ctx, &alloc, S("+15551234567"), 10,
-                                                       &entries, &n),
-                 HU_ERR_NOT_SUPPORTED);
+    HU_ASSERT_EQ(
+        ch.vtable->load_conversation_history(ch.ctx, &alloc, S("+15551234567"), 10, &entries, &n),
+        HU_ERR_NOT_SUPPORTED);
     HU_ASSERT_NULL(entries);
     hu_imessage_destroy(&ch);
 }
@@ -285,8 +283,8 @@ static void imessage_build_read_receipt_context_noop_under_test(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *out = NULL;
     size_t out_len = 99;
-    HU_ASSERT_EQ(
-        hu_imessage_build_read_receipt_context(&alloc, S("+15551234567"), &out, &out_len), HU_OK);
+    HU_ASSERT_EQ(hu_imessage_build_read_receipt_context(&alloc, S("+15551234567"), &out, &out_len),
+                 HU_OK);
     HU_ASSERT_NULL(out);
     HU_ASSERT_EQ(out_len, 0u);
 }
@@ -468,9 +466,9 @@ static void imessage_format_strips_ai_happy_to(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *out = NULL;
     size_t out_len = 0;
-    HU_ASSERT_EQ(hu_channel_strip_ai_phrases(&alloc, S("I'd be happy to help you today"),
-                                              &out, &out_len),
-                 HU_OK);
+    HU_ASSERT_EQ(
+        hu_channel_strip_ai_phrases(&alloc, S("I'd be happy to help you today"), &out, &out_len),
+        HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(strstr(out, "happy to") == NULL);
     alloc.free(alloc.ctx, out, out_len + 1);
@@ -480,10 +478,9 @@ static void imessage_format_strips_ai_great_question(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *out = NULL;
     size_t out_len = 0;
-    HU_ASSERT_EQ(
-        hu_channel_strip_ai_phrases(&alloc, S("Great question! Here is the answer"),
-                                    &out, &out_len),
-        HU_OK);
+    HU_ASSERT_EQ(hu_channel_strip_ai_phrases(&alloc, S("Great question! Here is the answer"), &out,
+                                             &out_len),
+                 HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(strstr(out, "Great question") == NULL);
     alloc.free(alloc.ctx, out, out_len + 1);
@@ -493,9 +490,9 @@ static void imessage_format_strips_as_an_ai(void) {
     hu_allocator_t alloc = hu_system_allocator();
     char *out = NULL;
     size_t out_len = 0;
-    HU_ASSERT_EQ(hu_channel_strip_ai_phrases(&alloc, S("As an AI, I cannot do that"), &out,
-                                              &out_len),
-                 HU_OK);
+    HU_ASSERT_EQ(
+        hu_channel_strip_ai_phrases(&alloc, S("As an AI, I cannot do that"), &out, &out_len),
+        HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(strstr(out, "As an AI") == NULL);
     alloc.free(alloc.ctx, out, out_len + 1);
@@ -506,8 +503,8 @@ static void imessage_format_outbound_full_pipeline(void) {
     char *out = NULL;
     size_t out_len = 0;
     HU_ASSERT_EQ(hu_channel_format_outbound(&alloc, S("imessage"),
-                                             S("I'd be happy to help! **Here** is `code`."),
-                                             &out, &out_len),
+                                            S("I'd be happy to help! **Here** is `code`."), &out,
+                                            &out_len),
                  HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(strstr(out, "happy to") == NULL);
@@ -525,9 +522,9 @@ static void imessage_format_outbound_caps_at_300(void) {
     big[sizeof(big) - 1] = '\0';
     char *out = NULL;
     size_t out_len = 0;
-    HU_ASSERT_EQ(hu_channel_format_outbound(&alloc, S("imessage"), big, sizeof(big) - 1,
-                                             &out, &out_len),
-                 HU_OK);
+    HU_ASSERT_EQ(
+        hu_channel_format_outbound(&alloc, S("imessage"), big, sizeof(big) - 1, &out, &out_len),
+        HU_OK);
     HU_ASSERT_NOT_NULL(out);
     HU_ASSERT_TRUE(out_len <= 301);
     alloc.free(alloc.ctx, out, out_len + 1);
@@ -562,7 +559,7 @@ static void imessage_awareness_anti_ai_rules_present(void) {
     char *ctx = hu_conversation_build_awareness(&alloc, entries, 2, NULL, &out_len);
     HU_ASSERT_NOT_NULL(ctx);
     HU_ASSERT_TRUE(strstr(ctx, "happy to") != NULL || strstr(ctx, "AI") != NULL ||
-                    strstr(ctx, "STYLE") != NULL || strstr(ctx, "naturally") != NULL);
+                   strstr(ctx, "STYLE") != NULL || strstr(ctx, "naturally") != NULL);
     alloc.free(alloc.ctx, ctx, out_len + 1);
 }
 
@@ -574,8 +571,8 @@ static void imessage_quality_score_penalizes_long_response(void) {
     char long_resp[400];
     memset(long_resp, 'a', sizeof(long_resp) - 1);
     long_resp[sizeof(long_resp) - 1] = '\0';
-    hu_quality_score_t score = hu_conversation_evaluate_quality(long_resp, sizeof(long_resp) - 1,
-                                                                entries, 2, 300);
+    hu_quality_score_t score =
+        hu_conversation_evaluate_quality(long_resp, sizeof(long_resp) - 1, entries, 2, 300);
     HU_ASSERT_TRUE(score.brevity < 80);
 }
 
@@ -598,8 +595,8 @@ static void imessage_tapback_decision_on_haha(void) {
         {.from_me = false, .text = "haha that's hilarious", .timestamp = "10:00"},
         {.from_me = true, .text = "right??", .timestamp = "10:01"},
     };
-    hu_tapback_decision_t d = hu_conversation_classify_tapback_decision(
-        S("haha that's hilarious"), entries, 2, NULL, 12345);
+    hu_tapback_decision_t d = hu_conversation_classify_tapback_decision(S("haha that's hilarious"),
+                                                                        entries, 2, NULL, 12345);
     HU_ASSERT_TRUE(d == HU_TAPBACK_ONLY || d == HU_TAPBACK_AND_TEXT || d == HU_TEXT_ONLY);
 }
 
@@ -608,8 +605,7 @@ static void imessage_reaction_classify_on_funny_text(void) {
         {.from_me = false, .text = "lmaooo", .timestamp = "10:00"},
     };
     /* Seed 0 yields roll < 30 → HAHA for funny-pattern messages (see test_conversation). */
-    hu_reaction_type_t r =
-        hu_conversation_classify_reaction(S("lmaooo"), false, entries, 1, 0u);
+    hu_reaction_type_t r = hu_conversation_classify_reaction(S("lmaooo"), false, entries, 1, 0u);
     HU_ASSERT_TRUE(r != HU_REACTION_NONE);
     HU_ASSERT_EQ(r, HU_REACTION_HAHA);
 }
@@ -653,8 +649,8 @@ static void imessage_gif_should_send_deterministic_false_on_serious(void) {
     hu_channel_history_entry_t entries[1] = {
         {.from_me = false, .text = "my grandmother just died", .timestamp = "10:00"},
     };
-    bool send = hu_conversation_should_send_gif(S("my grandmother just died"), entries, 1, 42,
-                                                 0.5f);
+    bool send =
+        hu_conversation_should_send_gif(S("my grandmother just died"), entries, 1, 42, 0.5f);
     HU_ASSERT_FALSE(send);
 }
 
@@ -662,8 +658,8 @@ static void imessage_should_send_music_on_music_mention(void) {
     hu_channel_history_entry_t hist[1] = {
         {.from_me = false, .text = "hey", .timestamp = "10:00"},
     };
-    bool result = hu_conversation_should_send_music("what are you listening to", 25, hist, 1, 42,
-                                                      1.0f);
+    bool result =
+        hu_conversation_should_send_music("what are you listening to", 25, hist, 1, 42, 1.0f);
     HU_ASSERT_TRUE(result);
 }
 
@@ -671,15 +667,13 @@ static void imessage_should_send_music_respects_zero_probability(void) {
     hu_channel_history_entry_t hist[1] = {
         {.from_me = false, .text = "hey", .timestamp = "10:00"},
     };
-    bool result =
-        hu_conversation_should_send_music("hello there", 11, hist, 1, 42, 0.0f);
+    bool result = hu_conversation_should_send_music("hello there", 11, hist, 1, 42, 0.0f);
     HU_ASSERT_FALSE(result);
 }
 
 static void imessage_build_music_prompt_includes_context(void) {
     char out[256];
-    size_t len =
-        hu_conversation_build_music_prompt("I'm feeling nostalgic", 21, out, sizeof(out));
+    size_t len = hu_conversation_build_music_prompt("I'm feeling nostalgic", 21, out, sizeof(out));
     HU_ASSERT_TRUE(len > 0u);
     HU_ASSERT_NOT_NULL(strstr(out, "nostalgic"));
 }
@@ -726,7 +720,6 @@ static void imessage_narrative_phase_from_short_convo(void) {
  * PART 10 — Persona integration (iMessage overlay + examples)
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-#ifdef HU_HAS_PERSONA
 static void imessage_persona_overlay_found_by_channel(void) {
     hu_persona_overlay_t overlay = {
         .channel = "imessage",
@@ -790,7 +783,6 @@ static void imessage_persona_example_selection_matches_topic(void) {
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(count >= 1);
 }
-#endif /* HU_HAS_PERSONA */
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * PART 11 — Poll metadata (attachment/video flags, multi-sender batching)
@@ -815,8 +807,7 @@ static void imessage_poll_video_flag_propagates(void) {
     hu_allocator_t alloc = hu_system_allocator();
     hu_channel_t ch;
     HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
-    HU_ASSERT_EQ(hu_imessage_test_inject_mock_ex2(&ch, "bob", 3, "[Video]", 7, false, true),
-                 HU_OK);
+    HU_ASSERT_EQ(hu_imessage_test_inject_mock_ex2(&ch, "bob", 3, "[Video]", 7, false, true), HU_OK);
     hu_channel_loop_msg_t msgs[2];
     size_t count = 0;
     HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 2, &count), HU_OK);
@@ -878,9 +869,8 @@ static void imessage_group_mention_hint_empty_for_dm(void) {
 
 static void imessage_link_context_detects_url(void) {
     char buf[256];
-    size_t len =
-        hu_conversation_build_link_context(S("check this out https://example.com"), buf,
-                                            sizeof(buf));
+    size_t len = hu_conversation_build_link_context(S("check this out https://example.com"), buf,
+                                                    sizeof(buf));
     HU_ASSERT_TRUE(len > 0);
 }
 
@@ -914,27 +904,24 @@ static void imessage_effect_name_slam(void) {
 static void imessage_effect_name_all_known(void) {
     HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.MobileSMS.expressivesend.loud"), "Loud");
     HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.MobileSMS.expressivesend.gentle"),
-                      "Gentle");
+                     "Gentle");
     HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.MobileSMS.expressivesend.invisibleink"),
-                      "Invisible Ink");
+                     "Invisible Ink");
     HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKConfettiEffect"),
-                      "Confetti");
+                     "Confetti");
     HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKEchoEffect"), "Echo");
     HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKFireworksEffect"),
-                      "Fireworks");
-    HU_ASSERT_STR_EQ(
-        hu_imessage_effect_name("com.apple.messages.effect.CKHappyBirthdayEffect"),
-        "Happy Birthday");
+                     "Fireworks");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKHappyBirthdayEffect"),
+                     "Happy Birthday");
     HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKHeartEffect"), "Heart");
-    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKLasersEffect"),
-                      "Lasers");
-    HU_ASSERT_STR_EQ(
-        hu_imessage_effect_name("com.apple.messages.effect.CKShootingStarEffect"),
-        "Shooting Star");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKLasersEffect"), "Lasers");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKShootingStarEffect"),
+                     "Shooting Star");
     HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKSparklesEffect"),
-                      "Sparkles");
-    HU_ASSERT_STR_EQ(
-        hu_imessage_effect_name("com.apple.messages.effect.CKSpotlightEffect"), "Spotlight");
+                     "Sparkles");
+    HU_ASSERT_STR_EQ(hu_imessage_effect_name("com.apple.messages.effect.CKSpotlightEffect"),
+                     "Spotlight");
 }
 
 static void imessage_effect_name_null_and_unknown(void) {
@@ -945,17 +932,15 @@ static void imessage_effect_name_null_and_unknown(void) {
 
 static void imessage_balloon_label_sticker(void) {
     HU_ASSERT_STR_EQ(
-        hu_imessage_balloon_label(
-            "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:"
-            "com.apple.Stickers.UserGenerated.StickerPack"),
+        hu_imessage_balloon_label("com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:"
+                                  "com.apple.Stickers.UserGenerated.StickerPack"),
         "[Sticker]");
 }
 
 static void imessage_balloon_label_memoji(void) {
     HU_ASSERT_STR_EQ(
-        hu_imessage_balloon_label(
-            "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:"
-            "com.apple.Animoji.StickersApp.MessagesExtension"),
+        hu_imessage_balloon_label("com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:"
+                                  "com.apple.Animoji.StickersApp.MessagesExtension"),
         "[Memoji]");
     HU_ASSERT_STR_EQ(hu_imessage_balloon_label("some.Memoji.plugin"), "[Memoji]");
 }
@@ -1307,20 +1292,18 @@ static void imessage_tapback_decision_short_msg_no_question(void) {
 
 static void imessage_tapback_decision_substantive_prefers_text(void) {
     hu_tapback_decision_t d = hu_conversation_classify_tapback_decision(
-        S("I was thinking we could go to that new restaurant downtown for dinner tonight"),
-        NULL, 0, NULL, 42);
+        S("I was thinking we could go to that new restaurant downtown for dinner tonight"), NULL, 0,
+        NULL, 42);
     HU_ASSERT_EQ((int)d, (int)HU_TEXT_ONLY);
 }
 
 static void imessage_tapback_decision_null_returns_no_response(void) {
-    hu_tapback_decision_t d =
-        hu_conversation_classify_tapback_decision(NULL, 0, NULL, 0, NULL, 0);
+    hu_tapback_decision_t d = hu_conversation_classify_tapback_decision(NULL, 0, NULL, 0, NULL, 0);
     HU_ASSERT_EQ((int)d, (int)HU_NO_RESPONSE);
 }
 
 static void imessage_tapback_decision_empty_returns_no_response(void) {
-    hu_tapback_decision_t d =
-        hu_conversation_classify_tapback_decision("", 0, NULL, 0, NULL, 0);
+    hu_tapback_decision_t d = hu_conversation_classify_tapback_decision("", 0, NULL, 0, NULL, 0);
     HU_ASSERT_EQ((int)d, (int)HU_NO_RESPONSE);
 }
 
@@ -1333,8 +1316,8 @@ static void imessage_tapback_decision_anti_spam_recent_tapbacks(void) {
     };
     int text_only = 0;
     for (uint32_t seed = 0; seed < 200; seed++) {
-        hu_tapback_decision_t d = hu_conversation_classify_tapback_decision(
-            S("sweet"), entries, 4, NULL, seed);
+        hu_tapback_decision_t d =
+            hu_conversation_classify_tapback_decision(S("sweet"), entries, 4, NULL, seed);
         if (d == HU_TEXT_ONLY)
             text_only++;
     }
@@ -1348,8 +1331,7 @@ static void imessage_tapback_decision_anti_spam_recent_tapbacks(void) {
 static void imessage_seen_behavior_non_busy_always_now(void) {
     for (uint32_t seed = 0; seed < 200; seed++) {
         uint32_t delay = 0;
-        hu_seen_action_t a =
-            hu_conversation_classify_seen_behavior(S("hey"), 20, seed, &delay);
+        hu_seen_action_t a = hu_conversation_classify_seen_behavior(S("hey"), 20, seed, &delay);
         HU_ASSERT_EQ((int)a, (int)HU_SEEN_RESPOND_NOW);
     }
 }
@@ -1367,8 +1349,7 @@ static void imessage_seen_behavior_busy_low_priority_sometimes_delays(void) {
     int delayed = 0;
     for (uint32_t seed = 0; seed < 1000; seed++) {
         uint32_t delay = 0;
-        hu_seen_action_t a =
-            hu_conversation_classify_seen_behavior(S("ok"), 14, seed, &delay);
+        hu_seen_action_t a = hu_conversation_classify_seen_behavior(S("ok"), 14, seed, &delay);
         if (a == HU_SEEN_DELAY_THEN_RESPOND) {
             delayed++;
             HU_ASSERT_TRUE(delay >= 300000);
@@ -1387,8 +1368,7 @@ static void imessage_seen_behavior_question_during_busy_responds_now(void) {
 
 static void imessage_seen_behavior_null_msg_responds_now(void) {
     uint32_t delay = 0;
-    hu_seen_action_t a =
-        hu_conversation_classify_seen_behavior(NULL, 0, 14, 42, &delay);
+    hu_seen_action_t a = hu_conversation_classify_seen_behavior(NULL, 0, 14, 42, &delay);
     HU_ASSERT_EQ((int)a, (int)HU_SEEN_RESPOND_NOW);
 }
 
@@ -1403,10 +1383,8 @@ static void imessage_double_text_farewell_suppressed(void) {
 }
 
 static void imessage_double_text_late_night_suppressed(void) {
-    HU_ASSERT_FALSE(
-        hu_conversation_should_double_text(S("that was fun"), NULL, 0, 23, 42, 1.0f));
-    HU_ASSERT_FALSE(
-        hu_conversation_should_double_text(S("that was fun"), NULL, 0, 3, 42, 1.0f));
+    HU_ASSERT_FALSE(hu_conversation_should_double_text(S("that was fun"), NULL, 0, 23, 42, 1.0f));
+    HU_ASSERT_FALSE(hu_conversation_should_double_text(S("that was fun"), NULL, 0, 3, 42, 1.0f));
 }
 
 static void imessage_double_text_zero_probability_never(void) {
@@ -1423,8 +1401,7 @@ static void imessage_double_text_null_response_never(void) {
 static void imessage_double_text_sometimes_true_with_high_prob(void) {
     int yes = 0;
     for (uint32_t seed = 0; seed < 500; seed++) {
-        if (hu_conversation_should_double_text(S("omg that was amazing!"), NULL, 0, 14, seed,
-                                               0.5f))
+        if (hu_conversation_should_double_text(S("omg that was amazing!"), NULL, 0, 14, seed, 0.5f))
             yes++;
     }
     HU_ASSERT_TRUE(yes > 50);
@@ -1488,8 +1465,7 @@ static void imessage_reaction_none_on_question(void) {
 static void imessage_reaction_gif_haha_or_heart(void) {
     int haha = 0, heart = 0;
     for (uint32_t seed = 0; seed < 500; seed++) {
-        hu_reaction_type_t r =
-            hu_conversation_classify_reaction(S("[GIF]"), false, NULL, 0, seed);
+        hu_reaction_type_t r = hu_conversation_classify_reaction(S("[GIF]"), false, NULL, 0, seed);
         if (r == HU_REACTION_HAHA)
             haha++;
         else if (r == HU_REACTION_HEART)
@@ -1525,8 +1501,7 @@ static void imessage_reaction_photo_sometimes_heart(void) {
 static void imessage_self_reaction_oops_yields_haha(void) {
     int haha = 0;
     for (uint32_t seed = 0; seed < 5000; seed++) {
-        hu_reaction_type_t r =
-            hu_conversation_classify_self_reaction(S("oops my bad lol"), seed);
+        hu_reaction_type_t r = hu_conversation_classify_self_reaction(S("oops my bad lol"), seed);
         if (r == HU_REACTION_HAHA)
             haha++;
     }
@@ -1536,8 +1511,7 @@ static void imessage_self_reaction_oops_yields_haha(void) {
 static void imessage_self_reaction_exclaim_yields_emphasis(void) {
     int emphasis = 0;
     for (uint32_t seed = 0; seed < 5000; seed++) {
-        hu_reaction_type_t r =
-            hu_conversation_classify_self_reaction(S("no way!!!"), seed);
+        hu_reaction_type_t r = hu_conversation_classify_self_reaction(S("no way!!!"), seed);
         if (r == HU_REACTION_EMPHASIS)
             emphasis++;
     }
@@ -1633,10 +1607,12 @@ static void imessage_mock_full_edited_unsent_flags(void) {
     hu_imessage_test_msg_opts_t opts_edited = {.was_edited = true};
     hu_imessage_test_msg_opts_t opts_unsent = {.was_unsent = true};
 
-    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("+15559999999"), S("edited"), &opts_edited),
-                 HU_OK);
-    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("+15559999999"), S("unsent"), &opts_unsent),
-                 HU_OK);
+    HU_ASSERT_EQ(
+        hu_imessage_test_inject_mock_full(&ch, S("+15559999999"), S("edited"), &opts_edited),
+        HU_OK);
+    HU_ASSERT_EQ(
+        hu_imessage_test_inject_mock_full(&ch, S("+15559999999"), S("unsent"), &opts_unsent),
+        HU_OK);
 
     hu_channel_loop_msg_t msgs[4];
     memset(msgs, 0, sizeof(msgs));
@@ -1717,8 +1693,8 @@ static void imessage_guid_lookup_returns_stored_text(void) {
 
     char buf[256];
     size_t out_len = 0;
-    hu_error_t err = hu_imessage_lookup_message_by_guid(&alloc, "MSG-ABC", 7, buf, sizeof(buf),
-                                                        &out_len);
+    hu_error_t err =
+        hu_imessage_lookup_message_by_guid(&alloc, "MSG-ABC", 7, buf, sizeof(buf), &out_len);
     HU_ASSERT_EQ(err, HU_OK);
     HU_ASSERT_TRUE(out_len > 0);
     HU_ASSERT_STR_EQ(buf, "original message text");
@@ -1733,8 +1709,8 @@ static void imessage_guid_lookup_unknown_guid_not_supported(void) {
 
     char buf[256];
     size_t out_len = 0;
-    hu_error_t err = hu_imessage_lookup_message_by_guid(&alloc, "MSG-UNKNOWN", 11, buf, sizeof(buf),
-                                                        &out_len);
+    hu_error_t err =
+        hu_imessage_lookup_message_by_guid(&alloc, "MSG-UNKNOWN", 11, buf, sizeof(buf), &out_len);
     HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
     HU_ASSERT_EQ(out_len, 0u);
 
@@ -1748,8 +1724,8 @@ static void imessage_guid_lookup_clear_empties_store(void) {
 
     char buf[256];
     size_t out_len = 0;
-    hu_error_t err = hu_imessage_lookup_message_by_guid(&alloc, "MSG-TEMP", 8, buf, sizeof(buf),
-                                                        &out_len);
+    hu_error_t err =
+        hu_imessage_lookup_message_by_guid(&alloc, "MSG-TEMP", 8, buf, sizeof(buf), &out_len);
     HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
 
     hu_imessage_test_clear_guid_lookups();
@@ -1784,8 +1760,9 @@ static void imessage_group_msg_chat_id_populated(void) {
         .chat_id = "iMessage;+;chat12345",
         .guid = "MSG-GRP-001",
     };
-    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("friend@test.com"), S("group hello"), &opts),
-                 HU_OK);
+    HU_ASSERT_EQ(
+        hu_imessage_test_inject_mock_full(&ch, S("friend@test.com"), S("group hello"), &opts),
+        HU_OK);
 
     hu_channel_loop_msg_t msgs[4];
     memset(msgs, 0, sizeof(msgs));
@@ -1920,12 +1897,10 @@ void run_imessage_adversarial_tests(void) {
     HU_RUN_TEST(imessage_narrative_phase_from_short_convo);
 
     /* Part 10: Persona overlays + example banks */
-#ifdef HU_HAS_PERSONA
     HU_RUN_TEST(imessage_persona_overlay_found_by_channel);
     HU_RUN_TEST(imessage_persona_overlay_not_found_for_other_channel);
     HU_RUN_TEST(imessage_persona_prompt_includes_casual_with_overlay);
     HU_RUN_TEST(imessage_persona_example_selection_matches_topic);
-#endif
 
     /* Part 11: Poll metadata */
 #if HU_IS_TEST

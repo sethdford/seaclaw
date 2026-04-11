@@ -101,10 +101,8 @@ hu_error_t cp_voice_clone(hu_allocator_t *alloc, hu_app_context_t *app, hu_ws_co
                                                   clone_res.voice_id, vid_len);
         if (perr != HU_OK)
             return perr;
-#ifdef HU_HAS_PERSONA
         if (app->agent)
             hu_agent_set_persona(app->agent, persona_name, persona_name_len);
-#endif
     }
 
     hu_json_value_t *resp = hu_json_object_new(alloc);

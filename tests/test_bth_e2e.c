@@ -30,10 +30,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifdef HU_HAS_PERSONA
 #include "human/persona/circadian.h"
 #include "human/persona/relationship.h"
-#endif
 
 static hu_channel_history_entry_t make_entry(bool from_me, const char *text, const char *ts) {
     hu_channel_history_entry_t e;
@@ -420,7 +418,6 @@ static void bth_pipeline_full_conversation(void) {
     /* V5. Pattern radar observed topics */
     HU_ASSERT_TRUE(radar.observation_count >= 1);
 
-#ifdef HU_HAS_PERSONA
     /* V6. Proactive check works */
     {
         hu_proactive_result_t pr;
@@ -444,7 +441,6 @@ static void bth_pipeline_full_conversation(void) {
         HU_ASSERT_TRUE(strstr(circ, "morning") != NULL || strstr(circ, "Morning") != NULL);
         alloc.free(alloc.ctx, circ, circ_len + 1);
     }
-#endif
 
     /* V8. Relationship state updated */
     HU_ASSERT_EQ(rel.session_count, 1u);

@@ -5,13 +5,8 @@
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/memory.h"
-#include "human/provider.h"
-#ifdef HU_HAS_PERSONA
 #include "human/persona.h"
-#else
-struct hu_persona;         /* opaque when persona not available */
-struct hu_contact_profile; /* opaque when persona not available */
-#endif
+#include "human/provider.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -274,12 +269,10 @@ size_t hu_conversation_build_vulnerability_directive(const hu_vulnerability_stat
  * high emotion, and early-turn detection. Uses persona context_modifiers when
  * non-NULL; otherwise defaults (0.4, 1.6, 1.5, 1.4). Writes into buf, returns
  * bytes written. */
-#ifdef HU_HAS_PERSONA
 size_t hu_conversation_build_context_modifiers(const hu_channel_history_entry_t *entries,
                                                size_t count, const hu_emotional_state_t *emo,
                                                const hu_context_modifiers_t *mods, char *buf,
                                                size_t cap);
-#endif
 
 /* ── Typo correction fragment (*meant) ─────────────────────────────────── */
 

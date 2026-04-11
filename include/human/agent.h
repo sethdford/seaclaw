@@ -43,35 +43,34 @@
 #ifdef HU_ENABLE_SQLITE
 #include "human/intelligence/meta_learning.h"
 #endif
+#include "human/agent/growth_narrative.h"
 #include "human/agent/process_reward.h"
+#include "human/agent/reflection.h"
+#include "human/cognition/attachment.h"
+#include "human/cognition/dual_process.h"
+#include "human/cognition/emotional.h"
+#include "human/cognition/metacognition.h"
+#include "human/cognition/novelty.h"
+#include "human/cognition/rupture_repair.h"
+#include "human/cognition/trust.h"
+#include "human/hook.h"
 #include "human/memory/adaptive_rag.h"
+#include "human/memory/personal_model.h"
 #include "human/memory/self_rag.h"
 #include "human/memory/stm.h"
-#include "human/persona/somatic.h"
-#include "human/cognition/novelty.h"
-#include "human/cognition/attachment.h"
-#include "human/cognition/rupture_repair.h"
-#include "human/persona/narrative_self.h"
-#include "human/persona/creative_voice.h"
-#include "human/agent/growth_narrative.h"
-#include "human/persona/genuine_boundaries.h"
-#include "human/cognition/trust.h"
 #include "human/memory/tiers.h"
 #include "human/ml/dpo.h"
 #include "human/observability/bth_metrics.h"
 #include "human/observer.h"
-#ifdef HU_HAS_PERSONA
+#include "human/permission.h"
 #include "human/persona.h"
 #include "human/persona/circadian.h"
+#include "human/persona/creative_voice.h"
+#include "human/persona/genuine_boundaries.h"
+#include "human/persona/narrative_self.h"
 #include "human/persona/relationship.h"
+#include "human/persona/somatic.h"
 #include "human/persona/voice_maturity.h"
-#endif
-#include "human/agent/reflection.h"
-#include "human/cognition/dual_process.h"
-#include "human/cognition/emotional.h"
-#include "human/cognition/metacognition.h"
-#include "human/hook.h"
-#include "human/permission.h"
 #include "human/provider.h"
 #include "human/security.h"
 #include "human/security/audit.h"
@@ -201,6 +200,7 @@ struct hu_agent {
     hu_tool_spec_t *tool_specs; /* owned; built from tools */
     size_t tool_specs_count;
     hu_memory_t *memory;                     /* optional, may be NULL */
+    hu_personal_model_t personal_model;      /* in-process model-of-user (facts, style, topics) */
     hu_retrieval_engine_t *retrieval_engine; /* optional; when set, memory_loader uses it */
     hu_session_store_t *session_store;       /* optional, may be NULL */
     hu_observer_t *observer;                 /* optional, may be NULL */
@@ -300,9 +300,9 @@ struct hu_agent {
     hu_reflection_config_t reflection;
     struct hu_outcome_tracker *outcomes; /* optional; tracks tool results and user corrections */
 
-    bool chain_of_thought;      /* inject reasoning instructions into prompt */
-    bool on_device_available;    /* true if on-device inference server was detected at startup */
-    char *persona_prompt;  /* custom identity override; owned */
+    bool chain_of_thought;    /* inject reasoning instructions into prompt */
+    bool on_device_available; /* true if on-device inference server was detected at startup */
+    char *persona_prompt;     /* custom identity override; owned */
     size_t persona_prompt_len;
 
     /* Set by channel before turn; used for per-channel persona overlays. Not owned. */
@@ -342,15 +342,11 @@ struct hu_agent {
     hu_meta_params_t meta_params;
 #endif
 
-#ifdef HU_HAS_PERSONA
     hu_relationship_state_t relationship; /* session-based warmth adaptation */
-#endif
 
-#ifdef HU_HAS_PERSONA
-    hu_persona_t *persona; /* loaded from config; owned */
+    hu_persona_t *persona; /* loaded from config; owned; NULL if no persona configured */
     hu_voice_profile_t voice_profile;
     bool voice_profile_initialized;
-#endif
     bool humanness_ctx_owned; /* true when conversation_context was built by humanness module */
     char *persona_name;
     size_t persona_name_len;
@@ -494,10 +490,9 @@ uint32_t hu_agent_estimate_tokens(const char *text, size_t len);
 hu_error_t hu_agent_execute_plan(hu_agent_t *agent, const char *plan_json, size_t plan_json_len,
                                  char **summary_out, size_t *summary_len_out);
 
-#ifdef HU_HAS_PERSONA
-/* Switch persona mid-conversation. name=NULL or name_len=0 clears the persona. */
+/* Switch persona mid-conversation. name=NULL or name_len=0 clears the persona.
+ * Requires HU_ENABLE_PERSONA to be compiled in; returns HU_ERR_NOT_SUPPORTED otherwise. */
 hu_error_t hu_agent_set_persona(hu_agent_t *agent, const char *name, size_t name_len);
-#endif
 
 /* Run memory consolidation (merge similar entries, decay old). */
 hu_error_t hu_agent_consolidate_memory(hu_agent_t *agent);

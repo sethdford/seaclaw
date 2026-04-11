@@ -11,9 +11,7 @@
 #ifndef _WIN32
 #include <sys/stat.h>
 #endif
-#if defined(HU_ENABLE_PERSONA)
 #include "human/persona.h"
-#endif
 
 #define HU_DOCTOR_LINE_CATEGORY "doctor_line"
 
@@ -62,7 +60,6 @@ static bool doctor_config_wants_http(const hu_config_t *cfg) {
     return false;
 }
 
-#if defined(HU_ENABLE_PERSONA)
 static bool doctor_config_wants_persona(const hu_config_t *cfg) {
     if (!cfg)
         return false;
@@ -74,7 +71,6 @@ static bool doctor_config_wants_persona(const hu_config_t *cfg) {
         return true;
     return false;
 }
-#endif
 
 static hu_error_t doctor_check_sqlite_backend(hu_allocator_t *alloc, hu_diag_item_t **buf,
                                               size_t *n, size_t *cap, const hu_config_t *cfg) {
@@ -108,7 +104,6 @@ static hu_error_t doctor_check_http_client(hu_allocator_t *alloc, hu_diag_item_t
 #endif
 }
 
-#if defined(HU_ENABLE_PERSONA)
 static hu_error_t doctor_check_persona_dir(hu_allocator_t *alloc, hu_diag_item_t **buf, size_t *n,
                                            size_t *cap, const hu_config_t *cfg) {
     if (!doctor_config_wants_persona(cfg))
@@ -145,7 +140,6 @@ static hu_error_t doctor_check_persona_dir(hu_allocator_t *alloc, hu_diag_item_t
 #endif
 #endif
 }
-#endif /* HU_ENABLE_PERSONA */
 
 static void doctor_free_diag_items(hu_allocator_t *alloc, hu_diag_item_t *buf, size_t n,
                                    size_t cap_slots) {
@@ -488,13 +482,11 @@ hu_error_t hu_doctor_check_config_semantics(hu_allocator_t *alloc, const hu_conf
         doctor_free_diag_items(alloc, buf, n, cap);
         return ext_err;
     }
-#if defined(HU_ENABLE_PERSONA)
     ext_err = doctor_check_persona_dir(alloc, &buf, &n, &cap, cfg);
     if (ext_err != HU_OK) {
         doctor_free_diag_items(alloc, buf, n, cap);
         return ext_err;
     }
-#endif
     ext_err = doctor_check_local_inference(alloc, &buf, &n, &cap);
     if (ext_err != HU_OK) {
         doctor_free_diag_items(alloc, buf, n, cap);

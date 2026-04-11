@@ -97,7 +97,6 @@ void run_path_security_tests(void);
 void run_process_util_tests(void);
 void run_prompt_tests(void);
 void run_tool_search_tests(void);
-#ifdef HU_ENABLE_PERSONA
 void run_persona_tests(void);
 void run_circadian_tests(void);
 void run_relationship_tests(void);
@@ -111,7 +110,6 @@ void run_voice_maturity_tests(void);
 void run_style_learner_tests(void);
 void run_temporal_tests(void);
 void run_inner_world_tests(void);
-#endif
 void run_lifecycle_tests(void);
 void run_observer_tests(void);
 void run_session_tests(void);
@@ -448,6 +446,7 @@ void run_canvas_render_tests(void);
 void run_background_registry_tests(void);
 void run_consistency_tests(void);
 void run_fact_extract_tests(void);
+void run_personal_model_tests(void);
 void run_hallucination_guard_tests(void);
 void run_humor_fw_tests(void);
 void run_self_improve_tests(void);
@@ -582,7 +581,6 @@ int main(int argc, char **argv) {
     run_process_util_tests();
     run_prompt_tests();
     run_tool_search_tests();
-#ifdef HU_ENABLE_PERSONA
     run_persona_tests();
     run_circadian_tests();
     run_relationship_tests();
@@ -596,7 +594,6 @@ int main(int argc, char **argv) {
     run_style_learner_tests();
     run_temporal_tests();
     run_inner_world_tests();
-#endif
     run_lifecycle_tests();
     run_observer_tests();
     run_session_tests();
@@ -922,6 +919,7 @@ int main(int argc, char **argv) {
     run_background_registry_tests();
     run_consistency_tests();
     run_fact_extract_tests();
+    run_personal_model_tests();
     run_hallucination_guard_tests();
     run_humor_fw_tests();
     run_self_improve_tests();

@@ -714,7 +714,6 @@ static void escalation_deescalation_directive_nonempty(void) {
     HU_ASSERT_NOT_NULL(strstr(buf, "empathetic"));
 }
 
-#ifdef HU_HAS_PERSONA
 /* ── Context modifiers tests (F16) ─────────────────────────────────────── */
 
 static void context_modifiers_heavy_topic_includes_directive(void) {
@@ -788,7 +787,6 @@ static void context_modifiers_combined_includes_multiple_lines(void) {
     HU_ASSERT_NOT_NULL(strstr(buf, "sharing something personal"));
     HU_ASSERT_NOT_NULL(strstr(buf, "Early in conversation"));
 }
-#endif /* HU_HAS_PERSONA */
 
 /* ── Honesty guardrail tests ─────────────────────────────────────────── */
 
@@ -3681,14 +3679,12 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(escalation_mixed_positive_negative_not_escalating);
     HU_RUN_TEST(escalation_deescalation_directive_nonempty);
 
-#ifdef HU_HAS_PERSONA
     /* Context modifiers (F16) */
     HU_RUN_TEST(context_modifiers_heavy_topic_includes_directive);
     HU_RUN_TEST(context_modifiers_personal_sharing_includes_directive);
     HU_RUN_TEST(context_modifiers_high_emotion_includes_directive);
     HU_RUN_TEST(context_modifiers_early_turn_includes_directive);
     HU_RUN_TEST(context_modifiers_combined_includes_multiple_lines);
-#endif
 
     /* Honesty guardrail */
     HU_RUN_TEST(honesty_detects_action_query);

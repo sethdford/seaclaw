@@ -6,13 +6,11 @@
 #include <string.h>
 #include <time.h>
 
-#ifdef HU_HAS_PERSONA
 #include "human/persona/life_sim.h"
 #include "human/persona/style_clone.h"
 #include "human/persona/voice_maturity.h"
-#endif
 
-#if defined(HU_ENABLE_SQLITE) && defined(HU_ENABLE_PERSONA) && HU_ENABLE_PERSONA
+#if defined(HU_ENABLE_SQLITE) && HU_ENABLE_SQLITE
 #include "human/persona/mood.h"
 #endif
 
@@ -95,7 +93,7 @@ hu_error_t hu_agent_build_turn_context(hu_agent_t *agent) {
 #endif
 
     /* 2. Mood directive (SQLite-backed, persona-dependent) */
-#if defined(HU_ENABLE_SQLITE) && defined(HU_ENABLE_PERSONA) && HU_ENABLE_PERSONA
+#if defined(HU_ENABLE_SQLITE) && HU_ENABLE_SQLITE
     if (agent->memory) {
         hu_mood_state_t mood_state;
         memset(&mood_state, 0, sizeof(mood_state));
@@ -114,10 +112,8 @@ hu_error_t hu_agent_build_turn_context(hu_agent_t *agent) {
 #endif
 
     /* 3. Life sim context */
-#ifdef HU_HAS_PERSONA
-    if (agent->persona &&
-        (agent->persona->daily_routine.weekday_count > 0 ||
-         agent->persona->daily_routine.weekend_count > 0)) {
+    if (agent->persona && (agent->persona->daily_routine.weekday_count > 0 ||
+                           agent->persona->daily_routine.weekend_count > 0)) {
 #ifndef HU_IS_TEST
         time_t now_ts = time(NULL);
         struct tm tm_buf;
@@ -137,10 +133,8 @@ hu_error_t hu_agent_build_turn_context(hu_agent_t *agent) {
         }
 #endif
     }
-#endif
 
     /* 4. Voice maturity guidance */
-#ifdef HU_HAS_PERSONA
     if (agent->persona) {
         if (!agent->voice_profile_initialized) {
             hu_voice_profile_init(&agent->voice_profile);
@@ -157,10 +151,8 @@ hu_error_t hu_agent_build_turn_context(hu_agent_t *agent) {
             alloc->free(alloc->ctx, vm_ctx, vm_ctx_len + 1);
         }
     }
-#endif
 
     /* 5. Style clone from conversation history */
-#ifdef HU_HAS_PERSONA
     if (agent->persona && agent->history && agent->history_count > 0) {
         const char *own_msgs[512];
         size_t own_count = 0;
@@ -183,7 +175,6 @@ hu_error_t hu_agent_build_turn_context(hu_agent_t *agent) {
             }
         }
     }
-#endif
 
     if (len > 0) {
         agent->conversation_context = buf;
@@ -207,9 +198,7 @@ void hu_agent_free_turn_context(hu_agent_t *agent) {
     agent->humanness_ctx_owned = false;
 }
 
-hu_error_t hu_agent_update_voice_profile(hu_agent_t *agent, const char *user_msg,
-                                         size_t msg_len) {
-#ifdef HU_HAS_PERSONA
+hu_error_t hu_agent_update_voice_profile(hu_agent_t *agent, const char *user_msg, size_t msg_len) {
     if (!agent || !agent->voice_profile_initialized)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -272,10 +261,4 @@ hu_error_t hu_agent_update_voice_profile(hu_agent_t *agent, const char *user_msg
 
     hu_voice_profile_update(&agent->voice_profile, had_emotion, had_topic, had_humor);
     return HU_OK;
-#else
-    (void)agent;
-    (void)user_msg;
-    (void)msg_len;
-    return HU_ERR_NOT_SUPPORTED;
-#endif
 }
