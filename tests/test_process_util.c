@@ -56,6 +56,33 @@ static void test_run_result_free_clears_buffers(void) {
     (void)err_buf;
 }
 
+static void test_process_run_with_timeout_zero_delegates(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *argv[] = {"echo", "hello", NULL};
+    hu_run_result_t result;
+    hu_error_t err = hu_process_run_with_timeout(&alloc, argv, NULL, 4096, 0, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.success);
+    hu_run_result_free(&alloc, &result);
+}
+
+static void test_process_run_with_timeout_nonzero_succeeds(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    const char *argv[] = {"echo", "hello", NULL};
+    hu_run_result_t result;
+    hu_error_t err = hu_process_run_with_timeout(&alloc, argv, NULL, 4096, 15, &result);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(result.success);
+    hu_run_result_free(&alloc, &result);
+}
+
+static void test_process_run_with_timeout_null_args_fail(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_run_result_t result;
+    hu_error_t err = hu_process_run_with_timeout(&alloc, NULL, NULL, 4096, 10, &result);
+    HU_ASSERT_NEQ(err, HU_OK);
+}
+
 void run_process_util_tests(void) {
     HU_TEST_SUITE("Process util");
 #if !defined(_WIN32) && (defined(__unix__) || defined(__APPLE__))
@@ -66,4 +93,7 @@ void run_process_util_tests(void) {
     HU_RUN_TEST(test_process_run_empty_argv0_fail);
     HU_RUN_TEST(test_run_result_free_null_safe);
     HU_RUN_TEST(test_run_result_free_clears_buffers);
+    HU_RUN_TEST(test_process_run_with_timeout_zero_delegates);
+    HU_RUN_TEST(test_process_run_with_timeout_nonzero_succeeds);
+    HU_RUN_TEST(test_process_run_with_timeout_null_args_fail);
 }

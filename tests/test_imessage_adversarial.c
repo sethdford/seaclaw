@@ -1558,6 +1558,272 @@ static void imessage_self_reaction_null_safe(void) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * PART 21 — Mock poll parity: full field injection
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+#if HU_IS_TEST
+static void imessage_mock_full_propagates_all_fields(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+
+    hu_imessage_test_msg_opts_t opts = {
+        .guid = "MSG-FULL-001",
+        .reply_to_guid = "MSG-FULL-000",
+        .chat_id = "iMessage;+;chat999",
+        .has_attachment = true,
+        .has_video = false,
+        .is_group = true,
+        .was_edited = true,
+        .was_unsent = false,
+        .timestamp_sec = 1700000000,
+    };
+    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("alice@test.com"), S("hey group"), &opts),
+                 HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_STR_EQ(msgs[0].session_key, "alice@test.com");
+    HU_ASSERT_STR_EQ(msgs[0].content, "hey group");
+    HU_ASSERT_STR_EQ(msgs[0].guid, "MSG-FULL-001");
+    HU_ASSERT_STR_EQ(msgs[0].reply_to_guid, "MSG-FULL-000");
+    HU_ASSERT_STR_EQ(msgs[0].chat_id, "iMessage;+;chat999");
+    HU_ASSERT_TRUE(msgs[0].is_group);
+    HU_ASSERT_TRUE(msgs[0].has_attachment);
+    HU_ASSERT_TRUE(!msgs[0].has_video);
+    HU_ASSERT_TRUE(msgs[0].was_edited);
+    HU_ASSERT_TRUE(!msgs[0].was_unsent);
+    HU_ASSERT_EQ(msgs[0].timestamp_sec, (int64_t)1700000000);
+    HU_ASSERT_EQ(msgs[0].message_id, (int64_t)1);
+
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_mock_full_group_msg_sets_is_group_and_chat_id(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+
+    hu_imessage_test_msg_opts_t opts = {
+        .is_group = true,
+        .chat_id = "iMessage;+;chatABC",
+    };
+    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("bob@test.com"), S("group msg"), &opts),
+                 HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_TRUE(msgs[0].is_group);
+    HU_ASSERT_STR_EQ(msgs[0].chat_id, "iMessage;+;chatABC");
+
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_mock_full_edited_unsent_flags(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+
+    hu_imessage_test_msg_opts_t opts_edited = {.was_edited = true};
+    hu_imessage_test_msg_opts_t opts_unsent = {.was_unsent = true};
+
+    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("+15559999999"), S("edited"), &opts_edited),
+                 HU_OK);
+    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("+15559999999"), S("unsent"), &opts_unsent),
+                 HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 2u);
+    HU_ASSERT_TRUE(msgs[0].was_edited);
+    HU_ASSERT_TRUE(!msgs[0].was_unsent);
+    HU_ASSERT_TRUE(!msgs[1].was_edited);
+    HU_ASSERT_TRUE(msgs[1].was_unsent);
+
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_mock_full_inline_reply_guid(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+
+    hu_imessage_test_msg_opts_t opts = {
+        .guid = "MSG-REPLY-002",
+        .reply_to_guid = "MSG-ORIGINAL-001",
+    };
+    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("+15559999999"), S("replying"), &opts),
+                 HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_STR_EQ(msgs[0].guid, "MSG-REPLY-002");
+    HU_ASSERT_STR_EQ(msgs[0].reply_to_guid, "MSG-ORIGINAL-001");
+
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_mock_full_timestamp_propagated(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+
+    hu_imessage_test_msg_opts_t opts = {.timestamp_sec = 1680000000};
+    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("+15559999999"), S("timestamped"), &opts),
+                 HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_EQ(msgs[0].timestamp_sec, (int64_t)1680000000);
+
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_mock_full_null_opts_rejected(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+
+    hu_error_t err = hu_imessage_test_inject_mock_full(&ch, S("+15559999999"), S("test"), NULL);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+
+    hu_imessage_destroy(&ch);
+}
+#endif /* HU_IS_TEST */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PART 22 — GUID lookup test store
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+#if HU_IS_TEST
+static void imessage_guid_lookup_returns_stored_text(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_imessage_test_clear_guid_lookups();
+    hu_imessage_test_set_guid_lookup("MSG-ABC", "original message text");
+
+    char buf[256];
+    size_t out_len = 0;
+    hu_error_t err = hu_imessage_lookup_message_by_guid(&alloc, "MSG-ABC", 7, buf, sizeof(buf),
+                                                        &out_len);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_TRUE(out_len > 0);
+    HU_ASSERT_STR_EQ(buf, "original message text");
+
+    hu_imessage_test_clear_guid_lookups();
+}
+
+static void imessage_guid_lookup_unknown_guid_not_supported(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_imessage_test_clear_guid_lookups();
+    hu_imessage_test_set_guid_lookup("MSG-KNOWN", "known text");
+
+    char buf[256];
+    size_t out_len = 0;
+    hu_error_t err = hu_imessage_lookup_message_by_guid(&alloc, "MSG-UNKNOWN", 11, buf, sizeof(buf),
+                                                        &out_len);
+    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+    HU_ASSERT_EQ(out_len, 0u);
+
+    hu_imessage_test_clear_guid_lookups();
+}
+
+static void imessage_guid_lookup_clear_empties_store(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_imessage_test_set_guid_lookup("MSG-TEMP", "temporary");
+    hu_imessage_test_clear_guid_lookups();
+
+    char buf[256];
+    size_t out_len = 0;
+    hu_error_t err = hu_imessage_lookup_message_by_guid(&alloc, "MSG-TEMP", 8, buf, sizeof(buf),
+                                                        &out_len);
+    HU_ASSERT_EQ(err, HU_ERR_NOT_SUPPORTED);
+
+    hu_imessage_test_clear_guid_lookups();
+}
+
+static void imessage_guid_lookup_null_args_rejected(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    char buf[64];
+    size_t out_len = 0;
+
+    HU_ASSERT_EQ(hu_imessage_lookup_message_by_guid(&alloc, NULL, 0, buf, sizeof(buf), &out_len),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_imessage_lookup_message_by_guid(&alloc, "X", 1, NULL, 0, &out_len),
+                 HU_ERR_INVALID_ARGUMENT);
+    HU_ASSERT_EQ(hu_imessage_lookup_message_by_guid(&alloc, "X", 1, buf, sizeof(buf), NULL),
+                 HU_ERR_INVALID_ARGUMENT);
+}
+#endif /* HU_IS_TEST */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PART 23 — Group chat routing verification
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+#if HU_IS_TEST
+static void imessage_group_msg_chat_id_populated(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+
+    hu_imessage_test_msg_opts_t opts = {
+        .is_group = true,
+        .chat_id = "iMessage;+;chat12345",
+        .guid = "MSG-GRP-001",
+    };
+    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("friend@test.com"), S("group hello"), &opts),
+                 HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+
+    /* session_key is the sender handle (for context/history lookups) */
+    HU_ASSERT_STR_EQ(msgs[0].session_key, "friend@test.com");
+    /* chat_id is the thread identifier (for send routing) */
+    HU_ASSERT_STR_EQ(msgs[0].chat_id, "iMessage;+;chat12345");
+    HU_ASSERT_TRUE(msgs[0].is_group);
+
+    hu_imessage_destroy(&ch);
+}
+
+static void imessage_dm_msg_chat_id_empty(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    HU_ASSERT_EQ(hu_imessage_create(&alloc, "+15551234567", 12, NULL, 0, &ch), HU_OK);
+
+    hu_imessage_test_msg_opts_t opts = {.is_group = false};
+    HU_ASSERT_EQ(hu_imessage_test_inject_mock_full(&ch, S("+15559999999"), S("dm hello"), &opts),
+                 HU_OK);
+
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    HU_ASSERT_EQ(hu_imessage_poll(ch.ctx, &alloc, msgs, 4, &count), HU_OK);
+    HU_ASSERT_EQ(count, 1u);
+    HU_ASSERT_TRUE(!msgs[0].is_group);
+    HU_ASSERT_STR_EQ(msgs[0].chat_id, "");
+
+    hu_imessage_destroy(&ch);
+}
+#endif /* HU_IS_TEST */
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * Suite registration
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1763,6 +2029,23 @@ void run_imessage_adversarial_tests(void) {
     HU_RUN_TEST(imessage_self_reaction_exclaim_yields_emphasis);
     HU_RUN_TEST(imessage_self_reaction_normal_text_always_none_at_high_seed);
     HU_RUN_TEST(imessage_self_reaction_null_safe);
+    /* Part 21: Mock poll parity — full field injection */
+    HU_RUN_TEST(imessage_mock_full_propagates_all_fields);
+    HU_RUN_TEST(imessage_mock_full_group_msg_sets_is_group_and_chat_id);
+    HU_RUN_TEST(imessage_mock_full_edited_unsent_flags);
+    HU_RUN_TEST(imessage_mock_full_inline_reply_guid);
+    HU_RUN_TEST(imessage_mock_full_timestamp_propagated);
+    HU_RUN_TEST(imessage_mock_full_null_opts_rejected);
+
+    /* Part 22: GUID lookup test store */
+    HU_RUN_TEST(imessage_guid_lookup_returns_stored_text);
+    HU_RUN_TEST(imessage_guid_lookup_unknown_guid_not_supported);
+    HU_RUN_TEST(imessage_guid_lookup_clear_empties_store);
+    HU_RUN_TEST(imessage_guid_lookup_null_args_rejected);
+
+    /* Part 23: Group chat routing */
+    HU_RUN_TEST(imessage_group_msg_chat_id_populated);
+    HU_RUN_TEST(imessage_dm_msg_chat_id_empty);
 }
 #else  /* !HU_HAS_IMESSAGE */
 void run_imessage_adversarial_tests(void) {
