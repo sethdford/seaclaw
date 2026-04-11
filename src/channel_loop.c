@@ -36,6 +36,7 @@ hu_error_t hu_channel_loop_tick(hu_channel_loop_ctx_t *ctx, hu_channel_loop_stat
         return HU_ERR_INVALID_ARGUMENT;
 
     hu_channel_loop_msg_t msgs[HU_LOOP_MSG_BUF];
+    memset(msgs, 0, sizeof(msgs));
     size_t count = 0;
     hu_error_t err = ctx->poll_fn(ctx->channel_ctx, ctx->alloc, msgs, HU_LOOP_MSG_BUF, &count);
     if (err != HU_OK)

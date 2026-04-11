@@ -10,6 +10,7 @@
 #include "human/core/http.h"
 #include "human/core/json.h"
 #include "human/core/process_util.h"
+#include "human/core/log.h"
 #include "human/core/string.h"
 #include "human/data/loader.h"
 #include <stdbool.h>
@@ -66,6 +67,7 @@ typedef struct hu_telegram_ctx {
     char *token;
     size_t token_len;
     int64_t last_update_id;
+    int64_t bot_user_id;
     bool running;
     /* Policy: NULL or count 0 = allow all; otherwise check allowlist */
     const char *const *allow_from;
@@ -81,6 +83,13 @@ typedef struct hu_telegram_ctx {
     struct {
         char session_key[128];
         char content[4096];
+        char chat_id[128];
+        char guid[96];
+        char reply_to_guid[96];
+        bool is_group;
+        bool has_attachment;
+        int64_t message_id;
+        int64_t timestamp_sec;
     } mock_msgs[8];
     size_t mock_count;
 #endif
@@ -317,12 +326,6 @@ fail:
 /* ─── Typing indicator ─────────────────────────────────────────────────── */
 
 static void send_typing_action(hu_telegram_ctx_t *c, const char *chat_id, size_t chat_id_len) {
-#if HU_IS_TEST
-    (void)c;
-    (void)chat_id;
-    (void)chat_id_len;
-    return;
-#else
     if (!c->token || chat_id_len == 0)
         return;
     char url_buf[512];
@@ -339,7 +342,6 @@ static void send_typing_action(hu_telegram_ctx_t *c, const char *chat_id, size_t
     if (resp.owned && resp.body)
         hu_http_response_free(c->alloc, &resp);
     (void)err;
-#endif
 }
 #endif
 
@@ -771,6 +773,7 @@ static hu_error_t telegram_send(void *ctx, const char *target, size_t target_len
     }
 
     /* Send media attachments */
+    hu_error_t media_err = HU_OK;
     for (size_t i = 0; i < media_count && media; i++) {
         const char *m = media[i];
         if (!m)
@@ -778,9 +781,12 @@ static hu_error_t telegram_send(void *ctx, const char *target, size_t target_len
         size_t mlen = strlen(m);
         tg_media_kind_t kind = infer_media_kind(m, mlen);
         hu_error_t err = send_media_curl(c, target, target_len, kind, m, mlen, NULL, 0);
-        (void)err;
+        if (err != HU_OK) {
+            hu_log_error("telegram", NULL, "media send failed for %s (err=%d)", m, (int)err);
+            media_err = err;
+        }
     }
-    return HU_OK;
+    return media_err;
 #endif
 }
 
@@ -988,8 +994,10 @@ static hu_error_t telegram_load_conversation_history(void *ctx, hu_allocator_t *
         memset(&entry, 0, sizeof(entry));
 
         hu_json_value_t *from = hu_json_object_get(msg_obj, "from");
-        if (from && from->type == HU_JSON_OBJECT)
-            entry.from_me = hu_json_get_bool(from, "is_bot", false);
+        if (from && from->type == HU_JSON_OBJECT) {
+            double from_id = hu_json_get_number(from, "id", 0);
+            entry.from_me = (c->bot_user_id > 0 && (int64_t)from_id == c->bot_user_id);
+        }
 
         size_t tcopy = text_len;
         if (tcopy > sizeof(entry.text) - 1)
@@ -1158,6 +1166,10 @@ hu_error_t hu_telegram_create_ex(hu_allocator_t *alloc, const char *token, size_
         memcpy(c->token, token, token_len);
         c->token[token_len] = '\0';
         c->token_len = token_len;
+        /* Extract bot user ID from token format "{bot_id}:{secret}" */
+        const char *colon = memchr(token, ':', token_len);
+        if (colon && colon > token)
+            c->bot_user_id = strtoll(token, NULL, 10);
     }
     out->ctx = c;
     out->vtable = &telegram_vtable;
@@ -1207,6 +1219,13 @@ hu_error_t hu_telegram_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         for (size_t i = 0; i < n; i++) {
             memcpy(msgs[i].session_key, c->mock_msgs[i].session_key, 128);
             memcpy(msgs[i].content, c->mock_msgs[i].content, 4096);
+            memcpy(msgs[i].chat_id, c->mock_msgs[i].chat_id, sizeof(msgs[i].chat_id));
+            memcpy(msgs[i].guid, c->mock_msgs[i].guid, sizeof(msgs[i].guid));
+            memcpy(msgs[i].reply_to_guid, c->mock_msgs[i].reply_to_guid, sizeof(msgs[i].reply_to_guid));
+            msgs[i].is_group = c->mock_msgs[i].is_group;
+            msgs[i].has_attachment = c->mock_msgs[i].has_attachment;
+            msgs[i].message_id = c->mock_msgs[i].message_id;
+            msgs[i].timestamp_sec = c->mock_msgs[i].timestamp_sec;
         }
         *out_count = n;
         c->mock_count = 0;
@@ -1309,6 +1328,7 @@ hu_error_t hu_telegram_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         const char *content = text;
         size_t content_len = text_len;
         char *built = NULL;
+        size_t built_alloc_size = 0;
         const char *file_id = NULL;
         bool is_photo = false;
         hu_json_value_t *photo = hu_json_object_get(msg_obj, "photo");
@@ -1365,6 +1385,7 @@ hu_error_t hu_telegram_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
                                     size_t need = prefix_len + (size_t)ub + 2 +
                                                   (text_len ? 1 + text_len : 0) + 1;
                                     built = (char *)alloc->alloc(alloc->ctx, need);
+                                    built_alloc_size = need;
                                     if (built) {
                                         size_t pos = 0;
                                         memcpy(built + pos, prefix, prefix_len);
@@ -1400,9 +1421,47 @@ hu_error_t hu_telegram_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel
         size_t ct_len = content_len < 4095 ? content_len : 4095;
         memcpy(msgs[cnt].content, content, ct_len);
         msgs[cnt].content[ct_len] = '\0';
+
+        /* Group detection from chat.type */
+        const char *chat_type = hu_json_get_string(chat, "type");
+        msgs[cnt].is_group = (chat_type &&
+            (strcmp(chat_type, "group") == 0 || strcmp(chat_type, "supergroup") == 0));
+
+        /* Structured chat_id for group send routing */
+        if (msgs[cnt].is_group) {
+            memcpy(msgs[cnt].chat_id, chat_id_buf, sk_len);
+            msgs[cnt].chat_id[sk_len] = '\0';
+        }
+
+        /* Message ID from Telegram */
+        double msg_id_num = hu_json_get_number(msg_obj, "message_id", 0);
+        msgs[cnt].message_id = (int64_t)msg_id_num;
+
+        /* Timestamp from Telegram (Unix epoch) */
+        double date_num = hu_json_get_number(msg_obj, "date", 0);
+        msgs[cnt].timestamp_sec = (int64_t)date_num;
+
+        /* Attachment flag */
+        msgs[cnt].has_attachment = (file_id != NULL);
+
+        /* Inline reply context */
+        hu_json_value_t *reply = hu_json_object_get(msg_obj, "reply_to_message");
+        if (reply && reply->type == HU_JSON_OBJECT) {
+            double reply_id = hu_json_get_number(reply, "message_id", 0);
+            if (reply_id > 0) {
+                char rbuf[32];
+                int rn = snprintf(rbuf, sizeof(rbuf), "%.0f", reply_id);
+                if (rn > 0 && (size_t)rn < sizeof(rbuf)) {
+                    size_t rl = (size_t)rn < 127 ? (size_t)rn : 127;
+                    memcpy(msgs[cnt].reply_to_guid, rbuf, rl);
+                    msgs[cnt].reply_to_guid[rl] = '\0';
+                }
+            }
+        }
+
         cnt++;
         if (built)
-            alloc->free(alloc->ctx, built, strlen(built) + 1);
+            alloc->free(alloc->ctx, built, built_alloc_size);
     }
 
     hu_json_free(alloc, parsed);
@@ -1439,5 +1498,53 @@ const char *hu_telegram_test_get_last_message(hu_channel_t *ch, size_t *out_len)
     if (out_len)
         *out_len = c->last_message_len;
     return c->last_message;
+}
+
+hu_error_t hu_telegram_test_inject_mock_full(hu_channel_t *ch, const char *session_key,
+                                              size_t session_key_len, const char *content,
+                                              size_t content_len,
+                                              const hu_telegram_test_msg_opts_t *opts) {
+    if (!ch || !ch->ctx || !opts)
+        return HU_ERR_INVALID_ARGUMENT;
+    hu_telegram_ctx_t *c = (hu_telegram_ctx_t *)ch->ctx;
+    if (c->mock_count >= 8)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t i = c->mock_count++;
+    memset(&c->mock_msgs[i], 0, sizeof(c->mock_msgs[i]));
+
+    size_t sk = session_key_len > 127 ? 127 : session_key_len;
+    if (session_key && sk > 0)
+        memcpy(c->mock_msgs[i].session_key, session_key, sk);
+    c->mock_msgs[i].session_key[sk] = '\0';
+
+    size_t ct = content_len > 4095 ? 4095 : content_len;
+    if (content && ct > 0)
+        memcpy(c->mock_msgs[i].content, content, ct);
+    c->mock_msgs[i].content[ct] = '\0';
+
+    c->mock_msgs[i].is_group = opts->is_group;
+    c->mock_msgs[i].has_attachment = opts->has_attachment;
+    c->mock_msgs[i].message_id = opts->message_id;
+    c->mock_msgs[i].timestamp_sec = opts->timestamp_sec;
+
+    if (opts->chat_id) {
+        size_t cl = strlen(opts->chat_id);
+        if (cl > 127) cl = 127;
+        memcpy(c->mock_msgs[i].chat_id, opts->chat_id, cl);
+        c->mock_msgs[i].chat_id[cl] = '\0';
+    }
+    if (opts->guid) {
+        size_t gl = strlen(opts->guid);
+        if (gl > 95) gl = 95;
+        memcpy(c->mock_msgs[i].guid, opts->guid, gl);
+        c->mock_msgs[i].guid[gl] = '\0';
+    }
+    if (opts->reply_to_guid) {
+        size_t rl = strlen(opts->reply_to_guid);
+        if (rl > 95) rl = 95;
+        memcpy(c->mock_msgs[i].reply_to_guid, opts->reply_to_guid, rl);
+        c->mock_msgs[i].reply_to_guid[rl] = '\0';
+    }
+    return HU_OK;
 }
 #endif

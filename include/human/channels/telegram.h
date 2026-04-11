@@ -33,6 +33,21 @@ hu_error_t hu_telegram_test_inject_mock(hu_channel_t *ch, const char *session_ke
                                         size_t session_key_len, const char *content,
                                         size_t content_len);
 const char *hu_telegram_test_get_last_message(hu_channel_t *ch, size_t *out_len);
+
+typedef struct {
+    const char *chat_id;
+    const char *guid;
+    const char *reply_to_guid;
+    bool is_group;
+    bool has_attachment;
+    int64_t message_id;
+    int64_t timestamp_sec;
+} hu_telegram_test_msg_opts_t;
+
+hu_error_t hu_telegram_test_inject_mock_full(hu_channel_t *ch, const char *session_key,
+                                              size_t session_key_len, const char *content,
+                                              size_t content_len,
+                                              const hu_telegram_test_msg_opts_t *opts);
 #endif
 
 #endif /* HU_CHANNELS_TELEGRAM_H */
