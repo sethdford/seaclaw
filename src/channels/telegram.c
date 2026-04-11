@@ -844,7 +844,7 @@ static hu_error_t telegram_get_response_constraints(void *ctx,
     (void)ctx;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;
-    out->max_chars = TELEGRAM_MAX_MSG;
+    out->max_chars = 300;
     return HU_OK;
 }
 

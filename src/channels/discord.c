@@ -381,7 +381,7 @@ static hu_error_t discord_get_response_constraints(void *ctx,
     (void)ctx;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;
-    out->max_chars = 2000;
+    out->max_chars = 400;
     return HU_OK;
 }
 

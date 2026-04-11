@@ -2892,6 +2892,55 @@ static void strip_double_exclamation(void) {
     HU_ASSERT_NULL(strstr(buf, "!!"));
 }
 
+/* ── Hallucinated channel tag stripping ────────────────────────────── */
+
+static void strip_channel_tag_paired(void) {
+    char buf[256];
+    const char *input = "<|channel>thought<channel|>haha, well i'm listening! what's up?";
+    size_t input_len = strlen(input);
+    memcpy(buf, input, input_len + 1);
+    size_t len = hu_conversation_strip_channel_tags(buf, input_len);
+    HU_ASSERT_STR_EQ(buf, "haha, well i'm listening! what's up?");
+    HU_ASSERT_EQ(len, strlen("haha, well i'm listening! what's up?"));
+}
+
+static void strip_channel_tag_standalone(void) {
+    char buf[256];
+    const char *input = "<|endoftext|>hello there";
+    size_t input_len = strlen(input);
+    memcpy(buf, input, input_len + 1);
+    size_t len = hu_conversation_strip_channel_tags(buf, input_len);
+    HU_ASSERT_STR_EQ(buf, "hello there");
+    HU_ASSERT_EQ(len, strlen("hello there"));
+}
+
+static void strip_channel_tag_no_tags(void) {
+    char buf[256];
+    const char *input = "just a normal message";
+    size_t input_len = strlen(input);
+    memcpy(buf, input, input_len + 1);
+    size_t len = hu_conversation_strip_channel_tags(buf, input_len);
+    HU_ASSERT_STR_EQ(buf, "just a normal message");
+    HU_ASSERT_EQ(len, input_len);
+}
+
+static void strip_channel_tag_multiple(void) {
+    char buf[256];
+    const char *input = "<|system|>prefix <|channel>thought<channel|>actual message";
+    size_t input_len = strlen(input);
+    memcpy(buf, input, input_len + 1);
+    size_t len = hu_conversation_strip_channel_tags(buf, input_len);
+    HU_ASSERT_STR_EQ(buf, "prefix actual message");
+    HU_ASSERT_EQ(len, strlen("prefix actual message"));
+}
+
+static void strip_channel_tag_empty_input(void) {
+    char buf[4] = "ab";
+    size_t len = hu_conversation_strip_channel_tags(buf, 2);
+    HU_ASSERT_EQ(len, (size_t)2);
+    HU_ASSERT_EQ(buf[0], 'a');
+}
+
 /* ── Example bank format compatibility test ─────────────────────────── */
 
 static void examples_load_input_output_format(void) {
@@ -3879,6 +3928,13 @@ void run_conversation_tests(void) {
     HU_RUN_TEST(strip_dont_hesitate);
     HU_RUN_TEST(strip_happy_to);
     HU_RUN_TEST(strip_double_exclamation);
+
+    /* Hallucinated channel tag stripping */
+    HU_RUN_TEST(strip_channel_tag_paired);
+    HU_RUN_TEST(strip_channel_tag_standalone);
+    HU_RUN_TEST(strip_channel_tag_no_tags);
+    HU_RUN_TEST(strip_channel_tag_multiple);
+    HU_RUN_TEST(strip_channel_tag_empty_input);
 
     /* Example bank format compatibility */
     HU_RUN_TEST(examples_load_input_output_format);

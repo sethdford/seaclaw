@@ -613,6 +613,16 @@ bool hu_conversation_check_ai_disclosure(const char *response, size_t response_l
  * Modifies buf in-place. Returns new length. */
 size_t hu_conversation_strip_ai_phrases(char *buf, size_t len);
 
+/* Strip hallucinated model artifacts from responses: ChatML tokens (<|word|>,
+ * <|word>...<word|>), sequence markers (</s>, [INST]), and XML reasoning
+ * wrappers (<thinking>...</thinking>, <analysis>...</analysis>, etc.).
+ * Modifies buf in-place. Returns new length. */
+size_t hu_conversation_strip_channel_tags(char *buf, size_t len);
+
+/* Strip formal structure tells from casual-channel messages: numbered lists,
+ * em-dashes (→ comma), en-dashes (→ hyphen). In-place. Returns new length. */
+size_t hu_conversation_strip_formal_structure(char *buf, size_t len);
+
 /* ── iMessage effect classifier (keyword-triggered, client-side) ───────── */
 
 /* Classify if a message contains iMessage effect trigger phrases.

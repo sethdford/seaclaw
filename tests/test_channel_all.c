@@ -363,7 +363,7 @@ static void test_slack_get_response_constraints(void) {
     hu_channel_response_constraints_t cons = {0};
     hu_error_t err = ch.vtable->get_response_constraints(ch.ctx, &cons);
     HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_EQ(cons.max_chars, 40000U);
+    HU_ASSERT_EQ(cons.max_chars, 500U);
     hu_slack_destroy(&ch);
 }
 
@@ -2357,7 +2357,7 @@ static void test_discord_get_response_constraints_max_chars(void) {
     HU_ASSERT_NOT_NULL(ch.vtable->get_response_constraints);
     hu_channel_response_constraints_t cs = {0};
     HU_ASSERT_EQ(ch.vtable->get_response_constraints(ch.ctx, &cs), HU_OK);
-    HU_ASSERT_EQ(cs.max_chars, 2000u);
+    HU_ASSERT_EQ(cs.max_chars, 400u);
     hu_discord_destroy(&ch);
 }
 

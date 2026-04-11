@@ -89,11 +89,15 @@ static int count_structural_tells(const char *s, size_t len) {
     }
     if (ci_has(s, len, "```"))
         count += 3;
+
+    int numbered_items = 0;
     for (size_t i = 0; i + 3 < len; i++) {
         if (s[i] == '\n' && s[i + 1] >= '1' && s[i + 1] <= '9' && s[i + 2] == '.' &&
             s[i + 3] == ' ')
-            count += 2;
+            numbered_items++;
     }
+    count += numbered_items * 2;
+
     int em_dash = 0;
     for (size_t i = 0; i + 2 < len; i++) {
         if ((unsigned char)s[i] == 0xE2 && (unsigned char)s[i + 1] == 0x80 &&
@@ -102,6 +106,41 @@ static int count_structural_tells(const char *s, size_t len) {
     }
     if (em_dash > 0)
         count += em_dash;
+
+    /* Colon-after-topic patterns: "Topic: explanation" at line start */
+    for (size_t i = 0; i + 3 < len; i++) {
+        if (s[i] == ':' && i > 0 && s[i - 1] != '/' && s[i - 1] != '\\') {
+            bool at_line_start = (i < 30);
+            if (!at_line_start) {
+                for (size_t j = i; j > 0; j--) {
+                    if (s[j - 1] == '\n') {
+                        at_line_start = (i - j < 30);
+                        break;
+                    }
+                }
+            }
+            if (at_line_start && i + 1 < len && s[i + 1] == ' ')
+                count++;
+        }
+    }
+
+    /* Count distinct paragraphs/topics (double-newline separated) */
+    int paragraphs = 1;
+    for (size_t i = 0; i + 1 < len; i++) {
+        if (s[i] == '\n' && s[i + 1] == '\n')
+            paragraphs++;
+    }
+    if (paragraphs >= 3)
+        count += paragraphs;
+
+    /* Overly long responses on a texting-style channel are tells */
+    if (len > 500)
+        count += 2;
+
+    /* "First...Second...Third" enumeration */
+    if (ci_has(s, len, "first") && ci_has(s, len, "second"))
+        count += 2;
+
     return count;
 }
 

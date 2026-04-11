@@ -4299,6 +4299,20 @@ hu_error_t hu_agent_turn(hu_agent_t *agent, const char *msg, size_t msg_len, cha
                 resp.tool_calls = text_calls;
                 resp.tool_calls_count = text_calls_count;
             }
+            /* Strip <tool_call>...</tool_call> tags from content so they don't leak to user */
+            {
+                char *tc_stripped = NULL;
+                size_t tc_stripped_len = 0;
+                if (hu_text_tool_calls_strip(agent->alloc, resp.content, resp.content_len,
+                                             &tc_stripped, &tc_stripped_len) == HU_OK) {
+                    if (tc_stripped) {
+                        agent->alloc->free(agent->alloc->ctx, (void *)resp.content,
+                                           resp.content_len + 1);
+                        resp.content = tc_stripped;
+                        resp.content_len = tc_stripped_len;
+                    }
+                }
+            }
         }
 
 #ifndef HU_IS_TEST

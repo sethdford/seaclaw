@@ -3536,6 +3536,22 @@ size_t hu_conversation_calibrate_length(const char *last_msg, size_t last_msg_le
         POS_ADVANCE(w, pos, cap);
     }
 
+    /* Partial engagement: multi-topic messages get selective response.
+     * Count sentence-ending punctuation as a proxy for distinct topics. */
+    {
+        size_t sentence_ends = 0;
+        for (size_t si = 0; si < last_msg_len; si++) {
+            if (last_msg[si] == '.' || last_msg[si] == '!' || last_msg[si] == '?')
+                sentence_ends++;
+        }
+        if (sentence_ends >= 2 || last_msg_len > 200) {
+            w = snprintf(buf + pos, cap - pos,
+                         "Multiple topics detected. Don't address every point. "
+                         "Respond to the most important thing only.\n");
+            POS_ADVANCE(w, pos, cap);
+        }
+    }
+
     /* Generic guidance (data-driven, not prescriptive) */
     w = snprintf(buf + pos, cap - pos,
                  "Match their energy and length. If they're brief, be brief. If they open up, "
@@ -4719,8 +4735,8 @@ bool hu_conversation_should_leave_on_read(const char *msg, size_t msg_len,
     if (!trigger)
         return false;
 
-    /* 2% probability roll */
-    return (seed % 100u) < 2u;
+    /* 10% probability for low-signal messages (real humans ~15-20%) */
+    return (seed % 100u) < 10u;
 }
 
 /* ── URL extraction ──────────────────────────────────────────────────── */
@@ -6279,6 +6295,10 @@ static const hu_ai_phrase_replacement_t s_ai_phrases_fallback[] = {
     {"self-care", 9, "rest", 4},
     {"impactful", 9, "big", 3},
     {"!! ", 3, "! ", 2},
+    {"As an AI, ", 10, "", 0},
+    {"As an AI ", 9, "", 0},
+    {"As a language model, ", 21, "", 0},
+    {"As a language model ", 20, "", 0},
 };
 
 static hu_ai_phrase_replacement_t *s_ai_phrases_cache = NULL;
@@ -6395,6 +6415,167 @@ size_t hu_conversation_strip_ai_phrases(char *buf, size_t len) {
         buf[0] -= 32;
 
     return len;
+}
+
+/* ── Hallucinated tag stripper ─────────────────────────────────────────── */
+
+static bool strip_match_lit(const char *buf, size_t len, size_t pos, const char *lit,
+                            size_t lit_len) {
+    return pos + lit_len <= len && memcmp(buf + pos, lit, lit_len) == 0;
+}
+
+static bool strip_find_xml_close(const char *buf, size_t len, size_t start, const char *tag,
+                                 size_t tag_len, size_t *end_out) {
+    for (size_t k = start; k + tag_len + 3 <= len; k++) {
+        if (buf[k] == '<' && buf[k + 1] == '/' && memcmp(buf + k + 2, tag, tag_len) == 0 &&
+            buf[k + 2 + tag_len] == '>') {
+            *end_out = k + 3 + tag_len;
+            return true;
+        }
+    }
+    return false;
+}
+
+size_t hu_conversation_strip_channel_tags(char *buf, size_t len) {
+    if (!buf || len < 3)
+        return len;
+
+    /* Known artifact tags to strip entirely (paired XML-style) */
+    static const char *const xml_tags[] = {"thinking", "answer", "analysis", "reflection",
+                                           "internal", "scratchpad"};
+    static const size_t xml_tag_count = sizeof(xml_tags) / sizeof(xml_tags[0]);
+
+    /* Known standalone tokens to strip */
+    static const struct {
+        const char *token;
+        size_t len;
+    } standalone[] = {
+        {"</s>", 4},   {"<s>", 3},       {"<|endoftext|>", 14},
+        {"[INST]", 6}, {"[/INST]", 7},   {"<<SYS>>", 7},
+        {"<</SYS>>", 8},
+    };
+    static const size_t standalone_count = sizeof(standalone) / sizeof(standalone[0]);
+
+    size_t w = 0;
+    size_t i = 0;
+    while (i < len) {
+        /* 1. Standalone known tokens */
+        bool matched = false;
+        for (size_t s = 0; s < standalone_count; s++) {
+            if (strip_match_lit(buf, len, i, standalone[s].token, standalone[s].len)) {
+                i += standalone[s].len;
+                matched = true;
+                break;
+            }
+        }
+        if (matched)
+            continue;
+
+        /* 2. ChatML-style <|word|> and paired <|word>...<word|> */
+        if (buf[i] == '<' && i + 1 < len && buf[i + 1] == '|') {
+            size_t j = i + 2;
+            while (j < len && buf[j] != '>' && buf[j] != '|' && buf[j] != '<' && buf[j] != ' ')
+                j++;
+            if (j < len && buf[j] == '|' && j + 1 < len && buf[j + 1] == '>') {
+                i = j + 2;
+                continue;
+            }
+            if (j < len && buf[j] == '>') {
+                size_t word_start = i + 2;
+                size_t word_len = j - word_start;
+                bool found_close = false;
+                for (size_t k = j + 1; k + word_len + 2 <= len; k++) {
+                    if (buf[k] == '<' && memcmp(buf + k + 1, buf + word_start, word_len) == 0 &&
+                        k + 1 + word_len < len && buf[k + 1 + word_len] == '|' &&
+                        k + 2 + word_len < len && buf[k + 2 + word_len] == '>') {
+                        i = k + word_len + 3;
+                        found_close = true;
+                        break;
+                    }
+                }
+                if (found_close)
+                    continue;
+            }
+        }
+
+        /* 3. XML-style paired tags: <thinking>...</thinking> etc. */
+        if (buf[i] == '<' && i + 1 < len && buf[i + 1] != '/') {
+            for (size_t t = 0; t < xml_tag_count; t++) {
+                size_t tl = strlen(xml_tags[t]);
+                if (strip_match_lit(buf, len, i + 1, xml_tags[t], tl) && i + 1 + tl < len &&
+                    buf[i + 1 + tl] == '>') {
+                    size_t end;
+                    if (strip_find_xml_close(buf, len, i + 2 + tl, xml_tags[t], tl, &end)) {
+                        i = end;
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+            if (matched)
+                continue;
+        }
+
+        buf[w++] = buf[i++];
+    }
+    buf[w] = '\0';
+
+    /* Trim leading whitespace left behind after stripping */
+    size_t trim = 0;
+    while (trim < w && (buf[trim] == ' ' || buf[trim] == '\n' || buf[trim] == '\r'))
+        trim++;
+    if (trim > 0 && trim < w) {
+        memmove(buf, buf + trim, w - trim);
+        w -= trim;
+        buf[w] = '\0';
+    }
+
+    return w;
+}
+
+/* ── Formal structure stripper (casual channels) ──────────────────────── */
+
+size_t hu_conversation_strip_formal_structure(char *buf, size_t len) {
+    if (!buf || len < 3)
+        return len;
+
+    size_t w = 0;
+    size_t i = 0;
+    while (i < len) {
+        /* Strip numbered list markers at line start: "1. ", "2) ", etc. */
+        if ((i == 0 || buf[i - 1] == '\n') && i + 2 < len && buf[i] >= '1' && buf[i] <= '9') {
+            size_t j = i + 1;
+            while (j < len && buf[j] >= '0' && buf[j] <= '9')
+                j++;
+            if (j < len && (buf[j] == '.' || buf[j] == ')') && j + 1 < len && buf[j + 1] == ' ') {
+                i = j + 2;
+                continue;
+            }
+        }
+
+        /* Replace em-dash (UTF-8: E2 80 94) with comma-space */
+        if (i + 2 < len && (unsigned char)buf[i] == 0xE2 && (unsigned char)buf[i + 1] == 0x80 &&
+            (unsigned char)buf[i + 2] == 0x94) {
+            buf[w++] = ',';
+            buf[w++] = ' ';
+            i += 3;
+            while (i < len && buf[i] == ' ')
+                i++;
+            continue;
+        }
+
+        /* Replace en-dash (UTF-8: E2 80 93) with a regular dash */
+        if (i + 2 < len && (unsigned char)buf[i] == 0xE2 && (unsigned char)buf[i + 1] == 0x80 &&
+            (unsigned char)buf[i + 2] == 0x93) {
+            buf[w++] = '-';
+            i += 3;
+            continue;
+        }
+
+        buf[w++] = buf[i++];
+    }
+    buf[w] = '\0';
+    return w;
 }
 
 /* ── iMessage effect classifier (keyword-triggered, client-side) ───────── */

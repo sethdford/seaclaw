@@ -58,6 +58,11 @@
 #include "human/daemon_lifecycle.h"
 #include "human/daemon_proactive.h"
 #include "human/daemon_routing.h"
+
+#include "human/agent/governor.h"
+#include "human/agent/proactive.h"
+#include "human/agent/proactive_ext.h"
+#include "human/context/self_awareness.h"
 #ifdef HU_HAS_CRON
 #include "human/cron.h"
 #include "human/crontab.h"
@@ -369,6 +374,10 @@ const hu_channel_daemon_config_t *hu_daemon_test_get_active_daemon_config(const 
 #endif
 
 #ifndef HU_IS_TEST
+/* F119: Proactive volume governor — shared between check-in cycle and inbound handler */
+static hu_proactive_budget_t gov_budget;
+static bool gov_budget_inited;
+
 /* Proactive-style budget for outbound visual attachments (separate from check-in governor). */
 static hu_proactive_budget_t hu_daemon_visual_attach_gov;
 static bool hu_daemon_visual_attach_gov_init;
@@ -870,18 +879,29 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
         return;
 
     /* F119 (Pillar 19): Proactive volume governor — check budget before proceeding */
-    static hu_proactive_budget_t gov_budget;
-    static bool gov_inited = false;
-    if (!gov_inited) {
+    if (!gov_budget_inited) {
         hu_proactive_budget_config_t gcfg = {.daily_max = 6,
                                              .weekly_max = 15,
                                              .relationship_multiplier = 1.0,
                                              .cool_off_after_unanswered = 2,
                                              .cool_off_hours = 72};
         hu_governor_init(&gcfg, &gov_budget);
-        gov_inited = true;
+        gov_budget_inited = true;
     }
     uint64_t gov_now_ms = (uint64_t)now * 1000ULL;
+    /* Escalating backoff: 72h → 144h → 288h → never, based on consecutive unanswered */
+    gov_budget.cool_off_hours = hu_proactive_backoff_hours(gov_budget.unanswered_count);
+    /* Reciprocity + busyness modulation of relationship multiplier */
+    {
+        hu_reciprocity_state_t rs = {.initiation_ratio = 0.5,
+                                     .unanswered_proactive = gov_budget.unanswered_count,
+                                     .contact_just_reengaged = false};
+        double recip_mult = hu_reciprocity_budget_multiplier(&rs);
+        hu_busyness_state_t bs = {
+            .calendar_busy = false, .life_sim_stressed = false, .seed = (uint32_t)now};
+        double busy_mult = hu_busyness_budget_multiplier(&bs);
+        gov_budget.relationship_multiplier = 1.0 * recip_mult * busy_mult;
+    }
     if (!hu_governor_has_budget(&gov_budget, gov_now_ms))
         return;
 
@@ -1006,6 +1026,7 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                 sched_now, sched_ch, strlen(sched_ch), sched_contact, sizeof(sched_contact),
                 sched_channel, sizeof(sched_channel), sched_msg, sizeof(sched_msg));
             if (sched_len > 0) {
+                sched_len = hu_conversation_strip_channel_tags(sched_msg, sched_len);
                 sched_len = hu_conversation_strip_ai_phrases(sched_msg, sched_len);
                 sched_len =
                     hu_conversation_vary_complexity(sched_msg, sched_len, (uint32_t)time(NULL));
@@ -1635,6 +1656,8 @@ void hu_service_run_proactive_checkins(hu_allocator_t *alloc, hu_agent_t *agent,
                                                   strlen(cp->contact_id), "proactive", 9))
                         skip = true;
                     if (!skip && channels[c].channel->vtable->send) {
+                        response_len =
+                            hu_conversation_strip_channel_tags(response, response_len);
                         response_len = hu_conversation_strip_ai_phrases(response, response_len);
                         response_len =
                             hu_conversation_vary_complexity(response, response_len, (uint32_t)now);
@@ -3508,6 +3531,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                 hu_stm_clear(&agent->stm);
 
 #ifndef HU_IS_TEST
+                /* F119: Contact replied — reset governor cool-off so proactive
+                 * outreach can resume after silence. */
+                (void)hu_governor_record_response(&gov_budget);
+
+                /* Reciprocity tracking: record their initiation for balanced outreach */
+                if (agent->memory) {
+                    bool they_asked = (memchr(combined, '?', combined_len) != NULL);
+                    (void)hu_self_awareness_record_their_reciprocity(
+                        alloc, agent->memory, batch_key, key_len, true, they_asked, false);
+                }
                 /* Only respond to contacts explicitly listed in persona_contacts.
                  * When a persona is loaded, ALL inbound messages from contacts not in
                  * the allowlist are silently dropped — even if the list is empty. */
@@ -8265,6 +8298,19 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     goto skip_llm_this_batch;
                 }
 
+                /* Persona-based "reading" delay before typing — simulates the
+                 * time a person spends reading the message before responding. */
+                if (agent->persona && agent->persona->avg_response_time_sec > 0.0) {
+                    double base_sec = agent->persona->avg_response_time_sec;
+                    unsigned int jitter = (unsigned int)(rand() % 2000u);
+                    unsigned int delay_ms = (unsigned int)(base_sec * 300.0) + jitter;
+                    if (delay_ms > 8000)
+                        delay_ms = 8000;
+#ifndef HU_IS_TEST
+                    hu_platform_sleep_ms(delay_ms);
+#endif
+                }
+
                 /* Start typing indicator before LLM call */
                 if (ch->channel->vtable->start_typing) {
                     ch->channel->vtable->start_typing(ch->channel->ctx, batch_key, key_len);
@@ -8479,6 +8525,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                             for (int bi = 0; bi < n; bi++) {
                                 if (burst_msgs[bi][0]) {
                                     size_t bm_len = strlen(burst_msgs[bi]);
+                                    bm_len = hu_conversation_strip_channel_tags(
+                                        burst_msgs[bi], bm_len);
                                     bm_len =
                                         hu_conversation_strip_ai_phrases(burst_msgs[bi], bm_len);
                                     bm_len = hu_conversation_vary_complexity(
@@ -9763,8 +9811,16 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                     size_t all_send_media_cnt = all_send_media_n;
 
 #ifndef HU_IS_TEST
+                    /* Strip hallucinated model tags (e.g. <|channel>thought<channel|>) */
+                    response_len =
+                        hu_conversation_strip_channel_tags(response, response_len);
+
                     /* BTH: Banned AI phrases filter — strip giveaway language */
                     response_len = hu_conversation_strip_ai_phrases(response, response_len);
+
+                    /* Strip formal structure (numbered lists, em-dashes) on casual channels */
+                    response_len =
+                        hu_conversation_strip_formal_structure(response, response_len);
 
                     /* Apply typing quirks from persona overlay as post-processing.
                      * This shrinks the buffer in-place; keep original size for free. */
@@ -10782,6 +10838,8 @@ hu_error_t hu_service_run(hu_allocator_t *alloc, uint32_t tick_interval_ms,
                                 if (dt_err == HU_OK && dt_resp && dt_resp_len > 0 &&
                                     dt_resp_len < 200) {
                                     /* Post-process double-text through the same BTH pipeline */
+                                    dt_resp_len =
+                                        hu_conversation_strip_channel_tags(dt_resp, dt_resp_len);
                                     dt_resp_len =
                                         hu_conversation_strip_ai_phrases(dt_resp, dt_resp_len);
                                     dt_resp_len = hu_conversation_vary_complexity(

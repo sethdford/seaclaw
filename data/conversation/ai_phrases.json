@@ -41,5 +41,15 @@
   {"from": "boundaries", "to": "limits"},
   {"from": "self-care", "to": "rest"},
   {"from": "impactful", "to": "big"},
-  {"from": "!! ", "to": "! "}
+  {"from": "!! ", "to": "! "},
+  {"from": "As an AI, ", "to": ""},
+  {"from": "As an AI ", "to": ""},
+  {"from": "As a language model, ", "to": ""},
+  {"from": "As a language model ", "to": ""},
+  {"from": "I hope this helps", "to": ""},
+  {"from": "Let me know if you need anything", "to": ""},
+  {"from": "Let me know if ", "to": ""},
+  {"from": "I understand your ", "to": ""},
+  {"from": "Here's what I think: ", "to": ""},
+  {"from": "That's a great question", "to": ""}
 ]

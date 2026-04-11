@@ -197,6 +197,39 @@ def get_hu_response(message):
     return get_hu_response_cli(message)
 
 
+import re
+
+
+def detect_structural_tells(response):
+    """Local pattern-based structural AI tell detection."""
+    tells = []
+    if re.search(r'^\d+[.)]\s', response, re.MULTILINE):
+        tells.append("numbered list")
+    if re.search(r'^[-*]\s', response, re.MULTILINE):
+        tells.append("bullet list")
+    if '\u2014' in response:
+        tells.append("em-dash")
+    if re.search(r'^[A-Z][a-z]+:\s', response, re.MULTILINE):
+        tells.append("topic-colon pattern")
+    if any(p in response.lower() for p in ["first,", "second,", "third,"]):
+        tells.append("first/second/third enumeration")
+    if any(p in response.lower() for p in ["in summary", "to summarize", "in conclusion"]):
+        tells.append("concluding summary")
+    if any(p in response.lower() for p in ["let me know", "hope this helps",
+                                            "feel free", "don't hesitate"]):
+        tells.append("offer of further help")
+    if len(response) > 500:
+        tells.append(f"overly long ({len(response)} chars)")
+    paragraphs = [p for p in response.split('\n\n') if p.strip()]
+    if len(paragraphs) >= 3:
+        tells.append(f"addresses {len(paragraphs)}+ topics")
+    if '```' in response:
+        tells.append("code block in casual message")
+    if '**' in response:
+        tells.append("markdown bold")
+    return tells
+
+
 def evaluate_response(scenario, response):
     eval_prompt = f"""You are evaluating whether an AI assistant's response sounds genuinely human.
 
@@ -237,7 +270,13 @@ Return ONLY valid JSON with this exact structure:
         raw = raw.split("```json")[1].split("```")[0].strip()
     elif "```" in raw:
         raw = raw.split("```")[1].split("```")[0].strip()
-    return json.loads(raw)
+    result = json.loads(raw)
+    local_tells = detect_structural_tells(response)
+    if local_tells:
+        existing = result.get("ai_tells_detected", [])
+        merged = list(dict.fromkeys(existing + local_tells))
+        result["ai_tells_detected"] = merged
+    return result
 
 
 def main():

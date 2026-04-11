@@ -172,7 +172,7 @@ static void test_telegram_get_response_constraints_max_chars(void) {
     hu_channel_response_constraints_t c = {0};
     hu_error_t err = ch.vtable->get_response_constraints(ch.ctx, &c);
     HU_ASSERT_EQ(err, HU_OK);
-    HU_ASSERT_EQ(c.max_chars, 4096u);
+    HU_ASSERT_EQ(c.max_chars, 300u);
     hu_telegram_destroy(&ch);
 }
 

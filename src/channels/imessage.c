@@ -1,6 +1,7 @@
 #include "human/core/log.h"
 #include "human/channels/imessage.h"
 #include "human/channel_loop.h"
+#include "human/context/conversation.h"
 #include "human/core/error.h"
 #include "human/core/process_util.h"
 #include "human/core/string.h"
@@ -543,66 +544,13 @@ static void imessage_stop(void *ctx) {
 
 #if (defined(__APPLE__) && defined(__MACH__)) || HU_IS_TEST
 
-/* Safety net: remove AI-sounding phrases that slipped through. Primary mechanism is
- * prompt-level guidance in hu_conversation_build_awareness. Modifies in-place.
- * Returns new length. Case-insensitive except "Absolutely! " (capital A only). */
+/* Safety net: delegates to the canonical AI phrase stripper in conversation.c,
+ * then collapses double spaces and trims whitespace. Modifies in-place. */
 size_t imessage_sanitize_output(char *buf, size_t len) {
     if (!buf || len == 0)
         return 0;
 
-    static const struct {
-        const char *phrase;
-        size_t phrase_len;
-        bool case_sensitive;
-    } phrases[] = {
-        {"I'd be happy to ", 16, false},
-        {"Great question! ", 16, false},
-        {"That's a great question", 23, false},
-        {"Let me know if you need anything", 32, false},
-        {"Let me know if ", 15, false},
-        {"Feel free to ", 13, false},
-        {"Absolutely! ", 12, true},
-        {"I understand your ", 18, false},
-        {"I appreciate ", 13, false},
-        {"Here's what I think: ", 21, false},
-        {"I hope this helps", 17, false},
-        {"Don't hesitate to ", 18, false},
-        {"I'm here to help", 16, false},
-        {"As an AI", 8, false},
-        {"As a language model", 19, false},
-    };
-
-    for (;;) {
-        bool changed = false;
-        for (size_t p = 0; p < sizeof(phrases) / sizeof(phrases[0]); p++) {
-            const char *needle = phrases[p].phrase;
-            size_t needle_len = phrases[p].phrase_len;
-            if (needle_len > len)
-                continue;
-
-            char *pos = buf;
-            while (pos + needle_len <= buf + len) {
-                bool match = false;
-                if (phrases[p].case_sensitive) {
-                    match = (memcmp(pos, needle, needle_len) == 0);
-                } else {
-                    match = (strncasecmp(pos, needle, needle_len) == 0);
-                }
-                if (match) {
-                    memmove(pos, pos + needle_len, (size_t)((buf + len) - (pos + needle_len)) + 1);
-                    len -= needle_len;
-                    buf[len] = '\0';
-                    changed = true;
-                    break;
-                }
-                pos++;
-            }
-            if (changed)
-                break;
-        }
-        if (!changed)
-            break;
-    }
+    len = hu_conversation_strip_ai_phrases(buf, len);
 
     /* Collapse double spaces */
     for (size_t i = 1; i < len; i++) {
@@ -1871,7 +1819,7 @@ static hu_error_t imessage_get_response_constraints(void *ctx,
     (void)ctx;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;
-    out->max_chars = 300;
+    out->max_chars = 200;
     return HU_OK;
 }
 

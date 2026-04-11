@@ -855,8 +855,7 @@ static hu_error_t slack_get_response_constraints(void *ctx,
     (void)ctx;
     if (!out)
         return HU_ERR_INVALID_ARGUMENT;
-    /* Slack block kit text fields are capped around 40k; practical outbound limit. */
-    out->max_chars = 40000U;
+    out->max_chars = 500;
     return HU_OK;
 }
 

@@ -2,6 +2,7 @@
  * Per-channel outbound message formatting (plain text / mrkdwn / minimal HTML).
  */
 #include "human/channels/format.h"
+#include "human/context/conversation.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 
@@ -197,7 +198,10 @@ hu_error_t hu_channel_strip_ai_phrases(hu_allocator_t *alloc, const char *text, 
         memcpy(buf, text, text_len);
     buf[text_len] = '\0';
 
-    size_t n = strip_ai_phrases_inplace(buf, text_len);
+    /* Delegate to the canonical AI phrase list in conversation.c, then
+     * run the format.c-specific extras (double space, trim) for compat. */
+    size_t n = hu_conversation_strip_ai_phrases(buf, text_len);
+    n = strip_ai_phrases_inplace(buf, n);
     *out = buf;
     *out_len = n;
     return HU_OK;

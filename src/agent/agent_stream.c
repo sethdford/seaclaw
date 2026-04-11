@@ -478,7 +478,13 @@ hu_error_t hu_agent_turn_stream_v2(hu_agent_t *agent, const char *msg, size_t ms
                     "4. ZERO em-dashes. Use commas, periods, or ... instead.\n"
                     "5. Use contractions always: I'm, don't, can't, won't, it's, that's.\n"
                     "6. No formal transitions: 'As for', 'In terms of', 'Speaking of'.\n"
-                    "7. Text like you're on your phone texting a friend.\n";
+                    "7. Text like you're on your phone texting a friend.\n"
+                    "8. NEVER use numbered or bulleted lists.\n"
+                    "9. Don't address every point in their message, pick what matters most.\n"
+                    "10. No topic-colon patterns like 'Weather: it's nice'.\n"
+                    "11. No 'First...Second...Third' enumeration.\n"
+                    "12. No concluding summaries or offers of further help.\n"
+                    "13. One topic per message.\n";
                 int n = snprintf(lp + lpo, sizeof(lp) - lpo, "%s", fmt_override);
                 if (n > 0 && lpo + (size_t)n < sizeof(lp))
                     lpo += (size_t)n;
