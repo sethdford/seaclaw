@@ -8,35 +8,70 @@
 typedef struct fact_pattern {
     const char *marker;
     hu_knowledge_type_t type;
+    float confidence;
 } fact_pattern_t;
 
 static const fact_pattern_t patterns[] = {
     /* Propositional — user preferences and facts */
-    {"i like ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"i love ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"i hate ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"i prefer ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"my favorite ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"i work at ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"i live in ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"i am a ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"i'm a ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"i have a ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"my name is ", HU_KNOWLEDGE_PROPOSITIONAL},
-    {"i enjoy ", HU_KNOWLEDGE_PROPOSITIONAL},
+    {"i like ", HU_KNOWLEDGE_PROPOSITIONAL, 0.8f},
+    {"i love ", HU_KNOWLEDGE_PROPOSITIONAL, 0.8f},
+    {"i hate ", HU_KNOWLEDGE_PROPOSITIONAL, 0.8f},
+    {"i prefer ", HU_KNOWLEDGE_PROPOSITIONAL, 0.8f},
+    {"my favorite ", HU_KNOWLEDGE_PROPOSITIONAL, 0.8f},
+    {"i work at ", HU_KNOWLEDGE_PROPOSITIONAL, 0.9f},
+    {"i live in ", HU_KNOWLEDGE_PROPOSITIONAL, 0.9f},
+    {"i am a ", HU_KNOWLEDGE_PROPOSITIONAL, 0.9f},
+    {"i'm a ", HU_KNOWLEDGE_PROPOSITIONAL, 0.9f},
+    {"i have a ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"my name is ", HU_KNOWLEDGE_PROPOSITIONAL, 0.9f},
+    {"i enjoy ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
     /* Prescriptive — behavioral patterns and preferences */
-    {"when i'm ", HU_KNOWLEDGE_PRESCRIPTIVE},
-    {"i usually ", HU_KNOWLEDGE_PRESCRIPTIVE},
-    {"i always ", HU_KNOWLEDGE_PRESCRIPTIVE},
-    {"i never ", HU_KNOWLEDGE_PRESCRIPTIVE},
-    {"please don't ", HU_KNOWLEDGE_PRESCRIPTIVE},
-    {"i'd rather ", HU_KNOWLEDGE_PRESCRIPTIVE},
-    {"i tend to ", HU_KNOWLEDGE_PRESCRIPTIVE},
+    {"when i'm ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i usually ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i always ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i never ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"please don't ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i'd rather ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i tend to ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    /* Expanded propositional patterns */
+    {"i'm not interested in ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i'm interested in ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i don't like ", HU_KNOWLEDGE_PROPOSITIONAL, 0.8f},
+    {"i dislike ", HU_KNOWLEDGE_PROPOSITIONAL, 0.8f},
+    {"i studied ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i went to ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i grew up in ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i'm from ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"my job is ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i work as ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i majored in ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i speak ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"my hobby is ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i'm allergic to ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i own a ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"i drive a ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"my partner ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"my wife ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"my husband ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"my kid ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"my kids ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"my dog ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    {"my cat ", HU_KNOWLEDGE_PROPOSITIONAL, 0.7f},
+    /* Expanded prescriptive patterns */
+    {"i don't want ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i can't stand ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i'm trying to ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i need to ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i want to ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i should ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i'm working on ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"remind me to ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"don't forget ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
+    {"i'm looking for ", HU_KNOWLEDGE_PRESCRIPTIVE, 0.7f},
 };
 static const size_t pattern_count = sizeof(patterns) / sizeof(patterns[0]);
 
-static bool ci_match(const char *text, size_t text_len,
-                     const char *pat, size_t pat_len) {
+static bool ci_match(const char *text, size_t text_len, const char *pat, size_t pat_len) {
     if (text_len < pat_len)
         return false;
     for (size_t i = 0; i < pat_len; i++) {
@@ -48,16 +83,15 @@ static bool ci_match(const char *text, size_t text_len,
 
 static size_t find_end(const char *text, size_t start, size_t len) {
     for (size_t i = start; i < len; i++) {
-        if (text[i] == '.' || text[i] == '!' || text[i] == '?' ||
-            text[i] == '\n' || text[i] == ',')
+        if (text[i] == '.' || text[i] == '!' || text[i] == '?' || text[i] == '\n' ||
+            text[i] == ',' || text[i] == ';')
             return i;
     }
     return len;
 }
 
-static void extract_spo(const char *sentence, size_t sent_len,
-                         const char *marker, size_t marker_len,
-                         hu_heuristic_fact_t *fact) {
+static void extract_spo(const char *sentence, size_t sent_len, const char *marker,
+                        size_t marker_len, hu_heuristic_fact_t *fact) {
     /* Subject: "User" for first-person statements */
     strncpy(fact->subject, "user", sizeof(fact->subject) - 1);
 
@@ -80,24 +114,29 @@ static void extract_spo(const char *sentence, size_t sent_len,
         memcpy(fact->object, sentence + obj_start, obj_len);
         fact->object[obj_len] = '\0';
         /* Trim trailing whitespace/punctuation */
-        while (obj_len > 0 && (fact->object[obj_len - 1] == ' ' ||
-               fact->object[obj_len - 1] == '.' || fact->object[obj_len - 1] == ','))
+        while (obj_len > 0 &&
+               (fact->object[obj_len - 1] == ' ' || fact->object[obj_len - 1] == '.' ||
+                fact->object[obj_len - 1] == ',' || fact->object[obj_len - 1] == ';'))
             fact->object[--obj_len] = '\0';
     }
 }
 
 /* ── Public API ──────────────────────────────────────────────────── */
 
-hu_error_t hu_fact_extract(const char *text, size_t text_len,
-                           hu_fact_extract_result_t *result) {
+hu_error_t hu_fact_extract(const char *text, size_t text_len, hu_fact_extract_result_t *result) {
     if (!text || !result)
         return HU_ERR_INVALID_ARGUMENT;
     memset(result, 0, sizeof(*result));
 
     for (size_t pos = 0; pos < text_len && result->fact_count < HU_FACT_EXTRACT_MAX;) {
-        /* Skip to start of a sentence or line */
+        /* Skip to start of a sentence, line, or clause after , / ; */
         while (pos < text_len && (text[pos] == ' ' || text[pos] == '\n'))
             pos++;
+        while (pos < text_len && (text[pos] == ',' || text[pos] == ';')) {
+            pos++;
+            while (pos < text_len && text[pos] == ' ')
+                pos++;
+        }
 
         bool found = false;
         for (size_t p = 0; p < pattern_count; p++) {
@@ -108,7 +147,7 @@ hu_error_t hu_fact_extract(const char *text, size_t text_len,
 
                 hu_heuristic_fact_t *f = &result->facts[result->fact_count];
                 f->type = patterns[p].type;
-                f->confidence = 0.7f;
+                f->confidence = patterns[p].confidence;
                 extract_spo(text + pos, sent_len, patterns[p].marker, mlen, f);
                 snprintf(f->source_hint, sizeof(f->source_hint), "conversation");
 
@@ -131,8 +170,8 @@ hu_error_t hu_fact_extract(const char *text, size_t text_len,
     return HU_OK;
 }
 
-size_t hu_fact_dedup(hu_fact_extract_result_t *result,
-                     const hu_heuristic_fact_t *existing, size_t existing_count) {
+size_t hu_fact_dedup(hu_fact_extract_result_t *result, const hu_heuristic_fact_t *existing,
+                     size_t existing_count) {
     if (!result || !existing || existing_count == 0)
         return result ? result->fact_count : 0;
 
@@ -156,10 +195,8 @@ size_t hu_fact_dedup(hu_fact_extract_result_t *result,
     return write;
 }
 
-hu_error_t hu_fact_format_for_store(hu_allocator_t *alloc,
-                                    const hu_heuristic_fact_t *fact,
-                                    char **key, size_t *key_len,
-                                    char **value, size_t *value_len) {
+hu_error_t hu_fact_format_for_store(hu_allocator_t *alloc, const hu_heuristic_fact_t *fact,
+                                    char **key, size_t *key_len, char **value, size_t *value_len) {
     if (!alloc || !fact || !key || !key_len || !value || !value_len)
         return HU_ERR_INVALID_ARGUMENT;
 
@@ -168,15 +205,14 @@ hu_error_t hu_fact_format_for_store(hu_allocator_t *alloc,
     int kn, vn;
 
     if (fact->type == HU_KNOWLEDGE_PROPOSITIONAL) {
-        kn = snprintf(kbuf, sizeof(kbuf), "fact:%s:%s:%s",
-                      fact->subject, fact->predicate, fact->object);
-        vn = snprintf(vbuf, sizeof(vbuf), "%s %s %s (confidence: %.2f)",
-                      fact->subject, fact->predicate, fact->object, fact->confidence);
+        kn = snprintf(kbuf, sizeof(kbuf), "fact:%s:%s:%s", fact->subject, fact->predicate,
+                      fact->object);
+        vn = snprintf(vbuf, sizeof(vbuf), "%s %s %s (confidence: %.2f)", fact->subject,
+                      fact->predicate, fact->object, fact->confidence);
     } else {
-        kn = snprintf(kbuf, sizeof(kbuf), "skill:%s:%s",
-                      fact->subject, fact->predicate);
-        vn = snprintf(vbuf, sizeof(vbuf), "%s %s %s (confidence: %.2f)",
-                      fact->subject, fact->predicate, fact->object, fact->confidence);
+        kn = snprintf(kbuf, sizeof(kbuf), "skill:%s:%s", fact->subject, fact->predicate);
+        vn = snprintf(vbuf, sizeof(vbuf), "%s %s %s (confidence: %.2f)", fact->subject,
+                      fact->predicate, fact->object, fact->confidence);
     }
 
     if (kn <= 0 || vn <= 0 || (size_t)kn >= sizeof(kbuf) || (size_t)vn >= sizeof(vbuf))
