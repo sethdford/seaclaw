@@ -8,6 +8,7 @@
 #include "human/core/error.h"
 #include "human/core/json.h"
 #include "human/core/string.h"
+#include "human/hula_sdk.h"
 #include "human/provider.h"
 #include "human/security.h"
 #include "test_framework.h"
