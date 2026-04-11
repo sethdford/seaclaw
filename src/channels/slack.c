@@ -4,6 +4,7 @@
  */
 #include "human/channel.h"
 #include "human/channel_loop.h"
+#include "human/channels/slack.h"
 #include "human/core/allocator.h"
 #include "human/core/error.h"
 #include "human/core/http.h"
@@ -60,6 +61,13 @@ typedef struct hu_slack_ctx {
     struct {
         char session_key[128];
         char content[4096];
+        char chat_id[128];
+        char guid[96];
+        char reply_to_guid[96];
+        bool is_group;
+        bool has_attachment;
+        int64_t message_id;
+        int64_t timestamp_sec;
     } mock_msgs[8];
     size_t mock_count;
 #endif
@@ -1262,6 +1270,14 @@ hu_error_t hu_slack_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_lo
         for (size_t i = 0; i < n; i++) {
             memcpy(msgs[i].session_key, ctx->mock_msgs[i].session_key, 128);
             memcpy(msgs[i].content, ctx->mock_msgs[i].content, 4096);
+            memcpy(msgs[i].chat_id, ctx->mock_msgs[i].chat_id, sizeof(msgs[i].chat_id));
+            memcpy(msgs[i].guid, ctx->mock_msgs[i].guid, sizeof(msgs[i].guid));
+            memcpy(msgs[i].reply_to_guid, ctx->mock_msgs[i].reply_to_guid,
+                   sizeof(msgs[i].reply_to_guid));
+            msgs[i].is_group = ctx->mock_msgs[i].is_group;
+            msgs[i].has_attachment = ctx->mock_msgs[i].has_attachment;
+            msgs[i].message_id = ctx->mock_msgs[i].message_id;
+            msgs[i].timestamp_sec = ctx->mock_msgs[i].timestamp_sec;
         }
         *out_count = n;
         ctx->mock_count = 0;
@@ -1390,6 +1406,32 @@ hu_error_t hu_slack_poll(void *channel_ctx, hu_allocator_t *alloc, hu_channel_lo
                 ct_len = SLACK_CONTENT_MAX;
             memcpy(msgs[cnt].content, text, ct_len);
             msgs[cnt].content[ct_len] = '\0';
+
+            /* Slack channels are group contexts by default */
+            msgs[cnt].is_group = true;
+            memcpy(msgs[cnt].chat_id, ch_id, sk_len);
+            msgs[cnt].chat_id[sk_len] = '\0';
+
+            /* Timestamp from Slack ts (Unix epoch with fractional part) */
+            if (ts) {
+                double ts_val = strtod(ts, NULL);
+                msgs[cnt].timestamp_sec = (int64_t)ts_val;
+            }
+
+            /* Thread reply context */
+            const char *thread_ts = hu_json_get_string(msg, "thread_ts");
+            if (thread_ts) {
+                size_t tl = strlen(thread_ts);
+                if (tl > 95) tl = 95;
+                memcpy(msgs[cnt].reply_to_guid, thread_ts, tl);
+                msgs[cnt].reply_to_guid[tl] = '\0';
+            }
+
+            /* Attachments / files */
+            hu_json_value_t *files = hu_json_object_get(msg, "files");
+            if (files && files->type == HU_JSON_ARRAY && files->data.array.len > 0)
+                msgs[cnt].has_attachment = true;
+
             cnt++;
         }
         hu_json_free(alloc, parsed);
@@ -1427,6 +1469,54 @@ const char *hu_slack_test_get_last_message(hu_channel_t *ch, size_t *out_len) {
     if (out_len)
         *out_len = c->last_message_len;
     return c->last_message;
+}
+
+hu_error_t hu_slack_test_inject_mock_full(hu_channel_t *ch, const char *session_key,
+                                           size_t session_key_len, const char *content,
+                                           size_t content_len,
+                                           const hu_slack_test_msg_opts_t *opts) {
+    if (!ch || !ch->ctx || !opts)
+        return HU_ERR_INVALID_ARGUMENT;
+    hu_slack_ctx_t *c = (hu_slack_ctx_t *)ch->ctx;
+    if (c->mock_count >= 8)
+        return HU_ERR_OUT_OF_MEMORY;
+    size_t i = c->mock_count++;
+    memset(&c->mock_msgs[i], 0, sizeof(c->mock_msgs[i]));
+
+    size_t sk = session_key_len > 127 ? 127 : session_key_len;
+    if (session_key && sk > 0)
+        memcpy(c->mock_msgs[i].session_key, session_key, sk);
+    c->mock_msgs[i].session_key[sk] = '\0';
+
+    size_t ct = content_len > 4095 ? 4095 : content_len;
+    if (content && ct > 0)
+        memcpy(c->mock_msgs[i].content, content, ct);
+    c->mock_msgs[i].content[ct] = '\0';
+
+    c->mock_msgs[i].is_group = opts->is_group;
+    c->mock_msgs[i].has_attachment = opts->has_attachment;
+    c->mock_msgs[i].message_id = opts->message_id;
+    c->mock_msgs[i].timestamp_sec = opts->timestamp_sec;
+
+    if (opts->chat_id) {
+        size_t cl = strlen(opts->chat_id);
+        if (cl > 127) cl = 127;
+        memcpy(c->mock_msgs[i].chat_id, opts->chat_id, cl);
+        c->mock_msgs[i].chat_id[cl] = '\0';
+    }
+    if (opts->guid) {
+        size_t gl = strlen(opts->guid);
+        if (gl > 95) gl = 95;
+        memcpy(c->mock_msgs[i].guid, opts->guid, gl);
+        c->mock_msgs[i].guid[gl] = '\0';
+    }
+    if (opts->reply_to_guid) {
+        size_t rl = strlen(opts->reply_to_guid);
+        if (rl > 95) rl = 95;
+        memcpy(c->mock_msgs[i].reply_to_guid, opts->reply_to_guid, rl);
+        c->mock_msgs[i].reply_to_guid[rl] = '\0';
+    }
+    return HU_OK;
 }
 #endif
 
