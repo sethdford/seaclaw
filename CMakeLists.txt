@@ -894,43 +894,42 @@ if(HU_ENABLE_APPLE_INTELLIGENCE)
     list(APPEND HU_CORE_SOURCES src/providers/apple.c)
 endif()
 
-# Persona system (~138 KB; disable for minimal/embedded builds)
-if(HU_ENABLE_PERSONA)
-    list(APPEND HU_CORE_SOURCES
-        src/persona/persona.c
-        src/persona/examples.c
-        src/persona/sampler.c
-        src/persona/analyzer.c
-        src/persona/creator.c
-        src/persona/cli.c
-        src/persona/feedback.c
-        src/persona/replay.c
-        src/persona/circadian.c
-        src/persona/temporal.c
-        src/persona/relationship.c
-        src/persona/auto_profile.c
-        src/persona/auto_tune.c
-        src/persona/voice_maturity.c
-        src/persona/style_clone.c
-        src/persona/training.c
-        src/persona/life_sim.c
-        src/persona/mood.c
-        src/persona/style_learner.c
-        src/persona/micro_expression.c
-        src/persona/creative_voice.c
-        src/persona/genuine_boundaries.c
-        src/tools/persona.c
-        src/context/theory_of_mind.c
-        src/context/self_awareness.c
-        src/context/anticipatory.c
-        src/context/protective.c
-        src/context/humor.c
-        src/context/social_graph.c
-        src/memory/degradation.c
-        src/memory/opinions.c
-        src/memory/life_chapters.c
-    )
-endif()
+# Persona system — always-on since v2026.4.0 (agent core references persona
+# symbols unconditionally).  ~138 KB added to release binary.
+list(APPEND HU_CORE_SOURCES
+    src/persona/persona.c
+    src/persona/examples.c
+    src/persona/sampler.c
+    src/persona/analyzer.c
+    src/persona/creator.c
+    src/persona/cli.c
+    src/persona/feedback.c
+    src/persona/replay.c
+    src/persona/circadian.c
+    src/persona/temporal.c
+    src/persona/relationship.c
+    src/persona/auto_profile.c
+    src/persona/auto_tune.c
+    src/persona/voice_maturity.c
+    src/persona/style_clone.c
+    src/persona/training.c
+    src/persona/life_sim.c
+    src/persona/mood.c
+    src/persona/style_learner.c
+    src/persona/micro_expression.c
+    src/persona/creative_voice.c
+    src/persona/genuine_boundaries.c
+    src/tools/persona.c
+    src/context/theory_of_mind.c
+    src/context/self_awareness.c
+    src/context/anticipatory.c
+    src/context/protective.c
+    src/context/humor.c
+    src/context/social_graph.c
+    src/memory/degradation.c
+    src/memory/opinions.c
+    src/memory/life_chapters.c
+)
 
 # Authentic existence (Phase 9: cognitive load, authentic)
 if(HU_ENABLE_AUTHENTIC)
@@ -939,15 +938,9 @@ if(HU_ENABLE_AUTHENTIC)
         src/context/authentic.c
     )
 endif()
-# authentic.c also needed when PERSONA is ON (add if not already from AUTHENTIC)
-if(HU_ENABLE_PERSONA AND NOT HU_ENABLE_AUTHENTIC)
+# authentic.c needed by persona (add if not already from AUTHENTIC)
+if(NOT HU_ENABLE_AUTHENTIC)
     list(APPEND HU_CORE_SOURCES src/context/authentic.c)
-endif()
-
-# context/anticipatory.c is persona-gated above, but daemon.c calls it under
-# HU_ENABLE_SQLITE without persona — ensure it's linked when SQLite is on.
-if(HU_ENABLE_SQLITE AND NOT HU_ENABLE_PERSONA)
-    list(APPEND HU_CORE_SOURCES src/context/anticipatory.c)
 endif()
 
 # Browser automation tools
@@ -1247,9 +1240,7 @@ endif()
 if(HU_ENABLE_FEEDS)
     target_compile_definitions(human_core PRIVATE HU_ENABLE_FEEDS=1)
 endif()
-if(HU_ENABLE_PERSONA)
-    target_compile_definitions(human_core PUBLIC HU_HAS_PERSONA=1)
-endif()
+target_compile_definitions(human_core PUBLIC HU_HAS_PERSONA=1)
 if(HU_ENABLE_CARTESIA)
     target_compile_definitions(human_core PRIVATE HU_ENABLE_CARTESIA=1)
 endif()
@@ -1800,21 +1791,7 @@ if(NOT HU_ENABLE_CRON)
         src/tools/cron_run.c src/tools/cron_runs.c src/tools/cron_update.c
         src/tools/schedule.c)
 endif()
-if(NOT HU_ENABLE_PERSONA)
-    list(APPEND HU_TEST_EXTRA_MODULES
-        src/persona/persona.c src/persona/examples.c src/persona/sampler.c
-        src/persona/analyzer.c src/persona/creator.c src/persona/cli.c src/persona/feedback.c
-        src/persona/replay.c src/persona/circadian.c src/persona/relationship.c
-        src/persona/auto_profile.c src/persona/auto_tune.c src/persona/voice_maturity.c
-        src/persona/style_clone.c src/persona/life_sim.c src/persona/mood.c
-        src/persona/style_learner.c src/persona/micro_expression.c src/persona/creative_voice.c
-        src/persona/genuine_boundaries.c src/tools/persona.c
-        src/context/theory_of_mind.c src/context/self_awareness.c src/context/anticipatory.c
-        src/context/protective.c src/context/humor.c src/context/social_graph.c
-        src/context/authentic.c
-        src/memory/degradation.c src/memory/opinions.c src/memory/life_chapters.c
-        src/memory/rag_pipeline.c src/persona/training.c)
-endif()
+# Persona sources are always in HU_CORE_SOURCES since v2026.4.0
 if(NOT HU_ENABLE_APPLE_INTELLIGENCE)
     list(APPEND HU_TEST_EXTRA_MODULES src/providers/apple.c)
 endif()
@@ -1856,9 +1833,7 @@ endif()
 if(HU_ENABLE_CARTESIA)
     target_compile_definitions(human_core_test PRIVATE HU_ENABLE_CARTESIA=1)
 endif()
-if(HU_ENABLE_PERSONA)
-    target_compile_definitions(human_core_test PRIVATE HU_ENABLE_PERSONA=1)
-endif()
+target_compile_definitions(human_core_test PRIVATE HU_ENABLE_PERSONA=1)
 # Tests always have all module groups available
 target_compile_definitions(human_core_test PRIVATE HU_HAS_PERIPHERALS=1 HU_HAS_TUNNELS=1 HU_HAS_RUNTIME_EXOTIC=1 HU_HAS_TOOLS_BROWSER=1 HU_HAS_TOOLS_ADVANCED=1 HU_HAS_OTEL=1 HU_HAS_CRON=1 HU_HAS_PUSH=1 HU_HAS_UPDATE=1 HU_HAS_SKILLS=1 HU_HAS_PERSONA=1 HU_ENABLE_ML=1)
 target_compile_options(human_core_test PRIVATE -UNDEBUG)
@@ -2332,9 +2307,7 @@ if(HU_ENABLE_FEEDS)
     list(APPEND HU_TEST_SOURCES tests/test_google_feeds.c tests/test_music_feeds.c
         tests/test_research_feeds.c tests/test_research_executor.c)
 endif()
-if(HU_ENABLE_PERSONA)
-    list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c tests/test_persona_feedback.c tests/test_persona_cli.c tests/test_voice_maturity.c tests/test_style_learner.c tests/test_temporal.c tests/test_inner_world.c)
-endif()
+list(APPEND HU_TEST_SOURCES tests/test_persona.c tests/test_circadian.c tests/test_relationship.c tests/test_replay.c tests/test_style_clone.c tests/test_life_sim.c tests/test_persona_mood.c tests/test_persona_feedback.c tests/test_persona_cli.c tests/test_voice_maturity.c tests/test_style_learner.c tests/test_temporal.c tests/test_inner_world.c)
 list(APPEND HU_TEST_SOURCES tests/test_cartesia.c)
 list(APPEND HU_TEST_SOURCES tests/test_cartesia_stream.c)
 list(APPEND HU_TEST_SOURCES tests/test_voice_clone.c)
@@ -2460,9 +2433,7 @@ endif()
 if(HU_ENABLE_COREML)
     target_compile_definitions(human_tests PRIVATE HU_ENABLE_COREML=1)
 endif()
-if(HU_ENABLE_PERSONA)
-    target_compile_definitions(human_tests PRIVATE HU_ENABLE_PERSONA=1)
-endif()
+target_compile_definitions(human_tests PRIVATE HU_ENABLE_PERSONA=1)
 if(HU_ENABLE_CARTESIA)
     target_compile_definitions(human_tests PRIVATE HU_ENABLE_CARTESIA=1)
 endif()

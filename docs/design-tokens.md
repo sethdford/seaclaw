@@ -31,14 +31,14 @@ Auto-generated from W3C token files in `design-tokens/`.
 | `--hu-accent-tertiary-text` | #7496c4 | #324a73 |
 | `--hu-accent-text` | #8DC63F | #3a6a24 |
 | `--hu-backdrop-overlay` | rgba(0, 0, 0, 0.6) | rgba(0, 0, 0, 0.3) |
-| `--hu-bg` | #0c0a08 | #F4F1EE |
-| `--hu-bg-elevated` | #28231e | #F9F7F4 |
-| `--hu-bg-inset` | #141210 | #EBE7E3 |
-| `--hu-bg-overlay` | #332d26 | #FFFEFA |
-| `--hu-bg-surface` | #1e1a16 | #FFFEFA |
+| `--hu-bg` | #0c0a08 | #F5F5F3 |
+| `--hu-bg-elevated` | #28231e | #FAFAF8 |
+| `--hu-bg-inset` | #141210 | #EDEDEB |
+| `--hu-bg-overlay` | #332d26 | #FFFFFF |
+| `--hu-bg-surface` | #1e1a16 | #FFFFFF |
 | `--hu-bg-warm` | — | #FAF8F6 |
-| `--hu-border` | #3e372f | #D8D2CC |
-| `--hu-border-subtle` | #28231e | #E6E1DB |
+| `--hu-border` | #3e372f | #DCDAD8 |
+| `--hu-border-subtle` | #28231e | #E8E6E3 |
 | `--hu-disabled-overlay` | rgba(252, 248, 242, 0.04) | rgba(0, 0, 0, 0.04) |
 | `--hu-dragged-overlay` | rgba(255, 255, 255, 0.16) | rgba(0, 0, 0, 0.14) |
 | `--hu-error` | #f97066 | #CC0000 |
@@ -58,11 +58,11 @@ Auto-generated from W3C token files in `design-tokens/`.
 | `--hu-pressed-overlay` | rgba(255, 255, 255, 0.12) | rgba(0, 0, 0, 0.10) |
 | `--hu-success` | #10b981 | #008000 |
 | `--hu-success-dim` | rgba(16, 185, 129, 0.15) | rgba(0, 128, 0, 0.08) |
-| `--hu-surface-bright` | #42392e | #fffefa |
-| `--hu-surface-container` | #1f1c19 | #f9f7f4 |
-| `--hu-surface-container-high` | #2a2621 | #f0ede9 |
-| `--hu-surface-container-highest` | #35302a | #e9e5e0 |
-| `--hu-surface-dim` | #080604 | #e6e2de |
+| `--hu-surface-bright` | #42392e | #ffffff |
+| `--hu-surface-container` | #1f1c19 | #f8f8f6 |
+| `--hu-surface-container-high` | #2a2621 | #f0eeed |
+| `--hu-surface-container-highest` | #35302a | #e8e7e4 |
+| `--hu-surface-dim` | #080604 | #e5e4e1 |
 | `--hu-text` | #ddd8d3 | #2D2A26 |
 | `--hu-text-faint` | #56504a | #9A9490 |
 | `--hu-text-muted` | #8a847e | #6B655E |
@@ -109,16 +109,16 @@ Auto-generated from W3C token files in `design-tokens/`.
 | Token | Value |
 |-------|-------|
 | `--hu-font-mono` | 'Geist Mono', ui-monospace, 'SF Mono', monospace |
-| `--hu-font` | 'Avenir', 'Avenir Next', -apple-system, BlinkMacSystemFont, system-ui, sans-serif |
-| `--hu-text-2xl` | clamp(1.25rem, 3vw, 1.75rem) |
-| `--hu-text-2xs` | 0.625rem |
-| `--hu-text-3xl` | clamp(1.5rem, 4vw, 2.25rem) |
-| `--hu-text-base` | 0.875rem |
+| `--hu-font` | 'Avenir', 'Avenir Next', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif |
+| `--hu-text-2xl` | clamp(1.5rem, 3vw, 2rem) |
+| `--hu-text-2xs` | 0.6875rem |
+| `--hu-text-3xl` | clamp(1.75rem, 4vw, 2.5rem) |
+| `--hu-text-base` | 1rem |
 | `--hu-text-hero` | clamp(2rem, 5vw, 3.5rem) |
-| `--hu-text-lg` | 1rem |
-| `--hu-text-sm` | 0.8125rem |
-| `--hu-text-xl` | 1.25rem |
-| `--hu-text-xs` | 0.6875rem |
+| `--hu-text-lg` | clamp(1.125rem, 1.5vw, 1.25rem) |
+| `--hu-text-sm` | 0.875rem |
+| `--hu-text-xl` | clamp(1.375rem, 2vw, 1.625rem) |
+| `--hu-text-xs` | 0.75rem |
 | `--hu-weight-black` | 900 |
 | `--hu-weight-bold` | 700 |
 | `--hu-weight-light` | 300 |
@@ -177,14 +177,14 @@ Auto-generated from W3C token files in `design-tokens/`.
 
 | Token | Value |
 |-------|-------|
-| `--hu-badge-font-size` | 0.6875rem |
+| `--hu-badge-font-size` | 0.75rem |
 | `--hu-badge-font-weight` | 500 |
 | `--hu-badge-padding-x` | 0.5rem |
 | `--hu-badge-padding-y` | 0.25rem |
 | `--hu-badge-radius` | 9999px |
-| `--hu-button-font-size` | 0.8125rem |
+| `--hu-button-font-size` | 0.875rem |
 | `--hu-button-font-weight` | 500 |
-| `--hu-button-min-height` | 36px |
+| `--hu-button-min-height` | 44px |
 | `--hu-button-padding-x` | 1rem |
 | `--hu-button-padding-y` | 0.5rem |
 | `--hu-button-radius` | 8px |
@@ -201,4 +201,4 @@ Auto-generated from W3C token files in `design-tokens/`.
 
 ---
 
-_Generated: 2026-03-23T10:58:14Z_
+_Generated: 2026-04-11T15:58:37Z_

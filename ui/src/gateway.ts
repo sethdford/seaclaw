@@ -213,7 +213,7 @@ export class GatewayClient extends EventTarget {
     const payload =
       data instanceof ArrayBuffer
         ? data
-        : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+        : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     this.#ws.send(payload);
   }
 

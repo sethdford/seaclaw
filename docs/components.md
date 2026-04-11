@@ -43,6 +43,16 @@ Auto-generated from `ui/src/components/`
 
 ---
 
+## `<hu-agent-graph>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `agents` | Array | |
+
+---
+
 ## `<hu-animated-icon>`
 
 ### Properties
@@ -67,6 +77,36 @@ Auto-generated from `ui/src/components/`
 | `suffix` | String | |
 | `prefix` | String | |
 | `private` | unknown | |
+
+---
+
+## `<hu-animated-value>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `value` | Number | |
+| `format` | String | |
+| `prefix` | String | |
+| `suffix` | String | |
+| `currency` | String | |
+| `showDelta` | Boolean | |
+| `duration` | Number | |
+| `private` | unknown | |
+| `private` | unknown | |
+
+---
+
+## `<hu-approval-gate>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `gateId` | unknown | |
+| `description` | unknown | |
+| `status` | unknown | |
 
 ---
 
@@ -95,6 +135,7 @@ ArtifactViewerType | |
 | `language` | String | |
 | `diffMode` | Boolean | |
 | `previousContent` | String | |
+| `artifactId` | String | |
 
 ---
 
@@ -198,6 +239,51 @@ ArtifactViewerType | |
 
 ---
 
+## `<hu-canvas-editor>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `content` | String | |
+| `format` | String | |
+| `readonly` | Boolean | |
+| `private` | unknown | |
+
+---
+
+## `<hu-canvas-sandbox>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `content` | String | |
+| `format` | String | |
+| `imports` | Object | |
+| `language` | String | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+
+---
+
+## `<hu-canvas>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `title` | String | |
+| `content` | String | |
+| `format` | String | |
+| `imports` | Object | |
+| `language` | String | |
+| `private` | unknown | |
+
+---
+
 ## `<hu-card>`
 
 ### Properties
@@ -209,7 +295,7 @@ ArtifactViewerType | |
 | `accent` | Boolean | |
 | `elevated` | Boolean | |
 | `glass` | Boolean | |
-| `solid` | Boolean | |
+| `ariaLabelAttr` | String | |
 | `tilt` | Boolean | |
 | `mesh` | Boolean | |
 | `chromatic` | Boolean | |
@@ -218,6 +304,7 @@ ArtifactViewerType | |
 
 ### Slots
 
+- `default`
 - `default`
 
 ---
@@ -252,6 +339,8 @@ ArtifactViewerType | |
 | `ariaMessageOrdinal` | Number | |
 | `ariaMessageTotal` | Number | |
 | `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
 
 ### Slots
 
@@ -275,6 +364,12 @@ ArtifactViewerType | |
 | `model` | String | |
 | `voiceActive` | Boolean | |
 | `voiceSupported` | Boolean | |
+| `thinkingEnabled` | Boolean | |
+| `researchEnabled` | Boolean | |
+| `activeMemories` | Number | |
+| `models` | Array | |
+| `persona` | String | |
+| `personas` | Array | |
 | `private` | unknown | |
 | `private` | unknown | |
 | `private` | unknown | |
@@ -320,7 +415,12 @@ ArtifactViewerType | |
 | Property | Type | Default |
 |----------|------|---------|
 | `sessions` | Array | |
+| `projects` | Array | |
 | `open` | Boolean | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
 | `private` | unknown | |
 | `private` | unknown | |
 
@@ -351,6 +451,8 @@ ArtifactViewerType | |
 | `code` | String | |
 | `language` | String | |
 | `onCopy` | Object | |
+| `private` | unknown | |
+| `private` | unknown | |
 | `private` | unknown | |
 | `private` | unknown | |
 | `private` | unknown | |
@@ -450,6 +552,10 @@ ArtifactViewerType | |
 | Property | Type | Default |
 |----------|------|---------|
 | `status` | String | |
+| `errorType` | String | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
 
 ---
 
@@ -586,7 +692,9 @@ ArtifactViewerType | |
 | Property | Type | Default |
 |----------|------|---------|
 | `src` | String | |
+| `alt` | String | |
 | `open` | Boolean | |
+| `private` | unknown | |
 | `private` | unknown | |
 | `private` | unknown | |
 | `private` | unknown | |
@@ -663,6 +771,19 @@ ArtifactViewerType | |
 
 ---
 
+## `<hu-memory-event>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `action` | String | |
+| `key` | String | |
+| `value` | String | |
+| `private` | unknown | |
+
+---
+
 ## `<hu-message-actions.test>`
 
 ### Properties
@@ -681,6 +802,8 @@ ArtifactViewerType | |
 | `role` | String | |
 | `content` | String | |
 | `index` | Number | |
+| `newlySent` | Boolean | |
+| `private` | unknown | |
 | `private` | unknown | |
 
 ---
@@ -739,6 +862,7 @@ ArtifactViewerType | |
 | `loadingEarlier` | Boolean | |
 | `suggestions` | Array | |
 | `artifacts` | Array | |
+| `private` | unknown | |
 | `private` | unknown | |
 | `private` | unknown | |
 | `private` | unknown | |
@@ -822,6 +946,19 @@ ArtifactViewerType | |
 
 ---
 
+## `<hu-persona-selector>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `value` | String | |
+| `personas` | Array | |
+| `private` | unknown | |
+| `private` | unknown | |
+
+---
+
 ## `<hu-popover>`
 
 ### Properties
@@ -853,6 +990,23 @@ ArtifactViewerType | |
 
 ---
 
+## `<hu-radial-gauge>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `value` | Number | |
+| `max` | Number | |
+| `unit` | String | |
+| `label` | String | |
+| `glass` | Boolean | |
+| `thresholds` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+
+---
+
 ## `<hu-radio>`
 
 ### Properties
@@ -878,6 +1032,35 @@ ArtifactViewerType | |
 | `streaming` | Boolean | |
 | `duration` | String | |
 | `collapsed` | Boolean | |
+| `private` | unknown | |
+| `private` | unknown | |
+
+---
+
+## `<hu-ring-progress>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `rings` | unknown | |
+| `size` | Number | |
+| `strokeWidth` | Number | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+
+---
+
+## `<hu-sankey>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `nodes` | unknown | |
+| `links` | unknown | |
+| `private` | unknown | |
 
 ---
 
@@ -937,6 +1120,7 @@ ArtifactViewerType | |
 | `options` | Array | |
 | `disabled` | Boolean | |
 | `size` | String | |
+| `ariaLabel` | String | |
 
 ---
 
@@ -1227,6 +1411,22 @@ ArtifactViewerType | |
 
 ---
 
+## `<hu-timeline-chart>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `bars` | unknown | |
+| `today` | String | |
+| `rowHeight` | Number | |
+| `paddingLeft` | Number | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+
+---
+
 ## `<hu-timeline>`
 
 ### Properties
@@ -1257,7 +1457,13 @@ ArtifactViewerType | |
 | `tool` | String | |
 | `status` | String | |
 | `content` | String | |
+| `input` | String | |
 | `collapsed` | Boolean | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
 
 ---
 
@@ -1287,6 +1493,21 @@ ArtifactViewerType | |
 
 ---
 
+## `<hu-voice-clone>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+| `private` | unknown | |
+
+---
+
 ## `<hu-voice-conversation>`
 
 ### Properties
@@ -1307,6 +1528,19 @@ ArtifactViewerType | |
 | `state` | String | |
 | `audioLevel` | Number | |
 | `disabled` | Boolean | |
+
+---
+
+## `<hu-web-search-result>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `query` | String | |
+| `sites` | Array | |
+| `sources` | Array | |
+| `private` | unknown | |
 
 ---
 
@@ -1334,5 +1568,31 @@ ArtifactViewerType | |
 
 ---
 
+## `<hu-workflow-timeline>`
 
-_91 components documented. Generated: 2026-03-23T10:58:27Z_
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `events` | Array | |
+| `workflowId` | unknown | |
+| `status` | unknown | |
+
+---
+
+## `<hu-workflow-view>`
+
+### Properties
+
+| Property | Type | Default |
+|----------|------|---------|
+| `workflowId` | unknown | |
+| `status` | unknown | |
+| `events` | Array | |
+| `agents` | Array | |
+| `approvalGates` | Array | |
+
+---
+
+
+_107 components documented. Generated: 2026-04-11T15:58:50Z_
