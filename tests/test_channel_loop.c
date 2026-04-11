@@ -281,6 +281,63 @@ static void test_channel_loop_touch_null_safe(void) {
     hu_channel_loop_touch(NULL);
 }
 
+/* ── Metadata zero-initialization ─────────────────────────────────────── */
+
+static int metadata_dispatch_count;
+static hu_channel_loop_msg_t metadata_last_msgs[2];
+
+static hu_error_t poll_with_metadata(void *ctx, hu_allocator_t *alloc, hu_channel_loop_msg_t *msgs,
+                                     size_t max_msgs, size_t *out_count) {
+    (void)ctx;
+    (void)alloc;
+    if (max_msgs < 1) {
+        *out_count = 0;
+        return HU_OK;
+    }
+    memcpy(&metadata_last_msgs[0], &msgs[0], sizeof(msgs[0]));
+    strncpy(msgs[0].session_key, "user1", sizeof(msgs[0].session_key) - 1);
+    strncpy(msgs[0].content, "test", sizeof(msgs[0].content) - 1);
+    *out_count = 1;
+    return HU_OK;
+}
+
+static hu_error_t metadata_dispatch(void *ctx, const char *session_key, const char *content,
+                                    char **response_out) {
+    (void)ctx;
+    (void)session_key;
+    (void)content;
+    *response_out = NULL;
+    metadata_dispatch_count++;
+    return HU_OK;
+}
+
+static void test_channel_loop_tick_zeros_msg_buffer(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_loop_state_t state;
+    hu_channel_loop_state_init(&state);
+    metadata_dispatch_count = 0;
+    memset(metadata_last_msgs, 0xFF, sizeof(metadata_last_msgs));
+    hu_channel_loop_ctx_t ctx = {
+        .alloc = &alloc,
+        .channel_ctx = NULL,
+        .agent_ctx = (void *)1,
+        .poll_fn = poll_with_metadata,
+        .dispatch_fn = metadata_dispatch,
+    };
+    int processed = 0;
+    hu_error_t err = hu_channel_loop_tick(&ctx, &state, &processed);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(processed, 1);
+    HU_ASSERT_EQ(metadata_last_msgs[0].is_group, false);
+    HU_ASSERT_EQ(metadata_last_msgs[0].message_id, 0);
+    HU_ASSERT_EQ(metadata_last_msgs[0].has_attachment, false);
+    HU_ASSERT_EQ(metadata_last_msgs[0].has_video, false);
+    HU_ASSERT_EQ(metadata_last_msgs[0].timestamp_sec, 0);
+    HU_ASSERT_EQ(metadata_last_msgs[0].chat_id[0], '\0');
+    HU_ASSERT_EQ(metadata_last_msgs[0].guid[0], '\0');
+    HU_ASSERT_EQ(metadata_last_msgs[0].reply_to_guid[0], '\0');
+}
+
 void run_channel_loop_tests(void) {
     HU_TEST_SUITE("channel_loop");
     HU_RUN_TEST(test_channel_loop_state_init);
@@ -300,4 +357,5 @@ void run_channel_loop_tests(void) {
     HU_RUN_TEST(test_channel_loop_tick_poll_error_propagates);
     HU_RUN_TEST(test_channel_loop_request_stop_null_safe);
     HU_RUN_TEST(test_channel_loop_touch_null_safe);
+    HU_RUN_TEST(test_channel_loop_tick_zeros_msg_buffer);
 }

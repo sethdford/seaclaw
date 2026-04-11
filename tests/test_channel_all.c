@@ -385,6 +385,99 @@ static void test_slack_human_active_recently_false(void) {
     HU_ASSERT(!ch.vtable->human_active_recently(ch.ctx, "C0001", 5, 3600));
     hu_slack_destroy(&ch);
 }
+
+/* ─── Slack mock-full tests ─────────────────────────────────────────────── */
+static void test_slack_mock_full_group_sets_is_group(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "xoxb-test", 9, &ch);
+    hu_slack_test_msg_opts_t opts = {0};
+    opts.is_group = true;
+    opts.chat_id = "C0001ABCDEF";
+    opts.message_id = 1234567890;
+    opts.timestamp_sec = 1700000000;
+    opts.has_attachment = true;
+    hu_error_t err = hu_slack_test_inject_mock_full(&ch, "C0001ABCDEF", 11, "hello group", 11, &opts);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    err = hu_slack_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 1);
+    HU_ASSERT(msgs[0].is_group);
+    HU_ASSERT_STR_EQ(msgs[0].chat_id, "C0001ABCDEF");
+    HU_ASSERT_EQ(msgs[0].message_id, 1234567890);
+    HU_ASSERT_EQ(msgs[0].timestamp_sec, 1700000000);
+    HU_ASSERT(msgs[0].has_attachment);
+    hu_slack_destroy(&ch);
+}
+
+static void test_slack_mock_full_reply_and_guid(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "xoxb-test", 9, &ch);
+    hu_slack_test_msg_opts_t opts = {0};
+    opts.guid = "1700000000.000100";
+    opts.reply_to_guid = "1699999999.000001";
+    hu_error_t err = hu_slack_test_inject_mock_full(&ch, "C0001", 5, "reply", 5, &opts);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    err = hu_slack_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 1);
+    HU_ASSERT_STR_EQ(msgs[0].guid, "1700000000.000100");
+    HU_ASSERT_STR_EQ(msgs[0].reply_to_guid, "1699999999.000001");
+    hu_slack_destroy(&ch);
+}
+
+static void test_slack_mock_full_dm_no_group(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "xoxb-test", 9, &ch);
+    hu_slack_test_msg_opts_t opts = {0};
+    opts.is_group = false;
+    hu_error_t err = hu_slack_test_inject_mock_full(&ch, "D0001", 5, "dm", 2, &opts);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    err = hu_slack_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 1);
+    HU_ASSERT(!msgs[0].is_group);
+    HU_ASSERT_STR_EQ(msgs[0].chat_id, "");
+    hu_slack_destroy(&ch);
+}
+
+static void test_slack_mock_full_null_opts_rejected(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "xoxb-test", 9, &ch);
+    hu_error_t err = hu_slack_test_inject_mock_full(&ch, "C0001", 5, "test", 4, NULL);
+    HU_ASSERT_EQ(err, HU_ERR_INVALID_ARGUMENT);
+    hu_slack_destroy(&ch);
+}
+
+static void test_slack_mock_full_timestamp_propagated(void) {
+    hu_allocator_t alloc = hu_system_allocator();
+    hu_channel_t ch;
+    hu_slack_create(&alloc, "xoxb-test", 9, &ch);
+    hu_slack_test_msg_opts_t opts = {0};
+    opts.timestamp_sec = 1712345678;
+    hu_error_t err = hu_slack_test_inject_mock_full(&ch, "C0001", 5, "ts", 2, &opts);
+    HU_ASSERT_EQ(err, HU_OK);
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    size_t count = 0;
+    err = hu_slack_poll(ch.ctx, &alloc, msgs, 4, &count);
+    HU_ASSERT_EQ(err, HU_OK);
+    HU_ASSERT_EQ(count, 1);
+    HU_ASSERT_EQ(msgs[0].timestamp_sec, 1712345678);
+    hu_slack_destroy(&ch);
+}
 #endif
 
 /* ─── WhatsApp ────────────────────────────────────────────────────────────── */
@@ -3140,6 +3233,11 @@ void run_channel_all_tests(void) {
     HU_RUN_TEST(test_slack_load_history_empty_in_test);
     HU_RUN_TEST(test_slack_react_ok_in_test);
     HU_RUN_TEST(test_slack_react_rejects_invalid_args_in_test);
+    HU_RUN_TEST(test_slack_mock_full_group_sets_is_group);
+    HU_RUN_TEST(test_slack_mock_full_reply_and_guid);
+    HU_RUN_TEST(test_slack_mock_full_dm_no_group);
+    HU_RUN_TEST(test_slack_mock_full_null_opts_rejected);
+    HU_RUN_TEST(test_slack_mock_full_timestamp_propagated);
 #endif
     HU_RUN_TEST(test_slack_get_response_constraints);
     HU_RUN_TEST(test_slack_get_attachment_path_null);

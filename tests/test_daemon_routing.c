@@ -115,6 +115,80 @@ static void test_set_threshold_rejects_too_small(void) {
     HU_ASSERT_NOT_NULL(phrase);
 }
 
+/* ── Integration: fully-populated loop_msg metadata ─────────────────── */
+
+static void test_photo_delay_group_msg_with_attachment(void) {
+    hu_channel_loop_msg_t msgs[2];
+    memset(msgs, 0, sizeof(msgs));
+    strncpy(msgs[0].session_key, "C0001ABCDEF", sizeof(msgs[0].session_key) - 1);
+    strncpy(msgs[0].chat_id, "C0001ABCDEF", sizeof(msgs[0].chat_id) - 1);
+    strncpy(msgs[0].content, "check this photo", sizeof(msgs[0].content) - 1);
+    msgs[0].is_group = true;
+    msgs[0].has_attachment = true;
+    msgs[0].timestamp_sec = 1700000000;
+    msgs[0].message_id = 42;
+    uint32_t delay = hu_daemon_compute_photo_delay(msgs, 0, 1, 123);
+    HU_ASSERT(delay >= 3000 && delay <= 8000);
+}
+
+static void test_video_delay_group_msg_with_video(void) {
+    hu_channel_loop_msg_t msgs[2];
+    memset(msgs, 0, sizeof(msgs));
+    strncpy(msgs[0].session_key, "C0001ABCDEF", sizeof(msgs[0].session_key) - 1);
+    strncpy(msgs[0].chat_id, "C0001ABCDEF", sizeof(msgs[0].chat_id) - 1);
+    strncpy(msgs[0].content, "watch this clip", sizeof(msgs[0].content) - 1);
+    msgs[0].is_group = true;
+    msgs[0].has_video = true;
+    msgs[0].timestamp_sec = 1700000000;
+    uint32_t delay = hu_daemon_compute_video_delay(msgs, 0, 1, 0);
+    HU_ASSERT(delay >= 2000 && delay <= 10000);
+}
+
+static void test_photo_delay_dm_no_attachment(void) {
+    hu_channel_loop_msg_t msgs[2];
+    memset(msgs, 0, sizeof(msgs));
+    strncpy(msgs[0].session_key, "D0001", sizeof(msgs[0].session_key) - 1);
+    strncpy(msgs[0].content, "just text", sizeof(msgs[0].content) - 1);
+    msgs[0].is_group = false;
+    msgs[0].has_attachment = false;
+    msgs[0].timestamp_sec = 1700000000;
+    uint32_t delay = hu_daemon_compute_photo_delay(msgs, 0, 1, 0);
+    HU_ASSERT_EQ(delay, 0);
+}
+
+static void test_tapback_worthy_with_group_context(void) {
+    HU_ASSERT_TRUE(hu_daemon_is_tapback_worthy("ok", 2));
+    HU_ASSERT_TRUE(hu_daemon_is_tapback_worthy("lol", 3));
+    HU_ASSERT_FALSE(hu_daemon_is_tapback_worthy("what do you think about this?", 28));
+}
+
+static void test_photo_delay_reply_msg_with_attachment(void) {
+    hu_channel_loop_msg_t msgs[2];
+    memset(msgs, 0, sizeof(msgs));
+    strncpy(msgs[0].session_key, "C0001", sizeof(msgs[0].session_key) - 1);
+    strncpy(msgs[0].chat_id, "C0001", sizeof(msgs[0].chat_id) - 1);
+    strncpy(msgs[0].reply_to_guid, "1699999999.000001", sizeof(msgs[0].reply_to_guid) - 1);
+    strncpy(msgs[0].content, "replying with image", sizeof(msgs[0].content) - 1);
+    msgs[0].is_group = true;
+    msgs[0].has_attachment = true;
+    uint32_t delay = hu_daemon_compute_photo_delay(msgs, 0, 1, 42);
+    HU_ASSERT(delay >= 3000 && delay <= 8000);
+}
+
+static void test_video_delay_batch_mixed_content(void) {
+    hu_channel_loop_msg_t msgs[4];
+    memset(msgs, 0, sizeof(msgs));
+    strncpy(msgs[0].session_key, "user1", sizeof(msgs[0].session_key) - 1);
+    strncpy(msgs[0].content, "text only", sizeof(msgs[0].content) - 1);
+    msgs[0].timestamp_sec = 1700000000;
+    strncpy(msgs[1].session_key, "user1", sizeof(msgs[1].session_key) - 1);
+    strncpy(msgs[1].content, "and a video", sizeof(msgs[1].content) - 1);
+    msgs[1].has_video = true;
+    msgs[1].timestamp_sec = 1700000001;
+    uint32_t delay = hu_daemon_compute_video_delay(msgs, 0, 2, 0);
+    HU_ASSERT(delay >= 2000 && delay <= 10000);
+}
+
 void run_daemon_routing_tests(void) {
     HU_TEST_SUITE("daemon_routing");
 
@@ -141,4 +215,12 @@ void run_daemon_routing_tests(void) {
     HU_RUN_TEST(test_missed_msg_deterministic);
     HU_RUN_TEST(test_set_threshold_changes_behavior);
     HU_RUN_TEST(test_set_threshold_rejects_too_small);
+
+    /* integration: fully-populated metadata */
+    HU_RUN_TEST(test_photo_delay_group_msg_with_attachment);
+    HU_RUN_TEST(test_video_delay_group_msg_with_video);
+    HU_RUN_TEST(test_photo_delay_dm_no_attachment);
+    HU_RUN_TEST(test_tapback_worthy_with_group_context);
+    HU_RUN_TEST(test_photo_delay_reply_msg_with_attachment);
+    HU_RUN_TEST(test_video_delay_batch_mixed_content);
 }
